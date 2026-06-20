@@ -793,8 +793,6 @@ dependencies = [
 [[package]]
 name = "greeners"
 version = "1.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6195e10826f1433126bc5162fa52ef8ae449c26129d190c490f0f386b18bb54a"
 dependencies = [
  "chrono",
  "csv",
