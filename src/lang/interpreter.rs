@@ -56,6 +56,7 @@ pub enum Value {
     ArimaResult(Rc<greeners::ArimaResult>),
     VarResult(Rc<greeners::var::VarResult>),
     VecmResult(Rc<greeners::vecm::VecmResult>),
+    GarchResult(Rc<greeners::GarchResult>),
     Nil,
 }
 
@@ -75,6 +76,7 @@ impl std::fmt::Display for Value {
             Value::ArimaResult(r)  => write!(f, "{r}"),
             Value::VarResult(r)    => write!(f, "{r}"),
             Value::VecmResult(r)   => write!(f, "{r}"),
+            Value::GarchResult(r)  => write!(f, "{r}"),
             Value::Nil             => write!(f, "nil"),
         }
     }
@@ -2084,6 +2086,111 @@ impl Interpreter {
                     let do_chi2 = matches!(opt_map.get("chi2"), Some(Value::Bool(true)));
                     Self::tabulate_two(&df, &var1, &var2, do_chi2)?;
                 }
+
+                Ok(Value::Nil)
+            }
+
+            // ── garch / egarch / gjrgarch ────────────────────────────────────
+            // garch(df, varname, p=1, q=1)
+            // garch(df, varname, p=1, q=1, dist=t)    — erros Student-t
+            // egarch(df, varname, p=1, q=1)
+            // gjrgarch(df, varname, p=1, q=1)
+            "garch" | "egarch" | "gjrgarch" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        format!("{func}() requer df e nome da variável")
+                    ));
+                }
+
+                let df = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(d) => d,
+                    _ => return Err(HayashiError::Type(
+                        format!("{func}(): primeiro argumento deve ser um DataFrame")
+                    )),
+                };
+
+                let col_name = match &args[1] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type(
+                        format!("{func}(): segundo argumento deve ser o nome de uma coluna")
+                    )),
+                };
+
+                let p = match opt_map.get("p") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 1,
+                };
+                let q = match opt_map.get("q") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 1,
+                };
+                let use_t_dist = matches!(
+                    opt_map.get("dist"),
+                    Some(Value::Str(s)) if s == "t"
+                );
+
+                let y = Array1::from(Self::eval_col_expr(&Expr::Var(col_name), &df)?);
+
+                let result = match (func, use_t_dist) {
+                    ("garch",    false) => greeners::GARCH::fit(&y, p, q),
+                    ("garch",    true)  => greeners::GARCH::fit_t(&y, p, q),
+                    ("egarch",   false) => greeners::EGARCH::fit(&y, p, q),
+                    ("egarch",   true)  => greeners::EGARCH::fit_t(&y, p, q),
+                    ("gjrgarch", false) => greeners::GJRGARCH::fit(&y, p, q),
+                    ("gjrgarch", true)  => greeners::GJRGARCH::fit_t(&y, p, q),
+                    _ => unreachable!(),
+                };
+
+                Ok(Value::GarchResult(Rc::new(
+                    result.map_err(|e| HayashiError::Runtime(format!("{func}: {e}")))?
+                )))
+            }
+
+            // forecast_vol(model, steps=10)
+            "forecast_vol" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "forecast_vol() requer um modelo GARCH".into()
+                    ));
+                }
+
+                let model = match self.eval_expr(&args[0])? {
+                    Value::GarchResult(m) => m,
+                    _ => return Err(HayashiError::Type(
+                        "forecast_vol() requer um modelo GARCH/EGARCH/GJRGARCH".into()
+                    )),
+                };
+
+                let steps = match opt_map.get("steps") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 10,
+                };
+
+                let vol = model.forecast_volatility(steps);
+                let model_label = match model.model_type {
+                    greeners::GarchModelType::GARCH    => "GARCH",
+                    greeners::GarchModelType::EGARCH   => "EGARCH",
+                    greeners::GarchModelType::GJRGARCH => "GJR-GARCH",
+                };
+                let dist_label = match model.dist {
+                    greeners::GarchDist::Normal   => "Normal",
+                    greeners::GarchDist::StudentT => "Student-t",
+                };
+
+                let sep = "─".repeat(40);
+                println!("\nForecast de Volatilidade — {model_label}({}, {}) [{dist_label}]  {steps} passos",
+                         model.p, model.q);
+                println!("{sep}");
+                println!("{:<6} {:>14} {:>14}", "h", "var. condicional", "volatilidade");
+                println!("{sep}");
+                for h in 0..steps {
+                    println!("{:<6} {:>14.6} {:>14.6}", h + 1, vol[h], vol[h].sqrt());
+                }
+                println!("{sep}");
+                println!();
 
                 Ok(Value::Nil)
             }
