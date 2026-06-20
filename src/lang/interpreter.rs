@@ -2214,6 +2214,82 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // white(model)
+            // White (1980): H₀: homocedasticidade
+            // Requer modelo OLS — regride u² nos regressores e seus quadrados
+            "white" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("white() requer um modelo OLS".into()));
+                }
+                let ols = match self.eval_expr(&args[0])? {
+                    Value::OlsResult(m) => m,
+                    _ => return Err(HayashiError::Type("white() suporta apenas modelos OLS".into())),
+                };
+
+                let (lm, p, df) = greeners::SpecificationTests::white_test(&ols.residuals, &ols.x)
+                    .map_err(|e| HayashiError::Runtime(format!("white: {e}")))?;
+
+                let sig = |p: f64| if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
+                let sep = "─".repeat(54);
+                println!("\nWhite Test (heteroscedasticidade)");
+                println!("{sep}");
+                println!("H₀: homocedasticidade");
+                println!("{sep}");
+                println!("{:<24} {:>10} {:>10} {:>4}", "Teste", "Estatística", "p-value", "");
+                println!("{sep}");
+                println!("{:<24} {:>10.4} {:>10.4} {:>4}",
+                    format!("LM ~ χ²({df})"), lm, p, sig(p));
+                println!("{sep}");
+                println!("(*** p<0.01  ** p<0.05  * p<0.10)");
+                println!();
+
+                Ok(Value::Nil)
+            }
+
+            // reset(model)
+            // reset(model, power=3)
+            // Ramsey RESET: H₀: especificação linear correta
+            // Requer modelo OLS — adiciona ŷ², ..., ŷ^power como regressores
+            "reset" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("reset() requer um modelo OLS".into()));
+                }
+                let ols = match self.eval_expr(&args[0])? {
+                    Value::OlsResult(m) => m,
+                    _ => return Err(HayashiError::Type("reset() suporta apenas modelos OLS".into())),
+                };
+
+                let power = match opt_map.get("power") {
+                    Some(Value::Int(v))   => (*v as usize).max(2),
+                    Some(Value::Float(v)) => (*v as usize).max(2),
+                    _ => 3,
+                };
+
+                let fitted = ols.result.fitted_values(&ols.x);
+                // y = resíduos + valores ajustados
+                let y = &ols.residuals + &fitted;
+
+                let (f, p, df1, df2) = greeners::SpecificationTests::reset_test(
+                    &y, &ols.x, &fitted, power
+                ).map_err(|e| HayashiError::Runtime(format!("reset: {e}")))?;
+
+                let sig = |p: f64| if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
+                let sep = "─".repeat(54);
+                println!("\nRamsey RESET Test  —  power = {power}");
+                println!("{sep}");
+                println!("H₀: especificação linear correta");
+                println!("{sep}");
+                println!("{:<24} {:>10} {:>10} {:>4}", "Teste", "Estatística", "p-value", "");
+                println!("{sep}");
+                println!("{:<24} {:>10.4} {:>10.4} {:>4}",
+                    format!("F ~ F({df1},{df2})"), f, p, sig(p));
+                println!("{sep}");
+                println!("(*** p<0.01  ** p<0.05  * p<0.10)");
+                println!();
+
+                Ok(Value::Nil)
+            }
+
             // jb(df, varname) | jb(model)
             // Jarque-Bera: H₀: resíduos normalmente distribuídos
             // Aceita série bruta, OLS, ARIMA, GARCH (resíduos padronizados)
