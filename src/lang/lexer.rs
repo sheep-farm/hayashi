@@ -19,6 +19,12 @@ pub enum Token {
     Replace,
     If,
     Count,
+    Tsset,
+
+    // Operadores de série temporal: L.x  L2.x  F.x  D.x
+    TsLag(usize),
+    TsLead(usize),
+    TsDiff(usize),
 
     // Operadores
     Eq,       // =
@@ -141,9 +147,36 @@ impl Lexer {
             "replace"  => Token::Replace,
             "if"       => Token::If,
             "count"    => Token::Count,
+            "tsset"    => Token::Tsset,
             "true"     => Token::Bool(true),
             "false"    => Token::Bool(false),
-            _        => Token::Ident(s),
+            _          => Token::Ident(s),
+        }
+    }
+
+    // Converte Token::Ident("L"/"L2"/"F"/"D" etc.) em TsLag/TsLead/TsDiff
+    // se o próximo char for '.'.  Consome o ponto.
+    fn maybe_ts_op(&mut self, tok: Token) -> Token {
+        let Token::Ident(ref s) = tok else { return tok };
+        let mut chars = s.chars();
+        let first = match chars.next() {
+            Some(c @ ('L' | 'F' | 'D')) => c,
+            _ => return tok,
+        };
+        let rest = chars.as_str();
+        if !rest.is_empty() && !rest.chars().all(|c| c.is_ascii_digit()) {
+            return tok; // ex: "LEVEL" não é operador ts
+        }
+        if self.peek() != Some('.') {
+            return tok;
+        }
+        self.advance(); // consome '.'
+        let n: usize = if rest.is_empty() { 1 } else { rest.parse().unwrap_or(1) };
+        match first {
+            'L' => Token::TsLag(n),
+            'F' => Token::TsLead(n),
+            'D' => Token::TsDiff(n),
+            _   => unreachable!(),
         }
     }
 
@@ -158,7 +191,11 @@ impl Lexer {
                 Some('\n') => tokens.push((Token::Newline, line)),
                 Some('"') => tokens.push((self.read_string()?, line)),
                 Some(c) if c.is_ascii_digit() => tokens.push((self.read_number(c), line)),
-                Some(c) if c.is_alphabetic() || c == '_' => tokens.push((self.read_ident(c), line)),
+                Some(c) if c.is_alphabetic() || c == '_' => {
+                    let tok = self.read_ident(c);
+                    let tok = self.maybe_ts_op(tok);
+                    tokens.push((tok, line));
+                }
                 Some('=') => {
                     if self.peek() == Some('=') { self.advance(); tokens.push((Token::EqEq, line)); }
                     else { tokens.push((Token::Eq, line)); }
