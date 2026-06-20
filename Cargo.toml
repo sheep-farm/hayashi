@@ -1,0 +1,20 @@
+[package]
+name = "hayashi"
+version = "0.1.0"
+edition = "2021"
+description = "An interpreted, statically-typed language for applied econometrics"
+license = "MIT"
+
+[[bin]]
+name = "hayashi"
+path = "src/main.rs"
+
+[dependencies]
+greeners = "1.4"
+ndarray = "0.17"
+thiserror = "2"
+rustyline = "14"
+anyhow = "1"
+dta = "0.6.0"
+ureq = "2"
+tempfile = "3"
