@@ -668,6 +668,249 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── esttab ───────────────────────────────────────────────────────
+            "esttab" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("esttab() requires at least one model".into()));
+                }
+
+                let fmt = match opt_map.get("fmt") {
+                    Some(Value::Str(s)) => s.clone(),
+                    None => "txt".to_string(),
+                    _ => return Err(HayashiError::Type("fmt= must be a string".into())),
+                };
+                let out_path = match opt_map.get("path") {
+                    Some(Value::Str(s)) => Some(s.clone()),
+                    None => None,
+                    _ => return Err(HayashiError::Type("path= must be a string".into())),
+                };
+
+                // (nome_variável, coef, se_opt, pval_opt)
+                type CoefRow = (String, f64, Option<f64>, Option<f64>);
+                // (label, coefs, n_obs)
+                type ModelInfo = (String, Vec<CoefRow>, usize);
+
+                // parseia CSV do OlsResult: variable,coef,se,t,p
+                let parse_csv = |csv: &str| -> Vec<CoefRow> {
+                    let mut rows = Vec::new();
+                    let mut first = true;
+                    for line in csv.lines() {
+                        let line = line.trim();
+                        if line.is_empty() { continue; }
+                        if first { first = false; continue; } // cabeçalho
+                        let f: Vec<&str> = line.splitn(6, ',').collect();
+                        if f.len() >= 5 {
+                            let name = f[0].trim().trim_matches('"').to_string();
+                            let coef = f[1].trim().parse::<f64>().unwrap_or(f64::NAN);
+                            let se   = f[2].trim().parse::<f64>().unwrap_or(f64::NAN);
+                            let p    = f[4].trim().parse::<f64>().unwrap_or(1.0);
+                            rows.push((name, coef, Some(se), Some(p)));
+                        }
+                    }
+                    rows
+                };
+
+                let stars = |p: Option<f64>| match p {
+                    Some(p) if p < 0.01 => "***",
+                    Some(p) if p < 0.05 => "**",
+                    Some(p) if p < 0.10 => "*",
+                    _ => "",
+                };
+
+                let mut models: Vec<ModelInfo> = Vec::new();
+                for arg in args {
+                    let val = self.eval_expr(arg)?;
+                    match val {
+                        Value::OlsResult(m) => {
+                            use greeners::ExportableResult;
+                            let coefs = parse_csv(&m.result.to_csv());
+                            let n = m.residuals.len();
+                            models.push(("OLS".into(), coefs, n));
+                        }
+                        Value::BinaryResult(bm) => {
+                            let label = if bm.kind == "logit" { "Logit" } else { "Probit" }.to_string();
+                            let n = bm.x.nrows();
+                            let coefs: Vec<CoefRow> = bm.coef_names.iter()
+                                .zip(bm.result.params.iter())
+                                .map(|(nm, &c)| (nm.clone(), c, None, None))
+                                .collect();
+                            models.push((label, coefs, n));
+                        }
+                        Value::IvResult(r) => {
+                            let _coefs: Vec<CoefRow> = Vec::new(); // sem acesso direto aos params via API pública
+                            let _ = r; // display via print separado
+                            return Err(HayashiError::Runtime(
+                                "esttab() does not yet support IV models — use print()".into()
+                            ));
+                        }
+                        _ => return Err(HayashiError::Type(
+                            "esttab() supports OLS and binary (logit/probit) models".into()
+                        )),
+                    }
+                }
+
+                // união dos nomes de variáveis na ordem de primeira ocorrência
+                let mut all_vars: Vec<String> = Vec::new();
+                let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+                for (_, coefs, _) in &models {
+                    for (nm, _, _, _) in coefs {
+                        if seen.insert(nm.clone()) { all_vars.push(nm.clone()); }
+                    }
+                }
+
+                let n_models = models.len();
+                let col_w = 16usize;
+                let label_w = all_vars.iter().map(|s| s.len()).max().unwrap_or(8).max(12) + 2;
+                let total_w = label_w + n_models * (col_w + 1);
+
+                // monta conteúdo (txt ou latex)
+                let mut buf = String::new();
+
+                if fmt == "latex" || fmt == "tex" {
+                    buf.push_str("\\begin{tabular}{l");
+                    for _ in 0..n_models { buf.push_str("r"); }
+                    buf.push_str("}\n\\hline\\hline\n");
+                    // cabeçalho
+                    buf.push_str(" &");
+                    for (i, (label, _, _)) in models.iter().enumerate() {
+                        buf.push_str(&format!(" ({}) {}", i + 1, label));
+                        if i + 1 < n_models { buf.push('&'); }
+                    }
+                    buf.push_str(" \\\\\n\\hline\n");
+
+                    for var in &all_vars {
+                        if var == "_cons" { continue; } // _cons vai no final
+                        buf.push_str(&format!("{var}"));
+                        for (_, coefs, _) in &models {
+                            let row = coefs.iter().find(|(nm, _, _, _)| nm == var);
+                            match row {
+                                Some((_, c, _, p)) => buf.push_str(&format!(" & {:.4}{}", c, stars(*p))),
+                                None => buf.push_str(" &"),
+                            }
+                        }
+                        buf.push_str(" \\\\\n");
+                        // SE linha
+                        let has_se = models.iter().any(|(_, coefs, _)|
+                            coefs.iter().find(|(nm, _, _, _)| nm == var)
+                                 .and_then(|(_, _, se, _)| *se).is_some());
+                        if has_se {
+                            buf.push_str(" ");
+                            for (_, coefs, _) in &models {
+                                let row = coefs.iter().find(|(nm, _, _, _)| nm == var);
+                                match row.and_then(|(_, _, se, _)| *se) {
+                                    Some(se) => buf.push_str(&format!(" & ({:.4})", se)),
+                                    None => buf.push_str(" &"),
+                                }
+                            }
+                            buf.push_str(" \\\\\n");
+                        }
+                    }
+                    // _cons no final
+                    if all_vars.iter().any(|v| v == "_cons") {
+                        buf.push_str("Constant");
+                        for (_, coefs, _) in &models {
+                            let row = coefs.iter().find(|(nm, _, _, _)| nm == "_cons");
+                            match row {
+                                Some((_, c, _, p)) => buf.push_str(&format!(" & {:.4}{}", c, stars(*p))),
+                                None => buf.push_str(" &"),
+                            }
+                        }
+                        buf.push_str(" \\\\\n");
+                        let has_se = models.iter().any(|(_, coefs, _)|
+                            coefs.iter().find(|(nm, _, _, _)| nm == "_cons")
+                                 .and_then(|(_, _, se, _)| *se).is_some());
+                        if has_se {
+                            buf.push_str(" ");
+                            for (_, coefs, _) in &models {
+                                let row = coefs.iter().find(|(nm, _, _, _)| nm == "_cons");
+                                match row.and_then(|(_, _, se, _)| *se) {
+                                    Some(se) => buf.push_str(&format!(" & ({:.4})", se)),
+                                    None => buf.push_str(" &"),
+                                }
+                            }
+                            buf.push_str(" \\\\\n");
+                        }
+                    }
+                    buf.push_str("\\hline\nN");
+                    for (_, _, n) in &models { buf.push_str(&format!(" & {n}")); }
+                    buf.push_str(" \\\\\n\\hline\\hline\n\\end{tabular}\n");
+                    buf.push_str("\\footnotesize{* p$<$0.10, ** p$<$0.05, *** p$<$0.01}\n");
+
+                } else {
+                    // ── ASCII txt ─────────────────────────────────────────────
+                    let sep = "─".repeat(total_w);
+
+                    // cabeçalho: numeração
+                    let mut line = format!("{:<lw$}", "", lw = label_w);
+                    for i in 0..n_models { line.push_str(&format!(" {:>cw$}", format!("({})", i + 1), cw = col_w)); }
+                    buf.push_str(&format!("{line}\n"));
+
+                    // cabeçalho: labels
+                    let mut line = format!("{:<lw$}", "", lw = label_w);
+                    for (label, _, _) in &models { line.push_str(&format!(" {:>cw$}", label, cw = col_w)); }
+                    buf.push_str(&format!("{line}\n"));
+                    buf.push_str(&format!("{sep}\n"));
+
+                    let print_var = |var: &str, buf: &mut String| {
+                        // linha de coeficientes
+                        let display_name = if var == "_cons" { "Constant" } else { var };
+                        let mut line = format!("{:<lw$}", display_name, lw = label_w);
+                        for (_, coefs, _) in &models {
+                            let row = coefs.iter().find(|(nm, _, _, _)| nm == var);
+                            match row {
+                                Some((_, c, _, p)) => {
+                                    let s = stars(*p);
+                                    let cell = format!("{:.4}{}", c, s);
+                                    line.push_str(&format!(" {:>cw$}", cell, cw = col_w));
+                                }
+                                None => line.push_str(&format!(" {:>cw$}", "", cw = col_w)),
+                            }
+                        }
+                        buf.push_str(&format!("{line}\n"));
+
+                        // linha de erros padrão
+                        let has_se = models.iter().any(|(_, coefs, _)|
+                            coefs.iter().find(|(nm, _, _, _)| nm == var)
+                                 .and_then(|(_, _, se, _)| *se).is_some());
+                        if has_se {
+                            let mut line = format!("{:<lw$}", "", lw = label_w);
+                            for (_, coefs, _) in &models {
+                                let row = coefs.iter().find(|(nm, _, _, _)| nm == var);
+                                match row.and_then(|(_, _, se, _)| *se) {
+                                    Some(se) => line.push_str(&format!(" {:>cw$}", format!("({:.4})", se), cw = col_w)),
+                                    None      => line.push_str(&format!(" {:>cw$}", "", cw = col_w)),
+                                }
+                            }
+                            buf.push_str(&format!("{line}\n"));
+                        }
+                    };
+
+                    for var in &all_vars {
+                        if var == "_cons" { continue; }
+                        print_var(var, &mut buf);
+                    }
+                    if all_vars.iter().any(|v| v == "_cons") {
+                        print_var("_cons", &mut buf);
+                    }
+
+                    buf.push_str(&format!("{sep}\n"));
+                    let mut line = format!("{:<lw$}", "N", lw = label_w);
+                    for (_, _, n) in &models { line.push_str(&format!(" {:>cw$}", n, cw = col_w)); }
+                    buf.push_str(&format!("{line}\n"));
+                    buf.push_str(&format!("{sep}\n"));
+                    buf.push_str("* p<0.10  ** p<0.05  *** p<0.01\n");
+                }
+
+                if let Some(path) = out_path {
+                    std::fs::write(&path, &buf).map_err(|e| HayashiError::Io(e))?;
+                    println!("Exported table → '{path}'");
+                } else {
+                    print!("\n{buf}");
+                }
+
+                Ok(Value::Nil)
+            }
+
             // ── margins ──────────────────────────────────────────────────────
             "margins" => {
                 if args.is_empty() {
