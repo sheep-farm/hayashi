@@ -2,120 +2,13 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use ndarray::{Array1, Array2};
 use greeners::{DataFrame, Formula as GFormula, OLS, CovarianceType, IV, Logit, Probit, FixedEffects, RandomEffects};
+use greeners::{t_pvalue_two, t_quantile, chi2_pvalue, norm_pdf, logistic};
 use greeners::diagnostics::Diagnostics;
 use greeners::specification_tests::SpecificationTests;
 use crate::lang::ast::*;
 use crate::lang::error::{HayashiError, Result};
 
-// ── Distribuição chi2 (Numerical Recipes — série + fração continuada) ─────────
-
-fn gammln(xx: f64) -> f64 {
-    let coefs = [76.18009172947146_f64, -86.50532032941677, 24.01409824083091,
-                 -1.231739572450155, 1.208650973866179e-3, -5.395239384953e-6];
-    let y = xx;
-    let tmp = xx + 5.5 - (xx + 0.5) * (xx + 5.5).ln();
-    let mut ser = 1.000000000190015_f64;
-    let mut x = y;
-    for c in &coefs { x += 1.0; ser += c / x; }
-    -tmp + (2.5066282746310005 * ser / y).ln()
-}
-
-fn gammp_series(a: f64, x: f64) -> f64 {
-    let mut ap = a;
-    let mut del = 1.0 / a;
-    let mut sum = del;
-    for _ in 0..200 {
-        ap += 1.0; del *= x / ap; sum += del;
-        if del.abs() < sum.abs() * 1e-10 { break; }
-    }
-    sum * (-x + a * x.ln() - gammln(a)).exp()
-}
-
-fn gammq_cf(a: f64, x: f64) -> f64 {
-    let fpmin = 1e-300_f64;
-    let mut b = x + 1.0 - a;
-    let mut c = 1.0 / fpmin;
-    let mut d = 1.0 / b;
-    let mut h = d;
-    for i in 1_i32..=200 {
-        let an = -(i as f64) * (i as f64 - a);
-        b += 2.0;
-        d = an * d + b; if d.abs() < fpmin { d = fpmin; }
-        c = b + an / c; if c.abs() < fpmin { c = fpmin; }
-        d = 1.0 / d;
-        let del = d * c; h *= del;
-        if (del - 1.0).abs() < 1e-10 { break; }
-    }
-    (-x + a * x.ln() - gammln(a)).exp() * h
-}
-
-// ── Distribuição t (via função beta incompleta) ───────────────────────────────
-
-fn betacf(a: f64, b: f64, x: f64) -> f64 {
-    let fpmin = 1e-300_f64;
-    let qab = a + b;
-    let qap = a + 1.0;
-    let qam = a - 1.0;
-    let mut c = 1.0_f64;
-    let mut d = 1.0 - qab * x / qap;
-    if d.abs() < fpmin { d = fpmin; }
-    d = 1.0 / d;
-    let mut h = d;
-    for m in 1_i32..=200 {
-        let m = m as f64;
-        let m2 = 2.0 * m;
-        let aa = m * (b - m) * x / ((qam + m2) * (a + m2));
-        d = 1.0 + aa * d; if d.abs() < fpmin { d = fpmin; }
-        c = 1.0 + aa / c; if c.abs() < fpmin { c = fpmin; }
-        d = 1.0 / d; h *= d * c;
-        let aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
-        d = 1.0 + aa * d; if d.abs() < fpmin { d = fpmin; }
-        c = 1.0 + aa / c; if c.abs() < fpmin { c = fpmin; }
-        d = 1.0 / d;
-        let del = d * c; h *= del;
-        if (del - 1.0).abs() < 1e-10 { break; }
-    }
-    h
-}
-
-fn betai(a: f64, b: f64, x: f64) -> f64 {
-    if x <= 0.0 { return 0.0; }
-    if x >= 1.0 { return 1.0; }
-    let lbeta = gammln(a) + gammln(b) - gammln(a + b);
-    let bt = (a * x.ln() + b * (1.0 - x).ln() - lbeta).exp();
-    if x < (a + 1.0) / (a + b + 2.0) { bt * betacf(a, b, x) / a }
-    else                               { 1.0 - bt * betacf(b, a, 1.0 - x) / b }
-}
-
-fn t_pvalue_two(t: f64, df: f64) -> f64 {
-    betai(df / 2.0, 0.5, df / (df + t * t))
-}
-
-fn t_critical_95(df: f64) -> f64 {
-    // busca binária para t tal que t_pvalue_two(t, df) = 0.05
-    let (mut lo, mut hi) = (0.0_f64, 50.0_f64);
-    for _ in 0..120 {
-        let mid = (lo + hi) / 2.0;
-        if t_pvalue_two(mid, df) > 0.05 { lo = mid; } else { hi = mid; }
-    }
-    (lo + hi) / 2.0
-}
-
-// ── Funções de distribuição normal (para probit margins) ─────────────────────
-
-fn norm_pdf(x: f64) -> f64 {
-    (-0.5 * x * x).exp() / (2.0 * std::f64::consts::PI).sqrt()
-}
-
-fn sigmoid(x: f64) -> f64 { 1.0 / (1.0 + (-x).exp()) }
-
-fn chi2_pvalue(stat: f64, df: usize) -> f64 {
-    // p = Q(df/2, stat/2) = 1 - P(df/2, stat/2)
-    let a = df as f64 / 2.0;
-    let x = stat / 2.0;
-    if x <= 0.0 { return 1.0; }
-    if x < a + 1.0 { 1.0 - gammp_series(a, x) } else { gammq_cf(a, x) }
-}
+fn t_critical_95(df: f64) -> f64 { t_quantile(0.975, df) }
 
 // ── Wrappers que preservam a matriz X para diagnósticos e predict ────────────
 
@@ -942,7 +835,7 @@ impl Interpreter {
 
                 // derivada da CDF em cada observação: dF(η)/dη
                 let deriv: Vec<f64> = eta.iter().map(|&e| match bm.kind.as_str() {
-                    "logit"  => { let p = sigmoid(e); p * (1.0 - p) }
+                    "logit"  => { let p = logistic(e); p * (1.0 - p) }
                     "probit" => norm_pdf(e),
                     _        => 0.0,
                 }).collect();
@@ -2105,7 +1998,7 @@ impl Interpreter {
                 }
             }
             let df = (row_set.len() - 1) * (col_set.len() - 1);
-            let p   = chi2_pvalue(stat, df);
+            let p   = chi2_pvalue(stat, df as f64);
             println!("  Pearson chi2({df}) = {stat:.4}   Pr = {p:.4}");
             println!();
         }
