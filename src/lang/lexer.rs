@@ -18,6 +18,9 @@ pub enum Token {
     Predict,
     Replace,
     If,
+    Else,
+    For,
+    In,
     Count,
     Tsset,
 
@@ -40,17 +43,22 @@ pub enum Token {
     Colon,    // :
     Comma,    // ,
     Dot,      // .
+    DotDot,   // ..
     Bang,     // !
     Lt,       // <
     LtEq,     // <=
     Gt,       // >
     GtEq,     // >=
+    And,      // &&
+    Or,       // ||
 
     // Delimitadores
     LParen,
     RParen,
     LBracket,
     RBracket,
+    LBrace,
+    RBrace,
 
     // Especiais
     Newline,
@@ -70,6 +78,10 @@ impl Lexer {
 
     fn peek(&self) -> Option<char> {
         self.src.get(self.pos).copied()
+    }
+
+    fn peek2(&self) -> Option<char> {
+        self.src.get(self.pos + 1).copied()
     }
 
     fn advance(&mut self) -> Option<char> {
@@ -111,7 +123,8 @@ impl Lexer {
             if c.is_ascii_digit() {
                 s.push(c);
                 self.advance();
-            } else if c == '.' && !is_float {
+            } else if c == '.' && !is_float && self.peek2() != Some('.') {
+                // só consome o ponto se não for ".." (range)
                 is_float = true;
                 s.push(c);
                 self.advance();
@@ -146,6 +159,9 @@ impl Lexer {
             "predict"  => Token::Predict,
             "replace"  => Token::Replace,
             "if"       => Token::If,
+            "else"     => Token::Else,
+            "for"      => Token::For,
+            "in"       => Token::In,
             "count"    => Token::Count,
             "tsset"    => Token::Tsset,
             "true"     => Token::Bool(true),
@@ -168,6 +184,11 @@ impl Lexer {
             return tok; // ex: "LEVEL" não é operador ts
         }
         if self.peek() != Some('.') {
+            return tok;
+        }
+        // não consome se for ".." (range) — ts op precisa de nome após "."
+        // verifica se o char depois de "." é letra ou underscore
+        if self.peek2().map(|c| c == '.').unwrap_or(false) {
             return tok;
         }
         self.advance(); // consome '.'
@@ -212,20 +233,32 @@ impl Lexer {
                     if self.peek() == Some('=') { self.advance(); tokens.push((Token::GtEq, line)); }
                     else { tokens.push((Token::Gt, line)); }
                 }
+                Some('&') => {
+                    if self.peek() == Some('&') { self.advance(); tokens.push((Token::And, line)); }
+                    else { return Err(HayashiError::Lex { line, msg: "use '&&' para 'e' lógico".into() }); }
+                }
+                Some('|') => {
+                    if self.peek() == Some('|') { self.advance(); tokens.push((Token::Or, line)); }
+                    else { tokens.push((Token::Pipe, line)); }
+                }
+                Some('.') => {
+                    if self.peek() == Some('.') { self.advance(); tokens.push((Token::DotDot, line)); }
+                    else { tokens.push((Token::Dot, line)); }
+                }
                 Some('~') => tokens.push((Token::Tilde, line)),
                 Some('+') => tokens.push((Token::Plus, line)),
                 Some('-') => tokens.push((Token::Minus, line)),
                 Some('*') => tokens.push((Token::Star, line)),
                 Some('/') => tokens.push((Token::Slash, line)),
                 Some('^') => tokens.push((Token::Caret, line)),
-                Some('|') => tokens.push((Token::Pipe, line)),
                 Some(':') => tokens.push((Token::Colon, line)),
                 Some(',') => tokens.push((Token::Comma, line)),
-                Some('.') => tokens.push((Token::Dot, line)),
                 Some('(') => tokens.push((Token::LParen, line)),
                 Some(')') => tokens.push((Token::RParen, line)),
                 Some('[') => tokens.push((Token::LBracket, line)),
                 Some(']') => tokens.push((Token::RBracket, line)),
+                Some('{') => tokens.push((Token::LBrace, line)),
+                Some('}') => tokens.push((Token::RBrace, line)),
                 Some(c) => return Err(HayashiError::Lex { line, msg: format!("unexpected character '{c}'") }),
             }
         }

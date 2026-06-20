@@ -21,16 +21,24 @@ pub struct Opt {
     pub value: Expr,
 }
 
-/// Operadores binários para expressões aritméticas/comparação
+/// Operadores binários para expressões aritméticas/comparação/lógica
 #[derive(Debug, Clone)]
 pub enum BinOp {
     Add, Sub, Mul, Div, Pow,
     Gt, Lt, GtEq, LtEq, Eq, Ne,
+    And, Or,
 }
 
 /// Operador de série temporal
 #[derive(Debug, Clone)]
 pub enum TsOpKind { Lag, Lead, Diff }
+
+/// Iterador de loop for
+#[derive(Debug, Clone)]
+pub enum ForIter {
+    Range(Expr, Expr),  // start..end  (exclusivo no topo, tipo Rust/Python)
+    Items(Expr),         // lista ou variável
+}
 
 /// Expressões da linguagem
 #[derive(Debug, Clone)]
@@ -42,11 +50,20 @@ pub enum Expr {
     Var(String),
     Formula(Formula),
 
-    // aritmética / comparação: price * 1.5, mpg > 20
+    // aritmética / comparação / lógica: price * 1.5, mpg > 20, a && b
     BinOp { op: BinOp, lhs: Box<Expr>, rhs: Box<Expr> },
 
     // negação unária: -price
     Neg(Box<Expr>),
+
+    // negação booleana: !flag
+    Not(Box<Expr>),
+
+    // lista literal: [1, 2, 3]  ou  [ols(...), fe(...)]
+    List(Vec<Expr>),
+
+    // indexação: lista[0]
+    Index { obj: Box<Expr>, idx: Box<Expr> },
 
     // chamada de função/estimador: ols(fórmula, df, cov=HC3)
     Call {
@@ -97,6 +114,20 @@ pub enum Stmt {
 
     // tsset df timevar
     Tsset { df: String, t_var: String },
+
+    // if cond { ... } [else if cond { ... }]* [else { ... }]
+    If {
+        cond: Expr,
+        then_body: Vec<Stmt>,
+        else_body: Option<Vec<Stmt>>,
+    },
+
+    // for var in iter { ... }
+    For {
+        var: String,
+        iter: ForIter,
+        body: Vec<Stmt>,
+    },
 
     // expr standalone (ex: test(model, white))
     Expr(Expr),

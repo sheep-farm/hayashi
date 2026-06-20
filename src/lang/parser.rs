@@ -105,10 +105,39 @@ impl Parser {
     }
 
     // ── Expressão aritmética (Pratt parsing) ────────────────────────────────
+    //
+    // Precedência (do menor para o maior):
+    //   or  ||
+    //   and  &&
+    //   comparison  > < >= <= == !=
+    //   additive    + -
+    //   multiplicative  * /
+    //   power       ^
+    //   unary       - !
+    //   primary
 
-    /// Ponto de entrada: expressão com comparações (menor precedência)
     fn parse_expr(&mut self) -> Result<Expr> {
-        self.parse_comparison()
+        self.parse_or()
+    }
+
+    fn parse_or(&mut self) -> Result<Expr> {
+        let mut lhs = self.parse_and()?;
+        while self.peek() == &Token::Or {
+            self.advance();
+            let rhs = self.parse_and()?;
+            lhs = Expr::BinOp { op: BinOp::Or, lhs: Box::new(lhs), rhs: Box::new(rhs) };
+        }
+        Ok(lhs)
+    }
+
+    fn parse_and(&mut self) -> Result<Expr> {
+        let mut lhs = self.parse_comparison()?;
+        while self.peek() == &Token::And {
+            self.advance();
+            let rhs = self.parse_comparison()?;
+            lhs = Expr::BinOp { op: BinOp::And, lhs: Box::new(lhs), rhs: Box::new(rhs) };
+        }
+        Ok(lhs)
     }
 
     fn parse_comparison(&mut self) -> Result<Expr> {
@@ -172,12 +201,35 @@ impl Parser {
     }
 
     fn parse_unary(&mut self) -> Result<Expr> {
-        if self.peek() == &Token::Minus {
-            self.advance();
-            let inner = self.parse_primary()?;
-            return Ok(Expr::Neg(Box::new(inner)));
+        match self.peek() {
+            Token::Minus => {
+                self.advance();
+                let inner = self.parse_primary()?;
+                Ok(Expr::Neg(Box::new(inner)))
+            }
+            Token::Bang => {
+                self.advance();
+                let inner = self.parse_primary()?;
+                Ok(Expr::Not(Box::new(inner)))
+            }
+            _ => self.parse_postfix(),
         }
-        self.parse_primary()
+    }
+
+    // Postfix: lida com v[idx] após parse_primary
+    fn parse_postfix(&mut self) -> Result<Expr> {
+        let mut expr = self.parse_primary()?;
+        loop {
+            if self.peek() == &Token::LBracket {
+                self.advance();
+                let idx = self.parse_expr()?;
+                self.expect(&Token::RBracket)?;
+                expr = Expr::Index { obj: Box::new(expr), idx: Box::new(idx) };
+            } else {
+                break;
+            }
+        }
+        Ok(expr)
     }
 
     fn parse_primary(&mut self) -> Result<Expr> {
@@ -194,6 +246,18 @@ impl Parser {
                 let inner = self.parse_expr()?;
                 self.expect(&Token::RParen)?;
                 Ok(inner)
+            }
+
+            // Lista literal: [e1, e2, ...]
+            Token::LBracket => {
+                self.advance();
+                let mut items = Vec::new();
+                while !matches!(self.peek(), Token::RBracket | Token::Eof | Token::Newline) {
+                    items.push(self.parse_expr()?);
+                    if self.peek() == &Token::Comma { self.advance(); }
+                }
+                self.expect(&Token::RBracket)?;
+                Ok(Expr::List(items))
             }
 
             // Fórmula sem LHS: ~ z1 + z2
@@ -272,15 +336,13 @@ impl Parser {
                         self.advance();
                         Expr::Str(kw)
                     } else {
-                        // opções numéricas usam aritmética completa
                         self.parse_expr()?
                     };
                     opts.push(Opt { name, value: val });
                 } else {
-                    // Dentro de call args, fórmulas contêm '+' que não deve ser
-                    // interpretado como adição — usamos parse_primary aqui.
-                    // Só promovemos para parse_expr em contextos claramente aritméticos
-                    // (ex: dentro do generate).
+                    // parse_primary dentro de args para evitar que '+' de fórmula
+                    // y ~ x1 + x2 seja interpretado como adição antes de checar '~'.
+                    // A fórmula é consumida inteira em parse_primary quando vê '~'.
                     args.push(self.parse_primary()?);
                 }
             } else {
@@ -290,6 +352,36 @@ impl Parser {
             if self.peek() == &Token::Comma { self.advance(); }
         }
         Ok((args, opts))
+    }
+
+    // ── Bloco { stmt* } ───────────────────────────────────────────────────────
+
+    fn parse_block(&mut self) -> Result<Vec<Stmt>> {
+        self.expect(&Token::LBrace)?;
+        self.skip_newlines();
+        let mut stmts = Vec::new();
+        while !matches!(self.peek(), Token::RBrace | Token::Eof) {
+            if let Some(s) = self.parse_stmt()? {
+                stmts.push(s);
+            }
+            self.skip_newlines();
+        }
+        self.expect(&Token::RBrace)?;
+        Ok(stmts)
+    }
+
+    // ── Iterador do for ────────────────────────────────────────────────────────
+    // Aceita:  start..end   (Range)   ou   expr   (Items — lista/var)
+
+    fn parse_for_iter(&mut self) -> Result<ForIter> {
+        let start = self.parse_expr()?;
+        if self.peek() == &Token::DotDot {
+            self.advance();
+            let end = self.parse_expr()?;
+            Ok(ForIter::Range(start, end))
+        } else {
+            Ok(ForIter::Items(start))
+        }
     }
 
     // ── Statement ────────────────────────────────────────────────────────────
@@ -404,6 +496,45 @@ impl Parser {
                 let df    = self.expect_ident()?;
                 let t_var = self.expect_ident()?;
                 Ok(Some(Stmt::Tsset { df, t_var }))
+            }
+
+            // ── if cond { ... } [else [if cond] { ... }] ─────────────────────
+            Token::If => {
+                self.advance();
+                let cond = self.parse_expr()?;
+                let then_body = self.parse_block()?;
+                // else [if ...]
+                let else_body = if self.peek() == &Token::Else {
+                    self.advance();
+                    if self.peek() == &Token::If {
+                        // else if → parseia como Stmt::If recursivo
+                        let inner = self.parse_stmt()?.ok_or_else(|| HayashiError::Parse {
+                            line, msg: "expected statement after 'else if'".into()
+                        })?;
+                        Some(vec![inner])
+                    } else {
+                        Some(self.parse_block()?)
+                    }
+                } else {
+                    None
+                };
+                Ok(Some(Stmt::If { cond, then_body, else_body }))
+            }
+
+            // ── for var in iter { ... } ───────────────────────────────────────
+            Token::For => {
+                self.advance();
+                let var = self.expect_ident()?;
+                // espera "in"
+                match self.advance().clone() {
+                    Token::In => {}
+                    t => return Err(HayashiError::Parse {
+                        line, msg: format!("expected 'in' after variável do for, got {t:?}")
+                    }),
+                }
+                let iter = self.parse_for_iter()?;
+                let body = self.parse_block()?;
+                Ok(Some(Stmt::For { var, iter, body }))
             }
 
             Token::Ident(_) => {
