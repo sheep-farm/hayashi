@@ -23,6 +23,7 @@ pub enum Token {
     In,
     Count,
     Tsset,
+    While,
 
     // Operadores de série temporal: L.x  L2.x  F.x  D.x
     TsLag(usize),
@@ -164,6 +165,7 @@ impl Lexer {
             "in"       => Token::In,
             "count"    => Token::Count,
             "tsset"    => Token::Tsset,
+            "while"    => Token::While,
             "true"     => Token::Bool(true),
             "false"    => Token::Bool(false),
             _          => Token::Ident(s),

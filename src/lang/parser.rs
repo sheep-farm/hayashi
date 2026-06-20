@@ -537,6 +537,14 @@ impl Parser {
                 Ok(Some(Stmt::For { var, iter, body }))
             }
 
+            // ── while cond { ... } ────────────────────────────────────────────
+            Token::While => {
+                self.advance();
+                let cond = self.parse_expr()?;
+                let body = self.parse_block()?;
+                Ok(Some(Stmt::While { cond, body }))
+            }
+
             Token::Ident(_) => {
                 let expr = self.parse_expr()?;
                 Ok(Some(Stmt::Expr(expr)))
