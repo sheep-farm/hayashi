@@ -101,6 +101,14 @@ fn t_critical_95(df: f64) -> f64 {
     (lo + hi) / 2.0
 }
 
+// ── Funções de distribuição normal (para probit margins) ─────────────────────
+
+fn norm_pdf(x: f64) -> f64 {
+    (-0.5 * x * x).exp() / (2.0 * std::f64::consts::PI).sqrt()
+}
+
+fn sigmoid(x: f64) -> f64 { 1.0 / (1.0 + (-x).exp()) }
+
 fn chi2_pvalue(stat: f64, df: usize) -> f64 {
     // p = Q(df/2, stat/2) = 1 - P(df/2, stat/2)
     let a = df as f64 / 2.0;
@@ -128,6 +136,8 @@ impl std::fmt::Display for OlsModel {
 pub struct BinaryModel {
     pub result: Rc<greeners::discrete::BinaryModelResult>,
     pub x: Array2<f64>,
+    pub kind: String,            // "logit" | "probit"
+    pub coef_names: Vec<String>, // nomes dos coeficientes para margins
 }
 
 impl std::fmt::Display for BinaryModel {
@@ -371,7 +381,8 @@ impl Interpreter {
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let result = Logit::from_formula(&g_formula, &df)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                Ok(Value::BinaryResult(BinaryModel { result: Rc::new(result), x }))
+                let coef_names = Self::coef_names_from_formula(&formula_ast, &df, x.ncols());
+                Ok(Value::BinaryResult(BinaryModel { result: Rc::new(result), x, kind: "logit".into(), coef_names }))
             }
 
             // ── Probit ────────────────────────────────────────────────────────
@@ -384,7 +395,8 @@ impl Interpreter {
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let result = Probit::from_formula(&g_formula, &df)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                Ok(Value::BinaryResult(BinaryModel { result: Rc::new(result), x }))
+                let coef_names = Self::coef_names_from_formula(&formula_ast, &df, x.ncols());
+                Ok(Value::BinaryResult(BinaryModel { result: Rc::new(result), x, kind: "probit".into(), coef_names }))
             }
 
             // ── Fixed Effects ─────────────────────────────────────────────────
@@ -653,6 +665,63 @@ impl Interpreter {
                     );
                 }
                 println!();
+                Ok(Value::Nil)
+            }
+
+            // ── margins ──────────────────────────────────────────────────────
+            "margins" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "margins() requires a logit or probit model".into(),
+                    ));
+                }
+                let model = self.eval_expr(&args[0])?;
+                let bm = match model {
+                    Value::BinaryResult(m) => m,
+                    _ => return Err(HayashiError::Type(
+                        "margins() requires a logit or probit model".into(),
+                    )),
+                };
+
+                let n = bm.x.nrows();
+                let k = bm.x.ncols();
+                let beta = &bm.result.params;
+
+                if beta.len() != k {
+                    return Err(HayashiError::Runtime(
+                        format!("coefficient count mismatch: {} params vs {} x cols", beta.len(), k)
+                    ));
+                }
+
+                // preditor linear η = Xβ para cada observação
+                let eta: Vec<f64> = (0..n).map(|i| bm.x.row(i).dot(beta)).collect();
+
+                // derivada da CDF em cada observação: dF(η)/dη
+                let deriv: Vec<f64> = eta.iter().map(|&e| match bm.kind.as_str() {
+                    "logit"  => { let p = sigmoid(e); p * (1.0 - p) }
+                    "probit" => norm_pdf(e),
+                    _        => 0.0,
+                }).collect();
+
+                // AME_k = (1/n) Σ_i [deriv_i * β_k]
+                // — para _cons não faz sentido reportar, pulamos (índice 0)
+                let sep = "─".repeat(46);
+                println!("\nAverage Marginal Effects — {}", bm.kind);
+                println!("{sep}");
+                println!("{:<20}  {:>12}", "Variable", "dy/dx");
+                println!("{sep}");
+
+                for k_idx in 0..k {
+                    let name = bm.coef_names.get(k_idx).map(String::as_str).unwrap_or("?");
+                    if name == "_cons" { continue; }
+                    let ame: f64 = deriv.iter().map(|&d| d * beta[k_idx]).sum::<f64>() / n as f64;
+                    println!("{:<20}  {:>12.6}", name, ame);
+                }
+
+                println!("{sep}");
+                println!("n = {n}   Model: {}", bm.kind);
+                println!();
+
                 Ok(Value::Nil)
             }
 
@@ -1521,6 +1590,34 @@ impl Interpreter {
             _ => return Err(HayashiError::Runtime("panel estimator requires id=column_name".into())),
         };
         Ok((formula_ast, df, id_col))
+    }
+
+    // ── Nomes dos coeficientes a partir da fórmula ────────────────────────────
+
+    fn coef_names_from_formula(formula_ast: &Formula, df: &DataFrame, n_cols: usize) -> Vec<String> {
+        let mut names: Vec<String> = vec!["_cons".into()];
+        for term in &formula_ast.rhs {
+            match term {
+                RhsTerm::Var(v)              => names.push(v.clone()),
+                RhsTerm::Transform(fn_, v)   => names.push(format!("{fn_}({v})")),
+                RhsTerm::Interaction(a, b)   => names.push(format!("{a}:{b}")),
+                RhsTerm::Categorical(v) => {
+                    let raw = Self::col_to_strings(df, v).unwrap_or_default();
+                    let mut unique: Vec<String> = raw.into_iter()
+                        .collect::<std::collections::HashSet<_>>().into_iter().collect();
+                    if unique.iter().all(|s| s.parse::<f64>().is_ok()) {
+                        unique.sort_by(|a, b| a.parse::<f64>().unwrap()
+                            .partial_cmp(&b.parse::<f64>().unwrap()).unwrap());
+                    } else { unique.sort(); }
+                    for val in unique.into_iter().skip(1) {
+                        names.push(format!("{v}={val}"));
+                    }
+                }
+            }
+        }
+        names.truncate(n_cols);
+        while names.len() < n_cols { names.push(format!("x{}", names.len() + 1)); }
+        names
     }
 
     // ── Extrai coluna como Vec<String> (para tabulate) ────────────────────────
