@@ -49,6 +49,58 @@ fn gammq_cf(a: f64, x: f64) -> f64 {
     (-x + a * x.ln() - gammln(a)).exp() * h
 }
 
+// ── Distribuição t (via função beta incompleta) ───────────────────────────────
+
+fn betacf(a: f64, b: f64, x: f64) -> f64 {
+    let fpmin = 1e-300_f64;
+    let qab = a + b;
+    let qap = a + 1.0;
+    let qam = a - 1.0;
+    let mut c = 1.0_f64;
+    let mut d = 1.0 - qab * x / qap;
+    if d.abs() < fpmin { d = fpmin; }
+    d = 1.0 / d;
+    let mut h = d;
+    for m in 1_i32..=200 {
+        let m = m as f64;
+        let m2 = 2.0 * m;
+        let aa = m * (b - m) * x / ((qam + m2) * (a + m2));
+        d = 1.0 + aa * d; if d.abs() < fpmin { d = fpmin; }
+        c = 1.0 + aa / c; if c.abs() < fpmin { c = fpmin; }
+        d = 1.0 / d; h *= d * c;
+        let aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
+        d = 1.0 + aa * d; if d.abs() < fpmin { d = fpmin; }
+        c = 1.0 + aa / c; if c.abs() < fpmin { c = fpmin; }
+        d = 1.0 / d;
+        let del = d * c; h *= del;
+        if (del - 1.0).abs() < 1e-10 { break; }
+    }
+    h
+}
+
+fn betai(a: f64, b: f64, x: f64) -> f64 {
+    if x <= 0.0 { return 0.0; }
+    if x >= 1.0 { return 1.0; }
+    let lbeta = gammln(a) + gammln(b) - gammln(a + b);
+    let bt = (a * x.ln() + b * (1.0 - x).ln() - lbeta).exp();
+    if x < (a + 1.0) / (a + b + 2.0) { bt * betacf(a, b, x) / a }
+    else                               { 1.0 - bt * betacf(b, a, 1.0 - x) / b }
+}
+
+fn t_pvalue_two(t: f64, df: f64) -> f64 {
+    betai(df / 2.0, 0.5, df / (df + t * t))
+}
+
+fn t_critical_95(df: f64) -> f64 {
+    // busca binária para t tal que t_pvalue_two(t, df) = 0.05
+    let (mut lo, mut hi) = (0.0_f64, 50.0_f64);
+    for _ in 0..120 {
+        let mid = (lo + hi) / 2.0;
+        if t_pvalue_two(mid, df) > 0.05 { lo = mid; } else { hi = mid; }
+    }
+    (lo + hi) / 2.0
+}
+
 fn chi2_pvalue(stat: f64, df: usize) -> f64 {
     // p = Q(df/2, stat/2) = 1 - P(df/2, stat/2)
     let a = df as f64 / 2.0;
@@ -601,6 +653,153 @@ impl Interpreter {
                     );
                 }
                 println!();
+                Ok(Value::Nil)
+            }
+
+            // ── ttest ────────────────────────────────────────────────────────
+            "ttest" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("ttest() requires a DataFrame".into()));
+                }
+                let df = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(d) => d,
+                    _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())),
+                };
+
+                let get_finite = |df: &DataFrame, col: &str| -> Result<Vec<f64>> {
+                    use greeners::Column;
+                    match df.get_column(col) {
+                        Ok(Column::Float(a)) => Ok(a.iter().filter(|x| x.is_finite()).copied().collect()),
+                        Ok(Column::Int(a))   => Ok(a.iter().map(|&x| x as f64).collect()),
+                        _ => Err(HayashiError::Type(format!("'{col}' is not numeric"))),
+                    }
+                };
+
+                let stats = |v: &[f64]| -> (f64, f64, f64) { // (mean, sd, n)
+                    let n = v.len() as f64;
+                    let m = v.iter().sum::<f64>() / n;
+                    let s = if n > 1.0 { (v.iter().map(|x| (x - m).powi(2)).sum::<f64>() / (n - 1.0)).sqrt() } else { f64::NAN };
+                    (m, s, n)
+                };
+
+                // ── um argumento variável → uni-amostral ou por grupo ─────────
+                if args.len() >= 2 {
+                    let var1 = match &args[1] {
+                        Expr::Var(n) | Expr::Str(n) => n.clone(),
+                        _ => return Err(HayashiError::Type("variable name must be an identifier".into())),
+                    };
+
+                    // ── PAREADO: ttest(df, v1, v2, paired=true) ──────────────
+                    if args.len() >= 3 && matches!(opt_map.get("paired"), Some(Value::Bool(true))) {
+                        let var2 = match &args[2] {
+                            Expr::Var(n) | Expr::Str(n) => n.clone(),
+                            _ => return Err(HayashiError::Type("variable name must be an identifier".into())),
+                        };
+                        let v1 = get_finite(&df, &var1)?;
+                        let v2 = get_finite(&df, &var2)?;
+                        if v1.len() != v2.len() {
+                            return Err(HayashiError::Runtime("paired ttest requires equal-length columns".into()));
+                        }
+                        let diff: Vec<f64> = v1.iter().zip(&v2).map(|(a, b)| a - b).collect();
+                        let (m, s, n) = stats(&diff);
+                        let se = s / n.sqrt();
+                        let t  = m / se;
+                        let df_t = n - 1.0;
+                        let p  = t_pvalue_two(t, df_t);
+                        let tc = t_critical_95(df_t);
+                        println!("\nPaired t-test: {var1} - {var2}");
+                        println!("{}", "─".repeat(62));
+                        println!("{:<14} {:>6}  {:>10}  {:>10}  {:>10}", "Variable", "Obs", "Mean", "Std. Err.", "[95% CI]");
+                        println!("{}", "─".repeat(62));
+                        println!("{:<14} {:>6.0}  {:>10.4}  {:>10.4}  [{:.4}, {:.4}]",
+                                 format!("{var1}-{var2}"), n, m, se, m - tc * se, m + tc * se);
+                        println!("{}", "─".repeat(62));
+                        println!("H0: mean(diff) = 0   t = {t:.4}   df = {df_t:.0}   p = {p:.4}");
+                        println!();
+
+                    // ── DOIS GRUPOS: ttest(df, var, by=group) ────────────────
+                    } else if let Some(Value::Str(by_col)) = opt_map.get("by") {
+                        let by_col = by_col.clone();
+                        let vals   = get_finite(&df, &var1)?;
+                        let groups = Self::col_to_strings(&df, &by_col)?;
+
+                        let mut group_data: HashMap<String, Vec<f64>> = HashMap::new();
+                        for (i, g) in groups.iter().enumerate() {
+                            group_data.entry(g.clone()).or_default().push(vals[i]);
+                        }
+                        let mut gkeys: Vec<String> = group_data.keys().cloned().collect();
+                        if gkeys.len() != 2 {
+                            return Err(HayashiError::Runtime(
+                                format!("two-sample ttest requires exactly 2 groups, got {}", gkeys.len())
+                            ));
+                        }
+                        let all_num = gkeys.iter().all(|s| s.parse::<f64>().is_ok());
+                        if all_num { gkeys.sort_by(|a, b| a.parse::<f64>().unwrap().partial_cmp(&b.parse::<f64>().unwrap()).unwrap()); }
+                        else       { gkeys.sort(); }
+
+                        let v1 = &group_data[&gkeys[0]];
+                        let v2 = &group_data[&gkeys[1]];
+                        let (m1, s1, n1) = stats(v1);
+                        let (m2, s2, n2) = stats(v2);
+
+                        // Welch's t
+                        let se1sq = s1 * s1 / n1;
+                        let se2sq = s2 * s2 / n2;
+                        let se    = (se1sq + se2sq).sqrt();
+                        let t     = (m1 - m2) / se;
+                        let df_t  = (se1sq + se2sq).powi(2) /
+                                    (se1sq.powi(2) / (n1 - 1.0) + se2sq.powi(2) / (n2 - 1.0));
+                        let p     = t_pvalue_two(t, df_t);
+                        let tc    = t_critical_95(df_t);
+
+                        println!("\nTwo-sample t-test (Welch): {var1} by {by_col}");
+                        println!("{}", "─".repeat(68));
+                        println!("{:<10} {:>6}  {:>10}  {:>10}  {:>10}  {:>10}", "Group", "Obs", "Mean", "Std. Err.", "Std. Dev.", "[95% CI]");
+                        println!("{}", "─".repeat(68));
+                        for (g, m, s, n, se_g) in [
+                            (&gkeys[0], m1, s1, n1, (s1*s1/n1).sqrt()),
+                            (&gkeys[1], m2, s2, n2, (s2*s2/n2).sqrt()),
+                        ] {
+                            println!("{:<10} {:>6.0}  {:>10.4}  {:>10.4}  {:>10.4}  [{:.4}, {:.4}]",
+                                     g, n, m, se_g, s, m - tc * se_g, m + tc * se_g);
+                        }
+                        println!("{}", "─".repeat(68));
+                        println!("diff = mean({}) - mean({})", gkeys[0], gkeys[1]);
+                        println!("H0: diff = 0   Welch's t = {t:.4}   df = {df_t:.2}   p = {p:.4}");
+                        println!();
+
+                    // ── UNI-AMOSTRAL: ttest(df, var, mu=0) ───────────────────
+                    } else {
+                        let mu = match opt_map.get("mu") {
+                            Some(Value::Float(f)) => *f,
+                            Some(Value::Int(i))   => *i as f64,
+                            None => 0.0,
+                            _ => return Err(HayashiError::Type("mu= must be numeric".into())),
+                        };
+                        let v    = get_finite(&df, &var1)?;
+                        let (m, s, n) = stats(&v);
+                        let se   = s / n.sqrt();
+                        let t    = (m - mu) / se;
+                        let df_t = n - 1.0;
+                        let p    = t_pvalue_two(t, df_t);
+                        let tc   = t_critical_95(df_t);
+
+                        println!("\nOne-sample t-test: {var1}   H0: mean = {mu}");
+                        println!("{}", "─".repeat(62));
+                        println!("{:<14} {:>6}  {:>10}  {:>10}  {:>10}", "Variable", "Obs", "Mean", "Std. Err.", "[95% CI]");
+                        println!("{}", "─".repeat(62));
+                        println!("{:<14} {:>6.0}  {:>10.4}  {:>10.4}  [{:.4}, {:.4}]",
+                                 var1, n, m, se, m - tc * se, m + tc * se);
+                        println!("{}", "─".repeat(62));
+                        println!("t = {t:.4}   df = {df_t:.0}   p = {p:.4}");
+                        println!();
+                    }
+                } else {
+                    return Err(HayashiError::Runtime(
+                        "ttest() requires a variable name as second argument".into(),
+                    ));
+                }
+
                 Ok(Value::Nil)
             }
 
