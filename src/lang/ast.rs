@@ -82,6 +82,9 @@ pub enum Stmt {
     // export(expr, formato, "arquivo")
     Export { value: Expr, fmt: String, path: Expr },
 
+    // replace df varname = expr [if cond]
+    Replace { df: String, varname: String, expr: Expr, cond: Option<Expr> },
+
     // expr standalone (ex: test(model, white))
     Expr(Expr),
 }

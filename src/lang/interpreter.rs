@@ -7,6 +7,56 @@ use greeners::specification_tests::SpecificationTests;
 use crate::lang::ast::*;
 use crate::lang::error::{HayashiError, Result};
 
+// ── Distribuição chi2 (Numerical Recipes — série + fração continuada) ─────────
+
+fn gammln(xx: f64) -> f64 {
+    let coefs = [76.18009172947146_f64, -86.50532032941677, 24.01409824083091,
+                 -1.231739572450155, 1.208650973866179e-3, -5.395239384953e-6];
+    let y = xx;
+    let tmp = xx + 5.5 - (xx + 0.5) * (xx + 5.5).ln();
+    let mut ser = 1.000000000190015_f64;
+    let mut x = y;
+    for c in &coefs { x += 1.0; ser += c / x; }
+    -tmp + (2.5066282746310005 * ser / y).ln()
+}
+
+fn gammp_series(a: f64, x: f64) -> f64 {
+    let mut ap = a;
+    let mut del = 1.0 / a;
+    let mut sum = del;
+    for _ in 0..200 {
+        ap += 1.0; del *= x / ap; sum += del;
+        if del.abs() < sum.abs() * 1e-10 { break; }
+    }
+    sum * (-x + a * x.ln() - gammln(a)).exp()
+}
+
+fn gammq_cf(a: f64, x: f64) -> f64 {
+    let fpmin = 1e-300_f64;
+    let mut b = x + 1.0 - a;
+    let mut c = 1.0 / fpmin;
+    let mut d = 1.0 / b;
+    let mut h = d;
+    for i in 1_i32..=200 {
+        let an = -(i as f64) * (i as f64 - a);
+        b += 2.0;
+        d = an * d + b; if d.abs() < fpmin { d = fpmin; }
+        c = b + an / c; if c.abs() < fpmin { c = fpmin; }
+        d = 1.0 / d;
+        let del = d * c; h *= del;
+        if (del - 1.0).abs() < 1e-10 { break; }
+    }
+    (-x + a * x.ln() - gammln(a)).exp() * h
+}
+
+fn chi2_pvalue(stat: f64, df: usize) -> f64 {
+    // p = Q(df/2, stat/2) = 1 - P(df/2, stat/2)
+    let a = df as f64 / 2.0;
+    let x = stat / 2.0;
+    if x <= 0.0 { return 1.0; }
+    if x < a + 1.0 { 1.0 - gammp_series(a, x) } else { gammq_cf(a, x) }
+}
+
 // ── Wrappers que preservam a matriz X para diagnósticos e predict ────────────
 
 #[derive(Clone)]
@@ -554,6 +604,228 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── dropna ───────────────────────────────────────────────────────
+            "dropna" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "dropna() requires a DataFrame as first argument".into(),
+                    ));
+                }
+                let df = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(df) => df,
+                    _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())),
+                };
+
+                // colunas a verificar: as listadas ou todas as float
+                let check: Vec<String> = if args.len() > 1 {
+                    args[1..].iter().map(|a| match a {
+                        Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
+                        _ => Err(HayashiError::Type("variable names must be identifiers".into())),
+                    }).collect::<Result<_>>()?
+                } else {
+                    use greeners::Column;
+                    df.column_names().into_iter()
+                        .filter(|n| matches!(df.get_column(n), Ok(Column::Float(_))))
+                        .collect()
+                };
+
+                let n = df.n_rows();
+                let mut keep = vec![true; n];
+
+                for col_name in &check {
+                    use greeners::Column;
+                    if let Ok(Column::Float(arr)) = df.get_column(col_name) {
+                        for (i, &v) in arr.iter().enumerate() {
+                            if v.is_nan() { keep[i] = false; }
+                        }
+                    }
+                }
+
+                let n_drop = keep.iter().filter(|&&k| !k).count();
+                let n_kept = n - n_drop;
+
+                // reconstrói o DataFrame filtrando as linhas
+                let all_names = df.column_names();
+                let mut builder = DataFrame::builder();
+
+                for col_name in &all_names {
+                    use greeners::Column;
+                    match df.get_column(col_name) {
+                        Ok(Column::Float(arr)) => {
+                            let vals: Vec<f64> = arr.iter().enumerate()
+                                .filter(|(i, _)| keep[*i])
+                                .map(|(_, &v)| v)
+                                .collect();
+                            builder = builder.add_column(col_name, vals);
+                        }
+                        Ok(Column::Int(arr)) => {
+                            let vals: Vec<f64> = arr.iter().enumerate()
+                                .filter(|(i, _)| keep[*i])
+                                .map(|(_, &v)| v as f64)
+                                .collect();
+                            builder = builder.add_column(col_name, vals);
+                        }
+                        _ => {
+                            if let Ok(arr) = df.get_string(col_name) {
+                                let vals: Vec<String> = arr.to_vec().into_iter().enumerate()
+                                    .filter(|(i, _)| keep[*i])
+                                    .map(|(_, v)| v)
+                                    .collect();
+                                builder = builder.add_string(col_name, vals);
+                            }
+                        }
+                    }
+                }
+
+                let new_df = builder.build()
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                println!("({n_drop} observations dropped, {n_kept} remaining)");
+                Ok(Value::DataFrame(new_df))
+            }
+
+            // ── rename ───────────────────────────────────────────────────────
+            "rename" => {
+                if args.len() != 3 {
+                    return Err(HayashiError::Runtime(
+                        "rename() requires (dataframe, oldname, newname)".into(),
+                    ));
+                }
+                let df = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(df) => df,
+                    _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())),
+                };
+                let old = match &args[1] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("oldname must be an identifier".into())),
+                };
+                let new = match &args[2] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("newname must be an identifier".into())),
+                };
+
+                let all_names = df.column_names();
+                if !all_names.contains(&old) {
+                    return Err(HayashiError::Runtime(
+                        format!("column '{old}' not found in DataFrame"),
+                    ));
+                }
+
+                let mut builder = DataFrame::builder();
+                for col_name in &all_names {
+                    let out_name = if col_name == &old { &new } else { col_name };
+                    use greeners::Column;
+                    match df.get_column(col_name) {
+                        Ok(Column::Float(arr)) => {
+                            builder = builder.add_column(out_name, arr.to_vec());
+                        }
+                        Ok(Column::Int(arr)) => {
+                            let vals: Vec<f64> = arr.iter().map(|&v| v as f64).collect();
+                            builder = builder.add_column(out_name, vals);
+                        }
+                        _ => {
+                            if let Ok(arr) = df.get_string(col_name) {
+                                builder = builder.add_string(out_name, arr.to_vec());
+                            }
+                        }
+                    }
+                }
+
+                let new_df = builder.build()
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                println!("({old} → {new})");
+                Ok(Value::DataFrame(new_df))
+            }
+
+            // ── drop ─────────────────────────────────────────────────────────
+            "drop" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "drop() requires (dataframe, var1, ...)".into(),
+                    ));
+                }
+                let df = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(df) => df,
+                    _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())),
+                };
+                let drop_names: std::collections::HashSet<String> = args[1..].iter()
+                    .map(|a| match a {
+                        Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
+                        _ => Err(HayashiError::Type("variable names must be identifiers".into())),
+                    })
+                    .collect::<Result<_>>()?;
+
+                let all = df.column_names();
+                let keep: Vec<&str> = all.iter()
+                    .filter(|n| !drop_names.contains(*n))
+                    .map(String::as_str)
+                    .collect();
+
+                let new_df = df.select(&keep)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                println!("({} variables dropped, {} remaining)", drop_names.len(), keep.len());
+                Ok(Value::DataFrame(new_df))
+            }
+
+            // ── keep ──────────────────────────────────────────────────────────
+            "keep" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "keep() requires (dataframe, var1, ...)".into(),
+                    ));
+                }
+                let df = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(df) => df,
+                    _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())),
+                };
+                let keep_names: Vec<String> = args[1..].iter()
+                    .map(|a| match a {
+                        Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
+                        _ => Err(HayashiError::Type("variable names must be identifiers".into())),
+                    })
+                    .collect::<Result<_>>()?;
+
+                let refs: Vec<&str> = keep_names.iter().map(String::as_str).collect();
+                let n_before = df.column_names().len();
+                let new_df = df.select(&refs)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                println!("({} variables kept, {} dropped)", refs.len(), n_before - refs.len());
+                Ok(Value::DataFrame(new_df))
+            }
+
+            // ── tabulate ─────────────────────────────────────────────────────
+            "tabulate" | "tab" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "tabulate() requires (dataframe, varname) or (dataframe, var1, var2)".into(),
+                    ));
+                }
+                let df = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(df) => df,
+                    _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())),
+                };
+                let var1 = match &args[1] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("variable name must be an identifier".into())),
+                };
+
+                if args.len() == 2 {
+                    Self::tabulate_one(&df, &var1)?;
+                } else {
+                    let var2 = match &args[2] {
+                        Expr::Var(n) | Expr::Str(n) => n.clone(),
+                        _ => return Err(HayashiError::Type("variable name must be an identifier".into())),
+                    };
+                    let do_chi2 = matches!(opt_map.get("chi2"), Some(Value::Bool(true)));
+                    Self::tabulate_two(&df, &var1, &var2, do_chi2)?;
+                }
+
+                Ok(Value::Nil)
+            }
+
             other => Err(HayashiError::Runtime(format!("unknown function '{other}'"))),
         }
     }
@@ -587,6 +859,158 @@ impl Interpreter {
             _ => return Err(HayashiError::Runtime("panel estimator requires id=column_name".into())),
         };
         Ok((formula_ast, df, id_col))
+    }
+
+    // ── Extrai coluna como Vec<String> (para tabulate) ────────────────────────
+
+    fn col_to_strings(df: &DataFrame, name: &str) -> Result<Vec<String>> {
+        use greeners::Column;
+        match df.get_column(name) {
+            Ok(Column::Int(arr)) => Ok(arr.iter().map(|x| x.to_string()).collect()),
+            Ok(Column::Float(arr)) => Ok(arr.iter().map(|x| {
+                if x.is_nan() { ".".to_string() }
+                else if x.fract() == 0.0 && x.abs() < 1e14 { format!("{}", *x as i64) }
+                else { format!("{:.4}", x) }
+            }).collect()),
+            _ => df.get_string(name)
+                    .map(|arr| arr.to_vec())
+                    .map_err(|_| HayashiError::Runtime(
+                        format!("column '{name}' not found or has unsupported type for tabulate")
+                    )),
+        }
+    }
+
+    // ── Tabela de frequências (uni-variada) ───────────────────────────────────
+
+    fn tabulate_one(df: &DataFrame, var: &str) -> Result<()> {
+        let vals = Self::col_to_strings(df, var)?;
+        let n = vals.len();
+
+        let mut counts: HashMap<String, usize> = HashMap::new();
+        for v in &vals { *counts.entry(v.clone()).or_insert(0) += 1; }
+
+        let mut unique: Vec<String> = counts.keys().cloned().collect();
+        let all_num = unique.iter().all(|s| s.parse::<f64>().is_ok());
+        if all_num {
+            unique.sort_by(|a, b| {
+                a.parse::<f64>().unwrap().partial_cmp(&b.parse::<f64>().unwrap()).unwrap()
+            });
+        } else {
+            unique.sort();
+        }
+
+        let label_w = var.len().max(12).max(unique.iter().map(|s| s.len()).max().unwrap_or(0)) + 2;
+        let sep = format!("{}-+{}", "-".repeat(label_w), "-".repeat(36));
+
+        println!("\n{:>lw$} | {:>10}  {:>10}  {:>10}", var, "Freq.", "Percent", "Cum.",
+                 lw = label_w);
+        println!("{sep}");
+
+        let mut cum = 0.0_f64;
+        for key in &unique {
+            let freq = counts[key];
+            let pct  = freq as f64 / n as f64 * 100.0;
+            cum += pct;
+            println!("{:>lw$} | {:>10}  {:>10.2}  {:>10.2}", key, freq, pct, cum,
+                     lw = label_w);
+        }
+        println!("{sep}");
+        println!("{:>lw$} | {:>10}  {:>10.2}", "Total", n, 100.0_f64, lw = label_w);
+        println!();
+        Ok(())
+    }
+
+    // ── Tabela cruzada (bi-variada, opcional chi2) ────────────────────────────
+
+    fn tabulate_two(df: &DataFrame, row_var: &str, col_var: &str, do_chi2: bool) -> Result<()> {
+        let rows = Self::col_to_strings(df, row_var)?;
+        let cols = Self::col_to_strings(df, col_var)?;
+
+        if rows.len() != cols.len() {
+            return Err(HayashiError::Runtime("columns have different lengths".into()));
+        }
+
+        // valores únicos, ordenados
+        let sort_strs = |mut v: Vec<String>| -> Vec<String> {
+            let all_num = v.iter().all(|s| s.parse::<f64>().is_ok());
+            if all_num {
+                v.sort_by(|a, b| a.parse::<f64>().unwrap()
+                    .partial_cmp(&b.parse::<f64>().unwrap()).unwrap());
+            } else {
+                v.sort();
+            }
+            v
+        };
+
+        let mut row_set: Vec<String> = rows.iter().cloned().collect::<std::collections::HashSet<_>>().into_iter().collect();
+        row_set = sort_strs(row_set);
+        let mut col_set: Vec<String> = cols.iter().cloned().collect::<std::collections::HashSet<_>>().into_iter().collect();
+        col_set = sort_strs(col_set);
+
+        // contagens
+        let mut cell: HashMap<(String, String), usize> = HashMap::new();
+        for (r, c) in rows.iter().zip(cols.iter()) {
+            *cell.entry((r.clone(), c.clone())).or_insert(0) += 1;
+        }
+
+        let n = rows.len();
+        let col_totals: Vec<usize> = col_set.iter()
+            .map(|c| row_set.iter().map(|r| *cell.get(&(r.clone(), c.clone())).unwrap_or(&0)).sum())
+            .collect();
+        let row_totals: Vec<usize> = row_set.iter()
+            .map(|r| col_set.iter().map(|c| *cell.get(&(r.clone(), c.clone())).unwrap_or(&0)).sum())
+            .collect();
+
+        // larguras de coluna
+        let cell_w   = 10usize;
+        let row_lw   = row_var.len().max(12).max(row_set.iter().map(|s| s.len()).max().unwrap_or(0)) + 2;
+        let col_head_w = col_set.len() * (cell_w + 1) + 1;
+        let total_w  = cell_w + 2;
+
+        // linha de cabeçalho do col_var
+        println!("\n{:>rw$} | {:^chw$}| {:>tw$}",
+                 "", col_var, "Total",
+                 rw = row_lw, chw = col_head_w, tw = total_w);
+
+        // linha com os valores das colunas
+        print!("{:>rw$} |", row_var, rw = row_lw);
+        for cv in &col_set { print!(" {:>cw$}", cv, cw = cell_w); }
+        println!(" | {:>cw$}", "Total", cw = cell_w);
+
+        let sep = format!("{}-+{}-+{}", "-".repeat(row_lw), "-".repeat(col_head_w), "-".repeat(total_w));
+        println!("{sep}");
+
+        for (i, rv) in row_set.iter().enumerate() {
+            print!("{:>rw$} |", rv, rw = row_lw);
+            for cv in &col_set {
+                let cnt = *cell.get(&(rv.clone(), cv.clone())).unwrap_or(&0);
+                print!(" {:>cw$}", cnt, cw = cell_w);
+            }
+            println!(" | {:>cw$}", row_totals[i], cw = cell_w);
+        }
+
+        println!("{sep}");
+        print!("{:>rw$} |", "Total", rw = row_lw);
+        for ct in &col_totals { print!(" {:>cw$}", ct, cw = cell_w); }
+        println!(" | {:>cw$}", n, cw = cell_w);
+        println!();
+
+        if do_chi2 {
+            let mut stat = 0.0_f64;
+            for (i, rv) in row_set.iter().enumerate() {
+                for (j, cv) in col_set.iter().enumerate() {
+                    let obs = *cell.get(&(rv.clone(), cv.clone())).unwrap_or(&0) as f64;
+                    let exp = row_totals[i] as f64 * col_totals[j] as f64 / n as f64;
+                    if exp > 0.0 { stat += (obs - exp).powi(2) / exp; }
+                }
+            }
+            let df = (row_set.len() - 1) * (col_set.len() - 1);
+            let p   = chi2_pvalue(stat, df);
+            println!("  Pearson chi2({df}) = {stat:.4}   Pr = {p:.4}");
+            println!();
+        }
+
+        Ok(())
     }
 
     fn extract_binary_args(&mut self, args: &[Expr]) -> Result<(Formula, DataFrame)> {
@@ -782,6 +1206,39 @@ impl Interpreter {
                 df_val.insert(varname.clone(), arr)
                     .map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
                 println!("({} obs)  {df}.{varname} ({kind}) predicted", df_val.n_rows());
+                self.env.set(df, Value::DataFrame(df_val));
+            }
+
+            Stmt::Replace { df, varname, expr, cond } => {
+                let mut df_val = match self.env.get(df) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(HayashiError::Runtime(format!("'{df}' is not a DataFrame"))),
+                };
+                let new_vals = Self::eval_col_expr(expr, &df_val)?;
+
+                let final_vals: Vec<f64> = if let Some(cond_expr) = cond {
+                    let mask = Self::eval_col_expr(cond_expr, &df_val)?;
+                    // lê coluna original para preservar onde mask == 0
+                    use greeners::Column;
+                    let old_vals: Vec<f64> = match df_val.get_column(varname) {
+                        Ok(Column::Float(arr)) => arr.to_vec(),
+                        Ok(Column::Int(arr))   => arr.iter().map(|&v| v as f64).collect(),
+                        _ => vec![f64::NAN; new_vals.len()],
+                    };
+                    let n_replaced = mask.iter().filter(|&&m| m != 0.0).count();
+                    println!("({n_replaced} real changes made)");
+                    mask.into_iter().zip(old_vals).zip(new_vals)
+                        .map(|((m, old), new)| if m != 0.0 { new } else { old })
+                        .collect()
+                } else {
+                    let n = new_vals.len();
+                    println!("({n} real changes made)");
+                    new_vals
+                };
+
+                let arr = ndarray::Array1::from(final_vals);
+                df_val.insert(varname.clone(), arr)
+                    .map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
                 self.env.set(df, Value::DataFrame(df_val));
             }
 
