@@ -2214,6 +2214,46 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // durbinwatson(model)
+            // Durbin-Watson: detecta autocorrelação de primeira ordem nos resíduos OLS
+            // DW ≈ 2 → sem autocorrelação; DW < 2 → positiva; DW > 2 → negativa
+            "durbinwatson" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "durbinwatson() requer um modelo OLS".into()
+                    ));
+                }
+                let ols = match self.eval_expr(&args[0])? {
+                    Value::OlsResult(m) => m,
+                    _ => return Err(HayashiError::Type(
+                        "durbinwatson() suporta apenas modelos OLS".into()
+                    )),
+                };
+
+                let dw = greeners::Diagnostics::durbin_watson(&ols.residuals);
+
+                let interpretation = if dw < 1.5 {
+                    "autocorrelação positiva provável"
+                } else if dw > 2.5 {
+                    "autocorrelação negativa provável"
+                } else {
+                    "sem autocorrelação evidente"
+                };
+
+                let sep = "─".repeat(50);
+                println!("\nDurbin-Watson Test");
+                println!("{sep}");
+                println!("H₀: sem autocorrelação de primeira ordem");
+                println!("{sep}");
+                println!("{:<18} {:>10}", "DW statistic", format!("{dw:.4}"));
+                println!("{:<18} {:>10}", "Interpretação", interpretation);
+                println!("{sep}");
+                println!("Referência: DW ≈ 2 (sem autocorr.) | <1.5 (positiva) | >2.5 (negativa)");
+                println!();
+
+                Ok(Value::Nil)
+            }
+
             // white(model)
             // White (1980): H₀: homocedasticidade
             // Requer modelo OLS — regride u² nos regressores e seus quadrados
