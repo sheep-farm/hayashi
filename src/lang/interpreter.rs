@@ -381,6 +381,75 @@ impl Interpreter {
                 Ok(Value::ReResult(Rc::new(result)))
             }
 
+            // ── Breusch-Pagan LM test (efeitos individuais em painel) ────────
+            "bplm" => {
+                // bplm(formula, df, id=col)
+                // H₀: sem efeitos individuais (σ²_u = 0) — pooled OLS adequado
+                // H₁: efeitos individuais existem — use FE ou RE
+                let (formula_ast, df, id_col) = self.extract_panel_args(args, &opt_map)?;
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                // OLS pooled para obter resíduos
+                let (y_vec, x_mat) = df.to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let ols = greeners::OLS::fit(
+                    &y_vec,
+                    &x_mat,
+                    greeners::CovarianceType::NonRobust,
+                ).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                let residuals = ols.residuals(&y_vec, &x_mat);
+
+                // IDs de entidade → usize
+                let entity_ids: Vec<usize> = if let Ok(ids) = df.get_int(&id_col) {
+                    ids.iter().map(|&v| v as usize).collect()
+                } else if let Ok(floats) = df.get(&id_col) {
+                    floats.iter().map(|&v| v as usize).collect()
+                } else {
+                    return Err(HayashiError::Runtime(
+                        format!("bplm: coluna '{id_col}' não encontrada ou não usável como ID")
+                    ));
+                };
+
+                let n = residuals.len();
+                let n_entities = {
+                    let mut ids_set = std::collections::HashSet::new();
+                    for &id in &entity_ids { ids_set.insert(id); }
+                    ids_set.len()
+                };
+                let t_bar = n as f64 / n_entities as f64;
+
+                let (lm, p) = greeners::PanelDiagnostics::breusch_pagan_lm(&residuals, &entity_ids)
+                    .map_err(|e| HayashiError::Runtime(e))?;
+
+                let sig = if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
+                let verdict = if p < 0.05 {
+                    "Rejeita H₀ → efeitos individuais presentes (use FE ou RE)"
+                } else {
+                    "Não rejeita H₀ → pooled OLS adequado (sem efeitos individuais)"
+                };
+
+                let thick = "═".repeat(62);
+                let thin  = "─".repeat(62);
+                println!("\n{thick}");
+                println!(" Breusch-Pagan LM Test (efeitos individuais)");
+                println!(" H₀: σ²_u = 0  (sem efeitos individuais)");
+                println!("{thick}");
+                println!("\n── Dados do Painel");
+                println!("   n = {}   N = {}   T̄ ≈ {:.1}", n, n_entities, t_bar);
+                println!("\n── Estatística");
+                println!("   LM ~ χ²(1) = {:.4}   p = {:.4}  {}", lm, p, sig);
+                println!("\n── Conclusão");
+                println!("   {}", verdict);
+                println!("\n{thin}");
+                println!("   *** p<0.01  ** p<0.05  * p<0.10");
+                println!("{thick}\n");
+
+                Ok(Value::Nil)
+            }
+
             // ── Hausman FE vs RE ──────────────────────────────────────────────
             "hausman" => {
                 if args.len() < 2 {
