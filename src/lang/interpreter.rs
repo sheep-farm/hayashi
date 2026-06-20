@@ -381,6 +381,146 @@ impl Interpreter {
                 Ok(Value::ReResult(Rc::new(result)))
             }
 
+            // ── F-test para Efeitos Fixos (FE vs pooled OLS) ─────────────────
+            "ftest_fe" => {
+                // ftest_fe(formula, df, id=col)
+                // H₀: todos os efeitos individuais são zero (pooled OLS adequado)
+                // H₁: efeitos individuais existem (use FE)
+                let (formula_ast, df, id_col) = self.extract_panel_args(args, &opt_map)?;
+                let formula_str = Self::formula_to_string(&formula_ast);
+
+                // FE (within)
+                let formula_no_const = if formula_str.contains("- 1") {
+                    formula_str.clone()
+                } else {
+                    format!("{} - 1", formula_str)
+                };
+                let g_formula_fe = GFormula::parse(&formula_no_const)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                let entity_ids_fe: Vec<i64> = if let Ok(ids) = df.get_int(&id_col) {
+                    ids.to_vec()
+                } else if let Ok(floats) = df.get(&id_col) {
+                    floats.iter().map(|&v| v as i64).collect()
+                } else {
+                    return Err(HayashiError::Runtime(
+                        format!("ftest_fe: coluna '{id_col}' não encontrada")
+                    ));
+                };
+
+                let fe = FixedEffects::from_formula(&g_formula_fe, &df, &entity_ids_fe)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                // Pooled OLS (com intercepto)
+                let g_formula_ols = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_pool, x_pool) = df.to_design_matrix(&g_formula_ols)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let ols = greeners::OLS::fit(&y_pool, &x_pool, greeners::CovarianceType::NonRobust)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                let ssr_pooled = ols.sigma.powi(2) * ols.df_resid as f64;
+                let ssr_fe     = fe.sigma.powi(2) * fe.df_resid as f64;
+                let n          = fe.n_obs;
+                let n_entities = fe.n_entities;
+                let k          = fe.params.len();
+
+                let (f_stat, p) = greeners::PanelDiagnostics::f_test_fixed_effects(
+                    ssr_pooled, ssr_fe, n, n_entities, k
+                ).map_err(|e| HayashiError::Runtime(e))?;
+
+                let df_num   = n_entities - 1;
+                let df_denom = n - n_entities - k;
+                let sig = if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
+                let verdict = if p < 0.05 {
+                    "Rejeita H₀ → efeitos fixos individuais são significativos (use FE)"
+                } else {
+                    "Não rejeita H₀ → pooled OLS adequado (efeitos individuais não significativos)"
+                };
+
+                let thick = "═".repeat(62);
+                let thin  = "─".repeat(62);
+                println!("\n{thick}");
+                println!(" F-test: Efeitos Fixos vs Pooled OLS");
+                println!(" H₀: todos os efeitos individuais são zero");
+                println!("{thick}");
+                println!("\n── Soma dos Quadrados dos Resíduos");
+                println!("   SSR pooled = {:.6}", ssr_pooled);
+                println!("   SSR FE     = {:.6}", ssr_fe);
+                println!("\n── Estatística");
+                println!("   F({}, {}) = {:.4}   p = {:.4}  {}", df_num, df_denom, f_stat, p, sig);
+                println!("\n── Conclusão");
+                println!("   {}", verdict);
+                println!("\n{thin}");
+                println!("   *** p<0.01  ** p<0.05  * p<0.10");
+                println!("{thick}\n");
+
+                Ok(Value::Nil)
+            }
+
+            // ── Pesaran CD: dependência cross-seccional ───────────────────────
+            "pesaran_cd" => {
+                // pesaran_cd(formula, df, id=col)
+                // H₀: resíduos independentes entre entidades (sem dependência cross-seccional)
+                // H₁: dependência cross-seccional presente
+                let (formula_ast, df, id_col) = self.extract_panel_args(args, &opt_map)?;
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                // OLS pooled para resíduos
+                let (y_vec, x_mat) = df.to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let ols = greeners::OLS::fit(&y_vec, &x_mat, greeners::CovarianceType::NonRobust)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let residuals = ols.residuals(&y_vec, &x_mat);
+
+                // IDs de entidade
+                let entity_ids: Vec<usize> = if let Ok(ids) = df.get_int(&id_col) {
+                    ids.iter().map(|&v| v as usize).collect()
+                } else if let Ok(floats) = df.get(&id_col) {
+                    floats.iter().map(|&v| v as usize).collect()
+                } else {
+                    return Err(HayashiError::Runtime(
+                        format!("pesaran_cd: coluna '{id_col}' não encontrada")
+                    ));
+                };
+
+                let n_entities = {
+                    let mut s = std::collections::HashSet::new();
+                    for &id in &entity_ids { s.insert(id); }
+                    s.len()
+                };
+                let t_bar = residuals.len() as f64 / n_entities as f64;
+
+                let (cd, p) = greeners::PanelDiagnostics::pesaran_cd(&residuals, &entity_ids)
+                    .map_err(|e| HayashiError::Runtime(e))?;
+
+                let sig = if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
+                let verdict = if p < 0.05 {
+                    "Rejeita H₀ → dependência cross-seccional presente"
+                } else {
+                    "Não rejeita H₀ → sem evidência de dependência cross-seccional"
+                };
+
+                let thick = "═".repeat(62);
+                let thin  = "─".repeat(62);
+                println!("\n{thick}");
+                println!(" Pesaran CD Test (dependência cross-seccional)");
+                println!(" H₀: ρ_ij = 0 para todo i≠j  (resíduos independentes)");
+                println!("{thick}");
+                println!("\n── Painel: N={} entidades   T̄≈{:.1}", n_entities, t_bar);
+                println!("\n── Estatística");
+                println!("   CD ~ N(0,1) = {:.4}   p = {:.4}  {}", cd, p, sig);
+                println!("\n── Conclusão");
+                println!("   {}", verdict);
+                println!("\n{thin}");
+                println!("   *** p<0.01  ** p<0.05  * p<0.10");
+                println!("{thick}\n");
+
+                Ok(Value::Nil)
+            }
+
             // ── Breusch-Pagan LM test (efeitos individuais em painel) ────────
             "bplm" => {
                 // bplm(formula, df, id=col)
