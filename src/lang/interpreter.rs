@@ -2170,7 +2170,9 @@ impl Interpreter {
                         Array1::from(Self::eval_col_expr(&Expr::Var(col_name), &df)?)
                     }
                     // resíduos de GARCH: archtest(model, lags=5)
-                    Value::GarchResult(m) => m.residuals.clone(),
+                    // usa resíduos padronizados z_t = ε_t/√h_t — sob H₀ de
+                    // especificação correta, z_t² não deve ter autocorrelação
+                    Value::GarchResult(m) => m.standardized_residuals.clone(),
                     _ => return Err(HayashiError::Type(
                         "archtest(): primeiro argumento deve ser um DataFrame ou modelo GARCH".into()
                     )),
