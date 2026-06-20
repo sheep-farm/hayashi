@@ -2723,6 +2723,188 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // diagnostics(model)
+            // Roda todos os testes aplicáveis ao tipo de modelo e imprime relatório unificado.
+            // OLS:  JB, DW, Breusch-Godfrey, White, RESET, VIF, Cook's D
+            // GARCH: Ljung-Box, ARCH LM, JB nos resíduos padronizados
+            // ARIMA: Ljung-Box, JB nos resíduos
+            "diagnostics" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "diagnostics() requer um modelo (OLS, GARCH ou ARIMA)".into()
+                    ));
+                }
+
+                let sig = |p: f64| -> &'static str {
+                    if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" }
+                };
+                let thick = "═".repeat(62);
+                let thin  = "─".repeat(62);
+
+                match self.eval_expr(&args[0])? {
+                    Value::OlsResult(ols) => {
+                        println!("\n{thick}");
+                        println!(" DIAGNÓSTICOS — OLS  (n={}  k={})", ols.residuals.len(), ols.x.ncols());
+                        println!("{thick}");
+
+                        // ── Normalidade
+                        let clean = Array1::from_vec(
+                            ols.residuals.iter().cloned().filter(|x| x.is_finite()).collect::<Vec<_>>()
+                        );
+                        println!("\n── Normalidade dos Resíduos (Jarque-Bera)");
+                        match greeners::Diagnostics::jarque_bera(&clean) {
+                            Ok((jb, p)) => println!("   JB ~ χ²(2)  = {:>9.4}   p = {:.4}  {}", jb, p, sig(p)),
+                            Err(e) => println!("   erro: {e}"),
+                        }
+
+                        // ── Autocorrelação 1ª ordem
+                        let dw = greeners::Diagnostics::durbin_watson(&ols.residuals);
+                        let dw_label = if dw < 1.5 { "autocorr. positiva" }
+                                       else if dw > 2.5 { "autocorr. negativa" }
+                                       else { "sem autocorr. evidente" };
+                        println!("\n── Autocorrelação 1ª Ordem (Durbin-Watson)");
+                        println!("   DW = {:.4}  [{}]", dw, dw_label);
+
+                        // ── Breusch-Godfrey
+                        println!("\n── Autocorrelação Serial (Breusch-Godfrey, lags=4)");
+                        match greeners::SpecificationTests::breusch_godfrey_test(&ols.residuals, &ols.x, 4) {
+                            Ok((lm, p, df)) => println!("   LM ~ χ²({})   = {:>9.4}   p = {:.4}  {}", df, lm, p, sig(p)),
+                            Err(e) => println!("   erro: {e}"),
+                        }
+
+                        // ── White
+                        println!("\n── Heteroscedasticidade (White)");
+                        match greeners::SpecificationTests::white_test(&ols.residuals, &ols.x) {
+                            Ok((lm, p, df)) => println!("   LM ~ χ²({})   = {:>9.4}   p = {:.4}  {}", df, lm, p, sig(p)),
+                            Err(e) => println!("   erro: {e}"),
+                        }
+
+                        // ── RESET
+                        println!("\n── Especificação Funcional (RESET, power=3)");
+                        let fitted = ols.result.fitted_values(&ols.x);
+                        let y = &ols.residuals + &fitted;
+                        match greeners::SpecificationTests::reset_test(&y, &ols.x, &fitted, 3) {
+                            Ok((f, p, df1, df2)) => println!("   F ~ F({},{}) = {:>9.4}   p = {:.4}  {}", df1, df2, f, p, sig(p)),
+                            Err(e) => println!("   erro: {e}"),
+                        }
+
+                        // ── VIF
+                        println!("\n── Multicolinearidade (VIF)");
+                        let names = ols.result.variable_names.as_deref().unwrap_or(&[]);
+                        match greeners::Diagnostics::vif(&ols.x) {
+                            Ok(vifs) => {
+                                for (i, &v) in vifs.iter().enumerate() {
+                                    if v.is_nan() { continue; }
+                                    let name = names.get(i).map(|s| s.as_str()).unwrap_or("?");
+                                    let diag = if v.is_infinite() || v > 10.0 { "grave" }
+                                               else if v > 5.0 { "moderado" } else { "ok" };
+                                    println!("   {:<20} VIF = {:>7.3}  [{}]", name, v, diag);
+                                }
+                            }
+                            Err(e) => println!("   erro: {e}"),
+                        }
+
+                        // ── Cook's D
+                        let n   = ols.residuals.len();
+                        let mse = ols.result.sigma * ols.result.sigma;
+                        let cutoff = 4.0 / n as f64;
+                        println!("\n── Observações Influentes (Cook's D > {:.4})", cutoff);
+                        match greeners::Diagnostics::cooks_distance(&ols.residuals, &ols.x, mse) {
+                            Ok(d) => {
+                                let flagged: Vec<(usize, f64)> = d.iter().enumerate()
+                                    .filter(|(_, &di)| di > cutoff)
+                                    .map(|(i, &di)| (i + 1, di))
+                                    .collect();
+                                if flagged.is_empty() {
+                                    println!("   Nenhuma observação influente.");
+                                } else {
+                                    for (i, di) in &flagged {
+                                        let label = if *di > 1.0 { "muito influente" } else { "influente" };
+                                        println!("   obs {:>4}  D = {:.4}  [{}]", i, di, label);
+                                    }
+                                }
+                            }
+                            Err(e) => println!("   erro: {e}"),
+                        }
+
+                        println!("\n{thin}");
+                        println!("  *** p<0.01  ** p<0.05  * p<0.10");
+                        println!("{thick}\n");
+                    }
+
+                    Value::GarchResult(m) => {
+                        let model_label = match m.model_type {
+                            greeners::GarchModelType::GARCH    => "GARCH",
+                            greeners::GarchModelType::EGARCH   => "EGARCH",
+                            greeners::GarchModelType::GJRGARCH => "GJR-GARCH",
+                        };
+                        println!("\n{thick}");
+                        println!(" DIAGNÓSTICOS — {model_label}({}, {})  (n={})", m.p, m.q, m.n_obs);
+                        println!("{thick}");
+
+                        let std_res = &m.standardized_residuals;
+                        let clean = Array1::from_vec(
+                            std_res.iter().cloned().filter(|x| x.is_finite()).collect::<Vec<_>>()
+                        );
+
+                        println!("\n── Autocorrelação nos Resíduos Padronizados (Ljung-Box, lags=10)");
+                        match greeners::Diagnostics::ljung_box(std_res, 10) {
+                            Ok(r) => println!("   Q(10) = {:>9.4}   p = {:.4}  {}", r.q_stat, r.p_value, sig(r.p_value)),
+                            Err(e) => println!("   erro: {e}"),
+                        }
+
+                        println!("\n── Efeitos ARCH Residuais (Engle LM, lags=5)");
+                        match greeners::Diagnostics::arch_test(std_res, 5) {
+                            Ok(r) => println!("   LM ~ χ²({}) = {:>9.4}   p = {:.4}  {}", r.lags, r.lm_stat, r.lm_pvalue, sig(r.lm_pvalue)),
+                            Err(e) => println!("   erro: {e}"),
+                        }
+
+                        println!("\n── Normalidade dos Resíduos Padronizados (Jarque-Bera)");
+                        match greeners::Diagnostics::jarque_bera(&clean) {
+                            Ok((jb, p)) => println!("   JB ~ χ²(2)  = {:>9.4}   p = {:.4}  {}", jb, p, sig(p)),
+                            Err(e) => println!("   erro: {e}"),
+                        }
+
+                        println!("\n{thin}");
+                        println!("  *** p<0.01  ** p<0.05  * p<0.10");
+                        println!("{thick}\n");
+                    }
+
+                    Value::ArimaResult(m) => {
+                        println!("\n{thick}");
+                        println!(" DIAGNÓSTICOS — ARIMA");
+                        println!("{thick}");
+
+                        let resid = Array1::from_vec(m.residuals().to_vec());
+                        let clean = Array1::from_vec(
+                            resid.iter().cloned().filter(|x| x.is_finite()).collect::<Vec<_>>()
+                        );
+
+                        println!("\n── Autocorrelação nos Resíduos (Ljung-Box, lags=10)");
+                        match greeners::Diagnostics::ljung_box(&resid, 10) {
+                            Ok(r) => println!("   Q(10) = {:>9.4}   p = {:.4}  {}", r.q_stat, r.p_value, sig(r.p_value)),
+                            Err(e) => println!("   erro: {e}"),
+                        }
+
+                        println!("\n── Normalidade dos Resíduos (Jarque-Bera)");
+                        match greeners::Diagnostics::jarque_bera(&clean) {
+                            Ok((jb, p)) => println!("   JB ~ χ²(2)  = {:>9.4}   p = {:.4}  {}", jb, p, sig(p)),
+                            Err(e) => println!("   erro: {e}"),
+                        }
+
+                        println!("\n{thin}");
+                        println!("  *** p<0.01  ** p<0.05  * p<0.10");
+                        println!("{thick}\n");
+                    }
+
+                    _ => return Err(HayashiError::Type(
+                        "diagnostics() suporta OLS, GARCH e ARIMA".into()
+                    )),
+                }
+
+                Ok(Value::Nil)
+            }
+
             other => Err(HayashiError::Runtime(format!("unknown function '{other}'"))),
         }
     }
