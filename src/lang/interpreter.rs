@@ -590,6 +590,85 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── Mundlak: correlação entre regressores e efeitos individuais ───
+            "mundlak" => {
+                // mundlak(formula, df, id=col)
+                // H₀: γ = 0 — médias individuais não correlacionadas com X (RE consistente)
+                // H₁: γ ≠ 0 — efeitos correlacionados com X (prefira FE)
+                let (formula_ast, df, id_col) = self.extract_panel_args(args, &opt_map)?;
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                let (y_vec, x_mat) = df.to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                let entity_ids: Vec<i64> = if let Ok(ids) = df.get_int(&id_col) {
+                    ids.to_vec()
+                } else if let Ok(floats) = df.get(&id_col) {
+                    floats.iter().map(|&v| v as i64).collect()
+                } else {
+                    return Err(HayashiError::Runtime(
+                        format!("mundlak: coluna '{id_col}' não encontrada")
+                    ));
+                };
+
+                // Nomes dos regressores variantes no tempo (excluindo "const")
+                let var_names = df.formula_var_names(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let non_const_names: Vec<&str> = var_names.iter()
+                    .filter(|n| n.as_str() != "const")
+                    .map(|s| s.as_str())
+                    .collect();
+
+                let n = y_vec.len();
+                let n_entities = {
+                    let mut s = std::collections::HashSet::new();
+                    for &id in &entity_ids { s.insert(id); }
+                    s.len()
+                };
+
+                let (f_stat, p, k, gamma_hat, gamma_se) =
+                    greeners::PanelDiagnostics::mundlak(&y_vec, &x_mat, &entity_ids)
+                        .map_err(|e| HayashiError::Runtime(e))?;
+
+                let df1 = k;
+                let df2_exact = if n > 2 * k + 1 { n - 2 * k - 1 } else { 1 };
+
+                let sig = if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
+                let verdict = if p < 0.05 {
+                    "Rejeita H₀ → efeitos individuais correlacionados com X (prefira FE)"
+                } else {
+                    "Não rejeita H₀ → RE consistente (sem evidência de correlação com efeitos)"
+                };
+
+                let thick = "═".repeat(70);
+                let thin  = "─".repeat(70);
+                println!("\n{thick}");
+                println!(" Mundlak Test (correlação entre regressores e efeitos individuais)");
+                println!(" H₀: γ = 0  (RE consistente)");
+                println!("{thick}");
+                println!("\n── Painel: n={} obs   N={} entidades   k={} regressores variantes", n, n_entities, k);
+                println!("\n── Coeficientes sobre médias individuais (X̄_i)");
+                println!("   {:<18} {:>10}  {:>10}  {:>8}", "Variável (X̄)", "γ̂", "SE", "t");
+                println!("   {}", "─".repeat(52));
+                for i in 0..k {
+                    let t_i = if gamma_se[i] > 1e-15 { gamma_hat[i] / gamma_se[i] } else { f64::NAN };
+                    let name = non_const_names.get(i).copied().unwrap_or("?");
+                    println!("   {:<18} {:>10.4}  {:>10.4}  {:>8.3}",
+                        format!("{}̄", name), gamma_hat[i], gamma_se[i], t_i);
+                }
+                println!("\n── Teste conjunto H₀: γ = 0");
+                println!("   F({}, {}) = {:.4}   p = {:.4}  {}", df1, df2_exact, f_stat, p, sig);
+                println!("\n── Conclusão");
+                println!("   {}", verdict);
+                println!("\n{thin}");
+                println!("   *** p<0.01  ** p<0.05  * p<0.10");
+                println!("{thick}\n");
+
+                Ok(Value::Nil)
+            }
+
             // ── Wooldridge: autocorrelação serial em painel ───────────────────
             "wooldridge" => {
                 // wooldridge(formula, df, id=col, time=col)
