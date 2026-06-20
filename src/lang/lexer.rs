@@ -16,6 +16,8 @@ pub enum Token {
     Export,
     Generate,
     Predict,
+    Replace,
+    If,
 
     // Operadores
     Eq,       // =
@@ -135,6 +137,8 @@ impl Lexer {
             "generate" => Token::Generate,
             "gen"      => Token::Generate,
             "predict"  => Token::Predict,
+            "replace"  => Token::Replace,
+            "if"       => Token::If,
             "true"     => Token::Bool(true),
             "false"    => Token::Bool(false),
             _        => Token::Ident(s),
