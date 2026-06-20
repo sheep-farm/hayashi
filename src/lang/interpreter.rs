@@ -748,6 +748,93 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── Arellano-Bond: teste m1/m2 para autocorrelação serial ─────────
+            "ab_test" => {
+                // ab_test(formula, df, id=col, time=col)
+                // Testa autocorrelação serial nos resíduos da equação em 1ª diferença.
+                // m1: DEVE rejeitar H₀ (FD induz AR(1) por construção)
+                // m2: NÃO deve rejeitar H₀ (valida instrumentos y_{i,t-2} do GMM)
+                let (formula_ast, df, id_col) = self.extract_panel_args(args, &opt_map)?;
+
+                let time_col = match opt_map.get("time") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => return Err(HayashiError::Runtime(
+                        "ab_test(): opção time=col é obrigatória".into()
+                    )),
+                };
+
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                let (y_vec, x_mat) = df.to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                let entity_ids: Vec<i64> = if let Ok(ids) = df.get_int(&id_col) {
+                    ids.to_vec()
+                } else if let Ok(floats) = df.get(&id_col) {
+                    floats.iter().map(|&v| v as i64).collect()
+                } else {
+                    return Err(HayashiError::Runtime(
+                        format!("ab_test: coluna id '{id_col}' não encontrada")
+                    ));
+                };
+
+                let time_vals: Vec<f64> = if let Ok(arr) = df.get(&time_col) {
+                    arr.to_vec()
+                } else if let Ok(arr) = df.get_int(&time_col) {
+                    arr.iter().map(|&v| v as f64).collect()
+                } else {
+                    return Err(HayashiError::Runtime(
+                        format!("ab_test: coluna time '{time_col}' não encontrada")
+                    ));
+                };
+
+                let n_entities = {
+                    let mut s = std::collections::HashSet::new();
+                    for &id in &entity_ids { s.insert(id); }
+                    s.len()
+                };
+
+                let (m1, p1, m2, p2) = greeners::PanelDiagnostics::arellano_bond_test(
+                    &y_vec, &x_mat, &entity_ids, &time_vals
+                ).map_err(|e| HayashiError::Runtime(e))?;
+
+                let sig = |p: f64| if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
+                let n_obs = y_vec.len();
+
+                let thick = "═".repeat(66);
+                let thin  = "─".repeat(66);
+                println!("\n{thick}");
+                println!(" Arellano-Bond Test (autocorrelação serial — resíduos em 1ª diferença)");
+                println!("{thick}");
+                println!("\n── Painel: n={} obs   N={} entidades", n_obs, n_entities);
+                println!("\n── Estatísticas  z ~ N(0,1)   H₀: sem autocorrelação de ordem p");
+                println!("   {:-^52}", "");
+                println!("   {:>4}  {:>10}  {:>10}  {:>6}  {}", "p", "z", "p-valor", "sig", "Interpretação");
+                println!("   {:-^52}", "");
+                let interp1 = if p1 < 0.05 { "OK — FD induz AR(1) (esperado)" } else { "Inesperado — verificar modelo" };
+                let interp2 = if p2 >= 0.05 { "OK — instrumentos válidos" } else { "Atenção — AR(2) detectado" };
+                println!("   {:>4}  {:>10.4}  {:>10.4}  {:>6}  {}", 1, m1, p1, sig(p1), interp1);
+                println!("   {:>4}  {:>10.4}  {:>10.4}  {:>6}  {}", 2, m2, p2, sig(p2), interp2);
+                println!("   {:-^52}", "");
+                println!("\n── Conclusão");
+                if p1 < 0.05 && p2 >= 0.05 {
+                    println!("   m1 rejeita e m2 não rejeita → estrutura consistente com GMM válido");
+                } else if p1 >= 0.05 {
+                    println!("   m1 não rejeita H₀ → checar especificação (AR(1) esperado em FD)");
+                } else {
+                    println!("   m2 rejeita H₀ → AR(2) nos resíduos; instrumentos y_{{t-2}} podem ser inválidos");
+                    println!("   Considere usar lags mais distantes (y_{{t-3}}, ...) como instrumentos");
+                }
+                println!("\n{thin}");
+                println!("   *** p<0.01  ** p<0.05  * p<0.10");
+                println!("   Variância estimada via sandwich (Σ_i dos produtos cruzados por entidade)");
+                println!("{thick}\n");
+
+                Ok(Value::Nil)
+            }
+
             // ── Wooldridge: autocorrelação serial em painel ───────────────────
             "wooldridge" => {
                 // wooldridge(formula, df, id=col, time=col)
