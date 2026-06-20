@@ -39,6 +39,19 @@ impl std::fmt::Display for BinaryModel {
     }
 }
 
+// ── Resultado de testes de diagnóstico (print-on-demand) ─────────────────────
+
+#[derive(Debug, Clone)]
+pub struct DiagResult {
+    pub rendered: String,  // output pré-renderizado pelo teste
+}
+
+impl std::fmt::Display for DiagResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.rendered)
+    }
+}
+
 // ── Valores em runtime ────────────────────────────────────────────────────────
 
 #[derive(Clone)]
@@ -57,6 +70,7 @@ pub enum Value {
     VarResult(Rc<greeners::var::VarResult>),
     VecmResult(Rc<greeners::vecm::VecmResult>),
     GarchResult(Rc<greeners::GarchResult>),
+    DiagResult(Rc<DiagResult>),
     Nil,
 }
 
@@ -77,6 +91,7 @@ impl std::fmt::Display for Value {
             Value::VarResult(r)    => write!(f, "{r}"),
             Value::VecmResult(r)   => write!(f, "{r}"),
             Value::GarchResult(r)  => write!(f, "{r}"),
+            Value::DiagResult(r)   => write!(f, "{r}"),
             Value::Nil             => write!(f, "nil"),
         }
     }
@@ -440,22 +455,22 @@ impl Interpreter {
 
                 let thick = "═".repeat(62);
                 let thin  = "─".repeat(62);
-                println!("\n{thick}");
-                println!(" F-test: Efeitos Fixos vs Pooled OLS");
-                println!(" H₀: todos os efeitos individuais são zero");
-                println!("{thick}");
-                println!("\n── Soma dos Quadrados dos Resíduos");
-                println!("   SSR pooled = {:.6}", ssr_pooled);
-                println!("   SSR FE     = {:.6}", ssr_fe);
-                println!("\n── Estatística");
-                println!("   F({}, {}) = {:.4}   p = {:.4}  {}", df_num, df_denom, f_stat, p, sig);
-                println!("\n── Conclusão");
-                println!("   {}", verdict);
-                println!("\n{thin}");
-                println!("   *** p<0.01  ** p<0.05  * p<0.10");
-                println!("{thick}\n");
-
-                Ok(Value::Nil)
+                let mut out = String::new();
+                out.push_str(&format!("\n{thick}\n"));
+                out.push_str(" F-test: Efeitos Fixos vs Pooled OLS\n");
+                out.push_str(" H₀: todos os efeitos individuais são zero\n");
+                out.push_str(&format!("{thick}\n"));
+                out.push_str("\n── Soma dos Quadrados dos Resíduos\n");
+                out.push_str(&format!("   SSR pooled = {:.6}\n", ssr_pooled));
+                out.push_str(&format!("   SSR FE     = {:.6}\n", ssr_fe));
+                out.push_str("\n── Estatística\n");
+                out.push_str(&format!("   F({}, {}) = {:.4}   p = {:.4}  {}\n", df_num, df_denom, f_stat, p, sig));
+                out.push_str("\n── Conclusão\n");
+                out.push_str(&format!("   {}\n", verdict));
+                out.push_str(&format!("\n{thin}\n"));
+                out.push_str("   *** p<0.01  ** p<0.05  * p<0.10\n");
+                out.push_str(&format!("{thick}\n"));
+                Ok(Self::diag(out))
             }
 
             // ── Pesaran CD: dependência cross-seccional ───────────────────────
@@ -505,20 +520,20 @@ impl Interpreter {
 
                 let thick = "═".repeat(62);
                 let thin  = "─".repeat(62);
-                println!("\n{thick}");
-                println!(" Pesaran CD Test (dependência cross-seccional)");
-                println!(" H₀: ρ_ij = 0 para todo i≠j  (resíduos independentes)");
-                println!("{thick}");
-                println!("\n── Painel: N={} entidades   T̄≈{:.1}", n_entities, t_bar);
-                println!("\n── Estatística");
-                println!("   CD ~ N(0,1) = {:.4}   p = {:.4}  {}", cd, p, sig);
-                println!("\n── Conclusão");
-                println!("   {}", verdict);
-                println!("\n{thin}");
-                println!("   *** p<0.01  ** p<0.05  * p<0.10");
-                println!("{thick}\n");
-
-                Ok(Value::Nil)
+                let mut out = String::new();
+                out.push_str(&format!("\n{thick}\n"));
+                out.push_str(" Pesaran CD Test (dependência cross-seccional)\n");
+                out.push_str(" H₀: ρ_ij = 0 para todo i≠j  (resíduos independentes)\n");
+                out.push_str(&format!("{thick}\n"));
+                out.push_str(&format!("\n── Painel: N={} entidades   T̄≈{:.1}\n", n_entities, t_bar));
+                out.push_str("\n── Estatística\n");
+                out.push_str(&format!("   CD ~ N(0,1) = {:.4}   p = {:.4}  {}\n", cd, p, sig));
+                out.push_str("\n── Conclusão\n");
+                out.push_str(&format!("   {}\n", verdict));
+                out.push_str(&format!("\n{thin}\n"));
+                out.push_str("   *** p<0.01  ** p<0.05  * p<0.10\n");
+                out.push_str(&format!("{thick}\n"));
+                Ok(Self::diag(out))
             }
 
             // ── Breusch-Pagan LM test (efeitos individuais em painel) ────────
@@ -573,21 +588,21 @@ impl Interpreter {
 
                 let thick = "═".repeat(62);
                 let thin  = "─".repeat(62);
-                println!("\n{thick}");
-                println!(" Breusch-Pagan LM Test (efeitos individuais)");
-                println!(" H₀: σ²_u = 0  (sem efeitos individuais)");
-                println!("{thick}");
-                println!("\n── Dados do Painel");
-                println!("   n = {}   N = {}   T̄ ≈ {:.1}", n, n_entities, t_bar);
-                println!("\n── Estatística");
-                println!("   LM ~ χ²(1) = {:.4}   p = {:.4}  {}", lm, p, sig);
-                println!("\n── Conclusão");
-                println!("   {}", verdict);
-                println!("\n{thin}");
-                println!("   *** p<0.01  ** p<0.05  * p<0.10");
-                println!("{thick}\n");
-
-                Ok(Value::Nil)
+                let mut out = String::new();
+                out.push_str(&format!("\n{thick}\n"));
+                out.push_str(" Breusch-Pagan LM Test (efeitos individuais)\n");
+                out.push_str(" H₀: σ²_u = 0  (sem efeitos individuais)\n");
+                out.push_str(&format!("{thick}\n"));
+                out.push_str("\n── Dados do Painel\n");
+                out.push_str(&format!("   n = {}   N = {}   T̄ ≈ {:.1}\n", n, n_entities, t_bar));
+                out.push_str("\n── Estatística\n");
+                out.push_str(&format!("   LM ~ χ²(1) = {:.4}   p = {:.4}  {}\n", lm, p, sig));
+                out.push_str("\n── Conclusão\n");
+                out.push_str(&format!("   {}\n", verdict));
+                out.push_str(&format!("\n{thin}\n"));
+                out.push_str("   *** p<0.01  ** p<0.05  * p<0.10\n");
+                out.push_str(&format!("{thick}\n"));
+                Ok(Self::diag(out))
             }
 
             // ── Chamberlain: correlação period-específica com efeitos individuais
@@ -648,25 +663,25 @@ impl Interpreter {
 
                 let thick = "═".repeat(70);
                 let thin  = "─".repeat(70);
-                println!("\n{thick}");
-                println!(" Chamberlain Test (correlação period-específica com efeitos individuais)");
-                println!(" H₀: Π_s = 0 ∀s  (RE consistente)");
-                println!("{thick}");
-                println!("\n── Painel: n={} obs   N={} entidades   T={} períodos", n_obs, n_entities, t_count);
-                println!("   Colunas de augmentação: {} de Chamberlain (k×T, após remover zero-variância)", k_active);
+                let mut out = String::new();
+                out.push_str(&format!("\n{thick}\n"));
+                out.push_str(" Chamberlain Test (correlação period-específica com efeitos individuais)\n");
+                out.push_str(" H₀: Π_s = 0 ∀s  (RE consistente)\n");
+                out.push_str(&format!("{thick}\n"));
+                out.push_str(&format!("\n── Painel: n={} obs   N={} entidades   T={} períodos\n", n_obs, n_entities, t_count));
+                out.push_str(&format!("   Colunas de augmentação: {} de Chamberlain (k×T, após remover zero-variância)\n", k_active));
                 if t_count > 6 {
-                    println!("   ⚠ T={} — com T grande o teste tem baixo poder em amostras finitas", t_count);
+                    out.push_str(&format!("   ⚠ T={} — com T grande o teste tem baixo poder em amostras finitas\n", t_count));
                 }
-                println!("\n── Teste conjunto H₀: todos os Π_s = 0");
-                println!("   F({}, {}) = {:.4}   p = {:.4}  {}", df1, df_denom, f_stat, p, sig);
-                println!("\n── Conclusão");
-                println!("   {}", verdict);
-                println!("\n{thin}");
-                println!("   *** p<0.01  ** p<0.05  * p<0.10");
-                println!("   Teste mais geral que Mundlak — inclui valores em todos os T períodos");
-                println!("{thick}\n");
-
-                Ok(Value::Nil)
+                out.push_str("\n── Teste conjunto H₀: todos os Π_s = 0\n");
+                out.push_str(&format!("   F({}, {}) = {:.4}   p = {:.4}  {}\n", df1, df_denom, f_stat, p, sig));
+                out.push_str("\n── Conclusão\n");
+                out.push_str(&format!("   {}\n", verdict));
+                out.push_str(&format!("\n{thin}\n"));
+                out.push_str("   *** p<0.01  ** p<0.05  * p<0.10\n");
+                out.push_str("   Teste mais geral que Mundlak — inclui valores em todos os T períodos\n");
+                out.push_str(&format!("{thick}\n"));
+                Ok(Self::diag(out))
             }
 
             // ── Mundlak: correlação entre regressores e efeitos individuais ───
@@ -723,29 +738,29 @@ impl Interpreter {
 
                 let thick = "═".repeat(70);
                 let thin  = "─".repeat(70);
-                println!("\n{thick}");
-                println!(" Mundlak Test (correlação entre regressores e efeitos individuais)");
-                println!(" H₀: γ = 0  (RE consistente)");
-                println!("{thick}");
-                println!("\n── Painel: n={} obs   N={} entidades   k={} regressores variantes", n, n_entities, k);
-                println!("\n── Coeficientes sobre médias individuais (X̄_i)");
-                println!("   {:<18} {:>10}  {:>10}  {:>8}", "Variável (X̄)", "γ̂", "SE", "t");
-                println!("   {}", "─".repeat(52));
+                let mut out = String::new();
+                out.push_str(&format!("\n{thick}\n"));
+                out.push_str(" Mundlak Test (correlação entre regressores e efeitos individuais)\n");
+                out.push_str(" H₀: γ = 0  (RE consistente)\n");
+                out.push_str(&format!("{thick}\n"));
+                out.push_str(&format!("\n── Painel: n={} obs   N={} entidades   k={} regressores variantes\n", n, n_entities, k));
+                out.push_str("\n── Coeficientes sobre médias individuais (X̄_i)\n");
+                out.push_str(&format!("   {:<18} {:>10}  {:>10}  {:>8}\n", "Variável (X̄)", "γ̂", "SE", "t"));
+                out.push_str(&format!("   {}\n", "─".repeat(52)));
                 for i in 0..k {
                     let t_i = if gamma_se[i] > 1e-15 { gamma_hat[i] / gamma_se[i] } else { f64::NAN };
                     let name = non_const_names.get(i).copied().unwrap_or("?");
-                    println!("   {:<18} {:>10.4}  {:>10.4}  {:>8.3}",
-                        format!("{}̄", name), gamma_hat[i], gamma_se[i], t_i);
+                    out.push_str(&format!("   {:<18} {:>10.4}  {:>10.4}  {:>8.3}\n",
+                        format!("{}̄", name), gamma_hat[i], gamma_se[i], t_i));
                 }
-                println!("\n── Teste conjunto H₀: γ = 0");
-                println!("   F({}, {}) = {:.4}   p = {:.4}  {}", df1, df2_exact, f_stat, p, sig);
-                println!("\n── Conclusão");
-                println!("   {}", verdict);
-                println!("\n{thin}");
-                println!("   *** p<0.01  ** p<0.05  * p<0.10");
-                println!("{thick}\n");
-
-                Ok(Value::Nil)
+                out.push_str("\n── Teste conjunto H₀: γ = 0\n");
+                out.push_str(&format!("   F({}, {}) = {:.4}   p = {:.4}  {}\n", df1, df2_exact, f_stat, p, sig));
+                out.push_str("\n── Conclusão\n");
+                out.push_str(&format!("   {}\n", verdict));
+                out.push_str(&format!("\n{thin}\n"));
+                out.push_str("   *** p<0.01  ** p<0.05  * p<0.10\n");
+                out.push_str(&format!("{thick}\n"));
+                Ok(Self::diag(out))
             }
 
             // ── Arellano-Bond: teste m1/m2 para autocorrelação serial ─────────
@@ -805,34 +820,34 @@ impl Interpreter {
 
                 let thick = "═".repeat(66);
                 let thin  = "─".repeat(66);
-                println!("\n{thick}");
-                println!(" Arellano-Bond Test (autocorrelação serial — resíduos em 1ª diferença)");
-                println!("{thick}");
-                println!("\n── Painel: n={} obs   N={} entidades", n_obs, n_entities);
-                println!("\n── Estatísticas  z ~ N(0,1)   H₀: sem autocorrelação de ordem p");
-                println!("   {:-^52}", "");
-                println!("   {:>4}  {:>10}  {:>10}  {:>6}  {}", "p", "z", "p-valor", "sig", "Interpretação");
-                println!("   {:-^52}", "");
+                let mut out = String::new();
+                out.push_str(&format!("\n{thick}\n"));
+                out.push_str(" Arellano-Bond Test (autocorrelação serial — resíduos em 1ª diferença)\n");
+                out.push_str(&format!("{thick}\n"));
+                out.push_str(&format!("\n── Painel: n={} obs   N={} entidades\n", n_obs, n_entities));
+                out.push_str("\n── Estatísticas  z ~ N(0,1)   H₀: sem autocorrelação de ordem p\n");
+                out.push_str(&format!("   {:-^52}\n", ""));
+                out.push_str(&format!("   {:>4}  {:>10}  {:>10}  {:>6}  {}\n", "p", "z", "p-valor", "sig", "Interpretação"));
+                out.push_str(&format!("   {:-^52}\n", ""));
                 let interp1 = if p1 < 0.05 { "OK — FD induz AR(1) (esperado)" } else { "Inesperado — verificar modelo" };
                 let interp2 = if p2 >= 0.05 { "OK — instrumentos válidos" } else { "Atenção — AR(2) detectado" };
-                println!("   {:>4}  {:>10.4}  {:>10.4}  {:>6}  {}", 1, m1, p1, sig(p1), interp1);
-                println!("   {:>4}  {:>10.4}  {:>10.4}  {:>6}  {}", 2, m2, p2, sig(p2), interp2);
-                println!("   {:-^52}", "");
-                println!("\n── Conclusão");
+                out.push_str(&format!("   {:>4}  {:>10.4}  {:>10.4}  {:>6}  {}\n", 1, m1, p1, sig(p1), interp1));
+                out.push_str(&format!("   {:>4}  {:>10.4}  {:>10.4}  {:>6}  {}\n", 2, m2, p2, sig(p2), interp2));
+                out.push_str(&format!("   {:-^52}\n", ""));
+                out.push_str("\n── Conclusão\n");
                 if p1 < 0.05 && p2 >= 0.05 {
-                    println!("   m1 rejeita e m2 não rejeita → estrutura consistente com GMM válido");
+                    out.push_str("   m1 rejeita e m2 não rejeita → estrutura consistente com GMM válido\n");
                 } else if p1 >= 0.05 {
-                    println!("   m1 não rejeita H₀ → checar especificação (AR(1) esperado em FD)");
+                    out.push_str("   m1 não rejeita H₀ → checar especificação (AR(1) esperado em FD)\n");
                 } else {
-                    println!("   m2 rejeita H₀ → AR(2) nos resíduos; instrumentos y_{{t-2}} podem ser inválidos");
-                    println!("   Considere usar lags mais distantes (y_{{t-3}}, ...) como instrumentos");
+                    out.push_str("   m2 rejeita H₀ → AR(2) nos resíduos; instrumentos y_{t-2} podem ser inválidos\n");
+                    out.push_str("   Considere usar lags mais distantes (y_{t-3}, ...) como instrumentos\n");
                 }
-                println!("\n{thin}");
-                println!("   *** p<0.01  ** p<0.05  * p<0.10");
-                println!("   Variância estimada via sandwich (Σ_i dos produtos cruzados por entidade)");
-                println!("{thick}\n");
-
-                Ok(Value::Nil)
+                out.push_str(&format!("\n{thin}\n"));
+                out.push_str("   *** p<0.01  ** p<0.05  * p<0.10\n");
+                out.push_str("   Variância estimada via sandwich (Σ_i dos produtos cruzados por entidade)\n");
+                out.push_str(&format!("{thick}\n"));
+                Ok(Self::diag(out))
             }
 
             // ── Wooldridge: autocorrelação serial em painel ───────────────────
@@ -896,23 +911,23 @@ impl Interpreter {
 
                 let thick = "═".repeat(62);
                 let thin  = "─".repeat(62);
-                println!("\n{thick}");
-                println!(" Wooldridge Test (autocorrelação serial em painel)");
-                println!(" H₀: ρ = -0.5  (sem autocorrelação nos erros idiossincráticos)");
-                println!("{thick}");
-                println!("\n── Painel: N={} entidades   pares usados={}   df={}", n_entities, n_pairs, df_t);
-                println!("\n── Estimativa");
-                println!("   ρ̂ = {:.4}   (H₀: ρ = -0.500)", rho);
-                println!("\n── Estatística");
-                println!("   t({}) = {:.4}   p = {:.4}  {}", df_t, t_stat, p, sig);
-                println!("\n── Conclusão");
-                println!("   {}", verdict);
-                println!("\n{thin}");
-                println!("   *** p<0.01  ** p<0.05  * p<0.10");
-                println!("   (SE padrão OLS — use SE robustos clusterizados para inferência formal)");
-                println!("{thick}\n");
-
-                Ok(Value::Nil)
+                let mut out = String::new();
+                out.push_str(&format!("\n{thick}\n"));
+                out.push_str(" Wooldridge Test (autocorrelação serial em painel)\n");
+                out.push_str(" H₀: ρ = -0.5  (sem autocorrelação nos erros idiossincráticos)\n");
+                out.push_str(&format!("{thick}\n"));
+                out.push_str(&format!("\n── Painel: N={} entidades   pares usados={}   df={}\n", n_entities, n_pairs, df_t));
+                out.push_str("\n── Estimativa\n");
+                out.push_str(&format!("   ρ̂ = {:.4}   (H₀: ρ = -0.500)\n", rho));
+                out.push_str("\n── Estatística\n");
+                out.push_str(&format!("   t({}) = {:.4}   p = {:.4}  {}\n", df_t, t_stat, p, sig));
+                out.push_str("\n── Conclusão\n");
+                out.push_str(&format!("   {}\n", verdict));
+                out.push_str(&format!("\n{thin}\n"));
+                out.push_str("   *** p<0.01  ** p<0.05  * p<0.10\n");
+                out.push_str("   (SE padrão OLS — use SE robustos clusterizados para inferência formal)\n");
+                out.push_str(&format!("{thick}\n"));
+                Ok(Self::diag(out))
             }
 
             // ── Hausman FE vs RE ──────────────────────────────────────────────
@@ -976,19 +991,20 @@ impl Interpreter {
 
                 let thick = "═".repeat(62);
                 let thin  = "─".repeat(62);
+                let mut out = String::new();
 
-                println!("\n{thick}");
-                println!(" Hausman Test: FE vs RE");
-                println!(" H₀: efeitos individuais não correlacionados com regressores (RE consistente)");
-                println!("{thick}");
-                println!("\n── Coeficientes Comuns");
-                println!("   {:<20} {:>10} {:>10} {:>10}", "Variável", "β_FE", "β_RE", "Δβ");
-                println!("   {thin}");
+                out.push_str(&format!("\n{thick}\n"));
+                out.push_str(" Hausman Test: FE vs RE\n");
+                out.push_str(" H₀: efeitos individuais não correlacionados com regressores (RE consistente)\n");
+                out.push_str(&format!("{thick}\n"));
+                out.push_str("\n── Coeficientes Comuns\n");
+                out.push_str(&format!("   {:<20} {:>10} {:>10} {:>10}\n", "Variável", "β_FE", "β_RE", "Δβ"));
+                out.push_str(&format!("   {thin}\n"));
 
                 for (name, bfe, vfe, bre, vre) in &pairs {
                     let diff = bfe - bre;
                     let dvar = vfe - vre;
-                    println!("   {:<20} {:>10.4} {:>10.4} {:>10.4}", name, bfe, bre, diff);
+                    out.push_str(&format!("   {:<20} {:>10.4} {:>10.4} {:>10.4}\n", name, bfe, bre, diff));
                     if dvar > 1e-15 {
                         chi2 += diff.powi(2) / dvar;
                         df += 1;
@@ -998,10 +1014,10 @@ impl Interpreter {
                 }
 
                 if df == 0 {
-                    println!("\n   [!] Var(β_FE) ≤ Var(β_RE) em todos os coeficientes.");
-                    println!("       Estatística indefinida — verifique especificação dos modelos.");
-                    println!("\n{thick}\n");
-                    return Ok(Value::Nil);
+                    out.push_str("\n   [!] Var(β_FE) ≤ Var(β_RE) em todos os coeficientes.\n");
+                    out.push_str("       Estatística indefinida — verifique especificação dos modelos.\n");
+                    out.push_str(&format!("\n{thick}\n"));
+                    return Ok(Self::diag(out));
                 }
 
                 let p = greeners::chi2_pvalue(chi2, df as f64);
@@ -1013,18 +1029,17 @@ impl Interpreter {
                     "Não rejeita H₀ → EFEITOS ALEATÓRIOS é consistente e eficiente"
                 };
 
-                println!("\n── Estatística");
-                println!("   χ²({}) = {:.4}   p = {:.4}  {}", df, chi2, p, sig);
+                out.push_str("\n── Estatística\n");
+                out.push_str(&format!("   χ²({}) = {:.4}   p = {:.4}  {}\n", df, chi2, p, sig));
                 if skipped > 0 {
-                    println!("   ({} coeficiente(s) excluídos: Var(β_FE) ≤ Var(β_RE))", skipped);
+                    out.push_str(&format!("   ({} coeficiente(s) excluídos: Var(β_FE) ≤ Var(β_RE))\n", skipped));
                 }
-                println!("\n── Conclusão");
-                println!("   {}", verdict);
-                println!("\n{thin}");
-                println!("   *** p<0.01  ** p<0.05  * p<0.10");
-                println!("{thick}\n");
-
-                Ok(Value::Nil)
+                out.push_str("\n── Conclusão\n");
+                out.push_str(&format!("   {}\n", verdict));
+                out.push_str(&format!("\n{thin}\n"));
+                out.push_str("   *** p<0.01  ** p<0.05  * p<0.10\n");
+                out.push_str(&format!("{thick}\n"));
+                Ok(Self::diag(out))
             }
 
             // ── Diagnósticos ──────────────────────────────────────────────────
@@ -3797,6 +3812,10 @@ impl Interpreter {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    fn diag(rendered: String) -> Value {
+        Value::DiagResult(Rc::new(DiagResult { rendered }))
+    }
+
     fn extract_panel_args(
         &mut self,
         args: &[Expr],
@@ -4533,7 +4552,10 @@ impl Interpreter {
             }
 
             Stmt::Expr(expr) => {
-                self.eval_expr(expr)?;
+                let val = self.eval_expr(expr)?;
+                if !matches!(val, Value::Nil) {
+                    println!("{val}");
+                }
             }
         }
         Ok(())
