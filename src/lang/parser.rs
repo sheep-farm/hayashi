@@ -537,6 +537,32 @@ impl Parser {
                 Ok(Some(Stmt::For { var, iter, body }))
             }
 
+            // ── fn nome(p1, p2) { corpo } ─────────────────────────────────────
+            Token::Fn => {
+                self.advance();
+                let name = self.expect_ident()?;
+                self.expect(&Token::LParen)?;
+                let mut params = Vec::new();
+                while !matches!(self.peek(), Token::RParen | Token::Eof) {
+                    params.push(self.expect_ident()?);
+                    if self.peek() == &Token::Comma { self.advance(); }
+                }
+                self.expect(&Token::RParen)?;
+                let body = self.parse_block()?;
+                Ok(Some(Stmt::Fn { name, params, body }))
+            }
+
+            // ── return [expr] ─────────────────────────────────────────────────
+            Token::Return => {
+                self.advance();
+                let expr = if matches!(self.peek(), Token::Newline | Token::RBrace | Token::Eof) {
+                    None
+                } else {
+                    Some(self.parse_expr()?)
+                };
+                Ok(Some(Stmt::Return(expr)))
+            }
+
             // ── while cond { ... } ────────────────────────────────────────────
             Token::While => {
                 self.advance();

@@ -39,6 +39,14 @@ impl std::fmt::Display for BinaryModel {
     }
 }
 
+// ── Função definida pelo usuário ─────────────────────────────────────────────
+
+#[derive(Debug, Clone)]
+pub struct UserFn {
+    pub params: Vec<String>,
+    pub body:   Vec<Stmt>,
+}
+
 // ── Resultado de testes de diagnóstico (print-on-demand) ─────────────────────
 
 #[derive(Debug, Clone)]
@@ -73,6 +81,7 @@ pub enum Value {
     DiagResult(Rc<DiagResult>),
     AbResult(Rc<greeners::ArellanoBondResult>),
     List(Rc<Vec<Value>>),
+    UserFn(Rc<UserFn>),
     Nil,
 }
 
@@ -103,6 +112,7 @@ impl std::fmt::Display for Value {
                 }
                 write!(f, "]")
             }
+            Value::UserFn(f_) => write!(f, "<fn({})>", f_.params.join(", ")),
             Value::Nil             => write!(f, "nil"),
         }
     }
@@ -132,13 +142,14 @@ impl Env {
 
 pub struct Interpreter {
     pub env: Env,
-    // df_name → nome da variável de tempo (definida via tsset)
     ts_info: HashMap<String, String>,
+    // valor capturado pelo Stmt::Return — consumido em eval_call
+    return_value: Option<Value>,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
-        Self { env: Env::new(), ts_info: HashMap::new() }
+        Self { env: Env::new(), ts_info: HashMap::new(), return_value: None }
     }
 
     // ── Avalia expressão ──────────────────────────────────────────────────────
@@ -299,6 +310,47 @@ impl Interpreter {
                     Value::Str(s)    => Ok(Value::Int(s.chars().count() as i64)),
                     _ => Err(HayashiError::Type("len() requer lista ou string".into())),
                 }
+            }
+
+            // ── Agregações sobre List ─────────────────────────────────────────
+            // ── Agregações sobre List ─────────────────────────────────────────
+            // "sum" fica reservado para summarize(df, var) já existente
+            // ── Agregações sobre List ─────────────────────────────────────────
+            // "sum" fica para summarize(df) — Stata-style
+            // "total" é a soma de uma lista numérica
+            "mean" | "std" | "min" | "max" | "total" => {
+                if args.len() != 1 {
+                    return Err(HayashiError::Runtime(
+                        format!("{func}() requer exatamente 1 argumento")
+                    ));
+                }
+                let v = self.eval_expr(&args[0])?;
+                let nums: Vec<f64> = match v {
+                    Value::List(lst) => lst.iter()
+                        .map(Self::value_as_f64)
+                        .collect::<Result<_>>()?,
+                    other => return Err(HayashiError::Type(
+                        format!("{func}() requer lista numérica, recebeu {other}")
+                    )),
+                };
+                if nums.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        format!("{func}(): lista vazia")
+                    ));
+                }
+                let result = match func {
+                    "total" => nums.iter().sum::<f64>(),
+                    "mean"  => nums.iter().sum::<f64>() / nums.len() as f64,
+                    "min"   => nums.iter().cloned().fold(f64::INFINITY, f64::min),
+                    "max"   => nums.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+                    "std"   => {
+                        let n = nums.len() as f64;
+                        let m = nums.iter().sum::<f64>() / n;
+                        (nums.iter().map(|x| (x - m).powi(2)).sum::<f64>() / (n - 1.0)).sqrt()
+                    }
+                    _ => unreachable!(),
+                };
+                Ok(Value::Float(result))
             }
 
             "push" => {
@@ -4018,7 +4070,55 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
-            other => Err(HayashiError::Runtime(format!("unknown function '{other}'"))),
+            // ── Função definida pelo usuário ──────────────────────────────────
+            other => {
+                // Recupera a função do env (se existir)
+                let user_fn = match self.env.get(other).cloned() {
+                    Some(Value::UserFn(f)) => f,
+                    _ => return Err(HayashiError::Runtime(
+                        format!("função '{other}' não encontrada")
+                    )),
+                };
+
+                if args.len() != user_fn.params.len() {
+                    return Err(HayashiError::Runtime(format!(
+                        "fn '{other}': esperado {} argumento(s), recebido {}",
+                        user_fn.params.len(), args.len()
+                    )));
+                }
+
+                // Avalia argumentos antes de modificar o env
+                let arg_vals: Vec<Value> = args.iter()
+                    .map(|e| self.eval_expr(e))
+                    .collect::<Result<_>>()?;
+
+                // Salva env atual e cria escopo local
+                let saved_env = self.env.vars.clone();
+
+                for (param, val) in user_fn.params.iter().zip(arg_vals) {
+                    self.env.set(param, val);
+                }
+
+                // Executa corpo — captura Return
+                let body = user_fn.body.clone();
+                let mut exec_err: Option<HayashiError> = None;
+                for s in &body {
+                    match self.exec(s) {
+                        Ok(()) => {}
+                        Err(HayashiError::Return) => break,
+                        Err(e) => { exec_err = Some(e); break; }
+                    }
+                }
+
+                // Restaura env do escopo externo
+                self.env.vars = saved_env;
+
+                if let Some(e) = exec_err {
+                    return Err(e);
+                }
+
+                Ok(self.return_value.take().unwrap_or(Value::Nil))
+            }
         }
     }
 
@@ -4909,6 +5009,24 @@ impl Interpreter {
                         }
                     }
                 }
+            }
+
+            // ── fn nome(params) { corpo } ────────────────────────────────────
+            Stmt::Fn { name, params, body } => {
+                self.env.set(name, Value::UserFn(Rc::new(UserFn {
+                    params: params.clone(),
+                    body: body.clone(),
+                })));
+            }
+
+            // ── return [expr] ─────────────────────────────────────────────────
+            Stmt::Return(expr) => {
+                let val = match expr {
+                    Some(e) => self.eval_expr(e)?,
+                    None    => Value::Nil,
+                };
+                self.return_value = Some(val);
+                return Err(HayashiError::Return);
             }
 
             // ── while cond { ... } ───────────────────────────────────────────
