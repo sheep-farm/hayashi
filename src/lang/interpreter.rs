@@ -2148,6 +2148,64 @@ impl Interpreter {
                 )))
             }
 
+            // archtest(df, varname, lags=5)
+            // Engle (1982) LM test — H₀: sem efeitos ARCH de ordem `lags`
+            // Também aceita resíduos de modelo GARCH: archtest(model, lags=5)
+            "archtest" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "archtest() requer uma série ou modelo GARCH".into()
+                    ));
+                }
+
+                let series = match self.eval_expr(&args[0])? {
+                    // série bruta: archtest(df, varname, lags=5)
+                    Value::DataFrame(df) => {
+                        let col_name = match args.get(1) {
+                            Some(Expr::Var(n)) => n.clone(),
+                            _ => return Err(HayashiError::Runtime(
+                                "archtest(df, varname): segundo argumento deve ser o nome da coluna".into()
+                            )),
+                        };
+                        Array1::from(Self::eval_col_expr(&Expr::Var(col_name), &df)?)
+                    }
+                    // resíduos de GARCH: archtest(model, lags=5)
+                    Value::GarchResult(m) => m.residuals.clone(),
+                    _ => return Err(HayashiError::Type(
+                        "archtest(): primeiro argumento deve ser um DataFrame ou modelo GARCH".into()
+                    )),
+                };
+
+                let lags = match opt_map.get("lags") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 5,
+                };
+
+                let res = greeners::Diagnostics::arch_test(&series, lags)
+                    .map_err(|e| HayashiError::Runtime(format!("archtest: {e}")))?;
+
+                let sep = "─".repeat(54);
+                let sig = |p: f64| if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
+                println!("\nARCH LM Test (Engle 1982)  —  lags = {}  n = {}", res.lags, res.n_obs);
+                println!("{sep}");
+                println!("H₀: sem efeitos ARCH de ordem {}", res.lags);
+                println!("{sep}");
+                println!("{:<22} {:>10} {:>10} {:>8}", "Teste", "Estatística", "p-value", "");
+                println!("{sep}");
+                println!("{:<22} {:>10.4} {:>10.4} {:>8}",
+                    format!("LM  ~ χ²({})", res.lags),
+                    res.lm_stat, res.lm_pvalue, sig(res.lm_pvalue));
+                println!("{:<22} {:>10.4} {:>10.4} {:>8}",
+                    format!("F   ~ F({},{})", res.lags, res.n_obs.saturating_sub(res.lags + 1)),
+                    res.f_stat, res.f_pvalue, sig(res.f_pvalue));
+                println!("{sep}");
+                println!("R² aux = {:.4}   (*** p<0.01  ** p<0.05  * p<0.10)", res.r_squared);
+                println!();
+
+                Ok(Value::Nil)
+            }
+
             // forecast_vol(model, steps=10)
             "forecast_vol" => {
                 if args.is_empty() {
