@@ -2214,6 +2214,108 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // leverage(model)
+            // leverage(model, threshold=2)   — múltiplo de k/n; padrão 2
+            // Diagonal da hat matrix: h_i = x_i'(X'X)⁻¹x_i
+            // Observações com h_i > threshold*k/n merecem atenção
+            "leverage" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("leverage() requer um modelo OLS".into()));
+                }
+                let ols = match self.eval_expr(&args[0])? {
+                    Value::OlsResult(m) => m,
+                    _ => return Err(HayashiError::Type("leverage() suporta apenas modelos OLS".into())),
+                };
+
+                let threshold = match opt_map.get("threshold") {
+                    Some(Value::Float(v)) => *v,
+                    Some(Value::Int(v))   => *v as f64,
+                    _ => 2.0,
+                };
+
+                let h = greeners::Diagnostics::leverage(&ols.x)
+                    .map_err(|e| HayashiError::Runtime(format!("leverage: {e}")))?;
+
+                let n = h.len();
+                let k = ols.x.ncols();
+                let cutoff = threshold * k as f64 / n as f64;
+                let h_mean = k as f64 / n as f64;
+
+                // mostra apenas observações acima do cutoff (ou todas se poucas)
+                let flagged: Vec<(usize, f64)> = h.iter().enumerate()
+                    .filter(|(_, &hi)| hi > cutoff)
+                    .map(|(i, &hi)| (i + 1, hi))
+                    .collect();
+
+                let sep = "─".repeat(46);
+                println!("\nLeverage  —  h̄ = {:.4}  cutoff = {:.4} ({}×k/n)", h_mean, cutoff, threshold);
+                println!("{sep}");
+                if flagged.is_empty() {
+                    println!("Nenhuma observação acima do cutoff.");
+                } else {
+                    println!("{:<8} {:>10}  {}", "obs", "h_i", "");
+                    println!("{sep}");
+                    for (i, hi) in &flagged {
+                        println!("{:<8} {:>10.4}  high leverage", i, hi);
+                    }
+                    println!("{sep}");
+                    println!("{} observação(ões) com h_i > {:.4}", flagged.len(), cutoff);
+                }
+                println!();
+
+                Ok(Value::Nil)
+            }
+
+            // cooks(model)
+            // cooks(model, threshold=1)   — limiar absoluto padrão; ou usa 4/n
+            // D_i = (e_i²·h_i) / (k·MSE·(1−h_i)²)
+            "cooks" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("cooks() requer um modelo OLS".into()));
+                }
+                let ols = match self.eval_expr(&args[0])? {
+                    Value::OlsResult(m) => m,
+                    _ => return Err(HayashiError::Type("cooks() suporta apenas modelos OLS".into())),
+                };
+
+                let mse = ols.result.sigma * ols.result.sigma;
+                let d = greeners::Diagnostics::cooks_distance(&ols.residuals, &ols.x, mse)
+                    .map_err(|e| HayashiError::Runtime(format!("cooks: {e}")))?;
+
+                let n = d.len();
+                let k = ols.x.ncols();
+                // cutoff configurável; padrão 4/n (regra de bolso mais comum)
+                let cutoff = match opt_map.get("threshold") {
+                    Some(Value::Float(v)) => *v,
+                    Some(Value::Int(v))   => *v as f64,
+                    _ => 4.0 / n as f64,
+                };
+
+                let flagged: Vec<(usize, f64)> = d.iter().enumerate()
+                    .filter(|(_, &di)| di > cutoff)
+                    .map(|(i, &di)| (i + 1, di))
+                    .collect();
+
+                let sep = "─".repeat(46);
+                println!("\nCook's Distance  —  n={n}  k={k}  cutoff={cutoff:.4} (4/n)");
+                println!("{sep}");
+                if flagged.is_empty() {
+                    println!("Nenhuma observação influente acima do cutoff.");
+                } else {
+                    println!("{:<8} {:>10}  {}", "obs", "D_i", "");
+                    println!("{sep}");
+                    for (i, di) in &flagged {
+                        let label = if *di > 1.0 { "muito influente" } else { "influente" };
+                        println!("{:<8} {:>10.4}  {}", i, di, label);
+                    }
+                    println!("{sep}");
+                    println!("{} observação(ões) com D_i > {:.4}", flagged.len(), cutoff);
+                }
+                println!();
+
+                Ok(Value::Nil)
+            }
+
             // vif(model)
             // Variance Inflation Factor — detecta multicolinearidade por variável
             // VIF_j = 1/(1−R²_j); VIF>10 indica multicolinearidade grave
