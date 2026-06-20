@@ -556,31 +556,36 @@ impl Interpreter {
 
                 // cabeçalho
                 println!(
-                    "\n{:<16} {:>9} {:>12} {:>12} {:>12} {:>12}",
-                    "Variable", "Obs", "Mean", "Std. Dev.", "Min", "Max"
+                    "\n{:<16} {:>9}  {:>7}  {:>12} {:>12} {:>12} {:>12}",
+                    "Variable", "Obs", "Missing", "Mean", "Std. Dev.", "Min", "Max"
                 );
-                println!("{}", "-".repeat(77));
+                println!("{}", "-".repeat(91));
 
                 for name in &requested {
                     use greeners::Column;
                     let col = df.get_column(name)
                         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-                    // extrai valores f64 conforme o tipo da coluna
-                    let vals: Vec<f64> = match col {
-                        Column::Float(arr) => arr.iter().copied()
-                            .filter(|x| x.is_finite()).collect(),
-                        Column::Int(arr) => arr.iter().map(|&x| x as f64).collect(),
+                    let (n_total, n_missing, vals): (usize, usize, Vec<f64>) = match col {
+                        Column::Float(arr) => {
+                            let total = arr.len();
+                            let vals: Vec<f64> = arr.iter().copied().filter(|x| x.is_finite()).collect();
+                            let missing = total - vals.len();
+                            (total, missing, vals)
+                        }
+                        Column::Int(arr) => {
+                            let vals: Vec<f64> = arr.iter().map(|&x| x as f64).collect();
+                            (vals.len(), 0, vals)
+                        }
                         _ => {
-                            // coluna não numérica: exibe linha vazia
-                            println!("{:<16} {:>9}", name, "(non-numeric)");
+                            println!("{:<16} {:>9}  {:>7}", name, "(non-numeric)", "");
                             continue;
                         }
                     };
 
                     let n = vals.len();
                     if n == 0 {
-                        println!("{:<16} {:>9}", name, 0);
+                        println!("{:<16} {:>9}  {:>7}  (all missing)", name, 0, n_total);
                         continue;
                     }
 
@@ -591,9 +596,10 @@ impl Interpreter {
                     let min = vals.iter().cloned().fold(f64::INFINITY, f64::min);
                     let max = vals.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
 
+                    let miss_str = if n_missing > 0 { format!("{}", n_missing) } else { String::new() };
                     println!(
-                        "{:<16} {:>9} {:>12.4} {:>12.4} {:>12.4} {:>12.4}",
-                        name, n, mean, sd, min, max
+                        "{:<16} {:>9}  {:>7}  {:>12.4} {:>12.4} {:>12.4} {:>12.4}",
+                        name, n, miss_str, mean, sd, min, max
                     );
                 }
                 println!();
@@ -1293,11 +1299,18 @@ impl Interpreter {
                     _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())),
                 };
 
-                let get_finite = |df: &DataFrame, col: &str| -> Result<Vec<f64>> {
+                let get_col_vals = |df: &DataFrame, col: &str| -> Result<Vec<f64>> {
                     use greeners::Column;
                     match df.get_column(col) {
-                        Ok(Column::Float(a)) => Ok(a.iter().filter(|x| x.is_finite()).copied().collect()),
-                        Ok(Column::Int(a))   => Ok(a.iter().map(|&x| x as f64).collect()),
+                        Ok(Column::Float(a)) => {
+                            if a.iter().any(|v| !v.is_finite()) {
+                                return Err(HayashiError::Runtime(
+                                    format!("ttest: column '{col}' contains NaN or Inf. Use dropna() first.")
+                                ));
+                            }
+                            Ok(a.iter().copied().collect())
+                        }
+                        Ok(Column::Int(a)) => Ok(a.iter().map(|&x| x as f64).collect()),
                         _ => Err(HayashiError::Type(format!("'{col}' is not numeric"))),
                     }
                 };
@@ -1322,8 +1335,8 @@ impl Interpreter {
                             Expr::Var(n) | Expr::Str(n) => n.clone(),
                             _ => return Err(HayashiError::Type("variable name must be an identifier".into())),
                         };
-                        let v1 = get_finite(&df, &var1)?;
-                        let v2 = get_finite(&df, &var2)?;
+                        let v1 = get_col_vals(&df, &var1)?;
+                        let v2 = get_col_vals(&df, &var2)?;
                         if v1.len() != v2.len() {
                             return Err(HayashiError::Runtime("paired ttest requires equal-length columns".into()));
                         }
@@ -1347,7 +1360,7 @@ impl Interpreter {
                     // ── DOIS GRUPOS: ttest(df, var, by=group) ────────────────
                     } else if let Some(Value::Str(by_col)) = opt_map.get("by") {
                         let by_col = by_col.clone();
-                        let vals   = get_finite(&df, &var1)?;
+                        let vals   = get_col_vals(&df, &var1)?;
                         let groups = Self::col_to_strings(&df, &by_col)?;
 
                         let mut group_data: HashMap<String, Vec<f64>> = HashMap::new();
@@ -1403,7 +1416,7 @@ impl Interpreter {
                             None => 0.0,
                             _ => return Err(HayashiError::Type("mu= must be numeric".into())),
                         };
-                        let v    = get_finite(&df, &var1)?;
+                        let v    = get_col_vals(&df, &var1)?;
                         let (m, s, n) = stats(&v);
                         let se   = s / n.sqrt();
                         let t    = (m - mu) / se;
@@ -1500,32 +1513,28 @@ impl Interpreter {
                     keys.sort();
                 }
 
-                // função de agregação
+                // função de agregação: NaN nos dados propaga NaN no resultado (IEEE 754)
                 let agg = |vals: &[f64]| -> f64 {
+                    let n = vals.len();
+                    if n == 0 { return f64::NAN; }
                     match func_name.as_str() {
-                        "count" => vals.len() as f64,
-                        _ => {
-                            let fin: Vec<f64> = vals.iter().filter(|x| x.is_finite()).copied().collect();
-                            let n = fin.len();
-                            if n == 0 { return f64::NAN; }
-                            match func_name.as_str() {
-                                "mean"   => fin.iter().sum::<f64>() / n as f64,
-                                "sum"    => fin.iter().sum::<f64>(),
-                                "min"    => fin.iter().cloned().fold(f64::INFINITY,     f64::min),
-                                "max"    => fin.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
-                                "sd"     => {
-                                    if n < 2 { return f64::NAN; }
-                                    let m = fin.iter().sum::<f64>() / n as f64;
-                                    (fin.iter().map(|x| (x - m).powi(2)).sum::<f64>() / (n - 1) as f64).sqrt()
-                                }
-                                "median" => {
-                                    let mut s = fin.clone();
-                                    s.sort_by(|a, b| a.partial_cmp(b).unwrap());
-                                    if n % 2 == 0 { (s[n/2 - 1] + s[n/2]) / 2.0 } else { s[n/2] }
-                                }
-                                _ => f64::NAN,
-                            }
+                        "count" => n as f64,
+                        "sum"    => vals.iter().sum::<f64>(),
+                        "mean"   => vals.iter().sum::<f64>() / n as f64,
+                        "min"    => vals.iter().cloned().fold(f64::INFINITY,     f64::min),
+                        "max"    => vals.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+                        "sd"     => {
+                            if n < 2 { return f64::NAN; }
+                            let m = vals.iter().sum::<f64>() / n as f64;
+                            (vals.iter().map(|x| (x - m).powi(2)).sum::<f64>() / (n - 1) as f64).sqrt()
                         }
+                        "median" => {
+                            if vals.iter().any(|v| !v.is_finite()) { return f64::NAN; }
+                            let mut s = vals.to_vec();
+                            s.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                            if n % 2 == 0 { (s[n/2 - 1] + s[n/2]) / 2.0 } else { s[n/2] }
+                        }
+                        _ => f64::NAN,
                     }
                 };
 
@@ -2572,17 +2581,12 @@ impl Interpreter {
                     )),
                 };
 
-                // filtra NaN/Inf antes de passar ao Greeners
-                let series_clean = Array1::from_vec(
-                    series.iter().cloned().filter(|x| x.is_finite()).collect::<Vec<_>>()
-                );
-
-                let (jb, p) = greeners::Diagnostics::jarque_bera(&series_clean)
+                let (jb, p) = greeners::Diagnostics::jarque_bera(&series)
                     .map_err(|e| HayashiError::Runtime(format!("jb: {e}")))?;
 
                 let sig = |p: f64| if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
                 let sep = "─".repeat(50);
-                println!("\nJarque-Bera Test  —  n = {}", series_clean.len());
+                println!("\nJarque-Bera Test  —  n = {}", series.len());
                 println!("{sep}");
                 println!("H₀: resíduos normalmente distribuídos");
                 println!("{sep}");
@@ -2773,11 +2777,8 @@ impl Interpreter {
                         println!("{thick}");
 
                         // ── Normalidade
-                        let clean = Array1::from_vec(
-                            ols.residuals.iter().cloned().filter(|x| x.is_finite()).collect::<Vec<_>>()
-                        );
                         println!("\n── Normalidade dos Resíduos (Jarque-Bera)");
-                        match greeners::Diagnostics::jarque_bera(&clean) {
+                        match greeners::Diagnostics::jarque_bera(&ols.residuals) {
                             Ok((jb, p)) => println!("   JB ~ χ²(2)  = {:>9.4}   p = {:.4}  {}", jb, p, sig(p)),
                             Err(e) => println!("   erro: {e}"),
                         }
@@ -2868,9 +2869,6 @@ impl Interpreter {
                         println!("{thick}");
 
                         let std_res = &m.standardized_residuals;
-                        let clean = Array1::from_vec(
-                            std_res.iter().cloned().filter(|x| x.is_finite()).collect::<Vec<_>>()
-                        );
 
                         println!("\n── Autocorrelação nos Resíduos Padronizados (Ljung-Box, lags=10)");
                         match greeners::Diagnostics::ljung_box(std_res, 10) {
@@ -2885,7 +2883,7 @@ impl Interpreter {
                         }
 
                         println!("\n── Normalidade dos Resíduos Padronizados (Jarque-Bera)");
-                        match greeners::Diagnostics::jarque_bera(&clean) {
+                        match greeners::Diagnostics::jarque_bera(std_res) {
                             Ok((jb, p)) => println!("   JB ~ χ²(2)  = {:>9.4}   p = {:.4}  {}", jb, p, sig(p)),
                             Err(e) => println!("   erro: {e}"),
                         }
@@ -2901,9 +2899,6 @@ impl Interpreter {
                         println!("{thick}");
 
                         let resid = Array1::from_vec(m.residuals().to_vec());
-                        let clean = Array1::from_vec(
-                            resid.iter().cloned().filter(|x| x.is_finite()).collect::<Vec<_>>()
-                        );
 
                         println!("\n── Autocorrelação nos Resíduos (Ljung-Box, lags=10)");
                         match greeners::Diagnostics::ljung_box(&resid, 10) {
@@ -2912,7 +2907,7 @@ impl Interpreter {
                         }
 
                         println!("\n── Normalidade dos Resíduos (Jarque-Bera)");
-                        match greeners::Diagnostics::jarque_bera(&clean) {
+                        match greeners::Diagnostics::jarque_bera(&resid) {
                             Ok((jb, p)) => println!("   JB ~ χ²(2)  = {:>9.4}   p = {:.4}  {}", jb, p, sig(p)),
                             Err(e) => println!("   erro: {e}"),
                         }
@@ -3509,11 +3504,8 @@ impl Interpreter {
                         .collect::<Result<_>>()?;
                     let n = df.n_rows();
                     return Ok((0..n).map(|i| {
-                        let row: Vec<f64> = cols.iter()
-                            .map(|c| c[i])
-                            .filter(|x| x.is_finite())
-                            .collect();
-                        if row.is_empty() { return f64::NAN; }
+                        let row: Vec<f64> = cols.iter().map(|c| c[i]).collect();
+                        if row.iter().any(|v| !v.is_finite()) { return f64::NAN; }
                         match func.as_str() {
                             "rowmean" => row.iter().sum::<f64>() / row.len() as f64,
                             "rowsum"  => row.iter().sum::<f64>(),
