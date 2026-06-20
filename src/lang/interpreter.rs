@@ -2214,6 +2214,101 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // jb(df, varname) | jb(model)
+            // Jarque-Bera: H₀: resíduos normalmente distribuídos
+            // Aceita série bruta, OLS, ARIMA, GARCH (resíduos padronizados)
+            "jb" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("jb() requer uma série ou modelo".into()));
+                }
+
+                let series = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(df) => {
+                        let col_name = match args.get(1) {
+                            Some(Expr::Var(n)) => n.clone(),
+                            _ => return Err(HayashiError::Runtime(
+                                "jb(df, varname): segundo argumento deve ser o nome da coluna".into()
+                            )),
+                        };
+                        Array1::from(Self::eval_col_expr(&Expr::Var(col_name), &df)?)
+                    }
+                    Value::OlsResult(m)   => m.residuals.clone(),
+                    Value::ArimaResult(m) => Array1::from_vec(m.residuals().to_vec()),
+                    Value::GarchResult(m) => m.standardized_residuals.clone(),
+                    _ => return Err(HayashiError::Type(
+                        "jb(): argumento deve ser DataFrame, OLS, ARIMA ou GARCH".into()
+                    )),
+                };
+
+                // filtra NaN/Inf antes de passar ao Greeners
+                let series_clean = Array1::from_vec(
+                    series.iter().cloned().filter(|x| x.is_finite()).collect::<Vec<_>>()
+                );
+
+                let (jb, p) = greeners::Diagnostics::jarque_bera(&series_clean)
+                    .map_err(|e| HayashiError::Runtime(format!("jb: {e}")))?;
+
+                let sig = |p: f64| if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
+                let sep = "─".repeat(50);
+                println!("\nJarque-Bera Test  —  n = {}", series_clean.len());
+                println!("{sep}");
+                println!("H₀: resíduos normalmente distribuídos");
+                println!("{sep}");
+                println!("{:<18} {:>10} {:>10} {:>4}", "Teste", "JB", "p-value", "");
+                println!("{sep}");
+                println!("{:<18} {:>10.4} {:>10.4} {:>4}",
+                    "Jarque-Bera ~ χ²(2)", jb, p, sig(p));
+                println!("{sep}");
+                println!("(*** p<0.01  ** p<0.05  * p<0.10)");
+                println!();
+
+                Ok(Value::Nil)
+            }
+
+            // bgodfrey(model, lags=4)
+            // Breusch-Godfrey: H₀: sem autocorrelação serial nos resíduos OLS
+            // Requer modelo OLS (precisa da matriz X para a regressão auxiliar)
+            "bgodfrey" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "bgodfrey() requer um modelo OLS".into()
+                    ));
+                }
+
+                let ols = match self.eval_expr(&args[0])? {
+                    Value::OlsResult(m) => m,
+                    _ => return Err(HayashiError::Type(
+                        "bgodfrey() suporta apenas modelos OLS".into()
+                    )),
+                };
+
+                let lags = match opt_map.get("lags") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 4,
+                };
+
+                let (lm, p, df) = greeners::SpecificationTests::breusch_godfrey_test(
+                    &ols.residuals, &ols.x, lags
+                ).map_err(|e| HayashiError::Runtime(format!("bgodfrey: {e}")))?;
+
+                let sig = |p: f64| if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
+                let sep = "─".repeat(54);
+                println!("\nBreusch-Godfrey LM Test  —  lags = {lags}");
+                println!("{sep}");
+                println!("H₀: sem autocorrelação serial de ordem {lags}");
+                println!("{sep}");
+                println!("{:<24} {:>10} {:>10} {:>4}", "Teste", "Estatística", "p-value", "");
+                println!("{sep}");
+                println!("{:<24} {:>10.4} {:>10.4} {:>4}",
+                    format!("LM ~ χ²({df})"), lm, p, sig(p));
+                println!("{sep}");
+                println!("(*** p<0.01  ** p<0.05  * p<0.10)");
+                println!();
+
+                Ok(Value::Nil)
+            }
+
             // archtest(df, varname, lags=5)
             // Engle (1982) LM test — H₀: sem efeitos ARCH de ordem `lags`
             // Também aceita resíduos de modelo GARCH: archtest(model, lags=5)
