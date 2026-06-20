@@ -604,6 +604,469 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── collapse ─────────────────────────────────────────────────────
+            "collapse" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "collapse() requires (df, func, [vars...], by=col)".into(),
+                    ));
+                }
+                let df = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(d) => d,
+                    _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())),
+                };
+                let func_name = match &args[1] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type(
+                        "second argument must be a function name (mean, sum, min, max, count, sd, median)".into(),
+                    )),
+                };
+                let by_col = match opt_map.get("by") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => return Err(HayashiError::Runtime("collapse() requires by=colname".into())),
+                };
+
+                // validar função antes de qualquer cálculo
+                match func_name.as_str() {
+                    "mean" | "sum" | "min" | "max" | "count" | "sd" | "median" => {}
+                    other => return Err(HayashiError::Runtime(format!(
+                        "unknown aggregation '{other}' — use: mean, sum, min, max, count, sd, median"
+                    ))),
+                }
+
+                // variáveis a agregar: args[2..] ou todas as numéricas exceto by
+                let agg_vars: Vec<String> = if args.len() > 2 {
+                    args[2..].iter().map(|a| match a {
+                        Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
+                        _ => Err(HayashiError::Type("variable names must be identifiers".into())),
+                    }).collect::<Result<_>>()?
+                } else {
+                    use greeners::Column;
+                    df.column_names().into_iter()
+                        .filter(|n| n != &by_col && matches!(df.get_column(n), Ok(Column::Float(_)) | Ok(Column::Int(_))))
+                        .collect()
+                };
+
+                // dados das colunas numéricas a agregar
+                let col_data: Vec<Vec<f64>> = agg_vars.iter().map(|col| {
+                    use greeners::Column;
+                    match df.get_column(col) {
+                        Ok(Column::Float(a)) => Ok(a.to_vec()),
+                        Ok(Column::Int(a))   => Ok(a.iter().map(|&x| x as f64).collect()),
+                        _ => Err(HayashiError::Type(format!("'{col}' is not numeric"))),
+                    }
+                }).collect::<Result<_>>()?;
+
+                // agrupa índices de linha por valor de by
+                let by_strs = Self::col_to_strings(&df, &by_col)?;
+                let n_obs = df.n_rows();
+                let mut groups: HashMap<String, Vec<usize>> = HashMap::new();
+                for (i, v) in by_strs.iter().enumerate() {
+                    groups.entry(v.clone()).or_default().push(i);
+                }
+
+                // ordena chaves de grupo
+                let mut keys: Vec<String> = groups.keys().cloned().collect();
+                let keys_numeric = keys.iter().all(|s| s.parse::<f64>().is_ok());
+                if keys_numeric {
+                    keys.sort_by(|a, b| a.parse::<f64>().unwrap().partial_cmp(&b.parse::<f64>().unwrap()).unwrap());
+                } else {
+                    keys.sort();
+                }
+
+                // função de agregação
+                let agg = |vals: &[f64]| -> f64 {
+                    match func_name.as_str() {
+                        "count" => vals.len() as f64,
+                        _ => {
+                            let fin: Vec<f64> = vals.iter().filter(|x| x.is_finite()).copied().collect();
+                            let n = fin.len();
+                            if n == 0 { return f64::NAN; }
+                            match func_name.as_str() {
+                                "mean"   => fin.iter().sum::<f64>() / n as f64,
+                                "sum"    => fin.iter().sum::<f64>(),
+                                "min"    => fin.iter().cloned().fold(f64::INFINITY,     f64::min),
+                                "max"    => fin.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+                                "sd"     => {
+                                    if n < 2 { return f64::NAN; }
+                                    let m = fin.iter().sum::<f64>() / n as f64;
+                                    (fin.iter().map(|x| (x - m).powi(2)).sum::<f64>() / (n - 1) as f64).sqrt()
+                                }
+                                "median" => {
+                                    let mut s = fin.clone();
+                                    s.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                                    if n % 2 == 0 { (s[n/2 - 1] + s[n/2]) / 2.0 } else { s[n/2] }
+                                }
+                                _ => f64::NAN,
+                            }
+                        }
+                    }
+                };
+
+                // constrói o DataFrame resultado
+                let mut builder = DataFrame::builder();
+
+                // coluna by (numérica ou string)
+                use greeners::Column;
+                if matches!(df.get_column(&by_col), Ok(Column::Float(_)) | Ok(Column::Int(_))) {
+                    let vals: Vec<f64> = keys.iter()
+                        .map(|k| k.parse::<f64>().unwrap_or(f64::NAN))
+                        .collect();
+                    builder = builder.add_column(&by_col, vals);
+                } else {
+                    builder = builder.add_string(&by_col, keys.clone());
+                }
+
+                // colunas agregadas
+                for (ci, col_name) in agg_vars.iter().enumerate() {
+                    let vals: Vec<f64> = keys.iter().map(|key| {
+                        let subset: Vec<f64> = groups[key].iter().map(|&i| col_data[ci][i]).collect();
+                        agg(&subset)
+                    }).collect();
+                    builder = builder.add_column(col_name, vals);
+                }
+
+                let new_df = builder.build()
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                println!("({} groups from {} observations)", keys.len(), n_obs);
+                Ok(Value::DataFrame(new_df))
+            }
+
+            // ── append ───────────────────────────────────────────────────────
+            "append" => {
+                if args.len() != 2 {
+                    return Err(HayashiError::Runtime("append() requires (df1, df2)".into()));
+                }
+                let df1 = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(d) => d,
+                    _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())),
+                };
+                let df2 = match self.eval_expr(&args[1])? {
+                    Value::DataFrame(d) => d,
+                    _ => return Err(HayashiError::Type("second argument must be a DataFrame".into())),
+                };
+
+                let names1 = df1.column_names();
+                let names2 = df2.column_names();
+                let set1: std::collections::HashSet<&str> = names1.iter().map(String::as_str).collect();
+                let n1 = df1.n_rows();
+                let n2 = df2.n_rows();
+
+                // união de colunas: ordem de df1 primeiro, depois novas de df2
+                let mut all_names = names1.clone();
+                for n in &names2 { if !set1.contains(n.as_str()) { all_names.push(n.clone()); } }
+
+                let get_num = |df: &DataFrame, col: &str, n: usize| -> Vec<f64> {
+                    use greeners::Column;
+                    match df.get_column(col) {
+                        Ok(Column::Float(a)) => a.to_vec(),
+                        Ok(Column::Int(a))   => a.iter().map(|&x| x as f64).collect(),
+                        _                    => vec![f64::NAN; n],
+                    }
+                };
+                let get_str = |df: &DataFrame, col: &str, n: usize| -> Vec<String> {
+                    df.get_string(col).map(|a| a.to_vec()).unwrap_or_else(|_| vec![String::new(); n])
+                };
+
+                let mut builder = DataFrame::builder();
+                for col in &all_names {
+                    use greeners::Column;
+                    let in1 = names1.contains(col);
+                    let in2 = names2.contains(col);
+                    let is_num = if in1 { matches!(df1.get_column(col), Ok(Column::Float(_)) | Ok(Column::Int(_))) }
+                                 else   { matches!(df2.get_column(col), Ok(Column::Float(_)) | Ok(Column::Int(_))) };
+                    if is_num {
+                        let p1 = if in1 { get_num(&df1, col, n1) } else { vec![f64::NAN; n1] };
+                        let p2 = if in2 { get_num(&df2, col, n2) } else { vec![f64::NAN; n2] };
+                        builder = builder.add_column(col, p1.into_iter().chain(p2).collect::<Vec<_>>());
+                    } else {
+                        let p1 = if in1 { get_str(&df1, col, n1) } else { vec![String::new(); n1] };
+                        let p2 = if in2 { get_str(&df2, col, n2) } else { vec![String::new(); n2] };
+                        builder = builder.add_string(col, p1.into_iter().chain(p2).collect::<Vec<_>>());
+                    }
+                }
+
+                let new_df = builder.build().map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                println!("({} + {} = {} observations)", n1, n2, n1 + n2);
+                Ok(Value::DataFrame(new_df))
+            }
+
+            // ── merge ─────────────────────────────────────────────────────────
+            "merge" => {
+                if args.len() != 2 {
+                    return Err(HayashiError::Runtime(
+                        "merge() requires (df1, df2, key=varname [, type=left|inner|outer])".into(),
+                    ));
+                }
+                let df1 = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(d) => d,
+                    _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())),
+                };
+                let df2 = match self.eval_expr(&args[1])? {
+                    Value::DataFrame(d) => d,
+                    _ => return Err(HayashiError::Type("second argument must be a DataFrame".into())),
+                };
+                let key_col = match opt_map.get("key") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => return Err(HayashiError::Runtime("merge() requires key=colname".into())),
+                };
+                let join_type = match opt_map.get("type") {
+                    Some(Value::Str(s)) => s.clone(),
+                    None => "left".to_string(),
+                    _ => return Err(HayashiError::Runtime("type= must be a string".into())),
+                };
+
+                // índice de busca no df2: key_str → primeiro índice de linha
+                let key2_strs = Self::col_to_strings(&df2, &key_col)?;
+                let mut lookup: HashMap<String, usize> = HashMap::new();
+                for (j, v) in key2_strs.iter().enumerate().rev() {
+                    lookup.insert(v.clone(), j); // rev para ficar com o primeiro
+                }
+
+                let key1_strs = Self::col_to_strings(&df1, &key_col)?;
+                let n1 = df1.n_rows();
+                let n2 = df2.n_rows();
+
+                // pares (idx_df1, idx_df2) para cada linha do resultado
+                type RowPair = (Option<usize>, Option<usize>);
+                let mut result_rows: Vec<RowPair> = (0..n1)
+                    .map(|i| (Some(i), lookup.get(&key1_strs[i]).copied()))
+                    .collect();
+
+                match join_type.as_str() {
+                    "left" => {}
+                    "inner" => result_rows.retain(|(_, r2)| r2.is_some()),
+                    "outer" | "full" => {
+                        let matched: std::collections::HashSet<usize> =
+                            result_rows.iter().filter_map(|(_, r2)| *r2).collect();
+                        for j in 0..n2 {
+                            if !matched.contains(&j) { result_rows.push((None, Some(j))); }
+                        }
+                    }
+                    other => return Err(HayashiError::Runtime(
+                        format!("unknown merge type '{other}' — use: left, inner, outer"),
+                    )),
+                }
+
+                let names1 = df1.column_names();
+                let names2 = df2.column_names();
+                let set1: std::collections::HashSet<&str> = names1.iter().map(String::as_str).collect();
+
+                // colunas extra de df2 (exclui key; sufixo _2 em colisão)
+                let extra: Vec<(String, String)> = names2.iter()
+                    .filter(|n| *n != &key_col)
+                    .map(|n| (n.clone(), if set1.contains(n.as_str()) { format!("{n}_2") } else { n.clone() }))
+                    .collect();
+
+                let get_num = |df: &DataFrame, col: &str| -> Vec<f64> {
+                    use greeners::Column;
+                    match df.get_column(col) {
+                        Ok(Column::Float(a)) => a.to_vec(),
+                        Ok(Column::Int(a))   => a.iter().map(|&x| x as f64).collect(),
+                        _                    => vec![],
+                    }
+                };
+                let get_str_col = |df: &DataFrame, col: &str| -> Vec<String> {
+                    df.get_string(col).map(|a| a.to_vec()).unwrap_or_default()
+                };
+
+                let mut builder = DataFrame::builder();
+
+                // colunas de df1
+                for col in &names1 {
+                    use greeners::Column;
+                    if matches!(df1.get_column(col), Ok(Column::Float(_)) | Ok(Column::Int(_))) {
+                        let src = get_num(&df1, col);
+                        builder = builder.add_column(col,
+                            result_rows.iter().map(|(r1, _)| r1.map_or(f64::NAN, |i| src[i])).collect::<Vec<_>>());
+                    } else {
+                        let src = get_str_col(&df1, col);
+                        builder = builder.add_string(col,
+                            result_rows.iter().map(|(r1, _)| r1.map_or(String::new(), |i| src[i].clone())).collect::<Vec<_>>());
+                    }
+                }
+
+                // colunas extras de df2
+                for (src_col, out_col) in &extra {
+                    use greeners::Column;
+                    if matches!(df2.get_column(src_col), Ok(Column::Float(_)) | Ok(Column::Int(_))) {
+                        let src = get_num(&df2, src_col);
+                        builder = builder.add_column(out_col,
+                            result_rows.iter().map(|(_, r2)| r2.map_or(f64::NAN, |j| src[j])).collect::<Vec<_>>());
+                    } else {
+                        let src = get_str_col(&df2, src_col);
+                        builder = builder.add_string(out_col,
+                            result_rows.iter().map(|(_, r2)| r2.map_or(String::new(), |j| src[j].clone())).collect::<Vec<_>>());
+                    }
+                }
+
+                // indicador _merge: 3=matched, 1=left only, 2=right only
+                builder = builder.add_column("_merge",
+                    result_rows.iter().map(|(r1, r2)| match (r1, r2) {
+                        (Some(_), Some(_)) => 3.0,
+                        (Some(_), None)    => 1.0,
+                        _                  => 2.0,
+                    }).collect::<Vec<_>>());
+
+                let new_df = builder.build().map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let n_matched = result_rows.iter().filter(|(_, r2)| r2.is_some()).count();
+                let n_out = result_rows.len();
+                println!("({n_matched} matched, {} not matched, {n_out} total)", n_out - n_matched);
+                Ok(Value::DataFrame(new_df))
+            }
+
+            // ── sort ─────────────────────────────────────────────────────────
+            "sort" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "sort() requires (dataframe, var1, ...)".into(),
+                    ));
+                }
+                let df = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(df) => df,
+                    _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())),
+                };
+                let sort_vars: Vec<String> = args[1..].iter()
+                    .map(|a| match a {
+                        Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
+                        _ => Err(HayashiError::Type("sort keys must be identifiers".into())),
+                    })
+                    .collect::<Result<_>>()?;
+                let desc = matches!(opt_map.get("desc"), Some(Value::Bool(true)));
+
+                // extrai chaves de ordenação
+                enum SortKey { Num(Vec<f64>), Str(Vec<String>) }
+                let keys: Vec<SortKey> = sort_vars.iter().map(|v| {
+                    use greeners::Column;
+                    match df.get_column(v) {
+                        Ok(Column::Float(arr)) => Ok(SortKey::Num(arr.to_vec())),
+                        Ok(Column::Int(arr))   => Ok(SortKey::Num(arr.iter().map(|&x| x as f64).collect())),
+                        _ => df.get_string(v)
+                                .map(|arr| SortKey::Str(arr.to_vec()))
+                                .map_err(|_| HayashiError::Runtime(format!("column '{v}' not found"))),
+                    }
+                }).collect::<Result<_>>()?;
+
+                let n = df.n_rows();
+                let mut idx: Vec<usize> = (0..n).collect();
+                idx.sort_by(|&a, &b| {
+                    use std::cmp::Ordering;
+                    for key in &keys {
+                        let ord = match key {
+                            SortKey::Num(v) => match (v[a].is_nan(), v[b].is_nan()) {
+                                (true,  true)  => Ordering::Equal,
+                                (true,  false) => Ordering::Greater,
+                                (false, true)  => Ordering::Less,
+                                (false, false) => v[a].partial_cmp(&v[b]).unwrap(),
+                            },
+                            SortKey::Str(v) => v[a].cmp(&v[b]),
+                        };
+                        if ord != Ordering::Equal {
+                            return if desc { ord.reverse() } else { ord };
+                        }
+                    }
+                    Ordering::Equal
+                });
+
+                let all_names = df.column_names();
+                let mut builder = DataFrame::builder();
+                for col_name in &all_names {
+                    use greeners::Column;
+                    match df.get_column(col_name) {
+                        Ok(Column::Float(arr)) => {
+                            builder = builder.add_column(col_name, idx.iter().map(|&i| arr[i]).collect::<Vec<_>>());
+                        }
+                        Ok(Column::Int(arr)) => {
+                            builder = builder.add_column(col_name, idx.iter().map(|&i| arr[i] as f64).collect::<Vec<_>>());
+                        }
+                        _ => {
+                            if let Ok(arr) = df.get_string(col_name) {
+                                let v = arr.to_vec();
+                                builder = builder.add_string(col_name, idx.iter().map(|&i| v[i].clone()).collect::<Vec<_>>());
+                            }
+                        }
+                    }
+                }
+
+                let new_df = builder.build()
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                println!("({n} observations sorted)");
+                Ok(Value::DataFrame(new_df))
+            }
+
+            // ── list ──────────────────────────────────────────────────────────
+            "list" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("list() requires a DataFrame".into()));
+                }
+                let df = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(df) => df,
+                    _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())),
+                };
+
+                // args[1]: Int → nrows; Ident → coluna
+                let mut n_show = 10usize;
+                let mut col_names: Vec<String> = Vec::new();
+
+                for arg in &args[1..] {
+                    match arg {
+                        Expr::Int(n)            => n_show = (*n).max(0) as usize,
+                        Expr::Var(n) | Expr::Str(n) => col_names.push(n.clone()),
+                        _ => return Err(HayashiError::Type("list() arguments must be identifiers or row count".into())),
+                    }
+                }
+                if col_names.is_empty() {
+                    col_names = df.column_names();
+                }
+
+                let n_rows = n_show.min(df.n_rows());
+
+                // extrai dados das colunas
+                let cols_data: Vec<(String, Vec<String>)> = col_names.iter().map(|name| {
+                    use greeners::Column;
+                    let vals: Vec<String> = match df.get_column(name) {
+                        Ok(Column::Float(arr)) => arr.iter().take(n_rows).map(|x| {
+                            if x.is_nan() { ".".into() }
+                            else if x.fract() == 0.0 && x.abs() < 1e14 { format!("{}", *x as i64) }
+                            else { format!("{:.4}", x) }
+                        }).collect(),
+                        Ok(Column::Int(arr)) => arr.iter().take(n_rows).map(|x| x.to_string()).collect(),
+                        _ => df.get_string(name).map(|a| a.to_vec().into_iter().take(n_rows).collect())
+                                .unwrap_or_else(|_| vec!["?".into(); n_rows]),
+                    };
+                    (name.clone(), vals)
+                }).collect();
+
+                // larguras de coluna
+                let row_num_w = n_rows.to_string().len().max(1);
+                let widths: Vec<usize> = cols_data.iter().map(|(name, vals)| {
+                    vals.iter().map(|v| v.len()).max().unwrap_or(0).max(name.len()) + 1
+                }).collect();
+
+                // cabeçalho
+                print!("{:>rw$} |", "", rw = row_num_w);
+                for (i, (name, _)) in cols_data.iter().enumerate() {
+                    print!(" {:>w$}", name, w = widths[i]);
+                }
+                println!();
+                println!("{}-+{}", "-".repeat(row_num_w), "-".repeat(widths.iter().sum::<usize>() + widths.len()));
+
+                // linhas
+                for r in 0..n_rows {
+                    print!("{:>rw$} |", r + 1, rw = row_num_w);
+                    for (i, (_, vals)) in cols_data.iter().enumerate() {
+                        print!(" {:>w$}", vals[r], w = widths[i]);
+                    }
+                    println!();
+                }
+                if df.n_rows() > n_rows {
+                    println!("  ({} more observations not shown)", df.n_rows() - n_rows);
+                }
+                println!();
+                Ok(Value::Nil)
+            }
+
             // ── dropna ───────────────────────────────────────────────────────
             "dropna" => {
                 if args.is_empty() {
@@ -1207,6 +1670,20 @@ impl Interpreter {
                     .map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
                 println!("({} obs)  {df}.{varname} ({kind}) predicted", df_val.n_rows());
                 self.env.set(df, Value::DataFrame(df_val));
+            }
+
+            Stmt::Count { df, cond } => {
+                let df_val = match self.env.get(df) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(HayashiError::Runtime(format!("'{df}' is not a DataFrame"))),
+                };
+                let n = if let Some(cond_expr) = cond {
+                    let mask = Self::eval_col_expr(cond_expr, &df_val)?;
+                    mask.iter().filter(|&&v| v != 0.0).count()
+                } else {
+                    df_val.n_rows()
+                };
+                println!("{n}");
             }
 
             Stmt::Replace { df, varname, expr, cond } => {

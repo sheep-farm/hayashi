@@ -354,6 +354,18 @@ impl Parser {
                 Ok(Some(Stmt::Predict { df, varname, model, kind }))
             }
 
+            Token::Count => {
+                self.advance();
+                let df = self.expect_ident()?;
+                let cond = if self.peek() == &Token::If {
+                    self.advance();
+                    Some(self.parse_expr()?)
+                } else {
+                    None
+                };
+                Ok(Some(Stmt::Count { df, cond }))
+            }
+
             Token::Replace => {
                 self.advance();
                 let df      = self.expect_ident()?;
