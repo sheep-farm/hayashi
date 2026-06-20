@@ -700,7 +700,8 @@ impl Interpreter {
                         if first { first = false; continue; } // cabeçalho
                         let f: Vec<&str> = line.splitn(6, ',').collect();
                         if f.len() >= 5 {
-                            let name = f[0].trim().trim_matches('"').to_string();
+                            let raw  = f[0].trim().trim_matches('"');
+                            let name = if raw == "const" { "_cons".to_string() } else { raw.to_string() };
                             let coef = f[1].trim().parse::<f64>().unwrap_or(f64::NAN);
                             let se   = f[2].trim().parse::<f64>().unwrap_or(f64::NAN);
                             let p    = f[4].trim().parse::<f64>().unwrap_or(1.0);
