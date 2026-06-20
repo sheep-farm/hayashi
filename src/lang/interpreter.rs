@@ -53,6 +53,7 @@ pub enum Value {
     BinaryResult(BinaryModel),
     PanelResult(Rc<greeners::panel::PanelResult>),
     ReResult(Rc<greeners::panel::RandomEffectsResult>),
+    ArimaResult(Rc<greeners::ArimaResult>),
     Nil,
 }
 
@@ -69,6 +70,7 @@ impl std::fmt::Display for Value {
             Value::BinaryResult(m) => write!(f, "{m}"),
             Value::PanelResult(r)  => write!(f, "{r}"),
             Value::ReResult(r)     => write!(f, "{r}"),
+            Value::ArimaResult(r)  => write!(f, "{r}"),
             Value::Nil             => write!(f, "nil"),
         }
     }
@@ -863,6 +865,101 @@ impl Interpreter {
 
                 println!("{sep}");
                 println!("n = {n}   Model: {}", bm.kind);
+                println!();
+
+                Ok(Value::Nil)
+            }
+
+            // ── arima / sarima ───────────────────────────────────────────────
+            // arima(df, varname, p=1, d=1, q=1)
+            // sarima(df, varname, p=1, d=1, q=1, P=1, D=0, Q=1, s=12)
+            "arima" | "sarima" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "arima() requer (dataframe, variável, p=, d=, q=)".into()
+                    ));
+                }
+
+                let df = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(d) => d,
+                    _ => return Err(HayashiError::Type("primeiro argumento deve ser um DataFrame".into())),
+                };
+
+                let col_name = match &args[1] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("segundo argumento deve ser o nome da variável".into())),
+                };
+
+                // extrai série como Array1<f64>
+                let y = Self::eval_col_expr(&Expr::Var(col_name.clone()), &df)?;
+                let y = ndarray::Array1::from(y);
+
+                // opts: p, d, q (ARIMA); P, D, Q, s (SARIMA)
+                let get_usize = |key: &str, default: usize| -> usize {
+                    match opt_map.get(key) {
+                        Some(Value::Int(v))   => *v as usize,
+                        Some(Value::Float(v)) => *v as usize,
+                        _ => default,
+                    }
+                };
+
+                let p = get_usize("p", 1);
+                let d = get_usize("d", 1);
+                let q = get_usize("q", 1);
+
+                let result = if func == "sarima" {
+                    let sp = get_usize("P", 0);
+                    let sd = get_usize("D", 0);
+                    let sq = get_usize("Q", 0);
+                    let s  = get_usize("s", 12);
+                    greeners::ARIMA::fit_sarimax(&y, (p, d, q), (sp, sd, sq, s), None)
+                        .map_err(|e| HayashiError::Runtime(format!("SARIMA: {e}")))?
+                } else {
+                    greeners::ARIMA::fit(&y, (p, d, q))
+                        .map_err(|e| HayashiError::Runtime(format!("ARIMA: {e}")))?
+                };
+
+                Ok(Value::ArimaResult(Rc::new(result)))
+            }
+
+            // ── forecast ─────────────────────────────────────────────────────
+            // forecast(model, steps=8)
+            // forecast(model, steps=8, alpha=0.05)
+            "forecast" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("forecast() requer um modelo ARIMA".into()));
+                }
+
+                let model = match self.eval_expr(&args[0])? {
+                    Value::ArimaResult(m) => m,
+                    _ => return Err(HayashiError::Type("forecast() requer um modelo ARIMA".into())),
+                };
+
+                let steps = match opt_map.get("steps") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 8,
+                };
+                let alpha = match opt_map.get("alpha") {
+                    Some(Value::Float(v)) => *v,
+                    Some(Value::Int(v))   => *v as f64,
+                    _ => 0.05,
+                };
+
+                let (fc, lo, hi) = model
+                    .predict_with_ci(steps, None, alpha)
+                    .map_err(|e| HayashiError::Runtime(format!("forecast: {e}")))?;
+
+                let sep = "─".repeat(52);
+                println!("\nForecast — {} passos à frente  (IC {}%)",
+                         steps, ((1.0 - alpha) * 100.0) as usize);
+                println!("{sep}");
+                println!("{:<6} {:>12} {:>12} {:>12}", "h", "forecast", "lower", "upper");
+                println!("{sep}");
+                for h in 0..steps {
+                    println!("{:<6} {:>12.4} {:>12.4} {:>12.4}", h + 1, fc[h], lo[h], hi[h]);
+                }
+                println!("{sep}");
                 println!();
 
                 Ok(Value::Nil)
