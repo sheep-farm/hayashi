@@ -72,6 +72,7 @@ pub enum Value {
     GarchResult(Rc<greeners::GarchResult>),
     DiagResult(Rc<DiagResult>),
     AbResult(Rc<greeners::ArellanoBondResult>),
+    List(Rc<Vec<Value>>),
     Nil,
 }
 
@@ -94,6 +95,14 @@ impl std::fmt::Display for Value {
             Value::GarchResult(r)  => write!(f, "{r}"),
             Value::DiagResult(r)   => write!(f, "{r}"),
             Value::AbResult(r)     => write!(f, "{r}"),
+            Value::List(v) => {
+                write!(f, "[")?;
+                for (i, item) in v.iter().enumerate() {
+                    if i > 0 { write!(f, ", ")?; }
+                    write!(f, "{item}")?;
+                }
+                write!(f, "]")
+            }
             Value::Nil             => write!(f, "nil"),
         }
     }
@@ -151,10 +160,72 @@ impl Interpreter {
                 Err(HayashiError::Runtime("formula must be used inside an estimator call".into()))
             }
 
-            Expr::BinOp { .. } | Expr::Neg(_) => {
-                Err(HayashiError::Runtime(
-                    "arithmetic expressions are only valid inside generate".into()
-                ))
+            // ── Aritmética / lógica escalar ───────────────────────────────────
+            Expr::BinOp { op, lhs, rhs } => {
+                // Short-circuit para And/Or
+                match op {
+                    BinOp::And => {
+                        let l = self.eval_expr(lhs)?;
+                        if !Self::value_as_bool(&l) { return Ok(Value::Bool(false)); }
+                        let r = self.eval_expr(rhs)?;
+                        return Ok(Value::Bool(Self::value_as_bool(&r)));
+                    }
+                    BinOp::Or => {
+                        let l = self.eval_expr(lhs)?;
+                        if Self::value_as_bool(&l) { return Ok(Value::Bool(true)); }
+                        let r = self.eval_expr(rhs)?;
+                        return Ok(Value::Bool(Self::value_as_bool(&r)));
+                    }
+                    _ => {}
+                }
+                let l = self.eval_expr(lhs)?;
+                let r = self.eval_expr(rhs)?;
+                Self::eval_scalar_binop(op, l, r)
+            }
+
+            Expr::Neg(inner) => {
+                match self.eval_expr(inner)? {
+                    Value::Int(v)   => Ok(Value::Int(-v)),
+                    Value::Float(v) => Ok(Value::Float(-v)),
+                    _ => Err(HayashiError::Type("negação unária requer número".into())),
+                }
+            }
+
+            Expr::Not(inner) => {
+                let v = self.eval_expr(inner)?;
+                Ok(Value::Bool(!Self::value_as_bool(&v)))
+            }
+
+            // ── Lista literal ─────────────────────────────────────────────────
+            Expr::List(items) => {
+                let vals: Vec<Value> = items.iter()
+                    .map(|e| self.eval_expr(e))
+                    .collect::<Result<_>>()?;
+                Ok(Value::List(Rc::new(vals)))
+            }
+
+            // ── Indexação: lista[idx] ─────────────────────────────────────────
+            Expr::Index { obj, idx } => {
+                let obj_val = self.eval_expr(obj)?;
+                let idx_val = self.eval_expr(idx)?;
+                let i = match idx_val {
+                    Value::Int(i) => i,
+                    Value::Float(f) => f as i64,
+                    _ => return Err(HayashiError::Type("índice deve ser inteiro".into())),
+                };
+                match obj_val {
+                    Value::List(v) => {
+                        let len = v.len() as i64;
+                        let real = if i < 0 { len + i } else { i };
+                        if real < 0 || real >= len {
+                            return Err(HayashiError::Runtime(
+                                format!("índice {i} fora do intervalo (len={len})")
+                            ));
+                        }
+                        Ok(v[real as usize].clone())
+                    }
+                    _ => Err(HayashiError::Type("indexação requer uma lista".into())),
+                }
             }
 
             Expr::Call { func, args, opts } => {
@@ -217,6 +288,70 @@ impl Interpreter {
             .collect::<Result<_>>()?;
 
         match func {
+            // ── Builtins de lista ─────────────────────────────────────────────
+            "len" => {
+                if args.len() != 1 {
+                    return Err(HayashiError::Runtime("len() requer exatamente 1 argumento".into()));
+                }
+                let v = self.eval_expr(&args[0])?;
+                match v {
+                    Value::List(lst) => Ok(Value::Int(lst.len() as i64)),
+                    Value::Str(s)    => Ok(Value::Int(s.chars().count() as i64)),
+                    _ => Err(HayashiError::Type("len() requer lista ou string".into())),
+                }
+            }
+
+            "push" => {
+                if args.len() != 2 {
+                    return Err(HayashiError::Runtime("push() requer (lista, item)".into()));
+                }
+                let lst = self.eval_expr(&args[0])?;
+                let item = self.eval_expr(&args[1])?;
+                match lst {
+                    Value::List(v) => {
+                        let mut new_v = (*v).clone();
+                        new_v.push(item);
+                        Ok(Value::List(Rc::new(new_v)))
+                    }
+                    _ => Err(HayashiError::Type("push() requer lista como primeiro argumento".into())),
+                }
+            }
+
+            "range" => {
+                if args.len() < 2 || args.len() > 3 {
+                    return Err(HayashiError::Runtime(
+                        "range(start, end [, step]) requer 2 ou 3 argumentos".into()
+                    ));
+                }
+                let start = match self.eval_expr(&args[0])? {
+                    Value::Int(i) => i,
+                    Value::Float(f) => f as i64,
+                    _ => return Err(HayashiError::Type("range: start deve ser inteiro".into())),
+                };
+                let end = match self.eval_expr(&args[1])? {
+                    Value::Int(i) => i,
+                    Value::Float(f) => f as i64,
+                    _ => return Err(HayashiError::Type("range: end deve ser inteiro".into())),
+                };
+                let step: i64 = if args.len() == 3 {
+                    match self.eval_expr(&args[2])? {
+                        Value::Int(i) => i,
+                        Value::Float(f) => f as i64,
+                        _ => return Err(HayashiError::Type("range: step deve ser inteiro".into())),
+                    }
+                } else if start <= end { 1 } else { -1 };
+                if step == 0 {
+                    return Err(HayashiError::Runtime("range: step não pode ser zero".into()));
+                }
+                let mut v = Vec::new();
+                let mut cur = start;
+                while if step > 0 { cur < end } else { cur > end } {
+                    v.push(Value::Int(cur));
+                    cur += step;
+                }
+                Ok(Value::List(Rc::new(v)))
+            }
+
             // ── OLS ───────────────────────────────────────────────────────────
             "ols" => {
                 if args.len() < 2 {
@@ -3893,6 +4028,96 @@ impl Interpreter {
         Value::DiagResult(Rc::new(DiagResult { rendered }))
     }
 
+    // ── Helpers para aritmética / lógica escalar ──────────────────────────────
+
+    fn value_as_bool(v: &Value) -> bool {
+        match v {
+            Value::Bool(b)  => *b,
+            Value::Int(i)   => *i != 0,
+            Value::Float(f) => *f != 0.0 && !f.is_nan(),
+            Value::Nil      => false,
+            _               => true,
+        }
+    }
+
+    fn value_as_f64(v: &Value) -> Result<f64> {
+        match v {
+            Value::Float(f) => Ok(*f),
+            Value::Int(i)   => Ok(*i as f64),
+            Value::Bool(b)  => Ok(if *b { 1.0 } else { 0.0 }),
+            _ => Err(HayashiError::Type("esperado valor numérico".into())),
+        }
+    }
+
+    fn eval_scalar_binop(op: &BinOp, l: Value, r: Value) -> Result<Value> {
+        // Comparações (funciona com qualquer tipo comparável)
+        match op {
+            BinOp::Eq => {
+                let eq = match (&l, &r) {
+                    (Value::Str(a), Value::Str(b)) => a == b,
+                    (Value::Bool(a), Value::Bool(b)) => a == b,
+                    _ => {
+                        let a = Self::value_as_f64(&l)?;
+                        let b = Self::value_as_f64(&r)?;
+                        (a - b).abs() < f64::EPSILON
+                    }
+                };
+                return Ok(Value::Bool(eq));
+            }
+            BinOp::Ne => {
+                let ne = match (&l, &r) {
+                    (Value::Str(a), Value::Str(b)) => a != b,
+                    (Value::Bool(a), Value::Bool(b)) => a != b,
+                    _ => {
+                        let a = Self::value_as_f64(&l)?;
+                        let b = Self::value_as_f64(&r)?;
+                        (a - b).abs() >= f64::EPSILON
+                    }
+                };
+                return Ok(Value::Bool(ne));
+            }
+            _ => {}
+        }
+
+        // Aritmética e comparações numéricas
+        match (&l, &r) {
+            // Int × Int → Int (para Add/Sub/Mul); Div/Pow → Float
+            (Value::Int(a), Value::Int(b)) => match op {
+                BinOp::Add  => Ok(Value::Int(a + b)),
+                BinOp::Sub  => Ok(Value::Int(a - b)),
+                BinOp::Mul  => Ok(Value::Int(a * b)),
+                BinOp::Div  => Ok(Value::Float(*a as f64 / *b as f64)),
+                BinOp::Pow  => Ok(Value::Float((*a as f64).powf(*b as f64))),
+                BinOp::Gt   => Ok(Value::Bool(a > b)),
+                BinOp::Lt   => Ok(Value::Bool(a < b)),
+                BinOp::GtEq => Ok(Value::Bool(a >= b)),
+                BinOp::LtEq => Ok(Value::Bool(a <= b)),
+                BinOp::And | BinOp::Or | BinOp::Eq | BinOp::Ne => unreachable!(),
+            },
+            // Qualquer Float → Float
+            _ => {
+                // Concatenação de strings
+                if let (BinOp::Add, Value::Str(a), Value::Str(b)) = (op, &l, &r) {
+                    return Ok(Value::Str(format!("{a}{b}")));
+                }
+                let a = Self::value_as_f64(&l)?;
+                let b = Self::value_as_f64(&r)?;
+                match op {
+                    BinOp::Add  => Ok(Value::Float(a + b)),
+                    BinOp::Sub  => Ok(Value::Float(a - b)),
+                    BinOp::Mul  => Ok(Value::Float(a * b)),
+                    BinOp::Div  => Ok(Value::Float(a / b)),
+                    BinOp::Pow  => Ok(Value::Float(a.powf(b))),
+                    BinOp::Gt   => Ok(Value::Bool(a > b)),
+                    BinOp::Lt   => Ok(Value::Bool(a < b)),
+                    BinOp::GtEq => Ok(Value::Bool(a >= b)),
+                    BinOp::LtEq => Ok(Value::Bool(a <= b)),
+                    BinOp::And | BinOp::Or | BinOp::Eq | BinOp::Ne => unreachable!(),
+                }
+            }
+        }
+    }
+
     fn extract_panel_args(
         &mut self,
         args: &[Expr],
@@ -4212,6 +4437,10 @@ impl Interpreter {
                 let vals = Self::eval_col_expr(inner, df)?;
                 Ok(vals.into_iter().map(|x| -x).collect())
             }
+            Expr::Not(inner) => {
+                let vals = Self::eval_col_expr(inner, df)?;
+                Ok(vals.into_iter().map(|x| if x == 0.0 { 1.0 } else { 0.0 }).collect())
+            }
             Expr::BinOp { op, lhs, rhs } => {
                 let l = Self::eval_col_expr(lhs, df)?;
                 let r = Self::eval_col_expr(rhs, df)?;
@@ -4230,6 +4459,8 @@ impl Interpreter {
                     BinOp::LtEq => if a <= b { 1.0 } else { 0.0 },
                     BinOp::Eq   => if (a - b).abs() < f64::EPSILON { 1.0 } else { 0.0 },
                     BinOp::Ne   => if (a - b).abs() >= f64::EPSILON { 1.0 } else { 0.0 },
+                    BinOp::And  => if a != 0.0 && b != 0.0 { 1.0 } else { 0.0 },
+                    BinOp::Or   => if a != 0.0 || b != 0.0 { 1.0 } else { 0.0 },
                 }).collect())
             }
             Expr::Call { func, args, .. } => {
@@ -4626,6 +4857,58 @@ impl Interpreter {
                 println!("  variável de tempo : {t_var}  ({t_min} a {t_max})");
                 println!("  n = {n}");
                 println!();
+            }
+
+            // ── if / else ────────────────────────────────────────────────────
+            Stmt::If { cond, then_body, else_body } => {
+                let cond_val = self.eval_expr(cond)?;
+                if Self::value_as_bool(&cond_val) {
+                    for s in then_body { self.exec(s)?; }
+                } else if let Some(else_stmts) = else_body {
+                    for s in else_stmts { self.exec(s)?; }
+                }
+            }
+
+            // ── for var in iter { ... } ───────────────────────────────────────
+            // Variáveis declaradas no corpo persistem no escopo externo (R-style).
+            Stmt::For { var, iter, body } => {
+                match iter {
+                    ForIter::Range(start_expr, end_expr) => {
+                        let start = match self.eval_expr(start_expr)? {
+                            Value::Int(i) => i,
+                            Value::Float(f) => f as i64,
+                            v => return Err(HayashiError::Type(
+                                format!("for: início do range deve ser inteiro, não {v}")
+                            )),
+                        };
+                        let end = match self.eval_expr(end_expr)? {
+                            Value::Int(i) => i,
+                            Value::Float(f) => f as i64,
+                            v => return Err(HayashiError::Type(
+                                format!("for: fim do range deve ser inteiro, não {v}")
+                            )),
+                        };
+                        let step: i64 = if start <= end { 1 } else { -1 };
+                        let mut cur = start;
+                        while if step > 0 { cur < end } else { cur > end } {
+                            self.env.set(var, Value::Int(cur));
+                            for s in body { self.exec(s)?; }
+                            cur += step;
+                        }
+                    }
+                    ForIter::Items(iter_expr) => {
+                        let items = match self.eval_expr(iter_expr)? {
+                            Value::List(v) => (*v).clone(),
+                            other => return Err(HayashiError::Type(
+                                format!("for: iterador deve ser lista, não {other}")
+                            )),
+                        };
+                        for item in items {
+                            self.env.set(var, item);
+                            for s in body { self.exec(s)?; }
+                        }
+                    }
+                }
             }
 
             Stmt::Expr(expr) => {
