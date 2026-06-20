@@ -16,6 +16,10 @@ pub enum HayashiError {
 
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
+
+    // Sentinela de controle de fluxo — capturada internamente, nunca exposta ao usuário
+    #[error("return")]
+    Return,
 }
 
 pub type Result<T> = std::result::Result<T, HayashiError>;

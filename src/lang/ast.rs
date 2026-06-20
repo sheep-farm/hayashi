@@ -135,6 +135,16 @@ pub enum Stmt {
         body: Vec<Stmt>,
     },
 
+    // fn nome(p1, p2) { corpo }
+    Fn {
+        name: String,
+        params: Vec<String>,
+        body: Vec<Stmt>,
+    },
+
+    // return [expr]
+    Return(Option<Expr>),
+
     // expr standalone (ex: test(model, white))
     Expr(Expr),
 }
