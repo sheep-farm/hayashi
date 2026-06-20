@@ -318,7 +318,7 @@ impl Interpreter {
             // ── Agregações sobre List ─────────────────────────────────────────
             // "sum" fica para summarize(df) — Stata-style
             // "total" é a soma de uma lista numérica
-            "mean" | "std" | "min" | "max" | "total" => {
+            "sum" | "mean" | "std" | "min" | "max" | "total" => {
                 if args.len() != 1 {
                     return Err(HayashiError::Runtime(
                         format!("{func}() requer exatamente 1 argumento")
@@ -339,7 +339,7 @@ impl Interpreter {
                     ));
                 }
                 let result = match func {
-                    "total" => nums.iter().sum::<f64>(),
+                    "sum" | "total" => nums.iter().sum::<f64>(),
                     "mean"  => nums.iter().sum::<f64>() / nums.len() as f64,
                     "min"   => nums.iter().cloned().fold(f64::INFINITY, f64::min),
                     "max"   => nums.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
@@ -1453,7 +1453,7 @@ impl Interpreter {
             }
 
             // ── summarize ────────────────────────────────────────────────────
-            "summarize" | "sum" => {
+            "summarize" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
                         "summarize() requires a DataFrame as first argument".into(),
