@@ -312,9 +312,168 @@ impl Interpreter {
                 }
             }
 
-            // ── Agregações sobre List ─────────────────────────────────────────
-            // ── Agregações sobre List ─────────────────────────────────────────
-            // "sum" fica reservado para summarize(df, var) já existente
+            // ── Funções de string ─────────────────────────────────────────────
+            "upper" | "lower" | "trim" => {
+                let s = match self.eval_expr(args.first().ok_or_else(||
+                    HayashiError::Runtime(format!("{func}() requer 1 argumento")))?)? {
+                    Value::Str(s) => s,
+                    v => return Err(HayashiError::Type(
+                        format!("{func}() requer string, recebeu {v}")
+                    )),
+                };
+                Ok(Value::Str(match func {
+                    "upper" => s.to_uppercase(),
+                    "lower" => s.to_lowercase(),
+                    "trim"  => s.trim().to_string(),
+                    _ => unreachable!(),
+                }))
+            }
+
+            "contains" => {
+                if args.len() != 2 {
+                    return Err(HayashiError::Runtime("contains(s, padrão) requer 2 argumentos".into()));
+                }
+                let s = match self.eval_expr(&args[0])? {
+                    Value::Str(s) => s,
+                    v => return Err(HayashiError::Type(format!("contains: esperado string, recebeu {v}"))),
+                };
+                let pat = match self.eval_expr(&args[1])? {
+                    Value::Str(s) => s,
+                    v => return Err(HayashiError::Type(format!("contains: padrão deve ser string, recebeu {v}"))),
+                };
+                Ok(Value::Bool(s.contains(pat.as_str())))
+            }
+
+            "starts_with" | "ends_with" => {
+                if args.len() != 2 {
+                    return Err(HayashiError::Runtime(format!("{func}(s, padrão) requer 2 argumentos")));
+                }
+                let s = match self.eval_expr(&args[0])? {
+                    Value::Str(s) => s,
+                    v => return Err(HayashiError::Type(format!("{func}: esperado string, recebeu {v}"))),
+                };
+                let pat = match self.eval_expr(&args[1])? {
+                    Value::Str(s) => s,
+                    v => return Err(HayashiError::Type(format!("{func}: padrão deve ser string, recebeu {v}"))),
+                };
+                Ok(Value::Bool(match func {
+                    "starts_with" => s.starts_with(pat.as_str()),
+                    "ends_with"   => s.ends_with(pat.as_str()),
+                    _ => unreachable!(),
+                }))
+            }
+
+            // substr(s, início [, comprimento]) — índice 0-based em chars
+            "substr" => {
+                if args.len() < 2 || args.len() > 3 {
+                    return Err(HayashiError::Runtime(
+                        "substr(s, início [, comprimento]) requer 2 ou 3 argumentos".into()
+                    ));
+                }
+                let s = match self.eval_expr(&args[0])? {
+                    Value::Str(s) => s,
+                    v => return Err(HayashiError::Type(format!("substr: esperado string, recebeu {v}"))),
+                };
+                let chars: Vec<char> = s.chars().collect();
+                let len = chars.len() as i64;
+                let start = match self.eval_expr(&args[1])? {
+                    Value::Int(i)   => i,
+                    Value::Float(f) => f as i64,
+                    v => return Err(HayashiError::Type(format!("substr: início deve ser inteiro, recebeu {v}"))),
+                };
+                let real_start = (if start < 0 { len + start } else { start }).clamp(0, len) as usize;
+                let count = if args.len() == 3 {
+                    match self.eval_expr(&args[2])? {
+                        Value::Int(i)   => i.max(0) as usize,
+                        Value::Float(f) => f.max(0.0) as usize,
+                        v => return Err(HayashiError::Type(format!("substr: comprimento deve ser inteiro, recebeu {v}"))),
+                    }
+                } else {
+                    chars.len().saturating_sub(real_start)
+                };
+                let end = (real_start + count).min(chars.len());
+                Ok(Value::Str(chars[real_start..end].iter().collect()))
+            }
+
+            // split(s, delimitador) → List de Str
+            "split" => {
+                if args.len() != 2 {
+                    return Err(HayashiError::Runtime("split(s, delimitador) requer 2 argumentos".into()));
+                }
+                let s = match self.eval_expr(&args[0])? {
+                    Value::Str(s) => s,
+                    v => return Err(HayashiError::Type(format!("split: esperado string, recebeu {v}"))),
+                };
+                let delim = match self.eval_expr(&args[1])? {
+                    Value::Str(s) => s,
+                    v => return Err(HayashiError::Type(format!("split: delimitador deve ser string, recebeu {v}"))),
+                };
+                let parts: Vec<Value> = s.split(delim.as_str())
+                    .map(|p| Value::Str(p.to_string()))
+                    .collect();
+                Ok(Value::List(Rc::new(parts)))
+            }
+
+            // str_replace(s, de, para) — "replace" é palavra-chave
+            "str_replace" => {
+                if args.len() != 3 {
+                    return Err(HayashiError::Runtime("str_replace(s, de, para) requer 3 argumentos".into()));
+                }
+                let s = match self.eval_expr(&args[0])? {
+                    Value::Str(s) => s,
+                    v => return Err(HayashiError::Type(format!("str_replace: esperado string, recebeu {v}"))),
+                };
+                let from = match self.eval_expr(&args[1])? {
+                    Value::Str(s) => s,
+                    v => return Err(HayashiError::Type(format!("str_replace: 'de' deve ser string, recebeu {v}"))),
+                };
+                let to = match self.eval_expr(&args[2])? {
+                    Value::Str(s) => s,
+                    v => return Err(HayashiError::Type(format!("str_replace: 'para' deve ser string, recebeu {v}"))),
+                };
+                Ok(Value::Str(s.replace(from.as_str(), to.as_str())))
+            }
+
+            // ── Conversões de tipo ────────────────────────────────────────────
+            "str" => {
+                if args.len() != 1 {
+                    return Err(HayashiError::Runtime("str() requer 1 argumento".into()));
+                }
+                Ok(Value::Str(format!("{}", self.eval_expr(&args[0])?)))
+            }
+
+            "int" => {
+                if args.len() != 1 {
+                    return Err(HayashiError::Runtime("int() requer 1 argumento".into()));
+                }
+                match self.eval_expr(&args[0])? {
+                    Value::Int(i)   => Ok(Value::Int(i)),
+                    Value::Float(f) => Ok(Value::Int(f as i64)),
+                    Value::Bool(b)  => Ok(Value::Int(if b { 1 } else { 0 })),
+                    Value::Str(s)   => s.trim().parse::<i64>().map(Value::Int)
+                        .map_err(|_| HayashiError::Runtime(
+                            format!("int(): não foi possível converter \"{s}\" para inteiro")
+                        )),
+                    v => Err(HayashiError::Type(format!("int(): não converte {v}"))),
+                }
+            }
+
+            "float" => {
+                if args.len() != 1 {
+                    return Err(HayashiError::Runtime("float() requer 1 argumento".into()));
+                }
+                match self.eval_expr(&args[0])? {
+                    Value::Float(f) => Ok(Value::Float(f)),
+                    Value::Int(i)   => Ok(Value::Float(i as f64)),
+                    Value::Bool(b)  => Ok(Value::Float(if b { 1.0 } else { 0.0 })),
+                    Value::Str(s)   => s.trim().parse::<f64>().map(Value::Float)
+                        .map_err(|_| HayashiError::Runtime(
+                            format!("float(): não foi possível converter \"{s}\" para número")
+                        )),
+                    v => Err(HayashiError::Type(format!("float(): não converte {v}"))),
+                }
+            }
+
             // ── Agregações sobre List ─────────────────────────────────────────
             // "sum" fica para summarize(df) — Stata-style
             // "total" é a soma de uma lista numérica
