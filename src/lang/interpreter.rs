@@ -2214,6 +2214,95 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // vif(model)
+            // Variance Inflation Factor — detecta multicolinearidade por variável
+            // VIF_j = 1/(1−R²_j); VIF>10 indica multicolinearidade grave
+            "vif" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("vif() requer um modelo OLS".into()));
+                }
+                let ols = match self.eval_expr(&args[0])? {
+                    Value::OlsResult(m) => m,
+                    _ => return Err(HayashiError::Type("vif() suporta apenas modelos OLS".into())),
+                };
+
+                let vifs = greeners::Diagnostics::vif(&ols.x)
+                    .map_err(|e| HayashiError::Runtime(format!("vif: {e}")))?;
+
+                let names = ols.result.variable_names.as_deref()
+                    .unwrap_or(&[]);
+
+                let sep = "─".repeat(40);
+                println!("\nVariance Inflation Factor (VIF)");
+                println!("{sep}");
+                println!("{:<20} {:>8}  {}", "Variável", "VIF", "Diagnóstico");
+                println!("{sep}");
+                for (i, &v) in vifs.iter().enumerate() {
+                    let name = names.get(i).map(|s| s.as_str()).unwrap_or("?");
+                    let diag = if v.is_nan() {
+                        "constante"
+                    } else if v.is_infinite() || v > 10.0 {
+                        "multicolinearidade grave"
+                    } else if v > 5.0 {
+                        "moderada"
+                    } else {
+                        "ok"
+                    };
+                    if v.is_nan() {
+                        println!("{:<20} {:>8}  {}", name, "—", diag);
+                    } else if v.is_infinite() {
+                        println!("{:<20} {:>8}  {}", name, "∞", diag);
+                    } else {
+                        println!("{:<20} {:>8.3}  {}", name, v, diag);
+                    }
+                }
+                println!("{sep}");
+                println!("Referência: VIF<5 ok  |  5-10 moderado  |  >10 grave");
+                println!();
+
+                Ok(Value::Nil)
+            }
+
+            // condnum(model)
+            // Condition number da matriz X — diagnóstico global de multicolinearidade
+            // κ = σ_max/σ_min; κ>30 indica problema sério
+            "condnum" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("condnum() requer um modelo OLS".into()));
+                }
+                let ols = match self.eval_expr(&args[0])? {
+                    Value::OlsResult(m) => m,
+                    _ => return Err(HayashiError::Type("condnum() suporta apenas modelos OLS".into())),
+                };
+
+                let kappa = greeners::Diagnostics::condition_number(&ols.x)
+                    .map_err(|e| HayashiError::Runtime(format!("condnum: {e}")))?;
+
+                let diag = if kappa.is_infinite() || kappa > 100.0 {
+                    "multicolinearidade severa"
+                } else if kappa > 30.0 {
+                    "multicolinearidade moderada"
+                } else if kappa > 10.0 {
+                    "atenção"
+                } else {
+                    "ok"
+                };
+
+                let sep = "─".repeat(44);
+                println!("\nCondition Number (multicolinearidade global)");
+                println!("{sep}");
+                if kappa.is_infinite() {
+                    println!("{:<20} {:>12}  {}", "κ(X)", "∞", diag);
+                } else {
+                    println!("{:<20} {:>12.2}  {}", "κ(X)", kappa, diag);
+                }
+                println!("{sep}");
+                println!("Referência: κ<10 ok  |  10-30 atenção  |  30-100 moderado  |  >100 severo");
+                println!();
+
+                Ok(Value::Nil)
+            }
+
             // durbinwatson(model)
             // Durbin-Watson: detecta autocorrelação de primeira ordem nos resíduos OLS
             // DW ≈ 2 → sem autocorrelação; DW < 2 → positiva; DW > 2 → negativa
