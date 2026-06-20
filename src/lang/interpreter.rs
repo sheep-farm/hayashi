@@ -117,46 +117,6 @@ fn chi2_pvalue(stat: f64, df: usize) -> f64 {
     if x < a + 1.0 { 1.0 - gammp_series(a, x) } else { gammq_cf(a, x) }
 }
 
-// ── Resolução de sistema linear Ax = b (eliminação de Gauss-Jordan) ─────────
-
-fn solve_linear(a: &Array2<f64>, b: &Array1<f64>) -> Option<Array1<f64>> {
-    let n = a.nrows();
-    if n == 0 || n != a.ncols() || n != b.len() { return None; }
-
-    let stride = n + 1;
-    let mut aug: Vec<f64> = Vec::with_capacity(n * stride);
-    for i in 0..n {
-        for j in 0..n { aug.push(a[[i, j]]); }
-        aug.push(b[i]);
-    }
-
-    for col in 0..n {
-        let pivot_row = (col..n).max_by(|&r1, &r2| {
-            aug[r1*stride+col].abs()
-                .partial_cmp(&aug[r2*stride+col].abs())
-                .unwrap_or(std::cmp::Ordering::Equal)
-        })?;
-        if aug[pivot_row*stride+col].abs() < 1e-14 { return None; }
-
-        if pivot_row != col {
-            for j in 0..=n { aug.swap(col*stride+j, pivot_row*stride+j); }
-        }
-
-        let piv = aug[col*stride+col];
-        for j in 0..=n { aug[col*stride+j] /= piv; }
-
-        for row in 0..n {
-            if row != col {
-                let factor = aug[row*stride+col];
-                if factor.abs() < 1e-15 { continue; }
-                for j in 0..=n { aug[row*stride+j] -= factor * aug[col*stride+j]; }
-            }
-        }
-    }
-
-    Some(Array1::from_iter((0..n).map(|i| aug[i*stride+n])))
-}
-
 // ── Wrappers que preservam a matriz X para diagnósticos e predict ────────────
 
 #[derive(Clone)]
@@ -1011,7 +971,7 @@ impl Interpreter {
 
             // ── lincom ───────────────────────────────────────────────────────
             // lincom(model, var1=mult1, var2=mult2, ...)
-            // Computa combinação linear c'β com SE via (X'X)⁻¹s²
+            // Delega álgebra ao Greeners via OlsResult::t_test(r, q, x)
             "lincom" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime("lincom() requires an OLS model".into()));
@@ -1020,44 +980,32 @@ impl Interpreter {
                 let ols = match self.eval_expr(&args[0])? {
                     Value::OlsResult(m) => m,
                     _ => return Err(HayashiError::Type(
-                        "lincom() requires an OLS model (logit/probit não suportado)".into()
+                        "lincom() suporta apenas modelos OLS".into()
                     )),
                 };
 
-                // extrai nomes e coeficientes do CSV
-                use greeners::ExportableResult;
-                let csv = ols.result.to_csv();
-                let mut coef_info: Vec<(String, f64)> = Vec::new();
-                let mut first_line = true;
-                for line in csv.lines() {
-                    let line = line.trim();
-                    if line.is_empty() { continue; }
-                    if first_line { first_line = false; continue; }
-                    let f: Vec<&str> = line.splitn(6, ',').collect();
-                    if f.len() < 2 { continue; }
-                    let raw  = f[0].trim().trim_matches('"');
-                    let name = if raw == "const" { "_cons".to_string() } else { raw.to_string() };
-                    let coef = f[1].trim().parse::<f64>().unwrap_or(f64::NAN);
-                    coef_info.push((name, coef));
-                }
+                // nomes dos coeficientes via API do Greeners (sem parse de CSV)
+                let var_names: Vec<String> = ols.result.variable_names
+                    .clone()
+                    .ok_or_else(|| HayashiError::Runtime(
+                        "modelo sem variable_names — use from_formula".into()
+                    ))?;
 
-                if coef_info.is_empty() {
-                    return Err(HayashiError::Runtime("falha ao extrair coeficientes do modelo".into()));
-                }
+                let k = var_names.len();
 
-                let k = coef_info.len();
-                let n = ols.residuals.len();
-
-                // monta vetor de contraste c a partir dos opts
+                // monta vetor de contraste c alinhado com var_names
+                // aceita "const" (Greeners) e "_cons" (Stata-compat) como aliases
                 let mut c = Array1::<f64>::zeros(k);
                 let mut found = false;
-                for (idx, (name, _)) in coef_info.iter().enumerate() {
-                    if let Some(val) = opt_map.get(name) {
-                        let mult = match val {
+                for (idx, greeners_name) in var_names.iter().enumerate() {
+                    let lookup = if greeners_name == "const" { "_cons" } else { greeners_name.as_str() };
+                    let val = opt_map.get(lookup).or_else(|| opt_map.get(greeners_name.as_str()));
+                    if let Some(v) = val {
+                        let mult = match v {
                             Value::Float(f) => *f,
                             Value::Int(i)   => *i as f64,
                             _ => return Err(HayashiError::Type(
-                                format!("{name}= deve ser numérico")
+                                format!("{greeners_name}= deve ser numérico")
                             )),
                         };
                         c[idx] = mult;
@@ -1066,46 +1014,38 @@ impl Interpreter {
                 }
 
                 if !found {
-                    let available = coef_info.iter().map(|(n, _)| n.as_str())
-                        .collect::<Vec<_>>().join(", ");
+                    let available: Vec<&str> = var_names.iter()
+                        .map(|n| if n == "const" { "_cons" } else { n.as_str() })
+                        .collect();
                     return Err(HayashiError::Runtime(
-                        format!("nenhum coeficiente encontrado — disponíveis: {available}")
+                        format!("nenhum coeficiente encontrado — disponíveis: {}", available.join(", "))
                     ));
                 }
 
-                // estimativa pontual
-                let beta = Array1::from_iter(coef_info.iter().map(|(_, v)| *v));
-                let estimate = c.dot(&beta);
+                // estimativa pontual c'β
+                let estimate = c.dot(&ols.result.params);
 
-                // SE via fórmula não-robusta: s² (X'X)⁻¹
-                let xtx = ols.x.t().dot(&ols.x);
-                let v = solve_linear(&xtx, &c)
-                    .ok_or_else(|| HayashiError::Runtime("X'X é singular — SE indisponível".into()))?;
+                // inferência delegada ao Greeners: t_test usa (X'X)⁻¹σ² internamente
+                let (t, p) = ols.result.t_test(&c, 0.0, &ols.x)
+                    .map_err(|e| HayashiError::Runtime(format!("lincom: {e}")))?;
 
-                let df_t  = (n - k) as f64;
-                let s_sq  = ols.residuals.mapv(|e| e * e).sum() / df_t;
-                let var_e = s_sq * c.dot(&v);
-                if var_e < 0.0 {
-                    return Err(HayashiError::Runtime(
-                        "variância negativa — verifique a combinação linear".into()
-                    ));
-                }
-                let se = var_e.sqrt();
-                let t  = estimate / se;
-                let p  = t_pvalue_two(t, df_t);
-                let tc = t_critical_95(df_t);
+                let se = if t.abs() > 1e-15 { estimate / t } else { 0.0 };
+                let df_t = ols.result.df_resid as f64;
+                let tc   = t_critical_95(df_t);
 
                 // rótulo legível da combinação
-                let expr_label: String = coef_info.iter().zip(c.iter())
+                let display_name = |n: &str| if n == "const" { "_cons".to_string() } else { n.to_string() };
+                let expr_label: String = var_names.iter().zip(c.iter())
                     .filter(|(_, &m)| m != 0.0)
                     .enumerate()
-                    .map(|(i, ((name, _), &mult))| {
+                    .map(|(i, (name, &mult))| {
+                        let dname = display_name(name);
                         let term = if mult == 1.0 {
-                            name.clone()
+                            dname
                         } else if mult == -1.0 {
-                            format!("-{name}")
+                            format!("-{dname}")
                         } else {
-                            format!("{mult}*{name}")
+                            format!("{mult}*{dname}")
                         };
                         if i == 0 { term } else if mult < 0.0 { format!(" - {}", &term[1..]) } else { format!(" + {term}") }
                     })
@@ -1121,7 +1061,6 @@ impl Interpreter {
                 println!("{sep}");
                 println!("95% CI: [{:.6},  {:.6}]",
                          estimate - tc * se, estimate + tc * se);
-                println!("(SE não-robusto — homoscedástico)");
                 println!();
 
                 Ok(Value::Nil)
