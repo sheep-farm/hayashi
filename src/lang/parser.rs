@@ -235,6 +235,23 @@ impl Parser {
                 Ok(Expr::Var(name))
             }
 
+            // Operadores de série temporal: L.price, L2.price, F.gdp, D.wage
+            Token::TsLag(n) => {
+                self.advance();
+                let var = self.expect_ident()?;
+                Ok(Expr::TsOp { op: TsOpKind::Lag, var, n })
+            }
+            Token::TsLead(n) => {
+                self.advance();
+                let var = self.expect_ident()?;
+                Ok(Expr::TsOp { op: TsOpKind::Lead, var, n })
+            }
+            Token::TsDiff(n) => {
+                self.advance();
+                let var = self.expect_ident()?;
+                Ok(Expr::TsOp { op: TsOpKind::Diff, var, n })
+            }
+
             _ => Err(HayashiError::Parse { line, msg: format!("unexpected token {:?}", self.peek()) }),
         }
     }
@@ -380,6 +397,13 @@ impl Parser {
                     None
                 };
                 Ok(Some(Stmt::Replace { df, varname, expr, cond }))
+            }
+
+            Token::Tsset => {
+                self.advance();
+                let df    = self.expect_ident()?;
+                let t_var = self.expect_ident()?;
+                Ok(Some(Stmt::Tsset { df, t_var }))
             }
 
             Token::Ident(_) => {

@@ -98,11 +98,13 @@ impl Env {
 
 pub struct Interpreter {
     pub env: Env,
+    // df_name → nome da variável de tempo (definida via tsset)
+    ts_info: HashMap<String, String>,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
-        Self { env: Env::new() }
+        Self { env: Env::new(), ts_info: HashMap::new() }
     }
 
     // ── Avalia expressão ──────────────────────────────────────────────────────
@@ -137,6 +139,10 @@ impl Interpreter {
             Expr::Field { obj, field, args, opts } => {
                 self.eval_field(obj, field, args, opts)
             }
+
+            Expr::TsOp { .. } => Err(HayashiError::Runtime(
+                "operadores L./F./D. só são válidos dentro de generate".into()
+            )),
         }
     }
 
@@ -1828,6 +1834,53 @@ impl Interpreter {
 
     // ── Nomes dos coeficientes a partir da fórmula ────────────────────────────
 
+    // Ordena um DataFrame por uma única coluna (ascendente).
+    // Usado por tsset para garantir ordem temporal.
+    fn sort_df_by(df: &DataFrame, col: &str) -> Result<DataFrame> {
+        use greeners::Column;
+        let n = df.n_rows();
+
+        // índice de ordenação pela coluna t_var
+        let mut idx: Vec<usize> = (0..n).collect();
+        match df.get_column(col) {
+            Ok(Column::Float(arr)) => {
+                let v = arr.to_vec();
+                idx.sort_by(|&a, &b| v[a].partial_cmp(&v[b]).unwrap_or(std::cmp::Ordering::Equal));
+            }
+            Ok(Column::Int(arr)) => {
+                let v: Vec<f64> = arr.iter().map(|&x| x as f64).collect();
+                idx.sort_by(|&a, &b| v[a].partial_cmp(&v[b]).unwrap());
+            }
+            _ => {
+                if let Ok(arr) = df.get_string(col) {
+                    let v = arr.to_vec();
+                    idx.sort_by(|&a, &b| v[a].cmp(&v[b]));
+                } else {
+                    return Err(HayashiError::Runtime(format!("coluna '{col}' não encontrada")));
+                }
+            }
+        }
+
+        let mut builder = DataFrame::builder();
+        for name in &df.column_names() {
+            match df.get_column(name) {
+                Ok(Column::Float(arr)) => {
+                    builder = builder.add_column(name, idx.iter().map(|&i| arr[i]).collect::<Vec<_>>());
+                }
+                Ok(Column::Int(arr)) => {
+                    builder = builder.add_column(name, idx.iter().map(|&i| arr[i] as f64).collect::<Vec<_>>());
+                }
+                _ => {
+                    if let Ok(arr) = df.get_string(name) {
+                        let v = arr.to_vec();
+                        builder = builder.add_string(name, idx.iter().map(|&i| v[i].clone()).collect());
+                    }
+                }
+            }
+        }
+        builder.build().map_err(|e| HayashiError::Runtime(e.to_string()))
+    }
+
     fn coef_names_from_formula(formula_ast: &Formula, df: &DataFrame, n_cols: usize) -> Vec<String> {
         let mut names: Vec<String> = vec!["_cons".into()];
         for term in &formula_ast.rhs {
@@ -2222,6 +2275,33 @@ impl Interpreter {
                     )))
                 }
             }
+            // ── operadores de série temporal ─────────────────────────────────
+            // Requerem que o df já esteja ordenado por tsset.
+            // L.x = x[i-n], F.x = x[i+n], D.x = x[i] - x[i-n]
+            Expr::TsOp { op, var, n } => {
+                use greeners::Column;
+                let col = df.get_column(var)
+                    .map_err(|_| HayashiError::Runtime(format!("coluna '{var}' não encontrada")))?;
+                let vals: Vec<f64> = match col {
+                    Column::Float(arr) => arr.to_vec(),
+                    Column::Int(arr)   => arr.iter().map(|&x| x as f64).collect(),
+                    _ => return Err(HayashiError::Type(format!("coluna '{var}' não é numérica"))),
+                };
+                let len = vals.len();
+                let n = *n;
+                Ok(match op {
+                    TsOpKind::Lag  => (0..len)
+                        .map(|i| if i >= n { vals[i - n] } else { f64::NAN })
+                        .collect(),
+                    TsOpKind::Lead => (0..len)
+                        .map(|i| if i + n < len { vals[i + n] } else { f64::NAN })
+                        .collect(),
+                    TsOpKind::Diff => (0..len)
+                        .map(|i| if i >= n { vals[i] - vals[i - n] } else { f64::NAN })
+                        .collect(),
+                })
+            }
+
             _ => Err(HayashiError::Runtime(
                 "expression type not supported in generate".into()
             )),
@@ -2433,6 +2513,32 @@ impl Interpreter {
                          Available: DataFrame→csv  |  OLS→csv,latex,html  |  other models→txt"
                     ))),
                 }
+            }
+
+            Stmt::Tsset { df, t_var } => {
+                let frame = match self.env.get(df)
+                    .ok_or_else(|| HayashiError::Runtime(format!("'{df}' não definido")))?
+                {
+                    Value::DataFrame(d) => d.clone(),
+                    _ => return Err(HayashiError::Type(format!("'{df}' não é um DataFrame"))),
+                };
+
+                // ordena por t_var (sort_df_by reporta erro se coluna não existe)
+                let sorted = Self::sort_df_by(&frame, t_var)?;
+
+                // estatísticas da variável de tempo para o sumário
+                let t_vals = Self::eval_col_expr(&Expr::Var(t_var.clone()), &sorted)?;
+                let t_min = t_vals.iter().cloned().fold(f64::INFINITY, f64::min);
+                let t_max = t_vals.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+                let n = sorted.n_rows();
+
+                self.ts_info.insert(df.clone(), t_var.clone());
+                self.env.set(df, Value::DataFrame(sorted));
+
+                println!("tsset {df}");
+                println!("  variável de tempo : {t_var}  ({t_min} a {t_max})");
+                println!("  n = {n}");
+                println!();
             }
 
             Stmt::Expr(expr) => {

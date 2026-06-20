@@ -28,6 +28,10 @@ pub enum BinOp {
     Gt, Lt, GtEq, LtEq, Eq, Ne,
 }
 
+/// Operador de série temporal
+#[derive(Debug, Clone)]
+pub enum TsOpKind { Lag, Lead, Diff }
+
 /// Expressões da linguagem
 #[derive(Debug, Clone)]
 pub enum Expr {
@@ -58,6 +62,9 @@ pub enum Expr {
         args: Vec<Expr>,
         opts: Vec<Opt>,
     },
+
+    // operadores de série temporal: L.price, L2.price, F.gdp, D.wage
+    TsOp { op: TsOpKind, var: String, n: usize },
 }
 
 /// Comandos (statements) da linguagem
@@ -87,6 +94,9 @@ pub enum Stmt {
 
     // count df [if cond]
     Count { df: String, cond: Option<Expr> },
+
+    // tsset df timevar
+    Tsset { df: String, t_var: String },
 
     // expr standalone (ex: test(model, white))
     Expr(Expr),
