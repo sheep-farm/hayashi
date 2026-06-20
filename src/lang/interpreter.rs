@@ -117,6 +117,46 @@ fn chi2_pvalue(stat: f64, df: usize) -> f64 {
     if x < a + 1.0 { 1.0 - gammp_series(a, x) } else { gammq_cf(a, x) }
 }
 
+// ── Resolução de sistema linear Ax = b (eliminação de Gauss-Jordan) ─────────
+
+fn solve_linear(a: &Array2<f64>, b: &Array1<f64>) -> Option<Array1<f64>> {
+    let n = a.nrows();
+    if n == 0 || n != a.ncols() || n != b.len() { return None; }
+
+    let stride = n + 1;
+    let mut aug: Vec<f64> = Vec::with_capacity(n * stride);
+    for i in 0..n {
+        for j in 0..n { aug.push(a[[i, j]]); }
+        aug.push(b[i]);
+    }
+
+    for col in 0..n {
+        let pivot_row = (col..n).max_by(|&r1, &r2| {
+            aug[r1*stride+col].abs()
+                .partial_cmp(&aug[r2*stride+col].abs())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })?;
+        if aug[pivot_row*stride+col].abs() < 1e-14 { return None; }
+
+        if pivot_row != col {
+            for j in 0..=n { aug.swap(col*stride+j, pivot_row*stride+j); }
+        }
+
+        let piv = aug[col*stride+col];
+        for j in 0..=n { aug[col*stride+j] /= piv; }
+
+        for row in 0..n {
+            if row != col {
+                let factor = aug[row*stride+col];
+                if factor.abs() < 1e-15 { continue; }
+                for j in 0..=n { aug[row*stride+j] -= factor * aug[col*stride+j]; }
+            }
+        }
+    }
+
+    Some(Array1::from_iter((0..n).map(|i| aug[i*stride+n])))
+}
+
 // ── Wrappers que preservam a matriz X para diagnósticos e predict ────────────
 
 #[derive(Clone)]
@@ -964,6 +1004,124 @@ impl Interpreter {
 
                 println!("{sep}");
                 println!("n = {n}   Model: {}", bm.kind);
+                println!();
+
+                Ok(Value::Nil)
+            }
+
+            // ── lincom ───────────────────────────────────────────────────────
+            // lincom(model, var1=mult1, var2=mult2, ...)
+            // Computa combinação linear c'β com SE via (X'X)⁻¹s²
+            "lincom" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("lincom() requires an OLS model".into()));
+                }
+
+                let ols = match self.eval_expr(&args[0])? {
+                    Value::OlsResult(m) => m,
+                    _ => return Err(HayashiError::Type(
+                        "lincom() requires an OLS model (logit/probit não suportado)".into()
+                    )),
+                };
+
+                // extrai nomes e coeficientes do CSV
+                use greeners::ExportableResult;
+                let csv = ols.result.to_csv();
+                let mut coef_info: Vec<(String, f64)> = Vec::new();
+                let mut first_line = true;
+                for line in csv.lines() {
+                    let line = line.trim();
+                    if line.is_empty() { continue; }
+                    if first_line { first_line = false; continue; }
+                    let f: Vec<&str> = line.splitn(6, ',').collect();
+                    if f.len() < 2 { continue; }
+                    let raw  = f[0].trim().trim_matches('"');
+                    let name = if raw == "const" { "_cons".to_string() } else { raw.to_string() };
+                    let coef = f[1].trim().parse::<f64>().unwrap_or(f64::NAN);
+                    coef_info.push((name, coef));
+                }
+
+                if coef_info.is_empty() {
+                    return Err(HayashiError::Runtime("falha ao extrair coeficientes do modelo".into()));
+                }
+
+                let k = coef_info.len();
+                let n = ols.residuals.len();
+
+                // monta vetor de contraste c a partir dos opts
+                let mut c = Array1::<f64>::zeros(k);
+                let mut found = false;
+                for (idx, (name, _)) in coef_info.iter().enumerate() {
+                    if let Some(val) = opt_map.get(name) {
+                        let mult = match val {
+                            Value::Float(f) => *f,
+                            Value::Int(i)   => *i as f64,
+                            _ => return Err(HayashiError::Type(
+                                format!("{name}= deve ser numérico")
+                            )),
+                        };
+                        c[idx] = mult;
+                        found = true;
+                    }
+                }
+
+                if !found {
+                    let available = coef_info.iter().map(|(n, _)| n.as_str())
+                        .collect::<Vec<_>>().join(", ");
+                    return Err(HayashiError::Runtime(
+                        format!("nenhum coeficiente encontrado — disponíveis: {available}")
+                    ));
+                }
+
+                // estimativa pontual
+                let beta = Array1::from_iter(coef_info.iter().map(|(_, v)| *v));
+                let estimate = c.dot(&beta);
+
+                // SE via fórmula não-robusta: s² (X'X)⁻¹
+                let xtx = ols.x.t().dot(&ols.x);
+                let v = solve_linear(&xtx, &c)
+                    .ok_or_else(|| HayashiError::Runtime("X'X é singular — SE indisponível".into()))?;
+
+                let df_t  = (n - k) as f64;
+                let s_sq  = ols.residuals.mapv(|e| e * e).sum() / df_t;
+                let var_e = s_sq * c.dot(&v);
+                if var_e < 0.0 {
+                    return Err(HayashiError::Runtime(
+                        "variância negativa — verifique a combinação linear".into()
+                    ));
+                }
+                let se = var_e.sqrt();
+                let t  = estimate / se;
+                let p  = t_pvalue_two(t, df_t);
+                let tc = t_critical_95(df_t);
+
+                // rótulo legível da combinação
+                let expr_label: String = coef_info.iter().zip(c.iter())
+                    .filter(|(_, &m)| m != 0.0)
+                    .enumerate()
+                    .map(|(i, ((name, _), &mult))| {
+                        let term = if mult == 1.0 {
+                            name.clone()
+                        } else if mult == -1.0 {
+                            format!("-{name}")
+                        } else {
+                            format!("{mult}*{name}")
+                        };
+                        if i == 0 { term } else if mult < 0.0 { format!(" - {}", &term[1..]) } else { format!(" + {term}") }
+                    })
+                    .collect();
+
+                let sep = "─".repeat(64);
+                println!("\nlincom: {expr_label}");
+                println!("{sep}");
+                println!("{:<12} {:>10} {:>10} {:>8} {:>10}", "Estimate", "Std.Err.", "t", "df", "p");
+                println!("{sep}");
+                println!("{:<12.6} {:>10.6} {:>10.4} {:>8.1} {:>10.4}",
+                         estimate, se, t, df_t, p);
+                println!("{sep}");
+                println!("95% CI: [{:.6},  {:.6}]",
+                         estimate - tc * se, estimate + tc * se);
+                println!("(SE não-robusto — homoscedástico)");
                 println!();
 
                 Ok(Value::Nil)
@@ -2101,7 +2259,109 @@ impl Interpreter {
             }
             Expr::Call { func, args, .. } => {
                 // funções escalares aplicadas elemento-a-elemento
+                // ── funções multi-coluna (rowmean / rowsum / rowmin / rowmax) ──
+                if matches!(func.as_str(), "rowmean" | "rowsum" | "rowmin" | "rowmax") {
+                    if args.is_empty() {
+                        return Err(HayashiError::Runtime(
+                            format!("{func}() requer ao menos uma coluna")
+                        ));
+                    }
+                    let cols: Vec<Vec<f64>> = args.iter()
+                        .map(|a| Self::eval_col_expr(a, df))
+                        .collect::<Result<_>>()?;
+                    let n = df.n_rows();
+                    return Ok((0..n).map(|i| {
+                        let row: Vec<f64> = cols.iter()
+                            .map(|c| c[i])
+                            .filter(|x| x.is_finite())
+                            .collect();
+                        if row.is_empty() { return f64::NAN; }
+                        match func.as_str() {
+                            "rowmean" => row.iter().sum::<f64>() / row.len() as f64,
+                            "rowsum"  => row.iter().sum::<f64>(),
+                            "rowmin"  => row.iter().cloned().fold(f64::INFINITY,     f64::min),
+                            "rowmax"  => row.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+                            _ => f64::NAN,
+                        }
+                    }).collect());
+                }
+
                 if args.len() == 1 {
+                    // ── funções que precisam de toda a coluna ──────────────────
+                    match func.as_str() {
+                        // rank com média para empates (ascendente; NaN vão ao fim)
+                        "rank" => {
+                            let vals = Self::eval_col_expr(&args[0], df)?;
+                            let n = vals.len();
+                            let mut order: Vec<usize> = (0..n).collect();
+                            order.sort_by(|&a, &b| {
+                                match (vals[a].is_nan(), vals[b].is_nan()) {
+                                    (true, true)   => std::cmp::Ordering::Equal,
+                                    (true, false)  => std::cmp::Ordering::Greater,
+                                    (false, true)  => std::cmp::Ordering::Less,
+                                    (false, false) => vals[a].partial_cmp(&vals[b]).unwrap(),
+                                }
+                            });
+                            let mut ranks = vec![0.0f64; n];
+                            let mut i = 0;
+                            while i < n {
+                                if vals[order[i]].is_nan() {
+                                    for k in i..n { ranks[order[k]] = f64::NAN; }
+                                    break;
+                                }
+                                let mut j = i;
+                                while j < n
+                                    && !vals[order[j]].is_nan()
+                                    && (vals[order[j]] - vals[order[i]]).abs() < 1e-10
+                                {
+                                    j += 1;
+                                }
+                                let avg = ((i + 1) as f64 + j as f64) / 2.0;
+                                for k in i..j { ranks[order[k]] = avg; }
+                                i = j;
+                            }
+                            return Ok(ranks);
+                        }
+                        // cumsum: soma cumulativa
+                        "cumsum" => {
+                            let vals = Self::eval_col_expr(&args[0], df)?;
+                            let mut s = 0.0f64;
+                            return Ok(vals.into_iter().map(|v| { s += v; s }).collect());
+                        }
+                        // group: ID inteiro (1-based) para cada valor único
+                        "group" => {
+                            let col_name = match &args[0] {
+                                Expr::Var(name) => name.clone(),
+                                _ => return Err(HayashiError::Runtime(
+                                    "group() requer o nome de uma coluna".into()
+                                )),
+                            };
+                            let strs = Self::col_to_strings(df, &col_name)?;
+                            let mut unique: Vec<String> = strs.iter().cloned()
+                                .collect::<std::collections::HashSet<_>>()
+                                .into_iter()
+                                .collect();
+                            if unique.iter().all(|s| s.parse::<f64>().is_ok()) {
+                                unique.sort_by(|a, b| {
+                                    a.parse::<f64>().unwrap()
+                                        .partial_cmp(&b.parse::<f64>().unwrap())
+                                        .unwrap()
+                                });
+                            } else {
+                                unique.sort();
+                            }
+                            let lookup: HashMap<String, f64> = unique.into_iter()
+                                .enumerate()
+                                .map(|(i, v)| (v, (i + 1) as f64))
+                                .collect();
+                            return Ok(strs.iter()
+                                .map(|v| *lookup.get(v).unwrap_or(&f64::NAN))
+                                .collect());
+                        }
+                        _ => {}
+                    }
+
+                    // ── funções escalares elemento-a-elemento ──────────────────
                     let vals = Self::eval_col_expr(&args[0], df)?;
                     let f: fn(f64) -> f64 = match func.as_str() {
                         "log"  | "ln"   => f64::ln,
@@ -2116,7 +2376,7 @@ impl Interpreter {
                         "sin"           => f64::sin,
                         "cos"           => f64::cos,
                         other => return Err(HayashiError::Runtime(
-                            format!("unknown column function '{other}'")
+                            format!("função de coluna desconhecida '{other}'")
                         )),
                     };
                     Ok(vals.into_iter().map(f).collect())
@@ -2126,7 +2386,7 @@ impl Interpreter {
                     Ok(base.into_iter().zip(exp).map(|(a, b)| a.powf(b)).collect())
                 } else {
                     Err(HayashiError::Runtime(format!(
-                        "function '{func}' not supported in generate expression"
+                        "função '{func}' não suportada em generate"
                     )))
                 }
             }
