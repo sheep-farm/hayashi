@@ -55,6 +55,7 @@ pub enum Value {
     ReResult(Rc<greeners::panel::RandomEffectsResult>),
     ArimaResult(Rc<greeners::ArimaResult>),
     VarResult(Rc<greeners::var::VarResult>),
+    VecmResult(Rc<greeners::vecm::VecmResult>),
     Nil,
 }
 
@@ -73,6 +74,7 @@ impl std::fmt::Display for Value {
             Value::ReResult(r)     => write!(f, "{r}"),
             Value::ArimaResult(r)  => write!(f, "{r}"),
             Value::VarResult(r)    => write!(f, "{r}"),
+            Value::VecmResult(r)   => write!(f, "{r}"),
             Value::Nil             => write!(f, "nil"),
         }
     }
@@ -870,6 +872,56 @@ impl Interpreter {
                 println!();
 
                 Ok(Value::Nil)
+            }
+
+            // ── vecm ─────────────────────────────────────────────────────────
+            // vecm(df, y1, y2, ..., lags=2, rank=1)
+            // rank = número de relações de cointegração (1 ≤ rank < k)
+            "vecm" => {
+                if args.len() < 3 {
+                    return Err(HayashiError::Runtime(
+                        "vecm() requer (dataframe, var1, var2, ..., lags=p, rank=r)".into()
+                    ));
+                }
+
+                let df = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(d) => d,
+                    _ => return Err(HayashiError::Type("primeiro argumento deve ser um DataFrame".into())),
+                };
+
+                let var_names: Vec<String> = args[1..].iter()
+                    .map(|a| match a {
+                        Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
+                        _ => Err(HayashiError::Type("variáveis do VECM devem ser identificadores".into())),
+                    })
+                    .collect::<Result<_>>()?;
+
+                let lags = match opt_map.get("lags") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 2,
+                };
+                let rank = match opt_map.get("rank") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 1,
+                };
+
+                // monta matriz T×k
+                let n = df.n_rows();
+                let k = var_names.len();
+                let mut data = ndarray::Array2::<f64>::zeros((n, k));
+                for (j, vname) in var_names.iter().enumerate() {
+                    let col = Self::eval_col_expr(&Expr::Var(vname.clone()), &df)?;
+                    for (i, &v) in col.iter().enumerate() {
+                        data[[i, j]] = v;
+                    }
+                }
+
+                let result = greeners::VECM::fit(&data, lags, rank)
+                    .map_err(|e| HayashiError::Runtime(format!("VECM: {e}")))?;
+
+                Ok(Value::VecmResult(Rc::new(result)))
             }
 
             // ── var ──────────────────────────────────────────────────────────
