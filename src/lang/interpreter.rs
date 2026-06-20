@@ -590,6 +590,85 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── Chamberlain: correlação period-específica com efeitos individuais
+            "chamberlain" => {
+                // chamberlain(formula, df, id=col, time=col)
+                // H₀: Π_s = 0 para todo s (RE consistente)
+                // H₁: pelo menos um Π_s ≠ 0 (efeitos correlacionados com X — use FE)
+                // Generalização do Mundlak: usa valores em TODOS os períodos, não só a média
+                let (formula_ast, df, id_col) = self.extract_panel_args(args, &opt_map)?;
+
+                let time_col = match opt_map.get("time") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => return Err(HayashiError::Runtime(
+                        "chamberlain(): opção time=col é obrigatória".into()
+                    )),
+                };
+
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                let (y_vec, x_mat) = df.to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                let entity_ids: Vec<i64> = if let Ok(ids) = df.get_int(&id_col) {
+                    ids.to_vec()
+                } else if let Ok(floats) = df.get(&id_col) {
+                    floats.iter().map(|&v| v as i64).collect()
+                } else {
+                    return Err(HayashiError::Runtime(
+                        format!("chamberlain: coluna id '{id_col}' não encontrada")
+                    ));
+                };
+
+                let time_vals: Vec<f64> = if let Ok(arr) = df.get(&time_col) {
+                    arr.to_vec()
+                } else if let Ok(arr) = df.get_int(&time_col) {
+                    arr.iter().map(|&v| v as f64).collect()
+                } else {
+                    return Err(HayashiError::Runtime(
+                        format!("chamberlain: coluna time '{time_col}' não encontrada")
+                    ));
+                };
+
+                let (f_stat, p, k_active, df_denom, n_entities, t_count) =
+                    greeners::PanelDiagnostics::chamberlain(&y_vec, &x_mat, &entity_ids, &time_vals)
+                        .map_err(|e| HayashiError::Runtime(e))?;
+
+                let n_obs = y_vec.len();
+                let df1 = k_active;
+
+                let sig = if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
+                let verdict = if p < 0.05 {
+                    "Rejeita H₀ → efeitos individuais correlacionados com X (prefira FE)"
+                } else {
+                    "Não rejeita H₀ → RE consistente (sem correlação period-específica)"
+                };
+
+                let thick = "═".repeat(70);
+                let thin  = "─".repeat(70);
+                println!("\n{thick}");
+                println!(" Chamberlain Test (correlação period-específica com efeitos individuais)");
+                println!(" H₀: Π_s = 0 ∀s  (RE consistente)");
+                println!("{thick}");
+                println!("\n── Painel: n={} obs   N={} entidades   T={} períodos", n_obs, n_entities, t_count);
+                println!("   Colunas de augmentação: {} de Chamberlain (k×T, após remover zero-variância)", k_active);
+                if t_count > 6 {
+                    println!("   ⚠ T={} — com T grande o teste tem baixo poder em amostras finitas", t_count);
+                }
+                println!("\n── Teste conjunto H₀: todos os Π_s = 0");
+                println!("   F({}, {}) = {:.4}   p = {:.4}  {}", df1, df_denom, f_stat, p, sig);
+                println!("\n── Conclusão");
+                println!("   {}", verdict);
+                println!("\n{thin}");
+                println!("   *** p<0.01  ** p<0.05  * p<0.10");
+                println!("   Teste mais geral que Mundlak — inclui valores em todos os T períodos");
+                println!("{thick}\n");
+
+                Ok(Value::Nil)
+            }
+
             // ── Mundlak: correlação entre regressores e efeitos individuais ───
             "mundlak" => {
                 // mundlak(formula, df, id=col)
