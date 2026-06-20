@@ -4106,6 +4106,12 @@ impl Interpreter {
                     match self.exec(s) {
                         Ok(()) => {}
                         Err(HayashiError::Return) => break,
+                        Err(HayashiError::Break | HayashiError::Continue) => {
+                            exec_err = Some(HayashiError::Runtime(
+                                "break/continue fora de um loop".into()
+                            ));
+                            break;
+                        }
                         Err(e) => { exec_err = Some(e); break; }
                     }
                 }
@@ -4972,6 +4978,21 @@ impl Interpreter {
             // ── for var in iter { ... } ───────────────────────────────────────
             // Variáveis declaradas no corpo persistem no escopo externo (R-style).
             Stmt::For { var, iter, body } => {
+                // Executa um passo do corpo; retorna true=continue, false=break
+                macro_rules! run_body {
+                    () => {{
+                        let mut do_break = false;
+                        for s in body {
+                            match self.exec(s) {
+                                Ok(()) => {}
+                                Err(HayashiError::Continue) => break,
+                                Err(HayashiError::Break)    => { do_break = true; break; }
+                                Err(e) => return Err(e),
+                            }
+                        }
+                        do_break
+                    }};
+                }
                 match iter {
                     ForIter::Range(start_expr, end_expr) => {
                         let start = match self.eval_expr(start_expr)? {
@@ -4992,7 +5013,7 @@ impl Interpreter {
                         let mut cur = start;
                         while if step > 0 { cur < end } else { cur > end } {
                             self.env.set(var, Value::Int(cur));
-                            for s in body { self.exec(s)?; }
+                            if run_body!() { break; }
                             cur += step;
                         }
                     }
@@ -5005,7 +5026,7 @@ impl Interpreter {
                         };
                         for item in items {
                             self.env.set(var, item);
-                            for s in body { self.exec(s)?; }
+                            if run_body!() { break; }
                         }
                     }
                 }
@@ -5029,12 +5050,22 @@ impl Interpreter {
                 return Err(HayashiError::Return);
             }
 
+            Stmt::Break    => return Err(HayashiError::Break),
+            Stmt::Continue => return Err(HayashiError::Continue),
+
             // ── while cond { ... } ───────────────────────────────────────────
             Stmt::While { cond, body } => {
-                loop {
+                'outer: loop {
                     let cond_val = self.eval_expr(cond)?;
                     if !Self::value_as_bool(&cond_val) { break; }
-                    for s in body { self.exec(s)?; }
+                    for s in body {
+                        match self.exec(s) {
+                            Ok(()) => {}
+                            Err(HayashiError::Break)    => break 'outer,
+                            Err(HayashiError::Continue) => break,
+                            Err(e) => return Err(e),
+                        }
+                    }
                 }
             }
 

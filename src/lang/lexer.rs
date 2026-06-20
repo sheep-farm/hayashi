@@ -26,6 +26,8 @@ pub enum Token {
     While,
     Fn,
     Return,
+    Break,
+    Continue,
 
     // Operadores de série temporal: L.x  L2.x  F.x  D.x
     TsLag(usize),
@@ -170,6 +172,8 @@ impl Lexer {
             "while"    => Token::While,
             "fn"       => Token::Fn,
             "return"   => Token::Return,
+            "break"    => Token::Break,
+            "continue" => Token::Continue,
             "true"     => Token::Bool(true),
             "false"    => Token::Bool(false),
             _          => Token::Ident(s),

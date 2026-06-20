@@ -563,6 +563,9 @@ impl Parser {
                 Ok(Some(Stmt::Return(expr)))
             }
 
+            Token::Break    => { self.advance(); Ok(Some(Stmt::Break)) }
+            Token::Continue => { self.advance(); Ok(Some(Stmt::Continue)) }
+
             // ── while cond { ... } ────────────────────────────────────────────
             Token::While => {
                 self.advance();
