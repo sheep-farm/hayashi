@@ -269,8 +269,20 @@ impl Interpreter {
 
                 let g_endog = GFormula::parse(&endog_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let g_instr = GFormula::parse(&instr_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                // A fórmula dos instrumentos pode ter LHS vazio (sintaxe ~ z1 + z2).
+                // GFormula::parse rejeita LHS vazio; construímos diretamente.
+                let g_instr = if instr_ast.lhs.is_empty() {
+                    let independents: Vec<String> = instr_ast.rhs.iter().map(|t| match t {
+                        RhsTerm::Var(v) => v.clone(),
+                        RhsTerm::Categorical(v) => format!("C({v})"),
+                        RhsTerm::Transform(fn_, v) => format!("{fn_}({v})"),
+                        RhsTerm::Interaction(a, b) => format!("{a}:{b}"),
+                    }).collect();
+                    GFormula { dependent: String::new(), independents, intercept: true }
+                } else {
+                    GFormula::parse(&instr_str)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?
+                };
 
                 let result = IV::from_formula(&g_endog, &g_instr, &df, cov)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -320,9 +332,13 @@ impl Interpreter {
                 let g_formula = GFormula::parse(&formula_no_const)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-                // tenta int; cai para string se não existir como int
+                // tenta int; cai para float→int; cai para string
                 let result = if let Ok(ids) = df.get_int(&id_col) {
                     let ids_vec: Vec<i64> = ids.to_vec();
+                    FixedEffects::from_formula(&g_formula, &df, &ids_vec)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?
+                } else if let Ok(floats) = df.get(&id_col) {
+                    let ids_vec: Vec<i64> = floats.iter().map(|&v| v as i64).collect();
                     FixedEffects::from_formula(&g_formula, &df, &ids_vec)
                         .map_err(|e| HayashiError::Runtime(e.to_string()))?
                 } else if let Ok(ids) = df.get_string(&id_col) {
@@ -345,10 +361,19 @@ impl Interpreter {
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-                let ids = df.get_int(&id_col)
-                    .map_err(|_| HayashiError::Runtime(
-                        format!("column '{id_col}' must be integer for re()"),
-                    ))?;
+                // aceita coluna float de valores inteiros (ex: idcode lido como f64)
+                let ids_owned: ndarray::Array1<i64>;
+                let ids = match df.get_int(&id_col) {
+                    Ok(arr) => arr,
+                    Err(_) => {
+                        let floats = df.get(id_col.as_str())
+                            .map_err(|_| HayashiError::Runtime(
+                                format!("column '{id_col}' must be integer for re()"),
+                            ))?;
+                        ids_owned = floats.mapv(|v| v as i64);
+                        &ids_owned
+                    }
+                };
 
                 let result = RandomEffects::from_formula(&g_formula, &df, ids)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -3002,8 +3027,123 @@ impl Interpreter {
                         println!("{thick}\n");
                     }
 
+                    Value::IvResult(iv) => {
+                        let k   = iv.params.len();
+                        let n   = iv.n_obs;
+                        let df  = iv.df_resid;
+                        let mse = iv.sigma * iv.sigma;
+                        let names = iv.variable_names.as_deref().unwrap_or(&[]);
+
+                        println!("\n{thick}");
+                        println!(" DIAGNÓSTICOS — IV/2SLS  (n={}  k={}  df={})", n, k, df);
+                        println!("{thick}");
+
+                        println!("\n── Ajuste");
+                        println!("   R²  = {:.4}   σ = {:.6}   MSE = {:.6}", iv.r_squared, iv.sigma, mse);
+
+                        println!("\n── Significância dos Coeficientes");
+                        let sig = |p: f64| -> &'static str {
+                            if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" }
+                        };
+                        println!("   {:<22} {:>8} {:>8}", "Variável", "p-value", "");
+                        println!("   {}", "─".repeat(40));
+                        for i in 0..k {
+                            let name = names.get(i).map(|s| s.as_str()).unwrap_or("?");
+                            println!("   {:<22} {:>8.4} {:>4}", name, iv.p_values[i], sig(iv.p_values[i]));
+                        }
+
+                        println!("\n── Testes Não Disponíveis");
+                        println!("   Resíduos e matriz Z não armazenados em IvResult.");
+                        println!("   • Sargan (sobreidentificação): precisa da matriz Z");
+                        println!("   • Endogeneidade (Wu-Hausman): compare IV vs OLS manualmente");
+                        println!("   • Instrumento fraco: verifique F da 1ª etapa (regra: F > 10)");
+                        println!("\n{thin}");
+                        println!("   *** p<0.01  ** p<0.05  * p<0.10");
+                        println!("{thick}\n");
+                    }
+
+                    Value::PanelResult(fe) => {
+                        let k = fe.params.len();
+                        let names = fe.variable_names.as_deref().unwrap_or(&[]);
+                        let sig = |p: f64| -> &'static str {
+                            if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" }
+                        };
+
+                        println!("\n{thick}");
+                        println!(" DIAGNÓSTICOS — Efeitos Fixos  (n={}  N={}  T≈{:.1}  k={})",
+                            fe.n_obs, fe.n_entities,
+                            fe.n_obs as f64 / fe.n_entities.max(1) as f64, k);
+                        println!("{thick}");
+
+                        println!("\n── Ajuste (Within)");
+                        println!("   R² within = {:.4}   σ = {:.6}   df = {}", fe.r_squared, fe.sigma, fe.df_resid);
+
+                        println!("\n── Significância dos Coeficientes");
+                        println!("   {:<22} {:>10} {:>8} {:>4}", "Variável", "coef", "p-value", "");
+                        println!("   {}", "─".repeat(48));
+                        for i in 0..k {
+                            let name = names.get(i).map(|s| s.as_str()).unwrap_or("?");
+                            println!("   {:<22} {:>10.4} {:>8.4} {:>4}",
+                                name, fe.params[i], fe.p_values[i], sig(fe.p_values[i]));
+                        }
+
+                        println!("\n── Testes Não Disponíveis");
+                        println!("   Resíduos não armazenados em PanelResult.");
+                        println!("   • Hausman FE vs RE: use hausman(fe_model, re_model)");
+                        println!("   • JB / Ljung-Box: rode sobre resíduos extraídos manualmente");
+                        println!("\n{thin}");
+                        println!("   *** p<0.01  ** p<0.05  * p<0.10");
+                        println!("{thick}\n");
+                    }
+
+                    Value::ReResult(re) => {
+                        let k = re.params.len();
+                        let sig = |p: f64| -> &'static str {
+                            if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" }
+                        };
+
+                        // Decomposição de variância
+                        let var_e   = re.sigma_e * re.sigma_e;   // variância dos efeitos individuais
+                        let var_u   = re.sigma_u * re.sigma_u;   // variância idiossincrática
+                        let var_tot = var_e + var_u;
+                        let icc     = if var_tot > 1e-15 { var_e / var_tot } else { 0.0 };
+
+                        println!("\n{thick}");
+                        println!(" DIAGNÓSTICOS — Efeitos Aleatórios  (k={})", k);
+                        println!("{thick}");
+
+                        println!("\n── Ajuste");
+                        println!("   R² geral = {:.4}", re.r_squared_overall);
+
+                        println!("\n── Decomposição de Variância");
+                        println!("   σ_e  (efeitos individuais) = {:.6}   σ_e² = {:.6}", re.sigma_e, var_e);
+                        println!("   σ_u  (idiossincrático)     = {:.6}   σ_u² = {:.6}", re.sigma_u, var_u);
+                        println!("   ICC  = σ_e²/(σ_e²+σ_u²)   = {:.4}   ({:.1}% da variância é entre entidades)",
+                            icc, icc * 100.0);
+                        println!("   θ    (peso GLS)            = {:.4}   (0→OLS  1→FE)", re.theta);
+
+                        println!("\n── Significância dos Coeficientes");
+                        println!("   {:<22} {:>10} {:>8} {:>4}", "Variável", "coef", "p-value", "");
+                        println!("   {}", "─".repeat(48));
+                        for i in 0..k {
+                            let name = re.variable_names.as_ref()
+                                .and_then(|v| v.get(i))
+                                .map(|s| s.as_str())
+                                .unwrap_or("const");
+                            println!("   {:<22} {:>10.4} {:>8.4} {:>4}",
+                                name, re.params[i], re.p_values[i], sig(re.p_values[i]));
+                        }
+
+                        println!("\n── Testes Não Disponíveis");
+                        println!("   • Hausman FE vs RE: use hausman(fe_model, re_model)");
+                        println!("   • BP LM test (H₀: sem efeitos individuais): σ_e²/σ_u² acima sugere efeitos");
+                        println!("\n{thin}");
+                        println!("   *** p<0.01  ** p<0.05  * p<0.10");
+                        println!("{thick}\n");
+                    }
+
                     _ => return Err(HayashiError::Type(
-                        "diagnostics() suporta OLS, GARCH, ARIMA, VAR e VECM".into()
+                        "diagnostics() suporta OLS, GARCH, ARIMA, VAR, VECM, IV, FE e RE".into()
                     )),
                 }
 
