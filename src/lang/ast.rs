@@ -129,6 +129,12 @@ pub enum Stmt {
         body: Vec<Stmt>,
     },
 
+    // while cond { ... }
+    While {
+        cond: Expr,
+        body: Vec<Stmt>,
+    },
+
     // expr standalone (ex: test(model, white))
     Expr(Expr),
 }

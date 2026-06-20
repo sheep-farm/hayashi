@@ -4911,6 +4911,15 @@ impl Interpreter {
                 }
             }
 
+            // ── while cond { ... } ───────────────────────────────────────────
+            Stmt::While { cond, body } => {
+                loop {
+                    let cond_val = self.eval_expr(cond)?;
+                    if !Self::value_as_bool(&cond_val) { break; }
+                    for s in body { self.exec(s)?; }
+                }
+            }
+
             Stmt::Expr(expr) => {
                 let val = self.eval_expr(expr)?;
                 if !matches!(val, Value::Nil) {
