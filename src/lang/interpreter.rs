@@ -381,6 +381,118 @@ impl Interpreter {
                 Ok(Value::ReResult(Rc::new(result)))
             }
 
+            // ── Hausman FE vs RE ──────────────────────────────────────────────
+            "hausman" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "hausman(fe_model, re_model)".into()
+                    ));
+                }
+
+                let fe = match self.eval_expr(&args[0])? {
+                    Value::PanelResult(r) => r,
+                    _ => return Err(HayashiError::Type(
+                        "hausman(): primeiro argumento deve ser um modelo FE".into()
+                    )),
+                };
+                let re = match self.eval_expr(&args[1])? {
+                    Value::ReResult(r) => r,
+                    _ => return Err(HayashiError::Type(
+                        "hausman(): segundo argumento deve ser um modelo RE".into()
+                    )),
+                };
+
+                // Variáveis comuns: FE não tem intercepto; RE tem.
+                // Alinha por nome quando disponível; senão assume mesma ordem.
+                let fe_names: Vec<String> = fe.variable_names
+                    .as_ref()
+                    .cloned()
+                    .unwrap_or_else(|| (0..fe.params.len()).map(|i| format!("x{}", i)).collect());
+
+                let re_names: Vec<String> = re.variable_names
+                    .as_ref()
+                    .cloned()
+                    .unwrap_or_else(|| (0..re.params.len()).map(|i| format!("x{}", i)).collect());
+
+                // Pares (β_FE, σ²_FE, β_RE, σ²_RE) para variáveis em comum (exclui intercepto)
+                let mut pairs: Vec<(String, f64, f64, f64, f64)> = Vec::new();
+                for (i, fe_name) in fe_names.iter().enumerate() {
+                    if fe_name == "const" { continue; }
+                    if let Some(j) = re_names.iter().position(|n| n == fe_name) {
+                        pairs.push((
+                            fe_name.clone(),
+                            fe.params[i],
+                            fe.std_errors[i].powi(2),
+                            re.params[j],
+                            re.std_errors[j].powi(2),
+                        ));
+                    }
+                }
+
+                if pairs.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "hausman: nenhuma variável comum entre FE e RE (verifique variable_names)".into()
+                    ));
+                }
+
+                // H = Σ (β_FE - β_RE)² / (σ²_FE - σ²_RE)  para pares onde σ²_FE > σ²_RE
+                let mut chi2 = 0.0;
+                let mut df = 0usize;
+                let mut skipped = 0usize;
+
+                let thick = "═".repeat(62);
+                let thin  = "─".repeat(62);
+
+                println!("\n{thick}");
+                println!(" Hausman Test: FE vs RE");
+                println!(" H₀: efeitos individuais não correlacionados com regressores (RE consistente)");
+                println!("{thick}");
+                println!("\n── Coeficientes Comuns");
+                println!("   {:<20} {:>10} {:>10} {:>10}", "Variável", "β_FE", "β_RE", "Δβ");
+                println!("   {thin}");
+
+                for (name, bfe, vfe, bre, vre) in &pairs {
+                    let diff = bfe - bre;
+                    let dvar = vfe - vre;
+                    println!("   {:<20} {:>10.4} {:>10.4} {:>10.4}", name, bfe, bre, diff);
+                    if dvar > 1e-15 {
+                        chi2 += diff.powi(2) / dvar;
+                        df += 1;
+                    } else {
+                        skipped += 1;
+                    }
+                }
+
+                if df == 0 {
+                    println!("\n   [!] Var(β_FE) ≤ Var(β_RE) em todos os coeficientes.");
+                    println!("       Estatística indefinida — verifique especificação dos modelos.");
+                    println!("\n{thick}\n");
+                    return Ok(Value::Nil);
+                }
+
+                let p = greeners::chi2_pvalue(chi2, df as f64);
+
+                let sig = if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
+                let verdict = if p < 0.05 {
+                    "Rejeita H₀ → use EFEITOS FIXOS (RE pode ser inconsistente)"
+                } else {
+                    "Não rejeita H₀ → EFEITOS ALEATÓRIOS é consistente e eficiente"
+                };
+
+                println!("\n── Estatística");
+                println!("   χ²({}) = {:.4}   p = {:.4}  {}", df, chi2, p, sig);
+                if skipped > 0 {
+                    println!("   ({} coeficiente(s) excluídos: Var(β_FE) ≤ Var(β_RE))", skipped);
+                }
+                println!("\n── Conclusão");
+                println!("   {}", verdict);
+                println!("\n{thin}");
+                println!("   *** p<0.01  ** p<0.05  * p<0.10");
+                println!("{thick}\n");
+
+                Ok(Value::Nil)
+            }
+
             // ── Diagnósticos ──────────────────────────────────────────────────
             "test" => {
                 if args.len() < 2 {
