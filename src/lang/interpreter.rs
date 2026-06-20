@@ -590,6 +590,86 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── Wooldridge: autocorrelação serial em painel ───────────────────
+            "wooldridge" => {
+                // wooldridge(formula, df, id=col, time=col)
+                // H₀: sem autocorrelação serial de 1ª ordem nos erros idiossincráticos (ρ = -0.5)
+                // H₁: autocorrelação serial presente (ρ ≠ -0.5)
+                let (formula_ast, df, id_col) = self.extract_panel_args(args, &opt_map)?;
+
+                let time_col = match opt_map.get("time") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => return Err(HayashiError::Runtime(
+                        "wooldridge(): opção time=col é obrigatória".into()
+                    )),
+                };
+
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                let (y_vec, x_mat) = df.to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                let entity_ids: Vec<i64> = if let Ok(ids) = df.get_int(&id_col) {
+                    ids.to_vec()
+                } else if let Ok(floats) = df.get(&id_col) {
+                    floats.iter().map(|&v| v as i64).collect()
+                } else {
+                    return Err(HayashiError::Runtime(
+                        format!("wooldridge: coluna id '{id_col}' não encontrada")
+                    ));
+                };
+
+                let time_vals: Vec<f64> = if let Ok(arr) = df.get(&time_col) {
+                    arr.to_vec()
+                } else if let Ok(arr) = df.get_int(&time_col) {
+                    arr.iter().map(|&v| v as f64).collect()
+                } else {
+                    return Err(HayashiError::Runtime(
+                        format!("wooldridge: coluna time '{time_col}' não encontrada")
+                    ));
+                };
+
+                let n_entities = {
+                    let mut s = std::collections::HashSet::new();
+                    for &id in &entity_ids { s.insert(id); }
+                    s.len()
+                };
+
+                let (rho, t_stat, p, n_pairs) = greeners::PanelDiagnostics::wooldridge_serial(
+                    &y_vec, &x_mat, &entity_ids, &time_vals
+                ).map_err(|e| HayashiError::Runtime(e))?;
+
+                let df_t = n_entities - 1;
+                let sig = if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
+                let verdict = if p < 0.05 {
+                    "Rejeita H₀ → autocorrelação serial de 1ª ordem presente"
+                } else {
+                    "Não rejeita H₀ → sem evidência de autocorrelação serial"
+                };
+
+                let thick = "═".repeat(62);
+                let thin  = "─".repeat(62);
+                println!("\n{thick}");
+                println!(" Wooldridge Test (autocorrelação serial em painel)");
+                println!(" H₀: ρ = -0.5  (sem autocorrelação nos erros idiossincráticos)");
+                println!("{thick}");
+                println!("\n── Painel: N={} entidades   pares usados={}   df={}", n_entities, n_pairs, df_t);
+                println!("\n── Estimativa");
+                println!("   ρ̂ = {:.4}   (H₀: ρ = -0.500)", rho);
+                println!("\n── Estatística");
+                println!("   t({}) = {:.4}   p = {:.4}  {}", df_t, t_stat, p, sig);
+                println!("\n── Conclusão");
+                println!("   {}", verdict);
+                println!("\n{thin}");
+                println!("   *** p<0.01  ** p<0.05  * p<0.10");
+                println!("   (SE padrão OLS — use SE robustos clusterizados para inferência formal)");
+                println!("{thick}\n");
+
+                Ok(Value::Nil)
+            }
+
             // ── Hausman FE vs RE ──────────────────────────────────────────────
             "hausman" => {
                 if args.len() < 2 {
