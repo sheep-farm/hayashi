@@ -2897,8 +2897,113 @@ impl Interpreter {
                         println!("{thick}\n");
                     }
 
+                    Value::VarResult(m) => {
+                        let k = m.n_vars;
+                        println!("\n{thick}");
+                        println!(" DIAGNÓSTICOS — VAR({})  (n={}  k={})", m.lags, m.n_obs, k);
+                        println!("{thick}");
+
+                        // ── Critérios de informação
+                        println!("\n── Critérios de Informação");
+                        println!("   AIC = {:.4}   BIC = {:.4}", m.aic, m.bic);
+
+                        // ── Desvio-padrão residual por equação (diagonal de Σ_u)
+                        println!("\n── Desvio-Padrão Residual por Equação");
+                        for (i, name) in m.var_names.iter().enumerate() {
+                            println!("   {:<22} σ = {:.6}", name, m.sigma_u[[i, i]].sqrt());
+                        }
+
+                        // ── Matriz de correlação dos resíduos (Σ_u normalizada)
+                        if k > 1 {
+                            println!("\n── Correlação Contemporânea dos Resíduos");
+                            // header
+                            let col_w = m.var_names.iter().map(|n| n.len()).max().unwrap_or(8).max(8) + 2;
+                            print!("   {:>col_w$}", "");
+                            for name in &m.var_names {
+                                print!(" {:>col_w$}", name);
+                            }
+                            println!();
+                            for i in 0..k {
+                                print!("   {:<col_w$}", m.var_names[i]);
+                                for j in 0..k {
+                                    let r = m.sigma_u[[i, j]]
+                                        / (m.sigma_u[[i, i]] * m.sigma_u[[j, j]]).sqrt();
+                                    if i == j {
+                                        print!(" {:>col_w$.4}", 1.0_f64);
+                                    } else {
+                                        print!(" {:>col_w$.4}", r);
+                                    }
+                                }
+                                println!();
+                            }
+                        }
+
+                        println!("\n── Nota");
+                        println!("   Resíduos não são armazenados em VarResult — para LB/JB por equação,");
+                        println!("   extraia a série e rode ljungbox/jb diretamente.");
+                        println!("\n{thin}");
+                        println!("{thick}\n");
+                    }
+
+                    Value::VecmResult(m) => {
+                        let k   = m.n_vars;
+                        let r   = m.rank;
+                        let n   = m.n_obs as f64;
+                        let eig = &m.eigenvalues; // ordenados decrescente
+
+                        println!("\n{thick}");
+                        println!(" DIAGNÓSTICOS — VECM  (n={}  k={}  rank={})", m.n_obs, k, r);
+                        println!("{thick}");
+
+                        // ── Johansen trace test
+                        // λ_trace(r₀) = -n Σ_{i=r₀}^{k-1} ln(1 - λ_i)  H₀: rank ≤ r₀
+                        // CVs 5%: Osterwald-Lenum (1992) Tabela 1 — constante restrita
+                        let cv_5pct: &[f64] = &[9.24, 19.96, 34.91, 53.12, 76.07, 102.56, 131.70];
+                        println!("\n── Teste de Johansen (Trace)");
+                        println!("   H₀: rank ≤ r   CVs 5%: Osterwald-Lenum (1992) Tabela 1");
+                        println!("   {:<6} {:>10} {:>12} {:>10} {:>6}", "H₀:r≤", "λ_max", "λ_trace", "CV 5%", "");
+                        println!("   {}", "─".repeat(46));
+                        for r0 in 0..k {
+                            let lam_max = if r0 < eig.len() {
+                                -n * (1.0 - eig[r0]).max(1e-15).ln()
+                            } else { 0.0 };
+                            let trace_stat: f64 = (r0..eig.len())
+                                .map(|i| -n * (1.0 - eig[i]).max(1e-15).ln())
+                                .sum();
+                            let cv = cv_5pct.get(k - r0 - 1).copied().unwrap_or(f64::NAN);
+                            let reject = if trace_stat > cv { "*" } else { " " };
+                            println!("   {:<6} {:>10.4} {:>12.4} {:>10.2} {:>6}",
+                                r0, lam_max, trace_stat, cv, reject);
+                        }
+                        println!("   (* rejeita H₀ a 5%)");
+
+                        // ── Velocidades de ajuste (alpha): k×rank
+                        println!("\n── Velocidades de Ajuste (Alpha)  [sinal negativo = correção ao equilíbrio]");
+                        for ec in 0..r {
+                            println!("   Vetor EC{}", ec + 1);
+                            for eq in 0..k {
+                                println!("     equação {:>2}   α = {:>9.4}", eq + 1, m.alpha[[eq, ec]]);
+                            }
+                        }
+
+                        // ── Vetores de cointegração (beta): k×rank
+                        println!("\n── Vetores de Cointegração (Beta)");
+                        for ec in 0..r {
+                            println!("   EC{}:", ec + 1);
+                            for var in 0..k {
+                                println!("     var {:>2}   β = {:>9.4}", var + 1, m.beta[[var, ec]]);
+                            }
+                        }
+
+                        println!("\n── Nota");
+                        println!("   VecmResult não armazena nomes de variáveis nem resíduos.");
+                        println!("   Para nomes, veja a ordem passada em vecm().");
+                        println!("\n{thin}");
+                        println!("{thick}\n");
+                    }
+
                     _ => return Err(HayashiError::Type(
-                        "diagnostics() suporta OLS, GARCH e ARIMA".into()
+                        "diagnostics() suporta OLS, GARCH, ARIMA, VAR e VECM".into()
                     )),
                 }
 
