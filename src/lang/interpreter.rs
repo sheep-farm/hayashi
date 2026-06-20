@@ -71,6 +71,7 @@ pub enum Value {
     VecmResult(Rc<greeners::vecm::VecmResult>),
     GarchResult(Rc<greeners::GarchResult>),
     DiagResult(Rc<DiagResult>),
+    AbResult(Rc<greeners::ArellanoBondResult>),
     Nil,
 }
 
@@ -92,6 +93,7 @@ impl std::fmt::Display for Value {
             Value::VecmResult(r)   => write!(f, "{r}"),
             Value::GarchResult(r)  => write!(f, "{r}"),
             Value::DiagResult(r)   => write!(f, "{r}"),
+            Value::AbResult(r)     => write!(f, "{r}"),
             Value::Nil             => write!(f, "nil"),
         }
     }
@@ -761,6 +763,81 @@ impl Interpreter {
                 out.push_str("   *** p<0.01  ** p<0.05  * p<0.10\n");
                 out.push_str(&format!("{thick}\n"));
                 Ok(Self::diag(out))
+            }
+
+            // ── Arellano-Bond Diff-GMM ────────────────────────────────────────
+            // ab(formula, df, id=col, time=col [, lags=2 [, step=1]])
+            // Estima y_it = ρ y_{i,t-1} + X_it'β + α_i + ε_it via Diff-GMM.
+            // Instrumenta Δy_{i,t-1} com y_{i,t-2},...,y_{i,t-lags-1} (collapsed).
+            "ab" => {
+                let (formula_ast, df, id_col) = self.extract_panel_args(args, &opt_map)?;
+
+                let time_col = match opt_map.get("time") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => return Err(HayashiError::Runtime(
+                        "ab(): opção time=col é obrigatória".into()
+                    )),
+                };
+
+                let max_lags: usize = match opt_map.get("lags") {
+                    Some(Value::Int(v)) => (*v).max(1) as usize,
+                    Some(Value::Float(v)) => (*v as i64).max(1) as usize,
+                    None => 2,
+                    _ => return Err(HayashiError::Runtime(
+                        "ab(): lags deve ser inteiro positivo".into()
+                    )),
+                };
+
+                let two_step: bool = match opt_map.get("step") {
+                    Some(Value::Int(2)) => true,
+                    Some(Value::Float(v)) if *v as i64 == 2 => true,
+                    Some(Value::Int(_)) | Some(Value::Float(_)) | None => false,
+                    _ => return Err(HayashiError::Runtime(
+                        "ab(): step deve ser 1 ou 2".into()
+                    )),
+                };
+
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                let (y_vec, x_mat) = df.to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                let entity_ids: Vec<i64> = if let Ok(ids) = df.get_int(&id_col) {
+                    ids.to_vec()
+                } else if let Ok(floats) = df.get(&id_col) {
+                    floats.iter().map(|&v| v as i64).collect()
+                } else {
+                    return Err(HayashiError::Runtime(
+                        format!("ab: coluna id '{id_col}' não encontrada")
+                    ));
+                };
+
+                let time_ids: Vec<i64> = if let Ok(ids) = df.get_int(&time_col) {
+                    ids.to_vec()
+                } else if let Ok(floats) = df.get(&time_col) {
+                    floats.iter().map(|&v| v as i64).collect()
+                } else {
+                    return Err(HayashiError::Runtime(
+                        format!("ab: coluna time '{time_col}' não encontrada")
+                    ));
+                };
+
+                let var_names = df.formula_var_names(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                let result = greeners::ArellanoBond::fit(
+                    &y_vec,
+                    &x_mat,
+                    &entity_ids,
+                    &time_ids,
+                    max_lags,
+                    two_step,
+                    Some(var_names),
+                ).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                Ok(Value::AbResult(Rc::new(result)))
             }
 
             // ── Arellano-Bond: teste m1/m2 para autocorrelação serial ─────────
