@@ -2148,6 +2148,72 @@ impl Interpreter {
                 )))
             }
 
+            // ljungbox(df, varname, lags=10)
+            // ljungbox(model, lags=10)   — aceita GARCH, ARIMA, OLS
+            // H₀: as primeiras `lags` autocorrelações são conjuntamente zero
+            "ljungbox" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "ljungbox() requer uma série ou modelo".into()
+                    ));
+                }
+
+                let series = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(df) => {
+                        let col_name = match args.get(1) {
+                            Some(Expr::Var(n)) => n.clone(),
+                            _ => return Err(HayashiError::Runtime(
+                                "ljungbox(df, varname): segundo argumento deve ser o nome da coluna".into()
+                            )),
+                        };
+                        Array1::from(Self::eval_col_expr(&Expr::Var(col_name), &df)?)
+                    }
+                    // resíduos padronizados de GARCH
+                    Value::GarchResult(m) => m.standardized_residuals.clone(),
+                    // resíduos de ARIMA
+                    Value::ArimaResult(m) => Array1::from_vec(m.residuals().to_vec()),
+                    // resíduos de OLS
+                    Value::OlsResult(m) => m.residuals.clone(),
+                    _ => return Err(HayashiError::Type(
+                        "ljungbox(): argumento deve ser DataFrame, GARCH, ARIMA ou OLS".into()
+                    )),
+                };
+
+                let lags = match opt_map.get("lags") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 10,
+                };
+
+                let res = greeners::Diagnostics::ljung_box(&series, lags)
+                    .map_err(|e| HayashiError::Runtime(format!("ljungbox: {e}")))?;
+
+                let sig = |p: f64| if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
+                let sep = "─".repeat(62);
+                println!("\nLjung-Box Test  —  lags = {}  n = {}", res.lags, res.n_obs);
+                println!("{sep}");
+                println!("H₀: sem autocorrelação até lag {}", res.lags);
+                println!("{sep}");
+                println!("{:<6} {:>10} {:>10} {:>8}", "lag", "ACF", "Q", "p-value");
+                println!("{sep}");
+                let mut q_accum = 0.0_f64;
+                let nf = res.n_obs as f64;
+                for (i, &rho) in res.acf.iter().enumerate() {
+                    let k = i + 1;
+                    q_accum += nf * (nf + 2.0) * rho * rho / (nf - k as f64);
+                    // p-value cumulativo para o Q até lag k
+                    let p_k = greeners::chi2_pvalue(q_accum, k as f64);
+                    println!("{:<6} {:>10.4} {:>10.4} {:>8.4} {:>3}",
+                        k, rho, q_accum, p_k, sig(p_k));
+                }
+                println!("{sep}");
+                println!("Q({lags}) = {:.4}   p = {:.4}  {}   (*** p<0.01  ** p<0.05  * p<0.10)",
+                    res.q_stat, res.p_value, sig(res.p_value));
+                println!();
+
+                Ok(Value::Nil)
+            }
+
             // archtest(df, varname, lags=5)
             // Engle (1982) LM test — H₀: sem efeitos ARCH de ordem `lags`
             // Também aceita resíduos de modelo GARCH: archtest(model, lags=5)
