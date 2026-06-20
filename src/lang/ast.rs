@@ -145,6 +145,10 @@ pub enum Stmt {
     // return [expr]
     Return(Option<Expr>),
 
+    // break / continue
+    Break,
+    Continue,
+
     // expr standalone (ex: test(model, white))
     Expr(Expr),
 }
