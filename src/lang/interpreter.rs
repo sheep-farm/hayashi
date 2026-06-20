@@ -54,6 +54,7 @@ pub enum Value {
     PanelResult(Rc<greeners::panel::PanelResult>),
     ReResult(Rc<greeners::panel::RandomEffectsResult>),
     ArimaResult(Rc<greeners::ArimaResult>),
+    VarResult(Rc<greeners::var::VarResult>),
     Nil,
 }
 
@@ -71,6 +72,7 @@ impl std::fmt::Display for Value {
             Value::PanelResult(r)  => write!(f, "{r}"),
             Value::ReResult(r)     => write!(f, "{r}"),
             Value::ArimaResult(r)  => write!(f, "{r}"),
+            Value::VarResult(r)    => write!(f, "{r}"),
             Value::Nil             => write!(f, "nil"),
         }
     }
@@ -865,6 +867,146 @@ impl Interpreter {
 
                 println!("{sep}");
                 println!("n = {n}   Model: {}", bm.kind);
+                println!();
+
+                Ok(Value::Nil)
+            }
+
+            // ── var ──────────────────────────────────────────────────────────
+            // var(df, y1, y2, ..., lags=2)
+            "var" => {
+                if args.len() < 3 {
+                    return Err(HayashiError::Runtime(
+                        "var() requer (dataframe, var1, var2, ..., lags=p)".into()
+                    ));
+                }
+
+                let df = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(d) => d,
+                    _ => return Err(HayashiError::Type("primeiro argumento deve ser um DataFrame".into())),
+                };
+
+                // args[1..]: nomes das variáveis
+                let var_names: Vec<String> = args[1..].iter()
+                    .map(|a| match a {
+                        Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
+                        _ => Err(HayashiError::Type("variáveis do VAR devem ser identificadores".into())),
+                    })
+                    .collect::<Result<_>>()?;
+
+                let lags = match opt_map.get("lags") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 1,
+                };
+
+                // monta matriz T×k
+                let n = df.n_rows();
+                let k = var_names.len();
+                let mut data = ndarray::Array2::<f64>::zeros((n, k));
+                for (j, vname) in var_names.iter().enumerate() {
+                    let col = Self::eval_col_expr(&Expr::Var(vname.clone()), &df)?;
+                    for (i, &v) in col.iter().enumerate() {
+                        data[[i, j]] = v;
+                    }
+                }
+
+                let result = greeners::VAR::fit(&data, lags, Some(var_names))
+                    .map_err(|e| HayashiError::Runtime(format!("VAR: {e}")))?;
+
+                Ok(Value::VarResult(Rc::new(result)))
+            }
+
+            // ── irf ──────────────────────────────────────────────────────────
+            // irf(model, steps=10)
+            "irf" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("irf() requer um modelo VAR".into()));
+                }
+                let model = match self.eval_expr(&args[0])? {
+                    Value::VarResult(m) => m,
+                    _ => return Err(HayashiError::Type("irf() requer um modelo VAR".into())),
+                };
+
+                let steps = match opt_map.get("steps") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 10,
+                };
+
+                let tensor = model.irf(steps)
+                    .map_err(|e| HayashiError::Runtime(format!("IRF: {e}")))?;
+
+                let k = model.n_vars;
+                let names = &model.var_names;
+                let sep = "─".repeat(14 + k * 12);
+
+                println!("\nIRF — VAR({}) — {} passos", model.lags, steps);
+
+                for j in 0..k {
+                    println!("\n  Impulso: {}", names[j]);
+                    println!("  {sep}");
+                    let header: String = names.iter()
+                        .map(|n| format!("{:>12}", n))
+                        .collect::<Vec<_>>().join("");
+                    println!("  {:>6}{header}", "h");
+                    println!("  {sep}");
+                    for h in 0..steps {
+                        let row: String = (0..k)
+                            .map(|i| format!("{:>12.4}", tensor[[h, i, j]]))
+                            .collect::<Vec<_>>().join("");
+                        println!("  {:>6}{row}", h + 1);
+                    }
+                    println!("  {sep}");
+                }
+                println!();
+
+                Ok(Value::Nil)
+            }
+
+            // ── fevd ─────────────────────────────────────────────────────────
+            // fevd(model, steps=10)
+            "fevd" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("fevd() requer um modelo VAR".into()));
+                }
+                let model = match self.eval_expr(&args[0])? {
+                    Value::VarResult(m) => m,
+                    _ => return Err(HayashiError::Type("fevd() requer um modelo VAR".into())),
+                };
+
+                let steps = match opt_map.get("steps") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 10,
+                };
+
+                let tensor = model.fevd(steps)
+                    .map_err(|e| HayashiError::Runtime(format!("FEVD: {e}")))?;
+
+                let k = model.n_vars;
+                let names = &model.var_names;
+                let col_w = names.iter().map(|n| n.len()).max().unwrap_or(8).max(8) + 2;
+                let sep = "─".repeat(8 + k * col_w);
+
+                println!("\nFEVD — VAR({}) — {} passos  (% da variância do erro de previsão)", model.lags, steps);
+
+                for i in 0..k {
+                    println!("\n  Variável: {}", names[i]);
+                    println!("  {sep}");
+                    let header: String = names.iter()
+                        .map(|n| format!("{:>col_w$}", n))
+                        .collect::<Vec<_>>().join("");
+                    println!("  {:>6}{header}", "h");
+                    println!("  {sep}");
+                    for h in 0..steps {
+                        let row: String = (0..k)
+                            .map(|j| format!("{:>col_w$.1}%", tensor[[h, i, j]] * 100.0))
+                            .collect::<Vec<_>>().join("");
+                        println!("  {:>6}{row}", h + 1);
+                    }
+                    println!("  {sep}");
+                }
                 println!();
 
                 Ok(Value::Nil)
