@@ -85,6 +85,9 @@ pub enum Stmt {
     // replace df varname = expr [if cond]
     Replace { df: String, varname: String, expr: Expr, cond: Option<Expr> },
 
+    // count df [if cond]
+    Count { df: String, cond: Option<Expr> },
+
     // expr standalone (ex: test(model, white))
     Expr(Expr),
 }

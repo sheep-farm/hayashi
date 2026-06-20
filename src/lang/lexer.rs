@@ -18,6 +18,7 @@ pub enum Token {
     Predict,
     Replace,
     If,
+    Count,
 
     // Operadores
     Eq,       // =
@@ -139,6 +140,7 @@ impl Lexer {
             "predict"  => Token::Predict,
             "replace"  => Token::Replace,
             "if"       => Token::If,
+            "count"    => Token::Count,
             "true"     => Token::Bool(true),
             "false"    => Token::Bool(false),
             _        => Token::Ident(s),
