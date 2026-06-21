@@ -248,6 +248,10 @@ pub enum Value {
     VarmaResult(Rc<greeners::varma::VarmaResult>),
     DecompResult(Rc<greeners::DecompositionResult>),
     MstlResult(Rc<greeners::MSTLResult>),
+    UCResult(Rc<greeners::UCResult>),
+    GamResult(Rc<greeners::GamResult>),
+    MiceResult(Rc<greeners::MICEResult>),
+    MSARResult(Rc<greeners::MarkovAutoregResult>),
     List(Rc<Vec<Value>>),
     UserFn(Rc<UserFn>),
     Nil,
@@ -307,6 +311,10 @@ impl std::fmt::Display for Value {
             Value::VarmaResult(r)         => write!(f, "{r}"),
             Value::DecompResult(r)        => write!(f, "{r}"),
             Value::MstlResult(r)          => write!(f, "{r}"),
+            Value::UCResult(r)            => write!(f, "{r}"),
+            Value::GamResult(r)           => write!(f, "{r}"),
+            Value::MiceResult(r)          => write!(f, "{r}"),
+            Value::MSARResult(r)          => write!(f, "{r}"),
             Value::List(v) => {
                 write!(f, "[")?;
                 for (i, item) in v.iter().enumerate() {
@@ -4480,6 +4488,26 @@ impl Interpreter {
                                 "esttab() não suporta decomposição sazonal — use print()".into()
                             ));
                         }
+                        Value::UCResult(_) => {
+                            return Err(HayashiError::Runtime(
+                                "esttab() não suporta UCM (parâmetros de variância, não β) — use print()".into()
+                            ));
+                        }
+                        Value::GamResult(_) => {
+                            return Err(HayashiError::Runtime(
+                                "esttab() não suporta GAM (termos smooth não têm tabela β padrão) — use print()".into()
+                            ));
+                        }
+                        Value::MiceResult(_) => {
+                            return Err(HayashiError::Runtime(
+                                "esttab() não suporta MICE (múltiplos datasets) — estime modelo em cada dataset e use Rubin's rules".into()
+                            ));
+                        }
+                        Value::MSARResult(_) => {
+                            return Err(HayashiError::Runtime(
+                                "esttab() não suporta Markov-AR (parâmetros por regime) — use print()".into()
+                            ));
+                        }
                         _ => return Err(HayashiError::Type(
                             "esttab(): tipo de modelo não suportado — use print()".into()
                         )),
@@ -7828,6 +7856,266 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── UCM — Unobserved Components Model ─────────────────────────────
+            // ucm(df, var, level=local_linear, seasonal=stochastic, period=12)
+            "ucm" | "uc" | "structural_ts" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "ucm(df, var, level=local_linear, seasonal=stochastic, period=12)".into()
+                    ));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())),
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                };
+                let var_name = match &args[1] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())),
+                };
+                let y = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?);
+
+                let level = match opt_map.get("level") {
+                    Some(Value::Str(s)) => match s.to_lowercase().as_str() {
+                        "local_level" | "ll"            => greeners::UCLevel::LocalLevel,
+                        "local_linear" | "local_linear_trend" | "llt" => greeners::UCLevel::LocalLinearTrend,
+                        "smooth_trend" | "st"           => greeners::UCLevel::SmoothTrend,
+                        "random_walk" | "rw"            => greeners::UCLevel::RandomWalk,
+                        other => return Err(HayashiError::Runtime(format!(
+                            "ucm: level='{other}' desconhecido — use: local_level, local_linear, smooth_trend, random_walk"
+                        ))),
+                    },
+                    _ => greeners::UCLevel::LocalLinearTrend,
+                };
+
+                let period = match opt_map.get("period") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 12,
+                };
+
+                let seasonal = match opt_map.get("seasonal") {
+                    Some(Value::Str(s)) => match s.to_lowercase().as_str() {
+                        "none"              => greeners::UCSeasonal::None,
+                        "deterministic"     => greeners::UCSeasonal::Deterministic(period),
+                        "stochastic"        => greeners::UCSeasonal::Stochastic(period),
+                        other => return Err(HayashiError::Runtime(format!(
+                            "ucm: seasonal='{other}' desconhecido — use: none, deterministic, stochastic"
+                        ))),
+                    },
+                    _ => greeners::UCSeasonal::None,
+                };
+
+                let result = greeners::UnobservedComponents::fit(&y, level, seasonal)
+                    .map_err(|e| HayashiError::Runtime(format!("ucm: {e}")))?;
+                Ok(Value::UCResult(Rc::new(result)))
+            }
+
+            // ── GAM — Generalized Additive Model (P-splines) ─────────────────
+            // gam(y ~ x2, df, smooth="x1", spline_df=10, alpha=0.1, family=gaussian, link=log)
+            "gam" | "gamfit" => {
+                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_vec, x_linear) = df.to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let linear_names = df.formula_var_names(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let n = y_vec.len();
+
+                // Parse smooth= option
+                let smooth_names: Vec<String> = match opt_map.get("smooth") {
+                    Some(Value::Str(s))  => vec![s.clone()],
+                    Some(Value::List(lst)) => lst.iter().map(|v| match v {
+                        Value::Str(s) => Ok(s.clone()),
+                        _ => Err(HayashiError::Type("smooth= deve ser string ou lista de strings".into())),
+                    }).collect::<Result<_>>()?,
+                    None => vec![],
+                    _ => return Err(HayashiError::Type("smooth= deve ser string ou lista de strings".into())),
+                };
+
+                if smooth_names.is_empty() && x_linear.ncols() == 0 {
+                    return Err(HayashiError::Runtime("gam: especifique termos lineares (fórmula) e/ou smooth=".into()));
+                }
+
+                let spline_df = match opt_map.get("spline_df") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 10,
+                };
+                let degree = match opt_map.get("degree") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 3,
+                };
+                let alpha_pen = match opt_map.get("alpha") {
+                    Some(Value::Float(v)) => *v,
+                    Some(Value::Int(v))   => *v as f64,
+                    _ => 0.1,
+                };
+
+                // Build smooth basis matrix (concatenate across all smooth vars)
+                let q_per = spline_df;
+                let q_total = q_per * smooth_names.len().max(1);
+                let mut x_smooth = ndarray::Array2::<f64>::zeros((n, q_total));
+                for (k, sname) in smooth_names.iter().enumerate() {
+                    let col = ndarray::Array1::from(Self::get_col_f64(&df, sname)?);
+                    let basis = greeners::BSplineBasis::generate(&col, q_per, degree)
+                        .map_err(|e| HayashiError::Runtime(format!("gam spline ({sname}): {e}")))?;
+                    for i in 0..n {
+                        for j in 0..q_per {
+                            x_smooth[[i, k * q_per + j]] = basis[[i, j]];
+                        }
+                    }
+                }
+                // If no smooth vars, x_smooth must still be n×1 (placeholder)
+                let x_smooth_ref = if smooth_names.is_empty() {
+                    ndarray::Array2::<f64>::zeros((n, 1))
+                } else {
+                    x_smooth
+                };
+
+                let alpha_pen_used = if smooth_names.is_empty() { 0.0 } else { alpha_pen };
+
+                // Parse family/link (same as GLM)
+                let alpha_val = match opt_map.get("alpha") { Some(Value::Float(v)) => *v, Some(Value::Int(v)) => *v as f64, _ => 1.0 };
+                let power_val = match opt_map.get("power") { Some(Value::Float(v)) => *v, Some(Value::Int(v)) => *v as f64, _ => 1.5 };
+                let family = match opt_map.get("family") {
+                    Some(Value::Str(s)) => match s.as_str() {
+                        "gaussian" | "normal"   => greeners::Family::Gaussian,
+                        "binomial" | "logistic" => greeners::Family::Binomial,
+                        "poisson"               => greeners::Family::Poisson,
+                        "gamma"                 => greeners::Family::Gamma,
+                        "inverse_gaussian"      => greeners::Family::InverseGaussian,
+                        "negbin"                => greeners::Family::NegativeBinomial(alpha_val),
+                        "tweedie"               => greeners::Family::Tweedie(power_val),
+                        other => return Err(HayashiError::Runtime(format!(
+                            "gam: family='{other}' desconhecido — use: gaussian, binomial, poisson, gamma, negbin"
+                        ))),
+                    },
+                    _ => greeners::Family::Gaussian,
+                };
+                let link = match opt_map.get("link") {
+                    Some(Value::Str(s)) => match s.as_str() {
+                        "identity"  => greeners::Link::Identity,
+                        "log"       => greeners::Link::Log,
+                        "logit"     => greeners::Link::Logit,
+                        "probit"    => greeners::Link::Probit,
+                        "inverse"   => greeners::Link::InversePower,
+                        "cloglog"   => greeners::Link::CLogLog,
+                        other => return Err(HayashiError::Runtime(format!(
+                            "gam: link='{other}' desconhecido — use: identity, log, logit, probit, inverse, cloglog"
+                        ))),
+                    },
+                    _ => greeners::Link::Identity,
+                };
+
+                let result = greeners::GLMGam::fit_with_names(
+                    &y_vec, &x_linear, &x_smooth_ref, &family, &link, alpha_pen_used,
+                    Some(linear_names),
+                ).map_err(|e| HayashiError::Runtime(format!("gam: {e}")))?;
+                Ok(Value::GamResult(Rc::new(result)))
+            }
+
+            // ── MICE — Multiple Imputation by Chained Equations ───────────────
+            // mice(df, vars=["x1","x2"], m=5, iter=10)
+            "mice" | "mi" | "multiple_imputation" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "mice(df, vars=[\"x1\",\"x2\"], m=5, iter=10)".into()
+                    ));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())),
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                };
+                let var_names: Vec<String> = match opt_map.get("vars") {
+                    Some(Value::List(lst)) => lst.iter().map(|v| match v {
+                        Value::Str(s) => Ok(s.clone()),
+                        _ => Err(HayashiError::Type("vars= deve ser lista de strings".into())),
+                    }).collect::<Result<_>>()?,
+                    Some(Value::Str(s)) => vec![s.clone()],
+                    None => {
+                        // All positional args after df are var names
+                        if args.len() > 1 {
+                            args[1..].iter().map(|a| match a {
+                                Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
+                                _ => Err(HayashiError::Type("variáveis de mice() devem ser identificadores".into())),
+                            }).collect::<Result<_>>()?
+                        } else {
+                            return Err(HayashiError::Runtime(
+                                "mice: especifique vars=[\"x1\",\"x2\",...] ou liste variáveis após df".into()
+                            ));
+                        }
+                    }
+                    _ => return Err(HayashiError::Type("vars= deve ser lista de strings".into())),
+                };
+                let m = match opt_map.get("m") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 5,
+                };
+                let iter = match opt_map.get("iter") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 10,
+                };
+
+                let mut data: std::collections::HashMap<String, ndarray::Array1<f64>> = std::collections::HashMap::new();
+                for vname in &var_names {
+                    data.insert(vname.clone(), ndarray::Array1::from(Self::get_col_f64(&df, vname)?));
+                }
+
+                let result = greeners::MICE::impute(&data, m, iter)
+                    .map_err(|e| HayashiError::Runtime(format!("mice: {e}")))?;
+                println!("{result}");
+                Ok(Value::MiceResult(Rc::new(result)))
+            }
+
+            // ── Markov Autoregression (Hamilton 1989 full MS-AR) ──────────────
+            // msauto(df, var, k=2, p=1)
+            "msauto" | "markov_ar" | "ms_ar" | "hamilton" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "msauto(df, var, k=2, p=1)".into()
+                    ));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())),
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                };
+                let var_name = match &args[1] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())),
+                };
+                let y = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?);
+                let k = match opt_map.get("k") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 2,
+                };
+                let p = match opt_map.get("p") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 1,
+                };
+                let result = greeners::MarkovAutoregression::fit(&y, k, p)
+                    .map_err(|e| HayashiError::Runtime(format!("msauto: {e}")))?;
+                Ok(Value::MSARResult(Rc::new(result)))
+            }
+
             // ── Função definida pelo usuário ──────────────────────────────────
             other => {
                 // Recupera a função do env (se existir)
@@ -8940,6 +9228,49 @@ impl Interpreter {
                     // ── VARMA ─────────────────────────────────────────────────────
                     (Value::VarmaResult(_), _) => return Err(HayashiError::Runtime(
                         "predict varma: predição multivariada não suportada como coluna — use print() para diagnóstico".into()
+                    )),
+
+                    // ── UCM ───────────────────────────────────────────────────────
+                    (Value::UCResult(r), "level")                     => r.level.to_vec(),
+                    (Value::UCResult(r), "trend")                     => r.trend.as_ref()
+                        .map(|t| t.to_vec())
+                        .unwrap_or_else(|| vec![f64::NAN; r.n_obs]),
+                    (Value::UCResult(r), "seasonal")                  => r.seasonal.as_ref()
+                        .map(|s| s.to_vec())
+                        .unwrap_or_else(|| vec![f64::NAN; r.n_obs]),
+                    (Value::UCResult(r), "residuals" | "resid" | "e") => r.residuals.to_vec(),
+                    (Value::UCResult(_), k) => return Err(HayashiError::Runtime(
+                        format!("predict ucm: kind '{k}' desconhecido — use: level, trend, seasonal, residuals")
+                    )),
+
+                    // ── GAM ───────────────────────────────────────────────────────
+                    (Value::GamResult(_), _) => return Err(HayashiError::Runtime(
+                        "predict gam: valores ajustados não estão armazenados — use gam() com df=dataset e calcule Xβ̂ manualmente".into()
+                    )),
+
+                    // ── MICE ──────────────────────────────────────────────────────
+                    (Value::MiceResult(_), _) => return Err(HayashiError::Runtime(
+                        "predict mice: MICE retorna múltiplos datasets; acesse via pooling de modelos".into()
+                    )),
+
+                    // ── MarkovAutoregression ───────────────────────────────────────
+                    (Value::MSARResult(r), "regime" | "state") => {
+                        r.predict_regime().iter().map(|&s| (s + 1) as f64).collect()
+                    }
+                    (Value::MSARResult(r), kind_s) if kind_s.starts_with("regime") && kind_s.len() > 6 => {
+                        let idx = kind_s["regime".len()..].parse::<usize>()
+                            .map(|n| n.saturating_sub(1))
+                            .unwrap_or(0);
+                        if idx >= r.k_regimes {
+                            return Err(HayashiError::Runtime(format!(
+                                "predict msauto: regime{} fora do intervalo 1..{}",
+                                idx + 1, r.k_regimes
+                            )));
+                        }
+                        r.smoothed_probs.column(idx).to_vec()
+                    }
+                    (Value::MSARResult(_), k) => return Err(HayashiError::Runtime(
+                        format!("predict msauto: kind '{k}' desconhecido — use: regime, regime1, regime2, ...")
                     )),
 
                     // ── Decomposição sazonal ──────────────────────────────────────
