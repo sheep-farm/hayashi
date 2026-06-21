@@ -1,0 +1,36 @@
+# Modelos de contagem: Poisson e Negative Binomial
+# Dataset: dados.csv — síntetico (n=200), educacao como proxy de anos de estudo
+# Variáveis: id, salario, educacao, experiencia, setor, genero, idade
+
+load "dados.csv" as df
+
+summarize(df, educacao, experiencia)
+
+# ── drop_collinear: verificar/remover colunas colineares antes de estimar ──────
+# Útil quando design matrix pode ter redundância (p. ex. dummies mal geradas)
+generate df exp2 = experiencia * experiencia   # criamos colinear artificial
+generate df exp3 = experiencia * 2             # múltiplo de exp — colinear com exp
+
+let df_clean = drop_collinear(df, vars=["educacao","experiencia","exp2","exp3"])
+# df_clean terá exp3 ou exp2 removida (colinear com experiencia)
+
+# ── Poisson ────────────────────────────────────────────────────────────────────
+# Usa educacao como variável de contagem (anos de estudo, inteiros ≥ 0)
+# E[educacao | X] = exp(X'β)
+let m_poisson = poisson(educacao ~ experiencia + idade, df, cov=HC3)
+print(m_poisson)
+
+# ── Negative Binomial (NB2) ───────────────────────────────────────────────────
+# Acomoda superdispersão: Var[Y] = μ + α μ²
+# α = 0 → reduz a Poisson
+let m_nb = negbin(educacao ~ experiencia + idade, df, cov=HC3)
+print(m_nb)
+
+# ── Comparação ─────────────────────────────────────────────────────────────────
+esttab(m_poisson, m_nb)
+
+# ── Efeitos marginais médios (AME) ─────────────────────────────────────────────
+# Para Poisson: AME_k = β_k × μ̄  (derivada de E[y|x] = exp(Xβ))
+# Para NegBin:  idêntico (mesma função de ligação)
+margins(m_poisson)
+margins(m_nb)
