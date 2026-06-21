@@ -2,13 +2,28 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use ndarray::{Array1, Array2};
 use greeners::{DataFrame, Formula as GFormula, OLS, CovarianceType, IV, Logit, Probit, FixedEffects, RandomEffects};
-use greeners::{t_pvalue_two, t_quantile, chi2_pvalue, norm_pdf, logistic};
+use greeners::{t_pvalue_two, t_quantile, chi2_pvalue, f_pvalue, norm_pdf, logistic};
 use greeners::diagnostics::Diagnostics;
 use greeners::specification_tests::SpecificationTests;
+use greeners::linalg::{LinalgInverse as _, LinalgEigh as _};
+use greeners::linalg::UPLO;
 use crate::lang::ast::*;
 use crate::lang::error::{HayashiError, Result};
 
 fn t_critical_95(df: f64) -> f64 { t_quantile(0.975, df) }
+
+fn rd_kernel_opt(opt: Option<&Value>) -> std::result::Result<greeners::RdKernel, String> {
+    match opt {
+        None => Ok(greeners::RdKernel::Triangular),
+        Some(Value::Str(s)) => match s.as_str() {
+            "triangular"   | "tri" => Ok(greeners::RdKernel::Triangular),
+            "uniform"      | "uni" => Ok(greeners::RdKernel::Uniform),
+            "epanechnikov" | "epa" => Ok(greeners::RdKernel::Epanechnikov),
+            other => Err(format!("kernel '{other}' desconhecido (triangular|uniform|epanechnikov)")),
+        },
+        _ => Err("kernel deve ser string".into()),
+    }
+}
 
 // ── Wrappers que preservam a matriz X para diagnósticos e predict ────────────
 
@@ -36,6 +51,124 @@ pub struct BinaryModel {
 impl std::fmt::Display for BinaryModel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.result)
+    }
+}
+
+// ── SUR wrapper (preserva nomes de variáveis por equação) ────────────────────
+
+#[derive(Clone)]
+pub struct SurModel {
+    pub result: Rc<greeners::sur::SurResult>,
+    pub eq_var_names: Vec<Vec<String>>, // nomes por equação
+}
+
+impl std::fmt::Display for SurModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let r = &self.result;
+        let thick = "═".repeat(78);
+        let thin  = "─".repeat(78);
+        writeln!(f, "\n{thick}")?;
+        writeln!(f, "{:^78}", " Seemingly Unrelated Regressions (SUR) ")?;
+        writeln!(f, "{:^78}", "Zellner's Efficient Estimator")?;
+        writeln!(f, "{thin}")?;
+        writeln!(f, " Cross-Equation Error Correlation (Σ):")?;
+        for row in r.sigma_cross.rows() {
+            write!(f, "  [")?;
+            for v in row { write!(f, " {:>8.4}", v)?; }
+            writeln!(f, " ]")?;
+        }
+        for (eq, vnames) in r.equations.iter().zip(self.eq_var_names.iter()) {
+            writeln!(f, "\n{:-^78}", format!(" Equation: {} ", eq.name))?;
+            writeln!(f, "{:<20} {:>10} {:>10} {:>8} {:>8}",
+                     "Variable", "Coef", "Std Err", "t", "P>|t|")?;
+            writeln!(f, "{thin}")?;
+            for i in 0..eq.params.len() {
+                let vname: &str = vnames.get(i).map(|s| s.as_str()).unwrap_or("?");
+                writeln!(f, "{:<20} {:>10.4} {:>10.4} {:>8.3} {:>8.3}",
+                         vname, eq.params[i], eq.std_errors[i],
+                         eq.t_values[i], eq.p_values[i])?;
+            }
+            writeln!(f, " R² = {:.4}", eq.r_squared)?;
+        }
+        writeln!(f, "{thick}")
+    }
+}
+
+// ── PCA wrapper (adiciona nomes de variáveis ao PCAResult) ───────────────────
+#[derive(Clone)]
+pub struct PcaModel {
+    pub result: Rc<greeners::PCAResult>,
+    pub var_names: Vec<String>,
+}
+
+impl std::fmt::Display for PcaModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let r = &self.result;
+        let thick = "═".repeat(62);
+        let thin  = "─".repeat(62);
+        writeln!(f, "\n{thick}")?;
+        writeln!(f, "{:^62}", " Principal Component Analysis ")?;
+        writeln!(f, "{thin}")?;
+        writeln!(f, " {:>20}  {:>10}", "Observações:", r.n_obs)?;
+        writeln!(f, " {:>20}  {:>10}", "Componentes:", r.n_components)?;
+        writeln!(f, " {:>20}  {:>10}", "Variáveis:", self.var_names.len())?;
+        writeln!(f, "\n{:^12} {:>12} {:>12} {:>10}", "Componente", "Var Expl.", "% Acum.", "Eigenvalue")?;
+        writeln!(f, "{thin}")?;
+        let mut cum = 0.0;
+        for i in 0..r.n_components {
+            cum += r.explained_variance_ratio[i];
+            writeln!(f, " PC{:<9} {:>12.4} {:>12.4} {:>10.4}",
+                     i + 1,
+                     r.explained_variance_ratio[i],
+                     cum,
+                     r.explained_variance[i])?;
+        }
+        writeln!(f, "\n{:^62}", " Loadings ")?;
+        writeln!(f, "{thin}")?;
+        let hdr: String = (0..r.n_components).map(|i| format!(" {:>8}", format!("PC{}", i+1))).collect();
+        writeln!(f, "{:<18}{hdr}", "Variável")?;
+        for (j, vname) in self.var_names.iter().enumerate() {
+            let row: String = (0..r.n_components)
+                .map(|i| format!(" {:>8.4}", r.loadings[[j, i]]))
+                .collect();
+            writeln!(f, "{:<18}{row}", vname)?;
+        }
+        writeln!(f, "{thick}")
+    }
+}
+
+// ── Factor Analysis wrapper ───────────────────────────────────────────────────
+#[derive(Clone)]
+pub struct FactorModel {
+    pub result: Rc<greeners::FactorResult>,
+    pub var_names: Vec<String>,
+}
+
+impl std::fmt::Display for FactorModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let r = &self.result;
+        let thick = "═".repeat(62);
+        let thin  = "─".repeat(62);
+        writeln!(f, "\n{thick}")?;
+        writeln!(f, "{:^62}", " Factor Analysis (Principal Axis) ")?;
+        writeln!(f, "{thin}")?;
+        writeln!(f, " {:>20}  {:>10}", "Observações:", r.n_obs)?;
+        writeln!(f, " {:>20}  {:>10}", "Fatores:", r.n_factors)?;
+        writeln!(f, "\n{:^62}", " Cargas Fatoriais (Loadings) ")?;
+        writeln!(f, "{thin}")?;
+        let hdr: String = (0..r.n_factors).map(|i| format!(" {:>8}", format!("F{}", i+1))).collect();
+        writeln!(f, "{:<18}{hdr}  {:>10}", "Variável", "Comunalit.")?;
+        for (j, vname) in self.var_names.iter().enumerate() {
+            let row: String = (0..r.n_factors)
+                .map(|i| format!(" {:>8.4}", r.loadings[[j, i]]))
+                .collect();
+            writeln!(f, "{:<18}{row}  {:>10.4}", vname, r.communalities[j])?;
+        }
+        writeln!(f, "\n{:<12} {:>10}", "Eigenvalues:", "")?;
+        for (i, &ev) in r.eigenvalues.iter().enumerate() {
+            writeln!(f, "  F{:<10} {:>10.4}", i+1, ev)?;
+        }
+        writeln!(f, "{thick}")
     }
 }
 
@@ -80,6 +213,38 @@ pub enum Value {
     GarchResult(Rc<greeners::GarchResult>),
     DiagResult(Rc<DiagResult>),
     AbResult(Rc<greeners::ArellanoBondResult>),
+    SysGmmResult(Rc<greeners::SystemGmmResult>),
+    FE2SLSResult(Rc<greeners::PanelIvResult>),
+    PcseResult(Rc<greeners::PcseResult>),
+    PanelGlsResult(Rc<greeners::PanelGlsResult>),
+    TobitResult(Rc<greeners::TobitResult>),
+    HeckmanResult(Rc<greeners::HeckmanResult>),
+    RdResult(Rc<greeners::RdResult>),
+    SynthResult(Rc<greeners::SynthResult>),
+    PsmResult(Rc<greeners::PsmResult>),
+    PoissonResult(Rc<greeners::PoissonResult>),
+    NegBinResult(Rc<greeners::NegBinResult>),
+    OrderedResult(Rc<greeners::OrderedResult>),
+    MNLogitResult(Rc<greeners::MNLogitResult>),
+    DidResult(Rc<greeners::DidResult>),
+    QuantileResult(Rc<greeners::QuantileResult>),
+    KMResult(Rc<greeners::KMResult>),
+    CoxResult(Rc<greeners::CoxResult>),
+    RlmResult(Rc<greeners::RlmResult>),
+    GeeResult(Rc<greeners::GeeResult>),
+    ZeroInflatedResult(Rc<greeners::ZeroInflatedResult>),
+    MixedResult(Rc<greeners::MixedResult>),
+    BetaResult(Rc<greeners::BetaResult>),
+    GlsarResult(Rc<greeners::GlsarResult>),
+    SurResult(SurModel),
+    RollingResult(Rc<greeners::RollingResult>),
+    RecursiveLSResult(Rc<greeners::RecursiveLSResult>),
+    GlmResult(Rc<greeners::GlmResult>),
+    LowessResult(Rc<greeners::LowessResult>),
+    PcaResult(PcaModel),
+    FactorResult(FactorModel),
+    MarkovResult(Rc<greeners::MarkovSwitchingResult>),
+    ConditionalResult(Rc<greeners::ConditionalResult>),
     List(Rc<Vec<Value>>),
     UserFn(Rc<UserFn>),
     Nil,
@@ -104,6 +269,38 @@ impl std::fmt::Display for Value {
             Value::GarchResult(r)  => write!(f, "{r}"),
             Value::DiagResult(r)   => write!(f, "{r}"),
             Value::AbResult(r)     => write!(f, "{r}"),
+            Value::SysGmmResult(r) => write!(f, "{r}"),
+            Value::FE2SLSResult(r)    => write!(f, "{r}"),
+            Value::PcseResult(r)      => write!(f, "{r}"),
+            Value::PanelGlsResult(r)  => write!(f, "{r}"),
+            Value::TobitResult(r)     => write!(f, "{r}"),
+            Value::HeckmanResult(r)   => write!(f, "{r}"),
+            Value::RdResult(r)        => write!(f, "{r}"),
+            Value::SynthResult(r)     => write!(f, "{r}"),
+            Value::PsmResult(r)       => write!(f, "{r}"),
+            Value::PoissonResult(r)   => write!(f, "{r}"),
+            Value::NegBinResult(r)   => write!(f, "{r}"),
+            Value::OrderedResult(r)  => write!(f, "{r}"),
+            Value::MNLogitResult(r)  => write!(f, "{r}"),
+            Value::DidResult(r)      => write!(f, "{r}"),
+            Value::QuantileResult(r) => write!(f, "{r}"),
+            Value::KMResult(r)       => write!(f, "{r}"),
+            Value::CoxResult(r)      => write!(f, "{r}"),
+            Value::RlmResult(r)           => write!(f, "{r}"),
+            Value::GeeResult(r)           => write!(f, "{r}"),
+            Value::ZeroInflatedResult(r)  => write!(f, "{r}"),
+            Value::MixedResult(r)         => write!(f, "{r}"),
+            Value::BetaResult(r)          => write!(f, "{r}"),
+            Value::GlsarResult(r)         => write!(f, "{r}"),
+            Value::SurResult(m)           => write!(f, "{m}"),
+            Value::RollingResult(r)       => write!(f, "{r}"),
+            Value::RecursiveLSResult(r)   => write!(f, "{r}"),
+            Value::GlmResult(r)           => write!(f, "{r}"),
+            Value::LowessResult(r)        => write!(f, "{r}"),
+            Value::PcaResult(m)           => write!(f, "{m}"),
+            Value::FactorResult(m)        => write!(f, "{m}"),
+            Value::MarkovResult(r)        => write!(f, "{r}"),
+            Value::ConditionalResult(r)   => write!(f, "{r}"),
             Value::List(v) => {
                 write!(f, "[")?;
                 for (i, item) in v.iter().enumerate() {
@@ -273,6 +470,41 @@ impl Interpreter {
             formula_str.push_str(&f.fe.join(" + "));
         }
         formula_str
+    }
+
+    /// Extrai coluna como Array1<f64>; aceita Float e Int.
+    fn get_col_f64(df: &DataFrame, name: &str) -> Result<ndarray::Array1<f64>> {
+        use greeners::Column;
+        let col = df.get_column(name)
+            .map_err(|_| HayashiError::Runtime(format!("coluna '{name}' não encontrada")))?;
+        match col {
+            Column::Float(arr) => Ok(arr.clone()),
+            Column::Int(arr)   => Ok(arr.mapv(|v| v as f64)),
+            _ => Err(HayashiError::Type(format!("coluna '{name}' não é numérica"))),
+        }
+    }
+
+    /// Reconstrói X a partir da lista de nomes de variáveis do modelo.
+    /// `_cons`/`const`/`Intercept` → coluna de 1s; demais → colunas do df.
+    fn build_x_from_varnames(df: &DataFrame, names: &[String]) -> Result<ndarray::Array2<f64>> {
+        let n = df.n_rows();
+        let k = names.len();
+        let mut x = ndarray::Array2::<f64>::zeros((n, k));
+        for (j, name) in names.iter().enumerate() {
+            match name.as_str() {
+                "_cons" | "const" | "Intercept" | "(Intercept)" => {
+                    x.column_mut(j).fill(1.0);
+                }
+                other => {
+                    let col = Self::get_col_f64(df, other)
+                        .map_err(|_| HayashiError::Runtime(
+                            format!("predict: coluna '{other}' não encontrada no DataFrame")
+                        ))?;
+                    x.column_mut(j).assign(&col);
+                }
+            }
+        }
+        Ok(x)
     }
 
     fn resolve_cov(opt_val: Option<&Value>) -> Result<CovarianceType> {
@@ -653,6 +885,212 @@ impl Interpreter {
                 Ok(Value::IvResult(Rc::new(result)))
             }
 
+            // ── Teste de instrumentos fracos (Cragg-Donald / Stock-Yogo) ──────
+            // weak_iv(endog_formula, instrument_formula, df)
+            // Mesma sintaxe do iv(). Calcula F de 1ª etapa (por endog) e
+            // estatística de Cragg-Donald. Compara com valores críticos de
+            // Stock & Yogo (2005).
+            "weak_iv" => {
+                if args.len() < 3 {
+                    return Err(HayashiError::Runtime(
+                        "weak_iv() requer (formula_estrutural, formula_instrumentos, df)".into()
+                    ));
+                }
+                let endog_ast = match &args[0] {
+                    Expr::Formula(f) => f.clone(),
+                    _ => return Err(HayashiError::Type("weak_iv(): primeiro arg deve ser fórmula".into())),
+                };
+                let instr_ast = match &args[1] {
+                    Expr::Formula(f) => f.clone(),
+                    _ => return Err(HayashiError::Type("weak_iv(): segundo arg deve ser fórmula de instrumentos".into())),
+                };
+                let df_name = match &args[2] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("weak_iv(): terceiro arg deve ser DataFrame".into())),
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(df)) => df.clone(),
+                    _ => return Err(HayashiError::Runtime(format!("weak_iv: '{df_name}' não é um DataFrame"))),
+                };
+
+                // ── Identifica variáveis ──
+                let endog_vars: std::collections::HashSet<String> =
+                    endog_ast.rhs.iter().map(|t| match t {
+                        RhsTerm::Var(v) => v.clone(), _ => String::new()
+                    }).filter(|s| !s.is_empty()).collect();
+                let instr_vars: std::collections::HashSet<String> =
+                    instr_ast.rhs.iter().map(|t| match t {
+                        RhsTerm::Var(v) => v.clone(), _ => String::new()
+                    }).filter(|s| !s.is_empty()).collect();
+
+                // endógenas = em endog mas NÃO em instr
+                let x_endog_names: Vec<String> = endog_ast.rhs.iter()
+                    .filter_map(|t| if let RhsTerm::Var(v) = t { Some(v.clone()) } else { None })
+                    .filter(|v| !instr_vars.contains(v))
+                    .collect();
+                // instrumentos excluídos = em instr mas NÃO em endog
+                let z_excl_names: Vec<String> = instr_ast.rhs.iter()
+                    .filter_map(|t| if let RhsTerm::Var(v) = t { Some(v.clone()) } else { None })
+                    .filter(|v| !endog_vars.contains(v))
+                    .collect();
+                // exógenos incluídos = em ambos
+                let x_exog_names: Vec<String> = instr_ast.rhs.iter()
+                    .filter_map(|t| if let RhsTerm::Var(v) = t { Some(v.clone()) } else { None })
+                    .filter(|v| endog_vars.contains(v.as_str()))
+                    .collect();
+
+                if x_endog_names.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "weak_iv: nenhuma variável endógena identificada (vars em endog mas não em instr)".into()
+                    ));
+                }
+                if z_excl_names.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "weak_iv: nenhum instrumento excluído identificado (vars em instr mas não em endog)".into()
+                    ));
+                }
+
+                let n = df.n_rows();
+                let k_endog = x_endog_names.len();
+                let l = z_excl_names.len(); // número de instrumentos excluídos
+                let k_exog = x_exog_names.len() + 1; // +1 intercepto
+
+                // ── Monta matrizes ──
+                // X_exog: intercepto + exógenos incluídos  (n × k_exog)
+                let mut x_exog = Array2::<f64>::ones((n, k_exog));
+                for (j, col) in x_exog_names.iter().enumerate() {
+                    let v = df.get(col).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    for i in 0..n { x_exog[[i, j + 1]] = v[i]; }
+                }
+
+                // Z_excl: instrumentos excluídos  (n × L)
+                let mut z_excl = Array2::<f64>::zeros((n, l));
+                for (j, col) in z_excl_names.iter().enumerate() {
+                    let v = df.get(col).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    for i in 0..n { z_excl[[i, j]] = v[i]; }
+                }
+
+                // W = [X_exog | Z_excl]  (n × (k_exog + L))
+                let mut w_full = Array2::<f64>::zeros((n, k_exog + l));
+                w_full.slice_mut(ndarray::s![.., ..k_exog]).assign(&x_exog);
+                w_full.slice_mut(ndarray::s![.., k_exog..]).assign(&z_excl);
+
+                // X_endog: variáveis endógenas  (n × k_endog)
+                let mut x_endog_mat = Array2::<f64>::zeros((n, k_endog));
+                for (j, col) in x_endog_names.iter().enumerate() {
+                    let v = df.get(col).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    for i in 0..n { x_endog_mat[[i, j]] = v[i]; }
+                }
+
+                // ── M_exog = I - X_exog (X_exog'X_exog)⁻¹ X_exog' ──
+                // para partial out os exógenos incluídos
+                let xtx_exog = x_exog.t().dot(&x_exog);
+                let xtx_exog_inv = xtx_exog.inv()
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                // P_exog aplicado a qualquer matriz A: P_exog A = X_exog (X_exog'X_exog)⁻¹ X_exog' A
+                let proj_exog = |a: &Array2<f64>| -> Array2<f64> {
+                    x_exog.dot(&xtx_exog_inv.dot(&x_exog.t().dot(a)))
+                };
+                // M_exog Z_excl (partialling out exog de Z_excl)
+                let mz = &z_excl - &proj_exog(&z_excl); // n × L
+                // M_exog X_endog
+                let _mx = &x_endog_mat - &proj_exog(&x_endog_mat); // n × k_endog
+
+                // ── Primeira etapa: regride X_endog em W_full ──
+                let wtw = w_full.t().dot(&w_full);
+                let wtw_inv = wtw.inv()
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let pi_hat = wtw_inv.dot(&w_full.t().dot(&x_endog_mat)); // (k_exog+L) × k_endog
+                let x_hat = w_full.dot(&pi_hat); // n × k_endog
+                let v_hat = &x_endog_mat - &x_hat; // resíduos 1ª etapa
+
+                // ── Π̂_Z: linhas de pi_hat correspondentes a Z_excl ──
+                let pi_z = pi_hat.slice(ndarray::s![k_exog.., ..]).to_owned(); // L × k_endog
+
+                // ── Σ̂_v = v̂'v̂ / (n - k_exog - L) ──
+                let df_fs = n - k_exog - l;
+                let vtv = v_hat.t().dot(&v_hat); // k_endog × k_endog
+                let sigma_v = &vtv / df_fs as f64;
+
+                // ── Matriz de Cragg-Donald: A = Π̂_Z' (Z'M_exog Z) Π̂_Z ──
+                let zmz = mz.t().dot(&mz); // L × L  (= Z'M_exog Z)
+                let cd_mat = pi_z.t().dot(&zmz.dot(&pi_z)); // k_endog × k_endog
+
+                // ── F de 1ª etapa por variável endógena (partial F em Z_excl) ──
+                let mut first_stage_lines = String::new();
+                for j in 0..k_endog {
+                    // partial F = (Π̂_Zj' Z'M Z Π̂_Zj / L) / Σ̂_vj
+                    let pi_zj = pi_z.column(j);
+                    let numerator = pi_zj.dot(&zmz.dot(&pi_zj)) / l as f64;
+                    let sigma_vj = sigma_v[[j, j]];
+                    let f_j = if sigma_vj > 1e-15 { numerator / sigma_vj } else { f64::NAN };
+                    let p_j = if f_j.is_finite() {
+                        f_pvalue(f_j, l as f64, df_fs as f64)
+                    } else { f64::NAN };
+                    first_stage_lines.push_str(&format!(
+                        "   {:<20} F({},{}) = {:>10.3}   p = {:.4}\n",
+                        x_endog_names[j], l, df_fs, f_j, p_j
+                    ));
+                }
+
+                // ── Cragg-Donald Wald F ──
+                let sigma_v_inv = sigma_v.inv()
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let cd_core = sigma_v_inv.dot(&cd_mat); // k_endog × k_endog
+
+                let cd_stat = if k_endog == 1 {
+                    cd_core[[0, 0]] / l as f64
+                } else {
+                    // λ_min de cd_core / L
+                    let (eigenvalues, _) = cd_core.eigh(UPLO::Lower)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    eigenvalues[0] / l as f64 // eigenvalues em ordem crescente
+                };
+
+                // ── Valores críticos de Stock & Yogo (2005) (k_endog=1, bias TSLS) ──
+                let sy_table: Vec<(usize, [f64; 4])> = vec![
+                    (1,  [16.38, 8.96, 6.66, 5.53]),
+                    (2,  [19.93, 11.59, 8.75, 7.25]),
+                    (3,  [22.30, 12.83, 9.54, 7.80]),
+                    (4,  [24.58, 13.96, 10.26, 8.31]),
+                    (5,  [26.87, 15.09, 11.04, 8.84]),
+                    (6,  [28.55, 16.00, 11.65, 9.23]),
+                    (7,  [30.10, 16.87, 12.26, 9.63]),
+                    (8,  [31.49, 17.60, 12.82, 10.00]),
+                    (9,  [32.84, 18.37, 13.44, 10.37]),
+                    (10, [34.16, 19.10, 14.01, 10.73]),
+                ];
+                let sy_line = if k_endog == 1 {
+                    if let Some((_, cvs)) = sy_table.iter().find(|(lv, _)| *lv == l) {
+                        format!(
+                            "   Stock-Yogo (2005) — valores críticos para viés TSLS máximo (k_endog=1, L={}):\n   10%:{:.2}  15%:{:.2}  20%:{:.2}  25%:{:.2}\n",
+                            l, cvs[0], cvs[1], cvs[2], cvs[3]
+                        )
+                    } else {
+                        format!("   Stock-Yogo (2005): tabela disponível para L=1..10 (L={} fora do intervalo).\n   Regra de bolso (Staiger & Stock 1997): F > 10.\n", l)
+                    }
+                } else {
+                    format!("   Stock-Yogo (2005): valores críticos para k_endog=1 apenas.\n   Para k_endog={}, consulte tabelas de Andrews, Stock & Sun (2019).\n", k_endog)
+                };
+
+                let thick = "═".repeat(70);
+                let thin  = "─".repeat(70);
+                let mut out = String::new();
+                out.push_str(&format!("\n{thick}\n"));
+                out.push_str(" Teste de Instrumentos Fracos\n");
+                out.push_str(&format!("{thick}\n"));
+                out.push_str(&format!(" n={n}  k_endog={k_endog}  L={l} (instrumentos excluídos)\n"));
+                out.push_str("\n── F de 1ª Etapa (partial F em instrumentos excluídos)\n");
+                out.push_str(&first_stage_lines);
+                out.push_str(&format!("\n── Cragg-Donald Wald F = {:.4}\n", cd_stat));
+                out.push_str(&format!("   (λ_min do núcleo de concentração / L)\n"));
+                out.push_str(&format!("\n{sy_line}"));
+                out.push_str(&format!("{thin}\n"));
+                out.push_str(" Regra de bolso: F > 10 (Staiger & Stock 1997)\n");
+                out.push_str(&format!("{thick}\n"));
+                Ok(Self::diag(out))
+            }
+
             // ── Logit ─────────────────────────────────────────────────────────
             "logit" => {
                 let (formula_ast, df) = self.extract_binary_args(args)?;
@@ -679,6 +1117,1869 @@ impl Interpreter {
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let coef_names = Self::coef_names_from_formula(&formula_ast, &df, x.ncols());
                 Ok(Value::BinaryResult(BinaryModel { result: Rc::new(result), x, kind: "probit".into(), coef_names }))
+            }
+
+            // ── Heckman Two-Step (Heckit) ─────────────────────────────────────
+            // heckman(outcome_formula, select_formula, df)
+            // outcome: y ~ x1 + x2       (estimado apenas nos obs selecionados)
+            // select:  z ~ w1 + w2 + w3  (probit em todos os obs; z deve ser 0/1)
+            "heckman" | "heckit" => {
+                if args.len() < 3 {
+                    return Err(HayashiError::Runtime(
+                        "heckman() requer (formula_resultado, formula_seleção, df)".into()
+                    ));
+                }
+                let out_ast = match &args[0] {
+                    Expr::Formula(f) => f.clone(),
+                    _ => return Err(HayashiError::Type(
+                        "heckman(): primeiro argumento deve ser fórmula de resultado (y ~ x1+x2)".into()
+                    )),
+                };
+                let sel_ast = match &args[1] {
+                    Expr::Formula(f) => f.clone(),
+                    _ => return Err(HayashiError::Type(
+                        "heckman(): segundo argumento deve ser fórmula de seleção (z ~ w1+w2)".into()
+                    )),
+                };
+                let df_name = match &args[2] {
+                    Expr::Var(name) => name.clone(),
+                    _ => return Err(HayashiError::Type(
+                        "heckman(): terceiro argumento deve ser nome do DataFrame".into()
+                    )),
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(df)) => df.clone(),
+                    _ => return Err(HayashiError::Runtime(
+                        format!("heckman: '{df_name}' não é um DataFrame")
+                    )),
+                };
+
+                // Equação de resultado
+                let out_str = Self::formula_to_string(&out_ast);
+                let g_out = GFormula::parse(&out_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_vec, x_out) = df.to_design_matrix(&g_out)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let out_names = df.formula_var_names(&g_out)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                // Equação de seleção
+                let sel_str = Self::formula_to_string(&sel_ast);
+                let g_sel = GFormula::parse(&sel_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (z_vec, x_sel) = df.to_design_matrix(&g_sel)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let sel_names = df.formula_var_names(&g_sel)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                let result = greeners::Heckman::fit(
+                    &y_vec, &x_out, &z_vec, &x_sel,
+                    Some(out_names), Some(sel_names),
+                ).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                Ok(Value::HeckmanResult(Rc::new(result)))
+            }
+
+            // ── Tobit — MLE com censura esquerda ──────────────────────────────
+            // tobit(formula, df [, ll=0])
+            "tobit" => {
+                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_vec, x_mat) = df.to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = df.formula_var_names(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let ll_limit = match opt_map.get("ll") {
+                    Some(Value::Float(v)) => *v,
+                    Some(Value::Int(v))   => *v as f64,
+                    None => 0.0,
+                    _ => return Err(HayashiError::Runtime(
+                        "tobit(): ll deve ser numérico".into()
+                    )),
+                };
+                let result = greeners::Tobit::fit(&y_vec, &x_mat, ll_limit, Some(var_names))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                Ok(Value::TobitResult(Rc::new(result)))
+            }
+
+            // ── Regressão Descontínua — Sharp RD ─────────────────────────────
+            // rd(outcome ~ running_var, cutoff, df [, bw=h, poly=1, kernel="triangular"])
+            "rd" => {
+                if args.len() < 3 {
+                    return Err(HayashiError::Runtime(
+                        "rd() requer (formula, cutoff, df [, bw=..., poly=..., kernel=...])".into()
+                    ));
+                }
+                let formula_ast = match &args[0] {
+                    Expr::Formula(f) => f.clone(),
+                    _ => return Err(HayashiError::Type("rd(): primeiro arg deve ser fórmula".into())),
+                };
+                let cutoff = match self.eval_expr(&args[1])? {
+                    Value::Float(v) => v,
+                    Value::Int(v)   => v as f64,
+                    _ => return Err(HayashiError::Type("rd(): segundo arg deve ser o cutoff (número)".into())),
+                };
+                let df = match self.eval_expr(&args[2])? {
+                    Value::DataFrame(df) => df,
+                    _ => return Err(HayashiError::Type("rd(): terceiro arg deve ser DataFrame".into())),
+                };
+
+                // Extrair nomes diretamente do AST da fórmula Hayashi
+                let outcome_name = formula_ast.lhs.clone();
+                let running_name = formula_ast.rhs.first()
+                    .and_then(|t| if let RhsTerm::Var(v) = t { Some(v.clone()) } else { None })
+                    .ok_or_else(|| HayashiError::Runtime(
+                        "rd(): fórmula deve ter exatamente uma variável no lado direito (running var)".into()
+                    ))?;
+
+                let y = df.get(&outcome_name)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?
+                    .to_owned();
+                let x = df.get(&running_name)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?
+                    .to_owned();
+
+                let bw = match opt_map.get("bw") {
+                    Some(Value::Float(v)) => Some(*v),
+                    Some(Value::Int(v))   => Some(*v as f64),
+                    None => None,
+                    _ => return Err(HayashiError::Runtime("rd: bw deve ser numérico".into())),
+                };
+                let poly = match opt_map.get("poly") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    None => 1,
+                    _ => return Err(HayashiError::Runtime("rd: poly deve ser inteiro".into())),
+                };
+                let kernel = rd_kernel_opt(opt_map.get("kernel"))
+                    .map_err(|e| HayashiError::Runtime(e))?;
+
+                let result = greeners::RD::fit(
+                    &y, &x, cutoff, bw, poly, kernel,
+                    Some((outcome_name, running_name)),
+                ).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                Ok(Value::RdResult(Rc::new(result)))
+            }
+
+            // ── Regressão Descontínua — Fuzzy RD ─────────────────────────────
+            // fuzzy_rd(outcome ~ running_var, "treatment_col", cutoff, df [, bw=h, poly=1])
+            "fuzzy_rd" => {
+                if args.len() < 4 {
+                    return Err(HayashiError::Runtime(
+                        "fuzzy_rd() requer (formula, \"treatment\", cutoff, df [, bw=..., poly=...])".into()
+                    ));
+                }
+                let formula_ast = match &args[0] {
+                    Expr::Formula(f) => f.clone(),
+                    _ => return Err(HayashiError::Type("fuzzy_rd(): primeiro arg deve ser fórmula".into())),
+                };
+                let treatment_name = match self.eval_expr(&args[1])? {
+                    Value::Str(s) => s,
+                    _ => return Err(HayashiError::Type(
+                        "fuzzy_rd(): segundo arg deve ser o nome da coluna de tratamento (string)".into()
+                    )),
+                };
+                let cutoff = match self.eval_expr(&args[2])? {
+                    Value::Float(v) => v,
+                    Value::Int(v)   => v as f64,
+                    _ => return Err(HayashiError::Type("fuzzy_rd(): terceiro arg deve ser cutoff (número)".into())),
+                };
+                let df = match self.eval_expr(&args[3])? {
+                    Value::DataFrame(df) => df,
+                    _ => return Err(HayashiError::Type("fuzzy_rd(): quarto arg deve ser DataFrame".into())),
+                };
+
+                let outcome_name = formula_ast.lhs.clone();
+                let running_name = formula_ast.rhs.first()
+                    .and_then(|t| if let RhsTerm::Var(v) = t { Some(v.clone()) } else { None })
+                    .ok_or_else(|| HayashiError::Runtime(
+                        "fuzzy_rd(): fórmula deve ter exatamente uma variável no lado direito (running var)".into()
+                    ))?;
+
+                let y = df.get(&outcome_name)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?
+                    .to_owned();
+                let d = df.get(&treatment_name)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?
+                    .to_owned();
+                let x = df.get(&running_name)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?
+                    .to_owned();
+
+                let bw = match opt_map.get("bw") {
+                    Some(Value::Float(v)) => Some(*v),
+                    Some(Value::Int(v))   => Some(*v as f64),
+                    None => None,
+                    _ => return Err(HayashiError::Runtime("fuzzy_rd: bw deve ser numérico".into())),
+                };
+                let poly = match opt_map.get("poly") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    None => 1,
+                    _ => return Err(HayashiError::Runtime("fuzzy_rd: poly deve ser inteiro".into())),
+                };
+                let kernel = rd_kernel_opt(opt_map.get("kernel"))
+                    .map_err(|e| HayashiError::Runtime(e))?;
+
+                let result = greeners::RD::fit_fuzzy(
+                    &y, &d, &x, cutoff, bw, poly, kernel,
+                    Some((outcome_name, running_name, treatment_name)),
+                ).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                Ok(Value::RdResult(Rc::new(result)))
+            }
+
+            // ── Propensity Score Matching (Rosenbaum & Rubin 1983) ───────────
+            // psm(outcome ~ treatment + cov1 + cov2, df [, k=1, caliper=0.2, replace=false, boot=200])
+            // O 1º termo RHS é o tratamento; demais são covariáveis para o PS.
+            "psm" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "psm() requer (formula, df [, k=..., caliper=..., replace=..., boot=...])".into()
+                    ));
+                }
+                let formula_ast = match &args[0] {
+                    Expr::Formula(f) => f.clone(),
+                    _ => return Err(HayashiError::Type("psm(): primeiro arg deve ser fórmula".into())),
+                };
+                let df = match self.eval_expr(&args[1])? {
+                    Value::DataFrame(df) => df,
+                    _ => return Err(HayashiError::Type("psm(): segundo arg deve ser DataFrame".into())),
+                };
+
+                let outcome_name = formula_ast.lhs.clone();
+                // Primeiro RHS = tratamento; demais = covariáveis
+                let mut rhs_names: Vec<String> = formula_ast.rhs.iter()
+                    .filter_map(|t| if let RhsTerm::Var(v) = t { Some(v.clone()) } else { None })
+                    .collect();
+                if rhs_names.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "psm(): fórmula deve ter ao menos 'outcome ~ treatment'".into()
+                    ));
+                }
+                let treatment_name = rhs_names.remove(0);
+                let covariate_names = rhs_names;
+
+                if covariate_names.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "psm(): forneça ao menos uma covariável: outcome ~ treatment + cov1 + ...".into()
+                    ));
+                }
+
+                let y = df.get(&outcome_name)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?.to_owned();
+                let d = df.get(&treatment_name)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?.to_owned();
+
+                let x = {
+                    let owned_cols: Vec<ndarray::Array1<f64>> = covariate_names.iter()
+                        .map(|c| df.get(c)
+                            .map(|a| a.to_owned())
+                            .map_err(|e| HayashiError::Runtime(e.to_string())))
+                        .collect::<Result<Vec<_>>>()?;
+                    let views: Vec<ndarray::ArrayView1<f64>> =
+                        owned_cols.iter().map(|a| a.view()).collect();
+                    ndarray::stack(ndarray::Axis(1), &views)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?
+                };
+
+                let k = match opt_map.get("k") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    None => 1,
+                    _ => return Err(HayashiError::Runtime("psm: k deve ser inteiro".into())),
+                };
+                let caliper: Option<f64> = match opt_map.get("caliper") {
+                    Some(Value::Float(v)) => Some(*v),
+                    Some(Value::Int(v))   => Some(*v as f64),
+                    None => None,
+                    _ => return Err(HayashiError::Runtime("psm: caliper deve ser numérico".into())),
+                };
+                let with_replacement = match opt_map.get("replace") {
+                    Some(Value::Bool(b)) => *b,
+                    None => false,
+                    _ => return Err(HayashiError::Runtime("psm: replace deve ser booleano".into())),
+                };
+                let n_boot = match opt_map.get("boot") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    None => 200,
+                    _ => return Err(HayashiError::Runtime("psm: boot deve ser inteiro".into())),
+                };
+
+                let result = greeners::PSM::fit(
+                    &y, &d, &x,
+                    k, caliper, with_replacement, n_boot,
+                    Some((outcome_name, treatment_name, covariate_names)),
+                ).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                Ok(Value::PsmResult(Rc::new(result)))
+            }
+
+            // ── Controle Sintético (ADH 2010) ────────────────────────────────
+            // synth("outcome", "treated_id", t0, df, id="entity", time="year")
+            // synth("outcome", "treated_id", t0, df, id="entity", time="year", covs=["x1","x2"])
+            "synth" => {
+                if args.len() < 4 {
+                    return Err(HayashiError::Runtime(
+                        "synth() requer (outcome, treated_id, t0, df, id=col, time=col [, covs=[...]])".into()
+                    ));
+                }
+                let outcome_col = match self.eval_expr(&args[0])? {
+                    Value::Str(s) => s,
+                    _ => return Err(HayashiError::Type(
+                        "synth(): primeiro arg deve ser nome da coluna de resultado (string)".into()
+                    )),
+                };
+                let treated_unit = match self.eval_expr(&args[1])? {
+                    Value::Str(s)  => s,
+                    Value::Int(v)  => v.to_string(),
+                    Value::Float(v) => (v as i64).to_string(),
+                    _ => return Err(HayashiError::Type(
+                        "synth(): segundo arg deve ser o ID da unidade tratada".into()
+                    )),
+                };
+                let t0 = match self.eval_expr(&args[2])? {
+                    Value::Float(v) => v,
+                    Value::Int(v)   => v as f64,
+                    _ => return Err(HayashiError::Type(
+                        "synth(): terceiro arg deve ser o período de início do tratamento (número)".into()
+                    )),
+                };
+                let df = match self.eval_expr(&args[3])? {
+                    Value::DataFrame(df) => df,
+                    _ => return Err(HayashiError::Type(
+                        "synth(): quarto arg deve ser DataFrame".into()
+                    )),
+                };
+
+                let id_col = match opt_map.get("id") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => return Err(HayashiError::Runtime(
+                        "synth(): opção id=coluna é obrigatória".into()
+                    )),
+                };
+                let time_col = match opt_map.get("time") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => return Err(HayashiError::Runtime(
+                        "synth(): opção time=coluna é obrigatória".into()
+                    )),
+                };
+                let cov_cols: Option<Vec<String>> = match opt_map.get("covs") {
+                    Some(Value::List(lst)) => Some(
+                        lst.iter().map(|v| match v {
+                            Value::Str(s) => Ok(s.clone()),
+                            _ => Err(HayashiError::Type(
+                                "synth(): covs deve ser lista de strings".into()
+                            )),
+                        }).collect::<Result<Vec<_>>>()?
+                    ),
+                    None => None,
+                    _ => return Err(HayashiError::Runtime("synth(): covs deve ser lista".into())),
+                };
+
+                let result = greeners::SyntheticControl::fit(
+                    &outcome_col,
+                    &treated_unit,
+                    t0,
+                    &df,
+                    &id_col,
+                    &time_col,
+                    cov_cols.as_deref(),
+                ).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                Ok(Value::SynthResult(Rc::new(result)))
+            }
+
+            // ── Poisson ───────────────────────────────────────────────────────
+            "poisson" => {
+                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_vec, x_mat) = df.to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = df.formula_var_names(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let cov = Self::resolve_cov(opt_map.get("cov"))?;
+                let result = greeners::Poisson::fit_with_names(&y_vec, &x_mat, cov, Some(var_names))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                Ok(Value::PoissonResult(Rc::new(result)))
+            }
+
+            // ── Negative Binomial (NB2) ───────────────────────────────────────
+            "nbreg" | "negbin" => {
+                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_vec, x_mat) = df.to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = df.formula_var_names(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let cov = Self::resolve_cov(opt_map.get("cov"))?;
+                let result = greeners::NegBin::fit_with_names(&y_vec, &x_mat, cov, Some(var_names))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                Ok(Value::NegBinResult(Rc::new(result)))
+            }
+
+            // ── Ordered Logit ─────────────────────────────────────────────────
+            "ologit" => {
+                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_vec, x_mat) = df.to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = df.formula_var_names(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let result = greeners::OrderedLogit::fit_with_names(&y_vec, &x_mat, Some(var_names))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                Ok(Value::OrderedResult(Rc::new(result)))
+            }
+
+            // ── Ordered Probit ────────────────────────────────────────────────
+            "oprobit" => {
+                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_vec, x_mat) = df.to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = df.formula_var_names(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let result = greeners::OrderedProbit::fit_with_names(&y_vec, &x_mat, Some(var_names))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                Ok(Value::OrderedResult(Rc::new(result)))
+            }
+
+            // ── Multinomial Logit ─────────────────────────────────────────────
+            "mlogit" => {
+                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_vec, x_mat) = df.to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = df.formula_var_names(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let result = greeners::MNLogit::fit_with_names(&y_vec, &x_mat, Some(var_names))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                Ok(Value::MNLogitResult(Rc::new(result)))
+            }
+
+            // ── Difference-in-Differences (2x2) ──────────────────────────────
+            // did(outcome ~ treated_group + post_period, df, cov=HC1)
+            "did" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "did(outcome ~ tratado + pos, df) requer fórmula e DataFrame".into()
+                    ));
+                }
+                let formula_ast = match &args[0] {
+                    Expr::Formula(f) => f.clone(),
+                    _ => return Err(HayashiError::Type("did(): primeiro arg deve ser fórmula".into())),
+                };
+                let df = match self.eval_expr(&args[1])? {
+                    Value::DataFrame(d) => d,
+                    _ => return Err(HayashiError::Type("did(): segundo arg deve ser DataFrame".into())),
+                };
+                // formula: outcome ~ treated_col + post_col
+                let rhs_vars: Vec<&str> = formula_ast.rhs.iter().filter_map(|t| {
+                    if let RhsTerm::Var(v) = t { Some(v.as_str()) } else { None }
+                }).collect();
+                if rhs_vars.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "did(): fórmula deve ter exatamente 2 variáveis no RHS: treated + post".into()
+                    ));
+                }
+                let y       = Self::get_col_f64(&df, &formula_ast.lhs)?;
+                let treated = Self::get_col_f64(&df, rhs_vars[0])?;
+                let post    = Self::get_col_f64(&df, rhs_vars[1])?;
+                let cov = Self::resolve_cov(opt_map.get("cov"))?;
+                let result = greeners::DiffInDiff::fit(&y, &treated, &post, cov)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                Ok(Value::DidResult(Rc::new(result)))
+            }
+
+            // ── Quantile Regression ───────────────────────────────────────────
+            // qreg(y ~ x1 + x2, df, tau=0.5, boot=200)
+            "qreg" => {
+                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let tau = match opt_map.get("tau") {
+                    Some(Value::Float(v)) => *v,
+                    Some(Value::Int(v))   => *v as f64,
+                    None                  => 0.5,
+                    _ => return Err(HayashiError::Type("tau= deve ser numérico".into())),
+                };
+                let n_boot = match opt_map.get("boot") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    None                  => 200,
+                    _ => return Err(HayashiError::Type("boot= deve ser inteiro".into())),
+                };
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_vec, x_mat) = df.to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = df.formula_var_names(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let result = greeners::QuantileReg::fit_with_names(&y_vec, &x_mat, tau, n_boot, Some(var_names))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                Ok(Value::QuantileResult(Rc::new(result)))
+            }
+
+            // ── Kaplan-Meier ──────────────────────────────────────────────────
+            // km(time_col, event_col, df)
+            "km" => {
+                if args.len() < 3 {
+                    return Err(HayashiError::Runtime(
+                        "km(time, event, df) requer 3 argumentos".into()
+                    ));
+                }
+                let time_name = match &args[0] {
+                    Expr::Var(v) | Expr::Str(v) => v.clone(),
+                    _ => return Err(HayashiError::Type("km(): primeiro arg deve ser nome da coluna de tempo".into())),
+                };
+                let event_name = match &args[1] {
+                    Expr::Var(v) | Expr::Str(v) => v.clone(),
+                    _ => return Err(HayashiError::Type("km(): segundo arg deve ser nome da coluna de evento".into())),
+                };
+                let df = match self.eval_expr(&args[2])? {
+                    Value::DataFrame(d) => d,
+                    _ => return Err(HayashiError::Type("km(): terceiro arg deve ser DataFrame".into())),
+                };
+                let times  = Self::get_col_f64(&df, &time_name)?;
+                let events_f = Self::get_col_f64(&df, &event_name)?;
+                let events: ndarray::Array1<u8> = events_f.iter().map(|&v| v as u8).collect();
+                let result = greeners::KaplanMeier::fit(&times, &events)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                Ok(Value::KMResult(Rc::new(result)))
+            }
+
+            // ── Cox Proportional Hazards ──────────────────────────────────────
+            // cox(time_col ~ x1 + x2, df, event=event_col)
+            "cox" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "cox(time ~ x1 + x2, df, event=col) requer fórmula e DataFrame".into()
+                    ));
+                }
+                let formula_ast = match &args[0] {
+                    Expr::Formula(f) => f.clone(),
+                    _ => return Err(HayashiError::Type("cox(): primeiro arg deve ser fórmula".into())),
+                };
+                let df = match self.eval_expr(&args[1])? {
+                    Value::DataFrame(d) => d,
+                    _ => return Err(HayashiError::Type("cox(): segundo arg deve ser DataFrame".into())),
+                };
+                let event_col = match opt_map.get("event") {
+                    Some(Value::Str(s)) => s.clone(),
+                    None => return Err(HayashiError::Runtime(
+                        "cox() requer opção event=nome_coluna".into()
+                    )),
+                    _ => return Err(HayashiError::Type("event= deve ser string".into())),
+                };
+                let times    = Self::get_col_f64(&df, &formula_ast.lhs)?;
+                let events_f = Self::get_col_f64(&df, &event_col)?;
+                let events: ndarray::Array1<u8> = events_f.iter().map(|&v| v as u8).collect();
+                // build covariate matrix from RHS variables
+                let rhs_vars: Vec<String> = formula_ast.rhs.iter().filter_map(|t| {
+                    if let RhsTerm::Var(v) = t { Some(v.clone()) } else { None }
+                }).collect();
+                if rhs_vars.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "cox(): fórmula precisa de ao menos uma covariável no RHS".into()
+                    ));
+                }
+                let cols: Vec<ndarray::Array1<f64>> = rhs_vars.iter()
+                    .map(|v| Self::get_col_f64(&df, v))
+                    .collect::<Result<_>>()?;
+                let n = times.len();
+                let k = cols.len();
+                let mut x_mat = ndarray::Array2::<f64>::zeros((n, k));
+                for (j, col) in cols.iter().enumerate() {
+                    x_mat.column_mut(j).assign(col);
+                }
+                let result = greeners::CoxPH::fit_with_names(&times, &events, &x_mat, Some(rhs_vars))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                Ok(Value::CoxResult(Rc::new(result)))
+            }
+
+            // ── Robust Linear Model (M-estimadores) ───────────────────────────
+            // rlm(y ~ x1 + x2, df, norm=huber|tukey|andrews|hampel, cov=HC3)
+            // norm padrão: Huber (c=1.345)
+            "rlm" => {
+                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_vec, x_mat) = df.to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = df.formula_var_names(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let norm = match opt_map.get("norm") {
+                    None => greeners::RobustNorm::Huber(1.345),
+                    Some(Value::Str(s)) => match s.as_str() {
+                        "huber"               => greeners::RobustNorm::Huber(1.345),
+                        "tukey" | "bisquare"  => greeners::RobustNorm::Tukey(4.685),
+                        "andrews" | "wave"    => greeners::RobustNorm::AndrewWave(std::f64::consts::PI),
+                        "hampel"              => greeners::RobustNorm::Hampel(2.0, 4.0, 8.0),
+                        "ols" | "leastsq"     => greeners::RobustNorm::LeastSquares,
+                        other => return Err(HayashiError::Runtime(
+                            format!("norm='{other}' desconhecido — use: huber, tukey, andrews, hampel, ols")
+                        )),
+                    },
+                    _ => return Err(HayashiError::Type("norm= deve ser string".into())),
+                };
+                let cov = Self::resolve_cov(opt_map.get("cov"))?;
+                let result = greeners::RLM::fit_with_names(&y_vec, &x_mat, &norm, cov, Some(var_names))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                Ok(Value::RlmResult(Rc::new(result)))
+            }
+
+            // ── GEE (Generalized Estimating Equations) ────────────────────────
+            // gee(y ~ x1 + x2, df, id=cluster_col, family=gaussian, corr=exchangeable)
+            // family: gaussian (padrão), binomial, poisson
+            // corr:   independence (padrão), exchangeable, ar1, unstructured
+            "gee" => {
+                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let id_col = match opt_map.get("id") {
+                    Some(Value::Str(s)) => s.clone(),
+                    None => return Err(HayashiError::Runtime(
+                        "gee() requer opção id=coluna_grupo".into()
+                    )),
+                    _ => return Err(HayashiError::Type("id= deve ser string".into())),
+                };
+                let family_str = match opt_map.get("family") {
+                    None => "gaussian",
+                    Some(Value::Str(s)) => match s.as_str() {
+                        "gaussian" | "normal" => "gaussian",
+                        "binomial" | "logit"  => "binomial",
+                        "poisson"             => "poisson",
+                        other => return Err(HayashiError::Runtime(
+                            format!("family='{other}' desconhecido — use: gaussian, binomial, poisson")
+                        )),
+                    },
+                    _ => return Err(HayashiError::Type("family= deve ser string".into())),
+                };
+                let corr_str = match opt_map.get("corr") {
+                    None => "independence",
+                    Some(Value::Str(s)) => s.as_str(),
+                    _ => "independence",
+                };
+                let corr = match corr_str {
+                    "independence" | "ind" => greeners::CorrStructure::Independence,
+                    "exchangeable" | "exch" => greeners::CorrStructure::Exchangeable,
+                    "ar1" | "ar(1)"        => greeners::CorrStructure::AR1,
+                    "unstructured" | "uns" => greeners::CorrStructure::Unstructured,
+                    other => return Err(HayashiError::Runtime(
+                        format!("corr='{other}' desconhecido — use: independence, exchangeable, ar1, unstructured")
+                    )),
+                };
+                let (family, link) = match family_str {
+                    "binomial" => (greeners::Family::Binomial, greeners::Link::Logit),
+                    "poisson"  => (greeners::Family::Poisson,  greeners::Link::Log),
+                    _          => (greeners::Family::Gaussian, greeners::Link::Identity),
+                };
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_vec, x_mat) = df.to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = df.formula_var_names(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                // converter coluna de id para índices de grupo (usize)
+                let id_vals = Self::get_col_f64(&df, &id_col)?;
+                let mut id_map: std::collections::HashMap<i64, usize> = std::collections::HashMap::new();
+                let mut next_id = 0usize;
+                let groups: ndarray::Array1<usize> = id_vals.iter().map(|&v| {
+                    let key = v as i64;
+                    *id_map.entry(key).or_insert_with(|| { let id = next_id; next_id += 1; id })
+                }).collect();
+                let result = greeners::GEE::fit_with_names(
+                    &y_vec, &x_mat, &groups, &family, &link, &corr, Some(var_names)
+                ).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                Ok(Value::GeeResult(Rc::new(result)))
+            }
+
+            // ── WLS (Weighted Least Squares) ──────────────────────────────────
+            // wls(y ~ x1 + x2, df, weights="w_col", cov=HC3)
+            "wls" => {
+                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let w_name = match opt_map.get("weights") {
+                    Some(Value::Str(s)) => s.clone(),
+                    None => return Err(HayashiError::Runtime(
+                        "wls() requer opção weights=\"coluna_pesos\"".into()
+                    )),
+                    _ => return Err(HayashiError::Type("weights= deve ser string".into())),
+                };
+                let weights = Self::get_col_f64(&df, &w_name)?;
+                let cov = Self::resolve_cov(opt_map.get("cov"))?;
+                let var_names = df.formula_var_names(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y, x) = df.to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let result = greeners::WLS::fit_with_names(&y, &x, &weights, cov, Some(var_names))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let fitted = x.dot(&result.params);
+                let residuals = &y - &fitted;
+                Ok(Value::OlsResult(OlsModel { result: Rc::new(result), residuals, x }))
+            }
+
+            // ── ZIP / ZINB (Zero-Inflated Count Models) ───────────────────────
+            // zip(y ~ x1 + x2, df)
+            // zip(y ~ x1 + x2, df, inflate=["x3", "x4"])
+            // zinb(y ~ x1 + x2, df)
+            "zip" | "zinb" => {
+                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_vec, x_count) = df.to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let count_names = df.formula_var_names(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                // inflate= opcional: lista de nomes de colunas para a equação de inflação
+                // Se omitido, usa a mesma matriz X do modelo de contagem
+                let (x_inflate_opt, inflate_names_opt): (Option<ndarray::Array2<f64>>, Option<Vec<String>>) =
+                    match opt_map.get("inflate") {
+                        Some(Value::List(lst)) => {
+                            let inames: Vec<String> = lst.iter().map(|v| match v {
+                                Value::Str(s) => Ok(s.clone()),
+                                _ => Err(HayashiError::Type("inflate= deve ser lista de strings".into())),
+                            }).collect::<Result<_>>()?;
+                            // intercept + colunas especificadas
+                            let n = df.n_rows();
+                            let k = inames.len() + 1;
+                            let mut xi = ndarray::Array2::<f64>::ones((n, k));
+                            for (j, name) in inames.iter().enumerate() {
+                                xi.column_mut(j + 1).assign(&Self::get_col_f64(&df, name)?);
+                            }
+                            let mut full_names = vec!["_cons".to_string()];
+                            full_names.extend(inames);
+                            (Some(xi), Some(full_names))
+                        }
+                        None => (None, None),
+                        _ => return Err(HayashiError::Type("inflate= deve ser lista de strings".into())),
+                    };
+
+                let use_negbin = func == "zinb";
+                let result = if use_negbin {
+                    greeners::ZINB::fit_with_names(
+                        &y_vec, &x_count, x_inflate_opt.as_ref(),
+                        Some(count_names), inflate_names_opt,
+                    ).map_err(|e| HayashiError::Runtime(e.to_string()))?
+                } else {
+                    greeners::ZIP::fit_with_names(
+                        &y_vec, &x_count, x_inflate_opt.as_ref(),
+                        Some(count_names), inflate_names_opt,
+                    ).map_err(|e| HayashiError::Runtime(e.to_string()))?
+                };
+                Ok(Value::ZeroInflatedResult(Rc::new(result)))
+            }
+
+            // ── MixedLM (Mixed Linear Models — efeitos mistos) ────────────────
+            // mixed(y ~ x1 + x2, df, id="group")           # intercept aleatório
+            // mixed(y ~ x1 + x2, df, id="group", re=["x1"]) # + slope aleatório
+            "mixed" | "mixedlm" => {
+                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                // id= obrigatório: coluna de grupo
+                let id_col = match opt_map.get("id") {
+                    Some(Value::Str(s)) => s.clone(),
+                    None => return Err(HayashiError::Runtime(
+                        "mixed() requer opção id=\"coluna_grupo\"".into()
+                    )),
+                    _ => return Err(HayashiError::Type("id= deve ser string".into())),
+                };
+
+                // re= opcional: lista de variáveis com efeito aleatório de slope
+                // Se omitido, modelo de intercept aleatório apenas (re = [1])
+                let re_vars: Vec<String> = match opt_map.get("re") {
+                    Some(Value::List(lst)) => lst.iter().map(|v| match v {
+                        Value::Str(s) => Ok(s.clone()),
+                        _ => Err(HayashiError::Type("re= deve ser lista de strings".into())),
+                    }).collect::<Result<_>>()?,
+                    None => vec![],
+                    _ => return Err(HayashiError::Type("re= deve ser lista de strings".into())),
+                };
+
+                let (y_vec, x_fixed) = df.to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = df.formula_var_names(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                // Converter id para índices de grupo
+                let id_vals = Self::get_col_f64(&df, &id_col)?;
+                let mut id_map: std::collections::HashMap<i64, usize> = std::collections::HashMap::new();
+                let mut next_id = 0usize;
+                let groups: ndarray::Array1<usize> = id_vals.iter().map(|&v| {
+                    let key = v as i64;
+                    *id_map.entry(key).or_insert_with(|| { let id = next_id; next_id += 1; id })
+                }).collect();
+
+                // Construir x_random: intercept + slopes especificados
+                let n = df.n_rows();
+                let q = re_vars.len() + 1; // +1 para intercept aleatório
+                let mut x_random = ndarray::Array2::<f64>::ones((n, q));
+                for (j, name) in re_vars.iter().enumerate() {
+                    x_random.column_mut(j + 1).assign(&Self::get_col_f64(&df, name)?);
+                }
+
+                let result = greeners::MixedLM::fit_with_names(
+                    &y_vec, &x_fixed, &groups, &x_random, Some(var_names),
+                ).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                Ok(Value::MixedResult(Rc::new(result)))
+            }
+
+            // ── testparm — Wald F-test conjunto (OLS/WLS) ────────────────────
+            // testparm(model, ["x1", "x2"])
+            // H0: β_x1 = β_x2 = 0 simultaneamente
+            "testparm" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "testparm(model, [\"x1\", \"x2\"]) requer modelo + lista de variáveis".into()
+                    ));
+                }
+                let model_val = self.eval_expr(&args[0])?;
+                let tested: Vec<String> = match self.eval_expr(&args[1])? {
+                    Value::List(lst) => lst.iter().map(|v| match v {
+                        Value::Str(s) => Ok(s.clone()),
+                        _ => Err(HayashiError::Type("testparm: lista deve conter strings".into())),
+                    }).collect::<Result<_>>()?,
+                    _ => return Err(HayashiError::Type(
+                        "testparm: segundo argumento deve ser lista de strings".into()
+                    )),
+                };
+                match &model_val {
+                    Value::OlsResult(m) => {
+                        let vnames = m.result.variable_names.as_deref().unwrap_or(&[]);
+                        let indices: Vec<usize> = tested.iter().map(|v| {
+                            vnames.iter().position(|n| n == v)
+                                .ok_or_else(|| HayashiError::Runtime(
+                                    format!("testparm: variável '{v}' não encontrada no modelo")
+                                ))
+                        }).collect::<Result<_>>()?;
+                        let (f_stat, p_val) = m.result.f_test(&indices, &m.x)
+                            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                        let df1 = indices.len();
+                        let df2 = m.result.df_resid;
+                        println!("\n{:=^62}", " testparm — Teste F Conjunto ");
+                        println!(" H0: {} = 0 (simultâneamente)", tested.join(" = "));
+                        println!("{:-^62}", "");
+                        println!(" F({df1}, {df2})  =  {f_stat:.4}");
+                        println!(" Prob > F      =  {p_val:.4}");
+                        if p_val < 0.01       { println!(" Resultado: rejeita H0 a 1%"); }
+                        else if p_val < 0.05  { println!(" Resultado: rejeita H0 a 5%"); }
+                        else if p_val < 0.10  { println!(" Resultado: rejeita H0 a 10%"); }
+                        else                  { println!(" Resultado: não rejeita H0 a 10%"); }
+                        println!("{:=^62}", "");
+                        Ok(Value::Nil)
+                    }
+                    _ => Err(HayashiError::Runtime(
+                        "testparm: suporte atual apenas para OLS/WLS — outros modelos usam chi2; implemente via wald_test()".into()
+                    )),
+                }
+            }
+
+            // ── GLSAR — GLS com erros AR(p) (Cochrane-Orcutt/Prais-Winsten) ─
+            // glsar(y ~ x1 + x2, df, ar=1, iter=50)
+            "glsar" | "prais" => {
+                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_vec, x_mat) = df.to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = df.formula_var_names(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let ar_order = match opt_map.get("ar") {
+                    Some(Value::Int(n)) => *n as usize,
+                    None => 1,
+                    _ => return Err(HayashiError::Type("ar= deve ser inteiro".into())),
+                };
+                let max_iter = match opt_map.get("iter") {
+                    Some(Value::Int(n)) => *n as usize,
+                    None => 50,
+                    _ => return Err(HayashiError::Type("iter= deve ser inteiro".into())),
+                };
+                let result = greeners::GLSAR::fit_with_names(
+                    &y_vec, &x_mat, ar_order, max_iter, Some(var_names)
+                ).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                Ok(Value::GlsarResult(Rc::new(result)))
+            }
+
+            // ── anova — ANOVA one-way ─────────────────────────────────────────
+            // anova(df, outcome, by=group_col)
+            "anova" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "anova(df, outcome, by=grupo)".into()
+                    ));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("primeiro argumento deve ser DataFrame".into())),
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                };
+                let outcome_name = match &args[1] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("segundo argumento deve ser nome da variável outcome".into())),
+                };
+                let outcome = Self::get_col_f64(&df, &outcome_name)?;
+                let by_col = match opt_map.get("by") {
+                    Some(Value::Str(s)) => s.clone(),
+                    None => return Err(HayashiError::Runtime(
+                        "anova() requer by=\"coluna_grupo\"".into()
+                    )),
+                    _ => return Err(HayashiError::Type("by= deve ser string".into())),
+                };
+                let group_vals = Self::get_col_f64(&df, &by_col)?;
+                let mut gmap: std::collections::HashMap<i64, usize> = std::collections::HashMap::new();
+                let mut next_g = 0usize;
+                let groups: ndarray::Array1<usize> = group_vals.iter().map(|&v| {
+                    let key = v as i64;
+                    *gmap.entry(key).or_insert_with(|| { let g = next_g; next_g += 1; g })
+                }).collect();
+                let result = greeners::Stats::anova_oneway(&outcome, &groups)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                println!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── Beta Regression ───────────────────────────────────────────────
+            // betareg(y ~ x1 + x2, df)               # link=logit (padrão)
+            // betareg(y ~ x1 + x2, df, link=probit)  # link alternativo
+            // betareg(y ~ x1 + x2, df, link=cloglog)
+            // Requer y ∈ (0,1) estritamente (proporções, probabilidades)
+            "betareg" | "beta" => {
+                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_vec, x_mat) = df.to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = df.formula_var_names(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let link = match opt_map.get("link") {
+                    None => greeners::BetaLink::Logit,
+                    Some(Value::Str(s)) => match s.as_str() {
+                        "logit"   => greeners::BetaLink::Logit,
+                        "probit"  => greeners::BetaLink::Probit,
+                        "cloglog" => greeners::BetaLink::CLogLog,
+                        other => return Err(HayashiError::Runtime(
+                            format!("betareg: link='{other}' desconhecido — use: logit, probit, cloglog")
+                        )),
+                    },
+                    _ => greeners::BetaLink::Logit,
+                };
+                let result = greeners::BetaModel::fit_with_names(&y_vec, &x_mat, &link, Some(var_names))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                Ok(Value::BetaResult(Rc::new(result)))
+            }
+
+            // glm — Modelos Lineares Generalizados (IRLS via Greeners)
+            // glm(y ~ x1 + x2, df, family=poisson, link=log, cov=robust)
+            // Famílias: gaussian, binomial, poisson, gamma, inverse_gaussian, negbin, tweedie
+            // Links: identity, log, logit, probit, inverse, cloglog
+            // Se link omitido usa link canônico da família
+            "glm" => {
+                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_vec, x_mat) = df.to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = df.formula_var_names(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let cov = Self::resolve_cov(opt_map.get("cov"))?;
+
+                let alpha_val = match opt_map.get("alpha") {
+                    Some(Value::Float(v)) => *v,
+                    Some(Value::Int(v)) => *v as f64,
+                    _ => 1.0,
+                };
+                let power_val = match opt_map.get("power") {
+                    Some(Value::Float(v)) => *v,
+                    Some(Value::Int(v)) => *v as f64,
+                    _ => 1.5,
+                };
+
+                let family = match opt_map.get("family") {
+                    None | Some(Value::Str(_)) if opt_map.get("family").is_none() => {
+                        greeners::Family::Gaussian
+                    }
+                    Some(Value::Str(s)) => match s.as_str() {
+                        "gaussian" | "normal" => greeners::Family::Gaussian,
+                        "binomial" | "logistic" => greeners::Family::Binomial,
+                        "poisson"  => greeners::Family::Poisson,
+                        "gamma"    => greeners::Family::Gamma,
+                        "inverse_gaussian" | "inversegaussian" => greeners::Family::InverseGaussian,
+                        "negbin" | "negative_binomial" => greeners::Family::NegativeBinomial(alpha_val),
+                        "tweedie" => greeners::Family::Tweedie(power_val),
+                        other => return Err(HayashiError::Runtime(
+                            format!("glm: family='{other}' desconhecido — use: gaussian, binomial, poisson, gamma, inverse_gaussian, negbin, tweedie")
+                        )),
+                    },
+                    _ => greeners::Family::Gaussian,
+                };
+
+                let result = match opt_map.get("link") {
+                    None => greeners::GLM::fit_with_names(&y_vec, &x_mat, family, cov, Some(var_names))
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?,
+                    Some(Value::Str(s)) => {
+                        let link = match s.as_str() {
+                            "identity"  => greeners::Link::Identity,
+                            "log"       => greeners::Link::Log,
+                            "logit"     => greeners::Link::Logit,
+                            "probit"    => greeners::Link::Probit,
+                            "inverse"   => greeners::Link::InversePower,
+                            "cloglog"   => greeners::Link::CLogLog,
+                            other => return Err(HayashiError::Runtime(
+                                format!("glm: link='{other}' desconhecido — use: identity, log, logit, probit, inverse, cloglog")
+                            )),
+                        };
+                        // fit_with_link não aceita var_names; setar após
+                        let mut r = greeners::GLM::fit_with_link(&y_vec, &x_mat, family, link, cov)
+                            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                        r.variable_names = Some(var_names);
+                        r
+                    }
+                    _ => greeners::GLM::fit_with_names(&y_vec, &x_mat, family, cov, Some(var_names))
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?,
+                };
+                Ok(Value::GlmResult(Rc::new(result)))
+            }
+
+            // influence — Diagnósticos de influência para OLS
+            // influence(model, df)
+            // Calcula DFBetas, DFFITS, leverage, resíduos studentizados
+            // Imprime sumário e observações influentes
+            "influence" => {
+                if args.len() < 1 {
+                    return Err(HayashiError::Runtime("influence(model, df)".into()));
+                }
+                let model_val = self.eval_expr(&args[0])?;
+                match &model_val {
+                    Value::OlsResult(m) => {
+                        let mse = m.result.sigma * m.result.sigma;
+                        let result = greeners::Influence::compute(&m.residuals, &m.x, mse)
+                            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                        println!("{result}");
+                        Ok(Value::Nil)
+                    }
+                    _ => Err(HayashiError::Runtime(
+                        "influence(): só suportado para modelos OLS/WLS — use: influence(m_ols, df)".into()
+                    )),
+                }
+            }
+
+            // lowess — Suavização não-paramétrica LOWESS
+            // lowess(df, y, x, frac=0.67, it=3)
+            // frac: fração dos dados usada em cada ajuste local (0 < frac ≤ 1)
+            // it: iterações de robustificação (0 = sem robustificação)
+            "lowess" => {
+                if args.len() < 3 {
+                    return Err(HayashiError::Runtime(
+                        "lowess(df, y_var, x_var, frac=0.67, it=3)".into()
+                    ));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("lowess: primeiro arg deve ser DataFrame".into())),
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                };
+                let y_name = match &args[1] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("lowess: segundo arg deve ser nome de coluna y".into())),
+                };
+                let x_name = match &args[2] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("lowess: terceiro arg deve ser nome de coluna x".into())),
+                };
+                let y_vec = ndarray::Array1::from(Self::get_col_f64(&df, &y_name)?);
+                let x_vec = ndarray::Array1::from(Self::get_col_f64(&df, &x_name)?);
+                let frac = match opt_map.get("frac") {
+                    Some(Value::Float(v)) => *v,
+                    Some(Value::Int(v)) => *v as f64,
+                    None => 0.6667,
+                    _ => 0.6667,
+                };
+                let it = match opt_map.get("it") {
+                    Some(Value::Int(v)) => *v as usize,
+                    None => 3,
+                    _ => 3,
+                };
+                let result = greeners::Lowess::fit(&y_vec, &x_vec, frac, it)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                println!("{result}");
+                Ok(Value::LowessResult(Rc::new(result)))
+            }
+
+            // kde — Estimativa de densidade por kernel (univariada)
+            // kde(df, var, bw=auto, kernel=gaussian)
+            // Imprime: n, bandwidth, suporte [min, max]
+            "kde" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "kde(df, var, bw=auto, kernel=gaussian)".into()
+                    ));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("kde: primeiro arg deve ser DataFrame".into())),
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                };
+                let var_name = match &args[1] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("kde: segundo arg deve ser nome de coluna".into())),
+                };
+                let data = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?);
+                let bw_opt = match opt_map.get("bw") {
+                    Some(Value::Float(v)) => Some(*v),
+                    Some(Value::Int(v)) => Some(*v as f64),
+                    _ => None,
+                };
+                let kernel = match opt_map.get("kernel") {
+                    Some(Value::Str(s)) => match s.as_str() {
+                        "gaussian" | "normal" => greeners::Kernel::Gaussian,
+                        "epanechnikov" => greeners::Kernel::Epanechnikov,
+                        "triangular"   => greeners::Kernel::Triangular,
+                        "uniform"      => greeners::Kernel::Uniform,
+                        other => return Err(HayashiError::Runtime(
+                            format!("kde: kernel='{other}' desconhecido — use: gaussian, epanechnikov, triangular, uniform")
+                        )),
+                    },
+                    _ => greeners::Kernel::Gaussian,
+                };
+                let result = greeners::KDEUnivariate::fit(&data, bw_opt, kernel)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let support_min = result.support.iter().cloned().fold(f64::INFINITY, f64::min);
+                let support_max = result.support.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+                let peak_idx = result.density.iter().enumerate()
+                    .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                    .map(|(i, _)| i).unwrap_or(0);
+                let peak_x = result.support[peak_idx];
+                let peak_d = result.density[peak_idx];
+                println!("\n{:=^50}", " KDE ");
+                println!("{:<20} {:>10}",   "Variável:", var_name);
+                println!("{:<20} {:>10}",   "Observações:", result.n_obs);
+                println!("{:<20} {:>10.6}", "Bandwidth:", result.bandwidth);
+                println!("{:<20} {:>10.4}", "Suporte min:", support_min);
+                println!("{:<20} {:>10.4}", "Suporte max:", support_max);
+                println!("{:<20} {:>10.4} @ x = {:.4}", "Pico (densidade):", peak_d, peak_x);
+                println!("{:=^50}", "");
+                Ok(Value::Nil)
+            }
+
+            // pca — Análise de Componentes Principais
+            // pca(df, x1, x2, x3, n=2)
+            // n=: número de componentes (padrão: min(vars, obs-1))
+            // Baseado na decomposição de autovalores da matriz de correlação
+            // Variáveis são padronizadas automaticamente (equivalente a cor PCA)
+            "pca" | "princomp" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "pca(df, x1, x2, x3, ..., n=k)".into()
+                    ));
+                }
+                let df = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(d) => d,
+                    _ => return Err(HayashiError::Type("pca: primeiro arg deve ser DataFrame".into())),
+                };
+                let var_names: Vec<String> = args[1..].iter()
+                    .map(|a| match a {
+                        Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
+                        _ => Err(HayashiError::Type("pca: variáveis devem ser identificadores".into())),
+                    })
+                    .collect::<Result<_>>()?;
+                let n = df.n_rows();
+                let k = var_names.len();
+                let n_components = match opt_map.get("n") {
+                    Some(Value::Int(v)) => (*v as usize).min(k).min(n - 1),
+                    Some(Value::Float(v)) => (*v as usize).min(k).min(n - 1),
+                    _ => k.min(n - 1),
+                };
+                let mut data = ndarray::Array2::<f64>::zeros((n, k));
+                for (j, vname) in var_names.iter().enumerate() {
+                    let col = Self::get_col_f64(&df, vname)?;
+                    for (i, &v) in col.iter().enumerate() { data[[i, j]] = v; }
+                }
+                let result = greeners::PCA::fit(&data, n_components)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                Ok(Value::PcaResult(PcaModel { result: Rc::new(result), var_names }))
+            }
+
+            // factor — Análise Fatorial (eixo principal)
+            // factor(df, x1, x2, x3, n=2, rotation=varimax)
+            // rotation=: none (padrão), varimax
+            // Diferença de PCA: PCA maximiza variância explicada;
+            //   FA estima fatores latentes com estrutura de covariância específica
+            "factor" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "factor(df, x1, x2, x3, ..., n=k, rotation=none|varimax)".into()
+                    ));
+                }
+                let df = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(d) => d,
+                    _ => return Err(HayashiError::Type("factor: primeiro arg deve ser DataFrame".into())),
+                };
+                let var_names: Vec<String> = args[1..].iter()
+                    .map(|a| match a {
+                        Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
+                        _ => Err(HayashiError::Type("factor: variáveis devem ser identificadores".into())),
+                    })
+                    .collect::<Result<_>>()?;
+                let n = df.n_rows();
+                let k = var_names.len();
+                let n_factors = match opt_map.get("n") {
+                    Some(Value::Int(v)) => (*v as usize).min(k),
+                    Some(Value::Float(v)) => (*v as usize).min(k),
+                    _ => k.min(2),
+                };
+                let rotation = match opt_map.get("rotation") {
+                    Some(Value::Str(s)) => match s.as_str() {
+                        "varimax" => greeners::Rotation::Varimax,
+                        "none"    => greeners::Rotation::None,
+                        other => return Err(HayashiError::Runtime(
+                            format!("factor: rotation='{other}' desconhecido — use: none, varimax")
+                        )),
+                    },
+                    _ => greeners::Rotation::None,
+                };
+                let mut data = ndarray::Array2::<f64>::zeros((n, k));
+                for (j, vname) in var_names.iter().enumerate() {
+                    let col = Self::get_col_f64(&df, vname)?;
+                    for (i, &v) in col.iter().enumerate() { data[[i, j]] = v; }
+                }
+                let result = greeners::FactorAnalysis::fit(&data, n_factors, rotation)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                Ok(Value::FactorResult(FactorModel { result: Rc::new(result), var_names }))
+            }
+
+            // manova — Análise de Variância Multivariada (one-way)
+            // manova(df, y1, y2, ..., by="group")
+            // Testa H0: vetores de médias iguais entre grupos
+            // Estatísticas: Wilks' Λ, Pillai's trace, Hotelling-Lawley, Roy's root
+            "manova" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "manova(df, y1, y2, ..., by=\"group_col\")".into()
+                    ));
+                }
+                let df = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(d) => d,
+                    _ => return Err(HayashiError::Type("manova: primeiro arg deve ser DataFrame".into())),
+                };
+                let group_col = match opt_map.get("by") {
+                    Some(Value::Str(s)) => s.clone(),
+                    None => return Err(HayashiError::Runtime("manova requer by=\"coluna_grupo\"".into())),
+                    _ => return Err(HayashiError::Type("manova: by= deve ser string".into())),
+                };
+                let outcome_names: Vec<String> = args[1..].iter()
+                    .map(|a| match a {
+                        Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
+                        _ => Err(HayashiError::Type("manova: variáveis outcomes devem ser identificadores".into())),
+                    })
+                    .collect::<Result<_>>()?;
+                let n = df.n_rows();
+                let q = outcome_names.len();
+                let mut y_mat = ndarray::Array2::<f64>::zeros((n, q));
+                for (j, vname) in outcome_names.iter().enumerate() {
+                    let col = Self::get_col_f64(&df, vname)?;
+                    for (i, &v) in col.iter().enumerate() { y_mat[[i, j]] = v; }
+                }
+                let group_vals = Self::get_col_f64(&df, &group_col)?;
+                let mut gmap: std::collections::HashMap<i64, usize> = std::collections::HashMap::new();
+                let mut gnext = 0usize;
+                let groups: ndarray::Array1<usize> = ndarray::Array1::from(
+                    group_vals.iter().map(|&v| {
+                        let key = v as i64;
+                        *gmap.entry(key).or_insert_with(|| { let g = gnext; gnext += 1; g })
+                    }).collect::<Vec<_>>()
+                );
+                let result = greeners::MANOVA::fit(&y_mat, &groups)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                println!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // bootse — Bootstrap standard errors para modelos OLS
+            // bootse(model, n=1000)
+            // Reamostral pares (y, X) com reposição para estimar distribuição amostral
+            // Compara SE originais com bootstrap SE e IC percentil 95%
+            "bootse" | "bootstrap" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("bootse(model, n=1000)".into()));
+                }
+                let model_val = self.eval_expr(&args[0])?;
+                let n_boot = match opt_map.get("n") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 1000,
+                };
+                let alpha = match opt_map.get("alpha") {
+                    Some(Value::Float(v)) => *v,
+                    _ => 0.05,
+                };
+                match &model_val {
+                    Value::OlsResult(m) => {
+                        // Extrair y do OLS: y = Xβ + ê
+                        let y_hat = m.x.dot(&m.result.params);
+                        let y_vec = &y_hat + &m.residuals;
+                        let boot_coefs = greeners::Bootstrap::pairs_bootstrap(&y_vec, &m.x, n_boot)
+                            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                        let boot_se = greeners::Bootstrap::bootstrap_se(&boot_coefs);
+                        let (ci_lo, ci_hi) = greeners::Bootstrap::percentile_ci(&boot_coefs, alpha);
+                        let vnames = m.result.variable_names.as_deref().unwrap_or(&[]);
+                        let k = m.result.params.len();
+                        let thick = "═".repeat(76);
+                        let thin  = "─".repeat(76);
+                        println!("\n{thick}");
+                        println!("{:^76}", format!(" Bootstrap SE (n={n_boot}, pairs) "));
+                        println!("{thin}");
+                        println!("{:<18} {:>10} {:>10} {:>10} {:>12} {:>12}",
+                                 "Variável", "β̂", "SE orig.", "SE boot", "IC inf 95%", "IC sup 95%");
+                        println!("{thin}");
+                        for i in 0..k {
+                            let vname = vnames.get(i).map(|s| s.as_str()).unwrap_or("?");
+                            println!("{:<18} {:>10.4} {:>10.4} {:>10.4} {:>12.4} {:>12.4}",
+                                     vname,
+                                     m.result.params[i],
+                                     m.result.std_errors[i],
+                                     boot_se[i],
+                                     ci_lo[i],
+                                     ci_hi[i]);
+                        }
+                        println!("{thick}");
+                        Ok(Value::Nil)
+                    }
+                    _ => Err(HayashiError::Runtime(
+                        "bootse(): suportado apenas para modelos OLS/WLS — use: bootse(m_ols, n=1000)".into()
+                    )),
+                }
+            }
+
+            // markov — Markov-Switching AR (Hamilton 1989)
+            // markov(df, y, k=2, p=1)
+            // k=: número de regimes (padrão: 2)
+            // p=: ordem AR dentro de cada regime (padrão: 1)
+            // Algoritmo: EM via filtro de Hamilton (forward-backward)
+            // Parâmetros por regime: intercept + AR coefficients + variance
+            "markov" | "msar" | "markovswitching" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "markov(df, y_var, k=2, p=1)".into()
+                    ));
+                }
+                let df = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(d) => d,
+                    _ => return Err(HayashiError::Type("markov: primeiro arg deve ser DataFrame".into())),
+                };
+                let y_name = match &args[1] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("markov: segundo arg deve ser nome da variável".into())),
+                };
+                let y_vec = ndarray::Array1::from(Self::get_col_f64(&df, &y_name)?);
+                let k = match opt_map.get("k") {
+                    Some(Value::Int(v)) => (*v as usize).max(2),
+                    Some(Value::Float(v)) => (*v as usize).max(2),
+                    _ => 2,
+                };
+                let p = match opt_map.get("p") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 1,
+                };
+                let result = greeners::MarkovSwitching::fit(&y_vec, k, p)
+                    .map_err(|e| HayashiError::Runtime(format!("markov: {e}")))?;
+                Ok(Value::MarkovResult(Rc::new(result)))
+            }
+
+            // clogit — Conditional Logit (Chamberlain 1980, FE logit)
+            // clogit(y ~ x1 + x2, df, group="id_col")
+            // Condiciona na soma de y por grupo → elimina efeitos fixos individuais
+            // Grupos sem variação em y são automaticamente excluídos
+            // Sem intercepto — absorvido pelo FE
+            "clogit" | "xtlogit_fe" => {
+                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let group_col = match opt_map.get("group") {
+                    Some(Value::Str(s)) => s.clone(),
+                    None => return Err(HayashiError::Runtime("clogit requer group=\"coluna_id\"".into())),
+                    _ => return Err(HayashiError::Type("clogit: group= deve ser string".into())),
+                };
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_vec, x_mat) = df.to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = df.formula_var_names(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let group_vals = Self::get_col_f64(&df, &group_col)?;
+                let mut gmap: std::collections::HashMap<i64, usize> = std::collections::HashMap::new();
+                let mut gnext = 0usize;
+                let groups: Vec<usize> = group_vals.iter().map(|&v| {
+                    let key = v as i64;
+                    *gmap.entry(key).or_insert_with(|| { let g = gnext; gnext += 1; g })
+                }).collect();
+                let result = greeners::ConditionalLogit::fit_with_names(
+                    &y_vec, &x_mat, &groups, Some(var_names)
+                ).map_err(|e| HayashiError::Runtime(format!("clogit: {e}")))?;
+                Ok(Value::ConditionalResult(Rc::new(result)))
+            }
+
+            // cpoisson — Conditional Poisson (FE Poisson)
+            // cpoisson(y ~ x1 + x2, df, group="id_col")
+            // Equivalente a FE Poisson; consistente sob heterogeidade não observada
+            // Só requer que E[y|x,c] = exp(c + xβ) — não requer y ~ Poisson (PPML)
+            "cpoisson" | "xtpoisson_fe" | "ppml" => {
+                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let group_col = match opt_map.get("group") {
+                    Some(Value::Str(s)) => s.clone(),
+                    None => return Err(HayashiError::Runtime("cpoisson requer group=\"coluna_id\"".into())),
+                    _ => return Err(HayashiError::Type("cpoisson: group= deve ser string".into())),
+                };
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_vec, x_mat) = df.to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = df.formula_var_names(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let group_vals = Self::get_col_f64(&df, &group_col)?;
+                let mut gmap: std::collections::HashMap<i64, usize> = std::collections::HashMap::new();
+                let mut gnext = 0usize;
+                let groups: Vec<usize> = group_vals.iter().map(|&v| {
+                    let key = v as i64;
+                    *gmap.entry(key).or_insert_with(|| { let g = gnext; gnext += 1; g })
+                }).collect();
+                let result = greeners::ConditionalPoisson::fit_with_names(
+                    &y_vec, &x_mat, &groups, Some(var_names)
+                ).map_err(|e| HayashiError::Runtime(format!("cpoisson: {e}")))?;
+                Ok(Value::ConditionalResult(Rc::new(result)))
+            }
+
+            // gqtest — Goldfeld-Quandt test (heteroskedasticidade)
+            // gqtest(model, split=0.2)
+            // H0: homocedasticidade
+            // Divide os resíduos em dois grupos (descartando `split` do meio)
+            // e testa se as variâncias diferem via F
+            // split=: fração do meio a descartar (padrão: 0.2)
+            // Mais potente que White quando heterocedasticidade é monotônica
+            "gqtest" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("gqtest(model, split=0.2)".into()));
+                }
+                let ols = match self.eval_expr(&args[0])? {
+                    Value::OlsResult(m) => m,
+                    _ => return Err(HayashiError::Type("gqtest(): suporta apenas modelos OLS".into())),
+                };
+                let split = match opt_map.get("split") {
+                    Some(Value::Float(v)) => *v,
+                    Some(Value::Int(v)) => *v as f64,
+                    _ => 0.2,
+                };
+                let (f, p, df1, df2) = greeners::SpecificationTests::goldfeld_quandt_test(
+                    &ols.residuals, split
+                ).map_err(|e| HayashiError::Runtime(format!("gqtest: {e}")))?;
+                let sig = |p: f64| if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
+                let sep = "─".repeat(56);
+                println!("\nGoldfeld-Quandt Test  —  split = {split:.2}");
+                println!("{sep}");
+                println!("H₀: homocedasticidade (σ²₁ = σ²₂)");
+                println!("{sep}");
+                println!("{:<26} {:>10} {:>10} {:>4}", "Teste", "Estatística", "p-value", "");
+                println!("{sep}");
+                println!("{:<26} {:>10.4} {:>10.4} {:>4}",
+                         format!("F ~ F({df1},{df2})"), f, p, sig(p));
+                println!("{sep}");
+                println!("(*** p<0.01  ** p<0.05  * p<0.10)");
+                println!();
+                Ok(Value::Nil)
+            }
+
+            // bphet — Breusch-Pagan test (heteroskedasticidade, OLS)
+            // bphet(model)
+            // H0: homocedasticidade — LM = n·R² da regressão auxiliar de u² em X
+            // Diferente de bptest() que é o LM de efeitos aleatórios (painel)
+            "bphet" | "hettest" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("bphet(model)".into()));
+                }
+                let ols = match self.eval_expr(&args[0])? {
+                    Value::OlsResult(m) => m,
+                    _ => return Err(HayashiError::Type("bphet(): suporta apenas modelos OLS".into())),
+                };
+                let (lm, p) = greeners::Diagnostics::breusch_pagan(&ols.residuals, &ols.x)
+                    .map_err(|e| HayashiError::Runtime(format!("bphet: {e}")))?;
+                let k = ols.x.ncols().saturating_sub(1);
+                let sig = |p: f64| if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
+                let sep = "─".repeat(56);
+                println!("\nBreusch-Pagan Heteroskedasticity Test");
+                println!("{sep}");
+                println!("H₀: homocedasticidade (variância constante)");
+                println!("{sep}");
+                println!("{:<26} {:>10} {:>10} {:>4}", "Teste", "Estatística", "p-value", "");
+                println!("{sep}");
+                println!("{:<26} {:>10.4} {:>10.4} {:>4}",
+                         format!("LM ~ χ²({k})"), lm, p, sig(p));
+                println!("{sep}");
+                println!("(*** p<0.01  ** p<0.05  * p<0.10)");
+                println!();
+                Ok(Value::Nil)
+            }
+
+            // ── Testes de diagnóstico para dados em painel ────────────────────
+
+            // bptest — Breusch-Pagan LM test (H0: pooled OLS adequado, σ²_u = 0)
+            // bptest(df, y ~ x1 + x2, id="entity_col")
+            "bptest" | "xttest0" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "bptest(df, y ~ x1+x2, id=\"entity_col\")".into()
+                    ));
+                }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let formula_ast = match &args[1] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser fórmula".into())) };
+                let id_col = match opt_map.get("id") { Some(Value::Str(s)) => s.clone(), None => return Err(HayashiError::Runtime("bptest requer id=\"coluna_entidade\"".into())), _ => return Err(HayashiError::Type("id= deve ser string".into())) };
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_vec, x_mat) = df.to_design_matrix(&g_formula).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                // OLS pooled para obter resíduos
+                let ols_pooled = OLS::from_formula(&g_formula, &df, CovarianceType::NonRobust).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let resids = &y_vec - &x_mat.dot(&ols_pooled.params);
+                // Converter id para usize
+                let id_vals = Self::get_col_f64(&df, &id_col)?;
+                let mut id_map: std::collections::HashMap<i64, usize> = std::collections::HashMap::new();
+                let mut next_id = 0usize;
+                let entity_ids: Vec<usize> = id_vals.iter().map(|&v| {
+                    let key = v as i64;
+                    *id_map.entry(key).or_insert_with(|| { let id = next_id; next_id += 1; id })
+                }).collect();
+                let (lm, p) = greeners::PanelDiagnostics::breusch_pagan_lm(&resids, &entity_ids)
+                    .map_err(|e| HayashiError::Runtime(e))?;
+                let sig = if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
+                println!("\n{:=^62}", " Breusch-Pagan LM Test (RE) ");
+                println!(" H0: σ²_u = 0 — pooled OLS adequado");
+                println!("{:-^62}", "");
+                println!(" LM = {lm:.4}    p-valor = {p:.4}  {sig}");
+                if p < 0.05 { println!(" Conclusão: rejeita H0 → usar RE ou FE"); }
+                else        { println!(" Conclusão: não rejeita H0 → pooled OLS adequado"); }
+                println!("{:=^62}", "");
+                Ok(Value::Nil)
+            }
+
+            // wooldridge — Teste de Wooldridge para correlação serial em painel
+            // H0: sem correlação serial de 1ª ordem nos erros idiossincráticos
+            // wooldridge(df, y ~ x1+x2, id="entity", time="time")
+            "wooldridge" | "xtserial" => {
+                if args.len() < 2 { return Err(HayashiError::Runtime("wooldridge(df, y~x, id=\"entity\", time=\"time\")".into())); }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let formula_ast = match &args[1] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser fórmula".into())) };
+                let id_col   = match opt_map.get("id")   { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("wooldridge requer id= e time=".into())) };
+                let time_col = match opt_map.get("time") { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("wooldridge requer time=\"coluna_tempo\"".into())) };
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_vec, x_mat) = df.to_design_matrix(&g_formula).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let id_vals: Vec<i64>   = Self::get_col_f64(&df, &id_col)?.iter().map(|&v| v as i64).collect();
+                let time_vals: Vec<f64> = Self::get_col_f64(&df, &time_col)?.to_vec();
+                let (rho, t_stat, p, n_pairs) = greeners::PanelDiagnostics::wooldridge_serial(&y_vec, &x_mat, &id_vals, &time_vals)
+                    .map_err(|e| HayashiError::Runtime(e))?;
+                let sig = if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
+                println!("\n{:=^62}", " Wooldridge Test — Correlação Serial em Painel ");
+                println!(" H0: ρ = -0.5 (sem correlação serial)");
+                println!("{:-^62}", "");
+                println!(" ρ̂ = {rho:.4}    t = {t_stat:.4}    p = {p:.4}  {sig}");
+                println!(" Pares de resíduos: {n_pairs}");
+                if p < 0.05 { println!(" Conclusão: rejeita H0 → correlação serial presente → usar SE robustos"); }
+                else        { println!(" Conclusão: não rejeita H0 → sem evidência de correlação serial"); }
+                println!("{:=^62}", "");
+                Ok(Value::Nil)
+            }
+
+            // pesaran — Pesaran CD test (cross-sectional dependence)
+            // H0: sem dependência cross-sectional
+            // pesaran(df, y ~ x1+x2, id="entity", time="time")
+            "pesaran" | "xtcd" => {
+                if args.len() < 2 { return Err(HayashiError::Runtime("pesaran(df, y~x, id=\"entity\", time=\"time\")".into())); }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let formula_ast = match &args[1] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser fórmula".into())) };
+                let id_col = match opt_map.get("id") { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("pesaran requer id=".into())) };
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_vec, x_mat) = df.to_design_matrix(&g_formula).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let ols_pooled = OLS::from_formula(&g_formula, &df, CovarianceType::NonRobust).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let resids = &y_vec - &x_mat.dot(&ols_pooled.params);
+                let id_vals = Self::get_col_f64(&df, &id_col)?;
+                let mut id_map: std::collections::HashMap<i64, usize> = std::collections::HashMap::new();
+                let mut next_id = 0usize;
+                let entity_ids: Vec<usize> = id_vals.iter().map(|&v| {
+                    let key = v as i64;
+                    *id_map.entry(key).or_insert_with(|| { let id = next_id; next_id += 1; id })
+                }).collect();
+                let (cd, p) = greeners::PanelDiagnostics::pesaran_cd(&resids, &entity_ids)
+                    .map_err(|e| HayashiError::Runtime(e))?;
+                let sig = if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
+                println!("\n{:=^62}", " Pesaran CD Test — Dependência Cross-Sectional ");
+                println!(" H0: sem dependência cross-sectional");
+                println!("{:-^62}", "");
+                println!(" CD = {cd:.4}    p-valor = {p:.4}  {sig}");
+                if p < 0.05 { println!(" Conclusão: rejeita H0 → dependência CS presente → usar SE robustos por cluster"); }
+                else        { println!(" Conclusão: não rejeita H0 → sem dependência CS detectada"); }
+                println!("{:=^62}", "");
+                Ok(Value::Nil)
+            }
+
+            // mundlak — Teste de Mundlak (adequação de RE vs FE)
+            // H0: médias de grupo não correlacionadas com regressores (RE ok)
+            // mundlak(df, y ~ x1+x2, id="entity")
+            "mundlak" => {
+                if args.len() < 2 { return Err(HayashiError::Runtime("mundlak(df, y~x, id=\"entity\")".into())); }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let formula_ast = match &args[1] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser fórmula".into())) };
+                let id_col = match opt_map.get("id") { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("mundlak requer id=".into())) };
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_vec, x_mat) = df.to_design_matrix(&g_formula).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = df.formula_var_names(&g_formula).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let id_vals: Vec<i64> = Self::get_col_f64(&df, &id_col)?.iter().map(|&v| v as i64).collect();
+                let (f_stat, p, k, gamma, gamma_se) = greeners::PanelDiagnostics::mundlak(&y_vec, &x_mat, &id_vals)
+                    .map_err(|e| HayashiError::Runtime(e))?;
+                let sig = if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
+                println!("\n{:=^62}", " Mundlak Test — RE vs FE (correlação das médias) ");
+                println!(" H0: γ = 0 (médias de grupo não correlacionadas com X → RE ok)");
+                println!("{:-^62}", "");
+                println!(" F({k}, .) = {f_stat:.4}    p = {p:.4}  {sig}");
+                println!("{:-^62}", "");
+                // Nomes das variáveis variantes no tempo (não-constantes)
+                let slope_names: Vec<&str> = var_names.iter()
+                    .filter(|n| n.as_str() != "_cons" && n.as_str() != "const")
+                    .map(|s| s.as_str()).collect();
+                println!(" {:<20} {:>10}  {:>10}", "Variável (γ̂)", "Coef", "Std Err");
+                for i in 0..k.min(gamma.len()) {
+                    let nm = slope_names.get(i).copied().unwrap_or("?");
+                    println!(" {:<20} {:>10.4}  {:>10.4}", nm, gamma[i], gamma_se.get(i).copied().unwrap_or(f64::NAN));
+                }
+                if p < 0.05 { println!("\n Conclusão: rejeita H0 → RE é inconsistente → usar FE ou Hausman"); }
+                else        { println!("\n Conclusão: não rejeita H0 → RE adequado"); }
+                println!("{:=^62}", "");
+                Ok(Value::Nil)
+            }
+
+            // abtest — Arellano-Bond m1/m2 test (validação de instrumentos GMM)
+            // abtest(df, y ~ x1+x2, id="entity", time="time")
+            // m1 deve rejeitar H0 (FD induz AR(1) por construção)
+            // m2 NÃO deve rejeitar H0 (valida instrumentos y_{i,t-2})
+            "abtest" | "abar" => {
+                if args.len() < 2 { return Err(HayashiError::Runtime("abtest(df, y~x, id=\"entity\", time=\"time\")".into())); }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let formula_ast = match &args[1] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser fórmula".into())) };
+                let id_col   = match opt_map.get("id")   { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("abtest requer id= e time=".into())) };
+                let time_col = match opt_map.get("time") { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("abtest requer time=\"coluna_tempo\"".into())) };
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_vec, x_mat) = df.to_design_matrix(&g_formula).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let id_vals: Vec<i64>   = Self::get_col_f64(&df, &id_col)?.iter().map(|&v| v as i64).collect();
+                let time_vals: Vec<f64> = Self::get_col_f64(&df, &time_col)?.to_vec();
+                let (m1, p1, m2, p2) = greeners::PanelDiagnostics::arellano_bond_test(&y_vec, &x_mat, &id_vals, &time_vals)
+                    .map_err(|e| HayashiError::Runtime(e))?;
+                let sig = |p: f64| if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
+                println!("\n{:=^62}", " Arellano-Bond Test — Autocorrelação em 1ª Diferença ");
+                println!(" m1 DEVE rejeitar H0 (AR(1) induzido por FD)");
+                println!(" m2 NÃO deve rejeitar H0 (valida instrumentos y_{{t-2}})");
+                println!("{:-^62}", "");
+                println!(" m1 = {m1:.4}    p(m1) = {p1:.4}  {}", sig(p1));
+                println!(" m2 = {m2:.4}    p(m2) = {p2:.4}  {}", sig(p2));
+                println!("{:-^62}", "");
+                if p1 >= 0.05 { println!(" [!] m1 não rejeita H0 — modelo pode estar mal especificado"); }
+                if p2 <  0.05 { println!(" [!] m2 rejeita H0 — instrumentos y_{{t-2}} podem ser inválidos"); }
+                println!("{:=^62}", "");
+                Ok(Value::Nil)
+            }
+
+            // ── SUR (Seemingly Unrelated Regressions) ─────────────────────────
+            // sur(df, y1 ~ x1 + x2, y2 ~ x3 + x4, ...)
+            // Estimador de Zellner (FGLS entre equações)
+            // Cada equação pode ter regressores diferentes
+            "sur" | "sureg" => {
+                if args.len() < 3 {
+                    return Err(HayashiError::Runtime(
+                        "sur(df, y1~x1+x2, y2~x3+x4, ...) requer df + ao menos 2 fórmulas".into()
+                    ));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("primeiro argumento deve ser DataFrame".into())),
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                };
+                let mut equations: Vec<greeners::SurEquation> = Vec::new();
+                let mut eq_var_names: Vec<Vec<String>> = Vec::new();
+
+                for arg in &args[1..] {
+                    let formula_ast = match arg {
+                        Expr::Formula(f) => f.clone(),
+                        _ => return Err(HayashiError::Type(
+                            "sur: cada equação deve ser uma fórmula (y ~ x1 + x2)".into()
+                        )),
+                    };
+                    let formula_str = Self::formula_to_string(&formula_ast);
+                    let g_formula = GFormula::parse(&formula_str)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let (y, x) = df.to_design_matrix(&g_formula)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let var_names = df.formula_var_names(&g_formula)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    eq_var_names.push(var_names);
+                    equations.push(greeners::SurEquation {
+                        y,
+                        x,
+                        name: formula_ast.lhs.clone(),
+                    });
+                }
+                let result = greeners::SUR::fit(&equations)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                Ok(Value::SurResult(SurModel {
+                    result: Rc::new(result),
+                    eq_var_names,
+                }))
+            }
+
+            // ── Rolling OLS (janela deslizante) ───────────────────────────────
+            // rolling(y ~ x1 + x2, df, window=30)
+            // Estima OLS para cada janela de tamanho `window`
+            // Útil para: coeficientes time-varying, testes de estabilidade
+            "rolling" | "rols" => {
+                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_vec, x_mat) = df.to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let window = match opt_map.get("window") {
+                    Some(Value::Int(n)) => *n as usize,
+                    None => return Err(HayashiError::Runtime(
+                        "rolling() requer window=N (ex: window=30)".into()
+                    )),
+                    _ => return Err(HayashiError::Type("window= deve ser inteiro".into())),
+                };
+                let result = greeners::RollingOLS::fit(&y_vec, &x_mat, window)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                Ok(Value::RollingResult(Rc::new(result)))
+            }
+
+            // ── Recursive OLS (Kalman, acumula observações) ───────────────────
+            // recursive(y ~ x1 + x2, df)
+            // Expande a janela de 1 em 1 — base para CUSUM e estabilidade
+            "recursive" | "recols" => {
+                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_vec, x_mat) = df.to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let result = greeners::RecursiveLS::fit(&y_vec, &x_mat)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                Ok(Value::RecursiveLSResult(Rc::new(result)))
+            }
+
+            // ── ic — tabela de critérios de informação (AIC/BIC) ──────────────
+            // ic(m1, m2, m3, ...)
+            // Compara modelos pelo AIC e BIC; ordena do menor (melhor) para maior
+            "ic" | "fitstat" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("ic() requer ao menos um modelo".into()));
+                }
+                struct IcRow {
+                    label: String,
+                    ll: f64,
+                    k: usize,
+                    n: usize,
+                    aic: f64,
+                    bic: f64,
+                }
+                let mut rows: Vec<IcRow> = Vec::new();
+                for arg in args {
+                    let label = match arg {
+                        Expr::Var(name) => name.clone(),
+                        _ => "model".to_string(),
+                    };
+                    let val = self.eval_expr(arg)?;
+                    let (ll, k, n) = match &val {
+                        Value::OlsResult(m)      => (m.result.log_likelihood, m.result.params.len(), m.result.n_obs),
+                        Value::BinaryResult(b)   => (b.result.log_likelihood, b.result.params.len(), b.x.nrows()),
+                        Value::PoissonResult(r)  => (r.log_likelihood, r.params.len(), r.n_obs),
+                        Value::NegBinResult(r)   => (r.log_likelihood, r.params.len(), r.n_obs),
+                        Value::OrderedResult(r)  => (r.log_likelihood, r.params.len() + r.thresholds.len(), r.n_obs),
+                        Value::TobitResult(r)    => (r.log_likelihood, r.params.len(), r.n_obs),
+                        Value::MixedResult(r)    => (r.log_likelihood, r.fixed_effects.len(), r.n_obs),
+                        Value::ZeroInflatedResult(r) => (r.log_likelihood, r.count_params.len() + r.inflate_params.len(), r.n_obs),
+                        Value::RollingResult(_) | Value::RecursiveLSResult(_) => {
+                            return Err(HayashiError::Runtime(
+                                format!("ic(): '{label}' não tem log-verossimilhança — use print() para diagnósticos")
+                            ));
+                        }
+                        _ => return Err(HayashiError::Runtime(
+                            format!("ic(): modelo '{label}' não tem log-verossimilhança disponível para ic() — use print()")
+                        )),
+                    };
+                    let aic = -2.0 * ll + 2.0 * k as f64;
+                    let bic = -2.0 * ll + (k as f64) * (n as f64).ln();
+                    rows.push(IcRow { label, ll, k, n, aic, bic });
+                }
+                // Ordenar por AIC
+                rows.sort_by(|a, b| a.aic.partial_cmp(&b.aic).unwrap_or(std::cmp::Ordering::Equal));
+                let min_aic = rows.first().map(|r| r.aic).unwrap_or(0.0);
+                let _min_bic = rows.iter().map(|r| r.bic).min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap_or(0.0);
+                println!("\n{:=^80}", " Critérios de Informação ");
+                println!("{:<20} {:>6} {:>6} {:>12} {:>12} {:>8} {:>8}",
+                         "Modelo", "N", "k", "Log-Lik", "AIC", "ΔAIC", "BIC");
+                println!("{:-^80}", "");
+                for row in &rows {
+                    println!("{:<20} {:>6} {:>6} {:>12.4} {:>12.4} {:>8.4} {:>12.4}",
+                             row.label, row.n, row.k, row.ll,
+                             row.aic, row.aic - min_aic, row.bic);
+                }
+                if rows.len() > 1 {
+                    println!("{:-^80}", "");
+                    println!(" Melhor AIC: {}   Melhor BIC: {}",
+                             rows.iter().min_by(|a,b| a.aic.partial_cmp(&b.aic).unwrap()).unwrap().label,
+                             rows.iter().min_by(|a,b| a.bic.partial_cmp(&b.bic).unwrap()).unwrap().label);
+                    // Pesos de Akaike
+                    let delta_aics: Vec<f64> = rows.iter().map(|r| r.aic - min_aic).collect();
+                    let rel: Vec<f64> = delta_aics.iter().map(|d| (-d / 2.0).exp()).collect();
+                    let sum_rel: f64 = rel.iter().sum();
+                    println!(" Pesos Akaike: {}",
+                             rows.iter().zip(rel.iter()).map(|(r, w)| format!("{}={:.3}", r.label, w / sum_rel))
+                                 .collect::<Vec<_>>().join("  "));
+                }
+                println!("{:=^80}", "");
+                Ok(Value::Nil)
             }
 
             // ── Fixed Effects ─────────────────────────────────────────────────
@@ -1032,11 +3333,8 @@ impl Interpreter {
                 Ok(Self::diag(out))
             }
 
-            // ── Mundlak: correlação entre regressores e efeitos individuais ───
-            "mundlak" => {
-                // mundlak(formula, df, id=col)
-                // H₀: γ = 0 — médias individuais não correlacionadas com X (RE consistente)
-                // H₁: γ ≠ 0 — efeitos correlacionados com X (prefira FE)
+            // ── Arellano-Bond Diff-GMM (OLD mundlak removed — use new mundlak above) ─
+            "mundlak_OLD_REMOVED" => {
                 let (formula_ast, df, id_col) = self.extract_panel_args(args, &opt_map)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
@@ -1186,6 +3484,245 @@ impl Interpreter {
                 Ok(Value::AbResult(Rc::new(result)))
             }
 
+            // ── System GMM (Blundell-Bond 1998) ──────────────────────────────
+            // sysgmm(formula, df, id=col, time=col [, lags=2 [, step=1]])
+            // Empilha eq. em 1ª diferença (instrumentadas com níveis defasados)
+            // + eq. em níveis (instrumentadas com Δy_{t-1} e ΔX_{t-1}).
+            "sysgmm" => {
+                let (formula_ast, df, id_col) = self.extract_panel_args(args, &opt_map)?;
+
+                let time_col = match opt_map.get("time") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => return Err(HayashiError::Runtime(
+                        "sysgmm(): opção time=col é obrigatória".into()
+                    )),
+                };
+
+                let max_lags: usize = match opt_map.get("lags") {
+                    Some(Value::Int(v)) => (*v).max(1) as usize,
+                    Some(Value::Float(v)) => (*v as i64).max(1) as usize,
+                    None => 2,
+                    _ => return Err(HayashiError::Runtime(
+                        "sysgmm(): lags deve ser inteiro positivo".into()
+                    )),
+                };
+
+                let two_step: bool = match opt_map.get("step") {
+                    Some(Value::Int(2)) => true,
+                    Some(Value::Float(v)) if *v as i64 == 2 => true,
+                    Some(Value::Int(_)) | Some(Value::Float(_)) | None => false,
+                    _ => return Err(HayashiError::Runtime(
+                        "sysgmm(): step deve ser 1 ou 2".into()
+                    )),
+                };
+
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                let (y_vec, x_mat) = df.to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                let entity_ids: Vec<i64> = if let Ok(ids) = df.get_int(&id_col) {
+                    ids.to_vec()
+                } else if let Ok(floats) = df.get(&id_col) {
+                    floats.iter().map(|&v| v as i64).collect()
+                } else {
+                    return Err(HayashiError::Runtime(
+                        format!("sysgmm: coluna id '{id_col}' não encontrada")
+                    ));
+                };
+
+                let time_ids: Vec<i64> = if let Ok(ids) = df.get_int(&time_col) {
+                    ids.to_vec()
+                } else if let Ok(floats) = df.get(&time_col) {
+                    floats.iter().map(|&v| v as i64).collect()
+                } else {
+                    return Err(HayashiError::Runtime(
+                        format!("sysgmm: coluna time '{time_col}' não encontrada")
+                    ));
+                };
+
+                let var_names = df.formula_var_names(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                let result = greeners::SystemGmm::fit(
+                    &y_vec,
+                    &x_mat,
+                    &entity_ids,
+                    &time_ids,
+                    max_lags,
+                    two_step,
+                    Some(var_names),
+                ).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                Ok(Value::SysGmmResult(Rc::new(result)))
+            }
+
+            // ── FE-2SLS (xtivreg, fe) — Hausman (1978) ───────────────────────
+            // feiv(endog_formula, instrument_formula, df, id=col [, cov=...])
+            // endog_formula: y ~ x1 + x2   (x2 é endógena)
+            // instrument_formula: ~ x1 + z1 + z2  (exógenos incluídos + excluídos)
+            "feiv" => {
+                if args.len() < 3 {
+                    return Err(HayashiError::Runtime(
+                        "feiv() requer (formula_estrutural, formula_instrumentos, df, id=col)".into()
+                    ));
+                }
+
+                let endog_ast = match &args[0] {
+                    Expr::Formula(f) => f.clone(),
+                    _ => return Err(HayashiError::Type(
+                        "feiv(): primeiro argumento deve ser fórmula estrutural (y ~ x1 + x2)".into()
+                    )),
+                };
+                let instr_ast = match &args[1] {
+                    Expr::Formula(f) => f.clone(),
+                    _ => return Err(HayashiError::Type(
+                        "feiv(): segundo argumento deve ser fórmula dos instrumentos (~ x1 + z1 + z2)".into()
+                    )),
+                };
+                let df_name = match &args[2] {
+                    Expr::Var(name) => name.clone(),
+                    _ => return Err(HayashiError::Type(
+                        "feiv(): terceiro argumento deve ser nome do DataFrame".into()
+                    )),
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(df)) => df.clone(),
+                    _ => return Err(HayashiError::Runtime(
+                        format!("feiv: '{df_name}' não é um DataFrame")
+                    )),
+                };
+
+                let id_col = match opt_map.get("id") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => return Err(HayashiError::Runtime(
+                        "feiv(): opção id=col é obrigatória".into()
+                    )),
+                };
+
+                // fórmula estrutural → y e X (sem constante, FE a absorve)
+                let endog_str = Self::formula_to_string(&endog_ast);
+                let g_endog = GFormula::parse(&endog_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_vec, x_mat) = df.to_design_matrix(&g_endog)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                // fórmula de instrumentos → Z (sem constante)
+                let instr_vars: Vec<String> = instr_ast.rhs.iter().map(|t| match t {
+                    RhsTerm::Var(v) => v.clone(),
+                    RhsTerm::Categorical(v) => format!("C({v})"),
+                    RhsTerm::Transform(fn_, v) => format!("{fn_}({v})"),
+                    RhsTerm::Interaction(a, b) => format!("{a}:{b}"),
+                }).collect();
+
+                let n = y_vec.len();
+                let l = instr_vars.len();
+                if l == 0 {
+                    return Err(HayashiError::Runtime(
+                        "feiv(): formula de instrumentos deve ter ao menos um instrumento".into()
+                    ));
+                }
+                let mut z_mat = ndarray::Array2::<f64>::zeros((n, l));
+                for (j, col_name) in instr_vars.iter().enumerate() {
+                    let col = df.get(col_name)
+                        .map_err(|_| HayashiError::Runtime(
+                            format!("feiv: instrumento '{col_name}' não encontrado no DataFrame")
+                        ))?;
+                    for (i, &v) in col.iter().enumerate() {
+                        z_mat[[i, j]] = v;
+                    }
+                }
+
+                // entity IDs
+                let entity_ids: Vec<i64> = if let Ok(ids) = df.get_int(&id_col) {
+                    ids.to_vec()
+                } else if let Ok(floats) = df.get(&id_col) {
+                    floats.iter().map(|&v| v as i64).collect()
+                } else {
+                    return Err(HayashiError::Runtime(
+                        format!("feiv: coluna id '{id_col}' não encontrada")
+                    ));
+                };
+
+                let var_names = df.formula_var_names(&g_endog)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                let result = greeners::FE2SLS::fit(
+                    &y_vec,
+                    &x_mat,
+                    &z_mat,
+                    &entity_ids,
+                    Some(var_names),
+                ).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                Ok(Value::FE2SLSResult(Rc::new(result)))
+            }
+
+            // ── PCSE — Panel-Corrected Standard Errors (Beck & Katz 1995) ─────
+            // pcse(formula, df, id=col, time=col)
+            "pcse" => {
+                let (formula_ast, df, id_col) = self.extract_panel_args(args, &opt_map)?;
+                let time_col = match opt_map.get("time") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => return Err(HayashiError::Runtime(
+                        "pcse(): opção time=col é obrigatória".into()
+                    )),
+                };
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_vec, x_mat) = df.to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let entity_ids = Self::col_as_i64(&df, &id_col)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let time_ids = Self::col_as_i64(&df, &time_col)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = df.formula_var_names(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let result = greeners::PCSE::fit(
+                    &y_vec, &x_mat, &entity_ids, &time_ids, Some(var_names),
+                ).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                Ok(Value::PcseResult(Rc::new(result)))
+            }
+
+            // ── Panel GLS — Parks (1967) / Stata xtgls ───────────────────────
+            // xtgls(formula, df, id=col, time=col [, panels="hetero"|"corr"])
+            "xtgls" => {
+                let (formula_ast, df, id_col) = self.extract_panel_args(args, &opt_map)?;
+                let time_col = match opt_map.get("time") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => return Err(HayashiError::Runtime(
+                        "xtgls(): opção time=col é obrigatória".into()
+                    )),
+                };
+                let panels_opt = match opt_map.get("panels") {
+                    Some(Value::Str(s)) if s == "corr" => greeners::GlsPanels::Correlated,
+                    Some(Value::Str(s)) if s == "hetero" || s == "heteroscedastic" =>
+                        greeners::GlsPanels::Hetero,
+                    None => greeners::GlsPanels::Hetero,
+                    _ => return Err(HayashiError::Runtime(
+                        "xtgls(): panels deve ser \"hetero\" ou \"corr\"".into()
+                    )),
+                };
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_vec, x_mat) = df.to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let entity_ids = Self::col_as_i64(&df, &id_col)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let time_ids = Self::col_as_i64(&df, &time_col)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = df.formula_var_names(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let result = greeners::PanelGLS::fit(
+                    &y_vec, &x_mat, &entity_ids, &time_ids, panels_opt, Some(var_names),
+                ).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                Ok(Value::PanelGlsResult(Rc::new(result)))
+            }
+
             // ── Arellano-Bond: teste m1/m2 para autocorrelação serial ─────────
             "ab_test" => {
                 // ab_test(formula, df, id=col, time=col)
@@ -1273,11 +3810,8 @@ impl Interpreter {
                 Ok(Self::diag(out))
             }
 
-            // ── Wooldridge: autocorrelação serial em painel ───────────────────
-            "wooldridge" => {
-                // wooldridge(formula, df, id=col, time=col)
-                // H₀: sem autocorrelação serial de 1ª ordem nos erros idiossincráticos (ρ = -0.5)
-                // H₁: autocorrelação serial presente (ρ ≠ -0.5)
+            // ── wooldridge_OLD_REMOVED (substituído pelo novo acima) ──────────
+            "wooldridge_OLD_REMOVED" => {
                 let (formula_ast, df, id_col) = self.extract_panel_args(args, &opt_map)?;
 
                 let time_col = match opt_map.get("time") {
@@ -1740,6 +4274,25 @@ impl Interpreter {
                     _ => "",
                 };
 
+                // extrai (label, coefs, n_obs) de tipos com campos padronizados
+                let extract_std = |label: &str,
+                                   vnames: &Option<Vec<String>>,
+                                   params: &ndarray::Array1<f64>,
+                                   se:     &ndarray::Array1<f64>,
+                                   pv:     &ndarray::Array1<f64>,
+                                   n: usize| -> ModelInfo {
+                    let k = params.len();
+                    let fb: Vec<String> = (0..k).map(|i| format!("x{i}")).collect();
+                    let nm = vnames.as_ref().unwrap_or(&fb);
+                    let coefs: Vec<CoefRow> = nm.iter()
+                        .zip(params.iter())
+                        .zip(se.iter())
+                        .zip(pv.iter())
+                        .map(|(((n, &c), &s), &p)| (n.clone(), c, Some(s), Some(p)))
+                        .collect();
+                    (label.to_string(), coefs, n)
+                };
+
                 let mut models: Vec<ModelInfo> = Vec::new();
                 for arg in args {
                     let val = self.eval_expr(arg)?;
@@ -1753,21 +4306,166 @@ impl Interpreter {
                         Value::BinaryResult(bm) => {
                             let label = if bm.kind == "logit" { "Logit" } else { "Probit" }.to_string();
                             let n = bm.x.nrows();
-                            let coefs: Vec<CoefRow> = bm.coef_names.iter()
-                                .zip(bm.result.params.iter())
-                                .map(|(nm, &c)| (nm.clone(), c, None, None))
-                                .collect();
-                            models.push((label, coefs, n));
+                            models.push(extract_std(&label, &bm.result.variable_names,
+                                &bm.result.params, &bm.result.std_errors, &bm.result.p_values, n));
                         }
                         Value::IvResult(r) => {
-                            let _coefs: Vec<CoefRow> = Vec::new(); // sem acesso direto aos params via API pública
-                            let _ = r; // display via print separado
+                            models.push(extract_std("IV/2SLS", &r.variable_names,
+                                &r.params, &r.std_errors, &r.p_values, r.n_obs));
+                        }
+                        Value::PoissonResult(r) => {
+                            models.push(extract_std("Poisson", &r.variable_names,
+                                &r.params, &r.std_errors, &r.p_values, r.n_obs));
+                        }
+                        Value::NegBinResult(r) => {
+                            models.push(extract_std("NegBin", &r.variable_names,
+                                &r.params, &r.std_errors, &r.p_values, r.n_obs));
+                        }
+                        Value::OrderedResult(r) => {
+                            let mut info = extract_std(&r.model_name, &r.variable_names,
+                                &r.params, &r.std_errors, &r.p_values, r.n_obs);
+                            for (i, (&thr, &thr_se)) in r.thresholds.iter()
+                                .zip(r.threshold_std_errors.iter()).enumerate()
+                            {
+                                info.1.push((format!("_cut{}", i + 1), thr, Some(thr_se), None));
+                            }
+                            models.push(info);
+                        }
+                        Value::TobitResult(r) => {
+                            let mut info = extract_std("Tobit", &r.variable_names,
+                                &r.params, &r.std_errors, &r.p_values, r.n_obs);
+                            info.1.push(("_sigma".into(), r.sigma, None, None));
+                            models.push(info);
+                        }
+                        Value::HeckmanResult(r) => {
+                            let mut info = extract_std("Heckman", &r.variable_names,
+                                &r.params, &r.std_errors, &r.p_values, r.n_obs);
+                            let dz = if r.delta_se > 0.0 { r.delta / r.delta_se } else { f64::NAN };
+                            let dp = if dz.is_finite() {
+                                t_pvalue_two(dz, r.n_selected as f64)
+                            } else { f64::NAN };
+                            info.1.push(("_lambda".into(), r.delta, Some(r.delta_se), Some(dp)));
+                            models.push(info);
+                        }
+                        Value::PanelResult(r) => {
+                            models.push(extract_std("FE", &r.variable_names,
+                                &r.params, &r.std_errors, &r.p_values, r.n_obs));
+                        }
+                        Value::ReResult(r) => {
+                            models.push(extract_std("RE", &r.variable_names,
+                                &r.params, &r.std_errors, &r.p_values, 0));
+                        }
+                        Value::AbResult(r) => {
+                            models.push(extract_std("AB-GMM", &r.variable_names,
+                                &r.params, &r.std_errors, &r.p_values, r.n_obs));
+                        }
+                        Value::SysGmmResult(r) => {
+                            models.push(extract_std("SysGMM", &r.variable_names,
+                                &r.params, &r.std_errors, &r.p_values, r.n_obs_fd));
+                        }
+                        Value::PcseResult(r) => {
+                            models.push(extract_std("PCSE", &r.variable_names,
+                                &r.params, &r.std_errors, &r.p_values, r.n_obs));
+                        }
+                        Value::PanelGlsResult(r) => {
+                            let label = match r.panels {
+                                greeners::panel::GlsPanels::Hetero      => "XTGLS-H",
+                                greeners::panel::GlsPanels::Correlated  => "XTGLS-C",
+                            };
+                            models.push(extract_std(label, &r.variable_names,
+                                &r.params, &r.std_errors, &r.p_values, r.n_obs));
+                        }
+                        Value::FE2SLSResult(r) => {
+                            models.push(extract_std("FE-IV", &r.variable_names,
+                                &r.params, &r.std_errors, &r.p_values, r.n_obs));
+                        }
+                        Value::QuantileResult(r) => {
+                            let label = format!("QReg(τ={:.2})", r.tau);
+                            models.push(extract_std(&label, &r.variable_names,
+                                &r.params, &r.std_errors, &r.p_values, 0));
+                        }
+                        Value::CoxResult(r) => {
+                            models.push(extract_std("CoxPH", &r.variable_names,
+                                &r.params, &r.std_errors, &r.p_values, r.n_obs));
+                        }
+                        Value::RlmResult(r) => {
+                            models.push(extract_std("RLM", &r.variable_names,
+                                &r.params, &r.std_errors, &r.p_values, r.n_obs));
+                        }
+                        Value::GeeResult(r) => {
+                            // GEE usa SE robusto (sandwich) por padrão
+                            models.push(extract_std("GEE", &r.variable_names,
+                                &r.params, &r.robust_se, &r.p_values, r.n_obs));
+                        }
+                        Value::BetaResult(r) => {
+                            models.push(extract_std("BetaReg", &r.variable_names,
+                                &r.params, &r.std_errors, &r.p_values, r.n_obs));
+                        }
+                        Value::GlmResult(r) => {
+                            let family_name = format!("GLM({:?})", r.family);
+                            models.push(extract_std(&family_name, &r.variable_names,
+                                &r.params, &r.std_errors, &r.p_values, r.n_obs));
+                        }
+                        Value::LowessResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() does not yet support IV models — use print()".into()
+                                "esttab() não suporta lowess — use predict para extrair valores suavizados".into()
+                            ));
+                        }
+                        Value::PcaResult(_) | Value::FactorResult(_) => {
+                            return Err(HayashiError::Runtime(
+                                "esttab() não suporta PCA/Factor — use print() para ver cargas e variância explicada".into()
+                            ));
+                        }
+                        Value::ConditionalResult(r) => {
+                            models.push(extract_std(&r.model_name, &r.variable_names,
+                                &r.params, &r.std_errors, &r.p_values, r.n_obs));
+                        }
+                        Value::MarkovResult(_) => {
+                            return Err(HayashiError::Runtime(
+                                "esttab() não suporta Markov Switching — use print() para ver parâmetros por regime".into()
+                            ));
+                        }
+                        Value::GlsarResult(r) => {
+                            models.push(extract_std("GLSAR", &r.variable_names,
+                                &r.params, &r.std_errors, &r.p_values, r.n_obs));
+                        }
+                        Value::MixedResult(r) => {
+                            // esttab exibe apenas efeitos fixos do MixedLM
+                            models.push(extract_std("MixedLM", &r.variable_names,
+                                &r.fixed_effects, &r.fixed_se, &r.p_values, r.n_obs));
+                        }
+                        Value::ZeroInflatedResult(_) => {
+                            return Err(HayashiError::Runtime(
+                                "esttab() não suporta zip/zinb (duas equações) — use print()".into()
+                            ));
+                        }
+                        Value::SurResult(_) => {
+                            return Err(HayashiError::Runtime(
+                                "esttab() não suporta sur (múltiplas equações) — use print()".into()
+                            ));
+                        }
+                        Value::RollingResult(_) | Value::RecursiveLSResult(_) => {
+                            return Err(HayashiError::Runtime(
+                                "esttab() não suporta rolling/recursive — coeficientes variam ao longo do tempo; use print()".into()
+                            ));
+                        }
+                        Value::MNLogitResult(_) => {
+                            return Err(HayashiError::Runtime(
+                                "esttab() não suporta mlogit (múltiplas equações) — use print()".into()
+                            ));
+                        }
+                        Value::DidResult(_) | Value::KMResult(_) => {
+                            return Err(HayashiError::Runtime(
+                                "esttab() não suporta did/km — resultado tem formato próprio; use print()".into()
+                            ));
+                        }
+                        Value::RdResult(_) | Value::SynthResult(_) | Value::PsmResult(_) => {
+                            return Err(HayashiError::Runtime(
+                                "esttab() não suporta estimadores causais (rd, psm, synth) — use print()".into()
                             ));
                         }
                         _ => return Err(HayashiError::Type(
-                            "esttab() supports OLS and binary (logit/probit) models".into()
+                            "esttab(): tipo de modelo não suportado — use print()".into()
                         )),
                     }
                 }
@@ -1938,56 +4636,148 @@ impl Interpreter {
             "margins" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
-                        "margins() requires a logit or probit model".into(),
+                        "margins() requer um modelo estimado como argumento".into(),
                     ));
                 }
                 let model = self.eval_expr(&args[0])?;
-                let bm = match model {
-                    Value::BinaryResult(m) => m,
+
+                let sep  = "─".repeat(60);
+                let sep2 = "═".repeat(60);
+
+                match model {
+                    // ── Logit / Probit ────────────────────────────────────────
+                    Value::BinaryResult(bm) => {
+                        let n    = bm.x.nrows();
+                        let k    = bm.x.ncols();
+                        let beta = &bm.result.params;
+                        let eta: Vec<f64> = (0..n).map(|i| bm.x.row(i).dot(beta)).collect();
+                        let deriv: Vec<f64> = eta.iter().map(|&e| match bm.kind.as_str() {
+                            "logit"  => { let p = logistic(e); p * (1.0 - p) }
+                            "probit" => norm_pdf(e),
+                            _        => 0.0,
+                        }).collect();
+                        println!("\n{sep2}");
+                        println!(" Average Marginal Effects — {}", bm.kind.to_uppercase());
+                        println!("{sep2}");
+                        println!("{:<22} {:>14}  {:>10}", "Variable", "dy/dx", "");
+                        println!("{sep}");
+                        for k_idx in 0..k {
+                            let name = bm.coef_names.get(k_idx).map(String::as_str).unwrap_or("?");
+                            if name == "_cons" { continue; }
+                            let ame: f64 = deriv.iter().map(|&d| d * beta[k_idx]).sum::<f64>() / n as f64;
+                            println!("{:<22} {:>14.6}", name, ame);
+                        }
+                        println!("{sep}");
+                        println!("n = {n}");
+                        println!("{sep2}\n");
+                    }
+
+                    // ── Poisson / NegBin ──────────────────────────────────────
+                    // AME_k = β_k * (1/n) Σ_i exp(X_iβ)  [derivada de E[y]=exp(Xβ)]
+                    Value::PoissonResult(r) => {
+                        let x    = r.x_data();
+                        let n    = x.nrows();
+                        let beta = &r.params;
+                        let mu_bar: f64 = (0..n).map(|i| x.row(i).dot(beta).exp()).sum::<f64>() / n as f64;
+                        let fb: Vec<String> = (0..beta.len()).map(|i| format!("x{i}")).collect();
+                        let names = r.variable_names.as_ref().unwrap_or(&fb);
+                        println!("\n{sep2}");
+                        println!(" Average Marginal Effects — POISSON  (dy/dx = β·μ̄)");
+                        println!("{sep2}");
+                        println!("{:<22} {:>14}  {:>10}", "Variable", "dy/dx", "");
+                        println!("{sep}");
+                        for (k_idx, name) in names.iter().enumerate() {
+                            if name == "_cons" || name == "const" { continue; }
+                            if k_idx >= beta.len() { break; }
+                            let ame = beta[k_idx] * mu_bar;
+                            println!("{:<22} {:>14.6}", name, ame);
+                        }
+                        println!("{sep}");
+                        println!("n = {n}   μ̄ = {mu_bar:.4}");
+                        println!("{sep2}\n");
+                    }
+                    Value::NegBinResult(r) => {
+                        let x    = r.x_data();
+                        let n    = x.nrows();
+                        let beta = &r.params;
+                        let mu_bar: f64 = (0..n).map(|i| x.row(i).dot(beta).exp()).sum::<f64>() / n as f64;
+                        let fb: Vec<String> = (0..beta.len()).map(|i| format!("x{i}")).collect();
+                        let names = r.variable_names.as_ref().unwrap_or(&fb);
+                        println!("\n{sep2}");
+                        println!(" Average Marginal Effects — NEG. BINOMIAL  (dy/dx = β·μ̄)");
+                        println!("{sep2}");
+                        println!("{:<22} {:>14}  {:>10}", "Variable", "dy/dx", "");
+                        println!("{sep}");
+                        for (k_idx, name) in names.iter().enumerate() {
+                            if name == "_cons" || name == "const" { continue; }
+                            if k_idx >= beta.len() { break; }
+                            let ame = beta[k_idx] * mu_bar;
+                            println!("{:<22} {:>14.6}", name, ame);
+                        }
+                        println!("{sep}");
+                        println!("n = {n}   μ̄ = {mu_bar:.4}  α = {:.4}", r.alpha);
+                        println!("{sep2}\n");
+                    }
+
+                    // ── Ordered Logit / Probit ────────────────────────────────
+                    // AME_k(Y=j) = (1/n) Σ_i [f(κ_{j-1} - X_iβ) - f(κ_j - X_iβ)] * β_k
+                    // (com κ_0 = -∞ → f(κ_0 - ·) = 0;  κ_J = +∞ → f(κ_J - ·) = 0)
+                    Value::OrderedResult(r) => {
+                        let x     = r.x_data();
+                        let n     = x.nrows();
+                        let beta  = &r.params;
+                        let cuts  = &r.thresholds;
+                        let j     = r.n_categories;
+                        let is_logit = r.model_name.to_lowercase().contains("logit");
+                        let link_pdf = |u: f64| -> f64 {
+                            if is_logit { let p = logistic(u); p * (1.0 - p) } else { norm_pdf(u) }
+                        };
+                        let fb: Vec<String> = (0..beta.len()).map(|i| format!("x{i}")).collect();
+                        let names = r.variable_names.as_ref().unwrap_or(&fb);
+                        // Xβ para cada observação
+                        let xb: Vec<f64> = (0..n).map(|i| x.row(i).dot(beta)).collect();
+                        // AME[var_k, cat_j]
+                        let k = beta.len();
+                        println!("\n{sep2}");
+                        println!(" Average Marginal Effects — {}", r.model_name.to_uppercase());
+                        println!(" dP(Y=j)/dx — um painel por categoria");
+                        println!("{sep2}");
+                        // header
+                        print!("{:<22}", "Variable");
+                        for cat_j in 0..j { print!("  {:>10}", format!("P(Y={})", cat_j + 1)); }
+                        println!();
+                        println!("{sep}");
+                        for k_idx in 0..k {
+                            let name = names.get(k_idx).map(String::as_str).unwrap_or("?");
+                            if name == "_cons" || name == "const" { continue; }
+                            print!("{:<22}", name);
+                            for cat_j in 0..j {
+                                // f(κ_{j-1} - Xβ) — zero para cat_j=0 (sem threshold inferior)
+                                let f_lo: f64 = if cat_j == 0 {
+                                    0.0
+                                } else {
+                                    (0..n).map(|i| link_pdf(cuts[cat_j - 1] - xb[i])).sum::<f64>() / n as f64
+                                };
+                                // f(κ_j - Xβ) — zero para cat_j=J-1 (sem threshold superior)
+                                let f_hi: f64 = if cat_j == j - 1 {
+                                    0.0
+                                } else {
+                                    (0..n).map(|i| link_pdf(cuts[cat_j] - xb[i])).sum::<f64>() / n as f64
+                                };
+                                let ame = (f_lo - f_hi) * beta[k_idx];
+                                print!("  {:>10.5}", ame);
+                            }
+                            println!();
+                        }
+                        println!("{sep}");
+                        println!("n = {n}   Categorias: {j}   Modelo: {}", r.model_name);
+                        println!("{sep2}\n");
+                    }
+
                     _ => return Err(HayashiError::Type(
-                        "margins() requires a logit or probit model".into(),
+                        "margins() suporta: logit, probit, poisson, negbin, ologit, oprobit".into()
                     )),
-                };
-
-                let n = bm.x.nrows();
-                let k = bm.x.ncols();
-                let beta = &bm.result.params;
-
-                if beta.len() != k {
-                    return Err(HayashiError::Runtime(
-                        format!("coefficient count mismatch: {} params vs {} x cols", beta.len(), k)
-                    ));
                 }
-
-                // preditor linear η = Xβ para cada observação
-                let eta: Vec<f64> = (0..n).map(|i| bm.x.row(i).dot(beta)).collect();
-
-                // derivada da CDF em cada observação: dF(η)/dη
-                let deriv: Vec<f64> = eta.iter().map(|&e| match bm.kind.as_str() {
-                    "logit"  => { let p = logistic(e); p * (1.0 - p) }
-                    "probit" => norm_pdf(e),
-                    _        => 0.0,
-                }).collect();
-
-                // AME_k = (1/n) Σ_i [deriv_i * β_k]
-                // — para _cons não faz sentido reportar, pulamos (índice 0)
-                let sep = "─".repeat(46);
-                println!("\nAverage Marginal Effects — {}", bm.kind);
-                println!("{sep}");
-                println!("{:<20}  {:>12}", "Variable", "dy/dx");
-                println!("{sep}");
-
-                for k_idx in 0..k {
-                    let name = bm.coef_names.get(k_idx).map(String::as_str).unwrap_or("?");
-                    if name == "_cons" { continue; }
-                    let ame: f64 = deriv.iter().map(|&d| d * beta[k_idx]).sum::<f64>() / n as f64;
-                    println!("{:<20}  {:>12.6}", name, ame);
-                }
-
-                println!("{sep}");
-                println!("n = {n}   Model: {}", bm.kind);
-                println!();
-
                 Ok(Value::Nil)
             }
 
@@ -2835,6 +5625,307 @@ impl Interpreter {
                 Ok(Value::DataFrame(new_df))
             }
 
+            // ── reshape ──────────────────────────────────────────────────────
+            // reshape(df, "long",  stubs=[...], i=id_col,    j=new_j_col)
+            // reshape(df, "wide",  values=[...], i=id_col,   j=j_col)
+            "reshape" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "reshape(df, \"long\"|\"wide\", ...) requer pelo menos 2 argumentos".into(),
+                    ));
+                }
+                let df = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(d) => d,
+                    _ => return Err(HayashiError::Type("reshape(): arg 1 deve ser DataFrame".into())),
+                };
+                let direction = match self.eval_expr(&args[1])? {
+                    Value::Str(s) => s,
+                    _ => return Err(HayashiError::Type(
+                        "reshape(): arg 2 deve ser \"long\" ou \"wide\"".into()
+                    )),
+                };
+                let i_col = match opt_map.get("i") {
+                    Some(Value::Str(s)) => s.clone(),
+                    None => return Err(HayashiError::Runtime("reshape() requer opção i=coluna_id".into())),
+                    _ => return Err(HayashiError::Type("i= deve ser string".into())),
+                };
+                let j_col = match opt_map.get("j") {
+                    Some(Value::Str(s)) => s.clone(),
+                    None => return Err(HayashiError::Runtime("reshape() requer opção j=coluna_tempo".into())),
+                    _ => return Err(HayashiError::Type("j= deve ser string".into())),
+                };
+
+                match direction.as_str() {
+                    // ── wide → long ──────────────────────────────────────────
+                    "long" => {
+                        let stubs: Vec<String> = match opt_map.get("stubs") {
+                            Some(Value::List(lst)) => lst.iter().map(|v| match v {
+                                Value::Str(s) => Ok(s.clone()),
+                                _ => Err(HayashiError::Type("stubs= deve ser lista de strings".into())),
+                            }).collect::<Result<_>>()?,
+                            None => return Err(HayashiError::Runtime(
+                                "reshape long requer opção stubs=[\"var1\", \"var2\", ...]".into()
+                            )),
+                            _ => return Err(HayashiError::Type("stubs= deve ser lista".into())),
+                        };
+
+                        // Para cada stub, detectar colunas e extrair sufixos
+                        let col_names = df.column_names();
+                        let mut stub_suffixes: Vec<Vec<String>> = Vec::new();
+                        for stub in &stubs {
+                            let mut suffs: Vec<String> = col_names.iter()
+                                .filter(|c| c.starts_with(stub.as_str()) && *c != stub)
+                                .map(|c| c[stub.len()..].to_string())
+                                .collect();
+                            suffs.sort();
+                            if suffs.is_empty() {
+                                return Err(HayashiError::Runtime(
+                                    format!("reshape long: nenhuma coluna com stub '{stub}' encontrada")
+                                ));
+                            }
+                            stub_suffixes.push(suffs);
+                        }
+                        // Validar que todos os stubs têm os mesmos sufixos
+                        let all_suf = stub_suffixes[0].clone();
+                        for (stub, suf) in stubs.iter().zip(stub_suffixes.iter()) {
+                            if suf != &all_suf {
+                                return Err(HayashiError::Runtime(
+                                    format!("reshape long: stub '{stub}' tem sufixos diferentes dos demais")
+                                ));
+                            }
+                        }
+
+                        // Coletar valores da coluna id
+                        use greeners::Column;
+                        let n_rows = df.n_rows();
+                        let id_vals: Vec<String> = match df.get_column(&i_col) {
+                            Ok(Column::Float(arr)) => arr.iter().map(|v| v.to_string()).collect(),
+                            Ok(Column::Int(arr))   => arr.iter().map(|v| v.to_string()).collect(),
+                            _ => if let Ok(arr) = df.get_string(&i_col) {
+                                arr.to_vec()
+                            } else {
+                                return Err(HayashiError::Runtime(format!("reshape: coluna id '{i_col}' não encontrada")));
+                            }
+                        };
+
+                        let n_suf = all_suf.len();
+                        let n_out = n_rows * n_suf;
+
+                        // Determinar colunas que não são stubs nem id (passam direto)
+                        let stub_cols: std::collections::HashSet<String> = stubs.iter()
+                            .flat_map(|s| all_suf.iter().map(move |sf| format!("{s}{sf}")))
+                            .collect();
+                        let passthrough: Vec<String> = col_names.iter()
+                            .filter(|c| **c != i_col && !stub_cols.contains(*c))
+                            .cloned().collect();
+
+                        let mut builder = DataFrame::builder();
+
+                        // coluna id: repete cada valor n_suf vezes
+                        let id_out: Vec<String> = id_vals.iter()
+                            .flat_map(|v| std::iter::repeat(v.clone()).take(n_suf))
+                            .collect();
+                        builder = builder.add_string(&i_col, id_out);
+
+                        // coluna j: para cada obs, cicla pelos sufixos
+                        let j_out: Vec<String> = (0..n_rows)
+                            .flat_map(|_| all_suf.iter().cloned())
+                            .collect();
+                        builder = builder.add_string(&j_col, j_out);
+
+                        // colunas passthrough
+                        for pc in &passthrough {
+                            match df.get_column(pc) {
+                                Ok(Column::Float(arr)) => {
+                                    let vals: Vec<f64> = arr.iter()
+                                        .flat_map(|&v| std::iter::repeat(v).take(n_suf))
+                                        .collect();
+                                    builder = builder.add_column(pc, vals);
+                                }
+                                Ok(Column::Int(arr)) => {
+                                    let vals: Vec<f64> = arr.iter()
+                                        .flat_map(|&v| std::iter::repeat(v as f64).take(n_suf))
+                                        .collect();
+                                    builder = builder.add_column(pc, vals);
+                                }
+                                _ => {}
+                            }
+                        }
+
+                        // colunas dos stubs
+                        for stub in &stubs {
+                            let mut vals: Vec<f64> = Vec::with_capacity(n_out);
+                            for row in 0..n_rows {
+                                for suf in &all_suf {
+                                    let col_name = format!("{stub}{suf}");
+                                    let v = match df.get_column(&col_name) {
+                                        Ok(Column::Float(arr)) => arr[row],
+                                        Ok(Column::Int(arr))   => arr[row] as f64,
+                                        _ => f64::NAN,
+                                    };
+                                    vals.push(v);
+                                }
+                            }
+                            builder = builder.add_column(stub, vals);
+                        }
+
+                        let new_df = builder.build()
+                            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                        println!("(reshape long: {} obs × {} variáveis → {} obs × {} variáveis)",
+                            n_rows, col_names.len(), n_out, new_df.column_names().len());
+                        Ok(Value::DataFrame(new_df))
+                    }
+
+                    // ── long → wide ──────────────────────────────────────────
+                    "wide" => {
+                        let values: Vec<String> = match opt_map.get("values") {
+                            Some(Value::List(lst)) => lst.iter().map(|v| match v {
+                                Value::Str(s) => Ok(s.clone()),
+                                _ => Err(HayashiError::Type("values= deve ser lista de strings".into())),
+                            }).collect::<Result<_>>()?,
+                            None => return Err(HayashiError::Runtime(
+                                "reshape wide requer opção values=[\"var1\", \"var2\", ...]".into()
+                            )),
+                            _ => return Err(HayashiError::Type("values= deve ser lista".into())),
+                        };
+
+                        use greeners::Column;
+                        let n_rows = df.n_rows();
+
+                        // Coletar valores únicos de j (em ordem de aparição)
+                        let j_vals: Vec<String> = {
+                            let mut seen = std::collections::HashSet::new();
+                            let mut out  = Vec::new();
+                            match df.get_column(&j_col) {
+                                Ok(Column::Float(arr)) => {
+                                    for &v in arr.iter() {
+                                        let s = if v.fract() == 0.0 { format!("{}", v as i64) } else { format!("{v}") };
+                                        if seen.insert(s.clone()) { out.push(s); }
+                                    }
+                                }
+                                Ok(Column::Int(arr)) => {
+                                    for &v in arr.iter() {
+                                        let s = v.to_string();
+                                        if seen.insert(s.clone()) { out.push(s); }
+                                    }
+                                }
+                                _ => {
+                                    if let Ok(arr) = df.get_string(&j_col) {
+                                        for v in arr.iter() {
+                                            if seen.insert(v.clone()) { out.push(v.clone()); }
+                                        }
+                                    } else {
+                                        return Err(HayashiError::Runtime(
+                                            format!("reshape wide: coluna j '{j_col}' não encontrada")
+                                        ));
+                                    }
+                                }
+                            }
+                            out
+                        };
+
+                        // j label por linha
+                        let row_j: Vec<String> = match df.get_column(&j_col) {
+                            Ok(Column::Float(arr)) => arr.iter().map(|&v| {
+                                if v.fract() == 0.0 { format!("{}", v as i64) } else { format!("{v}") }
+                            }).collect(),
+                            Ok(Column::Int(arr))   => arr.iter().map(|v| v.to_string()).collect(),
+                            _ => df.get_string(&j_col)
+                                .map_err(|_| HayashiError::Runtime("reshape wide: j coluna inválida".into()))?
+                                .to_vec(),
+                        };
+
+                        // id por linha
+                        let row_id: Vec<String> = match df.get_column(&i_col) {
+                            Ok(Column::Float(arr)) => arr.iter().map(|v| v.to_string()).collect(),
+                            Ok(Column::Int(arr))   => arr.iter().map(|v| v.to_string()).collect(),
+                            _ => df.get_string(&i_col)
+                                .map_err(|_| HayashiError::Runtime("reshape wide: i coluna inválida".into()))?
+                                .to_vec(),
+                        };
+
+                        // Ordem única de ids
+                        let mut seen_ids = std::collections::HashSet::new();
+                        let unique_ids: Vec<String> = row_id.iter()
+                            .filter(|id| seen_ids.insert((*id).clone()))
+                            .cloned().collect();
+                        let n_id = unique_ids.len();
+
+                        // id_idx[row] → índice no unique_ids
+                        let id_pos: std::collections::HashMap<&str, usize> = unique_ids.iter()
+                            .enumerate().map(|(i, s)| (s.as_str(), i)).collect();
+                        let j_pos: std::collections::HashMap<&str, usize> = j_vals.iter()
+                            .enumerate().map(|(i, s)| (s.as_str(), i)).collect();
+
+                        // Para cada coluna value, construir matrix (n_id × n_j)
+                        let mut value_mats: Vec<Vec<f64>> = values.iter().map(|_| {
+                            vec![f64::NAN; n_id * j_vals.len()]
+                        }).collect();
+
+                        for row in 0..n_rows {
+                            let i_idx = id_pos[row_id[row].as_str()];
+                            let j_idx = j_pos[row_j[row].as_str()];
+                            for (vi, val_col) in values.iter().enumerate() {
+                                let v = match df.get_column(val_col) {
+                                    Ok(Column::Float(arr)) => arr[row],
+                                    Ok(Column::Int(arr))   => arr[row] as f64,
+                                    _ => f64::NAN,
+                                };
+                                value_mats[vi][i_idx * j_vals.len() + j_idx] = v;
+                            }
+                        }
+
+                        let col_names = df.column_names();
+                        let skip: std::collections::HashSet<&str> = values.iter()
+                            .chain(std::iter::once(&j_col))
+                            .map(String::as_str).collect();
+                        let passthrough: Vec<String> = col_names.iter()
+                            .filter(|c| **c != i_col && !skip.contains(c.as_str()))
+                            .cloned().collect();
+
+                        // Pegar primeiro valor de passthrough por id
+                        let mut builder = DataFrame::builder();
+                        // id column
+                        builder = builder.add_string(&i_col, unique_ids.clone());
+                        // passthrough: valor da primeira linha com esse id
+                        for pc in &passthrough {
+                            let mut vals = vec![f64::NAN; n_id];
+                            for row in 0..n_rows {
+                                let ii = id_pos[row_id[row].as_str()];
+                                if vals[ii].is_nan() {
+                                    if let Ok(Column::Float(arr)) = df.get_column(pc) {
+                                        vals[ii] = arr[row];
+                                    } else if let Ok(Column::Int(arr)) = df.get_column(pc) {
+                                        vals[ii] = arr[row] as f64;
+                                    }
+                                }
+                            }
+                            builder = builder.add_column(pc, vals);
+                        }
+                        // value columns
+                        for (vi, stub) in values.iter().enumerate() {
+                            for (ji, jv) in j_vals.iter().enumerate() {
+                                let col_name = format!("{stub}{jv}");
+                                let col_vals: Vec<f64> = (0..n_id)
+                                    .map(|ii| value_mats[vi][ii * j_vals.len() + ji])
+                                    .collect();
+                                builder = builder.add_column(&col_name, col_vals);
+                            }
+                        }
+
+                        let new_df = builder.build()
+                            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                        println!("(reshape wide: {} obs → {} obs × {} variáveis)",
+                            n_rows, n_id, new_df.column_names().len());
+                        Ok(Value::DataFrame(new_df))
+                    }
+
+                    other => Err(HayashiError::Runtime(
+                        format!("reshape: direção '{other}' desconhecida — use \"long\" ou \"wide\"")
+                    )),
+                }
+            }
+
             // ── sort ─────────────────────────────────────────────────────────
             "sort" => {
                 if args.len() < 2 {
@@ -3066,6 +6157,62 @@ impl Interpreter {
                 Ok(Value::DataFrame(new_df))
             }
 
+            // ── filter ───────────────────────────────────────────────────────
+            // filter(df, condition_expr) → DataFrame com linhas onde cond ≠ 0
+            "filter" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "filter(df, cond) requer um DataFrame e uma expressão de condição".into(),
+                    ));
+                }
+                let df = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(df) => df,
+                    _ => return Err(HayashiError::Type(
+                        "filter(): primeiro argumento deve ser um DataFrame".into(),
+                    )),
+                };
+                let mask = Self::eval_col_expr(&args[1], &df)?;
+                let keep: Vec<bool> = mask.iter().map(|&v| v != 0.0 && !v.is_nan()).collect();
+                let n       = keep.len();
+                let n_kept  = keep.iter().filter(|&&k| k).count();
+                let n_drop  = n - n_kept;
+
+                let all_names = df.column_names();
+                let mut builder = DataFrame::builder();
+                for col_name in &all_names {
+                    use greeners::Column;
+                    match df.get_column(col_name) {
+                        Ok(Column::Float(arr)) => {
+                            let vals: Vec<f64> = arr.iter().enumerate()
+                                .filter(|(i, _)| keep[*i])
+                                .map(|(_, &v)| v)
+                                .collect();
+                            builder = builder.add_column(col_name, vals);
+                        }
+                        Ok(Column::Int(arr)) => {
+                            let vals: Vec<f64> = arr.iter().enumerate()
+                                .filter(|(i, _)| keep[*i])
+                                .map(|(_, &v)| v as f64)
+                                .collect();
+                            builder = builder.add_column(col_name, vals);
+                        }
+                        _ => {
+                            if let Ok(arr) = df.get_string(col_name) {
+                                let vals: Vec<String> = arr.iter().enumerate()
+                                    .filter(|(i, _)| keep[*i])
+                                    .map(|(_, v)| v.clone())
+                                    .collect();
+                                builder = builder.add_string(col_name, vals);
+                            }
+                        }
+                    }
+                }
+                let new_df = builder.build()
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                println!("({n_drop} observations removed, {n_kept} remaining)");
+                Ok(Value::DataFrame(new_df))
+            }
+
             // ── rename ───────────────────────────────────────────────────────
             "rename" => {
                 if args.len() != 3 {
@@ -3148,6 +6295,87 @@ impl Interpreter {
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
                 println!("({} variables dropped, {} remaining)", drop_names.len(), keep.len());
+                Ok(Value::DataFrame(new_df))
+            }
+
+            // ── drop_collinear ────────────────────────────────────────────────
+            // drop_collinear(df [, vars=[x1, x2, ...]])
+            // Detecta colunas perfeitamente colineares via QR e retorna novo df
+            // sem elas. O usuário vê exatamente o que foi removido antes de
+            // passar os dados para qualquer estimador.
+            "drop_collinear" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "drop_collinear() requer ao menos um DataFrame".into()
+                    ));
+                }
+                let df = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(df) => df,
+                    _ => return Err(HayashiError::Type(
+                        "drop_collinear(): primeiro argumento deve ser um DataFrame".into()
+                    )),
+                };
+
+                // Colunas a checar: vars=[...] ou todas as numéricas
+                let check_cols: Vec<String> = match opt_map.get("vars") {
+                    Some(Value::List(lst)) => lst.iter().map(|v| match v {
+                        Value::Str(s) => Ok(s.clone()),
+                        _ => Err(HayashiError::Type(
+                            "drop_collinear(): vars deve ser lista de nomes de colunas".into()
+                        )),
+                    }).collect::<Result<_>>()?,
+                    None => df.column_names().into_iter()
+                        .filter(|name| df.get(name).is_ok())
+                        .collect(),
+                    _ => return Err(HayashiError::Type(
+                        "drop_collinear(): vars deve ser lista de strings".into()
+                    )),
+                };
+
+                if check_cols.is_empty() {
+                    println!("drop_collinear: nenhuma coluna numérica encontrada.");
+                    return Ok(Value::DataFrame(df));
+                }
+
+                let n = df.n_rows();
+                let k = check_cols.len();
+                let mut mat = ndarray::Array2::<f64>::zeros((n, k));
+                for (j, col) in check_cols.iter().enumerate() {
+                    let col_data = df.get(col)
+                        .map_err(|_| HayashiError::Runtime(
+                            format!("drop_collinear: coluna '{col}' não encontrada ou não numérica")
+                        ))?;
+                    for (i, &v) in col_data.iter().enumerate() {
+                        mat[[i, j]] = v;
+                    }
+                }
+
+                let (_clean, keep_idx, omit_idx) =
+                    greeners::OLS::detect_collinearity(&mat, 1e-10);
+
+                if omit_idx.is_empty() {
+                    println!("drop_collinear: nenhuma colinearidade detectada entre as {} colunas verificadas.", k);
+                    return Ok(Value::DataFrame(df));
+                }
+
+                let omit_names: Vec<&str> = omit_idx.iter()
+                    .map(|&i| check_cols[i].as_str())
+                    .collect();
+                let keep_names: Vec<&str> = keep_idx.iter()
+                    .map(|&i| check_cols[i].as_str())
+                    .collect();
+
+                println!("drop_collinear: {} coluna(s) removida(s) por colinearidade perfeita:",
+                    omit_names.len());
+                for name in &omit_names {
+                    println!("  o.{name}");
+                }
+                println!("  {} coluna(s) mantida(s): {}", keep_names.len(),
+                    keep_names.join(", "));
+
+                let new_df = df.drop(&omit_names)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
                 Ok(Value::DataFrame(new_df))
             }
 
@@ -4412,6 +7640,17 @@ impl Interpreter {
         Ok((formula_ast, df, id_col))
     }
 
+    /// Extrai uma coluna como Vec<i64> — aceita colunas Int ou Float.
+    fn col_as_i64(df: &DataFrame, col: &str) -> std::result::Result<Vec<i64>, greeners::GreenersError> {
+        if let Ok(ids) = df.get_int(col) {
+            Ok(ids.to_vec())
+        } else if let Ok(floats) = df.get(col) {
+            Ok(floats.iter().map(|&v| v as i64).collect())
+        } else {
+            Err(greeners::GreenersError::VariableNotFound(col.to_string()))
+        }
+    }
+
     // ── Nomes dos coeficientes a partir da fórmula ────────────────────────────
 
     // Ordena um DataFrame por uma única coluna (ascendente).
@@ -4707,6 +7946,30 @@ impl Interpreter {
                 Ok(vals.into_iter().map(|x| if x == 0.0 { 1.0 } else { 0.0 }).collect())
             }
             Expr::BinOp { op, lhs, rhs } => {
+                // String column equality/inequality: col == "literal" or "literal" == col
+                if matches!(op, BinOp::Eq | BinOp::Ne) {
+                    let str_pair = match (lhs.as_ref(), rhs.as_ref()) {
+                        (Expr::Var(c), Expr::Str(t)) => Some((c.as_str(), t.as_str())),
+                        (Expr::Str(t), Expr::Var(c)) => Some((c.as_str(), t.as_str())),
+                        _ => None,
+                    };
+                    if let Some((col_name, target)) = str_pair {
+                        let is_eq = matches!(op, BinOp::Eq);
+                        if let Ok(col) = df.get_column(col_name) {
+                            use greeners::Column;
+                            let maybe: Option<Vec<f64>> = match col {
+                                Column::String(arr) => Some(arr.iter().map(|s| {
+                                    if (s.as_str() == target) == is_eq { 1.0 } else { 0.0 }
+                                }).collect()),
+                                Column::Categorical(cat) => Some(cat.to_strings().iter().map(|s| {
+                                    if (s.as_str() == target) == is_eq { 1.0 } else { 0.0 }
+                                }).collect()),
+                                _ => None,
+                            };
+                            if let Some(v) = maybe { return Ok(v); }
+                        }
+                    }
+                }
                 let l = Self::eval_col_expr(lhs, df)?;
                 let r = Self::eval_col_expr(rhs, df)?;
                 if l.len() != r.len() {
@@ -4936,27 +8199,375 @@ impl Interpreter {
                 let model_val = self.eval_expr(model)?;
 
                 let vals: Vec<f64> = match (&model_val, kind.as_str()) {
-                    // OLS — fitted values
-                    (Value::OlsResult(m), "xb") => {
+                    // ── OLS ──────────────────────────────────────────────────
+                    (Value::OlsResult(m), "xb" | "fitted") => {
                         m.x.dot(&m.result.params).to_vec()
                     }
-                    // OLS — residuals
                     (Value::OlsResult(m), "residuals" | "resid" | "e") => {
                         m.residuals.to_vec()
                     }
-                    // Logit/Probit — predicted probability
-                    (Value::BinaryResult(m), "pr" | "xb") => {
+                    (Value::OlsResult(_), k) => return Err(HayashiError::Runtime(
+                        format!("predict OLS: kind '{k}' desconhecido — use: xb, residuals")
+                    )),
+
+                    // ── Logit / Probit ────────────────────────────────────────
+                    (Value::BinaryResult(m), "pr" | "xb" | "fitted") => {
                         m.result.predict_proba(&m.x).to_vec()
                     }
-                    // Erros descritivos
-                    (Value::OlsResult(_), k) => return Err(HayashiError::Runtime(
-                        format!("unknown predict kind '{k}' for OLS — use: xb, residuals")
-                    )),
                     (Value::BinaryResult(_), k) => return Err(HayashiError::Runtime(
-                        format!("unknown predict kind '{k}' for logit/probit — use: pr")
+                        format!("predict logit/probit: kind '{k}' desconhecido — use: pr")
                     )),
+
+                    // ── Poisson / NegBin ──────────────────────────────────────
+                    (Value::PoissonResult(r), "count" | "mu" | "fitted") => {
+                        r.fitted_values().to_vec()
+                    }
+                    (Value::PoissonResult(r), "xb") => {
+                        r.x_data().dot(&r.params).to_vec()
+                    }
+                    (Value::PoissonResult(_), k) => return Err(HayashiError::Runtime(
+                        format!("predict Poisson: kind '{k}' desconhecido — use: count, xb")
+                    )),
+                    (Value::NegBinResult(r), "count" | "mu" | "fitted") => {
+                        r.fitted_values().to_vec()
+                    }
+                    (Value::NegBinResult(r), "xb") => {
+                        r.x_data().dot(&r.params).to_vec()
+                    }
+                    (Value::NegBinResult(_), k) => return Err(HayashiError::Runtime(
+                        format!("predict NegBin: kind '{k}' desconhecido — use: count, xb")
+                    )),
+
+                    // ── Ordered Logit / Probit ────────────────────────────────
+                    // "pr"   → P(Y = J) — probabilidade da categoria mais alta
+                    // "xb"   → preditor linear Xβ
+                    // "yhat" → categoria predita (argmax)
+                    // "prN"  → P(Y = N) para categoria específica N (1-indexed)
+                    (Value::OrderedResult(r), kind_s) => {
+                        let x = Self::build_x_from_varnames(&df_val,
+                            r.variable_names.as_deref().unwrap_or(&[]))?;
+                        match kind_s {
+                            "xb" => x.dot(&r.params).to_vec(),
+                            "yhat" => {
+                                let probs = r.predict_proba(&x);
+                                (0..probs.nrows()).map(|i| {
+                                    let row = probs.row(i);
+                                    let (cat, _) = row.iter().enumerate()
+                                        .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+                                        .unwrap_or((0, &0.0));
+                                    (cat + 1) as f64
+                                }).collect()
+                            }
+                            s if s.starts_with("pr") && s.len() > 2 => {
+                                let cat: usize = s[2..].parse::<usize>()
+                                    .map_err(|_| HayashiError::Runtime(
+                                        format!("predict Ordered: '{s}' — use prN onde N é a categoria (1-indexed)")
+                                    ))?;
+                                if cat == 0 || cat > r.n_categories {
+                                    return Err(HayashiError::Runtime(
+                                        format!("predict Ordered: categoria {cat} fora do intervalo 1..{}", r.n_categories)
+                                    ));
+                                }
+                                let probs = r.predict_proba(&x);
+                                (0..probs.nrows()).map(|i| probs[[i, cat - 1]]).collect()
+                            }
+                            "pr" => {
+                                // P(Y = última categoria)
+                                let probs = r.predict_proba(&x);
+                                let last = r.n_categories - 1;
+                                (0..probs.nrows()).map(|i| probs[[i, last]]).collect()
+                            }
+                            k => return Err(HayashiError::Runtime(
+                                format!("predict Ordered: kind '{k}' desconhecido — use: pr, prN, yhat, xb")
+                            )),
+                        }
+                    }
+
+                    // ── IV / 2SLS ─────────────────────────────────────────────
+                    (Value::IvResult(r), "xb" | "fitted") => {
+                        let names = r.variable_names.as_deref().unwrap_or(&[]);
+                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        x.dot(&r.params).to_vec()
+                    }
+                    (Value::IvResult(_), k) => return Err(HayashiError::Runtime(
+                        format!("predict IV: kind '{k}' desconhecido — use: xb")
+                    )),
+
+                    // ── Panel FE / RE ─────────────────────────────────────────
+                    (Value::PanelResult(r), "xb" | "fitted") => {
+                        let names = r.variable_names.as_deref().unwrap_or(&[]);
+                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        x.dot(&r.params).to_vec()
+                    }
+                    (Value::PanelResult(_), k) => return Err(HayashiError::Runtime(
+                        format!("predict FE: kind '{k}' desconhecido — use: xb")
+                    )),
+                    (Value::ReResult(r), "xb" | "fitted") => {
+                        let names = r.variable_names.as_deref().unwrap_or(&[]);
+                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        x.dot(&r.params).to_vec()
+                    }
+                    (Value::ReResult(_), k) => return Err(HayashiError::Runtime(
+                        format!("predict RE: kind '{k}' desconhecido — use: xb")
+                    )),
+
+                    // ── Tobit ─────────────────────────────────────────────────
+                    (Value::TobitResult(r), "xb" | "fitted") => {
+                        let names = r.variable_names.as_deref().unwrap_or(&[]);
+                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        x.dot(&r.params).to_vec()
+                    }
+                    (Value::TobitResult(_), k) => return Err(HayashiError::Runtime(
+                        format!("predict Tobit: kind '{k}' desconhecido — use: xb")
+                    )),
+
+                    // ── Heckman ───────────────────────────────────────────────
+                    (Value::HeckmanResult(r), "xb" | "fitted") => {
+                        let names = r.variable_names.as_deref().unwrap_or(&[]);
+                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        x.dot(&r.params).to_vec()
+                    }
+                    (Value::HeckmanResult(_), k) => return Err(HayashiError::Runtime(
+                        format!("predict Heckman: kind '{k}' desconhecido — use: xb")
+                    )),
+
+                    // ── Cox PH ────────────────────────────────────────────────
+                    (Value::CoxResult(r), "loghr" | "xb") => {
+                        let names = r.variable_names.as_deref().unwrap_or(&[]);
+                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        r.predict_log_hazard(&x).to_vec()
+                    }
+                    (Value::CoxResult(r), "hr" | "hazard") => {
+                        let names = r.variable_names.as_deref().unwrap_or(&[]);
+                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        r.predict_hazard_ratio(&x).to_vec()
+                    }
+                    (Value::CoxResult(_), k) => return Err(HayashiError::Runtime(
+                        format!("predict Cox: kind '{k}' desconhecido — use: loghr, hr")
+                    )),
+
+                    // ── Quantile Regression ───────────────────────────────────
+                    (Value::QuantileResult(r), "xb" | "fitted") => {
+                        let names = r.variable_names.as_deref().unwrap_or(&[]);
+                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        x.dot(&r.params).to_vec()
+                    }
+                    (Value::QuantileResult(_), k) => return Err(HayashiError::Runtime(
+                        format!("predict QReg: kind '{k}' desconhecido — use: xb")
+                    )),
+
+                    // ── RLM ──────────────────────────────────────────────────
+                    (Value::RlmResult(r), "xb" | "fitted") => {
+                        let names = r.variable_names.as_deref().unwrap_or(&[]);
+                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        x.dot(&r.params).to_vec()
+                    }
+                    (Value::RlmResult(_), k) => return Err(HayashiError::Runtime(
+                        format!("predict RLM: kind '{k}' desconhecido — use: xb")
+                    )),
+
+                    // ── GEE ──────────────────────────────────────────────────
+                    (Value::GeeResult(r), "xb" | "fitted") => {
+                        let names = r.variable_names.as_deref().unwrap_or(&[]);
+                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        x.dot(&r.params).to_vec()
+                    }
+                    (Value::GeeResult(_), k) => return Err(HayashiError::Runtime(
+                        format!("predict GEE: kind '{k}' desconhecido — use: xb")
+                    )),
+
+                    // ── Beta Regression ───────────────────────────────────────
+                    (Value::BetaResult(r), "pr" | "mu" | "fitted") => {
+                        let names = r.variable_names.as_deref().unwrap_or(&[]);
+                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        r.predict(&x, &greeners::BetaLink::Logit).to_vec()
+                    }
+                    (Value::BetaResult(r), "xb") => {
+                        let names = r.variable_names.as_deref().unwrap_or(&[]);
+                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        x.dot(&r.params).to_vec()
+                    }
+                    (Value::BetaResult(_), k) => return Err(HayashiError::Runtime(
+                        format!("predict BetaReg: kind '{k}' desconhecido — use: pr, xb")
+                    )),
+
+                    // ── GLSAR ────────────────────────────────────────────────
+                    (Value::GlsarResult(r), "xb" | "fitted") => {
+                        let names = r.variable_names.as_deref().unwrap_or(&[]);
+                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        r.fitted_values(&x).to_vec()
+                    }
+                    (Value::GlsarResult(r), "residuals" | "resid" | "e") => {
+                        let names = r.variable_names.as_deref().unwrap_or(&[]);
+                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        let y = Self::get_col_f64(&df_val, &varname)?;
+                        r.residuals(&y, &x).to_vec()
+                    }
+                    (Value::GlsarResult(_), k) => return Err(HayashiError::Runtime(
+                        format!("predict GLSAR: kind '{k}' desconhecido — use: xb, residuals")
+                    )),
+
+                    // ── MixedLM ───────────────────────────────────────────────
+                    (Value::MixedResult(r), "xb" | "fitted") => {
+                        let names = r.variable_names.as_deref().unwrap_or(&[]);
+                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        x.dot(&r.fixed_effects).to_vec()
+                    }
+                    (Value::MixedResult(_), k) => return Err(HayashiError::Runtime(
+                        format!("predict MixedLM: kind '{k}' desconhecido — use: xb")
+                    )),
+
+                    // ── ZIP / ZINB ────────────────────────────────────────────
+                    (Value::ZeroInflatedResult(r), "count" | "mu" | "fitted") => {
+                        // E[y|x, w>0] × P(w=0): media incondicional da contagem
+                        let names = r.count_var_names.as_deref().unwrap_or(&[]);
+                        let x_c = Self::build_x_from_varnames(&df_val, names)?;
+                        let inflate_names = r.inflate_var_names.as_deref().unwrap_or(names);
+                        let x_i = Self::build_x_from_varnames(&df_val, inflate_names)?;
+                        r.predict_count(&x_c, &x_i).to_vec()
+                    }
+                    (Value::ZeroInflatedResult(r), "pr0") => {
+                        // P(y=0 | x) — probabilidade de zero
+                        let names = r.count_var_names.as_deref().unwrap_or(&[]);
+                        let x_c = Self::build_x_from_varnames(&df_val, names)?;
+                        let inflate_names = r.inflate_var_names.as_deref().unwrap_or(names);
+                        let x_i = Self::build_x_from_varnames(&df_val, inflate_names)?;
+                        r.predict_proba_zero(&x_c, &x_i).to_vec()
+                    }
+                    (Value::ZeroInflatedResult(_), k) => return Err(HayashiError::Runtime(
+                        format!("predict ZIP/ZINB: kind '{k}' desconhecido — use: count, pr0")
+                    )),
+
+                    // ── Rolling OLS ───────────────────────────────────────────
+                    (Value::RollingResult(r), "residuals" | "resid" | "e") => {
+                        r.residuals.to_vec()
+                    }
+                    (Value::RollingResult(_), k) => return Err(HayashiError::Runtime(
+                        format!("predict RollingOLS: kind '{k}' desconhecido — use: residuals")
+                    )),
+
+                    // ── Recursive LS ──────────────────────────────────────────
+                    (Value::RecursiveLSResult(r), "residuals" | "resid" | "e") => {
+                        r.residuals.to_vec()
+                    }
+                    (Value::RecursiveLSResult(r), "cusum") => {
+                        r.cusum.to_vec()
+                    }
+                    (Value::RecursiveLSResult(r), "cusum_sq") => {
+                        r.cusum_squares.to_vec()
+                    }
+                    (Value::RecursiveLSResult(_), k) => return Err(HayashiError::Runtime(
+                        format!("predict RecursiveLS: kind '{k}' desconhecido — use: residuals, cusum, cusum_sq")
+                    )),
+
+                    // ── GLM ──────────────────────────────────────────────────────
+                    // pr/mu/fitted → μ̂ = g⁻¹(Xβ) — resposta média predita
+                    // xb → Xβ — preditor linear (escala do link)
+                    // residuals → resíduos de desvio (deviance residuals)
+                    // pearson → resíduos de Pearson (y-μ)/√V(μ)
+                    // working → resíduos de trabalho do IRLS
+                    (Value::GlmResult(r), "pr" | "mu" | "fitted") => {
+                        let names = r.variable_names.as_deref().unwrap_or(&[]);
+                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        r.predict_mean(&x).to_vec()
+                    }
+                    (Value::GlmResult(r), "xb") => {
+                        let names = r.variable_names.as_deref().unwrap_or(&[]);
+                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        r.predict(&x).to_vec()
+                    }
+                    (Value::GlmResult(r), "residuals" | "resid" | "e" | "deviance") => {
+                        r.residuals().to_vec()
+                    }
+                    (Value::GlmResult(r), "pearson") => {
+                        r.pearson_residuals().to_vec()
+                    }
+                    (Value::GlmResult(r), "working") => {
+                        r.working_residuals().to_vec()
+                    }
+                    (Value::GlmResult(_), k) => return Err(HayashiError::Runtime(
+                        format!("predict GLM: kind '{k}' desconhecido — use: pr, xb, residuals, pearson, working")
+                    )),
+
+                    // ── LOWESS ───────────────────────────────────────────────────
+                    // smoothed/yhat → valores suavizados ŷ_i
+                    // residuals → resíduos y_i - ŷ_i
+                    (Value::LowessResult(r), "smoothed" | "yhat" | "fitted") => {
+                        r.smoothed.to_vec()
+                    }
+                    (Value::LowessResult(r), "residuals" | "resid" | "e") => {
+                        r.residuals.to_vec()
+                    }
+                    (Value::LowessResult(_), k) => return Err(HayashiError::Runtime(
+                        format!("predict LOWESS: kind '{k}' desconhecido — use: smoothed, residuals")
+                    )),
+
+                    // ── PCA ──────────────────────────────────────────────────────
+                    // pc1, pc2, ..., pcN → escores do N-ésimo componente principal
+                    // Os escores são calculados durante o ajuste (dados de treino)
+                    (Value::PcaResult(m), kind_s) => {
+                        if kind_s.starts_with("pc") && kind_s.len() > 2 {
+                            let comp: usize = kind_s[2..].parse::<usize>()
+                                .map_err(|_| HayashiError::Runtime(
+                                    format!("predict PCA: '{kind_s}' inválido — use pcN onde N=1..{}", m.result.n_components)
+                                ))?;
+                            if comp == 0 || comp > m.result.n_components {
+                                return Err(HayashiError::Runtime(
+                                    format!("predict PCA: componente {comp} fora do intervalo 1..{}", m.result.n_components)
+                                ));
+                            }
+                            m.result.scores.column(comp - 1).to_vec()
+                        } else {
+                            return Err(HayashiError::Runtime(
+                                format!("predict PCA: kind '{kind_s}' desconhecido — use: pc1, pc2, ..., pc{}", m.result.n_components)
+                            ));
+                        }
+                    }
+
+                    // ── Factor Analysis ───────────────────────────────────────────
+                    // Factor Analysis não produz escores diretamente (não há método de predict)
+                    // Use pca() para escores; factor() é apenas para análise das cargas/estrutura
+                    (Value::FactorResult(_), _) => return Err(HayashiError::Runtime(
+                        "predict Factor Analysis: escores não disponíveis via FA — use pca() para escores; FA é para análise de cargas".into()
+                    )),
+
+                    // ── Markov Switching ──────────────────────────────────────────
+                    // smoothed → probabilidades suavizadas do regime mais provável (argmax)
+                    // regime1, regime2, ..., regimeN → prob suavizada do regime N
+                    (Value::MarkovResult(r), "smoothed" | "regime" | "state") => {
+                        // regime mais provável em cada ponto (1-indexed)
+                        (0..r.smoothed_probs.nrows()).map(|t| {
+                            let row = r.smoothed_probs.row(t);
+                            let (best, _) = row.iter().enumerate()
+                                .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                                .unwrap_or((0, &0.0));
+                            (best + 1) as f64
+                        }).collect()
+                    }
+                    (Value::MarkovResult(r), kind_s) if kind_s.starts_with("regime") && kind_s.len() > 6 => {
+                        let idx: usize = kind_s[6..].parse::<usize>()
+                            .map_err(|_| HayashiError::Runtime(
+                                format!("predict MarkovSwitching: '{kind_s}' inválido — use regimeN onde N=1..{}", r.n_regimes)
+                            ))?;
+                        if idx == 0 || idx > r.n_regimes {
+                            return Err(HayashiError::Runtime(
+                                format!("predict MarkovSwitching: regime {idx} fora do intervalo 1..{}", r.n_regimes)
+                            ));
+                        }
+                        r.smoothed_probs.column(idx - 1).to_vec()
+                    }
+                    (Value::MarkovResult(_), k) => return Err(HayashiError::Runtime(
+                        format!("predict MarkovSwitching: kind '{k}' desconhecido — use: regime, regime1, regime2, ...")
+                    )),
+
+                    // ── Conditional Logit / Poisson ───────────────────────────────
+                    // FE é diferenciado; predição incondicional não disponível
+                    (Value::ConditionalResult(_), _) => return Err(HayashiError::Runtime(
+                        "predict clogit/cpoisson: efeitos fixos absorvidos — predição incondicional não disponível; use os coeficientes β̂ para odds ratios ou efeitos marginais".into()
+                    )),
+
                     _ => return Err(HayashiError::Type(
-                        "predict requires an OLS or binary model".into()
+                        "predict: tipo de modelo não suportado".into()
                     )),
                 };
 
