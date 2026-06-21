@@ -570,6 +570,7 @@ impl Interpreter {
             None => Ok(CovarianceType::NonRobust),
             Some(Value::Str(s)) => match s.as_str() {
                 "nonrobust" | "ols"  => Ok(CovarianceType::NonRobust),
+                "robust"             => Ok(CovarianceType::HC1),
                 "HC1"                => Ok(CovarianceType::HC1),
                 "HC2"                => Ok(CovarianceType::HC2),
                 "HC3"                => Ok(CovarianceType::HC3),
@@ -577,6 +578,40 @@ impl Interpreter {
                 other => Err(HayashiError::Type(format!("unknown covariance type '{other}'"))),
             },
             _ => Err(HayashiError::Type("cov= must be a string".into())),
+        }
+    }
+
+    fn col_to_cluster_ids(df: &DataFrame, col: &str) -> Result<Vec<usize>> {
+        let mut map: HashMap<i64, usize> = HashMap::new();
+        let mut next = 0usize;
+        if let Ok(arr) = df.get_int(col) {
+            Ok(arr.iter().map(|&v| *map.entry(v).or_insert_with(|| { let id = next; next += 1; id })).collect())
+        } else if let Ok(arr) = df.get(col) {
+            Ok(arr.iter().map(|&v| { let key = v as i64; *map.entry(key).or_insert_with(|| { let id = next; next += 1; id }) }).collect())
+        } else if let Ok(arr) = df.get_string(col) {
+            let mut smap: HashMap<String, usize> = HashMap::new();
+            Ok(arr.iter().map(|v| *smap.entry(v.clone()).or_insert_with(|| { let id = next; next += 1; id })).collect())
+        } else {
+            Err(HayashiError::Runtime(format!("cluster column '{col}' not found")))
+        }
+    }
+
+    fn resolve_cov_full(opt_map: &HashMap<String, Value>, df: &DataFrame) -> Result<CovarianceType> {
+        if let Some(Value::Str(cluster_col)) = opt_map.get("cluster") {
+            let ids = Self::col_to_cluster_ids(df, cluster_col)?;
+            if let Some(Value::Str(cluster2_col)) = opt_map.get("cluster2") {
+                let ids2 = Self::col_to_cluster_ids(df, cluster2_col)?;
+                Ok(CovarianceType::ClusteredTwoWay(ids, ids2))
+            } else {
+                Ok(CovarianceType::Clustered(ids))
+            }
+        } else if let Some(Value::Str(nw)) = opt_map.get("nw") {
+            let lags: usize = nw.parse().unwrap_or_else(|_| (df.n_rows() as f64).powf(0.25) as usize);
+            Ok(CovarianceType::NeweyWest(lags))
+        } else if let Some(Value::Int(nw)) = opt_map.get("nw") {
+            Ok(CovarianceType::NeweyWest(*nw as usize))
+        } else {
+            Self::resolve_cov(opt_map.get("cov"))
         }
     }
 
@@ -880,7 +915,7 @@ impl Interpreter {
                     _ => return Err(HayashiError::Runtime(format!("'{df_name}' is not a DataFrame"))),
                 };
                 let formula_str = Self::formula_to_string(&formula_ast);
-                let cov = Self::resolve_cov(opt_map.get("cov"))?;
+                let cov = Self::resolve_cov_full(&opt_map, &df)?;
 
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -924,7 +959,7 @@ impl Interpreter {
                     Some(Value::DataFrame(df)) => df.clone(),
                     _ => return Err(HayashiError::Runtime(format!("'{df_name}' is not a DataFrame"))),
                 };
-                let cov = Self::resolve_cov(opt_map.get("cov"))?;
+                let cov = Self::resolve_cov_full(&opt_map, &df)?;
 
                 let endog_str = Self::formula_to_string(&endog_ast);
                 let instr_str = Self::formula_to_string(&instr_ast);
@@ -1567,7 +1602,7 @@ impl Interpreter {
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let var_names = df.formula_var_names(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let cov = Self::resolve_cov(opt_map.get("cov"))?;
+                let cov = Self::resolve_cov_full(&opt_map, &df)?;
                 let result = greeners::Poisson::fit_with_names(&y_vec, &x_mat, cov, Some(var_names))
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 Ok(Value::PoissonResult(Rc::new(result)))
@@ -1583,7 +1618,7 @@ impl Interpreter {
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let var_names = df.formula_var_names(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let cov = Self::resolve_cov(opt_map.get("cov"))?;
+                let cov = Self::resolve_cov_full(&opt_map, &df)?;
                 let result = greeners::NegBin::fit_with_names(&y_vec, &x_mat, cov, Some(var_names))
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 Ok(Value::NegBinResult(Rc::new(result)))
@@ -1662,7 +1697,7 @@ impl Interpreter {
                 let y       = Self::get_col_f64(&df, &formula_ast.lhs)?;
                 let treated = Self::get_col_f64(&df, rhs_vars[0])?;
                 let post    = Self::get_col_f64(&df, rhs_vars[1])?;
-                let cov = Self::resolve_cov(opt_map.get("cov"))?;
+                let cov = Self::resolve_cov_full(&opt_map, &df)?;
                 let result = greeners::DiffInDiff::fit(&y, &treated, &post, cov)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 Ok(Value::DidResult(Rc::new(result)))
@@ -1799,7 +1834,7 @@ impl Interpreter {
                     },
                     _ => return Err(HayashiError::Type("norm= deve ser string".into())),
                 };
-                let cov = Self::resolve_cov(opt_map.get("cov"))?;
+                let cov = Self::resolve_cov_full(&opt_map, &df)?;
                 let result = greeners::RLM::fit_with_names(&y_vec, &x_mat, &norm, cov, Some(var_names))
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 Ok(Value::RlmResult(Rc::new(result)))
@@ -1885,7 +1920,7 @@ impl Interpreter {
                     _ => return Err(HayashiError::Type("weights= deve ser string".into())),
                 };
                 let weights = Self::get_col_f64(&df, &w_name)?;
-                let cov = Self::resolve_cov(opt_map.get("cov"))?;
+                let cov = Self::resolve_cov_full(&opt_map, &df)?;
                 let var_names = df.formula_var_names(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let (y, x) = df.to_design_matrix(&g_formula)
@@ -2170,7 +2205,7 @@ impl Interpreter {
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let var_names = df.formula_var_names(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let cov = Self::resolve_cov(opt_map.get("cov"))?;
+                let cov = Self::resolve_cov_full(&opt_map, &df)?;
 
                 let alpha_val = match opt_map.get("alpha") {
                     Some(Value::Float(v)) => *v,
@@ -4032,10 +4067,6 @@ impl Interpreter {
                     return Err(HayashiError::Runtime("test(model, name) requires 2 arguments".into()));
                 }
                 let model = self.eval_expr(&args[0])?;
-                let test_name = match &args[1] {
-                    Expr::Var(s) => s.clone(),
-                    _ => return Err(HayashiError::Type("second argument must be a test name".into())),
-                };
 
                 let ols = match &model {
                     Value::OlsResult(m) => m.clone(),
@@ -4044,7 +4075,14 @@ impl Interpreter {
                     )),
                 };
 
+                let test_name = match &args[1] {
+                    Expr::Var(s) => s.clone(),
+                    Expr::Str(s) => s.clone(),
+                    _ => return Err(HayashiError::Type("second argument must be a name or string".into())),
+                };
+
                 match test_name.as_str() {
+                    // ── Specification tests ──────────────────────────────
                     "white" => {
                         match SpecificationTests::white_test(&ols.residuals, &ols.x) {
                             Ok((stat, p, df)) => {
@@ -4081,9 +4119,76 @@ impl Interpreter {
                                       else { "No strong evidence of autocorrelation" };
                         println!("  Conclusion   : {}", verdict);
                     }
-                    other => return Err(HayashiError::Runtime(
-                        format!("unknown test '{other}' — available: white, bp, dw"),
-                    )),
+
+                    // ── Wald / F-test sobre coeficientes ─────────────────
+                    other => {
+                        let names = ols.result.variable_names.as_ref()
+                            .ok_or_else(|| HayashiError::Runtime("model has no variable names".into()))?;
+                        let k = ols.result.params.len();
+                        let find_idx = |name: &str| -> Result<usize> {
+                            let n = name.trim();
+                            names.iter().position(|v| v == n)
+                                .or_else(|| if n == "_cons" || n == "const" { Some(k - 1) } else { None })
+                                .ok_or_else(|| HayashiError::Runtime(format!("variable '{n}' not found in model")))
+                        };
+
+                        // "X1 = X2" ou "X1 = 0.5"
+                        if let Some((lhs_s, rhs_s)) = other.split_once('=') {
+                            let lhs_name = lhs_s.trim();
+                            let rhs_trimmed = rhs_s.trim();
+                            if let Ok(val) = rhs_trimmed.parse::<f64>() {
+                                let idx = find_idx(lhs_name)?;
+                                let mut r = ndarray::Array1::<f64>::zeros(k);
+                                r[idx] = 1.0;
+                                let (t, p) = ols.result.t_test(&r, val, &ols.x)
+                                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                                println!("\n{:=^60}", " test ");
+                                println!("  H₀: {lhs_name} = {val}");
+                                println!("  t = {t:.4}   p = {p:.4}");
+                                let sig = if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
+                                println!("  {sig}");
+                            } else {
+                                let idx1 = find_idx(lhs_name)?;
+                                let idx2 = find_idx(rhs_trimmed)?;
+                                let mut r = ndarray::Array1::<f64>::zeros(k);
+                                r[idx1] = 1.0;
+                                r[idx2] = -1.0;
+                                let (t, p) = ols.result.t_test(&r, 0.0, &ols.x)
+                                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                                println!("\n{:=^60}", " test ");
+                                println!("  H₀: {lhs_name} = {rhs_trimmed}");
+                                println!("  t = {t:.4}   p = {p:.4}");
+                                let sig = if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
+                                println!("  {sig}");
+                            }
+                        } else {
+                            // joint F-test: test(model, var1, var2, ...) — first var already parsed as `other`
+                            let mut indices = vec![find_idx(other)?];
+                            for arg in &args[2..] {
+                                let name = match arg {
+                                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                                    _ => match self.eval_expr(arg)? {
+                                        Value::Str(s) => s,
+                                        _ => return Err(HayashiError::Type("test() arguments must be variable names".into())),
+                                    },
+                                };
+                                indices.push(find_idx(&name)?);
+                            }
+                            let (f, p) = ols.result.f_test(&indices, &ols.x)
+                                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                            let var_list: Vec<&str> = indices.iter().map(|&i| names[i].as_str()).collect();
+                            let q = indices.len();
+                            println!("\n{:=^60}", " test ");
+                            if q == 1 {
+                                println!("  H₀: {} = 0", var_list[0]);
+                            } else {
+                                println!("  H₀: {} = 0", var_list.join(" = "));
+                            }
+                            println!("  F({q}, {}) = {f:.4}   p = {p:.4}", ols.result.df_resid);
+                            let sig = if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
+                            println!("  {sig}");
+                        }
+                    }
                 }
 
                 Ok(Value::Nil)
