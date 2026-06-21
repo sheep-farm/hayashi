@@ -245,6 +245,9 @@ pub enum Value {
     FactorResult(FactorModel),
     MarkovResult(Rc<greeners::MarkovSwitchingResult>),
     ConditionalResult(Rc<greeners::ConditionalResult>),
+    VarmaResult(Rc<greeners::varma::VarmaResult>),
+    DecompResult(Rc<greeners::DecompositionResult>),
+    MstlResult(Rc<greeners::MSTLResult>),
     List(Rc<Vec<Value>>),
     UserFn(Rc<UserFn>),
     Nil,
@@ -301,6 +304,9 @@ impl std::fmt::Display for Value {
             Value::FactorResult(m)        => write!(f, "{m}"),
             Value::MarkovResult(r)        => write!(f, "{r}"),
             Value::ConditionalResult(r)   => write!(f, "{r}"),
+            Value::VarmaResult(r)         => write!(f, "{r}"),
+            Value::DecompResult(r)        => write!(f, "{r}"),
+            Value::MstlResult(r)          => write!(f, "{r}"),
             Value::List(v) => {
                 write!(f, "[")?;
                 for (i, item) in v.iter().enumerate() {
@@ -4464,6 +4470,16 @@ impl Interpreter {
                                 "esttab() não suporta estimadores causais (rd, psm, synth) — use print()".into()
                             ));
                         }
+                        Value::VarmaResult(_) => {
+                            return Err(HayashiError::Runtime(
+                                "esttab() não suporta VARMA (coeficientes matriciais) — use print()".into()
+                            ));
+                        }
+                        Value::DecompResult(_) | Value::MstlResult(_) => {
+                            return Err(HayashiError::Runtime(
+                                "esttab() não suporta decomposição sazonal — use print()".into()
+                            ));
+                        }
                         _ => return Err(HayashiError::Type(
                             "esttab(): tipo de modelo não suportado — use print()".into()
                         )),
@@ -7457,6 +7473,361 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── VARMA(p,q) ────────────────────────────────────────────────────
+            // varma(df, y1, y2, ..., p=1, q=1)
+            "varma" | "varmax" => {
+                if args.len() < 3 {
+                    return Err(HayashiError::Runtime(
+                        "varma(df, y1, y2, ..., p=1, q=1)".into()
+                    ));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())),
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                };
+                let var_names: Vec<String> = args[1..].iter().map(|a| match a {
+                    Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
+                    _ => Err(HayashiError::Type("variáveis de varma() devem ser identificadores".into())),
+                }).collect::<Result<_>>()?;
+                let p = match opt_map.get("p") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 1,
+                };
+                let q = match opt_map.get("q") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 1,
+                };
+                let n = df.n_rows();
+                let k = var_names.len();
+                let mut data = ndarray::Array2::<f64>::zeros((n, k));
+                for (j, vname) in var_names.iter().enumerate() {
+                    let col = Self::get_col_f64(&df, vname)?;
+                    for (i, &v) in col.iter().enumerate() {
+                        data[[i, j]] = v;
+                    }
+                }
+                let result = greeners::VARMA::fit(&data, p, q)
+                    .map_err(|e| HayashiError::Runtime(format!("VARMA: {e}")))?;
+                Ok(Value::VarmaResult(Rc::new(result)))
+            }
+
+            // ── Decomposição sazonal ──────────────────────────────────────────
+            // decompose(df, var, period=12, model=additive)
+            "decompose" | "seasonal_decompose" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "decompose(df, var, period=12, model=additive)".into()
+                    ));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())),
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                };
+                let var_name = match &args[1] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())),
+                };
+                let series = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?);
+                let period = match opt_map.get("period") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 12,
+                };
+                let model_str = match opt_map.get("model") {
+                    Some(Value::Str(s)) => s.as_str(),
+                    _ => "additive",
+                };
+                let result = greeners::Decomposition::seasonal_decompose(&series, period, model_str)
+                    .map_err(|e| HayashiError::Runtime(format!("decompose: {e}")))?;
+                Ok(Value::DecompResult(Rc::new(result)))
+            }
+
+            // stl(df, var, period=12, sw=7, tw=0)
+            "stl" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "stl(df, var, period=12, sw=7, tw=0)".into()
+                    ));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())),
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                };
+                let var_name = match &args[1] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())),
+                };
+                let series = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?);
+                let period = match opt_map.get("period") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 12,
+                };
+                let sw = match opt_map.get("sw") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 7,
+                };
+                let tw = match opt_map.get("tw") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 0,
+                };
+                let result = greeners::Decomposition::stl(&series, period, sw, tw)
+                    .map_err(|e| HayashiError::Runtime(format!("stl: {e}")))?;
+                Ok(Value::DecompResult(Rc::new(result)))
+            }
+
+            // ── MSTL ─────────────────────────────────────────────────────────
+            // mstl(df, var, periods=[7, 365])
+            "mstl" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "mstl(df, var, periods=[7,365])".into()
+                    ));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())),
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                };
+                let var_name = match &args[1] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())),
+                };
+                let series = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?);
+                let periods: Vec<usize> = match opt_map.get("periods") {
+                    Some(Value::List(lst)) => lst.iter().map(|v| match v {
+                        Value::Int(i)   => Ok(*i as usize),
+                        Value::Float(f) => Ok(*f as usize),
+                        _ => Err(HayashiError::Type("periods= deve ser lista de inteiros".into())),
+                    }).collect::<Result<_>>()?,
+                    Some(Value::Int(i))   => vec![*i as usize],
+                    Some(Value::Float(f)) => vec![*f as usize],
+                    _ => vec![7, 365],
+                };
+                let result = greeners::MSTL::fit(&series, &periods)
+                    .map_err(|e| HayashiError::Runtime(format!("mstl: {e}")))?;
+                Ok(Value::MstlResult(Rc::new(result)))
+            }
+
+            // ── Testes de proporção ───────────────────────────────────────────
+            // proptest(count, n, mu=0.5)
+            "proptest" | "prtest" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "proptest(count, n, mu=0.5)".into()
+                    ));
+                }
+                let count = match self.eval_expr(&args[0])? {
+                    Value::Int(v)   => v as usize,
+                    Value::Float(v) => v as usize,
+                    _ => return Err(HayashiError::Type("count deve ser inteiro".into())),
+                };
+                let n = match self.eval_expr(&args[1])? {
+                    Value::Int(v)   => v as usize,
+                    Value::Float(v) => v as usize,
+                    _ => return Err(HayashiError::Type("n deve ser inteiro".into())),
+                };
+                let mu = match opt_map.get("mu") {
+                    Some(Value::Float(v)) => *v,
+                    Some(Value::Int(v))   => *v as f64,
+                    _ => 0.5,
+                };
+                let (z, p) = greeners::ProportionTests::proportions_ztest_1samp(count, n, mu)
+                    .map_err(|e| HayashiError::Runtime(format!("proptest: {e}")))?;
+                let p_hat = count as f64 / n as f64;
+                let sig = |p: f64| if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
+                let sep = "─".repeat(56);
+                println!("\nTeste de Proporção (1 amostra)");
+                println!("{sep}");
+                println!("  H₀: p = {mu:.4}");
+                println!("  p̂ = {p_hat:.4}  (count={count}, n={n})");
+                println!("{sep}");
+                println!("{:<26} {:>10} {:>10} {:>4}", "Teste", "Estatística", "p-value", "");
+                println!("{sep}");
+                println!("{:<26} {:>10.4} {:>10.4} {:>4}", "z", z, p, sig(p));
+                println!("{sep}");
+                println!("(*** p<0.01  ** p<0.05  * p<0.10)");
+                println!();
+                Ok(Value::Nil)
+            }
+
+            // proptest2(count1, n1, count2, n2)
+            "proptest2" | "prtest2" => {
+                if args.len() < 4 {
+                    return Err(HayashiError::Runtime(
+                        "proptest2(count1, n1, count2, n2)".into()
+                    ));
+                }
+                let to_usize = |v: Value| -> Result<usize> { match v {
+                    Value::Int(i)   => Ok(i as usize),
+                    Value::Float(f) => Ok(f as usize),
+                    _ => Err(HayashiError::Type("argumentos de proptest2() devem ser inteiros".into())),
+                }};
+                let c1 = to_usize(self.eval_expr(&args[0])?)?;
+                let n1 = to_usize(self.eval_expr(&args[1])?)?;
+                let c2 = to_usize(self.eval_expr(&args[2])?)?;
+                let n2 = to_usize(self.eval_expr(&args[3])?)?;
+                let (z, p) = greeners::ProportionTests::proportions_ztest_2samp(c1, n1, c2, n2)
+                    .map_err(|e| HayashiError::Runtime(format!("proptest2: {e}")))?;
+                let p1 = c1 as f64 / n1 as f64;
+                let p2 = c2 as f64 / n2 as f64;
+                let sig = |p: f64| if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
+                let sep = "─".repeat(56);
+                println!("\nTeste de Proporção (2 amostras)");
+                println!("{sep}");
+                println!("  H₀: p₁ = p₂");
+                println!("  p̂₁ = {p1:.4}  (count={c1}, n={n1})");
+                println!("  p̂₂ = {p2:.4}  (count={c2}, n={n2})");
+                println!("{sep}");
+                println!("{:<26} {:>10} {:>10} {:>4}", "Teste", "Estatística", "p-value", "");
+                println!("{sep}");
+                println!("{:<26} {:>10.4} {:>10.4} {:>4}", "z (bicaudal)", z, p, sig(p));
+                println!("{sep}");
+                println!("(*** p<0.01  ** p<0.05  * p<0.10)");
+                println!();
+                Ok(Value::Nil)
+            }
+
+            // propci(count, n, alpha=0.05)
+            "propci" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("propci(count, n, alpha=0.05)".into()));
+                }
+                let count = match self.eval_expr(&args[0])? {
+                    Value::Int(v)   => v as usize,
+                    Value::Float(v) => v as usize,
+                    _ => return Err(HayashiError::Type("count deve ser inteiro".into())),
+                };
+                let n = match self.eval_expr(&args[1])? {
+                    Value::Int(v)   => v as usize,
+                    Value::Float(v) => v as usize,
+                    _ => return Err(HayashiError::Type("n deve ser inteiro".into())),
+                };
+                let alpha = match opt_map.get("alpha") {
+                    Some(Value::Float(v)) => *v,
+                    Some(Value::Int(v))   => *v as f64,
+                    _ => 0.05,
+                };
+                let (lo, hi) = greeners::ProportionTests::proportion_confint(count, n, alpha)
+                    .map_err(|e| HayashiError::Runtime(format!("propci: {e}")))?;
+                let p_hat = count as f64 / n as f64;
+                let pct = (1.0 - alpha) * 100.0;
+                let sep = "─".repeat(56);
+                println!("\nIC de Proporção — Wilson Score ({pct:.0}%)");
+                println!("{sep}");
+                println!("  p̂ = {p_hat:.4}  (count={count}, n={n})");
+                println!("  IC [{pct:.0}%]: [{lo:.4}, {hi:.4}]");
+                println!("{sep}");
+                println!();
+                Ok(Value::Nil)
+            }
+
+            // chisq2x2(a, b, c, d)  — tabela 2×2
+            "chisq2x2" | "chi2_2x2" => {
+                if args.len() < 4 {
+                    return Err(HayashiError::Runtime("chisq2x2(a, b, c, d)".into()));
+                }
+                let to_usize = |v: Value| -> Result<usize> { match v {
+                    Value::Int(i)   => Ok(i as usize),
+                    Value::Float(f) => Ok(f as usize),
+                    _ => Err(HayashiError::Type("células da tabela devem ser inteiros".into())),
+                }};
+                let a = to_usize(self.eval_expr(&args[0])?)?;
+                let b = to_usize(self.eval_expr(&args[1])?)?;
+                let c = to_usize(self.eval_expr(&args[2])?)?;
+                let d = to_usize(self.eval_expr(&args[3])?)?;
+                let table = [[a, b], [c, d]];
+                let (chi2, p) = greeners::ProportionTests::chi2_contingency(&table)
+                    .map_err(|e| HayashiError::Runtime(format!("chisq2x2: {e}")))?;
+                let sig = |p: f64| if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
+                let sep = "─".repeat(56);
+                println!("\nTeste Qui-Quadrado — Tabela 2×2");
+                println!("{sep}");
+                println!("       | Col 0 | Col 1 |  Total");
+                println!("  Row 0|  {:>5} |  {:>5} |  {:>5}", a, b, a + b);
+                println!("  Row 1|  {:>5} |  {:>5} |  {:>5}", c, d, c + d);
+                println!("  Total|  {:>5} |  {:>5} |  {:>5}", a+c, b+d, a+b+c+d);
+                println!("{sep}");
+                println!("{:<26} {:>10} {:>10} {:>4}", "Teste", "Estatística", "p-value", "");
+                println!("{sep}");
+                println!("{:<26} {:>10.4} {:>10.4} {:>4}", "χ²(1)", chi2, p, sig(p));
+                println!("{sep}");
+                println!("(*** p<0.01  ** p<0.05  * p<0.10)");
+                println!();
+                Ok(Value::Nil)
+            }
+
+            // ── Múltiplos testes ──────────────────────────────────────────────
+            // multipletests(pvalues, method=bonferroni, alpha=0.05)
+            "multipletests" | "multtest" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "multipletests(pvalues, method=bonferroni, alpha=0.05)".into()
+                    ));
+                }
+                let pvals_val = self.eval_expr(&args[0])?;
+                let pvals: Vec<f64> = match pvals_val {
+                    Value::List(lst) => lst.iter().map(|v| match v {
+                        Value::Float(f) => Ok(*f),
+                        Value::Int(i)   => Ok(*i as f64),
+                        _ => Err(HayashiError::Type("pvalues deve ser lista de floats".into())),
+                    }).collect::<Result<_>>()?,
+                    _ => return Err(HayashiError::Type("primeiro arg deve ser lista de p-values".into())),
+                };
+                let alpha = match opt_map.get("alpha") {
+                    Some(Value::Float(v)) => *v,
+                    Some(Value::Int(v))   => *v as f64,
+                    _ => 0.05,
+                };
+                let method = match opt_map.get("method") {
+                    Some(Value::Str(s)) => match s.to_lowercase().as_str() {
+                        "bonferroni"              => greeners::MultiTestMethod::Bonferroni,
+                        "sidak"                   => greeners::MultiTestMethod::Sidak,
+                        "holm" | "holm_bonferroni" | "holmbonferroni" => greeners::MultiTestMethod::HolmBonferroni,
+                        "bh" | "benjamini_hochberg" | "fdr_bh"        => greeners::MultiTestMethod::BenjaminiHochberg,
+                        "by" | "benjamini_yekutieli" | "fdr_by"       => greeners::MultiTestMethod::BenjaminiYekutieli,
+                        other => return Err(HayashiError::Runtime(
+                            format!("método desconhecido: '{other}' — use bonferroni, sidak, holm, bh, by")
+                        )),
+                    },
+                    _ => greeners::MultiTestMethod::Bonferroni,
+                };
+                let method_name = format!("{:?}", method);
+                let (rejects, pvals_adj) = greeners::MultipleTests::multipletests(&pvals, alpha, method)
+                    .map_err(|e| HayashiError::Runtime(format!("multipletests: {e}")))?;
+                let sep = "─".repeat(64);
+                println!("\nMúltiplos Testes — {method_name}  (α={alpha})");
+                println!("{sep}");
+                println!("{:>5}  {:>12}  {:>12}  {:>8}", "#", "p original", "p ajustado", "Rejeitar?");
+                println!("{sep}");
+                for (i, ((p_orig, p_adj), rej)) in pvals.iter().zip(pvals_adj.iter()).zip(rejects.iter()).enumerate() {
+                    let mark = if *rej { "  SIM ***" } else { "  não" };
+                    println!("{:>5}  {:>12.6}  {:>12.6}  {}", i + 1, p_orig, p_adj, mark);
+                }
+                println!("{sep}");
+                println!();
+                Ok(Value::Nil)
+            }
+
             // ── Função definida pelo usuário ──────────────────────────────────
             other => {
                 // Recupera a função do env (se existir)
@@ -8564,6 +8935,44 @@ impl Interpreter {
                     // FE é diferenciado; predição incondicional não disponível
                     (Value::ConditionalResult(_), _) => return Err(HayashiError::Runtime(
                         "predict clogit/cpoisson: efeitos fixos absorvidos — predição incondicional não disponível; use os coeficientes β̂ para odds ratios ou efeitos marginais".into()
+                    )),
+
+                    // ── VARMA ─────────────────────────────────────────────────────
+                    (Value::VarmaResult(_), _) => return Err(HayashiError::Runtime(
+                        "predict varma: predição multivariada não suportada como coluna — use print() para diagnóstico".into()
+                    )),
+
+                    // ── Decomposição sazonal ──────────────────────────────────────
+                    (Value::DecompResult(r), "trend")    => r.trend.to_vec(),
+                    (Value::DecompResult(r), "seasonal") => r.seasonal.to_vec(),
+                    (Value::DecompResult(r), "residual" | "resid" | "e") => r.residual.to_vec(),
+                    (Value::DecompResult(r), "observed" | "fitted") => r.observed.to_vec(),
+                    (Value::DecompResult(_), k) => return Err(HayashiError::Runtime(
+                        format!("predict decompose: kind '{k}' desconhecido — use: trend, seasonal, residual, observed")
+                    )),
+
+                    // ── MSTL ─────────────────────────────────────────────────────
+                    (Value::MstlResult(r), "trend") => r.trend.to_vec(),
+                    (Value::MstlResult(r), "resid" | "residual" | "e") => r.resid.to_vec(),
+                    (Value::MstlResult(r), kind_s) if kind_s.starts_with("seasonal") => {
+                        // "seasonal" → primeira componente; "seasonal1" → índice 1-based
+                        let idx = if kind_s == "seasonal" {
+                            0usize
+                        } else {
+                            kind_s["seasonal".len()..].parse::<usize>()
+                                .map(|n| n.saturating_sub(1))
+                                .unwrap_or(0)
+                        };
+                        if idx >= r.seasonal.len() {
+                            return Err(HayashiError::Runtime(format!(
+                                "predict mstl: componente seasonal{} não existe — modelo tem {} períodos",
+                                idx + 1, r.seasonal.len()
+                            )));
+                        }
+                        r.seasonal[idx].to_vec()
+                    }
+                    (Value::MstlResult(_), k) => return Err(HayashiError::Runtime(
+                        format!("predict mstl: kind '{k}' desconhecido — use: trend, resid, seasonal, seasonal1, seasonal2, ...")
                     )),
 
                     _ => return Err(HayashiError::Type(
