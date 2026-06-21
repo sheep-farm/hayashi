@@ -8642,6 +8642,480 @@ impl Interpreter {
                 Ok(Value::ThresholdResult(Rc::new(result)))
             }
 
+            // ── Canonical Correlation Analysis ────────────────────────────────
+
+            // cancorr(df, xvars=["x1","x2"], yvars=["y1","y2"])
+            // ou cancorr(df, x1, x2, ...) com yvars= como lista
+            "cancorr" | "canon" | "cancor" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("cancorr(df, xvars=[\"x1\",\"x2\"], yvars=[\"y1\",\"y2\"])".into()));
+                }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let x_names: Vec<String> = match opt_map.get("xvars") {
+                    Some(Value::List(lst)) => lst.iter().map(|v| match v { Value::Str(s) => Ok(s.clone()), _ => Err(HayashiError::Type("xvars deve ser lista de strings".into())) }).collect::<Result<_>>()?,
+                    Some(Value::Str(s)) => vec![s.clone()],
+                    None => args[1..].iter().map(|a| match a { Expr::Var(n) | Expr::Str(n) => Ok(n.clone()), _ => Err(HayashiError::Type("args devem ser nomes de variáveis".into())) }).collect::<Result<_>>()?,
+                    _ => return Err(HayashiError::Type("xvars= deve ser lista de strings".into())),
+                };
+                let y_names: Vec<String> = match opt_map.get("yvars") {
+                    Some(Value::List(lst)) => lst.iter().map(|v| match v { Value::Str(s) => Ok(s.clone()), _ => Err(HayashiError::Type("yvars deve ser lista de strings".into())) }).collect::<Result<_>>()?,
+                    Some(Value::Str(s)) => vec![s.clone()],
+                    _ => return Err(HayashiError::Runtime("cancorr requer yvars=[\"y1\",\"y2\"]".into())),
+                };
+                if x_names.is_empty() || y_names.is_empty() { return Err(HayashiError::Runtime("cancorr: xvars e yvars não podem ser vazios".into())); }
+                let n = df.n_rows();
+                let px = x_names.len(); let py = y_names.len();
+                let mut x_mat = ndarray::Array2::<f64>::zeros((n, px));
+                let mut y_mat = ndarray::Array2::<f64>::zeros((n, py));
+                for (j, name) in x_names.iter().enumerate() { let c = Self::get_col_f64(&df, name)?; for (i, &v) in c.iter().enumerate() { x_mat[[i, j]] = v; } }
+                for (j, name) in y_names.iter().enumerate() { let c = Self::get_col_f64(&df, name)?; for (i, &v) in c.iter().enumerate() { y_mat[[i, j]] = v; } }
+                let result = greeners::CanCorr::fit(&x_mat, &y_mat)
+                    .map_err(|e| HayashiError::Runtime(format!("cancorr: {e}")))?;
+                println!("{result}");
+                println!("  X vars: {}", x_names.join(", "));
+                println!("  Y vars: {}", y_names.join(", "));
+                Ok(Value::Nil)
+            }
+
+            // ── Estatísticas ponderadas ───────────────────────────────────────
+
+            // summarize_w(df, var, weight=wvar, mu0=0, alpha=0.05)
+            "summarize_w" | "dstats_w" | "svymean" | "wtsum" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("summarize_w(df, var, weight=wvar, mu0=0, alpha=0.05)".into()));
+                }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())) };
+                let data = Self::get_col_f64(&df, &var_name)?;
+                let weights = match opt_map.get("weight").or_else(|| opt_map.get("weights").or_else(|| opt_map.get("w"))) {
+                    Some(Value::Str(wname)) => {
+                        let wc = Self::get_col_f64(&df, wname)?;
+                        Some(ndarray::Array1::from(wc.to_vec()))
+                    }
+                    _ => None,
+                };
+                let w_ref = weights.as_ref();
+                let ds = greeners::DescrStatsW::new(&ndarray::Array1::from(data.to_vec()), w_ref)
+                    .map_err(|e| HayashiError::Runtime(format!("summarize_w: {e}")))?;
+                let mu0 = match opt_map.get("mu0") { Some(Value::Float(v)) => *v, Some(Value::Int(v)) => *v as f64, _ => 0.0 };
+                let alpha = match opt_map.get("alpha") { Some(Value::Float(v)) => *v, Some(Value::Int(v)) => *v as f64, _ => 0.05 };
+                let (t_stat, t_p) = ds.ttest_mean(mu0).map_err(|e| HayashiError::Runtime(format!("summarize_w t-test: {e}")))?;
+                let (ci_lo, ci_hi) = ds.conf_int_mean(alpha).map_err(|e| HayashiError::Runtime(format!("summarize_w CI: {e}")))?;
+                let label = w_ref.map_or("(pesos iguais)".to_string(), |_| format!("(ponderado)"));
+                println!("\n{:=^60}", format!(" DescrStats {label} — {var_name} "));
+                println!("{:<20} {:>12}   {:<20} {:>12}", "N", ds.nobs as usize, "Σ pesos", format!("{:.2}", ds.sum_weights));
+                println!("{:<20} {:>12.6}   {:<20} {:>12.6}", "Média", ds.mean, "Desvio padrão", ds.std);
+                println!("{:<20} {:>12.6}   {:<20} {:>12.6}", "Mín", ds.min, "Máx", ds.max);
+                println!("{:<20} {:>12.6}   {:<20} {:>12.6}", "P25", ds.q25, "Mediana", ds.median);
+                println!("{:<20} {:>12.6}   {:<20} {:>12.6}", "P75", ds.q75, "Variância", ds.var);
+                println!("{:<20} {:>12.6}   {:<20} {:>12.6}", "Assimetria", ds.skewness, "Curtose", ds.kurtosis);
+                println!("{:-^60}", "");
+                println!("  t-test H₀: μ = {:.4}    t = {:.4}   p = {:.4}", mu0, t_stat, t_p);
+                println!("  IC {}%: [{:.6}, {:.6}]", ((1.0 - alpha) * 100.0) as usize, ci_lo, ci_hi);
+                println!("{:=^60}", "");
+                Ok(Value::Nil)
+            }
+
+            // ── Tabstat — tabela de estatísticas por grupo ────────────────────
+
+            // tabstat(df, var1, var2, ..., by=grupo, stats=[mean,sd,n,p25,p75,min,max,sum])
+            "tabstat" | "tabstats" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("tabstat(df, var1, ..., by=grupo, stats=[mean,sd,n])".into()));
+                }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let var_names: Vec<String> = {
+                    let mut v = Vec::new();
+                    for a in &args[1..] {
+                        match a { Expr::Var(n) | Expr::Str(n) => v.push(n.clone()),
+                            _ => return Err(HayashiError::Type("args devem ser nomes de variáveis".into())) }
+                    }
+                    v
+                };
+                if var_names.is_empty() { return Err(HayashiError::Runtime("tabstat: forneça ao menos uma variável".into())); }
+                // stats= lista de estatísticas a mostrar
+                let default_stats = vec!["mean".to_string(), "sd".to_string(), "n".to_string()];
+                let stat_list: Vec<String> = match opt_map.get("stats") {
+                    Some(Value::List(lst)) => lst.iter().map(|v| match v { Value::Str(s) => s.clone(), _ => "mean".into() }).collect(),
+                    Some(Value::Str(s)) => vec![s.clone()],
+                    _ => default_stats,
+                };
+                let by_col: Option<Vec<f64>> = match opt_map.get("by") {
+                    Some(Value::Str(bname)) => Some(Self::get_col_f64(&df, bname)?.to_vec()),
+                    _ => None,
+                };
+                // Coleta grupos únicos
+                let groups: Vec<Option<String>> = if let Some(ref bv) = by_col {
+                    let mut uniq: Vec<f64> = bv.clone(); uniq.sort_by(|a,b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)); uniq.dedup();
+                    uniq.into_iter().map(|g| Some(format!("{}", g as i64))).collect()
+                } else { vec![None] };
+                // Cabeçalho
+                let stat_w = 10usize;
+                let var_w  = var_names.iter().map(|n| n.len()).max().unwrap_or(6).max(6);
+                println!("\n{:=^70}", " tabstat ");
+                print!("{:>var_w$}", "");
+                for s in &stat_list { print!("  {:>stat_w$}", s); }
+                println!();
+                println!("{}", "-".repeat(var_w + stat_list.len() * (stat_w + 2)));
+                for grp in &groups {
+                    if let Some(ref g) = grp { println!("  grupo = {g}"); }
+                    for vname in &var_names {
+                        let col = Self::get_col_f64(&df, vname)?;
+                        let data: Vec<f64> = if let Some(ref bv) = by_col {
+                            let gval: f64 = grp.as_ref().unwrap().parse::<f64>().unwrap_or(f64::NAN);
+                            col.iter().zip(bv.iter()).filter(|(_, &b)| (b - gval).abs() < 1e-9).map(|(&c, _)| c).filter(|v| !v.is_nan()).collect()
+                        } else { col.iter().cloned().filter(|v| !v.is_nan()).collect() };
+                        if data.is_empty() { continue; }
+                        let n = data.len() as f64;
+                        let mean = data.iter().sum::<f64>() / n;
+                        let sd = (data.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n - 1.0).max(1.0)).sqrt();
+                        let mut sorted = data.clone(); sorted.sort_by(|a,b| a.partial_cmp(b).unwrap());
+                        let min = sorted[0]; let max = *sorted.last().unwrap();
+                        let sum = data.iter().sum::<f64>();
+                        let pct = |p: f64| { let idx = (p / 100.0 * (n - 1.0)).round() as usize; sorted[idx.min(sorted.len() - 1)] };
+                        print!("{:>var_w$}", vname);
+                        for s in &stat_list {
+                            let val = match s.as_str() {
+                                "mean" | "avg"   => mean,
+                                "sd"   | "std"   => sd,
+                                "var"            => sd * sd,
+                                "n"    | "count" => n,
+                                "sum"            => sum,
+                                "min"            => min,
+                                "max"            => max,
+                                "p25"  | "q1"    => pct(25.0),
+                                "p50"  | "median"=> pct(50.0),
+                                "p75"  | "q3"    => pct(75.0),
+                                "p10"            => pct(10.0),
+                                "p90"            => pct(90.0),
+                                "iqr"            => pct(75.0) - pct(25.0),
+                                "range"          => max - min,
+                                "cv"             => if mean.abs() > 1e-15 { sd / mean.abs() } else { f64::NAN },
+                                _                => f64::NAN,
+                            };
+                            if s == "n" { print!("  {:>stat_w$}", val as usize); } else { print!("  {:>12.4}", val); }
+                        }
+                        println!();
+                    }
+                }
+                println!("{:=^70}", "");
+                Ok(Value::Nil)
+            }
+
+            // ── xtsum — decomposição within/between ───────────────────────────
+
+            // xtsum(df, var, id=entity_col)
+            "xtsum" | "xt_summary" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("xtsum(df, var1, var2, ..., id=entity_col)".into()));
+                }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let id_name = match opt_map.get("id") { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("xtsum requer id=coluna_entidade".into())) };
+                let var_names: Vec<String> = { let mut v = Vec::new(); for a in &args[1..] { match a { Expr::Var(n) | Expr::Str(n) => v.push(n.clone()), _ => {} } } v };
+                if var_names.is_empty() { return Err(HayashiError::Runtime("xtsum: forneça ao menos uma variável".into())); }
+                let id_col = Self::get_col_f64(&df, &id_name)?;
+                // Identifica entidades únicas
+                let mut ids_uniq: Vec<f64> = id_col.to_vec(); ids_uniq.sort_by(|a,b| a.partial_cmp(b).unwrap()); ids_uniq.dedup();
+                let n_total = df.n_rows();
+                let n_entities = ids_uniq.len();
+                println!("\n{:=^78}", " xtsum — decomposição within/between ");
+                println!("{:<20} | {:>7} | {:>8} | {:>8} | {:>8} | {:>8} | {:>8}",
+                    "Variável", "Tipo", "Média", "DP", "Mín", "Máx", "N");
+                println!("{}", "-".repeat(78));
+                for vname in &var_names {
+                    let col = Self::get_col_f64(&df, vname)?;
+                    let vals: Vec<f64> = col.iter().cloned().collect();
+                    // Overall
+                    let n_total_f = n_total as f64;
+                    let mean_ov = vals.iter().sum::<f64>() / n_total_f;
+                    let var_ov  = vals.iter().map(|x| (x - mean_ov).powi(2)).sum::<f64>() / (n_total_f - 1.0).max(1.0);
+                    let sd_ov   = var_ov.sqrt();
+                    let min_ov  = vals.iter().cloned().fold(f64::INFINITY, f64::min);
+                    let max_ov  = vals.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+                    println!("{:<20} | {:>7} | {:>8.4} | {:>8.4} | {:>8.4} | {:>8.4} | {:>8}",
+                        vname, "overall", mean_ov, sd_ov, min_ov, max_ov, n_total);
+                    // Between: média por entidade
+                    let group_means: Vec<f64> = ids_uniq.iter().map(|&gid| {
+                        let gvals: Vec<f64> = id_col.iter().zip(vals.iter()).filter(|(&id, _)| (id - gid).abs() < 1e-9).map(|(_, &v)| v).collect();
+                        if gvals.is_empty() { f64::NAN } else { gvals.iter().sum::<f64>() / gvals.len() as f64 }
+                    }).collect();
+                    let n_b = n_entities as f64;
+                    let mean_b = group_means.iter().filter(|v| !v.is_nan()).sum::<f64>() / n_b;
+                    let var_b  = group_means.iter().filter(|v| !v.is_nan()).map(|x| (x - mean_b).powi(2)).sum::<f64>() / (n_b - 1.0).max(1.0);
+                    let sd_b   = var_b.sqrt();
+                    let min_b  = group_means.iter().cloned().fold(f64::INFINITY, f64::min);
+                    let max_b  = group_means.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+                    println!("{:<20} | {:>7} | {:>8} | {:>8.4} | {:>8.4} | {:>8.4} | {:>8}",
+                        "", "between", "", sd_b, min_b, max_b, n_entities);
+                    // Within: desvio de cada obs. em relação à média do seu grupo
+                    let within_vals: Vec<f64> = id_col.iter().zip(vals.iter()).map(|(&id, &v)| {
+                        let gm = group_means[ids_uniq.iter().position(|&g| (g - id).abs() < 1e-9).unwrap_or(0)];
+                        v - gm + mean_ov  // demeaned + overall mean
+                    }).collect();
+                    let n_w = n_total as f64;
+                    let var_w  = within_vals.iter().map(|x| (x - mean_ov).powi(2)).sum::<f64>() / (n_w - 1.0).max(1.0);
+                    let sd_w   = var_w.sqrt();
+                    let min_w  = within_vals.iter().cloned().fold(f64::INFINITY, f64::min);
+                    let max_w  = within_vals.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+                    println!("{:<20} | {:>7} | {:>8} | {:>8.4} | {:>8.4} | {:>8.4} | {:>8}",
+                        "", "within", "", sd_w, min_w, max_w, n_total);
+                }
+                println!("{:=^78}", "");
+                println!("  Entidades: {}   Períodos médios: {:.1}", n_entities, n_total as f64 / n_entities as f64);
+                Ok(Value::Nil)
+            }
+
+            // ── Testes não-paramétricos ───────────────────────────────────────
+
+            // spearman(df, var1, var2) — correlação de Spearman
+            "spearman" | "spearman_rho" => {
+                if args.len() < 3 {
+                    return Err(HayashiError::Runtime("spearman(df, var1, var2)".into()));
+                }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let v1 = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg: nome de variável".into())) };
+                let v2 = match &args[2] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("terceiro arg: nome de variável".into())) };
+                let x = Self::get_col_f64(&df, &v1)?.to_vec();
+                let y = Self::get_col_f64(&df, &v2)?.to_vec();
+                let n = x.len().min(y.len());
+                if n < 3 { return Err(HayashiError::Runtime("spearman: n < 3".into())); }
+                // Ranking com ties (média dos ranks)
+                let rank = |vals: &[f64]| -> Vec<f64> {
+                    let mut idx: Vec<usize> = (0..vals.len()).collect();
+                    idx.sort_by(|&a, &b| vals[a].partial_cmp(&vals[b]).unwrap_or(std::cmp::Ordering::Equal));
+                    let mut ranks = vec![0.0f64; vals.len()];
+                    let mut i = 0;
+                    while i < idx.len() {
+                        let mut j = i + 1;
+                        while j < idx.len() && (vals[idx[j]] - vals[idx[i]]).abs() < 1e-12 { j += 1; }
+                        let avg_rank = (i + j + 1) as f64 / 2.0; // 1-indexed
+                        for k in i..j { ranks[idx[k]] = avg_rank; }
+                        i = j;
+                    }
+                    ranks
+                };
+                let rx = rank(&x[..n]);
+                let ry = rank(&y[..n]);
+                let nf = n as f64;
+                let mean_rx = rx.iter().sum::<f64>() / nf;
+                let mean_ry = ry.iter().sum::<f64>() / nf;
+                let num: f64 = rx.iter().zip(ry.iter()).map(|(a, b)| (a - mean_rx) * (b - mean_ry)).sum();
+                let dx: f64  = rx.iter().map(|a| (a - mean_rx).powi(2)).sum::<f64>();
+                let dy: f64  = ry.iter().map(|b| (b - mean_ry).powi(2)).sum::<f64>();
+                let rho = if dx * dy < 1e-15 { 0.0 } else { num / (dx * dy).sqrt() };
+                let t_stat = rho * ((nf - 2.0) / (1.0 - rho * rho).max(1e-15)).sqrt();
+                let p_val = greeners::t_pvalue_two(t_stat.abs(), nf - 2.0);
+                println!("\n  Spearman ρ({v1}, {v2})");
+                println!("  ρ = {rho:.6}   t = {t_stat:.4}   df = {}   p = {p_val:.4}", n - 2);
+                println!("  H₀: ρₛ = 0 (não correlacionadas em ranking)");
+                Ok(Value::Nil)
+            }
+
+            // ranksum(df, var, by=group) — Mann-Whitney U / Wilcoxon rank-sum
+            "ranksum" | "mannwhitney" | "wilcoxon_rs" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("ranksum(df, var, by=group_col)".into()));
+                }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg: nome de variável".into())) };
+                let by_name = match opt_map.get("by") { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("ranksum requer by=coluna_grupo".into())) };
+                let y_col   = Self::get_col_f64(&df, &var_name)?;
+                let grp_col = Self::get_col_f64(&df, &by_name)?;
+                let n_total = y_col.len();
+                // Separar em dois grupos pelo valor único
+                let mut gvals: Vec<f64> = grp_col.to_vec(); gvals.sort_by(|a,b| a.partial_cmp(b).unwrap()); gvals.dedup();
+                if gvals.len() != 2 { return Err(HayashiError::Runtime(format!("ranksum: by= deve ter exatamente 2 grupos únicos; encontrou {}", gvals.len()))); }
+                let g0: Vec<f64> = (0..n_total).filter(|&i| (grp_col[i] - gvals[0]).abs() < 1e-9).map(|i| y_col[i]).collect();
+                let g1: Vec<f64> = (0..n_total).filter(|&i| (grp_col[i] - gvals[1]).abs() < 1e-9).map(|i| y_col[i]).collect();
+                let n1 = g0.len(); let n2 = g1.len();
+                if n1 < 1 || n2 < 1 { return Err(HayashiError::Runtime("ranksum: um dos grupos está vazio".into())); }
+                // Rank combinado com ties
+                let mut combined: Vec<(f64, usize)> = g0.iter().map(|&v| (v, 0)).chain(g1.iter().map(|&v| (v, 1))).collect();
+                combined.sort_by(|a,b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+                let m = combined.len();
+                let mut ranks = vec![0.0f64; m];
+                let mut i = 0;
+                while i < m {
+                    let mut j = i + 1;
+                    while j < m && (combined[j].0 - combined[i].0).abs() < 1e-12 { j += 1; }
+                    let avg_rank = (i + j + 1) as f64 / 2.0;
+                    for k in i..j { ranks[k] = avg_rank; }
+                    i = j;
+                }
+                let w1: f64 = (0..m).filter(|&k| combined[k].1 == 0).map(|k| ranks[k]).sum();
+                let u1 = w1 - (n1 * (n1 + 1)) as f64 / 2.0;
+                let u2 = (n1 * n2) as f64 - u1;
+                let u = u1.min(u2);
+                // Normal approximation (large sample)
+                let n1f = n1 as f64; let n2f = n2 as f64; let nf = m as f64;
+                let mu_u = n1f * n2f / 2.0;
+                let var_u = n1f * n2f * (nf + 1.0) / 12.0;
+                let z_stat = (u - mu_u) / var_u.sqrt();
+                // p-value via normal approximation
+                let p_normal = 2.0 * (1.0 - Self::norm_cdf(z_stat.abs()));
+                println!("\n  Mann-Whitney U / Wilcoxon Rank-Sum");
+                println!("  {}: n₁={n1}  {}: n₂={n2}", var_name, by_name);
+                println!("  Grupo {}:  {var_name}", gvals[0] as i64);
+                println!("  Grupo {}:  {var_name}", gvals[1] as i64);
+                println!("  W (rank-sum grupo 0) = {w1:.1}");
+                println!("  U₁ = {u1:.1}   U₂ = {u2:.1}   U = {u:.1}");
+                println!("  z = {z_stat:.4}   p = {p_normal:.4}   (aprox. normal)");
+                println!("  H₀: distribuição de {var_name} igual nos dois grupos");
+                Ok(Value::Nil)
+            }
+
+            // kruskal(df, var, by=group) — Kruskal-Wallis (≥ 2 grupos)
+            "kruskal" | "kwallis" | "kruskal_wallis" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("kruskal(df, var, by=group_col)".into()));
+                }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg: nome de variável".into())) };
+                let by_name = match opt_map.get("by") { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("kruskal requer by=coluna_grupo".into())) };
+                let y_col   = Self::get_col_f64(&df, &var_name)?;
+                let grp_col = Self::get_col_f64(&df, &by_name)?;
+                let n = y_col.len();
+                let mut gvals: Vec<f64> = grp_col.to_vec(); gvals.sort_by(|a,b| a.partial_cmp(b).unwrap()); gvals.dedup();
+                let k = gvals.len();
+                if k < 2 { return Err(HayashiError::Runtime("kruskal: precisa de pelo menos 2 grupos".into())); }
+                // Rank global com ties
+                let mut indexed: Vec<(f64, usize)> = y_col.iter().cloned().enumerate().map(|(i,v)| (v, i)).collect();
+                indexed.sort_by(|a,b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+                let mut global_ranks = vec![0.0f64; n];
+                let mut i = 0;
+                let n_m = indexed.len();
+                while i < n_m {
+                    let mut j = i + 1;
+                    while j < n_m && (indexed[j].0 - indexed[i].0).abs() < 1e-12 { j += 1; }
+                    let avg_rank = (i + j + 1) as f64 / 2.0;
+                    for k2 in i..j { global_ranks[indexed[k2].1] = avg_rank; }
+                    i = j;
+                }
+                let nf = n as f64;
+                let mean_rank = (nf + 1.0) / 2.0;
+                // H statistic
+                let h_num: f64 = gvals.iter().map(|&gid| {
+                    let idxs: Vec<usize> = (0..n).filter(|&i| (grp_col[i] - gid).abs() < 1e-9).collect();
+                    let ni = idxs.len() as f64;
+                    if ni == 0.0 { return 0.0; }
+                    let rbar = idxs.iter().map(|&i| global_ranks[i]).sum::<f64>() / ni;
+                    ni * (rbar - mean_rank).powi(2)
+                }).sum();
+                let h = 12.0 / (nf * (nf + 1.0)) * h_num;
+                let df_kw = (k - 1) as f64;
+                let p_val = greeners::chi2_pvalue(h, (k - 1) as f64);
+                println!("\n  Kruskal-Wallis H");
+                println!("  {var_name} por {by_name}  ({k} grupos, N={n})");
+                for gid in &gvals {
+                    let gdata: Vec<f64> = (0..n).filter(|&i| (grp_col[i] - gid).abs() < 1e-9).map(|i| y_col[i]).collect();
+                    let gn = gdata.len();
+                    let gm = gdata.iter().sum::<f64>() / gn as f64;
+                    let rbar = (0..n).filter(|&i| (grp_col[i] - gid).abs() < 1e-9).map(|i| global_ranks[i]).sum::<f64>() / gn as f64;
+                    println!("    grupo {:>4}: n={gn:>4}  média={gm:>8.4}  rank_médio={rbar:>8.2}", *gid as i64);
+                }
+                println!("  H = {h:.4}   df = {df_kw}   p = {p_val:.4}   χ² approx.");
+                println!("  H₀: mesma distribuição em todos os grupos");
+                Ok(Value::Nil)
+            }
+
+            // signrank(df, var, mu0=0) — Wilcoxon signed-rank (uma amostra ou pares)
+            "signrank" | "wilcoxon_sr" | "wilcoxon_signed_rank" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("signrank(df, var, mu0=0)  ou  signrank(df, d)  onde d = x - y".into()));
+                }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg: nome de variável".into())) };
+                let mu0 = match opt_map.get("mu0") { Some(Value::Float(v)) => *v, Some(Value::Int(v)) => *v as f64, _ => 0.0 };
+                let data = Self::get_col_f64(&df, &var_name)?;
+                let diffs: Vec<f64> = data.iter().map(|&v| v - mu0).filter(|v| v.abs() > 1e-15).collect();
+                let n = diffs.len();
+                if n == 0 { return Err(HayashiError::Runtime("signrank: todos os diffs são zero".into())); }
+                // Rank dos |diffs|
+                let mut abs_indexed: Vec<(f64, usize, f64)> = diffs.iter().enumerate().map(|(i, &d)| (d.abs(), i, d.signum())).collect();
+                abs_indexed.sort_by(|a,b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+                let mut ranks = vec![0.0f64; n];
+                let mut i = 0;
+                while i < n {
+                    let mut j = i + 1;
+                    while j < n && (abs_indexed[j].0 - abs_indexed[i].0).abs() < 1e-12 { j += 1; }
+                    let avg_rank = (i + j + 1) as f64 / 2.0;
+                    for k in i..j { ranks[abs_indexed[k].1] = avg_rank; }
+                    i = j;
+                }
+                let w_plus:  f64 = (0..n).filter(|&i| diffs[i] > 0.0).map(|i| ranks[i]).sum();
+                let w_minus: f64 = (0..n).filter(|&i| diffs[i] < 0.0).map(|i| ranks[i]).sum();
+                let w = w_plus.min(w_minus);
+                // Normal approx (n ≥ 10)
+                let nf = n as f64;
+                let mu_w = nf * (nf + 1.0) / 4.0;
+                let var_w = nf * (nf + 1.0) * (2.0 * nf + 1.0) / 24.0;
+                let z_stat = (w - mu_w) / var_w.sqrt();
+                let p_val = 2.0 * (1.0 - Self::norm_cdf(z_stat.abs()));
+                println!("\n  Wilcoxon Signed-Rank Test");
+                println!("  H₀: mediana({var_name}) = {mu0}");
+                println!("  n = {n}  (excluindo diffs ≈ 0)");
+                println!("  W+ = {w_plus:.1}   W- = {w_minus:.1}   W = {w:.1}");
+                println!("  z = {z_stat:.4}   p = {p_val:.4}   (aprox. normal)");
+                Ok(Value::Nil)
+            }
+
+            // bitest(count, n, mu=0.5) — teste binomial (sinal)
+            "bitest" | "signtest" | "binom_test" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("bitest(successes, n, mu=0.5)  ou  bitest(df, var, mu=0)".into()));
+                }
+                // Suporta dois modos:
+                // 1) bitest(count, n, mu=0.5)       — contagens diretas
+                // 2) bitest(df, var, mu=0, by=group) — positivos vs negativos na coluna
+                let first_val = self.eval_expr(&args[0])?;
+                match first_val {
+                    Value::Int(count) => {
+                        // modo 1
+                        let n_trials = match self.eval_expr(&args[1])? { Value::Int(v) => v as usize, Value::Float(v) => v as usize, _ => return Err(HayashiError::Type("segundo arg: n (inteiro)".into())) };
+                        let mu = match opt_map.get("mu").or_else(|| opt_map.get("p")) { Some(Value::Float(v)) => *v, Some(Value::Int(v)) => *v as f64, _ => 0.5 };
+                        let k = count as usize;
+                        // p-value via normal approx (prop test)
+                        let nf = n_trials as f64; let phat = k as f64 / nf;
+                        let se = (mu * (1.0 - mu) / nf).sqrt();
+                        let z = (phat - mu) / se;
+                        let p = 2.0 * (1.0 - Self::norm_cdf(z.abs()));
+                        println!("\n  Binomial / Sign Test");
+                        println!("  Sucessos: {k}   n: {n_trials}   p̂ = {:.4}   H₀: p = {mu}", phat);
+                        println!("  z = {z:.4}   p = {p:.4}");
+                    }
+                    Value::DataFrame(_) | Value::Nil => {
+                        // Tentativa de modo 2: bitest(df, var, mu=0)
+                        let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                        let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                        let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg: nome de variável".into())) };
+                        let mu0 = match opt_map.get("mu").or_else(|| opt_map.get("mu0")) { Some(Value::Float(v)) => *v, Some(Value::Int(v)) => *v as f64, _ => 0.0 };
+                        let data = Self::get_col_f64(&df, &var_name)?;
+                        let pos = data.iter().filter(|&&v| v > mu0).count();
+                        let neg = data.iter().filter(|&&v| v < mu0).count();
+                        let ties = data.len() - pos - neg;
+                        let n_eff = pos + neg;
+                        let phat = pos as f64 / n_eff as f64;
+                        let nf = n_eff as f64;
+                        let z = (phat - 0.5) * nf.sqrt() / 0.5;
+                        let p = 2.0 * (1.0 - Self::norm_cdf(z.abs()));
+                        println!("\n  Sign Test  ({var_name} vs {mu0})");
+                        println!("  + : {pos}   - : {neg}   empates: {ties}   n efetivo: {n_eff}");
+                        println!("  p̂(+) = {phat:.4}   z = {z:.4}   p = {p:.4}");
+                        println!("  H₀: P(X > {mu0}) = 0.5");
+                    }
+                    _ => return Err(HayashiError::Type("bitest: primeiro arg deve ser inteiro (count) ou DataFrame".into())),
+                }
+                Ok(Value::Nil)
+            }
+
             // ── Visualização ASCII — ACF / PACF / QQ-plot / heatmap ──────────
 
             // acfplot(df, var, lags=20, width=50, title="")
@@ -9456,6 +9930,14 @@ impl Interpreter {
             println!("  Valores: [{}]", out_str.join(", "));
         }
         println!();
+    }
+
+    // ── Φ(x) normal CDF — Abramowitz & Stegun 26.2.17 (erro < 7.5e-8) ───────
+    fn norm_cdf(x: f64) -> f64 {
+        let t = 1.0 / (1.0 + 0.2316419 * x.abs());
+        let poly = t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+        let phi = 1.0 - greeners::norm_pdf(x) * poly;
+        if x >= 0.0 { phi } else { 1.0 - phi }
     }
 
     // ── ACF / PACF como barras ASCII ─────────────────────────────────────────
