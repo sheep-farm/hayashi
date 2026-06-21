@@ -326,7 +326,16 @@ impl Parser {
 
         while !matches!(self.peek(), Token::RParen | Token::Eof | Token::Newline) {
             // opt=value  ou  expr normal
-            if let Token::Ident(name) = self.peek().clone() {
+            // Caso especial: keyword `if` usada como chave de opção (ex: mean(df, y, if=x==1))
+            let is_kw_opt = matches!(self.peek(), Token::If | Token::Else)
+                && self.tokens.get(self.pos + 1).map(|(t, _)| t == &Token::Eq).unwrap_or(false);
+            if is_kw_opt {
+                let kw_name = match self.peek() { Token::If => "if", _ => "else" }.to_string();
+                self.advance(); // keyword
+                self.advance(); // =
+                let val = self.parse_expr()?;
+                opts.push(Opt { name: kw_name, value: val });
+            } else if let Token::Ident(name) = self.peek().clone() {
                 // lookahead: é opt=val?
                 if self.tokens.get(self.pos + 1).map(|(t, _)| t == &Token::Eq).unwrap_or(false) {
                     self.advance(); // nome
