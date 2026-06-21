@@ -9116,6 +9116,61 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── list(df) — imprime observações no estilo Stata ────────────────
+            "list" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("list(df [, vars=[] , if=cond, n=10])".into()));
+                }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+
+                // quais colunas mostrar
+                let col_names: Vec<String> = if let Some(Value::List(lst)) = opt_map.get("vars") {
+                    lst.iter().map(|v| format!("{v}")).collect()
+                } else {
+                    df.column_names().into_iter().map(|s| s.to_string()).collect()
+                };
+
+                // limite de linhas
+                let n_rows = df.n_rows();
+                let show_n = match opt_map.get("n") {
+                    Some(Value::Int(v)) => (*v as usize).min(n_rows),
+                    Some(Value::Float(v)) => (*v as usize).min(n_rows),
+                    _ => n_rows,
+                };
+
+                // largura de coluna: 10 ou comprimento do nome + 2
+                let col_w: Vec<usize> = col_names.iter().map(|n| n.len().max(9) + 1).collect();
+                let obs_w = format!("{show_n}").len().max(3);
+
+                // cabeçalho
+                print!("{:>obs_w$} ", "obs");
+                for (i, name) in col_names.iter().enumerate() { print!("{:>w$}", name, w = col_w[i]); }
+                println!();
+                // separador
+                print!("{}", "-".repeat(obs_w + 1));
+                for w in &col_w { print!("{}", "-".repeat(*w)); }
+                println!();
+
+                // linhas
+                for row_i in 0..show_n {
+                    print!("{:>obs_w$}.", row_i + 1);
+                    for (ci, cname) in col_names.iter().enumerate() {
+                        let val = df.get(cname).ok().and_then(|col| col.get(row_i).copied()).unwrap_or(f64::NAN);
+                        if val.is_nan() {
+                            print!("{:>w$}", ".", w = col_w[ci]);
+                        } else {
+                            print!("{:>w$.4}", val, w = col_w[ci]);
+                        }
+                    }
+                    println!();
+                }
+                if show_n < n_rows {
+                    println!("  ... ({} de {} obs mostradas)", show_n, n_rows);
+                }
+                Ok(Value::Nil)
+            }
+
             // ── Visualização ASCII — ACF / PACF / QQ-plot / heatmap ──────────
 
             // acfplot(df, var, lags=20, width=50, title="")
@@ -10379,6 +10434,56 @@ impl Interpreter {
             Stmt::Let { name, value } => {
                 let val = self.eval_expr(value)?;
                 self.env.set(name, val);
+            }
+
+            // ── input df \n headers \n rows \n end ───────────────────────────
+            Stmt::Input { alias, headers, rows } => {
+                if headers.is_empty() {
+                    return Err(HayashiError::Runtime("input: nenhuma variável no cabeçalho".into()));
+                }
+                if rows.is_empty() {
+                    return Err(HayashiError::Runtime("input: nenhuma linha de dados".into()));
+                }
+                let k = headers.len();
+                // Verifica que todas as linhas têm o mesmo número de colunas
+                for (i, row) in rows.iter().enumerate() {
+                    if row.len() != k {
+                        return Err(HayashiError::Runtime(format!(
+                            "input: linha {} tem {} valores, esperado {} ({})",
+                            i + 1, row.len(), k, headers.join(", ")
+                        )));
+                    }
+                }
+                let n = rows.len();
+                // Transpõe: rows → columns
+                let mut col_map: std::collections::HashMap<String, ndarray::Array1<f64>> = std::collections::HashMap::new();
+                for (j, name) in headers.iter().enumerate() {
+                    let col: ndarray::Array1<f64> = ndarray::Array1::from(
+                        rows.iter().map(|r| r[j]).collect::<Vec<_>>()
+                    );
+                    col_map.insert(name.clone(), col);
+                }
+                let df = greeners::DataFrame::new(col_map)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                println!("input → {alias} ({n} obs, {} vars: {})", k, headers.join(", "));
+                self.env.set(&alias, Value::DataFrame(df));
+            }
+
+            // ── display expr ─────────────────────────────────────────────────
+            Stmt::Display(expr) => {
+                let val = self.eval_expr(expr)?;
+                match &val {
+                    Value::Float(v)  => println!("{v}"),
+                    Value::Int(v)    => println!("{v}"),
+                    Value::Bool(v)   => println!("{v}"),
+                    Value::Str(v)    => println!("{v}"),
+                    Value::Nil       => println!("(nil)"),
+                    Value::List(lst) => {
+                        for v in lst.iter() { print!("  {v}"); }
+                        println!();
+                    }
+                    _ => println!("{val}"),
+                }
             }
 
             Stmt::Load { path, alias } => {

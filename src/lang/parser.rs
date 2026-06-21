@@ -574,6 +574,73 @@ impl Parser {
                 Ok(Some(Stmt::While { cond, body }))
             }
 
+            // ── input df \n header_row \n data_rows \n end ────────────────────
+            Token::Ident(ref s) if s == "input" => {
+                self.advance();
+                let alias = self.expect_ident()?;
+                self.skip_newlines();
+
+                // Header: nomes das variáveis até newline
+                let mut headers: Vec<String> = Vec::new();
+                loop {
+                    match self.peek().clone() {
+                        Token::Newline | Token::Eof => break,
+                        Token::Ident(h) => { let h = h.clone(); self.advance(); headers.push(h); }
+                        _ => break,
+                    }
+                }
+                self.skip_newlines();
+
+                // Linhas de dados até "end"
+                let mut rows: Vec<Vec<f64>> = Vec::new();
+                'outer: loop {
+                    self.skip_newlines();
+                    // Detectar "end"
+                    if let Token::Ident(ref s) = self.peek().clone() {
+                        if s == "end" { self.advance(); break 'outer; }
+                    }
+                    if self.peek() == &Token::Eof { break; }
+
+                    let mut row: Vec<f64> = Vec::new();
+                    loop {
+                        match self.peek().clone() {
+                            Token::Newline | Token::Eof => break,
+                            Token::Float(v) => { let v = v; self.advance(); row.push(v); }
+                            Token::Int(v)   => { let v = v as f64; self.advance(); row.push(v); }
+                            Token::Minus => {
+                                self.advance();
+                                let v = match self.peek().clone() {
+                                    Token::Float(v) => { self.advance(); -v }
+                                    Token::Int(v)   => { self.advance(); -(v as f64) }
+                                    _ => return Err(HayashiError::Parse { line, msg: "esperado número após '-'".into() }),
+                                };
+                                row.push(v);
+                            }
+                            Token::Dot => { self.advance(); row.push(f64::NAN); } // . = missing
+                            _ => break,
+                        }
+                    }
+                    if !row.is_empty() { rows.push(row); }
+                }
+                Ok(Some(Stmt::Input { alias, headers, rows }))
+            }
+
+            // ── display expr  (sem parênteses) ───────────────────────────────
+            Token::Ident(ref s) if s == "display" || s == "di" => {
+                self.advance();
+                let expr = self.parse_expr()?;
+                Ok(Some(Stmt::Display(expr)))
+            }
+
+            // ── scalar name = expr  (alias de let) ───────────────────────────
+            Token::Ident(ref s) if s == "scalar" => {
+                self.advance();
+                let name = self.expect_ident()?;
+                self.expect(&Token::Eq)?;
+                let value = self.parse_expr()?;
+                Ok(Some(Stmt::Let { name, value }))
+            }
+
             Token::Ident(_) => {
                 let expr = self.parse_expr()?;
                 Ok(Some(Stmt::Expr(expr)))

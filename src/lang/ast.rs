@@ -149,6 +149,20 @@ pub enum Stmt {
     Break,
     Continue,
 
+    // input df
+    // Y X u
+    // 4 1  3
+    // ...
+    // end
+    Input {
+        alias: String,
+        headers: Vec<String>,
+        rows: Vec<Vec<f64>>,
+    },
+
+    // display expr   (sem parênteses, como Stata)
+    Display(Expr),
+
     // expr standalone (ex: test(model, white))
     Expr(Expr),
 }
