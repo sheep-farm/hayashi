@@ -620,7 +620,7 @@ impl Interpreter {
     fn eval_call(&mut self, func: &str, args: &[Expr], opts: &[Opt]) -> Result<Value> {
         // avalia opts primeiro (exceto "if"/"vars" — avaliados lazy pelos builtins)
         let opt_map: HashMap<String, Value> = opts.iter()
-            .filter(|o| o.name != "if" && o.name != "vars")
+            .filter(|o| o.name != "if" && o.name != "vars" && o.name != "dydx")
             .map(|o| Ok((o.name.clone(), self.eval_expr(&o.value)?)))
             .collect::<Result<_>>()?;
 
@@ -3013,7 +3013,7 @@ impl Interpreter {
             // ── ic — tabela de critérios de informação (AIC/BIC) ──────────────
             // ic(m1, m2, m3, ...)
             // Compara modelos pelo AIC e BIC; ordena do menor (melhor) para maior
-            "ic" | "fitstat" => {
+            "ic" | "fitstat" | "estat" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime("ic() requer ao menos um modelo".into()));
                 }
@@ -4828,6 +4828,37 @@ impl Interpreter {
                 }
                 let model = self.eval_expr(&args[0])?;
 
+                // dydx=[X1, X2] — quais variáveis mostrar (lazy, nomes de coluna)
+                let dydx_filter: Option<Vec<String>> = opts.iter().find(|o| o.name == "dydx").map(|o| {
+                    match &o.value {
+                        Expr::List(items) => items.iter().filter_map(|e| match e {
+                            Expr::Var(n) | Expr::Str(n) => Some(n.clone()),
+                            _ => None,
+                        }).collect(),
+                        Expr::Var(n) | Expr::Str(n) => vec![n.clone()],
+                        _ => vec![],
+                    }
+                });
+                let show_var = |name: &str| -> bool {
+                    match &dydx_filter {
+                        None => name != "_cons" && name != "const",
+                        Some(list) => list.iter().any(|s| s == name),
+                    }
+                };
+
+                // at_X=value — fixa variável X no valor dado para cálculo de margins
+                let at_vals: HashMap<String, f64> = opt_map.iter()
+                    .filter(|(k, _)| k.starts_with("at_"))
+                    .filter_map(|(k, v)| {
+                        let var = k.strip_prefix("at_").unwrap().to_string();
+                        match v {
+                            Value::Float(f) => Some((var, *f)),
+                            Value::Int(i) => Some((var, *i as f64)),
+                            _ => None,
+                        }
+                    })
+                    .collect();
+
                 let sep  = "─".repeat(60);
                 let sep2 = "═".repeat(60);
 
@@ -4837,20 +4868,36 @@ impl Interpreter {
                         let n    = bm.x.nrows();
                         let k    = bm.x.ncols();
                         let beta = &bm.result.params;
-                        let eta: Vec<f64> = (0..n).map(|i| bm.x.row(i).dot(beta)).collect();
+
+                        // aplicar at_* → copiar X e substituir colunas fixadas
+                        let x_use = if at_vals.is_empty() {
+                            bm.x.clone()
+                        } else {
+                            let mut x_mod = bm.x.clone();
+                            for (var, val) in &at_vals {
+                                if let Some(idx) = bm.coef_names.iter().position(|n| n == var) {
+                                    x_mod.column_mut(idx).fill(*val);
+                                }
+                            }
+                            x_mod
+                        };
+
+                        let eta: Vec<f64> = (0..n).map(|i| x_use.row(i).dot(beta)).collect();
                         let deriv: Vec<f64> = eta.iter().map(|&e| match bm.kind.as_str() {
                             "logit"  => { let p = logistic(e); p * (1.0 - p) }
                             "probit" => norm_pdf(e),
                             _        => 0.0,
                         }).collect();
+                        let at_label = if at_vals.is_empty() { String::new() }
+                            else { format!("  at({})", at_vals.iter().map(|(k,v)| format!("{k}={v}")).collect::<Vec<_>>().join(", ")) };
                         println!("\n{sep2}");
-                        println!(" Average Marginal Effects — {}", bm.kind.to_uppercase());
+                        println!(" Average Marginal Effects — {}{at_label}", bm.kind.to_uppercase());
                         println!("{sep2}");
-                        println!("{:<22} {:>14}  {:>10}", "Variable", "dy/dx", "");
+                        println!("{:<22} {:>14}", "Variable", "dy/dx");
                         println!("{sep}");
                         for k_idx in 0..k {
                             let name = bm.coef_names.get(k_idx).map(String::as_str).unwrap_or("?");
-                            if name == "_cons" { continue; }
+                            if !show_var(name) { continue; }
                             let ame: f64 = deriv.iter().map(|&d| d * beta[k_idx]).sum::<f64>() / n as f64;
                             println!("{:<22} {:>14.6}", name, ame);
                         }
@@ -4865,16 +4912,25 @@ impl Interpreter {
                         let x    = r.x_data();
                         let n    = x.nrows();
                         let beta = &r.params;
-                        let mu_bar: f64 = (0..n).map(|i| x.row(i).dot(beta).exp()).sum::<f64>() / n as f64;
                         let fb: Vec<String> = (0..beta.len()).map(|i| format!("x{i}")).collect();
                         let names = r.variable_names.as_ref().unwrap_or(&fb);
+                        let x_use = if at_vals.is_empty() { x.to_owned() } else {
+                            let mut xm = x.to_owned();
+                            for (var, val) in &at_vals {
+                                if let Some(idx) = names.iter().position(|n| n == var) { xm.column_mut(idx).fill(*val); }
+                            }
+                            xm
+                        };
+                        let mu_bar: f64 = (0..n).map(|i| x_use.row(i).dot(beta).exp()).sum::<f64>() / n as f64;
+                        let at_label = if at_vals.is_empty() { String::new() }
+                            else { format!("  at({})", at_vals.iter().map(|(k,v)| format!("{k}={v}")).collect::<Vec<_>>().join(", ")) };
                         println!("\n{sep2}");
-                        println!(" Average Marginal Effects — POISSON  (dy/dx = β·μ̄)");
+                        println!(" Average Marginal Effects — POISSON{at_label}  (dy/dx = β·μ̄)");
                         println!("{sep2}");
-                        println!("{:<22} {:>14}  {:>10}", "Variable", "dy/dx", "");
+                        println!("{:<22} {:>14}", "Variable", "dy/dx");
                         println!("{sep}");
                         for (k_idx, name) in names.iter().enumerate() {
-                            if name == "_cons" || name == "const" { continue; }
+                            if !show_var(name) { continue; }
                             if k_idx >= beta.len() { break; }
                             let ame = beta[k_idx] * mu_bar;
                             println!("{:<22} {:>14.6}", name, ame);
@@ -4887,16 +4943,25 @@ impl Interpreter {
                         let x    = r.x_data();
                         let n    = x.nrows();
                         let beta = &r.params;
-                        let mu_bar: f64 = (0..n).map(|i| x.row(i).dot(beta).exp()).sum::<f64>() / n as f64;
                         let fb: Vec<String> = (0..beta.len()).map(|i| format!("x{i}")).collect();
                         let names = r.variable_names.as_ref().unwrap_or(&fb);
+                        let x_use = if at_vals.is_empty() { x.to_owned() } else {
+                            let mut xm = x.to_owned();
+                            for (var, val) in &at_vals {
+                                if let Some(idx) = names.iter().position(|n| n == var) { xm.column_mut(idx).fill(*val); }
+                            }
+                            xm
+                        };
+                        let mu_bar: f64 = (0..n).map(|i| x_use.row(i).dot(beta).exp()).sum::<f64>() / n as f64;
+                        let at_label = if at_vals.is_empty() { String::new() }
+                            else { format!("  at({})", at_vals.iter().map(|(k,v)| format!("{k}={v}")).collect::<Vec<_>>().join(", ")) };
                         println!("\n{sep2}");
-                        println!(" Average Marginal Effects — NEG. BINOMIAL  (dy/dx = β·μ̄)");
+                        println!(" Average Marginal Effects — NEG. BINOMIAL{at_label}  (dy/dx = β·μ̄)");
                         println!("{sep2}");
-                        println!("{:<22} {:>14}  {:>10}", "Variable", "dy/dx", "");
+                        println!("{:<22} {:>14}", "Variable", "dy/dx");
                         println!("{sep}");
                         for (k_idx, name) in names.iter().enumerate() {
-                            if name == "_cons" || name == "const" { continue; }
+                            if !show_var(name) { continue; }
                             if k_idx >= beta.len() { break; }
                             let ame = beta[k_idx] * mu_bar;
                             println!("{:<22} {:>14.6}", name, ame);
