@@ -2532,23 +2532,144 @@ impl Interpreter {
             // bootse(model, n=1000)
             // Reamostral pares (y, X) com reposição para estimar distribuição amostral
             // Compara SE originais com bootstrap SE e IC percentil 95%
-            "bootse" | "bootstrap" => {
-                if args.is_empty() {
-                    return Err(HayashiError::Runtime("bootse(model, n=1000)".into()));
-                }
-                let model_val = self.eval_expr(&args[0])?;
+            // ── bootstrap genérico ────────────────────────────────────────────
+            // bootstrap(estimator, formula, df, n=1000, alpha=0.05)
+            // Reamostra linhas do DataFrame com reposição e re-estima.
+            // Funciona com qualquer estimador: ols, logit, probit, iv, poisson, etc.
+            // bootse(model, n=1000) mantido como alias para OLS pairs bootstrap.
+            "bootstrap" | "boot" => {
+                // ── Forma 1: bootstrap(estimator, formula, df, n=...) — genérico
+                // ── Forma 2: bootse(model, n=...) — OLS pairs (legado, args[0] é Value)
                 let n_boot = match opt_map.get("n") {
                     Some(Value::Int(v)) => *v as usize,
                     Some(Value::Float(v)) => *v as usize,
-                    _ => 1000,
+                    _ => match opt_map.get("reps") {
+                        Some(Value::Int(v)) => *v as usize,
+                        Some(Value::Float(v)) => *v as usize,
+                        _ => 1000,
+                    },
                 };
                 let alpha = match opt_map.get("alpha") {
                     Some(Value::Float(v)) => *v,
                     _ => 0.05,
                 };
+
+                if args.len() >= 3 {
+                    // ── Forma genérica: bootstrap(estimator, formula, df, ...)
+                    let estimator_name = match &args[0] {
+                        Expr::Var(n) | Expr::Str(n) => n.clone(),
+                        _ => return Err(HayashiError::Type(
+                            "bootstrap: primeiro arg deve ser nome do estimador (ols, logit, ...)".into()
+                        )),
+                    };
+                    let formula_expr = args[1].clone();
+                    let df_name = match &args[2] {
+                        Expr::Var(n) => n.clone(),
+                        _ => return Err(HayashiError::Type(
+                            "bootstrap: terceiro arg deve ser nome do DataFrame".into()
+                        )),
+                    };
+                    let df = match self.env.get(&df_name) {
+                        Some(Value::DataFrame(d)) => d.clone(),
+                        _ => return Err(HayashiError::Runtime(
+                            format!("'{df_name}' não é DataFrame")
+                        )),
+                    };
+
+                    // estimar no sample completo para referência
+                    let extra_opts: Vec<Opt> = opts.iter()
+                        .filter(|o| !matches!(o.name.as_str(), "n" | "reps" | "alpha"))
+                        .cloned().collect();
+                    let full_result = self.eval_call(
+                        &estimator_name,
+                        &[formula_expr.clone(), Expr::Var(df_name.clone())],
+                        &extra_opts,
+                    )?;
+                    let full_params = Self::extract_params(&full_result)
+                        .ok_or_else(|| HayashiError::Runtime(
+                            "bootstrap: modelo não suportado (sem params extraíveis)".into()
+                        ))?;
+                    let full_se = Self::extract_se(&full_result).unwrap_or_default();
+                    let var_names = Self::extract_var_names(&full_result);
+                    let k = full_params.len();
+
+                    // bootstrap loop
+                    use rand::seq::SliceRandom;
+                    let mut rng = rand::thread_rng();
+                    let n = df.n_rows();
+                    let indices: Vec<usize> = (0..n).collect();
+                    let mut boot_coefs = ndarray::Array2::<f64>::zeros((n_boot, k));
+                    let mut n_ok = 0usize;
+
+                    for b in 0..n_boot {
+                        let boot_idx: Vec<usize> = (0..n)
+                            .map(|_| *indices.choose(&mut rng).unwrap())
+                            .collect();
+                        let boot_df = match df.iloc(Some(&boot_idx), None) {
+                            Ok(d) => d,
+                            Err(_) => continue,
+                        };
+                        self.env.set("__boot_df__", Value::DataFrame(boot_df));
+                        match self.eval_call(
+                            &estimator_name,
+                            &[formula_expr.clone(), Expr::Var("__boot_df__".into())],
+                            &extra_opts,
+                        ) {
+                            Ok(ref result) => {
+                                if let Some(params) = Self::extract_params(result) {
+                                    for j in 0..k.min(params.len()) {
+                                        boot_coefs[[b, j]] = params[j];
+                                    }
+                                    n_ok += 1;
+                                }
+                            }
+                            Err(_) => {}
+                        }
+                    }
+                    self.env.remove("__boot_df__");
+
+                    if n_ok < 10 {
+                        return Err(HayashiError::Runtime(
+                            format!("bootstrap: apenas {n_ok}/{n_boot} replicações convergiram")
+                        ));
+                    }
+
+                    // truncar para replicações bem-sucedidas
+                    let boot_se = greeners::Bootstrap::bootstrap_se(&boot_coefs);
+                    let (ci_lo, ci_hi) = greeners::Bootstrap::percentile_ci(&boot_coefs, alpha);
+
+                    let thick = "═".repeat(76);
+                    let thin  = "─".repeat(76);
+                    println!("\n{thick}");
+                    println!("{:^76}", format!(" Bootstrap SE — {} (n={n_ok}/{n_boot}) ", estimator_name));
+                    println!("{thin}");
+                    println!("{:<18} {:>10} {:>10} {:>10} {:>12} {:>12}",
+                             "Variável", "β̂", "SE orig.", "SE boot", "IC inf", "IC sup");
+                    println!("{thin}");
+                    for i in 0..k {
+                        let vname = var_names.get(i).map(|s| s.as_str()).unwrap_or("?");
+                        let orig_se = if i < full_se.len() { full_se[i] } else { f64::NAN };
+                        println!("{:<18} {:>10.4} {:>10.4} {:>10.4} {:>12.4} {:>12.4}",
+                                 vname,
+                                 full_params[i],
+                                 orig_se,
+                                 boot_se[i],
+                                 ci_lo[i],
+                                 ci_hi[i]);
+                    }
+                    println!("{thick}");
+                    return Ok(Value::Nil);
+                }
+
+                // ── Forma legado: bootse(model, n=...) — OLS pairs ──────────
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "bootstrap(estimator, formula, df, n=1000) ou bootse(model, n=1000)".into()
+                    ));
+                }
+                let model_val = self.eval_expr(&args[0])?;
                 match &model_val {
                     Value::OlsResult(m) => {
-                        // Extrair y do OLS: y = Xβ + ê
                         let y_hat = m.x.dot(&m.result.params);
                         let y_vec = &y_hat + &m.residuals;
                         let boot_coefs = greeners::Bootstrap::pairs_bootstrap(&y_vec, &m.x, n_boot)
@@ -2579,9 +2700,13 @@ impl Interpreter {
                         Ok(Value::Nil)
                     }
                     _ => Err(HayashiError::Runtime(
-                        "bootse(): suportado apenas para modelos OLS/WLS — use: bootse(m_ols, n=1000)".into()
+                        "bootse(model) suporta OLS. Para outros: bootstrap(estimator, formula, df, n=1000)".into()
                     )),
                 }
+            }
+
+            "bootse" => {
+                return self.eval_call("bootstrap", args, opts);
             }
 
             // markov — Markov-Switching AR (Hamilton 1989)
@@ -10072,6 +10197,45 @@ impl Interpreter {
             Value::Float(f) => *f != 0.0 && !f.is_nan(),
             Value::Nil      => false,
             _               => true,
+        }
+    }
+
+    fn extract_params(v: &Value) -> Option<Vec<f64>> {
+        match v {
+            Value::OlsResult(m) => Some(m.result.params.to_vec()),
+            Value::BinaryResult(m) => Some(m.result.params.to_vec()),
+            Value::PoissonResult(r) => Some(r.params.to_vec()),
+            Value::NegBinResult(r) => Some(r.params.to_vec()),
+            Value::QuantileResult(r) => Some(r.params.to_vec()),
+            Value::PanelResult(r) => Some(r.params.to_vec()),
+            Value::TobitResult(r) => Some(r.params.to_vec()),
+            _ => None,
+        }
+    }
+
+    fn extract_se(v: &Value) -> Option<Vec<f64>> {
+        match v {
+            Value::OlsResult(m) => Some(m.result.std_errors.to_vec()),
+            Value::BinaryResult(m) => Some(m.result.std_errors.to_vec()),
+            Value::PoissonResult(r) => Some(r.std_errors.to_vec()),
+            Value::NegBinResult(r) => Some(r.std_errors.to_vec()),
+            Value::QuantileResult(r) => Some(r.std_errors.to_vec()),
+            Value::PanelResult(r) => Some(r.std_errors.to_vec()),
+            Value::TobitResult(r) => Some(r.std_errors.to_vec()),
+            _ => None,
+        }
+    }
+
+    fn extract_var_names(v: &Value) -> Vec<String> {
+        match v {
+            Value::OlsResult(m) => m.result.variable_names.clone().unwrap_or_default(),
+            Value::BinaryResult(m) => m.coef_names.clone(),
+            Value::PoissonResult(r) => r.variable_names.clone().unwrap_or_default(),
+            Value::NegBinResult(r) => r.variable_names.clone().unwrap_or_default(),
+            Value::QuantileResult(r) => r.variable_names.clone().unwrap_or_default(),
+            Value::PanelResult(r) => r.variable_names.clone().unwrap_or_default(),
+            Value::TobitResult(r) => r.variable_names.clone().unwrap_or_default(),
+            _ => vec![],
         }
     }
 
