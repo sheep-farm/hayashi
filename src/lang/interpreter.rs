@@ -567,7 +567,7 @@ impl Interpreter {
 
     fn resolve_cov(opt_val: Option<&Value>) -> Result<CovarianceType> {
         match opt_val {
-            None => Ok(CovarianceType::HC3),
+            None => Ok(CovarianceType::NonRobust),
             Some(Value::Str(s)) => match s.as_str() {
                 "nonrobust" | "ols"  => Ok(CovarianceType::NonRobust),
                 "HC1"                => Ok(CovarianceType::HC1),
@@ -2718,7 +2718,7 @@ impl Interpreter {
 
             // bptest — Breusch-Pagan LM test (H0: pooled OLS adequado, σ²_u = 0)
             // bptest(df, y ~ x1 + x2, id="entity_col")
-            "bptest" | "xttest0" => {
+            "bptest" | "xttest0" | "xtbp" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
                         "bptest(df, y ~ x1+x2, id=\"entity_col\")".into()
@@ -2758,7 +2758,7 @@ impl Interpreter {
             // wooldridge — Teste de Wooldridge para correlação serial em painel
             // H0: sem correlação serial de 1ª ordem nos erros idiossincráticos
             // wooldridge(df, y ~ x1+x2, id="entity", time="time")
-            "wooldridge" | "xtserial" => {
+            "wooldridge" | "xtserial" | "wooldridge_serial" | "xtwooldridge" => {
                 if args.len() < 2 { return Err(HayashiError::Runtime("wooldridge(df, y~x, id=\"entity\", time=\"time\")".into())); }
                 let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
                 let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
@@ -2859,7 +2859,7 @@ impl Interpreter {
             // abtest(df, y ~ x1+x2, id="entity", time="time")
             // m1 deve rejeitar H0 (FD induz AR(1) por construção)
             // m2 NÃO deve rejeitar H0 (valida instrumentos y_{i,t-2})
-            "abtest" | "abar" => {
+            "abtest" | "abar" | "abond" | "xtabond_test" | "arellano_bond" => {
                 if args.len() < 2 { return Err(HayashiError::Runtime("abtest(df, y~x, id=\"entity\", time=\"time\")".into())); }
                 let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
                 let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
@@ -3190,7 +3190,7 @@ impl Interpreter {
             }
 
             // ── Pesaran CD: dependência cross-seccional ───────────────────────
-            "pesaran_cd" => {
+            "pesaran_cd" | "cd_test" => {
                 // pesaran_cd(formula, df, id=col)
                 // H₀: resíduos independentes entre entidades (sem dependência cross-seccional)
                 // H₁: dependência cross-seccional presente
@@ -5108,7 +5108,7 @@ impl Interpreter {
             // ── forecast ─────────────────────────────────────────────────────
             // forecast(model, steps=8)
             // forecast(model, steps=8, alpha=0.05)
-            "forecast" => {
+            "forecast" | "fcast" | "predict_h" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime("forecast() requer um modelo ARIMA".into()));
                 }
@@ -6609,7 +6609,7 @@ impl Interpreter {
             // ljungbox(df, varname, lags=10)
             // ljungbox(model, lags=10)   — aceita GARCH, ARIMA, OLS
             // H₀: as primeiras `lags` autocorrelações são conjuntamente zero
-            "ljungbox" => {
+            "ljungbox" | "ljung_box" | "portmanteau" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
                         "ljungbox() requer uma série ou modelo".into()
@@ -7077,7 +7077,7 @@ impl Interpreter {
             // archtest(df, varname, lags=5)
             // Engle (1982) LM test — H₀: sem efeitos ARCH de ordem `lags`
             // Também aceita resíduos de modelo GARCH: archtest(model, lags=5)
-            "archtest" => {
+            "archtest" | "arch_test" | "engle_arch" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
                         "archtest() requer uma série ou modelo GARCH".into()
@@ -8573,58 +8573,6 @@ impl Interpreter {
                 Ok(Value::EtsResult(Rc::new(result)))
             }
 
-            // forecast(model, steps=12, alpha=0.05) — previsão fora da amostra
-            // Suporta: EtsResult, ArimaResult
-            "forecast" | "fcast" | "predict_h" => {
-                if args.is_empty() {
-                    return Err(HayashiError::Runtime("forecast(model, steps=12, alpha=0.05)".into()));
-                }
-                let steps = match opt_map.get("steps") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 12 };
-                // Se o segundo arg for positional (steps sem nome):
-                let steps = if args.len() >= 2 {
-                    match self.eval_expr(&args[1])? { Value::Int(v) => v as usize, Value::Float(v) => v as usize, _ => steps }
-                } else { steps };
-                let alpha = match opt_map.get("alpha") { Some(Value::Float(v)) => *v, Some(Value::Int(v)) => *v as f64, _ => 0.05 };
-                // invnorm(1-alpha/2) via aproximação racional simples
-                let ci_mult: f64 = {
-                    let p = 1.0 - alpha / 2.0;
-                    // Abramowitz & Stegun 26.2.17 — erro < 4.5e-4
-                    let t = (-2.0 * (1.0 - p).ln()).sqrt();
-                    let c0 = 2.515517_f64; let c1 = 0.802853; let c2 = 0.010328;
-                    let d1 = 1.432788_f64; let d2 = 0.189269; let d3 = 0.001308;
-                    t - (c0 + c1 * t + c2 * t * t) / (1.0 + d1 * t + d2 * t * t + d3 * t.powi(3))
-                };
-                match self.eval_expr(&args[0])? {
-                    Value::EtsResult(r) => {
-                        let fc = r.predict(steps);
-                        let resid = &r.residuals;
-                        let n = resid.len() as f64;
-                        let sigma = (resid.iter().map(|e| e * e).sum::<f64>() / n).sqrt();
-                        println!("\n{:=^50}", " ETS Forecast ");
-                        println!("{:<6} {:>12} {:>12} {:>12}", "h", "forecast", "lower", "upper");
-                        println!("{}", "-".repeat(44));
-                        for h in 0..steps {
-                            let f_h = fc[h];
-                            let margin = ci_mult * sigma * ((h + 1) as f64).sqrt();
-                            println!("{:<6} {:>12.4} {:>12.4} {:>12.4}", h + 1, f_h, f_h - margin, f_h + margin);
-                        }
-                        println!("{}", "=".repeat(50));
-                        Ok(Value::List(Rc::new(fc.to_vec().into_iter().map(Value::Float).collect())))
-                    }
-                    Value::ArimaResult(r) => {
-                        let fc = r.predict(steps, None)
-                            .map_err(|e| HayashiError::Runtime(format!("forecast arima: {e}")))?;
-                        println!("\n{:=^50}", " ARIMA Forecast ");
-                        println!("{:<6} {:>12}", "h", "forecast");
-                        println!("{}", "-".repeat(20));
-                        for (h, &f_h) in fc.iter().enumerate() { println!("{:<6} {:>12.4}", h + 1, f_h); }
-                        println!("{}", "=".repeat(50));
-                        Ok(Value::List(Rc::new(fc.to_vec().into_iter().map(Value::Float).collect())))
-                    }
-                    _ => Err(HayashiError::Type("forecast() suporta EtsResult ou ArimaResult".into())),
-                }
-            }
-
             // ── Panel Threshold (Hansen 1999) ─────────────────────────────────
 
             // pthresh(y ~ x1 + x2, df, q=var, id=id, threshold=auto)
@@ -9475,46 +9423,6 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
-            // ── Diagnósticos de séries temporais ──────────────────────────────
-
-            // ljungbox(df, var, lags=N)
-            "ljungbox" | "ljung_box" | "portmanteau" => {
-                if args.len() < 2 { return Err(HayashiError::Runtime("ljungbox(df, var, lags=N)".into())); }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("ljungbox: primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("ljungbox: segundo arg deve ser nome de variável".into())) };
-                let series = Self::get_col_f64(&df, &var_name)?;
-                let lags = match opt_map.get("lags") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 10 };
-                let arr = ndarray::Array1::from(series.to_vec());
-                let r = greeners::TimeSeries::ljung_box(&arr, lags).map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                println!("\n{:=^60}", " Ljung-Box Q Test ");
-                println!("  Variable: {var_name}   Lags: {}", r.lags);
-                println!("  H₀: sem autocorrelação até lag {}", r.lags);
-                println!("  Q statistic:  {:>10.4}", r.test_statistic);
-                println!("  p-value:      {:>10.4}", r.p_value);
-                println!("  Conclusion: {}", if r.p_value < 0.05 { "REJEITA H₀ — autocorrelação presente" } else { "Não rejeita H₀" });
-                Ok(Value::Nil)
-            }
-
-            // archtest(df, var, lags=N)
-            "archtest" | "arch_test" | "engle_arch" => {
-                if args.len() < 2 { return Err(HayashiError::Runtime("archtest(df, var, lags=N)".into())); }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("archtest: primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("archtest: segundo arg deve ser nome de variável".into())) };
-                let series = Self::get_col_f64(&df, &var_name)?;
-                let lags = match opt_map.get("lags") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 4 };
-                let arr = ndarray::Array1::from(series.to_vec());
-                let r = greeners::TimeSeries::arch_test(&arr, lags).map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                println!("\n{:=^60}", " Engle ARCH-LM Test ");
-                println!("  Variable: {var_name}   Lags: {}", r.lags);
-                println!("  H₀: sem efeitos ARCH (variância condicional constante)");
-                println!("  LM statistic: {:>10.4}", r.test_statistic);
-                println!("  p-value:      {:>10.4}", r.p_value);
-                println!("  Conclusion: {}", if r.p_value < 0.05 { "REJEITA H₀ — efeitos ARCH presentes" } else { "Não rejeita H₀" });
-                Ok(Value::Nil)
-            }
-
             // ── Cointegração ──────────────────────────────────────────────────
 
             // granger(df, y, x, lags=N)
@@ -9597,102 +9505,6 @@ impl Interpreter {
             }
 
             // ══════════════════════════════════════════════════════════════════
-            // ── Diagnósticos de painel ─────────────────────────────────────────
-            // ══════════════════════════════════════════════════════════════════
-
-            // xtbp(df, formula, id=)  — Breusch-Pagan LM (RE vs pooled)
-            "xtbp" | "xttest0" | "bplm" => {
-                if args.len() < 2 { return Err(HayashiError::Runtime("xtbp(df, formula, id=id_var)".into())); }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("xtbp: primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let formula = match &args[1] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("xtbp: segundo arg deve ser fórmula".into())) };
-                let id_name = match opt_map.get("id") { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("xtbp: id= obrigatório".into())) };
-                let formula_str = Self::formula_to_string(&formula);
-                let gformula = GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let (y_arr, x_mat) = df.to_design_matrix(&gformula).map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let ols_r = greeners::OLS::fit(&y_arr, &x_mat, greeners::CovarianceType::NonRobust).map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let resid = ols_r.residuals(&y_arr, &x_mat);
-                let id_col = Self::get_col_f64(&df, &id_name)?;
-                let entity_ids: Vec<usize> = id_col.iter().map(|&v| v as usize).collect();
-                let (lm, pval) = greeners::PanelDiagnostics::breusch_pagan_lm(&resid, &entity_ids).map_err(|e| HayashiError::Runtime(e))?;
-                println!("\n{:=^60}", " Breusch-Pagan LM Test (RE vs Pooled) ");
-                println!("  H₀: var(u_i) = 0  (pooled OLS adequado)");
-                println!("  LM ~ χ²(1) = {lm:.4}   p = {pval:.4}");
-                println!("  Conclusion: {}", if pval < 0.05 { "REJEITA H₀ — usar efeitos aleatórios" } else { "Não rejeita H₀ — pooled OLS adequado" });
-                Ok(Value::Nil)
-            }
-
-            // pesaran_cd(df, formula, id=)  — teste de dependência cross-sectional
-            "pesaran_cd" | "xtcd" | "cd_test" => {
-                if args.len() < 2 { return Err(HayashiError::Runtime("pesaran_cd(df, formula, id=id_var)".into())); }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("pesaran_cd: primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let formula = match &args[1] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("pesaran_cd: segundo arg deve ser fórmula".into())) };
-                let id_name = match opt_map.get("id") { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("pesaran_cd: id= obrigatório".into())) };
-                let formula_str = Self::formula_to_string(&formula);
-                let gformula = GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let (y_arr, x_mat) = df.to_design_matrix(&gformula).map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let ols_r = greeners::OLS::fit(&y_arr, &x_mat, greeners::CovarianceType::NonRobust).map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let resid = ols_r.residuals(&y_arr, &x_mat);
-                let id_col = Self::get_col_f64(&df, &id_name)?;
-                let entity_ids: Vec<usize> = id_col.iter().map(|&v| v as usize).collect();
-                let (cd, pval) = greeners::PanelDiagnostics::pesaran_cd(&resid, &entity_ids).map_err(|e| HayashiError::Runtime(e))?;
-                println!("\n{:=^60}", " Pesaran CD Test (Cross-Section Dependence) ");
-                println!("  H₀: sem dependência cross-sectional");
-                println!("  CD ~ N(0,1) = {cd:.4}   p = {pval:.4}");
-                println!("  Conclusion: {}", if pval < 0.05 { "REJEITA H₀ — dependência cross-sectional presente" } else { "Não rejeita H₀" });
-                Ok(Value::Nil)
-            }
-
-            // abond(df, formula, id=, time=)  — Arellano-Bond autocorrelação GMM
-            "abond" | "xtabond_test" | "arellano_bond" => {
-                if args.len() < 2 { return Err(HayashiError::Runtime("abond(df, formula, id=, time=)".into())); }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("abond: primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let formula = match &args[1] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("abond: segundo arg deve ser fórmula".into())) };
-                let id_name = match opt_map.get("id") { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("abond: id= obrigatório".into())) };
-                let time_name = match opt_map.get("time") { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("abond: time= obrigatório".into())) };
-                let formula_str = Self::formula_to_string(&formula);
-                let gformula = GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let (y_arr, x_mat) = df.to_design_matrix(&gformula).map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let id_col = Self::get_col_f64(&df, &id_name)?;
-                let time_col = Self::get_col_f64(&df, &time_name)?;
-                let entity_ids: Vec<i64> = id_col.iter().map(|&v| v as i64).collect();
-                let time_vals: Vec<f64> = time_col.to_vec();
-                let (m1, p1, m2, p2) = greeners::PanelDiagnostics::arellano_bond_test(&y_arr, &x_mat, &entity_ids, &time_vals).map_err(|e| HayashiError::Runtime(e))?;
-                println!("\n{:=^60}", " Arellano-Bond AR Test ");
-                println!("  H₀: sem autocorrelação nos resíduos em diferenças");
-                println!("  AR(1):  z = {m1:.4}   p = {p1:.4}");
-                println!("  AR(2):  z = {m2:.4}   p = {p2:.4}");
-                println!("  (AR(1) esperado ser significativo; AR(2) não deve rejeitar H₀)");
-                Ok(Value::Nil)
-            }
-
-            // wooldridge_serial(df, formula, id=, time=)
-            "wooldridge_serial" | "xtwooldridge" | "xtserial" => {
-                if args.len() < 2 { return Err(HayashiError::Runtime("wooldridge_serial(df, formula, id=, time=)".into())); }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("wooldridge_serial: primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let formula = match &args[1] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("wooldridge_serial: segundo arg deve ser fórmula".into())) };
-                let id_name = match opt_map.get("id") { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("wooldridge_serial: id= obrigatório".into())) };
-                let time_name = match opt_map.get("time") { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("wooldridge_serial: time= obrigatório".into())) };
-                let formula_str = Self::formula_to_string(&formula);
-                let gformula = GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let (y_arr, x_mat) = df.to_design_matrix(&gformula).map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let id_col = Self::get_col_f64(&df, &id_name)?;
-                let time_col = Self::get_col_f64(&df, &time_name)?;
-                let entity_ids: Vec<i64> = id_col.iter().map(|&v| v as i64).collect();
-                let time_vals: Vec<f64> = time_col.to_vec();
-                let (t_stat, p_val, rho, n_ents) = greeners::PanelDiagnostics::wooldridge_serial(&y_arr, &x_mat, &entity_ids, &time_vals).map_err(|e| HayashiError::Runtime(e))?;
-                println!("\n{:=^60}", " Wooldridge Serial Correlation Test ");
-                println!("  H₀: sem correlação serial de primeira ordem nos erros");
-                println!("  Entidades: {n_ents}");
-                println!("  ρ̂(resid) = {rho:.4}");
-                println!("  t = {t_stat:.4}   p = {p_val:.4}");
-                println!("  Conclusion: {}", if p_val < 0.05 { "REJEITA H₀ — correlação serial presente" } else { "Não rejeita H₀" });
-                Ok(Value::Nil)
-            }
-
             // ── xtset: declara estrutura de painel ────────────────────────────
             // xtset(df, id_col, time_col)  — armazena em panel_info
             // Após xtset, fe/re/ab/etc. não precisam de id= e time=
