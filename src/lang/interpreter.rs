@@ -8512,6 +8512,131 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── Visualização ASCII ────────────────────────────────────────────
+
+            // histogram(df, var, bins=20, width=50, title="")
+            "histogram" | "hist" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("histogram(df, var, bins=20, width=50)".into()));
+                }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())) };
+                let data = Self::get_col_f64(&df, &var_name)?;
+                let bins = match opt_map.get("bins") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 20 };
+                let width = match opt_map.get("width") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 50 };
+                let title = match opt_map.get("title") { Some(Value::Str(s)) => s.clone(), _ => format!("Histograma — {var_name}") };
+                let clean: Vec<f64> = data.iter().cloned().filter(|v| !v.is_nan()).collect();
+                Self::ascii_histogram(&clean, bins, &title, &var_name, width);
+                Ok(Value::Nil)
+            }
+
+            // scatter(df, x, y, width=60, height=20, title="")
+            "scatter" | "scatterplot" => {
+                if args.len() < 3 {
+                    return Err(HayashiError::Runtime("scatter(df, x, y, width=60, height=20)".into()));
+                }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let xname = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável (x)".into())) };
+                let yname = match &args[2] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("terceiro arg deve ser nome de variável (y)".into())) };
+                let xs = Self::get_col_f64(&df, &xname)?;
+                let ys = Self::get_col_f64(&df, &yname)?;
+                let w = match opt_map.get("width")  { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 60 };
+                let h = match opt_map.get("height") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 20 };
+                let title = match opt_map.get("title") { Some(Value::Str(s)) => s.clone(), _ => format!("{yname} vs {xname}") };
+                Self::ascii_scatter(&xs.to_vec(), &ys.to_vec(), &title, &xname, &yname, w, h);
+                Ok(Value::Nil)
+            }
+
+            // lineplot(df, x, y, width=60, height=20, title="")
+            "lineplot" | "tsplot" | "twoway" => {
+                if args.len() < 3 {
+                    return Err(HayashiError::Runtime("lineplot(df, x, y, width=60, height=20)".into()));
+                }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let xname = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável (x/tempo)".into())) };
+                let yname = match &args[2] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("terceiro arg deve ser nome de variável (y)".into())) };
+                let xs = Self::get_col_f64(&df, &xname)?;
+                let ys = Self::get_col_f64(&df, &yname)?;
+                let w = match opt_map.get("width")  { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 60 };
+                let h = match opt_map.get("height") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 20 };
+                let title = match opt_map.get("title") { Some(Value::Str(s)) => s.clone(), _ => format!("{yname} — série temporal") };
+                Self::ascii_lineplot(&xs.to_vec(), &ys.to_vec(), &title, &xname, &yname, w, h);
+                Ok(Value::Nil)
+            }
+
+            // boxplot(df, var, width=60, title="")
+            "boxplot" | "box" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("boxplot(df, var, width=60)".into()));
+                }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())) };
+                let data = Self::get_col_f64(&df, &var_name)?;
+                let w = match opt_map.get("width") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 60 };
+                let title = match opt_map.get("title") { Some(Value::Str(s)) => s.clone(), _ => format!("Boxplot — {var_name}") };
+                let clean: Vec<f64> = data.iter().cloned().filter(|v| !v.is_nan()).collect();
+                Self::ascii_boxplot(&clean, &title, &var_name, w);
+                Ok(Value::Nil)
+            }
+
+            // kdensity(df, var, width=60, height=20) — KDE via ascii_scatter dos pontos da densidade
+            "kdensity" | "density" | "densityplot" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("kdensity(df, var, width=60, height=20)".into()));
+                }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())) };
+                let data = Self::get_col_f64(&df, &var_name)?;
+                let w = match opt_map.get("width")  { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 60 };
+                let h = match opt_map.get("height") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 20 };
+                // bw= option ou Silverman
+                let bw_opt = match opt_map.get("bw") { Some(Value::Float(v)) => Some(*v), Some(Value::Int(v)) => Some(*v as f64), _ => None };
+                let kernel = match opt_map.get("kernel") {
+                    Some(Value::Str(s)) => match s.as_str() {
+                        "epanechnikov" | "epa" => greeners::Kernel::Epanechnikov,
+                        "triangular"           => greeners::Kernel::Triangular,
+                        "uniform"              => greeners::Kernel::Uniform,
+                        _                      => greeners::Kernel::Gaussian,
+                    },
+                    _ => greeners::Kernel::Gaussian,
+                };
+                let clean: Vec<f64> = data.iter().cloned().filter(|v| !v.is_nan()).collect();
+                let n = clean.len();
+                if n < 4 { return Err(HayashiError::Runtime("kdensity: poucos dados".into())); }
+                // Estimar KDE — usa support/density já calculados no fit (512 pontos)
+                let result = greeners::KDEUnivariate::fit(&ndarray::Array1::from(clean.clone()), bw_opt, kernel)
+                    .map_err(|e| HayashiError::Runtime(format!("kdensity: {e}")))?;
+                let xs: Vec<f64> = result.support.to_vec();
+                let ys: Vec<f64> = result.density.to_vec();
+                let title = match opt_map.get("title") { Some(Value::Str(s)) => s.clone(), _ => format!("KDE — {var_name}  (bw={:.4})", result.bandwidth) };
+                Self::ascii_lineplot(&xs, &ys, &title, &var_name, "densidade", w, h);
+                Ok(Value::Nil)
+            }
+
+            // residplot(model, width=60, height=20) — resíduos vs ŷ
+            "residplot" | "rvfplot" | "resid_plot" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("residplot(model, width=60, height=20)".into()));
+                }
+                let (fitted, resids, mname) = match self.eval_expr(&args[0])? {
+                    Value::OlsResult(m) => {
+                        let yhat = m.x.dot(&m.result.params).to_vec();
+                        (yhat, m.residuals.to_vec(), "OLS".to_string())
+                    }
+                    _ => return Err(HayashiError::Type("residplot() suporta apenas modelos OLS; para GLM use predict + scatter".into())),
+                };
+                let w = match opt_map.get("width")  { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 60 };
+                let h = match opt_map.get("height") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 20 };
+                let title = format!("Resíduos vs Ŷ — {mname}");
+                Self::ascii_scatter(&fitted, &resids, &title, "ŷ (fitted)", "e (resíduo)", w, h);
+                Ok(Value::Nil)
+            }
+
             // ── Função definida pelo usuário ──────────────────────────────────
             other => {
                 // Recupera a função do env (se existir)
@@ -8931,6 +9056,194 @@ impl Interpreter {
         }
 
         Ok(())
+    }
+
+    // ── Helpers de visualização ASCII ────────────────────────────────────────
+
+    fn ascii_histogram(data: &[f64], bins: usize, title: &str, var: &str, width: usize) {
+        if data.is_empty() { println!("  (sem dados)"); return; }
+        let min = data.iter().cloned().fold(f64::INFINITY, f64::min);
+        let max = data.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        if (max - min).abs() < 1e-15 { println!("  (variância zero)"); return; }
+        let step = (max - min) / bins as f64;
+        let mut counts = vec![0usize; bins];
+        for &v in data {
+            let idx = ((v - min) / step).floor() as usize;
+            let idx = idx.min(bins - 1);
+            counts[idx] += 1;
+        }
+        let max_count = *counts.iter().max().unwrap_or(&1);
+        let bar_w = width.max(10);
+        let n = data.len();
+        let mean = data.iter().sum::<f64>() / n as f64;
+        let sd = (data.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / n as f64).sqrt();
+        println!();
+        println!("{:=^width$}", format!(" {title} "), width = bar_w + 34);
+        println!("  Variável: {var}   n={n}   μ={mean:.4}   σ={sd:.4}   [{min:.4}, {max:.4}]");
+        println!("{:-^width$}", "", width = bar_w + 34);
+        for (i, &cnt) in counts.iter().enumerate() {
+            let lo = min + i as f64 * step;
+            let hi = lo + step;
+            let bar_len = if max_count > 0 { cnt * bar_w / max_count } else { 0 };
+            let bar: String = "█".repeat(bar_len);
+            println!("  [{:>10.4},{:>10.4})  {:>5}  {:<width$}", lo, hi, cnt, bar, width = bar_w);
+        }
+        println!("{:-^width$}", "", width = bar_w + 34);
+        println!();
+    }
+
+    fn ascii_scatter(xs: &[f64], ys: &[f64], title: &str, xlab: &str, ylab: &str, w: usize, h: usize) {
+        if xs.is_empty() { println!("  (sem dados)"); return; }
+        let xmin = xs.iter().cloned().fold(f64::INFINITY, f64::min);
+        let xmax = xs.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        let ymin = ys.iter().cloned().fold(f64::INFINITY, f64::min);
+        let ymax = ys.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        let xrng = (xmax - xmin).max(1e-15);
+        let yrng = (ymax - ymin).max(1e-15);
+        let mut grid = vec![vec![' '; w]; h];
+        for (&x, &y) in xs.iter().zip(ys.iter()) {
+            if x.is_nan() || y.is_nan() { continue; }
+            let col = ((x - xmin) / xrng * (w - 1) as f64).round() as usize;
+            let row = h - 1 - ((y - ymin) / yrng * (h - 1) as f64).round() as usize;
+            let col = col.min(w - 1);
+            let row = row.min(h - 1);
+            grid[row][col] = '·';
+        }
+        println!();
+        println!("{:=^width$}", format!(" {title} "), width = w + 18);
+        println!("  {:<10}  {:>10.4} ┐", ylab, ymax);
+        for (i, row) in grid.iter().enumerate() {
+            let y_val = ymax - (i as f64 / (h - 1) as f64) * yrng;
+            let prefix = if i == 0 || i == h / 2 || i == h - 1 {
+                format!("  {:>10.4} │", y_val)
+            } else {
+                format!("             │")
+            };
+            let line: String = row.iter().collect();
+            println!("{prefix}{line}");
+        }
+        println!("             └{}", "─".repeat(w));
+        let mid_x = xmin + xrng / 2.0;
+        println!("              {:<10.4}{:^width$.4}{:>10.4}", xmin, mid_x, xmax, width = w - 20);
+        println!("              {:^width$}", xlab, width = w);
+        println!("  n={}", xs.len());
+        println!();
+    }
+
+    fn ascii_lineplot(xs: &[f64], ys: &[f64], title: &str, xlab: &str, ylab: &str, w: usize, h: usize) {
+        if xs.is_empty() { println!("  (sem dados)"); return; }
+        let xmin = xs.iter().cloned().fold(f64::INFINITY, f64::min);
+        let xmax = xs.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        let ymin = ys.iter().cloned().fold(f64::INFINITY, f64::min);
+        let ymax = ys.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        let xrng = (xmax - xmin).max(1e-15);
+        let yrng = (ymax - ymin).max(1e-15);
+        // Sort by x
+        let mut pairs: Vec<(f64, f64)> = xs.iter().zip(ys.iter())
+            .filter(|(&x, &y)| !x.is_nan() && !y.is_nan())
+            .map(|(&x, &y)| (x, y)).collect();
+        pairs.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        let mut grid = vec![vec![' '; w]; h];
+        let mut prev_col: Option<(usize, usize)> = None;
+        for &(x, y) in &pairs {
+            let col = ((x - xmin) / xrng * (w - 1) as f64).round() as usize;
+            let row = h - 1 - ((y - ymin) / yrng * (h - 1) as f64).round() as usize;
+            let col = col.min(w - 1);
+            let row = row.min(h - 1);
+            if let Some((pr, pc)) = prev_col {
+                // Fill between previous and current column
+                if pc < col {
+                    for c in pc..=col {
+                        let t = (c - pc) as f64 / (col - pc).max(1) as f64;
+                        let r = (pr as f64 + t * (row as f64 - pr as f64)).round() as usize;
+                        let r = r.min(h - 1);
+                        if grid[r][c] == ' ' { grid[r][c] = '─'; }
+                    }
+                }
+            }
+            grid[row][col] = '●';
+            prev_col = Some((row, col));
+        }
+        println!();
+        println!("{:=^width$}", format!(" {title} "), width = w + 18);
+        println!("  {:<10}  {:>10.4} ┐", ylab, ymax);
+        for (i, row) in grid.iter().enumerate() {
+            let y_val = ymax - (i as f64 / (h - 1) as f64) * yrng;
+            let prefix = if i == 0 || i == h / 2 || i == h - 1 {
+                format!("  {:>10.4} │", y_val)
+            } else {
+                format!("             │")
+            };
+            let line: String = row.iter().collect();
+            println!("{prefix}{line}");
+        }
+        println!("             └{}", "─".repeat(w));
+        let mid_x = xmin + xrng / 2.0;
+        println!("              {:<10.4}{:^width$.4}{:>10.4}", xmin, mid_x, xmax, width = w - 20);
+        println!("              {:^width$}", xlab, width = w);
+        println!("  n={}", pairs.len());
+        println!();
+    }
+
+    fn ascii_boxplot(data: &[f64], title: &str, var: &str, w: usize) {
+        if data.is_empty() { println!("  (sem dados)"); return; }
+        let mut sorted = data.to_vec();
+        sorted.retain(|v| !v.is_nan());
+        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        let n = sorted.len();
+        if n < 4 { println!("  (poucos dados para boxplot)"); return; }
+        let q = |p: f64| -> f64 {
+            let idx = p * (n - 1) as f64;
+            let lo = idx.floor() as usize;
+            let hi = idx.ceil().min((n - 1) as f64) as usize;
+            sorted[lo] + (idx - lo as f64) * (sorted[hi] - sorted[lo])
+        };
+        let mn = sorted[0];
+        let q1 = q(0.25);
+        let med = q(0.50);
+        let q3 = q(0.75);
+        let mx = sorted[n - 1];
+        let mean = sorted.iter().sum::<f64>() / n as f64;
+        let iqr = q3 - q1;
+        let fence_lo = q1 - 1.5 * iqr;
+        let fence_hi = q3 + 1.5 * iqr;
+        let whisker_lo = sorted.iter().cloned().filter(|&v| v >= fence_lo).fold(f64::INFINITY, f64::min);
+        let whisker_hi = sorted.iter().cloned().filter(|&v| v <= fence_hi).fold(f64::NEG_INFINITY, f64::max);
+        let outliers: Vec<f64> = sorted.iter().cloned().filter(|&v| v < fence_lo || v > fence_hi).collect();
+
+        let rng = (mx - mn).max(1e-15);
+        let to_col = |v: f64| -> usize { (((v - mn) / rng * (w - 1) as f64).round() as usize).min(w - 1) };
+        let c_wlo = to_col(whisker_lo);
+        let c_q1  = to_col(q1);
+        let c_med = to_col(med);
+        let c_q3  = to_col(q3);
+        let c_whi = to_col(whisker_hi);
+
+        // Build boxplot line
+        let mut line = vec![' '; w];
+        for c in c_wlo..=c_whi { line[c] = '─'; }
+        for c in c_q1..=c_q3 { line[c] = '█'; }
+        line[c_wlo] = '├';
+        line[c_whi] = '┤';
+        line[c_q1]  = '▐';
+        line[c_q3]  = '▌';
+        line[c_med] = '|';
+        for &v in &outliers { let c = to_col(v); line[c] = '○'; }
+
+        println!();
+        println!("{:=^width$}", format!(" {title} "), width = w + 18);
+        println!("  Variável: {var}   n={n}");
+        println!();
+        println!("             {}", line.iter().collect::<String>());
+        println!();
+        println!("  Min:    {:>12.4}   Q1:  {:>12.4}   Mediana: {:>12.4}", whisker_lo, q1, med);
+        println!("  Média:  {:>12.4}   Q3:  {:>12.4}   Max:     {:>12.4}", mean, q3, whisker_hi);
+        println!("  IQR:    {:>12.4}   Outliers: {}", iqr, outliers.len());
+        if !outliers.is_empty() && outliers.len() <= 10 {
+            let out_str: Vec<String> = outliers.iter().map(|v| format!("{:.3}", v)).collect();
+            println!("  Valores: [{}]", out_str.join(", "));
+        }
+        println!();
     }
 
     fn extract_binary_args(&mut self, args: &[Expr]) -> Result<(Formula, DataFrame)> {
