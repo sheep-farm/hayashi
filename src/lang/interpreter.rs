@@ -281,6 +281,8 @@ pub enum Value {
     SVarResult(Rc<greeners::SVarResult>),
     ThreeSLSResult(ThreeSLSModel),
     DFMResult(DFMModel),
+    EtsResult(Rc<greeners::ETSResult>),
+    ThresholdResult(Rc<greeners::threshold::ThresholdResult>),
     List(Rc<Vec<Value>>),
     UserFn(Rc<UserFn>),
     Nil,
@@ -347,6 +349,8 @@ impl std::fmt::Display for Value {
             Value::SVarResult(r)          => write!(f, "{r}"),
             Value::ThreeSLSResult(m)      => write!(f, "{m}"),
             Value::DFMResult(m)           => write!(f, "{m}"),
+            Value::EtsResult(r)           => write!(f, "{r}"),
+            Value::ThresholdResult(r)     => write!(f, "{r}"),
             Value::List(v) => {
                 write!(f, "[")?;
                 for (i, item) in v.iter().enumerate() {
@@ -4555,6 +4559,16 @@ impl Interpreter {
                                 "esttab() não suporta DFM (fatores latentes) — use print()".into()
                             ));
                         }
+                        Value::EtsResult(_) => {
+                            return Err(HayashiError::Runtime(
+                                "esttab() não suporta ETS (parâmetros de suavização) — use print()".into()
+                            ));
+                        }
+                        Value::ThresholdResult(_) => {
+                            return Err(HayashiError::Runtime(
+                                "esttab() não suporta panel threshold (dois regimes) — use print()".into()
+                            ));
+                        }
                         _ => return Err(HayashiError::Type(
                             "esttab(): tipo de modelo não suportado — use print()".into()
                         )),
@@ -8512,6 +8526,204 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── ETS — Suavização Exponencial (Holt-Winters) ───────────────────
+
+            // ets(df, var, trend=add, seasonal=add, period=12, damped=false)
+            // Alias: ses (simple), hwes (Holt-Winters)
+            "ets" | "ses" | "hwes" | "holtwinters" | "exponential_smoothing" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("ets(df, var, trend=add, seasonal=add, period=12, damped=false)".into()));
+                }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())) };
+                let y = Self::get_col_f64(&df, &var_name)?;
+                // Regra para aliases:
+                //   ses         → trend=none, seasonal=none
+                //   hwes        → trend=add,  seasonal=add
+                //   ets         → usa opções explícitas (padrão: add, add)
+                let (trend_def, seas_def) = match func {
+                    "ses"  => ("none", "none"),
+                    "hwes" | "holtwinters" => ("add", "add"),
+                    _      => ("add", "add"),
+                };
+                let trend_str = match opt_map.get("trend") { Some(Value::Str(s)) => s.clone(), _ => trend_def.to_string() };
+                let seas_str  = match opt_map.get("seasonal") { Some(Value::Str(s)) => s.clone(), _ => seas_def.to_string() };
+                let period    = match opt_map.get("period") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 12 };
+                let damped    = match opt_map.get("damped") { Some(Value::Bool(b)) => *b, Some(Value::Str(s)) => s == "true" || s == "yes", _ => false };
+                let trend_opt: Option<&str>   = if trend_str == "none" { None } else { Some(&trend_str) };
+                let seas_opt:  Option<&str>   = if seas_str  == "none" { None } else { Some(&seas_str) };
+                let seas_period = if seas_opt.is_some() { period } else { 0 };
+                let result = greeners::ExponentialSmoothing::fit(
+                    &ndarray::Array1::from(y.to_vec()),
+                    trend_opt, seas_opt, seas_period, damped,
+                ).map_err(|e| HayashiError::Runtime(format!("ets: {e}")))?;
+                Ok(Value::EtsResult(Rc::new(result)))
+            }
+
+            // forecast(model, steps=12, alpha=0.05) — previsão fora da amostra
+            // Suporta: EtsResult, ArimaResult
+            "forecast" | "fcast" | "predict_h" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("forecast(model, steps=12, alpha=0.05)".into()));
+                }
+                let steps = match opt_map.get("steps") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 12 };
+                // Se o segundo arg for positional (steps sem nome):
+                let steps = if args.len() >= 2 {
+                    match self.eval_expr(&args[1])? { Value::Int(v) => v as usize, Value::Float(v) => v as usize, _ => steps }
+                } else { steps };
+                let alpha = match opt_map.get("alpha") { Some(Value::Float(v)) => *v, Some(Value::Int(v)) => *v as f64, _ => 0.05 };
+                // invnorm(1-alpha/2) via aproximação racional simples
+                let ci_mult: f64 = {
+                    let p = 1.0 - alpha / 2.0;
+                    // Abramowitz & Stegun 26.2.17 — erro < 4.5e-4
+                    let t = (-2.0 * (1.0 - p).ln()).sqrt();
+                    let c0 = 2.515517_f64; let c1 = 0.802853; let c2 = 0.010328;
+                    let d1 = 1.432788_f64; let d2 = 0.189269; let d3 = 0.001308;
+                    t - (c0 + c1 * t + c2 * t * t) / (1.0 + d1 * t + d2 * t * t + d3 * t.powi(3))
+                };
+                match self.eval_expr(&args[0])? {
+                    Value::EtsResult(r) => {
+                        let fc = r.predict(steps);
+                        let resid = &r.residuals;
+                        let n = resid.len() as f64;
+                        let sigma = (resid.iter().map(|e| e * e).sum::<f64>() / n).sqrt();
+                        println!("\n{:=^50}", " ETS Forecast ");
+                        println!("{:<6} {:>12} {:>12} {:>12}", "h", "forecast", "lower", "upper");
+                        println!("{}", "-".repeat(44));
+                        for h in 0..steps {
+                            let f_h = fc[h];
+                            let margin = ci_mult * sigma * ((h + 1) as f64).sqrt();
+                            println!("{:<6} {:>12.4} {:>12.4} {:>12.4}", h + 1, f_h, f_h - margin, f_h + margin);
+                        }
+                        println!("{}", "=".repeat(50));
+                        Ok(Value::List(Rc::new(fc.to_vec().into_iter().map(Value::Float).collect())))
+                    }
+                    Value::ArimaResult(r) => {
+                        let fc = r.predict(steps, None)
+                            .map_err(|e| HayashiError::Runtime(format!("forecast arima: {e}")))?;
+                        println!("\n{:=^50}", " ARIMA Forecast ");
+                        println!("{:<6} {:>12}", "h", "forecast");
+                        println!("{}", "-".repeat(20));
+                        for (h, &f_h) in fc.iter().enumerate() { println!("{:<6} {:>12.4}", h + 1, f_h); }
+                        println!("{}", "=".repeat(50));
+                        Ok(Value::List(Rc::new(fc.to_vec().into_iter().map(Value::Float).collect())))
+                    }
+                    _ => Err(HayashiError::Type("forecast() suporta EtsResult ou ArimaResult".into())),
+                }
+            }
+
+            // ── Panel Threshold (Hansen 1999) ─────────────────────────────────
+
+            // pthresh(y ~ x1 + x2, df, q=var, id=id, threshold=auto)
+            "pthresh" | "xtthresh" | "panel_threshold" | "threshold" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("pthresh(y ~ x1 + x2, df, q=threshold_var, id=entity_id)".into()));
+                }
+                let formula = match &args[0] {
+                    Expr::Formula(f) => f.clone(),
+                    _ => return Err(HayashiError::Type("primeiro arg deve ser fórmula y ~ x1 + x2".into())),
+                };
+                let df_name = match &args[1] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let q_name = match opt_map.get("q") { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("pthresh requer q=variavel_threshold".into())) };
+                let id_name = match opt_map.get("id") { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("pthresh requer id=coluna_entidade".into())) };
+                let formula_str = Self::formula_to_string(&formula);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_vec, x_mat) = df.to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let q_col = Self::get_col_f64(&df, &q_name)?;
+                let id_col = Self::get_col_f64(&df, &id_name)?;
+                let entity_ids: ndarray::Array1<i64> = ndarray::Array1::from(id_col.iter().map(|&v| v as i64).collect::<Vec<_>>());
+                let q_arr = ndarray::Array1::from(q_col.to_vec());
+                let result = greeners::PanelThreshold::fit(&y_vec, &x_mat, &q_arr, &entity_ids)
+                    .map_err(|e| HayashiError::Runtime(format!("pthresh: {e}")))?;
+                Ok(Value::ThresholdResult(Rc::new(result)))
+            }
+
+            // ── Visualização ASCII — ACF / PACF / QQ-plot / heatmap ──────────
+
+            // acfplot(df, var, lags=20, width=50, title="")
+            "acfplot" | "acf_plot" | "corrgram" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("acfplot(df, var, lags=20, width=50)".into()));
+                }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())) };
+                let data = Self::get_col_f64(&df, &var_name)?;
+                let max_lag = match opt_map.get("lags") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 20 };
+                let width  = match opt_map.get("width")  { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 50 };
+                let title  = match opt_map.get("title")  { Some(Value::Str(s)) => s.clone(), _ => format!("ACF — {var_name}") };
+                let clean: Vec<f64> = data.iter().cloned().filter(|v| !v.is_nan()).collect();
+                Self::ascii_acf(&clean, max_lag, &title, width, false);
+                Ok(Value::Nil)
+            }
+
+            // pacfplot(df, var, lags=20, width=50, title="")
+            "pacfplot" | "pacf_plot" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("pacfplot(df, var, lags=20, width=50)".into()));
+                }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())) };
+                let data = Self::get_col_f64(&df, &var_name)?;
+                let max_lag = match opt_map.get("lags") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 20 };
+                let width  = match opt_map.get("width")  { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 50 };
+                let title  = match opt_map.get("title")  { Some(Value::Str(s)) => s.clone(), _ => format!("PACF — {var_name}") };
+                let clean: Vec<f64> = data.iter().cloned().filter(|v| !v.is_nan()).collect();
+                Self::ascii_acf(&clean, max_lag, &title, width, true);
+                Ok(Value::Nil)
+            }
+
+            // qqplot(df, var, width=50, height=20, dist="normal", title="")
+            "qqplot" | "qnorm" | "pnorm" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("qqplot(df, var, width=50, height=20)".into()));
+                }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())) };
+                let data = Self::get_col_f64(&df, &var_name)?;
+                let w = match opt_map.get("width")  { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 50 };
+                let h = match opt_map.get("height") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 20 };
+                let title = match opt_map.get("title") { Some(Value::Str(s)) => s.clone(), _ => format!("QQ-plot normal — {var_name}") };
+                let clean: Vec<f64> = data.iter().cloned().filter(|v| !v.is_nan()).collect();
+                Self::ascii_qqplot(&clean, &title, &var_name, w, h);
+                Ok(Value::Nil)
+            }
+
+            // corrplot(df, var1, var2, ...) — matriz de correlação ASCII
+            "corrplot" | "corr_heatmap" | "pwcorr_plot" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("corrplot(df, var1, var2, ...)".into()));
+                }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let var_names: Vec<String> = {
+                    let mut v = Vec::new();
+                    for a in &args[1..] {
+                        match a {
+                            Expr::Var(n) | Expr::Str(n) => v.push(n.clone()),
+                            _ => return Err(HayashiError::Type("args devem ser nomes de variáveis".into())),
+                        }
+                    }
+                    v
+                };
+                if var_names.len() < 2 { return Err(HayashiError::Runtime("corrplot: forneça ao menos 2 variáveis".into())); }
+                let cols: Vec<Vec<f64>> = {
+                    let mut v = Vec::new();
+                    for n in &var_names {
+                        v.push(Self::get_col_f64(&df, n)?.to_vec());
+                    }
+                    v
+                };
+                Self::ascii_corrplot(&cols, &var_names);
+                Ok(Value::Nil)
+            }
+
             // ── Visualização ASCII ────────────────────────────────────────────
 
             // histogram(df, var, bins=20, width=50, title="")
@@ -9243,6 +9455,162 @@ impl Interpreter {
             let out_str: Vec<String> = outliers.iter().map(|v| format!("{:.3}", v)).collect();
             println!("  Valores: [{}]", out_str.join(", "));
         }
+        println!();
+    }
+
+    // ── ACF / PACF como barras ASCII ─────────────────────────────────────────
+    fn ascii_acf(data: &[f64], max_lag: usize, title: &str, width: usize, partial: bool) {
+        let n = data.len();
+        if n < 4 { println!("(dados insuficientes para ACF)"); return; }
+        let mean = data.iter().sum::<f64>() / n as f64;
+        let var  = data.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / n as f64;
+        if var < 1e-15 { println!("(variância zero)"); return; }
+
+        // Calcula autocorrelações completas
+        let max_lag = max_lag.min(n / 2);
+        let acf: Vec<f64> = (0..=max_lag).map(|k| {
+            let s: f64 = (0..n - k).map(|i| (data[i] - mean) * (data[i + k] - mean)).sum();
+            s / (n as f64 * var)
+        }).collect();
+
+        // PACF via algoritmo de Yule-Walker (Durbin-Levinson)
+        let values: Vec<f64> = if partial {
+            let mut pacf = vec![0.0f64; max_lag + 1];
+            pacf[0] = 1.0;
+            if max_lag >= 1 { pacf[1] = acf[1]; }
+            let mut phi: Vec<Vec<f64>> = vec![vec![0.0; max_lag + 1]; max_lag + 1];
+            phi[1][1] = acf[1];
+            for k in 2..=max_lag {
+                let num: f64 = acf[k] - (1..k).map(|j| phi[k-1][j] * acf[k-j]).sum::<f64>();
+                let den: f64 = 1.0  - (1..k).map(|j| phi[k-1][j] * acf[j]).sum::<f64>();
+                let phi_kk = if den.abs() < 1e-15 { 0.0 } else { num / den };
+                phi[k][k] = phi_kk;
+                for j in 1..k { phi[k][j] = phi[k-1][j] - phi_kk * phi[k-1][k-j]; }
+                pacf[k] = phi_kk;
+            }
+            pacf
+        } else {
+            acf.clone()
+        };
+
+        let ci = 1.96 / (n as f64).sqrt(); // banda de confiança a 95%
+        println!("\n{:=<width$}", "");
+        println!(" {title}");
+        println!("{:=<width$}", "");
+        let half = width / 2;
+        for lag in 1..=max_lag {
+            let v = values[lag];
+            let bar_len = ((v.abs() * half as f64).round() as usize).min(half);
+            let in_ci = v.abs() <= ci;
+            let bar_char = if in_ci { '─' } else { '█' };
+            let bar: String = std::iter::repeat(bar_char).take(bar_len).collect();
+            let (left, right) = if v >= 0.0 {
+                (format!("{:<half$}", " "), format!("{}", bar))
+            } else {
+                let pad = half - bar_len;
+                (format!("{:>half$}", bar), " ".repeat(pad))
+            };
+            println!("{:3} |{}|{} {:6.3}", lag, left, right, v);
+        }
+        println!("{:=<width$}", "");
+        println!("  CI ±{:.3} (95%)  │ ── dentro  █ fora", ci);
+        println!();
+    }
+
+    // ── QQ-plot normal ────────────────────────────────────────────────────────
+    fn ascii_qqplot(data: &[f64], title: &str, var: &str, w: usize, h: usize) {
+        let mut sorted = data.to_vec();
+        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        let n = sorted.len();
+        if n < 4 { println!("(dados insuficientes para QQ-plot)"); return; }
+        // Quantis teóricos normais por aproximação de Blom: p_i = (i - 3/8) / (n + 1/4)
+        let theoretical: Vec<f64> = (1..=n).map(|i| {
+            let p = (i as f64 - 0.375) / (n as f64 + 0.25);
+            // Aproximação de Peter Acklam para invnorm (erro < 3.5e-4)
+            let q = p - 0.5;
+            let r = if q.abs() <= 0.425 {
+                let a = [3.3871328_f64, 133.14166789, 1971.5909503, 13731.693765, 45921.953931,
+                         67265.770927, 33430.575583, 2509.0809287];
+                let b = [1.0_f64, 42.313330701, 687.18700749, 5394.1960214, 21213.794301,
+                         39307.895800, 28729.085735, 5226.4952788];
+                let q2 = q * q;
+                let num = a.iter().enumerate().fold(0.0, |s,(i,&c)| s + c * q2.powi(i as i32));
+                let den = b.iter().enumerate().fold(0.0, |s,(i,&c)| s + c * q2.powi(i as i32));
+                q * num / den
+            } else {
+                let pp = if q < 0.0 { p } else { 1.0 - p };
+                let r = (-pp.ln()).sqrt();
+                let c = if r <= 5.0 {
+                    [1.42343711_f64, 4.63033784, 5.76082150, 1.42343711, 1.63155402, 0.07027109]
+                } else {
+                    [6.65790464_f64, 5.46378491, 1.78482653, 0.05697114, 0.18127138, 0.00778070]
+                };
+                let num = c[0] + r * (c[1] + r * c[2]);
+                let den = 1.0  + r * (c[3] + r * (c[4] + r * c[5]));
+                if q < 0.0 { -(num / den) } else { num / den }
+            };
+            r
+        }).collect();
+        let mean_s = sorted.iter().sum::<f64>() / n as f64;
+        let std_s  = (sorted.iter().map(|x| (x - mean_s).powi(2)).sum::<f64>() / n as f64).sqrt().max(1e-15);
+        // Standarizar os quantis empíricos
+        let empirical: Vec<f64> = sorted.iter().map(|x| (x - mean_s) / std_s).collect();
+        println!("\n{:=<w$}", "");
+        println!(" {title}  (normalizado)");
+        println!("{:=<w$}", "");
+        Self::ascii_scatter(&theoretical, &empirical, title, "quantil teórico", var, w, h);
+        // Linha de referência (y = x): já visível no scatter se os dados são normais
+        println!("  (linha ideal: pontos ao longo da diagonal)");
+    }
+
+    // ── Matriz de correlação como heatmap de texto ────────────────────────────
+    fn ascii_corrplot(cols: &[Vec<f64>], names: &[String]) {
+        let k = cols.len();
+        let n = cols[0].len();
+        let means: Vec<f64> = cols.iter().map(|c| c.iter().sum::<f64>() / n as f64).collect();
+        // Calcula correlações
+        let mut corr = vec![vec![0.0f64; k]; k];
+        for i in 0..k {
+            for j in 0..k {
+                let xi: Vec<f64> = cols[i].iter().map(|x| x - means[i]).collect();
+                let xj: Vec<f64> = cols[j].iter().map(|x| x - means[j]).collect();
+                let num: f64 = xi.iter().zip(&xj).map(|(a, b)| a * b).sum();
+                let di: f64  = xi.iter().map(|a| a * a).sum::<f64>().sqrt();
+                let dj: f64  = xj.iter().map(|b| b * b).sum::<f64>().sqrt();
+                corr[i][j] = if di * dj < 1e-15 { 0.0 } else { num / (di * dj) };
+            }
+        }
+        // Largura do nome
+        let nw = names.iter().map(|n| n.len()).max().unwrap_or(4).max(4);
+        // Cabeçalho
+        println!("\n{:=<80}", "");
+        println!(" Matriz de Correlação");
+        println!("{:=<80}", "");
+        print!("{:>nw$}", "");
+        for n in names { print!(" {:>7}", &n[..n.len().min(7)]); }
+        println!();
+        // Linhas
+        for i in 0..k {
+            print!("{:>nw$}", &names[i][..names[i].len().min(nw)]);
+            for j in 0..k {
+                let v = corr[i][j];
+                // Representação por blocos: ████ para |r|=1, ░░░░ para r≈0
+                let shade = if v.abs() >= 0.9 { "████" }
+                    else if v.abs() >= 0.7 { "▓▓▓▓" }
+                    else if v.abs() >= 0.5 { "▒▒▒▒" }
+                    else if v.abs() >= 0.3 { "░░░░" }
+                    else { "    " };
+                let sign = if v < 0.0 { "-" } else { "+" };
+                print!(" {sign}{shade}", );
+            }
+            print!("   ");
+            for j in 0..k {
+                print!(" {:>6.3}", corr[i][j]);
+            }
+            println!();
+        }
+        println!("{:=<80}", "");
+        println!("  Escala: ████ |r|≥0.9  ▓▓▓▓ ≥0.7  ▒▒▒▒ ≥0.5  ░░░░ ≥0.3  (+neg=-)");
         println!();
     }
 
@@ -10040,6 +10408,21 @@ impl Interpreter {
                     }
                     (Value::MstlResult(_), k) => return Err(HayashiError::Runtime(
                         format!("predict mstl: kind '{k}' desconhecido — use: trend, resid, seasonal, seasonal1, seasonal2, ...")
+                    )),
+
+                    // ── ETS (suavização exponencial) ──────────────────────────
+                    (Value::EtsResult(r), "fitted" | "yhat" | "xb") => r.fitted_values.to_vec(),
+                    (Value::EtsResult(r), "residuals" | "resid" | "e") => r.residuals.to_vec(),
+                    (Value::EtsResult(r), "level")    => r.level.to_vec(),
+                    (Value::EtsResult(r), "trend")    => r.trend.to_vec(),
+                    (Value::EtsResult(r), "seasonal") => r.seasonal.to_vec(),
+                    (Value::EtsResult(_), k) => return Err(HayashiError::Runtime(
+                        format!("predict ets: kind '{k}' desconhecido — use: fitted, residuals, level, trend, seasonal")
+                    )),
+
+                    // ── PanelThreshold ────────────────────────────────────────
+                    (Value::ThresholdResult(_), k) => return Err(HayashiError::Runtime(
+                        format!("predict pthresh: kind '{k}' — use print() para ver limiares e coeficientes")
                     )),
 
                     _ => return Err(HayashiError::Type(
