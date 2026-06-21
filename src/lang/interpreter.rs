@@ -34,6 +34,7 @@ pub struct OlsModel {
     pub x: Array2<f64>,
 }
 
+
 impl std::fmt::Display for OlsModel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.result)
@@ -9122,6 +9123,312 @@ impl Interpreter {
                     }
                     _ => return Err(HayashiError::Type("bitest: primeiro arg deve ser inteiro (count) ou DataFrame".into())),
                 }
+                Ok(Value::Nil)
+            }
+
+            // ══════════════════════════════════════════════════════════════════
+            // ── Testes de raiz unitária ────────────────────────────────────────
+            // ══════════════════════════════════════════════════════════════════
+
+            // adf(df, var, lags=N)
+            "adf" | "dickey_fuller" | "augmented_df" => {
+                if args.len() < 2 { return Err(HayashiError::Runtime("adf(df, var, lags=N)".into())); }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("adf: primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("adf: segundo arg deve ser nome de variável".into())) };
+                let series = Self::get_col_f64(&df, &var_name)?;
+                let max_lags = match opt_map.get("lags") { Some(Value::Int(v)) => Some(*v as usize), Some(Value::Float(v)) => Some(*v as usize), _ => None };
+                let arr = ndarray::Array1::from(series.to_vec());
+                let r = greeners::TimeSeries::adf(&arr, max_lags).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                println!("\n{:=^60}", " Augmented Dickey-Fuller Test ");
+                println!("  Variable: {var_name}   Lags used: {}", r.lags_used);
+                println!("  H₀: series has a unit root (non-stationary)");
+                println!("  Test statistic:  {:>10.4}", r.test_statistic);
+                if let Some(p) = r.p_value { println!("  p-value:         {:>10.4}", p); }
+                let (cv1, cv5, cv10) = r.critical_values;
+                println!("  Critical values:  1%={cv1:.3}  5%={cv5:.3}  10%={cv10:.3}");
+                println!("  Conclusion: {}", if r.is_stationary { "REJEITA H₀ — estacionária" } else { "Não rejeita H₀ — raiz unitária presente" });
+                Ok(Value::Nil)
+            }
+
+            // kpss(df, var, regression=c, lags=N)
+            "kpss" => {
+                if args.len() < 2 { return Err(HayashiError::Runtime("kpss(df, var, regression=c|ct, lags=N)".into())); }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("kpss: primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("kpss: segundo arg deve ser nome de variável".into())) };
+                let series = Self::get_col_f64(&df, &var_name)?;
+                let regression = match opt_map.get("regression") { Some(Value::Str(s)) => s.clone(), _ => "c".to_string() };
+                let max_lags = match opt_map.get("lags") { Some(Value::Int(v)) => Some(*v as usize), Some(Value::Float(v)) => Some(*v as usize), _ => None };
+                let arr = ndarray::Array1::from(series.to_vec());
+                let r = greeners::TimeSeries::kpss(&arr, &regression, max_lags).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                println!("\n{:=^60}", " KPSS Test ");
+                println!("  Variable: {var_name}   Regression: {}   Lags: {}", r.regression, r.lags_used);
+                println!("  H₀: series is stationary");
+                println!("  Test statistic:  {:>10.4}", r.test_statistic);
+                let (cv10, cv5, cv25, cv1) = r.critical_values;
+                println!("  Critical values:  10%={cv10:.3}  5%={cv5:.3}  2.5%={cv25:.3}  1%={cv1:.3}");
+                println!("  Conclusion: {}", if r.is_stationary { "Não rejeita H₀ — estacionária" } else { "REJEITA H₀ — não estacionária" });
+                Ok(Value::Nil)
+            }
+
+            // pp(df, var, lags=N)
+            "pp" | "phillips_perron" => {
+                if args.len() < 2 { return Err(HayashiError::Runtime("pp(df, var, lags=N)".into())); }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("pp: primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("pp: segundo arg deve ser nome de variável".into())) };
+                let series = Self::get_col_f64(&df, &var_name)?;
+                let max_lags = match opt_map.get("lags") { Some(Value::Int(v)) => Some(*v as usize), Some(Value::Float(v)) => Some(*v as usize), _ => None };
+                let arr = ndarray::Array1::from(series.to_vec());
+                let r = greeners::TimeSeries::phillips_perron(&arr, max_lags).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                println!("\n{:=^60}", " Phillips-Perron Test ");
+                println!("  Variable: {var_name}   Lags used: {}", r.lags_used);
+                println!("  H₀: series has a unit root (non-stationary)");
+                println!("  Zα statistic:    {:>10.4}", r.z_alpha);
+                println!("  Zt statistic:    {:>10.4}", r.z_t);
+                let (cv1, cv5, cv10) = r.critical_values;
+                println!("  Critical values:  1%={cv1:.3}  5%={cv5:.3}  10%={cv10:.3}");
+                println!("  Conclusion: {}", if r.is_stationary { "REJEITA H₀ — estacionária" } else { "Não rejeita H₀ — raiz unitária presente" });
+                Ok(Value::Nil)
+            }
+
+            // za(df, var, trim=0.15)
+            "za" | "zivot_andrews" | "zivot" => {
+                if args.len() < 2 { return Err(HayashiError::Runtime("za(df, var, trim=0.15)".into())); }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("za: primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("za: segundo arg deve ser nome de variável".into())) };
+                let series = Self::get_col_f64(&df, &var_name)?;
+                let trim = match opt_map.get("trim") { Some(Value::Float(v)) => *v, Some(Value::Int(v)) => *v as f64, _ => 0.15 };
+                let arr = ndarray::Array1::from(series.to_vec());
+                let r = greeners::TimeSeries::zivot_andrews(&arr, trim).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                println!("\n{:=^60}", " Zivot-Andrews Test ");
+                println!("  Variable: {var_name}");
+                println!("  H₀: unit root (sem quebra estrutural)");
+                println!("  Test statistic:  {:>10.4}", r.statistic);
+                println!("  Break point:     obs {}", r.break_point);
+                let (cv1, cv5, cv10) = r.critical_values;
+                println!("  Critical values:  1%={cv1:.3}  5%={cv5:.3}  10%={cv10:.3}");
+                println!("  Conclusion: {}", if r.is_stationary { "REJEITA H₀ — estacionária com quebra" } else { "Não rejeita H₀ — raiz unitária" });
+                Ok(Value::Nil)
+            }
+
+            // ── Diagnósticos de séries temporais ──────────────────────────────
+
+            // ljungbox(df, var, lags=N)
+            "ljungbox" | "ljung_box" | "portmanteau" => {
+                if args.len() < 2 { return Err(HayashiError::Runtime("ljungbox(df, var, lags=N)".into())); }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("ljungbox: primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("ljungbox: segundo arg deve ser nome de variável".into())) };
+                let series = Self::get_col_f64(&df, &var_name)?;
+                let lags = match opt_map.get("lags") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 10 };
+                let arr = ndarray::Array1::from(series.to_vec());
+                let r = greeners::TimeSeries::ljung_box(&arr, lags).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                println!("\n{:=^60}", " Ljung-Box Q Test ");
+                println!("  Variable: {var_name}   Lags: {}", r.lags);
+                println!("  H₀: sem autocorrelação até lag {}", r.lags);
+                println!("  Q statistic:  {:>10.4}", r.test_statistic);
+                println!("  p-value:      {:>10.4}", r.p_value);
+                println!("  Conclusion: {}", if r.p_value < 0.05 { "REJEITA H₀ — autocorrelação presente" } else { "Não rejeita H₀" });
+                Ok(Value::Nil)
+            }
+
+            // archtest(df, var, lags=N)
+            "archtest" | "arch_test" | "engle_arch" => {
+                if args.len() < 2 { return Err(HayashiError::Runtime("archtest(df, var, lags=N)".into())); }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("archtest: primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("archtest: segundo arg deve ser nome de variável".into())) };
+                let series = Self::get_col_f64(&df, &var_name)?;
+                let lags = match opt_map.get("lags") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 4 };
+                let arr = ndarray::Array1::from(series.to_vec());
+                let r = greeners::TimeSeries::arch_test(&arr, lags).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                println!("\n{:=^60}", " Engle ARCH-LM Test ");
+                println!("  Variable: {var_name}   Lags: {}", r.lags);
+                println!("  H₀: sem efeitos ARCH (variância condicional constante)");
+                println!("  LM statistic: {:>10.4}", r.test_statistic);
+                println!("  p-value:      {:>10.4}", r.p_value);
+                println!("  Conclusion: {}", if r.p_value < 0.05 { "REJEITA H₀ — efeitos ARCH presentes" } else { "Não rejeita H₀" });
+                Ok(Value::Nil)
+            }
+
+            // ── Cointegração ──────────────────────────────────────────────────
+
+            // granger(df, y, x, lags=N)
+            "granger" | "granger_causality" => {
+                if args.len() < 3 { return Err(HayashiError::Runtime("granger(df, y, x, lags=N)".into())); }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("granger: primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let y_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("granger: segundo arg deve ser nome de variável".into())) };
+                let x_name = match &args[2] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("granger: terceiro arg deve ser nome de variável".into())) };
+                let lags = match opt_map.get("lags") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 4 };
+                let y_arr = ndarray::Array1::from(Self::get_col_f64(&df, &y_name)?.to_vec());
+                let x_arr = ndarray::Array1::from(Self::get_col_f64(&df, &x_name)?.to_vec());
+                let r = greeners::TimeSeries::granger_causality(&y_arr, &x_arr, lags).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                println!("\n{:=^60}", " Granger Causality Test ");
+                println!("  H₀: {x_name} não causa Granger {y_name}   (lags={lags})");
+                println!("  F({}, {}) = {:.4}   p = {:.4}", r.df_num, r.df_denom, r.f_statistic, r.p_value);
+                println!("  Conclusion: {}", if r.p_value < 0.05 { format!("REJEITA H₀ — {x_name} causa Granger {y_name}") } else { "Não rejeita H₀".to_string() });
+                Ok(Value::Nil)
+            }
+
+            // engle_granger(df, y1, y2)
+            "engle_granger" | "coint" | "egtest" => {
+                if args.len() < 3 { return Err(HayashiError::Runtime("engle_granger(df, y1, y2)".into())); }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("engle_granger: primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let y1_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("engle_granger: segundo arg deve ser nome de variável".into())) };
+                let y2_name = match &args[2] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("engle_granger: terceiro arg deve ser nome de variável".into())) };
+                let y1_arr = ndarray::Array1::from(Self::get_col_f64(&df, &y1_name)?.to_vec());
+                let y2_arr = ndarray::Array1::from(Self::get_col_f64(&df, &y2_name)?.to_vec());
+                let r = greeners::TimeSeries::engle_granger(&y1_arr, &y2_arr).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                println!("\n{:=^60}", " Engle-Granger Cointegration Test ");
+                println!("  Variables: {y1_name}, {y2_name}");
+                println!("  H₀: sem cointegração");
+                println!("  ADF statistic: {:>10.4}", r.adf_statistic);
+                let (cv1, cv5, cv10) = r.critical_values;
+                println!("  Critical values:  1%={cv1:.3}  5%={cv5:.3}  10%={cv10:.3}");
+                let coef = &r.cointegrating_vector;
+                if coef.len() >= 2 { println!("  Vetor cointegrante: [{:.4}, {:.4}]", coef[0], coef[1]); }
+                println!("  Conclusion: {}", if r.is_cointegrated { "REJEITA H₀ — séries cointegradas" } else { "Não rejeita H₀ — sem cointegração" });
+                Ok(Value::Nil)
+            }
+
+            // johansen(df, [var1, var2, ...], lags=N, det=0)
+            "johansen" | "johansen_trace" | "vecrank" => {
+                if args.len() < 2 { return Err(HayashiError::Runtime("johansen(df, [var1, var2, ...], lags=N, det=0)".into())); }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("johansen: primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let var_names: Vec<String> = match self.eval_expr(&args[1])? {
+                    Value::List(lst) => lst.iter().map(|v| format!("{v}")).collect(),
+                    _ => return Err(HayashiError::Type("johansen: segundo arg deve ser lista de variáveis".into())),
+                };
+                let lags = match opt_map.get("lags") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 2 };
+                let det = match opt_map.get("det") { Some(Value::Int(v)) => *v as i32, Some(Value::Float(v)) => *v as i32, _ => 0i32 };
+                let n = df.n_rows();
+                let k = var_names.len();
+                let mut data = ndarray::Array2::<f64>::zeros((n, k));
+                for (j, name) in var_names.iter().enumerate() {
+                    let col = Self::get_col_f64(&df, name)?;
+                    for i in 0..n { data[[i, j]] = col[i]; }
+                }
+                let r = greeners::TimeSeries::johansen(&data, lags, det).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                println!("\n{:=^60}", " Johansen Cointegration Test ");
+                println!("  Variables: {}   Lags: {lags}   Det order: {det}", var_names.join(", "));
+                println!("  Cointegrating rank: {}", r.cointegrating_rank);
+                println!("\n  Trace Test:");
+                println!("  {:>4}  {:>12}  {:>10}  {:>10}  {:>10}", "Rank", "Trace stat", "10%", "5%", "1%");
+                for i in 0..r.n_vars {
+                    let stat = r.trace_stats[i];
+                    let cv = r.trace_critical_values.row(i);
+                    println!("  {:>4}  {:>12.4}  {:>10.4}  {:>10.4}  {:>10.4}", i, stat, cv[0], cv[1], cv[2]);
+                }
+                println!("\n  Max-Eigenvalue Test:");
+                println!("  {:>4}  {:>12}  {:>10}  {:>10}  {:>10}", "Rank", "Max-eig", "10%", "5%", "1%");
+                for i in 0..r.n_vars {
+                    let stat = r.max_eigen_stats[i];
+                    let cv = r.max_eigen_critical_values.row(i);
+                    println!("  {:>4}  {:>12.4}  {:>10.4}  {:>10.4}  {:>10.4}", i, stat, cv[0], cv[1], cv[2]);
+                }
+                Ok(Value::Nil)
+            }
+
+            // ══════════════════════════════════════════════════════════════════
+            // ── Diagnósticos de painel ─────────────────────────────────────────
+            // ══════════════════════════════════════════════════════════════════
+
+            // xtbp(df, formula, id=)  — Breusch-Pagan LM (RE vs pooled)
+            "xtbp" | "xttest0" | "bplm" => {
+                if args.len() < 2 { return Err(HayashiError::Runtime("xtbp(df, formula, id=id_var)".into())); }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("xtbp: primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let formula = match &args[1] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("xtbp: segundo arg deve ser fórmula".into())) };
+                let id_name = match opt_map.get("id") { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("xtbp: id= obrigatório".into())) };
+                let formula_str = Self::formula_to_string(&formula);
+                let gformula = GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_arr, x_mat) = df.to_design_matrix(&gformula).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let ols_r = greeners::OLS::fit(&y_arr, &x_mat, greeners::CovarianceType::NonRobust).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let resid = ols_r.residuals(&y_arr, &x_mat);
+                let id_col = Self::get_col_f64(&df, &id_name)?;
+                let entity_ids: Vec<usize> = id_col.iter().map(|&v| v as usize).collect();
+                let (lm, pval) = greeners::PanelDiagnostics::breusch_pagan_lm(&resid, &entity_ids).map_err(|e| HayashiError::Runtime(e))?;
+                println!("\n{:=^60}", " Breusch-Pagan LM Test (RE vs Pooled) ");
+                println!("  H₀: var(u_i) = 0  (pooled OLS adequado)");
+                println!("  LM ~ χ²(1) = {lm:.4}   p = {pval:.4}");
+                println!("  Conclusion: {}", if pval < 0.05 { "REJEITA H₀ — usar efeitos aleatórios" } else { "Não rejeita H₀ — pooled OLS adequado" });
+                Ok(Value::Nil)
+            }
+
+            // pesaran_cd(df, formula, id=)  — teste de dependência cross-sectional
+            "pesaran_cd" | "xtcd" | "cd_test" => {
+                if args.len() < 2 { return Err(HayashiError::Runtime("pesaran_cd(df, formula, id=id_var)".into())); }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("pesaran_cd: primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let formula = match &args[1] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("pesaran_cd: segundo arg deve ser fórmula".into())) };
+                let id_name = match opt_map.get("id") { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("pesaran_cd: id= obrigatório".into())) };
+                let formula_str = Self::formula_to_string(&formula);
+                let gformula = GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_arr, x_mat) = df.to_design_matrix(&gformula).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let ols_r = greeners::OLS::fit(&y_arr, &x_mat, greeners::CovarianceType::NonRobust).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let resid = ols_r.residuals(&y_arr, &x_mat);
+                let id_col = Self::get_col_f64(&df, &id_name)?;
+                let entity_ids: Vec<usize> = id_col.iter().map(|&v| v as usize).collect();
+                let (cd, pval) = greeners::PanelDiagnostics::pesaran_cd(&resid, &entity_ids).map_err(|e| HayashiError::Runtime(e))?;
+                println!("\n{:=^60}", " Pesaran CD Test (Cross-Section Dependence) ");
+                println!("  H₀: sem dependência cross-sectional");
+                println!("  CD ~ N(0,1) = {cd:.4}   p = {pval:.4}");
+                println!("  Conclusion: {}", if pval < 0.05 { "REJEITA H₀ — dependência cross-sectional presente" } else { "Não rejeita H₀" });
+                Ok(Value::Nil)
+            }
+
+            // abond(df, formula, id=, time=)  — Arellano-Bond autocorrelação GMM
+            "abond" | "xtabond_test" | "arellano_bond" => {
+                if args.len() < 2 { return Err(HayashiError::Runtime("abond(df, formula, id=, time=)".into())); }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("abond: primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let formula = match &args[1] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("abond: segundo arg deve ser fórmula".into())) };
+                let id_name = match opt_map.get("id") { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("abond: id= obrigatório".into())) };
+                let time_name = match opt_map.get("time") { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("abond: time= obrigatório".into())) };
+                let formula_str = Self::formula_to_string(&formula);
+                let gformula = GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_arr, x_mat) = df.to_design_matrix(&gformula).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let id_col = Self::get_col_f64(&df, &id_name)?;
+                let time_col = Self::get_col_f64(&df, &time_name)?;
+                let entity_ids: Vec<i64> = id_col.iter().map(|&v| v as i64).collect();
+                let time_vals: Vec<f64> = time_col.to_vec();
+                let (m1, p1, m2, p2) = greeners::PanelDiagnostics::arellano_bond_test(&y_arr, &x_mat, &entity_ids, &time_vals).map_err(|e| HayashiError::Runtime(e))?;
+                println!("\n{:=^60}", " Arellano-Bond AR Test ");
+                println!("  H₀: sem autocorrelação nos resíduos em diferenças");
+                println!("  AR(1):  z = {m1:.4}   p = {p1:.4}");
+                println!("  AR(2):  z = {m2:.4}   p = {p2:.4}");
+                println!("  (AR(1) esperado ser significativo; AR(2) não deve rejeitar H₀)");
+                Ok(Value::Nil)
+            }
+
+            // wooldridge_serial(df, formula, id=, time=)
+            "wooldridge_serial" | "xtwooldridge" | "xtserial" => {
+                if args.len() < 2 { return Err(HayashiError::Runtime("wooldridge_serial(df, formula, id=, time=)".into())); }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("wooldridge_serial: primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let formula = match &args[1] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("wooldridge_serial: segundo arg deve ser fórmula".into())) };
+                let id_name = match opt_map.get("id") { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("wooldridge_serial: id= obrigatório".into())) };
+                let time_name = match opt_map.get("time") { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("wooldridge_serial: time= obrigatório".into())) };
+                let formula_str = Self::formula_to_string(&formula);
+                let gformula = GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_arr, x_mat) = df.to_design_matrix(&gformula).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let id_col = Self::get_col_f64(&df, &id_name)?;
+                let time_col = Self::get_col_f64(&df, &time_name)?;
+                let entity_ids: Vec<i64> = id_col.iter().map(|&v| v as i64).collect();
+                let time_vals: Vec<f64> = time_col.to_vec();
+                let (t_stat, p_val, rho, n_ents) = greeners::PanelDiagnostics::wooldridge_serial(&y_arr, &x_mat, &entity_ids, &time_vals).map_err(|e| HayashiError::Runtime(e))?;
+                println!("\n{:=^60}", " Wooldridge Serial Correlation Test ");
+                println!("  H₀: sem correlação serial de primeira ordem nos erros");
+                println!("  Entidades: {n_ents}");
+                println!("  ρ̂(resid) = {rho:.4}");
+                println!("  t = {t_stat:.4}   p = {p_val:.4}");
+                println!("  Conclusion: {}", if p_val < 0.05 { "REJEITA H₀ — correlação serial presente" } else { "Não rejeita H₀" });
                 Ok(Value::Nil)
             }
 
