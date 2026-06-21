@@ -193,6 +193,32 @@ impl std::fmt::Display for DiagResult {
     }
 }
 
+// ── DFM wrapper ───────────────────────────────────────────────────────────────
+#[derive(Clone)]
+pub struct DFMModel {
+    pub result: Rc<greeners::DynamicFactorResult>,
+    pub var_names: Vec<String>,
+}
+
+impl std::fmt::Display for DFMModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.result)
+    }
+}
+
+// ── 3SLS wrapper ──────────────────────────────────────────────────────────────
+#[derive(Clone)]
+pub struct ThreeSLSModel {
+    pub result: Rc<greeners::three_sls::ThreeSLSResult>,
+    pub eq_var_names: Vec<Vec<String>>,
+}
+
+impl std::fmt::Display for ThreeSLSModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.result)
+    }
+}
+
 // ── Valores em runtime ────────────────────────────────────────────────────────
 
 #[derive(Clone)]
@@ -252,6 +278,9 @@ pub enum Value {
     GamResult(Rc<greeners::GamResult>),
     MiceResult(Rc<greeners::MICEResult>),
     MSARResult(Rc<greeners::MarkovAutoregResult>),
+    SVarResult(Rc<greeners::SVarResult>),
+    ThreeSLSResult(ThreeSLSModel),
+    DFMResult(DFMModel),
     List(Rc<Vec<Value>>),
     UserFn(Rc<UserFn>),
     Nil,
@@ -315,6 +344,9 @@ impl std::fmt::Display for Value {
             Value::GamResult(r)           => write!(f, "{r}"),
             Value::MiceResult(r)          => write!(f, "{r}"),
             Value::MSARResult(r)          => write!(f, "{r}"),
+            Value::SVarResult(r)          => write!(f, "{r}"),
+            Value::ThreeSLSResult(m)      => write!(f, "{m}"),
+            Value::DFMResult(m)           => write!(f, "{m}"),
             Value::List(v) => {
                 write!(f, "[")?;
                 for (i, item) in v.iter().enumerate() {
@@ -4508,6 +4540,21 @@ impl Interpreter {
                                 "esttab() não suporta Markov-AR (parâmetros por regime) — use print()".into()
                             ));
                         }
+                        Value::SVarResult(_) => {
+                            return Err(HayashiError::Runtime(
+                                "esttab() não suporta SVAR (matrizes A/B estruturais) — use print()".into()
+                            ));
+                        }
+                        Value::ThreeSLSResult(_) => {
+                            return Err(HayashiError::Runtime(
+                                "esttab() não suporta 3SLS (múltiplas equações) — use print()".into()
+                            ));
+                        }
+                        Value::DFMResult(_) => {
+                            return Err(HayashiError::Runtime(
+                                "esttab() não suporta DFM (fatores latentes) — use print()".into()
+                            ));
+                        }
                         _ => return Err(HayashiError::Type(
                             "esttab(): tipo de modelo não suportado — use print()".into()
                         )),
@@ -8116,6 +8163,355 @@ impl Interpreter {
                 Ok(Value::MSARResult(Rc::new(result)))
             }
 
+            // ── SVAR — Structural VAR ─────────────────────────────────────────
+            // svar(df, y1, y2, ..., lags=1, id=cholesky)
+            // id=cholesky  : identificação recursiva (Cholesky)
+            // id=longrun   : restrições de longo prazo (Blanchard-Quah)
+            "svar" | "svec" => {
+                if args.len() < 3 {
+                    return Err(HayashiError::Runtime(
+                        "svar(df, y1, y2, ..., lags=1, id=cholesky)".into()
+                    ));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())),
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                };
+                let var_names: Vec<String> = args[1..].iter().map(|a| match a {
+                    Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
+                    _ => Err(HayashiError::Type("variáveis de svar() devem ser identificadores".into())),
+                }).collect::<Result<_>>()?;
+                let lags = match opt_map.get("lags") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 1,
+                };
+                let n = df.n_rows();
+                let k = var_names.len();
+                let mut data = ndarray::Array2::<f64>::zeros((n, k));
+                for (j, vname) in var_names.iter().enumerate() {
+                    let col = Self::get_col_f64(&df, vname)?;
+                    for (i, &v) in col.iter().enumerate() { data[[i, j]] = v; }
+                }
+                let identification = match opt_map.get("id") {
+                    Some(Value::Str(s)) => match s.to_lowercase().as_str() {
+                        "cholesky" | "recursive" => greeners::SVarIdentification::Cholesky,
+                        "longrun" | "long_run" | "bq" | "blanchard_quah" => {
+                            let mask = ndarray::Array2::from_elem((k, k), f64::NAN);
+                            greeners::SVarIdentification::LongRun(mask)
+                        }
+                        other => return Err(HayashiError::Runtime(format!(
+                            "svar: id='{other}' desconhecido — use: cholesky, longrun"
+                        ))),
+                    },
+                    _ => greeners::SVarIdentification::Cholesky,
+                };
+                let result = greeners::SVAR::fit(&data, lags, identification)
+                    .map_err(|e| HayashiError::Runtime(format!("svar: {e}")))?;
+                Ok(Value::SVarResult(Rc::new(result)))
+            }
+
+            // sirf(model, steps=10) — Structural IRF
+            "sirf" | "svar_irf" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("sirf(model, steps=10)".into()));
+                }
+                let model = match self.eval_expr(&args[0])? {
+                    Value::SVarResult(m) => m,
+                    _ => return Err(HayashiError::Type("sirf() requer um modelo SVAR".into())),
+                };
+                let steps = match opt_map.get("steps") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 10,
+                };
+                let tensor = model.structural_irf(steps)
+                    .map_err(|e| HayashiError::Runtime(format!("sirf: {e}")))?;
+                let k = model.var_result.n_vars;
+                let names = &model.var_result.var_names;
+                let sep = "─".repeat(14 + k * 12);
+                println!("\nSVAR Structural IRF — {} — id: {} — {} passos",
+                    format!("VAR({})", model.var_result.lags), model.identification, steps);
+                for j in 0..k {
+                    println!("\n  Impulso: {}", names[j]);
+                    println!("  {sep}");
+                    let header: String = names.iter().map(|n| format!("{:>12}", n)).collect::<Vec<_>>().join("");
+                    println!("  {:>6}  {header}", "h");
+                    println!("  {sep}");
+                    for h in 0..steps {
+                        let row: String = (0..k).map(|i| format!("{:>12.4}", tensor[[h, i, j]])).collect::<Vec<_>>().join("");
+                        println!("  {:>6}  {row}", h);
+                    }
+                }
+                println!();
+                Ok(Value::Nil)
+            }
+
+            // sfevd(model, steps=10) — Structural FEVD
+            "sfevd" | "svar_fevd" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("sfevd(model, steps=10)".into()));
+                }
+                let model = match self.eval_expr(&args[0])? {
+                    Value::SVarResult(m) => m,
+                    _ => return Err(HayashiError::Type("sfevd() requer um modelo SVAR".into())),
+                };
+                let steps = match opt_map.get("steps") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 10,
+                };
+                let tensor = model.structural_fevd(steps)
+                    .map_err(|e| HayashiError::Runtime(format!("sfevd: {e}")))?;
+                let k = model.var_result.n_vars;
+                let names = &model.var_result.var_names;
+                let sep = "─".repeat(14 + k * 12);
+                println!("\nSVAR Structural FEVD — {} — id: {}", format!("VAR({})", model.var_result.lags), model.identification);
+                for i in 0..k {
+                    println!("\n  Resposta: {}", names[i]);
+                    println!("  {sep}");
+                    let header: String = names.iter().map(|n| format!("{:>12}", n)).collect::<Vec<_>>().join("");
+                    println!("  {:>6}  {header}", "h");
+                    println!("  {sep}");
+                    for h in 0..steps {
+                        let row: String = (0..k).map(|j| format!("{:>12.4}", tensor[[h, i, j]])).collect::<Vec<_>>().join("");
+                        println!("  {:>6}  {row}", h);
+                    }
+                }
+                println!();
+                Ok(Value::Nil)
+            }
+
+            // ── 3SLS — Three Stage Least Squares ──────────────────────────────
+            // threesl(df, y1~x1+z1, y2~x1+z2, instruments=["z1","z2"])
+            "threesl" | "three_sls" | "3sls" | "reg3" => {
+                if args.len() < 3 {
+                    return Err(HayashiError::Runtime(
+                        "threesl(df, y1~x1+z1, y2~x2+z2, instruments=[\"z1\",\"z2\"])".into()
+                    ));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())),
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                };
+
+                // Parse instruments= option
+                let instr_names: Vec<String> = match opt_map.get("instruments") {
+                    Some(Value::List(lst)) => lst.iter().map(|v| match v {
+                        Value::Str(s) => Ok(s.clone()),
+                        _ => Err(HayashiError::Type("instruments= deve ser lista de strings".into())),
+                    }).collect::<Result<_>>()?,
+                    Some(Value::Str(s)) => vec![s.clone()],
+                    None => return Err(HayashiError::Runtime(
+                        "threesl requer instruments=[\"z1\",\"z2\",...] — lista de variáveis exógenas".into()
+                    )),
+                    _ => return Err(HayashiError::Type("instruments= deve ser lista de strings".into())),
+                };
+
+                // Build global instrument matrix Z (n × q)
+                let n = df.n_rows();
+                let mut z_instr = ndarray::Array2::<f64>::zeros((n, instr_names.len()));
+                for (j, zname) in instr_names.iter().enumerate() {
+                    let col = Self::get_col_f64(&df, zname)?;
+                    for (i, &v) in col.iter().enumerate() { z_instr[[i, j]] = v; }
+                }
+
+                // Build equations from formulas
+                let mut equations: Vec<greeners::Equation> = Vec::new();
+                let mut eq_var_names: Vec<Vec<String>> = Vec::new();
+                for arg in &args[1..] {
+                    let formula_ast = match arg {
+                        Expr::Formula(f) => f.clone(),
+                        _ => return Err(HayashiError::Type(
+                            "threesl: cada equação deve ser uma fórmula (y ~ x1 + z1)".into()
+                        )),
+                    };
+                    let formula_str = Self::formula_to_string(&formula_ast);
+                    let g_formula = GFormula::parse(&formula_str)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let (y, x) = df.to_design_matrix(&g_formula)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let var_names = df.formula_var_names(&g_formula)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    eq_var_names.push(var_names);
+                    equations.push(greeners::Equation {
+                        y,
+                        x,
+                        name: formula_ast.lhs.clone(),
+                    });
+                }
+                let result = greeners::ThreeSLS::fit(&equations, &z_instr)
+                    .map_err(|e| HayashiError::Runtime(format!("threesl: {e}")))?;
+                Ok(Value::ThreeSLSResult(ThreeSLSModel {
+                    result: Rc::new(result),
+                    eq_var_names,
+                }))
+            }
+
+            // ── DFM — Dynamic Factor Model ────────────────────────────────────
+            // dfm(df, y1, y2, ..., factors=2, order=1)
+            "dfm" | "dynamic_factor" => {
+                if args.len() < 3 {
+                    return Err(HayashiError::Runtime(
+                        "dfm(df, y1, y2, ..., factors=2, order=1)".into()
+                    ));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())),
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                };
+                let var_names: Vec<String> = args[1..].iter().map(|a| match a {
+                    Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
+                    _ => Err(HayashiError::Type("variáveis de dfm() devem ser identificadores".into())),
+                }).collect::<Result<_>>()?;
+                let k_factors = match opt_map.get("factors") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 2,
+                };
+                let factor_order = match opt_map.get("order") {
+                    Some(Value::Int(v))   => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 1,
+                };
+                let n = df.n_rows();
+                let k = var_names.len();
+                let mut data = ndarray::Array2::<f64>::zeros((n, k));
+                for (j, vname) in var_names.iter().enumerate() {
+                    let col = Self::get_col_f64(&df, vname)?;
+                    for (i, &v) in col.iter().enumerate() { data[[i, j]] = v; }
+                }
+                let result = greeners::DynamicFactor::fit(&data, k_factors, factor_order)
+                    .map_err(|e| HayashiError::Runtime(format!("dfm: {e}")))?;
+                Ok(Value::DFMResult(DFMModel { result: Rc::new(result), var_names }))
+            }
+
+            // ── Diagnósticos menores de normalidade / forma funcional ─────────
+
+            // adtest(df, var) — Anderson-Darling test para normalidade
+            "adtest" | "anderson_darling" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("adtest(df, var)".into()));
+                }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())) };
+                let data = Self::get_col_f64(&df, &var_name)?;
+                let r = greeners::Diagnostics::anderson_darling(&ndarray::Array1::from(data))
+                    .map_err(|e| HayashiError::Runtime(format!("adtest: {e}")))?;
+                let sep = "─".repeat(56);
+                println!("\nAnderson-Darling Test (normalidade)");
+                println!("{sep}");
+                println!("  H₀: dados provêm de distribuição normal");
+                println!("  A² (ajustado) = {:.4}  (n={})", r.statistic, r.n_obs);
+                println!("{sep}");
+                println!("{:<12} {:>10}", "α", "A²*_crítico");
+                println!("{sep}");
+                for (&sig, &cv) in r.significance_levels.iter().zip(r.critical_values.iter()) {
+                    let mark = if r.statistic > cv { " ← REJEITA" } else { "" };
+                    println!("{:<12.3} {:>10.3}{mark}", sig, cv);
+                }
+                println!("{sep}");
+                println!("(Rejeita H₀ quando A²* > valor crítico)");
+                println!();
+                Ok(Value::Nil)
+            }
+
+            // lilliefors(df, var) — KS com parâmetros estimados
+            "lilliefors" | "lillie" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("lilliefors(df, var)".into()));
+                }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())) };
+                let data = Self::get_col_f64(&df, &var_name)?;
+                let (stat, p) = greeners::Diagnostics::lilliefors(&ndarray::Array1::from(data))
+                    .map_err(|e| HayashiError::Runtime(format!("lilliefors: {e}")))?;
+                let sig = if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
+                let sep = "─".repeat(56);
+                println!("\nLilliefors Test (normalidade — KS com parâmetros estimados)");
+                println!("{sep}");
+                println!("  H₀: dados provêm de distribuição normal");
+                println!("{sep}");
+                println!("{:<26} {:>10} {:>10} {:>4}", "Teste", "Estatística", "p-value", "");
+                println!("{sep}");
+                println!("{:<26} {:>10.4} {:>10.4} {:>4}", "KS (Lilliefors)", stat, p, sig);
+                println!("{sep}");
+                println!("(*** p<0.01  ** p<0.05  * p<0.10)");
+                println!();
+                Ok(Value::Nil)
+            }
+
+            // omnibus(model) — D'Agostino-Pearson nos resíduos
+            "omnibus" | "dagostino" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("omnibus(model)".into()));
+                }
+                let resids = match self.eval_expr(&args[0])? {
+                    Value::OlsResult(m) => m.residuals.to_vec(),
+                    _ => return Err(HayashiError::Type("omnibus() suporta apenas modelos OLS".into())),
+                };
+                let (k2, p) = greeners::Diagnostics::omnibus(&ndarray::Array1::from(resids))
+                    .map_err(|e| HayashiError::Runtime(format!("omnibus: {e}")))?;
+                let sig = if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
+                let sep = "─".repeat(56);
+                println!("\nD'Agostino-Pearson Omnibus Test (normalidade dos resíduos)");
+                println!("{sep}");
+                println!("  H₀: resíduos são normalmente distribuídos");
+                println!("  (combina assimetria e curtose via K² ~ χ²(2))");
+                println!("{sep}");
+                println!("{:<26} {:>10} {:>10} {:>4}", "Teste", "Estatística", "p-value", "");
+                println!("{sep}");
+                println!("{:<26} {:>10.4} {:>10.4} {:>4}", "K² ~ χ²(2)", k2, p, sig);
+                println!("{sep}");
+                println!("(*** p<0.01  ** p<0.05  * p<0.10)");
+                println!();
+                Ok(Value::Nil)
+            }
+
+            // harveycollier(model) — teste de linearidade via resíduos recursivos
+            "harveycollier" | "harvey_collier" | "hctest" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("harveycollier(model)".into()));
+                }
+                let ols = match self.eval_expr(&args[0])? {
+                    Value::OlsResult(m) => m,
+                    _ => return Err(HayashiError::Type("harveycollier() suporta apenas modelos OLS".into())),
+                };
+                // reconstruir y = ŷ + resíduos (OlsModel não armazena y diretamente)
+                let y_hat = ols.x.dot(&ols.result.params);
+                let y_obs = y_hat + &ols.residuals;
+                let (t, p) = greeners::Diagnostics::harvey_collier(&y_obs, &ols.x)
+                    .map_err(|e| HayashiError::Runtime(format!("harveycollier: {e}")))?;
+                let sig = if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
+                let sep = "─".repeat(56);
+                println!("\nHarvey-Collier Test (linearidade da especificação)");
+                println!("{sep}");
+                println!("  H₀: especificação funcional está correta (linear)");
+                println!("  (testa se média dos resíduos recursivos é zero)");
+                println!("{sep}");
+                println!("{:<26} {:>10} {:>10} {:>4}", "Teste", "Estatística", "p-value", "");
+                println!("{sep}");
+                println!("{:<26} {:>10.4} {:>10.4} {:>4}", "t (HC)", t, p, sig);
+                println!("{sep}");
+                println!("(*** p<0.01  ** p<0.05  * p<0.10)");
+                println!();
+                Ok(Value::Nil)
+            }
+
             // ── Função definida pelo usuário ──────────────────────────────────
             other => {
                 // Recupera a função do env (se existir)
@@ -9251,6 +9647,33 @@ impl Interpreter {
                     // ── MICE ──────────────────────────────────────────────────────
                     (Value::MiceResult(_), _) => return Err(HayashiError::Runtime(
                         "predict mice: MICE retorna múltiplos datasets; acesse via pooling de modelos".into()
+                    )),
+
+                    // ── SVAR ─────────────────────────────────────────────────────
+                    (Value::SVarResult(_), _) => return Err(HayashiError::Runtime(
+                        "predict svar: sem valores ajustados — use sirf() e sfevd() para análise de impulso-resposta".into()
+                    )),
+
+                    // ── 3SLS ─────────────────────────────────────────────────────
+                    (Value::ThreeSLSResult(_), _) => return Err(HayashiError::Runtime(
+                        "predict 3sls: múltiplas equações — use print() para ver coeficientes por equação".into()
+                    )),
+
+                    // ── DFM ───────────────────────────────────────────────────────
+                    (Value::DFMResult(m), kind_s) if kind_s.starts_with('f') => {
+                        let idx = kind_s[1..].parse::<usize>()
+                            .map(|n| n.saturating_sub(1))
+                            .unwrap_or(0);
+                        if idx >= m.result.n_factors {
+                            return Err(HayashiError::Runtime(format!(
+                                "predict dfm: fator f{} não existe — modelo tem {} fatores",
+                                idx + 1, m.result.n_factors
+                            )));
+                        }
+                        m.result.factors.column(idx).to_vec()
+                    }
+                    (Value::DFMResult(_), k) => return Err(HayashiError::Runtime(
+                        format!("predict dfm: kind '{k}' desconhecido — use: f1, f2, ... (índice 1-based do fator latente)")
                     )),
 
                     // ── MarkovAutoregression ───────────────────────────────────────
