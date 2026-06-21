@@ -384,6 +384,10 @@ impl Env {
     pub fn get(&self, name: &str) -> Option<&Value> {
         self.vars.get(name)
     }
+
+    pub fn remove(&mut self, name: &str) {
+        self.vars.remove(name);
+    }
 }
 
 // ── Interpetador ──────────────────────────────────────────────────────────────
@@ -5321,6 +5325,81 @@ impl Interpreter {
             // ── lincom ───────────────────────────────────────────────────────
             // lincom(model, var1=mult1, var2=mult2, ...)
             // Delega álgebra ao Greeners via OlsResult::t_test(r, q, x)
+            // ── nlcom: combinação não-linear de coefs (delta method) ────────
+            // nlcom(model, expr) — expr usa nomes de coeficientes como variáveis
+            // Exemplos: nlcom(m, X1 / X2)   nlcom(m, exp(_cons))   nlcom(m, X1 * X2)
+            "nlcom" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("nlcom(model, expression)".into()));
+                }
+                let ols = match self.eval_expr(&args[0])? {
+                    Value::OlsResult(m) => m,
+                    _ => return Err(HayashiError::Type("nlcom() requires an OLS model".into())),
+                };
+                let names = ols.result.variable_names.as_ref()
+                    .ok_or_else(|| HayashiError::Runtime("model has no variable names".into()))?;
+                let params = &ols.result.params;
+                let k = params.len();
+                let expr = &args[1];
+
+                // salvar variáveis existentes e bind coeficientes
+                let mut saved: Vec<(String, Option<Value>)> = Vec::new();
+                for (i, name) in names.iter().enumerate() {
+                    saved.push((name.clone(), self.env.get(name).cloned()));
+                    self.env.set(name, Value::Float(params[i]));
+                }
+
+                // avaliar g(β̂)
+                let g = match self.eval_expr(expr)? {
+                    Value::Float(f) => f,
+                    Value::Int(i) => i as f64,
+                    _ => {
+                        for (name, old) in &saved {
+                            match old { Some(v) => self.env.set(name, v.clone()), None => { self.env.remove(name); } }
+                        }
+                        return Err(HayashiError::Type("nlcom: expression must evaluate to a number".into()));
+                    }
+                };
+
+                // gradiente numérico (diferenças centrais)
+                let h = 1e-7;
+                let mut grad = ndarray::Array1::<f64>::zeros(k);
+                for j in 0..k {
+                    let orig = params[j];
+                    self.env.set(&names[j], Value::Float(orig + h));
+                    let g_plus = match self.eval_expr(expr)? { Value::Float(f) => f, Value::Int(i) => i as f64, _ => g };
+                    self.env.set(&names[j], Value::Float(orig - h));
+                    let g_minus = match self.eval_expr(expr)? { Value::Float(f) => f, Value::Int(i) => i as f64, _ => g };
+                    grad[j] = (g_plus - g_minus) / (2.0 * h);
+                    self.env.set(&names[j], Value::Float(orig));
+                }
+
+                // restaurar variáveis
+                for (name, old) in &saved {
+                    match old { Some(v) => self.env.set(name, v.clone()), None => { self.env.remove(name); } }
+                }
+
+                // V = σ²(X'X)⁻¹
+                let xt_x = ols.x.t().dot(&ols.x);
+                let xt_x_inv = xt_x.inv().map_err(|e| HayashiError::Runtime(format!("nlcom: {e}")))?;
+                let sigma2 = ols.result.sigma * ols.result.sigma;
+                let vcov = &xt_x_inv * sigma2;
+
+                // SE = sqrt(g' V g)
+                let se = (grad.dot(&vcov.dot(&grad))).max(0.0).sqrt();
+                let t = if se > 1e-15 { g / se } else { f64::NAN };
+                let p = t_pvalue_two(t, ols.result.df_resid as f64);
+
+                println!("\n{:=^60}", " nlcom ");
+                println!("  g(β̂) = {g:.6}");
+                println!("  SE    = {se:.6}   (delta method)");
+                println!("  t     = {t:.4}   p = {p:.4}");
+                let sig = if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
+                if !sig.is_empty() { println!("  {sig}"); }
+                println!("{:=^60}\n", "");
+                Ok(Value::Float(g))
+            }
+
             "lincom" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime("lincom() requires an OLS model".into()));
