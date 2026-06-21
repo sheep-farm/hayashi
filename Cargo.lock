@@ -854,6 +854,7 @@ dependencies = [
  "dta",
  "greeners",
  "ndarray 0.17.2",
+ "rand",
  "rustyline",
  "tempfile",
  "thiserror 2.0.18",
