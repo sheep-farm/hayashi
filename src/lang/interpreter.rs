@@ -576,9 +576,9 @@ impl Interpreter {
     // ── Funções built-in ──────────────────────────────────────────────────────
 
     fn eval_call(&mut self, func: &str, args: &[Expr], opts: &[Opt]) -> Result<Value> {
-        // avalia opts primeiro (exceto "if" — condição de linha, avaliada via eval_col_expr)
+        // avalia opts primeiro (exceto "if"/"vars" — avaliados lazy pelos builtins)
         let opt_map: HashMap<String, Value> = opts.iter()
-            .filter(|o| o.name != "if")
+            .filter(|o| o.name != "if" && o.name != "vars")
             .map(|o| Ok((o.name.clone(), self.eval_expr(&o.value)?)))
             .collect::<Result<_>>()?;
 
@@ -6130,17 +6130,47 @@ impl Interpreter {
                     _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())),
                 };
 
-                // args[1]: Int → nrows; Ident → coluna
-                let mut n_show = 10usize;
+                // args[1..]: Int → nrows; Ident/Str → coluna
+                let mut n_explicit: Option<usize> = None;
                 let mut col_names: Vec<String> = Vec::new();
 
                 for arg in &args[1..] {
                     match arg {
-                        Expr::Int(n)            => n_show = (*n).max(0) as usize,
+                        Expr::Int(n)                => n_explicit = Some((*n).max(0) as usize),
                         Expr::Var(n) | Expr::Str(n) => col_names.push(n.clone()),
                         _ => return Err(HayashiError::Type("list() arguments must be identifiers or row count".into())),
                     }
                 }
+
+                // vars=[A, B, C] — opção nomeada (somente se nenhuma coluna foi dada positionally)
+                if col_names.is_empty() {
+                    if let Some(vars_opt) = opts.iter().find(|o| o.name == "vars") {
+                        match &vars_opt.value {
+                            Expr::List(items) => {
+                                for e in items {
+                                    match e {
+                                        Expr::Var(n) | Expr::Str(n) => col_names.push(n.clone()),
+                                        _ => {}
+                                    }
+                                }
+                            }
+                            Expr::Var(n) | Expr::Str(n) => col_names.push(n.clone()),
+                            _ => {}
+                        }
+                    }
+                }
+
+                // n= opção (sobrepõe default 10; arg positional Int tem prioridade)
+                let n_show = if let Some(n) = n_explicit {
+                    n
+                } else {
+                    match opt_map.get("n") {
+                        Some(Value::Int(v))   => (*v).max(0) as usize,
+                        Some(Value::Float(v)) => (*v as i64).max(0) as usize,
+                        _                     => 10usize,
+                    }
+                };
+
                 if col_names.is_empty() {
                     col_names = df.column_names();
                 }
@@ -7070,6 +7100,11 @@ impl Interpreter {
                 println!();
 
                 Ok(Value::Nil)
+            }
+
+            // aliases para bgodfrey
+            "bgtest" | "bg" | "breusch_godfrey" => {
+                return self.eval_call("bgodfrey", args, opts);
             }
 
             // archtest(df, varname, lags=5)
@@ -9130,6 +9165,265 @@ impl Interpreter {
             // ── Testes de raiz unitária ────────────────────────────────────────
             // ══════════════════════════════════════════════════════════════════
 
+            // ══════════════════════════════════════════════════════════════════
+            // ── Filtros de ciclo de negócios ──────────────────────────────────
+            // ══════════════════════════════════════════════════════════════════
+
+            // hpfilter(df, var, lambda=1600)  →  cria df.var_trend e df.var_cycle
+            "hpfilter" | "hp_filter" | "hprescott" => {
+                if args.len() < 2 { return Err(HayashiError::Runtime("hpfilter(df, var, lambda=1600)".into())); }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("hpfilter: primeiro arg deve ser DataFrame".into())) };
+                let mut df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("hpfilter: segundo arg deve ser nome de variável".into())) };
+                let lambda = match opt_map.get("lambda") { Some(Value::Float(v)) => *v, Some(Value::Int(v)) => *v as f64, _ => 1600.0 };
+                let series = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?.to_vec());
+                let (trend, cycle) = greeners::TimeSeries::hp_filter(&series, lambda).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let trend_name = format!("{var_name}_trend");
+                let cycle_name = format!("{var_name}_cycle");
+                df.insert(trend_name.clone(), trend).map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
+                df.insert(cycle_name.clone(), cycle).map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
+                println!("hpfilter: λ={lambda}  →  {trend_name} e {cycle_name} adicionadas a {df_name}");
+                self.env.set(&df_name, Value::DataFrame(df));
+                Ok(Value::Nil)
+            }
+
+            // bkfilter(df, var, low=6, high=32, k=12)  →  cria df.var_cycle
+            "bkfilter" | "bk_filter" | "baxter_king" => {
+                if args.len() < 2 { return Err(HayashiError::Runtime("bkfilter(df, var, low=6, high=32, k=12)".into())); }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("bkfilter: primeiro arg deve ser DataFrame".into())) };
+                let mut df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("bkfilter: segundo arg deve ser nome de variável".into())) };
+                let low  = match opt_map.get("low")  { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 6 };
+                let high = match opt_map.get("high") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 32 };
+                let k    = match opt_map.get("k")    { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 12 };
+                let series = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?.to_vec());
+                let cycle = greeners::TimeSeries::bk_filter(&series, low, high, k).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let cycle_name = format!("{var_name}_cycle");
+                df.insert(cycle_name.clone(), cycle).map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
+                println!("bkfilter: períodos [{low},{high}] k={k}  →  {cycle_name} adicionada a {df_name}");
+                self.env.set(&df_name, Value::DataFrame(df));
+                Ok(Value::Nil)
+            }
+
+            // cffilter(df, var, low=6, high=32, drift=false)  →  cria df.var_cycle
+            "cffilter" | "cf_filter" | "christiano_fitzgerald" => {
+                if args.len() < 2 { return Err(HayashiError::Runtime("cffilter(df, var, low=6, high=32, drift=false)".into())); }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("cffilter: primeiro arg deve ser DataFrame".into())) };
+                let mut df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("cffilter: segundo arg deve ser nome de variável".into())) };
+                let low   = match opt_map.get("low")  { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 6 };
+                let high  = match opt_map.get("high") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 32 };
+                let drift = matches!(opt_map.get("drift"), Some(Value::Bool(true)));
+                let series = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?.to_vec());
+                let cycle = greeners::TimeSeries::cf_filter(&series, low, high, drift).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let cycle_name = format!("{var_name}_cycle");
+                df.insert(cycle_name.clone(), cycle).map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
+                println!("cffilter: períodos [{low},{high}] drift={drift}  →  {cycle_name} adicionada a {df_name}");
+                self.env.set(&df_name, Value::DataFrame(df));
+                Ok(Value::Nil)
+            }
+
+            // ══════════════════════════════════════════════════════════════════
+            // ── Regressão penalizada — Lasso / Ridge / ElasticNet ─────────────
+            // ══════════════════════════════════════════════════════════════════
+
+            // ridge(formula, df, alpha=1.0)
+            // β_ridge = (X'X + αI)^{-1} X'y  (forma fechada)
+            "ridge" | "ridge_reg" => {
+                if args.len() < 2 { return Err(HayashiError::Runtime("ridge(formula, df, alpha=1.0)".into())); }
+                let formula = match &args[0] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("ridge: primeiro arg deve ser fórmula".into())) };
+                let df_name = match &args[1] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("ridge: segundo arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let alpha = match opt_map.get("alpha") { Some(Value::Float(v)) => *v, Some(Value::Int(v)) => *v as f64, _ => 1.0_f64 };
+                let formula_str = Self::formula_to_string(&formula);
+                let gformula = GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y, x) = df.to_design_matrix(&gformula).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let n = x.nrows();
+                let k = x.ncols();
+                // (X'X + αI)^{-1} X'y
+                let xtx = x.t().dot(&x);
+                let mut reg = xtx.clone();
+                for i in 0..k { reg[[i, i]] += alpha; }
+                let reg_inv = reg.inv().map_err(|_| HayashiError::Runtime("ridge: matriz singular".into()))?;
+                let params = reg_inv.dot(&x.t().dot(&y));
+                let y_hat = x.dot(&params);
+                let resid: Vec<f64> = y.iter().zip(y_hat.iter()).map(|(a, b)| a - b).collect();
+                let sse: f64 = resid.iter().map(|r| r * r).sum();
+                let sst: f64 = { let m = y.mean().unwrap_or(0.0); y.iter().map(|v| (v - m).powi(2)).sum() };
+                let r2 = 1.0 - sse / sst;
+                let var_names: Vec<String> = gformula.independents.clone();
+                println!("\n{:=^60}", " Ridge Regression ");
+                println!("  Formula: {formula_str}   α = {alpha}");
+                println!("  n = {n}   k = {k}   R² = {r2:.4}");
+                println!("\n  {:<20} {:>12}", "Variable", "Coeff");
+                println!("  {}", "─".repeat(33));
+                if gformula.intercept && var_names.len() < params.len() {
+                    println!("  {:<20} {:>12.6}", "const", params[0]);
+                    for (i, name) in var_names.iter().enumerate() { println!("  {:<20} {:>12.6}", name, params[i + 1]); }
+                } else {
+                    for (i, name) in var_names.iter().enumerate() { println!("  {:<20} {:>12.6}", name, params[i]); }
+                }
+                Ok(Value::Nil)
+            }
+
+            // lasso(formula, df, alpha=1.0, tol=1e-6, max_iter=10000)
+            // Coordinate descent para Lasso (L1), com intercept não penalizado
+            "lasso" | "lasso_reg" => {
+                if args.len() < 2 { return Err(HayashiError::Runtime("lasso(formula, df, alpha=1.0, tol=1e-6, max_iter=10000)".into())); }
+                let formula = match &args[0] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("lasso: primeiro arg deve ser fórmula".into())) };
+                let df_name = match &args[1] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("lasso: segundo arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let alpha    = match opt_map.get("alpha")    { Some(Value::Float(v)) => *v, Some(Value::Int(v)) => *v as f64, _ => 1.0_f64 };
+                let tol      = match opt_map.get("tol")      { Some(Value::Float(v)) => *v, _ => 1e-6_f64 };
+                let max_iter = match opt_map.get("max_iter") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 10_000usize };
+                let formula_str = Self::formula_to_string(&formula);
+                let gformula = GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y, x) = df.to_design_matrix(&gformula).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let n_obs = x.nrows();
+                let k = x.ncols();
+                let has_intercept = gformula.intercept;
+                let start_col = if has_intercept { 1 } else { 0 };
+                // Centrar y; padronizar X (colunas covariáveis)
+                let y_mean = y.sum() / n_obs as f64;
+                let y_c: ndarray::Array1<f64> = y.mapv(|v| v - y_mean);
+                let mut x_std = x.clone();
+                let mut col_mean: Vec<f64> = vec![0.0; k];
+                let mut col_std_v: Vec<f64> = vec![1.0; k];
+                for j in start_col..k {
+                    let col = x.column(j);
+                    let mj = col.sum() / n_obs as f64;
+                    let sj = (col.iter().map(|&v| (v - mj).powi(2)).sum::<f64>() / n_obs as f64).sqrt();
+                    col_mean[j] = mj;
+                    if sj > 1e-12 {
+                        col_std_v[j] = sj;
+                        for i in 0..n_obs { x_std[[i, j]] = (x[[i, j]] - mj) / sj; }
+                    }
+                }
+                let soft = |z: f64, lam: f64| -> f64 { if z > lam { z - lam } else if z < -lam { z + lam } else { 0.0 } };
+                let xx_diag: Vec<f64> = (start_col..k).map(|j| x_std.column(j).dot(&x_std.column(j))).collect();
+                // coordinate descent sem intercept (y já centralizado)
+                let mut beta = ndarray::Array1::<f64>::zeros(k - start_col);
+                for _iter in 0..max_iter {
+                    let mut max_delta = 0.0_f64;
+                    let xb: ndarray::Array1<f64> = {
+                        let mut v = ndarray::Array1::<f64>::zeros(n_obs);
+                        for j in 0..beta.len() {
+                            let col_j = x_std.column(start_col + j);
+                            v = v + col_j.mapv(|x| x * beta[j]);
+                        }
+                        v
+                    };
+                    let r = &y_c - &xb;
+                    for j in 0..beta.len() {
+                        let denom = xx_diag[j];
+                        if denom < 1e-12 { continue; }
+                        let rho_j = r.dot(&x_std.column(start_col + j)) + denom * beta[j];
+                        let new_b = soft(rho_j / denom, alpha * n_obs as f64 / denom);
+                        let delta = (new_b - beta[j]).abs();
+                        if delta > max_delta { max_delta = delta; }
+                        beta[j] = new_b;
+                    }
+                    if max_delta < tol { break; }
+                }
+                // destandardizar: β_j_orig = β_j_std / std_j
+                // intercept: intercept = y_mean - sum_j(β_j_orig * mean_j)
+                let mut params = ndarray::Array1::<f64>::zeros(k);
+                for j in 0..beta.len() { params[start_col + j] = beta[j] / col_std_v[start_col + j]; }
+                if has_intercept {
+                    params[0] = y_mean - (start_col..k).map(|j| params[j] * col_mean[j]).sum::<f64>();
+                }
+                let y_hat = x.dot(&params);
+                let sse: f64 = y.iter().zip(y_hat.iter()).map(|(a, b)| (a - b).powi(2)).sum();
+                let sst: f64 = { let m = y.mean().unwrap_or(0.0); y.iter().map(|v| (v - m).powi(2)).sum() };
+                let r2 = 1.0 - sse / sst;
+                let n_nonzero = params.iter().skip(start_col).filter(|&&v| v.abs() > 1e-10).count();
+                let var_names = &gformula.independents;
+                println!("\n{:=^60}", " Lasso Regression ");
+                println!("  Formula: {formula_str}   α = {alpha}");
+                println!("  n = {}   k = {}   R² = {r2:.4}   vars ativas: {n_nonzero}", x.nrows(), k);
+                println!("\n  {:<20} {:>12}", "Variable", "Coeff");
+                println!("  {}", "─".repeat(33));
+                if gformula.intercept {
+                    println!("  {:<20} {:>12.6}", "const", params[0]);
+                    for (i, name) in var_names.iter().enumerate() { println!("  {:<20} {:>12.6}", name, params[i + 1]); }
+                } else {
+                    for (i, name) in var_names.iter().enumerate() { println!("  {:<20} {:>12.6}", name, params[i]); }
+                }
+                Ok(Value::Nil)
+            }
+
+            // elasticnet(formula, df, alpha=1.0, l1_ratio=0.5, ...)
+            // Combina L1 e L2: penalty = l1_ratio*α*|β| + (1-l1_ratio)*α/2*β²
+            "elasticnet" | "elastic_net" | "enet" => {
+                if args.len() < 2 { return Err(HayashiError::Runtime("elasticnet(formula, df, alpha=1.0, l1_ratio=0.5)".into())); }
+                let formula = match &args[0] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("elasticnet: primeiro arg deve ser fórmula".into())) };
+                let df_name = match &args[1] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("elasticnet: segundo arg deve ser DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let alpha    = match opt_map.get("alpha")    { Some(Value::Float(v)) => *v, Some(Value::Int(v)) => *v as f64, _ => 1.0_f64 };
+                let l1_ratio = match opt_map.get("l1_ratio") { Some(Value::Float(v)) => *v, Some(Value::Int(v)) => *v as f64, _ => 0.5_f64 };
+                let tol      = match opt_map.get("tol")      { Some(Value::Float(v)) => *v, _ => 1e-6_f64 };
+                let max_iter = match opt_map.get("max_iter") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 10_000usize };
+                let formula_str = Self::formula_to_string(&formula);
+                let gformula = GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y, x) = df.to_design_matrix(&gformula).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let n_obs = x.nrows();
+                let k = x.ncols();
+                let has_intercept = gformula.intercept;
+                let start_col = if has_intercept { 1 } else { 0 };
+                let y_mean = y.sum() / n_obs as f64;
+                let y_c: ndarray::Array1<f64> = y.mapv(|v| v - y_mean);
+                let mut x_std = x.clone();
+                let mut col_mean: Vec<f64> = vec![0.0; k];
+                let mut col_std_v: Vec<f64> = vec![1.0; k];
+                for j in start_col..k {
+                    let col = x.column(j);
+                    let mj = col.sum() / n_obs as f64;
+                    let sj = (col.iter().map(|&v| (v - mj).powi(2)).sum::<f64>() / n_obs as f64).sqrt();
+                    col_mean[j] = mj; if sj > 1e-12 { col_std_v[j] = sj; for i in 0..n_obs { x_std[[i, j]] = (x[[i, j]] - mj) / sj; } }
+                }
+                let l1 = alpha * l1_ratio;
+                let l2 = alpha * (1.0 - l1_ratio);
+                let soft = |z: f64, lam: f64| -> f64 { if z > lam { z - lam } else if z < -lam { z + lam } else { 0.0 } };
+                let xx_diag: Vec<f64> = (start_col..k).map(|j| x_std.column(j).dot(&x_std.column(j))).collect();
+                let mut beta = ndarray::Array1::<f64>::zeros(k - start_col);
+                for _iter in 0..max_iter {
+                    let mut max_delta = 0.0_f64;
+                    let xb: ndarray::Array1<f64> = { let mut v = ndarray::Array1::<f64>::zeros(n_obs); for j in 0..beta.len() { let c = x_std.column(start_col + j); v = v + c.mapv(|x| x * beta[j]); } v };
+                    let r = &y_c - &xb;
+                    for j in 0..beta.len() {
+                        let denom = xx_diag[j] + l2 * n_obs as f64;
+                        if denom < 1e-12 { continue; }
+                        let rho_j = r.dot(&x_std.column(start_col + j)) + xx_diag[j] * beta[j];
+                        let new_b = soft(rho_j / denom, l1 * n_obs as f64 / denom);
+                        let delta = (new_b - beta[j]).abs();
+                        if delta > max_delta { max_delta = delta; }
+                        beta[j] = new_b;
+                    }
+                    if max_delta < tol { break; }
+                }
+                let mut params = ndarray::Array1::<f64>::zeros(k);
+                for j in 0..beta.len() { params[start_col + j] = beta[j] / col_std_v[start_col + j]; }
+                if has_intercept { params[0] = y_mean - (start_col..k).map(|j| params[j] * col_mean[j]).sum::<f64>(); }
+                let y_hat = x.dot(&params);
+                let sse: f64 = y.iter().zip(y_hat.iter()).map(|(a, b)| (a - b).powi(2)).sum();
+                let sst: f64 = { let m = y.mean().unwrap_or(0.0); y.iter().map(|v| (v - m).powi(2)).sum() };
+                let r2 = 1.0 - sse / sst;
+                let n_nonzero = params.iter().skip(start_col).filter(|&&v| v.abs() > 1e-10).count();
+                let var_names = &gformula.independents;
+                println!("\n{:=^60}", " ElasticNet Regression ");
+                println!("  Formula: {formula_str}   α={alpha}   l1_ratio={l1_ratio}");
+                println!("  n={}  k={}  R²={r2:.4}  vars ativas: {n_nonzero}", x.nrows(), k);
+                println!("\n  {:<20} {:>12}", "Variable", "Coeff");
+                println!("  {}", "─".repeat(33));
+                if gformula.intercept {
+                    println!("  {:<20} {:>12.6}", "const", params[0]);
+                    for (i, name) in var_names.iter().enumerate() { println!("  {:<20} {:>12.6}", name, params[i + 1]); }
+                } else {
+                    for (i, name) in var_names.iter().enumerate() { println!("  {:<20} {:>12.6}", name, params[i]); }
+                }
+                Ok(Value::Nil)
+            }
+
             // adf(df, var, lags=N)
             "adf" | "dickey_fuller" | "augmented_df" => {
                 if args.len() < 2 { return Err(HayashiError::Runtime("adf(df, var, lags=N)".into())); }
@@ -9429,61 +9723,6 @@ impl Interpreter {
                 println!("  ρ̂(resid) = {rho:.4}");
                 println!("  t = {t_stat:.4}   p = {p_val:.4}");
                 println!("  Conclusion: {}", if p_val < 0.05 { "REJEITA H₀ — correlação serial presente" } else { "Não rejeita H₀" });
-                Ok(Value::Nil)
-            }
-
-            // ── list(df) — imprime observações no estilo Stata ────────────────
-            "list" => {
-                if args.is_empty() {
-                    return Err(HayashiError::Runtime("list(df [, vars=[] , if=cond, n=10])".into()));
-                }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-
-                // quais colunas mostrar
-                let col_names: Vec<String> = if let Some(Value::List(lst)) = opt_map.get("vars") {
-                    lst.iter().map(|v| format!("{v}")).collect()
-                } else {
-                    df.column_names().into_iter().map(|s| s.to_string()).collect()
-                };
-
-                // limite de linhas
-                let n_rows = df.n_rows();
-                let show_n = match opt_map.get("n") {
-                    Some(Value::Int(v)) => (*v as usize).min(n_rows),
-                    Some(Value::Float(v)) => (*v as usize).min(n_rows),
-                    _ => n_rows,
-                };
-
-                // largura de coluna: 10 ou comprimento do nome + 2
-                let col_w: Vec<usize> = col_names.iter().map(|n| n.len().max(9) + 1).collect();
-                let obs_w = format!("{show_n}").len().max(3);
-
-                // cabeçalho
-                print!("{:>obs_w$} ", "obs");
-                for (i, name) in col_names.iter().enumerate() { print!("{:>w$}", name, w = col_w[i]); }
-                println!();
-                // separador
-                print!("{}", "-".repeat(obs_w + 1));
-                for w in &col_w { print!("{}", "-".repeat(*w)); }
-                println!();
-
-                // linhas
-                for row_i in 0..show_n {
-                    print!("{:>obs_w$}.", row_i + 1);
-                    for (ci, cname) in col_names.iter().enumerate() {
-                        let val = df.get(cname).ok().and_then(|col| col.get(row_i).copied()).unwrap_or(f64::NAN);
-                        if val.is_nan() {
-                            print!("{:>w$}", ".", w = col_w[ci]);
-                        } else {
-                            print!("{:>w$.4}", val, w = col_w[ci]);
-                        }
-                    }
-                    println!();
-                }
-                if show_n < n_rows {
-                    println!("  ... ({} de {} obs mostradas)", show_n, n_rows);
-                }
                 Ok(Value::Nil)
             }
 
