@@ -6699,6 +6699,100 @@ impl Interpreter {
                 Ok(Value::DataFrame(new_df))
             }
 
+            // ── encode: string → numérico ─────────────────────────────────────
+            // encode(df, col)           → substitui coluna string por numérica (0, 1, 2...)
+            // encode(df, col, gen=new)  → cria nova coluna, mantém original
+            "encode" | "destring" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("encode(df, col [, gen=new_name])".into()));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())),
+                };
+                let mut df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                };
+                let col_name = match &args[1] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("segundo arg deve ser nome de coluna".into())),
+                };
+                let gen_name = match opt_map.get("gen") {
+                    Some(Value::Str(s)) => Some(s.clone()),
+                    _ => None,
+                };
+
+                let str_vals = df.get_string(&col_name)
+                    .map_err(|_| HayashiError::Runtime(
+                        format!("'{col_name}' não é coluna de string — encode() só funciona com strings")
+                    ))?
+                    .to_vec();
+
+                // mapear valores únicos → inteiros (ordem de primeira aparição)
+                let mut label_map: Vec<String> = Vec::new();
+                let mut val_to_idx: HashMap<String, usize> = HashMap::new();
+                let numeric: Vec<f64> = str_vals.iter().map(|s| {
+                    if let Some(&idx) = val_to_idx.get(s) {
+                        idx as f64
+                    } else {
+                        let idx = label_map.len();
+                        label_map.push(s.clone());
+                        val_to_idx.insert(s.clone(), idx);
+                        idx as f64
+                    }
+                }).collect();
+
+                let target_col = gen_name.unwrap_or_else(|| col_name.clone());
+                df.insert(target_col.clone(), ndarray::Array1::from(numeric))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                self.env.set(&df_name, Value::DataFrame(df));
+
+                // imprimir mapeamento
+                println!("encode {col_name} → {target_col}");
+                for (i, label) in label_map.iter().enumerate() {
+                    println!("  {i} = \"{label}\"");
+                }
+                Ok(Value::Nil)
+            }
+
+            // ── decode: numérico → string (oposto de encode) ─────────────────
+            // decode(df, col, labels=["a", "b", "c"])
+            "decode" | "tostring" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("decode(df, col, labels=[...])".into()));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())),
+                };
+                let mut df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                };
+                let col_name = match &args[1] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("segundo arg deve ser nome de coluna".into())),
+                };
+                let labels: Vec<String> = match opt_map.get("labels") {
+                    Some(Value::List(lst)) => lst.iter().filter_map(|v| match v {
+                        Value::Str(s) => Some(s.clone()),
+                        _ => None,
+                    }).collect(),
+                    _ => return Err(HayashiError::Runtime("decode() requer labels=[\"a\", \"b\", ...]".into())),
+                };
+                let vals = Self::get_col_f64(&df, &col_name)?;
+                let str_vals: Vec<String> = vals.iter().map(|&v| {
+                    let idx = v as usize;
+                    labels.get(idx).cloned().unwrap_or_else(|| format!("{v}"))
+                }).collect();
+                df.insert_column(col_name.clone(), greeners::Column::String(ndarray::Array1::from(str_vals)))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                self.env.set(&df_name, Value::DataFrame(df));
+                println!("decode {col_name}: {} labels applied", labels.len());
+                Ok(Value::Nil)
+            }
+
             // ── rename ───────────────────────────────────────────────────────
             "rename" => {
                 if args.len() != 3 {

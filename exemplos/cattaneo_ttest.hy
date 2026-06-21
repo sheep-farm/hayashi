@@ -3,7 +3,8 @@
 
 load "https://github.com/Daniel-Uhr/data/raw/main/cattaneo2.dta" as df
 
-// mbsmoke no .dta já é 0/1 (nonsmoker/smoker)
+// mbsmoke é string no .dta ("nonsmoker"/"smoker") — converter
+encode(df, mbsmoke)
 generate df Y = bweight
 generate df Treated = mbsmoke
 
@@ -19,3 +20,5 @@ ttest(df, Y, by=Treated)
 
 // Regressão simples — coef. de Treated = diferença de médias
 ols(Y ~ Treated, df)
+
+ols(Y ~ Treated + medu, df)
