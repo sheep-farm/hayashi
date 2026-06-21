@@ -391,13 +391,20 @@ impl Env {
 pub struct Interpreter {
     pub env: Env,
     ts_info: HashMap<String, String>,
+    // estrutura de painel declarada via xtset(df, id, time)
+    panel_info: HashMap<String, (String, String)>,
     // valor capturado pelo Stmt::Return — consumido em eval_call
     return_value: Option<Value>,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
-        Self { env: Env::new(), ts_info: HashMap::new(), return_value: None }
+        Self {
+            env: Env::new(),
+            ts_info: HashMap::new(),
+            panel_info: HashMap::new(),
+            return_value: None,
+        }
     }
 
     // ── Avalia expressão ──────────────────────────────────────────────────────
@@ -2720,7 +2727,7 @@ impl Interpreter {
                 let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
                 let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
                 let formula_ast = match &args[1] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser fórmula".into())) };
-                let id_col = match opt_map.get("id") { Some(Value::Str(s)) => s.clone(), None => return Err(HayashiError::Runtime("bptest requer id=\"coluna_entidade\"".into())), _ => return Err(HayashiError::Type("id= deve ser string".into())) };
+                let id_col = match opt_map.get("id") { Some(Value::Str(s)) => s.clone(), _ => self.panel_info.get(&df_name).map(|(id,_)| id.clone()).filter(|s| !s.is_empty()).ok_or_else(|| HayashiError::Runtime(format!("bptest requer id= ou xtset({df_name}, id, time)")))? };
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let (y_vec, x_mat) = df.to_design_matrix(&g_formula).map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -2756,8 +2763,8 @@ impl Interpreter {
                 let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
                 let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
                 let formula_ast = match &args[1] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser fórmula".into())) };
-                let id_col   = match opt_map.get("id")   { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("wooldridge requer id= e time=".into())) };
-                let time_col = match opt_map.get("time") { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("wooldridge requer time=\"coluna_tempo\"".into())) };
+                let id_col   = match opt_map.get("id")   { Some(Value::Str(s)) => s.clone(), _ => self.panel_info.get(&df_name).map(|(id,_)| id.clone()).filter(|s| !s.is_empty()).ok_or_else(|| HayashiError::Runtime(format!("wooldridge requer id= ou xtset({df_name}, id, time)")))? };
+                let time_col = match opt_map.get("time") { Some(Value::Str(s)) => s.clone(), _ => self.panel_info.get(&df_name).map(|(_,t)| t.clone()).filter(|s| !s.is_empty()).ok_or_else(|| HayashiError::Runtime(format!("wooldridge requer time= ou xtset({df_name}, id, time)")))? };
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let (y_vec, x_mat) = df.to_design_matrix(&g_formula).map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -2785,7 +2792,7 @@ impl Interpreter {
                 let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
                 let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
                 let formula_ast = match &args[1] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser fórmula".into())) };
-                let id_col = match opt_map.get("id") { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("pesaran requer id=".into())) };
+                let id_col = match opt_map.get("id") { Some(Value::Str(s)) => s.clone(), _ => self.panel_info.get(&df_name).map(|(id,_)| id.clone()).filter(|s| !s.is_empty()).ok_or_else(|| HayashiError::Runtime(format!("pesaran requer id= ou xtset({df_name}, id, time)")))? };
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let (y_vec, x_mat) = df.to_design_matrix(&g_formula).map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -2819,7 +2826,7 @@ impl Interpreter {
                 let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
                 let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
                 let formula_ast = match &args[1] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser fórmula".into())) };
-                let id_col = match opt_map.get("id") { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("mundlak requer id=".into())) };
+                let id_col = match opt_map.get("id") { Some(Value::Str(s)) => s.clone(), _ => self.panel_info.get(&df_name).map(|(id,_)| id.clone()).filter(|s| !s.is_empty()).ok_or_else(|| HayashiError::Runtime(format!("mundlak requer id= ou xtset({df_name}, id, time)")))? };
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let (y_vec, x_mat) = df.to_design_matrix(&g_formula).map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -2857,8 +2864,8 @@ impl Interpreter {
                 let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
                 let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
                 let formula_ast = match &args[1] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser fórmula".into())) };
-                let id_col   = match opt_map.get("id")   { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("abtest requer id= e time=".into())) };
-                let time_col = match opt_map.get("time") { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("abtest requer time=\"coluna_tempo\"".into())) };
+                let id_col   = match opt_map.get("id")   { Some(Value::Str(s)) => s.clone(), _ => self.panel_info.get(&df_name).map(|(id,_)| id.clone()).filter(|s| !s.is_empty()).ok_or_else(|| HayashiError::Runtime(format!("abtest requer id= ou xtset({df_name}, id, time)")))? };
+                let time_col = match opt_map.get("time") { Some(Value::Str(s)) => s.clone(), _ => self.panel_info.get(&df_name).map(|(_,t)| t.clone()).filter(|s| !s.is_empty()).ok_or_else(|| HayashiError::Runtime(format!("abtest requer time= ou xtset({df_name}, id, time)")))? };
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let (y_vec, x_mat) = df.to_design_matrix(&g_formula).map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -3044,7 +3051,7 @@ impl Interpreter {
 
             // ── Fixed Effects ─────────────────────────────────────────────────
             "fe" => {
-                let (formula_ast, df, id_col) = self.extract_panel_args(args, &opt_map)?;
+                let (formula_ast, df, _df_name, id_col) = self.extract_panel_args(args, &opt_map)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 // FE elimina o intercepto via within-transform; forçamos - 1
                 // para evitar coluna de zeros pós-demeaning (singular matrix)
@@ -3080,7 +3087,7 @@ impl Interpreter {
 
             // ── Random Effects ────────────────────────────────────────────────
             "re" => {
-                let (formula_ast, df, id_col) = self.extract_panel_args(args, &opt_map)?;
+                let (formula_ast, df, _df_name, id_col) = self.extract_panel_args(args, &opt_map)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -3110,7 +3117,7 @@ impl Interpreter {
                 // ftest_fe(formula, df, id=col)
                 // H₀: todos os efeitos individuais são zero (pooled OLS adequado)
                 // H₁: efeitos individuais existem (use FE)
-                let (formula_ast, df, id_col) = self.extract_panel_args(args, &opt_map)?;
+                let (formula_ast, df, _df_name, id_col) = self.extract_panel_args(args, &opt_map)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
 
                 // FE (within)
@@ -3187,7 +3194,7 @@ impl Interpreter {
                 // pesaran_cd(formula, df, id=col)
                 // H₀: resíduos independentes entre entidades (sem dependência cross-seccional)
                 // H₁: dependência cross-seccional presente
-                let (formula_ast, df, id_col) = self.extract_panel_args(args, &opt_map)?;
+                let (formula_ast, df, _df_name, id_col) = self.extract_panel_args(args, &opt_map)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -3250,7 +3257,7 @@ impl Interpreter {
                 // bplm(formula, df, id=col)
                 // H₀: sem efeitos individuais (σ²_u = 0) — pooled OLS adequado
                 // H₁: efeitos individuais existem — use FE ou RE
-                let (formula_ast, df, id_col) = self.extract_panel_args(args, &opt_map)?;
+                let (formula_ast, df, _df_name, id_col) = self.extract_panel_args(args, &opt_map)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -3320,14 +3327,8 @@ impl Interpreter {
                 // H₀: Π_s = 0 para todo s (RE consistente)
                 // H₁: pelo menos um Π_s ≠ 0 (efeitos correlacionados com X — use FE)
                 // Generalização do Mundlak: usa valores em TODOS os períodos, não só a média
-                let (formula_ast, df, id_col) = self.extract_panel_args(args, &opt_map)?;
-
-                let time_col = match opt_map.get("time") {
-                    Some(Value::Str(s)) => s.clone(),
-                    _ => return Err(HayashiError::Runtime(
-                        "chamberlain(): opção time=col é obrigatória".into()
-                    )),
-                };
+                let (formula_ast, df, df_name, id_col) = self.extract_panel_args(args, &opt_map)?;
+                let time_col = self.get_time_col(&df_name, &opt_map)?;
 
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
@@ -3395,7 +3396,7 @@ impl Interpreter {
 
             // ── Arellano-Bond Diff-GMM (OLD mundlak removed — use new mundlak above) ─
             "mundlak_OLD_REMOVED" => {
-                let (formula_ast, df, id_col) = self.extract_panel_args(args, &opt_map)?;
+                let (formula_ast, df, _df_name, id_col) = self.extract_panel_args(args, &opt_map)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -3474,14 +3475,8 @@ impl Interpreter {
             // Estima y_it = ρ y_{i,t-1} + X_it'β + α_i + ε_it via Diff-GMM.
             // Instrumenta Δy_{i,t-1} com y_{i,t-2},...,y_{i,t-lags-1} (collapsed).
             "ab" => {
-                let (formula_ast, df, id_col) = self.extract_panel_args(args, &opt_map)?;
-
-                let time_col = match opt_map.get("time") {
-                    Some(Value::Str(s)) => s.clone(),
-                    _ => return Err(HayashiError::Runtime(
-                        "ab(): opção time=col é obrigatória".into()
-                    )),
-                };
+                let (formula_ast, df, df_name, id_col) = self.extract_panel_args(args, &opt_map)?;
+                let time_col = self.get_time_col(&df_name, &opt_map)?;
 
                 let max_lags: usize = match opt_map.get("lags") {
                     Some(Value::Int(v)) => (*v).max(1) as usize,
@@ -3549,14 +3544,8 @@ impl Interpreter {
             // Empilha eq. em 1ª diferença (instrumentadas com níveis defasados)
             // + eq. em níveis (instrumentadas com Δy_{t-1} e ΔX_{t-1}).
             "sysgmm" => {
-                let (formula_ast, df, id_col) = self.extract_panel_args(args, &opt_map)?;
-
-                let time_col = match opt_map.get("time") {
-                    Some(Value::Str(s)) => s.clone(),
-                    _ => return Err(HayashiError::Runtime(
-                        "sysgmm(): opção time=col é obrigatória".into()
-                    )),
-                };
+                let (formula_ast, df, df_name, id_col) = self.extract_panel_args(args, &opt_map)?;
+                let time_col = self.get_time_col(&df_name, &opt_map)?;
 
                 let max_lags: usize = match opt_map.get("lags") {
                     Some(Value::Int(v)) => (*v).max(1) as usize,
@@ -3723,13 +3712,8 @@ impl Interpreter {
             // ── PCSE — Panel-Corrected Standard Errors (Beck & Katz 1995) ─────
             // pcse(formula, df, id=col, time=col)
             "pcse" => {
-                let (formula_ast, df, id_col) = self.extract_panel_args(args, &opt_map)?;
-                let time_col = match opt_map.get("time") {
-                    Some(Value::Str(s)) => s.clone(),
-                    _ => return Err(HayashiError::Runtime(
-                        "pcse(): opção time=col é obrigatória".into()
-                    )),
-                };
+                let (formula_ast, df, df_name, id_col) = self.extract_panel_args(args, &opt_map)?;
+                let time_col = self.get_time_col(&df_name, &opt_map)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -3750,13 +3734,8 @@ impl Interpreter {
             // ── Panel GLS — Parks (1967) / Stata xtgls ───────────────────────
             // xtgls(formula, df, id=col, time=col [, panels="hetero"|"corr"])
             "xtgls" => {
-                let (formula_ast, df, id_col) = self.extract_panel_args(args, &opt_map)?;
-                let time_col = match opt_map.get("time") {
-                    Some(Value::Str(s)) => s.clone(),
-                    _ => return Err(HayashiError::Runtime(
-                        "xtgls(): opção time=col é obrigatória".into()
-                    )),
-                };
+                let (formula_ast, df, df_name, id_col) = self.extract_panel_args(args, &opt_map)?;
+                let time_col = self.get_time_col(&df_name, &opt_map)?;
                 let panels_opt = match opt_map.get("panels") {
                     Some(Value::Str(s)) if s == "corr" => greeners::GlsPanels::Correlated,
                     Some(Value::Str(s)) if s == "hetero" || s == "heteroscedastic" =>
@@ -3789,14 +3768,8 @@ impl Interpreter {
                 // Testa autocorrelação serial nos resíduos da equação em 1ª diferença.
                 // m1: DEVE rejeitar H₀ (FD induz AR(1) por construção)
                 // m2: NÃO deve rejeitar H₀ (valida instrumentos y_{i,t-2} do GMM)
-                let (formula_ast, df, id_col) = self.extract_panel_args(args, &opt_map)?;
-
-                let time_col = match opt_map.get("time") {
-                    Some(Value::Str(s)) => s.clone(),
-                    _ => return Err(HayashiError::Runtime(
-                        "ab_test(): opção time=col é obrigatória".into()
-                    )),
-                };
+                let (formula_ast, df, df_name, id_col) = self.extract_panel_args(args, &opt_map)?;
+                let time_col = self.get_time_col(&df_name, &opt_map)?;
 
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
@@ -3872,14 +3845,8 @@ impl Interpreter {
 
             // ── wooldridge_OLD_REMOVED (substituído pelo novo acima) ──────────
             "wooldridge_OLD_REMOVED" => {
-                let (formula_ast, df, id_col) = self.extract_panel_args(args, &opt_map)?;
-
-                let time_col = match opt_map.get("time") {
-                    Some(Value::Str(s)) => s.clone(),
-                    _ => return Err(HayashiError::Runtime(
-                        "wooldridge(): opção time=col é obrigatória".into()
-                    )),
-                };
+                let (formula_ast, df, df_name, id_col) = self.extract_panel_args(args, &opt_map)?;
+                let time_col = self.get_time_col(&df_name, &opt_map)?;
 
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
@@ -9726,6 +9693,44 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── xtset: declara estrutura de painel ────────────────────────────
+            // xtset(df, id_col, time_col)  — armazena em panel_info
+            // Após xtset, fe/re/ab/etc. não precisam de id= e time=
+            "xtset" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "xtset(df, id_col, time_col)  ou  xtset(df, time_col) para série temporal".into()
+                    ));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("primeiro arg deve ser nome do DataFrame".into())),
+                };
+                match self.env.get(&df_name) {
+                    Some(Value::DataFrame(_)) => {}
+                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é um DataFrame"))),
+                };
+                let id_col = match &args[1] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("id_col deve ser identificador ou string".into())),
+                };
+                let time_col = if args.len() >= 3 {
+                    match &args[2] {
+                        Expr::Var(n) | Expr::Str(n) => n.clone(),
+                        _ => return Err(HayashiError::Type("time_col deve ser identificador ou string".into())),
+                    }
+                } else {
+                    String::new()
+                };
+                self.panel_info.insert(df_name.clone(), (id_col.clone(), time_col.clone()));
+                if time_col.is_empty() {
+                    println!("xtset {df_name}  (série temporal: t={id_col})");
+                } else {
+                    println!("xtset {df_name}  id={id_col}  time={time_col}");
+                }
+                Ok(Value::Nil)
+            }
+
             // ── Visualização ASCII — ACF / PACF / QQ-plot / heatmap ──────────
 
             // acfplot(df, var, lags=20, width=50, title="")
@@ -10091,10 +10096,10 @@ impl Interpreter {
         &mut self,
         args: &[Expr],
         opt_map: &HashMap<String, Value>,
-    ) -> Result<(Formula, DataFrame, String)> {
+    ) -> Result<(Formula, DataFrame, String, String)> {
         if args.len() < 2 {
             return Err(HayashiError::Runtime(
-                "panel estimator requires (formula, dataframe, id=col)".into(),
+                "panel estimator requires (formula, dataframe [, id=col])".into(),
             ));
         }
         let formula_ast = match &args[0] {
@@ -10111,9 +10116,26 @@ impl Interpreter {
         };
         let id_col = match opt_map.get("id") {
             Some(Value::Str(s)) => s.clone(),
-            _ => return Err(HayashiError::Runtime("panel estimator requires id=column_name".into())),
+            _ => self.panel_info.get(&df_name)
+                .map(|(id, _)| id.clone())
+                .filter(|s| !s.is_empty())
+                .ok_or_else(|| HayashiError::Runtime(
+                    format!("panel estimator requires id=col or xtset({df_name}, id, time) first")
+                ))?,
         };
-        Ok((formula_ast, df, id_col))
+        Ok((formula_ast, df, df_name, id_col))
+    }
+
+    fn get_time_col(&self, df_name: &str, opt_map: &HashMap<String, Value>) -> Result<String> {
+        match opt_map.get("time") {
+            Some(Value::Str(s)) => Ok(s.clone()),
+            _ => self.panel_info.get(df_name)
+                .map(|(_, t)| t.clone())
+                .filter(|s| !s.is_empty())
+                .ok_or_else(|| HayashiError::Runtime(
+                    format!("panel estimator requires time=col or xtset({df_name}, id, time) first")
+                )),
+        }
     }
 
     /// Extrai uma coluna como Vec<i64> — aceita colunas Int ou Float.
