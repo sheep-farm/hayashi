@@ -259,7 +259,16 @@ impl Lexer {
                 Some('+') => tokens.push((Token::Plus, line)),
                 Some('-') => tokens.push((Token::Minus, line)),
                 Some('*') => tokens.push((Token::Star, line)),
-                Some('/') => tokens.push((Token::Slash, line)),
+                Some('/') => {
+                    if self.peek() == Some('/') {
+                        // comentário de linha: consome até \n
+                        while !matches!(self.peek(), Some('\n') | None) {
+                            self.advance();
+                        }
+                    } else {
+                        tokens.push((Token::Slash, line));
+                    }
+                }
                 Some('^') => tokens.push((Token::Caret, line)),
                 Some(':') => tokens.push((Token::Colon, line)),
                 Some(',') => tokens.push((Token::Comma, line)),

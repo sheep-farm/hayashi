@@ -575,8 +575,9 @@ impl Interpreter {
     // ── Funções built-in ──────────────────────────────────────────────────────
 
     fn eval_call(&mut self, func: &str, args: &[Expr], opts: &[Opt]) -> Result<Value> {
-        // avalia opts primeiro
+        // avalia opts primeiro (exceto "if" — condição de linha, avaliada via eval_col_expr)
         let opt_map: HashMap<String, Value> = opts.iter()
+            .filter(|o| o.name != "if")
             .map(|o| Ok((o.name.clone(), self.eval_expr(&o.value)?)))
             .collect::<Result<_>>()?;
 
@@ -760,24 +761,32 @@ impl Interpreter {
             // "sum" fica para summarize(df) — Stata-style
             // "total" é a soma de uma lista numérica
             "sum" | "mean" | "std" | "min" | "max" | "total" => {
-                if args.len() != 1 {
-                    return Err(HayashiError::Runtime(
-                        format!("{func}() requer exatamente 1 argumento")
-                    ));
-                }
-                let v = self.eval_expr(&args[0])?;
-                let nums: Vec<f64> = match v {
-                    Value::List(lst) => lst.iter()
-                        .map(Self::value_as_f64)
-                        .collect::<Result<_>>()?,
-                    other => return Err(HayashiError::Type(
-                        format!("{func}() requer lista numérica, recebeu {other}")
-                    )),
+                // Forma 1: mean(list)
+                // Forma 2: mean(df, var)  ou  mean(df, var, if=cond)
+                let nums: Vec<f64> = if args.len() >= 2 {
+                    // forma DataFrame
+                    let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type(format!("{func}: primeiro arg deve ser DataFrame"))) };
+                    let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                    let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type(format!("{func}: segundo arg deve ser nome de variável"))) };
+                    let col = Self::get_col_f64(&df, &var_name)?;
+                    // filtro opcional: if=cond
+                    if let Some(cond_opt) = opts.iter().find(|o| o.name == "if") {
+                        let mask = Self::eval_col_expr(&cond_opt.value, &df)?;
+                        col.iter().zip(mask.iter()).filter(|(_, &m)| m != 0.0).map(|(&v, _)| v).collect()
+                    } else {
+                        col.to_vec()
+                    }
+                } else if args.len() == 1 {
+                    let v = self.eval_expr(&args[0])?;
+                    match v {
+                        Value::List(lst) => lst.iter().map(Self::value_as_f64).collect::<Result<_>>()?,
+                        other => return Err(HayashiError::Type(format!("{func}() requer lista numérica, recebeu {other}"))),
+                    }
+                } else {
+                    return Err(HayashiError::Runtime(format!("{func}() requer pelo menos 1 argumento")));
                 };
                 if nums.is_empty() {
-                    return Err(HayashiError::Runtime(
-                        format!("{func}(): lista vazia")
-                    ));
+                    return Err(HayashiError::Runtime(format!("{func}(): nenhum valor (lista vazia ou filtro excluiu tudo)")));
                 }
                 let result = match func {
                     "sum" | "total" => nums.iter().sum::<f64>(),
