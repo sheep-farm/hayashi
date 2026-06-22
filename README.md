@@ -250,4 +250,4 @@ cargo test                 # 338 tests, <1s
 
 ## License
 
-MIT
+GPL-3.0 — see [LICENSE](LICENSE).
