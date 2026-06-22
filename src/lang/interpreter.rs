@@ -932,6 +932,116 @@ impl Interpreter {
                 return self.eval_call("ols", args, opts);
             }
 
+            // ── Fama-MacBeth (1973) ──────────────────────────────────────────
+            // fmb(formula, df, time=col)
+            // Cross-sectional regressions por período, média dos coeficientes
+            // SE = σ(β̂_t) / √T  (Fama-MacBeth standard errors)
+            "fmb" | "fama_macbeth" | "xtfmb" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("fmb(formula, df, time=col)".into()));
+                }
+                let formula_ast = match &args[0] {
+                    Expr::Formula(f) => f.clone(),
+                    _ => return Err(HayashiError::Type("first argument must be a formula".into())),
+                };
+                let df_name = match &args[1] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("second argument must be DataFrame".into())),
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' is not a DataFrame"))),
+                };
+                let time_col = match opt_map.get("time") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => self.panel_info.get(&df_name)
+                        .map(|(_, t)| t.clone())
+                        .filter(|s| !s.is_empty())
+                        .ok_or_else(|| HayashiError::Runtime(
+                            "fmb requires time=col or xtset(df, id, time)".into()
+                        ))?,
+                };
+
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                // períodos únicos
+                let t_vals = Self::get_col_f64(&df, &time_col)?;
+                let mut periods: Vec<i64> = t_vals.iter().map(|&v| v as i64).collect::<std::collections::HashSet<_>>().into_iter().collect();
+                periods.sort();
+                let n_periods = periods.len();
+
+                if n_periods < 2 {
+                    return Err(HayashiError::Runtime("fmb requires at least 2 time periods".into()));
+                }
+
+                // cross-sectional OLS por período
+                let mut all_coefs: Vec<Vec<f64>> = Vec::new();
+                let mut var_names: Vec<String> = Vec::new();
+                let mut n_total = 0usize;
+
+                for &t in &periods {
+                    let mask: Vec<f64> = t_vals.iter().map(|&v| if v as i64 == t { 1.0 } else { 0.0 }).collect();
+                    let sub_df = Self::filter_df_by_mask(&df, &mask)?;
+                    let n_t = sub_df.n_rows();
+                    if n_t < 3 { continue; }
+                    n_total += n_t;
+                    match OLS::from_formula(&g_formula, &sub_df, CovarianceType::NonRobust) {
+                        Ok(result) => {
+                            if var_names.is_empty() {
+                                var_names = result.variable_names.clone().unwrap_or_default();
+                            }
+                            all_coefs.push(result.params.to_vec());
+                        }
+                        Err(_) => {} // pular períodos com problemas
+                    }
+                }
+
+                let t_ok = all_coefs.len();
+                if t_ok < 2 {
+                    return Err(HayashiError::Runtime(
+                        format!("fmb: only {t_ok} periods converged, need at least 2")
+                    ));
+                }
+
+                let k = all_coefs[0].len();
+                let t_f = t_ok as f64;
+
+                // média e SE de Fama-MacBeth
+                let mut mean_coef = vec![0.0; k];
+                for coefs in &all_coefs {
+                    for j in 0..k { mean_coef[j] += coefs[j]; }
+                }
+                for j in 0..k { mean_coef[j] /= t_f; }
+
+                let mut fm_se = vec![0.0; k];
+                for coefs in &all_coefs {
+                    for j in 0..k { fm_se[j] += (coefs[j] - mean_coef[j]).powi(2); }
+                }
+                for j in 0..k { fm_se[j] = (fm_se[j] / (t_f * (t_f - 1.0))).sqrt(); }
+
+                // output
+                let thick = "═".repeat(70);
+                let thin  = "─".repeat(70);
+                println!("\n{thick}");
+                println!("{:^70}", " Fama-MacBeth (1973) ");
+                println!("{thin}");
+                println!("  Períodos: {t_ok}   N total: {n_total}");
+                println!("{thin}");
+                println!("{:<18} {:>10} {:>10} {:>10} {:>10}", "Variable", "Coef", "FM-SE", "t", "p");
+                println!("{thin}");
+                for j in 0..k {
+                    let name = var_names.get(j).map(|s| s.as_str()).unwrap_or("?");
+                    let t_stat = if fm_se[j] > 1e-15 { mean_coef[j] / fm_se[j] } else { f64::NAN };
+                    let p = t_pvalue_two(t_stat, (t_ok - 1) as f64);
+                    let sig = if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
+                    println!("{:<18} {:>10.4} {:>10.4} {:>10.4} {:>10.4} {sig}", name, mean_coef[j], fm_se[j], t_stat, p);
+                }
+                println!("{thick}\n");
+                Ok(Value::Nil)
+            }
+
             // ── OLS ───────────────────────────────────────────────────────────
             "ols" => {
                 if args.len() < 2 {
