@@ -13,6 +13,7 @@ archtest(sp, change, lags=10)
 
 # ── teste nos resíduos do GARCH(1,1)
 # Se GARCH for bem especificado, H₀ não deve ser rejeitada nos resíduos padronizados
+let sp = dropna(sp, change)
 let m = garch(sp, change, p=1, q=1)
 print(m)
 archtest(m, lags=5)

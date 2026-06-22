@@ -14,6 +14,8 @@
 
 load "https://www.stata-press.com/data/r17/mroz.dta" as df
 
+# dropna apenas nas variáveis do modelo de seleção (lwage é missing para inlf=0 por design)
+let df = dropna(df, educ, exper, expersq, nwifeinc, kidslt6, kidsge6, fatheduc, motheduc, hours, inlf)
 summarize(df, hours, lwage, educ, exper, expersq)
 tabulate(df, inlf)
 

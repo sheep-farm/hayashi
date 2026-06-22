@@ -15,7 +15,29 @@
 # n=k: primeiros k componentes (padrão: todos)
 # Escolha de k: scree plot (cotovelo) ou critério Kaiser (eigenvalue > 1)
 
-load "macro.csv" as macro
+input macro
+pib_growth inflation unemployment interest_rate trade_balance
+2.1 3.5 5.2 4.5 -1.2
+1.8 4.0 5.8 5.0 -0.8
+3.2 2.8 4.5 3.8 -1.5
+0.5 5.1 6.3 6.0 -0.3
+2.5 3.2 5.0 4.2 -1.0
+1.2 4.5 6.0 5.5 -0.5
+3.0 2.5 4.2 3.5 -1.8
+0.8 4.8 6.5 5.8 -0.2
+2.8 3.0 4.8 4.0 -1.3
+1.5 4.2 5.5 5.2 -0.6
+3.5 2.2 4.0 3.2 -2.0
+0.3 5.5 7.0 6.5 0.1
+2.0 3.8 5.3 4.8 -0.9
+1.0 4.6 6.2 5.6 -0.4
+2.7 3.1 4.9 4.1 -1.1
+1.6 4.3 5.7 5.3 -0.7
+3.3 2.6 4.3 3.6 -1.6
+0.6 5.0 6.8 6.2 -0.1
+2.3 3.4 5.1 4.4 -1.0
+1.9 4.1 5.6 5.1 -0.8
+end
 # Variáveis: pib_growth, inflation, unemployment, interest_rate, trade_balance
 
 # PCA completo (todos os componentes)
@@ -36,7 +58,29 @@ summarize(macro, pc1_scores, pc2_scores)
 
 # Usar escores como regressores (elimina multicolinearidade)
 # PC1 pode capturar fator cíclico geral; PC2 pode capturar pressão inflacionária
-load "bonds.csv" as bonds
+input bonds
+spread1 spread2 spread3 duration yield
+1.2 0.8 1.5 3.5 4.2
+1.5 1.0 1.8 4.0 4.5
+0.9 0.6 1.2 3.0 3.8
+1.8 1.2 2.1 4.5 5.0
+1.1 0.7 1.4 3.2 4.0
+1.6 1.1 1.9 4.2 4.7
+0.8 0.5 1.1 2.8 3.5
+2.0 1.4 2.3 5.0 5.3
+1.3 0.9 1.6 3.6 4.3
+1.7 1.2 2.0 4.3 4.8
+0.7 0.4 1.0 2.5 3.2
+2.2 1.5 2.5 5.2 5.5
+1.0 0.7 1.3 3.1 3.9
+1.4 1.0 1.7 3.8 4.4
+1.9 1.3 2.2 4.7 5.1
+0.6 0.3 0.9 2.3 3.0
+2.1 1.5 2.4 5.1 5.4
+1.2 0.8 1.5 3.4 4.1
+1.6 1.1 1.9 4.1 4.6
+0.9 0.6 1.2 2.9 3.6
+end
 let m_pca_bonds = pca(bonds, spread1, spread2, spread3, duration, n=2)
 predict bonds factor1 = m_pca_bonds, "pc1"
 predict bonds factor2 = m_pca_bonds, "pc2"
@@ -49,7 +93,7 @@ print(m_bond_ols)
 # Condition number = sqrt(max_eigenvalue / min_eigenvalue)
 # CN > 30 → multicolinearidade grave
 
-load "auto.csv" as auto
+load "https://www.stata-press.com/data/r9/auto.dta" as auto
 let m_pca_auto = pca(auto, price, mpg, weight, length)
 print(m_pca_auto)
 # Eigenvalue próximo de 0 → variáveis colineares
@@ -75,7 +119,29 @@ print(m_pca_auto)
 # rotation=varimax : rotação ortogonal — cada variável carrega em um fator
 #                   (solução mais interpretável; indicado para construção de índices)
 
-load "pesquisa.csv" as pesq
+input pesq
+q1 q2 q3 q4 q5 q6 q7 q8 q9 q10
+4.0 3.0 5.0 2.0 4.0 3.0 5.0 2.0 4.0 3.0
+5.0 4.0 4.0 3.0 5.0 4.0 4.0 3.0 5.0 4.0
+3.0 2.0 3.0 4.0 3.0 2.0 3.0 4.0 3.0 2.0
+4.0 4.0 5.0 1.0 4.0 4.0 5.0 1.0 4.0 4.0
+2.0 3.0 2.0 5.0 2.0 3.0 2.0 5.0 2.0 3.0
+5.0 5.0 4.0 2.0 5.0 5.0 4.0 2.0 5.0 5.0
+3.0 3.0 3.0 3.0 3.0 3.0 3.0 3.0 3.0 3.0
+4.0 2.0 5.0 1.0 4.0 2.0 5.0 1.0 4.0 2.0
+1.0 1.0 2.0 5.0 1.0 1.0 2.0 5.0 1.0 1.0
+5.0 4.0 5.0 2.0 5.0 4.0 5.0 2.0 5.0 4.0
+3.0 3.0 4.0 3.0 3.0 3.0 4.0 3.0 3.0 3.0
+2.0 2.0 1.0 4.0 2.0 2.0 1.0 4.0 2.0 2.0
+4.0 5.0 4.0 1.0 4.0 5.0 4.0 1.0 4.0 5.0
+5.0 3.0 5.0 2.0 5.0 3.0 5.0 2.0 5.0 3.0
+3.0 4.0 3.0 3.0 3.0 4.0 3.0 3.0 3.0 4.0
+1.0 2.0 2.0 5.0 1.0 2.0 2.0 5.0 1.0 2.0
+4.0 4.0 4.0 2.0 4.0 4.0 4.0 2.0 4.0 4.0
+2.0 1.0 3.0 4.0 2.0 1.0 3.0 4.0 2.0 1.0
+5.0 5.0 5.0 1.0 5.0 5.0 5.0 1.0 5.0 5.0
+3.0 2.0 4.0 3.0 3.0 2.0 4.0 3.0 3.0 2.0
+end
 # Variáveis: q1..q10 — questões de uma escala Likert (bem-estar subjetivo)
 # Hipótese: 3 fatores latentes (físico, emocional, social)
 
@@ -95,8 +161,30 @@ print(m_factor_vx)
 # 3. Percentual de variância explicada: ≥ 60% da variância total
 
 # Exemplo: PCA do mercado financeiro
-load "retornos.csv" as ret
-# Variáveis: ret_x1..ret_x20 — retornos de 20 ações
+input ret
+ret_x1 ret_x2 ret_x3 ret_x4 ret_x5
+0.05 0.03 0.04 0.02 0.06
+-0.02 -0.01 -0.03 0.01 -0.02
+0.08 0.06 0.07 0.04 0.09
+-0.01 0.02 -0.01 0.03 0.00
+0.03 0.04 0.02 0.05 0.04
+-0.04 -0.03 -0.05 -0.01 -0.03
+0.06 0.05 0.06 0.03 0.07
+0.01 0.00 0.01 0.02 0.01
+-0.03 -0.02 -0.04 0.00 -0.02
+0.07 0.06 0.08 0.04 0.08
+0.02 0.01 0.03 0.01 0.02
+-0.05 -0.04 -0.06 -0.02 -0.04
+0.04 0.03 0.05 0.02 0.05
+0.00 0.01 -0.01 0.03 0.01
+0.09 0.07 0.08 0.05 0.10
+-0.02 -0.01 -0.02 0.01 -0.01
+0.05 0.04 0.06 0.03 0.06
+-0.01 0.00 -0.02 0.02 0.00
+0.03 0.02 0.04 0.01 0.03
+0.06 0.05 0.07 0.04 0.07
+end
+# Variáveis: ret_x1..ret_x5 — retornos de 5 ações
 
 let m_fator_fin = factor(ret, ret_x1, ret_x2, ret_x3, ret_x4, ret_x5,
                           n=3, rotation=varimax)
@@ -118,21 +206,21 @@ print(m_fator_fin)
 # Ao rejeitar H0: usar ANOVA univariado + ajuste Bonferroni para identificar quais outcomes diferem
 
 load "painel.csv" as painel
-# Variáveis: lucro, alavancagem, tamanho, setor (grupo)
+# Variáveis: lucro, alavancagem, tamanho, empresa (grupo numérico)
 
-# MANOVA: lucro e alavancagem diferem entre setores?
-manova(painel, lucro, alavancagem, by="setor")
-# H0: [E[lucro], E[alavancagem]] igual em todos os setores
+# MANOVA: lucro e alavancagem diferem entre empresas?
+manova(painel, lucro, alavancagem, by="empresa")
+# H0: [E[lucro], E[alavancagem]] igual em todas as empresas
 
 # MANOVA com 3 outcomes
-manova(painel, lucro, alavancagem, tamanho, by="setor")
+manova(painel, lucro, alavancagem, tamanho, by="empresa")
 
 # Sequência recomendada:
 #  1. MANOVA (H0 global) → se p < 0.05, pelo menos um outcome difere
 #  2. ANOVA separado para cada outcome → identificar quais
 #  3. Comparações par-a-par com ttest + correção Bonferroni
 
-load "auto.csv" as auto2
+load "https://www.stata-press.com/data/r9/auto.dta" as auto2
 manova(auto2, price, mpg, weight, by="foreign")
 # H0: distribuição conjunta de (price, mpg, weight) é igual entre nacional e importado
 
@@ -156,7 +244,7 @@ anova(auto2, weight, by="foreign")
 #
 # Saída: β̂, SE original, SE bootstrap, IC percentil inferior/superior
 
-load "auto.csv" as auto3
+load "https://www.stata-press.com/data/r9/auto.dta" as auto3
 
 let m_ols = ols(price ~ mpg + weight + C(foreign), auto3, cov=nonrobust)
 print(m_ols)

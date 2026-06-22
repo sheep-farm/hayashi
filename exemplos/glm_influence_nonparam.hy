@@ -22,9 +22,56 @@
 # glm(y~x, df, family=poisson) ≡ poisson(y~x, df)
 # Use glm() quando quiser link não-canônico ou família menos comum
 
-load "auto.csv" as auto
-load "saude.csv" as saude
-load "seguro.csv" as seguro
+load "https://www.stata-press.com/data/r9/auto.dta" as auto
+
+input saude
+visitas renda doenca
+0.0 3.2 0.0
+3.0 4.1 1.0
+0.0 2.8 0.0
+1.0 3.5 0.0
+5.0 4.5 1.0
+2.0 3.9 1.0
+0.0 2.5 0.0
+4.0 4.3 1.0
+1.0 3.0 0.0
+0.0 2.7 0.0
+6.0 4.8 1.0
+0.0 3.1 0.0
+2.0 3.7 1.0
+1.0 3.3 0.0
+3.0 4.0 1.0
+0.0 2.6 0.0
+7.0 5.0 1.0
+1.0 3.4 0.0
+4.0 4.2 1.0
+0.0 2.9 0.0
+end
+
+input seguro
+sinistros exposure severidade n_sinistros renda
+2.0 100.0 5000.0 2.0 3.5
+5.0 200.0 12000.0 5.0 4.2
+1.0 80.0 3000.0 1.0 3.1
+3.0 150.0 8000.0 3.0 3.8
+0.0 50.0 1500.0 0.0 2.9
+4.0 180.0 9500.0 4.0 4.0
+2.0 120.0 5500.0 2.0 3.4
+6.0 250.0 15000.0 6.0 4.5
+1.0 90.0 2800.0 1.0 3.0
+3.0 160.0 7500.0 3.0 3.7
+7.0 300.0 18000.0 7.0 4.8
+2.0 110.0 4800.0 2.0 3.3
+4.0 170.0 9000.0 4.0 3.9
+1.0 70.0 2500.0 1.0 2.8
+5.0 220.0 13000.0 5.0 4.3
+3.0 140.0 7000.0 3.0 3.6
+0.0 60.0 1200.0 0.0 2.7
+6.0 260.0 16000.0 6.0 4.6
+2.0 130.0 5200.0 2.0 3.5
+4.0 190.0 10000.0 4.0 4.1
+end
+
 # seguro: sinistros (contagem) e exposure (número apólices), severidade (custo total)
 # auto: price, mpg, weight, foreign
 
@@ -58,7 +105,7 @@ let m_gamma_inv = glm(severidade ~ n_sinistros + exposure, seguro,
 print(m_gamma_inv)
 
 # Comparar AIC: qual link melhor ajusta os dados?
-ic(m_gamma_log, m_gamma_inv)
+# ic(m_gamma_log, m_gamma_inv)  # ic() não suporta GLM gamma ainda
 
 # ── NegBin via GLM (alpha como parâmetro de dispersão) ──────────────────────
 # alpha: parâmetro de sobredispersão; Var(Y) = μ + α·μ²
@@ -80,11 +127,11 @@ print(m_tw)
 # working      → resíduos de trabalho do IRLS
 
 predict auto   p_hat     = m_glm_logit, "pr"        # P(foreign=1|X)
-predict saude  mu_pois   = m_glm_pois,  mu        # E[visitas|X]
-predict saude  xb_pois   = m_glm_pois,  xb        # log(E[visitas|X])
-predict saude  dev_resid = m_glm_pois,  residuals # deviance residuals
-predict saude  prs_resid = m_glm_pois,  pearson   # Pearson residuals
-predict saude  wrk_resid = m_glm_pois,  working   # working residuals
+predict saude  mu_pois   = m_glm_pois,  "mu"        # E[visitas|X]
+predict saude  xb_pois   = m_glm_pois,  "xb"        # log(E[visitas|X])
+predict saude  dev_resid = m_glm_pois,  "residuals" # deviance residuals
+predict saude  prs_resid = m_glm_pois,  "pearson"   # Pearson residuals
+predict saude  wrk_resid = m_glm_pois,  "working"   # working residuals
 
 summarize(saude, visitas, mu_pois, dev_resid, prs_resid)
 
@@ -100,7 +147,7 @@ esttab(m_glm_pois, m_glm_nb)
 # Leverage: diagonal da hat matrix h_ii; alto quando > 2k/n
 # Resíduos studentizados internos e externos
 
-load "auto.csv" as auto2
+load "https://www.stata-press.com/data/r9/auto.dta" as auto2
 
 let m_ols = ols(price ~ mpg + weight + length, auto2, cov=nonrobust)
 print(m_ols)
@@ -136,7 +183,29 @@ influence(m_ols)
 #  2. Verificar se relação é linear ou não-linear
 #  3. Visualização residual: LOWESS(resíduos, ŷ) — deve ser plana se bem especificado
 
-load "macro.csv" as macro
+input macro
+pib_growth inflation unemployment
+2.1 3.5 5.2
+1.8 4.0 5.8
+3.2 2.8 4.5
+0.5 5.1 6.3
+2.5 3.2 5.0
+1.2 4.5 6.0
+3.0 2.5 4.2
+0.8 4.8 6.5
+2.8 3.0 4.8
+1.5 4.2 5.5
+3.5 2.2 4.0
+0.3 5.5 7.0
+2.0 3.8 5.3
+1.0 4.6 6.2
+2.7 3.1 4.9
+1.6 4.3 5.7
+3.3 2.6 4.3
+0.6 5.0 6.8
+2.3 3.4 5.1
+1.9 4.1 5.6
+end
 # Variáveis: pib_growth, inflation, unemployment
 
 # LOWESS simples: inflation vs pib_growth
@@ -179,7 +248,7 @@ predict macro smoothed_resid = m_resid_low, "smoothed"
 #   bw=0.5  → bandwidth manual
 # kernels: gaussian (padrão), epanechnikov, triangular, uniform
 
-load "auto.csv" as auto3
+load "https://www.stata-press.com/data/r9/auto.dta" as auto3
 
 # KDE com bandwidth automático (Silverman)
 kde(auto3, price)

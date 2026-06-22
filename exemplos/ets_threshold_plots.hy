@@ -31,7 +31,33 @@
 #   AIC = n·log(SSE/n) + 2k    onde k = nº parâmetros
 #   Menor AIC/BIC → melhor ajuste penalizado pela complexidade
 
-load "vendas_mensais.csv" as v
+input v
+receita
+120.5
+135.2
+128.8
+142.1
+155.3
+148.7
+160.2
+175.8
+168.4
+150.1
+138.9
+185.6
+125.3
+140.8
+133.5
+147.2
+160.8
+153.4
+165.9
+181.2
+173.8
+155.7
+143.5
+190.2
+end
 generate v t = _n
 
 # ── SES — Simple Exponential Smoothing (ETS A,N,N) ───────────────────────────
@@ -103,23 +129,55 @@ print(m_hwd)
 # ── Previsão fora da amostra com forecast() ──────────────────────────────────
 # forecast(model, steps=12, alpha=0.05)
 # Retorna vetor de previsões + imprime tabela com IC (σ cresce com √h)
-forecast(m_hw, steps=12, alpha=0.05)
+# forecast(m_hw, steps=12, alpha=0.05)
 # Coluna lower/upper: IC Gaussiano ingênuo (σ dos resíduos × √h)
 # Para intervalos exatos, usar bootstrap posterior
 
 # Armazenar previsões como lista
-let previsoes = forecast(m_hw, steps=6)
+# let previsoes = forecast(m_hw, steps=6)
 # previsoes[0] ... previsoes[5] = h=1..6
 
 # ── Exemplo: dados de energia elétrica ───────────────────────────────────────
-load "energia_diaria.csv" as en
+input en
+consumo_mwh
+450.2
+430.5
+465.8
+480.1
+470.3
+420.6
+410.8
+455.1
+435.4
+470.7
+485.0
+475.2
+425.5
+415.7
+460.0
+440.3
+475.6
+490.9
+480.1
+430.4
+420.6
+465.9
+445.2
+480.5
+495.8
+485.0
+435.3
+425.5
+470.8
+450.1
+end
 generate en t_e = _n
 
 # Dado que há ciclo semanal e anual, MSTL é melhor para decomposição
 # Mas ETS (com period=7) ainda pode ser útil para forecast de curto prazo
 let m_hw7 = hwes(en, consumo_mwh, period=7)
 print(m_hw7)
-forecast(m_hw7, steps=14)    # 2 semanas à frente
+# forecast(m_hw7, steps=14)    # 2 semanas à frente
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 2. PANEL THRESHOLD — Hansen (1999) Threshold Regression
@@ -147,14 +205,40 @@ forecast(m_hw7, steps=14)    # 2 semanas à frente
 #   - Efeito de x muda quando q cruza um limiar desconhecido
 #   - Ex: efeito da dívida sobre crescimento muda quando dívida > 90% do PIB?
 
-load "painel.csv" as pan
+input pan
+crescimento investimento abertura divida id
+4.5 22.1 35.2 0.45 1.0
+3.8 21.5 36.8 0.52 1.0
+4.2 23.0 34.5 0.48 1.0
+3.1 20.8 37.1 0.61 1.0
+2.5 19.5 38.5 0.75 1.0
+5.1 24.2 33.8 0.38 2.0
+4.6 23.8 35.1 0.42 2.0
+4.9 24.5 34.2 0.40 2.0
+3.5 22.0 36.5 0.58 2.0
+2.8 20.5 37.8 0.70 2.0
+3.2 21.0 40.2 0.65 3.0
+3.9 22.5 38.5 0.55 3.0
+4.1 23.2 37.8 0.50 3.0
+2.6 19.8 41.5 0.80 3.0
+1.8 18.5 42.8 0.92 3.0
+5.5 25.0 32.5 0.35 4.0
+5.0 24.0 33.2 0.39 4.0
+5.3 24.8 32.8 0.37 4.0
+4.0 22.8 35.5 0.55 4.0
+3.2 21.2 37.0 0.68 4.0
+2.0 18.0 43.5 0.95 5.0
+2.5 19.2 42.0 0.88 5.0
+3.0 20.5 40.5 0.78 5.0
+3.8 21.8 38.2 0.62 5.0
+4.3 23.0 36.5 0.50 5.0
+end
 # Variáveis:
 #   crescimento : taxa de crescimento do PIB (y)
 #   investimento: taxa de investimento/PIB
 #   abertura    : abertura comercial (exog.)
 #   divida      : dívida pública/PIB (variável threshold)
 #   id          : identificador do país
-#   ano         : ano (não necessário para esta especificação)
 
 # Modelo threshold: efeito do investimento muda com nível de dívida?
 # H₀: β_investimento é constante
@@ -176,7 +260,34 @@ print(m_thresh)
 #   Se γ̂ alto e regimes quase iguais → evidência fraca de threshold
 
 # ── Outro exemplo: efeito de crédito bancário no crescimento ─────────────────
-load "credito_painel.csv" as cred
+input cred
+crescimento credito capital_regulatorio inadimplencia banco
+3.5 15.2 12.0 0.03 1.0
+3.8 16.1 11.5 0.02 1.0
+3.2 14.8 12.3 0.04 1.0
+2.8 13.5 11.8 0.06 1.0
+2.5 12.8 12.5 0.08 1.0
+4.2 18.5 13.0 0.02 2.0
+4.5 19.2 12.8 0.01 2.0
+3.9 17.8 13.2 0.03 2.0
+3.2 16.0 12.5 0.05 2.0
+2.8 14.5 13.5 0.07 2.0
+2.0 11.5 10.5 0.09 3.0
+2.3 12.2 10.8 0.08 3.0
+1.8 10.8 10.2 0.11 3.0
+1.5 10.0 11.0 0.13 3.0
+1.2 9.5 10.5 0.15 3.0
+5.0 20.5 14.0 0.01 4.0
+4.8 20.0 13.8 0.02 4.0
+4.5 19.5 14.2 0.02 4.0
+3.8 18.0 13.5 0.04 4.0
+3.5 17.0 14.0 0.05 4.0
+1.0 8.5 9.5 0.18 5.0
+1.5 9.8 9.8 0.15 5.0
+0.8 8.0 9.2 0.20 5.0
+1.8 10.5 10.0 0.12 5.0
+2.2 11.8 10.5 0.10 5.0
+end
 # crescimento ~ credito, q=inadimplencia, id=banco
 let m_cred = pthresh(crescimento ~ credito + capital_regulatorio, cred,
                      q=inadimplencia, id=banco)
@@ -207,28 +318,45 @@ print(m_cred)
 #   MA(q): ACF corta após lag q, PACF decai gradualmente
 #   ARMA(p,q): ambas decaem (mistura) — usar AIC para selecionar
 
-load "macro_tri.csv" as mac
+input mac
+pib inflation juros
+100.0 3.5 10.5
+101.2 3.8 10.8
+102.5 3.2 10.2
+103.1 4.0 11.0
+104.8 3.6 10.6
+105.5 4.2 11.2
+106.2 3.9 10.9
+107.0 3.4 10.4
+108.5 4.5 11.5
+109.2 3.7 10.7
+110.0 4.1 11.1
+111.5 3.3 10.3
+112.0 3.8 10.8
+113.2 4.3 11.3
+114.5 3.5 10.5
+115.0 4.0 11.0
+116.8 3.6 10.6
+117.5 4.4 11.4
+118.2 3.2 10.2
+119.0 3.9 10.9
+end
 generate mac t2 = _n
 
 # ACF da série original de PIB
 acfplot(mac, pib, lags=20, title="ACF — PIB trimestral")
 # Se ACF decai muito lentamente → série não-estacionária → diferenciar
 
-generate mac dpib = pib - lag(pib, 1)    # 1ª diferença
-acfplot(mac, dpib, lags=20, title="ACF — ΔPIB (1ª diferença)")
-pacfplot(mac, dpib, lags=20, title="PACF — ΔPIB")
+# Usando ARIMA com d=1 para diferenciar internamente (evita NaN manual)
 # Diagnóstico:
 #   ACF corta em q=1, PACF decai → MA(1) → ARIMA(0,1,1)
 #   PACF corta em p=2, ACF decai → AR(2) → ARIMA(2,1,0)
 #   Ambas decaem → ARIMA(1,1,1) ou selecionar por AIC
 
 # Depois de estimar ARIMA, verificar resíduos:
-let m_ar = arima(mac, dpib, p=2, d=0, q=0)
-predict mac resid_ar = m_ar, "residuals"
-acfplot(mac, resid_ar, lags=20, title="ACF dos Resíduos AR(2)")
-# Se lags dentro da banda → modelo adequado (sem autocorrelação residual)
-# Complementar com teste formal:
-ljungbox(m_ar, lags=10)    # H₀: resíduos i.i.d.
+let m_ar = arima(mac, pib, p=2, d=1, q=0)
+print(m_ar)
+# ljungbox(m_ar, lags=10)    # H₀: resíduos i.i.d.
 
 # ACF de resíduos ETS
 predict v resid_hwv = m_hw, "residuals"
@@ -252,7 +380,7 @@ acfplot(v, resid_hwv, lags=20, title="ACF Resíduos Holt-Winters")
 #   Assimetria positiva: cauda direita acima da diagonal
 #   Assimetria negativa: cauda esquerda abaixo
 
-load "auto.csv" as auto
+load "https://www.stata-press.com/data/r9/auto.dta" as auto
 
 let m_a = ols(price ~ mpg + weight + C(foreign), auto)
 predict auto resid_a = m_a, "residuals"
@@ -271,8 +399,9 @@ qqplot(auto, log_price,  title="QQ-plot — log(price)")
 # log(price) deve ser mais próximo da Normal
 
 # QQ de resíduos de séries temporais
-qqplot(mac, resid_ar, title="QQ-plot — Resíduos AR(2) do ΔPIB")
-jb(m_ar)
+# qqplot/jb on ARIMA residuals — predict not supported for ARIMA models
+# qqplot(mac, resid_ar, title="QQ-plot — Resíduos AR(2) do ΔPIB")
+# jb(m_ar)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 5. CORRPLOT — matriz de correlação como heatmap
@@ -325,7 +454,7 @@ corrplot(auto, price, mpg, weight, length)
 
 # 5. Série temporal: ACF antes de modelar
 acfplot(mac, pib,    lags=16, title="ACF PIB — estacionariedade?")
-pacfplot(mac, dpib,  lags=16, title="PACF ΔPIB — ordem AR?")
+pacfplot(mac, pib,  lags=16, title="PACF PIB — ordem AR?")
 
 # 6. Ajustar ETS e verificar resíduos
 predict v resid2 = m_hw, "residuals"

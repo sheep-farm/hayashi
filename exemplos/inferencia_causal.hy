@@ -12,19 +12,23 @@
 
 load "dados.csv" as df
 
-summarize(df, salario, experiencia, educacao, idade)
+# Converter colunas inteiras para float
+generate df experiencia_f = experiencia * 1.0
+generate df educacao_f = educacao * 1.0
+generate df idade_f = idade * 1.0
 
-# Bandwidth automático (seletor IK — Imbens-Kalyanaraman 2012)
-# Kernel triangular, polinômio local linear (padrão)
-let rd_auto = rd(salario ~ experiencia, 10.0, df)
+summarize(df, salario, experiencia_f, educacao_f, idade_f)
+
+# Bandwidth explícito — dataset pequeno (n=50), bw amplo para ter observações suficientes
+let rd_auto = rd(salario ~ experiencia_f, 10.0, df, bw=5.0)
 print(rd_auto)
 
-# Bandwidth explícito, polinômio quadrático
-let rd_q2 = rd(salario ~ experiencia, 10.0, df, bw=3.0, poly=2)
+# Bandwidth mais estreito, polinômio quadrático
+let rd_q2 = rd(salario ~ experiencia_f, 10.0, df, bw=6.0, poly=2)
 print(rd_q2)
 
 # Kernel uniforme (todos os pesos iguais dentro da janela)
-let rd_uni = rd(salario ~ experiencia, 10.0, df, bw=2.5, kernel="uniform")
+let rd_uni = rd(salario ~ experiencia_f, 10.0, df, bw=5.0, kernel="uniform")
 print(rd_uni)
 
 
@@ -33,10 +37,10 @@ print(rd_uni)
 # ══════════════════════════════════════════════════════════════════════════════
 # Cenário: elegibilidade (xp ≥ 10) não garante receber o bônus (non-compliance).
 # Criamos um indicador de tratamento efetivo com fuzzy assignment.
-generate df recebeu_bonus = (experiencia >= 10)
+generate df recebeu_bonus = (experiencia_f >= 10)
 # Na prática: recebeu_bonus é correlacionado com elegibilidade mas ≠ determinístico
 # Estimador: LATE = salto(salario) / salto(recebeu_bonus)
-let rd_fuzzy = fuzzy_rd(salario ~ experiencia, "recebeu_bonus", 10.0, df, bw=3.0)
+let rd_fuzzy = fuzzy_rd(salario ~ experiencia_f, "recebeu_bonus", 10.0, df, bw=3.0)
 print(rd_fuzzy)
 
 
@@ -47,20 +51,20 @@ print(rd_fuzzy)
 # Tratamento: educacao > 14 (pós-graduação vs graduação)
 # Covariáveis de balanceamento: experiencia, idade, genero binário
 
-generate df alta_edu = (educacao > 14)
+generate df alta_edu = (educacao_f > 14)
 
 # filter() — seleção de linhas por condição (inclui comparação de colunas string)
 # Sintaxe: filter(df, condição_numérica_ou_string)
 # Exemplo com coluna numérica: apenas trabalhadores adultos
-let df_adultos = filter(df, idade >= 25)
+let df_adultos = filter(df, idade_f >= 25)
 # Exemplo com coluna string (se existir): filter(df, genero == "F")
 
 # 1:1 matching sem reposição, bandwidth automático do PS
-let m_psm = psm(salario ~ alta_edu + experiencia + idade, df_adultos)
+let m_psm = psm(salario ~ alta_edu + experiencia_f + idade_f, df_adultos)
 print(m_psm)
 
 # 2:1 matching com caliper 0.05 (evita matches ruins)
-let m_psm2 = psm(salario ~ alta_edu + experiencia + idade, df,
+let m_psm2 = psm(salario ~ alta_edu + experiencia_f + idade_f, df,
                  k=2, caliper=0.05, replace=false, boot=300)
 print(m_psm2)
 
@@ -73,16 +77,19 @@ print(m_psm2)
 
 load "painel.csv" as painel
 
+# Converter ano (inteiro) para float para uso no synth
+generate painel ano_f = ano * 1.0
+
 summarize(painel, lucro, alavancagem, tamanho)
 
 # Empresa 1 recebeu algum tratamento a partir de 2021
 # t0 = 2021 → 2018-2020 são períodos pré-tratamento
-let m_synth = synth("lucro", "1", 2021, painel, id="empresa", time="ano")
+let m_synth = synth("lucro", "1", 2021, painel, id="empresa", time="ano_f")
 print(m_synth)
 
 # Com covariáveis para melhorar o ajuste pré-tratamento (matching de preditores)
 let m_synth2 = synth("lucro", "1", 2021, painel,
-                     id="empresa", time="ano",
+                     id="empresa", time="ano_f",
                      covs=["alavancagem", "tamanho"])
 print(m_synth2)
 

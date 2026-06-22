@@ -52,7 +52,29 @@ abtest(painel, lucro ~ alavancagem + tamanho, id="empresa", time="ano")
 # Distribui sobre Beta(μ·φ, (1-μ)·φ); estima μ e φ (precisão)
 # Não aceita exatamente 0 ou 1 — transformar antes se necessário
 
-load "proporcoes.csv" as prop
+input prop
+market_share renda preco pub
+0.15 3.2 10.5 2.0
+0.25 4.1 8.2 3.5
+0.10 2.8 12.0 1.0
+0.35 4.5 7.5 4.0
+0.20 3.5 9.8 2.5
+0.30 4.3 8.0 3.8
+0.12 3.0 11.5 1.5
+0.40 4.8 6.5 4.5
+0.18 3.3 10.0 2.2
+0.28 4.0 8.5 3.2
+0.08 2.5 13.0 0.8
+0.45 5.0 6.0 5.0
+0.22 3.6 9.5 2.8
+0.32 4.2 7.8 3.6
+0.14 2.9 11.0 1.2
+0.38 4.6 7.0 4.2
+0.16 3.1 10.2 1.8
+0.42 4.9 6.2 4.8
+0.24 3.8 9.0 3.0
+0.05 2.3 14.0 0.5
+end
 # Variáveis: market_share (outcome), renda, preco, pub (regressores)
 
 # Link logit (padrão): η = logit(μ) = log(μ/(1-μ))
@@ -66,7 +88,7 @@ print(m_beta_probit)
 # Comparar com logit binário (inadequado mas referência)
 let m_logit = logit(market_share ~ renda + preco + pub, prop)
 
-ic(m_beta, m_beta_probit)
+# ic(m_beta, m_beta_probit)  # ic() não suporta betareg ainda
 
 # Predição
 predict prop mu_hat = m_beta, "pr" # E[y|x] ∈ (0,1)
