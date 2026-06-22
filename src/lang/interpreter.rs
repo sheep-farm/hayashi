@@ -371,24 +371,57 @@ impl std::fmt::Display for Value {
 // ── Ambiente de variáveis ─────────────────────────────────────────────────────
 
 pub struct Env {
-    vars: HashMap<String, Value>,
+    scopes: Vec<HashMap<String, Value>>,
 }
 
 impl Env {
     pub fn new() -> Self {
-        Self { vars: HashMap::new() }
+        Self { scopes: vec![HashMap::new()] }
     }
 
+    pub fn push_scope(&mut self) {
+        self.scopes.push(HashMap::new());
+    }
+
+    pub fn pop_scope(&mut self) {
+        if self.scopes.len() > 1 {
+            self.scopes.pop();
+        }
+    }
+
+    /// `let x = val` — cria no escopo atual (topo)
+    pub fn declare(&mut self, name: &str, val: Value) {
+        self.scopes.last_mut().unwrap().insert(name.to_string(), val);
+    }
+
+    /// `x = val` (sem let) — busca do topo pra base e modifica onde encontrar.
+    /// Se não encontrar, insere no escopo atual.
     pub fn set(&mut self, name: &str, val: Value) {
-        self.vars.insert(name.to_string(), val);
+        for scope in self.scopes.iter_mut().rev() {
+            if scope.contains_key(name) {
+                scope.insert(name.to_string(), val);
+                return;
+            }
+        }
+        self.scopes.last_mut().unwrap().insert(name.to_string(), val);
     }
 
+    /// Busca do topo pra base (lexical scoping)
     pub fn get(&self, name: &str) -> Option<&Value> {
-        self.vars.get(name)
+        for scope in self.scopes.iter().rev() {
+            if let Some(v) = scope.get(name) {
+                return Some(v);
+            }
+        }
+        None
     }
 
     pub fn remove(&mut self, name: &str) {
-        self.vars.remove(name);
+        for scope in self.scopes.iter_mut().rev() {
+            if scope.remove(name).is_some() {
+                return;
+            }
+        }
     }
 }
 
@@ -10984,14 +11017,11 @@ impl Interpreter {
                     .map(|e| self.eval_expr(e))
                     .collect::<Result<_>>()?;
 
-                // Salva env atual e cria escopo local
-                let saved_env = self.env.vars.clone();
-
+                self.env.push_scope();
                 for (param, val) in user_fn.params.iter().zip(arg_vals) {
-                    self.env.set(param, val);
+                    self.env.declare(param, val);
                 }
 
-                // Executa corpo — captura Return
                 let body = user_fn.body.clone();
                 let mut exec_err: Option<HayashiError> = None;
                 for s in &body {
@@ -11008,8 +11038,7 @@ impl Interpreter {
                     }
                 }
 
-                // Restaura env do escopo externo
-                self.env.vars = saved_env;
+                self.env.pop_scope();
 
                 if let Some(e) = exec_err {
                     return Err(e);
@@ -12100,6 +12129,11 @@ impl Interpreter {
         match stmt {
             Stmt::Let { name, value } => {
                 let val = self.eval_expr(value)?;
+                self.env.declare(name, val);
+            }
+
+            Stmt::Assign { name, value } => {
+                let val = self.eval_expr(value)?;
                 self.env.set(name, val);
             }
 
@@ -12852,27 +12886,32 @@ impl Interpreter {
             Stmt::If { cond, then_body, else_body } => {
                 let cond_val = self.eval_expr(cond)?;
                 if Self::value_as_bool(&cond_val) {
+                    self.env.push_scope();
                     for s in then_body { self.exec(s)?; }
+                    self.env.pop_scope();
                 } else if let Some(else_stmts) = else_body {
+                    self.env.push_scope();
                     for s in else_stmts { self.exec(s)?; }
+                    self.env.pop_scope();
                 }
             }
 
             // ── for var in iter { ... } ───────────────────────────────────────
             // Variáveis declaradas no corpo persistem no escopo externo (R-style).
             Stmt::For { var, iter, body } => {
-                // Executa um passo do corpo; retorna true=continue, false=break
                 macro_rules! run_body {
                     () => {{
                         let mut do_break = false;
+                        self.env.push_scope();
                         for s in body {
                             match self.exec(s) {
                                 Ok(()) => {}
                                 Err(HayashiError::Continue) => break,
                                 Err(HayashiError::Break)    => { do_break = true; break; }
-                                Err(e) => return Err(e),
+                                Err(e) => { self.env.pop_scope(); return Err(e); }
                             }
                         }
+                        self.env.pop_scope();
                         do_break
                     }};
                 }
@@ -12941,14 +12980,16 @@ impl Interpreter {
                 'outer: loop {
                     let cond_val = self.eval_expr(cond)?;
                     if !Self::value_as_bool(&cond_val) { break; }
+                    self.env.push_scope();
                     for s in body {
                         match self.exec(s) {
                             Ok(()) => {}
-                            Err(HayashiError::Break)    => break 'outer,
+                            Err(HayashiError::Break)    => { self.env.pop_scope(); break 'outer; }
                             Err(HayashiError::Continue) => break,
-                            Err(e) => return Err(e),
+                            Err(e) => { self.env.pop_scope(); return Err(e); }
                         }
                     }
+                    self.env.pop_scope();
                 }
             }
 
