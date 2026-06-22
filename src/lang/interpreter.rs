@@ -230,7 +230,7 @@ pub enum Value {
     Int(i64),
     Bool(bool),
     Str(String),
-    DataFrame(DataFrame),
+    DataFrame(Rc<DataFrame>),
     OlsResult(OlsModel),
     IvResult(Rc<greeners::iv::IvResult>),
     BinaryResult(BinaryModel),
@@ -666,16 +666,17 @@ impl Interpreter {
         }
     }
 
-    fn filter_df_by_mask(df: &DataFrame, mask: &[f64]) -> Result<DataFrame> {
+    fn filter_df_by_mask(df: &DataFrame, mask: &[f64]) -> Result<Rc<DataFrame>> {
         let keep: Vec<usize> = mask.iter().enumerate()
             .filter(|(_, &m)| m != 0.0)
             .map(|(i, _)| i)
             .collect();
         df.iloc(Some(&keep), None)
+            .map(Rc::new)
             .map_err(|e| HayashiError::Runtime(e.to_string()))
     }
 
-    fn maybe_filter_df(&self, df: &DataFrame, opts: &[Opt]) -> Result<DataFrame> {
+    fn maybe_filter_df(&self, df: &Rc<DataFrame>, opts: &[Opt]) -> Result<Rc<DataFrame>> {
         if let Some(if_opt) = opts.iter().find(|o| o.name == "if") {
             let mask = Self::eval_col_expr(&if_opt.value, df)?;
             Self::filter_df_by_mask(df, &mask)
@@ -2887,7 +2888,7 @@ impl Interpreter {
                             Ok(d) => d,
                             Err(_) => continue,
                         };
-                        self.env.set("__boot_df__", Value::DataFrame(boot_df));
+                        self.env.set("__boot_df__", Value::DataFrame(Rc::new(boot_df)));
                         match self.eval_call(
                             &estimator_name,
                             &[formula_expr.clone(), Expr::Var("__boot_df__".into())],
@@ -6565,7 +6566,7 @@ impl Interpreter {
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
                 println!("({} groups from {} observations)", keys.len(), n_obs);
-                Ok(Value::DataFrame(new_df))
+                Ok(Value::DataFrame(Rc::new(new_df)))
             }
 
             // ── append ───────────────────────────────────────────────────────
@@ -6624,7 +6625,7 @@ impl Interpreter {
 
                 let new_df = builder.build().map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 println!("({} + {} = {} observations)", n1, n2, n1 + n2);
-                Ok(Value::DataFrame(new_df))
+                Ok(Value::DataFrame(Rc::new(new_df)))
             }
 
             // ── merge ─────────────────────────────────────────────────────────
@@ -6748,7 +6749,7 @@ impl Interpreter {
                 let n_matched = result_rows.iter().filter(|(_, r2)| r2.is_some()).count();
                 let n_out = result_rows.len();
                 println!("({n_matched} matched, {} not matched, {n_out} total)", n_out - n_matched);
-                Ok(Value::DataFrame(new_df))
+                Ok(Value::DataFrame(Rc::new(new_df)))
             }
 
             // ── reshape ──────────────────────────────────────────────────────
@@ -6899,7 +6900,7 @@ impl Interpreter {
                             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                         println!("(reshape long: {} obs × {} variáveis → {} obs × {} variáveis)",
                             n_rows, col_names.len(), n_out, new_df.column_names().len());
-                        Ok(Value::DataFrame(new_df))
+                        Ok(Value::DataFrame(Rc::new(new_df)))
                     }
 
                     // ── long → wide ──────────────────────────────────────────
@@ -7043,7 +7044,7 @@ impl Interpreter {
                             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                         println!("(reshape wide: {} obs → {} obs × {} variáveis)",
                             n_rows, n_id, new_df.column_names().len());
-                        Ok(Value::DataFrame(new_df))
+                        Ok(Value::DataFrame(Rc::new(new_df)))
                     }
 
                     other => Err(HayashiError::Runtime(
@@ -7128,7 +7129,7 @@ impl Interpreter {
                 let new_df = builder.build()
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 println!("({n} observations sorted)");
-                Ok(Value::DataFrame(new_df))
+                Ok(Value::DataFrame(Rc::new(new_df)))
             }
 
             // ── list ──────────────────────────────────────────────────────────
@@ -7269,7 +7270,7 @@ impl Interpreter {
                 let hi = winsorized.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
                 let n_clip = orig.iter().zip(winsorized.iter()).filter(|(a, b)| a != b).count();
 
-                df.insert(gen_name.clone(), winsorized)
+                Rc::make_mut(&mut df).insert(gen_name.clone(), winsorized)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 self.env.set(&df_name, Value::DataFrame(df));
                 println!("winsor {var_name} → {gen_name}  (p={p}, range=[{lo:.4}, {hi:.4}], {n_clip} obs clipped)");
@@ -7305,7 +7306,7 @@ impl Interpreter {
                 let n_dummies = dummies.len();
                 let dummy_names: Vec<String> = dummies.iter().map(|(n, _)| n.clone()).collect();
                 for (col_name, vals) in dummies {
-                    df.insert(col_name, vals)
+                    Rc::make_mut(&mut df).insert(col_name, vals)
                         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 }
                 self.env.set(&df_name, Value::DataFrame(df));
@@ -7396,7 +7397,7 @@ impl Interpreter {
                     v
                 }).collect();
                 let n_changed = col.iter().zip(recoded.iter()).filter(|(a, b)| a != b).count();
-                df.insert(var.clone(), ndarray::Array1::from(recoded))
+                Rc::make_mut(&mut df).insert(var.clone(), ndarray::Array1::from(recoded))
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 self.env.set(&df_name, Value::DataFrame(df));
                 println!("recode {var}: {n_changed} changes");
@@ -7480,7 +7481,7 @@ impl Interpreter {
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
                 println!("({n_drop} observations dropped, {n_kept} remaining)");
-                Ok(Value::DataFrame(new_df))
+                Ok(Value::DataFrame(Rc::new(new_df)))
             }
 
             // ── filter ───────────────────────────────────────────────────────
@@ -7536,7 +7537,7 @@ impl Interpreter {
                 let new_df = builder.build()
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 println!("({n_drop} observations removed, {n_kept} remaining)");
-                Ok(Value::DataFrame(new_df))
+                Ok(Value::DataFrame(Rc::new(new_df)))
             }
 
             // ── encode: string → numérico ─────────────────────────────────────
@@ -7569,7 +7570,7 @@ impl Interpreter {
                     ))?;
 
                 let target_col = gen_name.unwrap_or_else(|| col_name.clone());
-                df.insert(target_col.clone(), numeric)
+                Rc::make_mut(&mut df).insert(target_col.clone(), numeric)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 self.env.set(&df_name, Value::DataFrame(df));
 
@@ -7610,7 +7611,7 @@ impl Interpreter {
                     let idx = v as usize;
                     labels.get(idx).cloned().unwrap_or_else(|| format!("{v}"))
                 }).collect();
-                df.insert_column(col_name.clone(), greeners::Column::String(ndarray::Array1::from(str_vals)))
+                Rc::make_mut(&mut df).insert_column(col_name.clone(), greeners::Column::String(ndarray::Array1::from(str_vals)))
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 self.env.set(&df_name, Value::DataFrame(df));
                 println!("decode {col_name}: {} labels applied", labels.len());
@@ -7668,7 +7669,7 @@ impl Interpreter {
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
                 println!("({old} → {new})");
-                Ok(Value::DataFrame(new_df))
+                Ok(Value::DataFrame(Rc::new(new_df)))
             }
 
             // ── drop ─────────────────────────────────────────────────────────
@@ -7699,7 +7700,7 @@ impl Interpreter {
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
                 println!("({} variables dropped, {} remaining)", drop_names.len(), keep.len());
-                Ok(Value::DataFrame(new_df))
+                Ok(Value::DataFrame(Rc::new(new_df)))
             }
 
             // ── drop_collinear ────────────────────────────────────────────────
@@ -7777,10 +7778,10 @@ impl Interpreter {
                 println!("  {} coluna(s) mantida(s): {}", keep_names.len(),
                     keep_names.join(", "));
 
-                let new_df = df.drop(&omit_names)
+                let new_df = DataFrame::drop(&df, &omit_names)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-                Ok(Value::DataFrame(new_df))
+                Ok(Value::DataFrame(Rc::new(new_df)))
             }
 
             // ── keep ──────────────────────────────────────────────────────────
@@ -7807,7 +7808,7 @@ impl Interpreter {
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
                 println!("({} variables kept, {} dropped)", refs.len(), n_before - refs.len());
-                Ok(Value::DataFrame(new_df))
+                Ok(Value::DataFrame(Rc::new(new_df)))
             }
 
             // ── tabulate ─────────────────────────────────────────────────────
@@ -10387,8 +10388,8 @@ impl Interpreter {
                 let (trend, cycle) = greeners::TimeSeries::hp_filter(&series, lambda).map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let trend_name = format!("{var_name}_trend");
                 let cycle_name = format!("{var_name}_cycle");
-                df.insert(trend_name.clone(), trend).map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
-                df.insert(cycle_name.clone(), cycle).map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
+                Rc::make_mut(&mut df).insert(trend_name.clone(), trend).map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
+                Rc::make_mut(&mut df).insert(cycle_name.clone(), cycle).map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
                 println!("hpfilter: λ={lambda}  →  {trend_name} e {cycle_name} adicionadas a {df_name}");
                 self.env.set(&df_name, Value::DataFrame(df));
                 Ok(Value::Nil)
@@ -10406,7 +10407,7 @@ impl Interpreter {
                 let series = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?.to_vec());
                 let cycle = greeners::TimeSeries::bk_filter(&series, low, high, k).map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let cycle_name = format!("{var_name}_cycle");
-                df.insert(cycle_name.clone(), cycle).map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
+                Rc::make_mut(&mut df).insert(cycle_name.clone(), cycle).map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
                 println!("bkfilter: períodos [{low},{high}] k={k}  →  {cycle_name} adicionada a {df_name}");
                 self.env.set(&df_name, Value::DataFrame(df));
                 Ok(Value::Nil)
@@ -10424,7 +10425,7 @@ impl Interpreter {
                 let series = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?.to_vec());
                 let cycle = greeners::TimeSeries::cf_filter(&series, low, high, drift).map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let cycle_name = format!("{var_name}_cycle");
-                df.insert(cycle_name.clone(), cycle).map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
+                Rc::make_mut(&mut df).insert(cycle_name.clone(), cycle).map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
                 println!("cffilter: períodos [{low},{high}] drift={drift}  →  {cycle_name} adicionada a {df_name}");
                 self.env.set(&df_name, Value::DataFrame(df));
                 Ok(Value::Nil)
@@ -11407,7 +11408,7 @@ impl Interpreter {
         &mut self,
         args: &[Expr],
         opt_map: &HashMap<String, Value>,
-    ) -> Result<(Formula, DataFrame, String, String)> {
+    ) -> Result<(Formula, Rc<DataFrame>, String, String)> {
         if args.len() < 2 {
             return Err(HayashiError::Runtime(
                 "panel estimator requires (formula, dataframe [, id=col])".into(),
@@ -12063,7 +12064,7 @@ impl Interpreter {
         }
     }
 
-    fn extract_binary_args_filtered(&mut self, args: &[Expr], opts: &[Opt]) -> Result<(Formula, DataFrame)> {
+    fn extract_binary_args_filtered(&mut self, args: &[Expr], opts: &[Opt]) -> Result<(Formula, Rc<DataFrame>)> {
         if args.len() < 2 {
             return Err(HayashiError::Runtime("estimator requires (formula, dataframe)".into()));
         }
@@ -12490,7 +12491,7 @@ impl Interpreter {
                 let df = greeners::DataFrame::new(col_map)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 println!("input → {alias} ({n} obs, {} vars: {})", k, headers.join(", "));
-                self.env.set(&alias, Value::DataFrame(df));
+                self.env.set(&alias, Value::DataFrame(Rc::new(df)));
             }
 
             // ── display expr ─────────────────────────────────────────────────
@@ -12535,7 +12536,7 @@ impl Interpreter {
                     (df, n)
                 };
                 println!("Loaded '{}' → {alias} ({} rows)", path_str, n_rows);
-                self.env.set(alias, Value::DataFrame(df));
+                self.env.set(alias, Value::DataFrame(Rc::new(df)));
             }
 
             Stmt::Predict { df, varname, model, kind } => {
@@ -13042,7 +13043,7 @@ impl Interpreter {
                 };
 
                 let arr = ndarray::Array1::from(vals);
-                df_val.insert(varname.clone(), arr)
+                Rc::make_mut(&mut df_val).insert(varname.clone(), arr)
                     .map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
                 println!("({} obs)  {df}.{varname} ({kind}) predicted", df_val.n_rows());
                 self.env.set(df, Value::DataFrame(df_val));
@@ -13090,7 +13091,7 @@ impl Interpreter {
                 };
 
                 let arr = ndarray::Array1::from(final_vals);
-                df_val.insert(varname.clone(), arr)
+                Rc::make_mut(&mut df_val).insert(varname.clone(), arr)
                     .map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
                 self.env.set(df, Value::DataFrame(df_val));
             }
@@ -13102,7 +13103,7 @@ impl Interpreter {
                 };
                 let vals = Self::eval_col_expr(expr, &df_val)?;
                 let arr = ndarray::Array1::from(vals);
-                df_val.insert(varname.clone(), arr)
+                Rc::make_mut(&mut df_val).insert(varname.clone(), arr)
                     .map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
                 println!("({} obs)  {df}.{varname} generated", df_val.n_rows());
                 self.env.set(df, Value::DataFrame(df_val));
@@ -13197,7 +13198,7 @@ impl Interpreter {
                 let n = sorted.n_rows();
 
                 self.ts_info.insert(df.clone(), t_var.clone());
-                self.env.set(df, Value::DataFrame(sorted));
+                self.env.set(df, Value::DataFrame(Rc::new(sorted)));
 
                 println!("tsset {df}");
                 println!("  variável de tempo : {t_var}  ({t_min} a {t_max})");
