@@ -6,8 +6,9 @@ set_seed(2024)
 load "https://github.com/Daniel-Uhr/data/raw/main/cattaneo2.dta" as df
 
 // ── Preparação ──────────────────────────────────────────────
+// mbsmoke no .dta é byte: 1=smoker, 0=nonsmoker
 generate df Y = bweight
-generate df Treated = (mbsmoke == "smoker")
+generate df Treated = mbsmoke
 generate df lnY = log(Y)
 
 // Winsorizar para robustez
