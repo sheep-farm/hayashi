@@ -7165,29 +7165,17 @@ impl Interpreter {
                     _ => var_name.clone(),
                 };
 
-                let col = Self::get_col_f64(&df, &var_name)?;
-                let mut sorted: Vec<f64> = col.iter().filter(|v| v.is_finite()).cloned().collect();
-                sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
-                let n = sorted.len();
-                let lo_idx = ((p) * n as f64).floor() as usize;
-                let hi_idx = ((1.0 - p) * n as f64).ceil() as usize;
-                let lo = sorted[lo_idx.min(n - 1)];
-                let hi = sorted[hi_idx.min(n - 1).max(lo_idx)];
+                let winsorized = df.winsorize(&var_name, p)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let orig = Self::get_col_f64(&df, &var_name)?;
+                let lo = winsorized.iter().cloned().fold(f64::INFINITY, f64::min);
+                let hi = winsorized.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+                let n_clip = orig.iter().zip(winsorized.iter()).filter(|(a, b)| a != b).count();
 
-                let winsorized: Vec<f64> = col.iter().map(|&v| {
-                    if !v.is_finite() { v }
-                    else if v < lo { lo }
-                    else if v > hi { hi }
-                    else { v }
-                }).collect();
-
-                let n_lo = col.iter().filter(|&&v| v.is_finite() && v < lo).count();
-                let n_hi = col.iter().filter(|&&v| v.is_finite() && v > hi).count();
-
-                df.insert(gen_name.clone(), ndarray::Array1::from(winsorized))
+                df.insert(gen_name.clone(), winsorized)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 self.env.set(&df_name, Value::DataFrame(df));
-                println!("winsor {var_name} → {gen_name}  (p={p}, lo={lo:.4}, hi={hi:.4}, {n_lo}+{n_hi} obs clipped)");
+                println!("winsor {var_name} → {gen_name}  (p={p}, range=[{lo:.4}, {hi:.4}], {n_clip} obs clipped)");
                 Ok(Value::Nil)
             }
 
@@ -7215,39 +7203,18 @@ impl Interpreter {
                     _ => var_name.clone(),
                 };
 
-                // tentar como numérica, fallback para string
-                let n_rows = df.n_rows();
-                let categories: Vec<String> = if let Ok(arr) = df.get(&var_name) {
-                    let mut unique: Vec<i64> = arr.iter().map(|&v| v as i64).collect::<std::collections::HashSet<_>>().into_iter().collect();
-                    unique.sort();
-                    unique.iter().map(|v| v.to_string()).collect()
-                } else if let Ok(arr) = df.get_string(&var_name) {
-                    let mut unique: Vec<String> = arr.iter().cloned().collect::<std::collections::HashSet<_>>().into_iter().collect();
-                    unique.sort();
-                    unique
-                } else {
-                    return Err(HayashiError::Runtime(format!("coluna '{var_name}' não encontrada")));
-                };
-
-                // gerar dummies
-                for cat in &categories {
-                    let dummy: Vec<f64> = if let Ok(arr) = df.get(&var_name) {
-                        let cat_val: f64 = cat.parse().unwrap_or(f64::NAN);
-                        arr.iter().map(|&v| if (v - cat_val).abs() < 0.5 { 1.0 } else { 0.0 }).collect()
-                    } else if let Ok(arr) = df.get_string(&var_name) {
-                        arr.iter().map(|s| if s == cat { 1.0 } else { 0.0 }).collect()
-                    } else {
-                        vec![0.0; n_rows]
-                    };
-                    let col_name = format!("{prefix}_{cat}");
-                    df.insert(col_name, ndarray::Array1::from(dummy))
+                let dummies = df.generate_dummies(&var_name, &prefix)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let n_dummies = dummies.len();
+                let dummy_names: Vec<String> = dummies.iter().map(|(n, _)| n.clone()).collect();
+                for (col_name, vals) in dummies {
+                    df.insert(col_name, vals)
                         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 }
-
                 self.env.set(&df_name, Value::DataFrame(df));
-                println!("tabgen {var_name}: {} dummies geradas (prefix={prefix}_)", categories.len());
-                for cat in &categories {
-                    println!("  {prefix}_{cat}");
+                println!("tabgen {var_name}: {n_dummies} dummies geradas (prefix={prefix}_)");
+                for name in &dummy_names {
+                    println!("  {name}");
                 }
                 Ok(Value::Nil)
             }
@@ -7412,32 +7379,16 @@ impl Interpreter {
                     _ => None,
                 };
 
-                let str_vals = df.get_string(&col_name)
-                    .map_err(|_| HayashiError::Runtime(
-                        format!("'{col_name}' não é coluna de string — encode() só funciona com strings")
-                    ))?
-                    .to_vec();
-
-                // mapear valores únicos → inteiros (ordem de primeira aparição)
-                let mut label_map: Vec<String> = Vec::new();
-                let mut val_to_idx: HashMap<String, usize> = HashMap::new();
-                let numeric: Vec<f64> = str_vals.iter().map(|s| {
-                    if let Some(&idx) = val_to_idx.get(s) {
-                        idx as f64
-                    } else {
-                        let idx = label_map.len();
-                        label_map.push(s.clone());
-                        val_to_idx.insert(s.clone(), idx);
-                        idx as f64
-                    }
-                }).collect();
+                let (numeric, label_map) = df.encode(&col_name)
+                    .map_err(|e| HayashiError::Runtime(
+                        format!("encode '{col_name}': {e}")
+                    ))?;
 
                 let target_col = gen_name.unwrap_or_else(|| col_name.clone());
-                df.insert(target_col.clone(), ndarray::Array1::from(numeric))
+                df.insert(target_col.clone(), numeric)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 self.env.set(&df_name, Value::DataFrame(df));
 
-                // imprimir mapeamento
                 println!("encode {col_name} → {target_col}");
                 for (i, label) in label_map.iter().enumerate() {
                     println!("  {i} = \"{label}\"");
