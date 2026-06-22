@@ -3,10 +3,9 @@
 
 load "https://github.com/Daniel-Uhr/data/raw/main/cattaneo2.dta" as df
 
-// mbsmoke é string no .dta ("nonsmoker"/"smoker") — converter
-encode(df, mbsmoke)
+// mbsmoke é string no .dta — comparação direta funciona
 generate df Y = bweight
-generate df Treated = mbsmoke
+generate df Treated = (mbsmoke == "smoker")
 
 // Médias condicionais
 scalar mu1 = mean(df, Y, if = Treated == 1)
