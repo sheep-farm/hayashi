@@ -108,6 +108,115 @@ esttab m_*
 | Bayesian | `bayes:` | — | Missing |
 | Spatial | `spregress` | — | Missing |
 
+## Language structures — Hayashi vs Stata
+
+Stata is a command-oriented language with global state. Hayashi is a block-scoped, expression-oriented language with modern constructs.
+
+### Type system
+
+| Feature | Stata | Hayashi |
+|---|---|---|
+| Integer | numeric (no distinction) | `int` (64-bit) |
+| Float | numeric | `float` (64-bit) |
+| Boolean | 0/1 | `bool` (`true`/`false`) |
+| String | `"text"` | `"text"` |
+| List/array | — | `[1, 2, 3]` with 16 operations |
+| Dictionary | — | `{"key": value}` with 7 operations |
+| Nil/missing | `.` | `nil` |
+| Type check | — | `type(x)` returns `"int"`, `"list"`, etc. |
+| Conversions | `real()`, `string()` | `int()`, `float()`, `str()`, `bool()` |
+
+### Variables and mutability
+
+| Feature | Stata | Hayashi |
+|---|---|---|
+| Declaration | implicit global | `let x = 10` (mutable) |
+| Constant | — | `const PI = 3.14` (immutable) |
+| Scoping | global only | block-scoped, deterministic destruction |
+| Shadowing | allowed (no warning) | **forbidden** — error on redeclare over const |
+| Function params | mutable | `const` by default (immutable input) |
+| DataFrame passing | single active dataset | `Rc` copy-on-write, zero-copy reads |
+
+### Control flow
+
+| Feature | Stata | Hayashi |
+|---|---|---|
+| If/else | `if` / `else` | `if cond { } else { }` |
+| If expression | — | `let r = if x > 0 { "yes" } else { "no" }` |
+| Match | — | `match x { 1 => "one", _ => "other" }` |
+| For loop | `forvalues` / `foreach` | `for i in 1..10 { }` / `for v in list { }` |
+| While loop | `while` | `while cond { }` |
+| Try/catch | `capture` (no error access) | `try { } catch e { display e }` |
+| Break/continue | — (only in Mata) | `break` / `continue` |
+
+### Functions
+
+| Feature | Stata | Hayashi |
+|---|---|---|
+| User functions | Mata only (separate language) | `fn name(x) { return x * x }` |
+| Closures | — | `\|x\| x * 2` — anonymous, captures scope |
+| First-class | no | yes — assign to variable, pass as argument |
+| `map`/`filter` | — | `map(list, \|x\| x * 2)`, `filter(list, \|x\| x > 0)` |
+
+### Operators Stata lacks
+
+| Operator | Syntax | Example |
+|---|---|---|
+| Pipe | `\|>` | `data \|> sort \|> filter(\|x\| x > 0) \|> map(\|x\| x * 10)` |
+| Membership | `in` | `if 3 in [1, 2, 3]`, `if "key" in dict` |
+| F-string | `f"..."` | `f"mean = {mu:.2f}, n = {n}"` |
+| Match | `match` | `match status { 1 => "active", _ => "unknown" }` |
+| Ternary | if-expr | `let label = if x > 0 { "pos" } else { "neg" }` |
+
+### Collections Stata lacks
+
+```
+// List — 16 operations, immutable (returns new list)
+let nums = [3, 1, 2] |> sort |> map(|x| x * 10)   // [10, 20, 30]
+push  pop  insert  remove  clear  reverse  index  slice
+join  map  filter  unique  flatten  sort  range  len
+
+// Dict — 7 operations, immutable
+let config = {"alpha": 0.05, "n_boot": 1000}
+keys  values  has_key  dict_set  dict_remove  dict_merge  len
+
+// Pipe chaining (no Stata equivalent)
+raw_data
+    |> filter(|row| row > 0)
+    |> sort
+    |> unique
+    |> map(|x| x * 100)
+```
+
+### Error handling
+
+| Feature | Stata | Hayashi |
+|---|---|---|
+| Suppress output | `quietly` | `quietly(expr)` |
+| Ignore errors | `capture` (no error info) | `capture(expr)` — returns Nil on error |
+| Structured handling | — | `try { } catch e { display f"Error: {e}" }` |
+| Assertions | `assert` | `assert(cond, "message")` |
+| Error messages | generic | line numbers: `"line 15: undefined variable 'x'"` |
+
+### Multiple DataFrames
+
+Stata supports only one active dataset (frames added in v16, verbose syntax). Hayashi treats DataFrames as regular variables:
+
+```
+// Hayashi — natural
+load "sales.csv" as sales
+load "clients.parquet" as clients
+load "stock.db" as stock, table=products
+let merged = merge(sales, clients, key=id)
+
+// Stata — requires frame switching
+frame create clients
+frame change clients
+use "clients.dta"
+frame change default
+frlink 1:1 id, frame(clients)
+```
+
 ## Where Hayashi wins
 
 **Cost and deployment:**
