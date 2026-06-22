@@ -3281,3 +3281,157 @@ fn smoke_funcoes_matematicas() {
     assert!(ok, "funcoes_matematicas.hy failed:\n{out}");
     assert!(out.contains("Skewness"));
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PARIDADE STATA — distribuições, _n/_N, ci, centile, recode, egen
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn gen_row_number() {
+    assert_ok_contains("_n", r#"
+input df
+X
+10
+20
+30
+end
+generate df row = _n
+list(df)
+"#, "3");
+}
+
+#[test]
+fn gen_total_rows() {
+    assert_ok_contains("_N", r#"
+input df
+X
+10
+20
+30
+end
+generate df total = _N
+display mean(df, total)
+"#, "3");
+}
+
+#[test]
+fn gen_standardize() {
+    assert_ok_contains("std", r#"
+input df
+X
+1
+2
+3
+4
+5
+end
+generate df Z = std(X)
+summarize(df, Z)
+"#, "0.0000");
+}
+
+#[test]
+fn gen_iqr() {
+    assert_ok("iqr", r#"
+input df
+X
+1
+2
+3
+4
+5
+6
+7
+8
+end
+generate df I = iqr(X)
+"#);
+}
+
+#[test]
+fn ci_means() {
+    assert_ok_contains("ci_means", r#"
+input df
+X
+1
+2
+3
+4
+5
+end
+ci(df, X)
+"#, "95% CI");
+}
+
+#[test]
+fn centile_basic() {
+    assert_ok_contains("centile", r#"
+input df
+X
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+end
+centile(df, X)
+"#, "50.0%");
+}
+
+#[test]
+fn recode_basic() {
+    assert_ok_contains("recode", r#"
+input df
+X
+1
+2
+3
+4
+end
+recode(df, X, from=[1, 2], to=[10, 20])
+"#, "2 changes");
+}
+
+#[test]
+fn dist_chi2tail() {
+    assert_ok("chi2tail", r#"
+input df
+X
+1
+5
+10
+end
+generate df P = chi2tail(2, X)
+"#);
+}
+
+#[test]
+fn dist_ttail() {
+    assert_ok("ttail", r#"
+input df
+X
+1
+2
+3
+end
+generate df P = ttail(10, X)
+"#);
+}
+
+#[test]
+fn dist_invttail() {
+    assert_ok("invttail", r#"
+input df
+X
+0.05
+0.025
+0.01
+end
+generate df T = invttail(10, X)
+"#);
+}

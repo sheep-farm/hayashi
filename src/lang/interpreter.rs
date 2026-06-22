@@ -7316,6 +7316,93 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── ci: intervalo de confiança para a média ─────────────────────
+            "ci" | "ci_means" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("ci(df, var [, level=0.95])".into()));
+                }
+                let df = match self.eval_expr(&args[0])? { Value::DataFrame(d) => d, _ => return Err(HayashiError::Type("df".into())) };
+                let var = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("var".into())) };
+                let level = match opt_map.get("level") { Some(Value::Float(v)) => *v, _ => 0.95 };
+                let col = Self::get_col_f64(&df, &var)?;
+                let vals: Vec<f64> = col.iter().filter(|v| v.is_finite()).copied().collect();
+                let n = vals.len() as f64;
+                let mean = vals.iter().sum::<f64>() / n;
+                let sd = (vals.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n - 1.0)).sqrt();
+                let se = sd / n.sqrt();
+                let alpha = 1.0 - level;
+                let t_crit = greeners::t_quantile(1.0 - alpha / 2.0, n - 1.0);
+                let lo = mean - t_crit * se;
+                let hi = mean + t_crit * se;
+                println!("\n  Variable: {var}   Obs: {}", vals.len());
+                println!("  Mean:     {mean:.6}");
+                println!("  Std. Err: {se:.6}");
+                println!("  [{:.0}% CI] [{lo:.6}, {hi:.6}]\n", level * 100.0);
+                Ok(Value::Nil)
+            }
+
+            // ── centile: percentis arbitrários ────────────────────────────────
+            "centile" | "pctile" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("centile(df, var, centiles=[25, 50, 75])".into()));
+                }
+                let df = match self.eval_expr(&args[0])? { Value::DataFrame(d) => d, _ => return Err(HayashiError::Type("df".into())) };
+                let var = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("var".into())) };
+                let col = Self::get_col_f64(&df, &var)?;
+                let mut sorted: Vec<f64> = col.iter().filter(|v| v.is_finite()).copied().collect();
+                sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                let n = sorted.len();
+                let pcts = match opt_map.get("centiles") {
+                    Some(Value::List(lst)) => lst.iter().filter_map(|v| match v {
+                        Value::Int(i) => Some(*i as f64),
+                        Value::Float(f) => Some(*f),
+                        _ => None,
+                    }).collect::<Vec<f64>>(),
+                    _ => vec![1.0, 5.0, 10.0, 25.0, 50.0, 75.0, 90.0, 95.0, 99.0],
+                };
+                println!("\n  Variable: {var}   Obs: {n}");
+                for p in &pcts {
+                    let idx = (p / 100.0 * (n - 1) as f64).round() as usize;
+                    let val = sorted[idx.min(n - 1)];
+                    println!("    {:>5.1}%  {:>12.4}", p, val);
+                }
+                println!();
+                Ok(Value::Nil)
+            }
+
+            // ── recode: recodifica valores ───────────────────────────────────
+            // recode(df, var, rules=[[0, 1], [1, 2], [2, 3]])
+            // ou recode(df, var, from=[1,2,3], to=[10,20,30])
+            "recode" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("recode(df, var, from=[...], to=[...])".into()));
+                }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("df".into())) };
+                let mut df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let var = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("var".into())) };
+                let from_vals: Vec<f64> = match opt_map.get("from") {
+                    Some(Value::List(lst)) => lst.iter().filter_map(|v| match v { Value::Int(i) => Some(*i as f64), Value::Float(f) => Some(*f), _ => None }).collect(),
+                    _ => return Err(HayashiError::Runtime("recode requer from=[...] e to=[...]".into())),
+                };
+                let to_vals: Vec<f64> = match opt_map.get("to") {
+                    Some(Value::List(lst)) => lst.iter().filter_map(|v| match v { Value::Int(i) => Some(*i as f64), Value::Float(f) => Some(*f), _ => None }).collect(),
+                    _ => return Err(HayashiError::Runtime("recode requer to=[...]".into())),
+                };
+                let col = Self::get_col_f64(&df, &var)?;
+                let recoded: Vec<f64> = col.iter().map(|&v| {
+                    for (i, &fv) in from_vals.iter().enumerate() {
+                        if (v - fv).abs() < 0.5 { return to_vals.get(i).copied().unwrap_or(v); }
+                    }
+                    v
+                }).collect();
+                let n_changed = col.iter().zip(recoded.iter()).filter(|(a, b)| a != b).count();
+                df.insert(var.clone(), ndarray::Array1::from(recoded))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                self.env.set(&df_name, Value::DataFrame(df));
+                println!("recode {var}: {n_changed} changes");
+                Ok(Value::Nil)
+            }
+
             // ── dropna ───────────────────────────────────────────────────────
             "dropna" => {
                 if args.is_empty() {
@@ -12029,6 +12116,13 @@ impl Interpreter {
                 )))
             }
             Expr::Var(name) => {
+                // _n = row number (1-based), _N = total rows
+                if name == "_n" {
+                    return Ok((1..=df.n_rows()).map(|i| i as f64).collect());
+                }
+                if name == "_N" {
+                    return Ok(vec![df.n_rows() as f64; df.n_rows()]);
+                }
                 use greeners::Column;
                 let col = df.get_column(name)
                     .map_err(|_| HayashiError::Runtime(format!("column '{name}' not found")))?;
@@ -12181,6 +12275,25 @@ impl Interpreter {
                             let mut s = 0.0f64;
                             return Ok(vals.into_iter().map(|v| { s += v; s }).collect());
                         }
+                        // std: standardize (z-score)
+                        "std" | "standardize" | "zscore" => {
+                            let vals = Self::eval_col_expr(&args[0], df)?;
+                            let clean: Vec<f64> = vals.iter().filter(|v| v.is_finite()).copied().collect();
+                            let n = clean.len() as f64;
+                            let mean = clean.iter().sum::<f64>() / n;
+                            let sd = (clean.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n - 1.0)).sqrt();
+                            return Ok(vals.iter().map(|&v| if v.is_finite() && sd > 1e-15 { (v - mean) / sd } else { f64::NAN }).collect());
+                        }
+                        // iqr: interquartile range (scalar broadcast)
+                        "iqr" => {
+                            let vals = Self::eval_col_expr(&args[0], df)?;
+                            let mut sorted: Vec<f64> = vals.iter().filter(|v| v.is_finite()).copied().collect();
+                            sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                            let n = sorted.len();
+                            let q25 = sorted[(0.25 * (n - 1) as f64).round() as usize];
+                            let q75 = sorted[(0.75 * (n - 1) as f64).round() as usize];
+                            return Ok(vec![q75 - q25; df.n_rows()]);
+                        }
                         // group: ID inteiro (1-based) para cada valor único
                         "group" => {
                             let col_name = match &args[0] {
@@ -12259,18 +12372,41 @@ impl Interpreter {
                             let k = k.min(n - k);
                             (1..=k).fold(1u64, |acc, i| acc * (n - k + i) / i) as f64
                         },
+                        "ttail"         => |df_v: f64, x: f64| 1.0 - greeners::t_pvalue_two(x, df_v) / 2.0,
+                        "invttail"      => |df_v: f64, p: f64| greeners::t_quantile(1.0 - p, df_v),
+                        "chi2tail"      => |df_v: f64, x: f64| greeners::chi2_pvalue(x, df_v),
+                        "Ftail" | "ftail" => |df1: f64, x: f64| greeners::f_pvalue(x, df1, 1000.0),
                         other => return Err(HayashiError::Runtime(
                             format!("função '{other}' não suportada em generate")
                         )),
                     };
                     Ok(a.into_iter().zip(b).map(|(x, y)| f(x, y)).collect())
-                } else if args.len() == 3 && func == "cond" {
-                    let cond = Self::eval_col_expr(&args[0], df)?;
-                    let if_true = Self::eval_col_expr(&args[1], df)?;
-                    let if_false = Self::eval_col_expr(&args[2], df)?;
-                    Ok(cond.into_iter().zip(if_true.into_iter().zip(if_false))
-                        .map(|(c, (t, f))| if c != 0.0 { t } else { f })
-                        .collect())
+                } else if args.len() == 3 {
+                    let a = Self::eval_col_expr(&args[0], df)?;
+                    let b = Self::eval_col_expr(&args[1], df)?;
+                    let c = Self::eval_col_expr(&args[2], df)?;
+                    match func.as_str() {
+                        "cond" => Ok(a.into_iter().zip(b.into_iter().zip(c))
+                            .map(|(cond, (t, f))| if cond != 0.0 { t } else { f })
+                            .collect()),
+                        "Ftail" | "ftail" => Ok(a.into_iter().zip(b.into_iter().zip(c))
+                            .map(|(df1, (df2, x))| greeners::f_pvalue(x, df1, df2))
+                            .collect()),
+                        "binomial" | "binomialp" => Ok(a.into_iter().zip(b.into_iter().zip(c))
+                            .map(|(n, (k, p))| {
+                                let (n, k) = (n as u64, k as u64);
+                                if k > n { return 0.0; }
+                                let comb = {
+                                    let kk = k.min(n - k);
+                                    (1..=kk).fold(1u64, |acc, i| acc * (n - kk + i) / i) as f64
+                                };
+                                comb * p.powi(k as i32) * (1.0 - p).powi((n - k) as i32)
+                            })
+                            .collect()),
+                        _ => Err(HayashiError::Runtime(format!(
+                            "função '{func}' não suportada em generate"
+                        ))),
+                    }
                 } else {
                     Err(HayashiError::Runtime(format!(
                         "função '{func}' não suportada em generate"
