@@ -647,6 +647,15 @@ impl Interpreter {
                 Err(self.rt_err("match: no arm matched"))
             }
 
+            Expr::IfExpr { cond, then_expr, else_expr } => {
+                let cond_val = self.eval_expr(cond)?;
+                if Self::value_as_bool(&cond_val) {
+                    self.eval_expr(then_expr)
+                } else {
+                    self.eval_expr(else_expr)
+                }
+            }
+
             // ── Aritmética / lógica escalar ───────────────────────────────────
             Expr::BinOp { op, lhs, rhs } => {
                 // Short-circuit para And/Or
@@ -662,6 +671,24 @@ impl Interpreter {
                         if Self::value_as_bool(&l) { return Ok(Value::Bool(true)); }
                         let r = self.eval_expr(rhs)?;
                         return Ok(Value::Bool(Self::value_as_bool(&r)));
+                    }
+                    BinOp::In => {
+                        let l = self.eval_expr(lhs)?;
+                        let r = self.eval_expr(rhs)?;
+                        let found = match &r {
+                            Value::List(lst) => {
+                                let needle = format!("{l}");
+                                lst.iter().any(|item| format!("{item}") == needle)
+                            }
+                            Value::Dict(m) => {
+                                match &l { Value::Str(s) => m.contains_key(s), _ => m.contains_key(&format!("{l}")) }
+                            }
+                            Value::Str(s) => {
+                                match &l { Value::Str(sub) => s.contains(sub.as_str()), _ => s.contains(&format!("{l}")) }
+                            }
+                            _ => return Err(self.type_err("'in' requires list, dict, or string on right side")),
+                        };
+                        return Ok(Value::Bool(found));
                     }
                     _ => {}
                 }
@@ -12003,7 +12030,7 @@ impl Interpreter {
                 BinOp::Lt   => Ok(Value::Bool(a < b)),
                 BinOp::GtEq => Ok(Value::Bool(a >= b)),
                 BinOp::LtEq => Ok(Value::Bool(a <= b)),
-                BinOp::And | BinOp::Or | BinOp::Eq | BinOp::Ne => unreachable!(),
+                BinOp::And | BinOp::Or | BinOp::Eq | BinOp::Ne | BinOp::In => unreachable!(),
             },
             // Qualquer Float → Float
             _ => {
@@ -12023,7 +12050,7 @@ impl Interpreter {
                     BinOp::Lt   => Ok(Value::Bool(a < b)),
                     BinOp::GtEq => Ok(Value::Bool(a >= b)),
                     BinOp::LtEq => Ok(Value::Bool(a <= b)),
-                    BinOp::And | BinOp::Or | BinOp::Eq | BinOp::Ne => unreachable!(),
+                    BinOp::And | BinOp::Or | BinOp::Eq | BinOp::Ne | BinOp::In => unreachable!(),
                 }
             }
         }
@@ -12810,6 +12837,7 @@ impl Interpreter {
                     BinOp::Ne   => if (a - b).abs() >= f64::EPSILON { 1.0 } else { 0.0 },
                     BinOp::And  => if a != 0.0 && b != 0.0 { 1.0 } else { 0.0 },
                     BinOp::Or   => if a != 0.0 || b != 0.0 { 1.0 } else { 0.0 },
+                    BinOp::In   => 0.0,
                 }).collect())
             }
             Expr::Call { func, args, .. } => {

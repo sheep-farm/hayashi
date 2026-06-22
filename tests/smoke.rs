@@ -3864,6 +3864,73 @@ print(m)"#);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// IF-EXPRESSION — ternary
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn if_expr_true() {
+    assert_ok_contains("if_expr_t", r#"let r = if 1 > 0 { "yes" } else { "no" }
+display r"#, "yes");
+}
+
+#[test]
+fn if_expr_false() {
+    assert_ok_contains("if_expr_f", r#"let r = if 1 < 0 { "yes" } else { "no" }
+display r"#, "no");
+}
+
+#[test]
+fn if_expr_nested() {
+    assert_ok_contains("if_expr_nest", r#"let x = 5
+let r = if x > 10 { "big" } else { if x > 3 { "mid" } else { "small" } }
+display r"#, "mid");
+}
+
+#[test]
+fn if_expr_arithmetic() {
+    assert_ok_contains("if_expr_arith", r#"let x = -5
+let abs = if x < 0 { -x } else { x }
+display abs"#, "5");
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// IN operator
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn in_list_found() {
+    assert_ok_contains("in_list_t", "display 2 in [1, 2, 3]", "true");
+}
+
+#[test]
+fn in_list_not_found() {
+    assert_ok_contains("in_list_f", "display 9 in [1, 2, 3]", "false");
+}
+
+#[test]
+fn in_dict() {
+    assert_ok_contains("in_dict", r#"let d = {"a": 1, "b": 2}
+display "a" in d"#, "true");
+}
+
+#[test]
+fn in_dict_missing() {
+    assert_ok_contains("in_dict_f", r#"let d = {"a": 1}
+display "z" in d"#, "false");
+}
+
+#[test]
+fn in_string() {
+    assert_ok_contains("in_str", r#"display "lo" in "hello""#, "true");
+}
+
+#[test]
+fn in_combined_with_if() {
+    assert_ok_contains("in_if", r#"let r = if 3 in [1, 2, 3] { "found" } else { "nope" }
+display r"#, "found");
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // MATCH — pattern matching
 // ══════════════════════════════════════════════════════════════════════════════
 
