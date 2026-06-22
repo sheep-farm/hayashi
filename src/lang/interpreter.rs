@@ -1067,6 +1067,97 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── portsort: portfolio sorts por quantis ────────────────────────
+            // portsort(df, ret, sort_var, n=5)
+            // Ordena observações por sort_var, divide em n portfólios,
+            // reporta média, SE e t de ret por portfólio + spread H-L.
+            "portsort" | "portfolio_sort" | "psort" => {
+                if args.len() < 3 {
+                    return Err(HayashiError::Runtime("portsort(df, ret_var, sort_var, n=5)".into()));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())),
+                };
+                let df_raw = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                };
+                let df = self.maybe_filter_df(&df_raw, opts)?;
+                let ret_name = match &args[1] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("segundo arg deve ser variável de retorno".into())),
+                };
+                let sort_name = match &args[2] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("terceiro arg deve ser variável de sort".into())),
+                };
+                let n_ports: usize = match opt_map.get("n") {
+                    Some(Value::Int(v)) => (*v).max(2) as usize,
+                    Some(Value::Float(v)) => (*v as usize).max(2),
+                    _ => 5,
+                };
+
+                let ret_col = Self::get_col_f64(&df, &ret_name)?;
+                let sort_col = Self::get_col_f64(&df, &sort_name)?;
+                let n_obs = ret_col.len();
+
+                // pares (sort_val, ret_val) — excluir NaN
+                let mut pairs: Vec<(f64, f64)> = sort_col.iter().zip(ret_col.iter())
+                    .filter(|(s, r)| s.is_finite() && r.is_finite())
+                    .map(|(&s, &r)| (s, r))
+                    .collect();
+                pairs.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+                let n_valid = pairs.len();
+                let per_port = n_valid / n_ports;
+
+                if per_port < 1 {
+                    return Err(HayashiError::Runtime(
+                        format!("portsort: {n_valid} obs válidas insuficientes para {n_ports} portfólios")
+                    ));
+                }
+
+                // atribuir portfólios
+                struct PortStats { mean: f64, se: f64, n: usize }
+                let mut ports: Vec<PortStats> = Vec::new();
+                for p in 0..n_ports {
+                    let start = p * per_port;
+                    let end = if p == n_ports - 1 { n_valid } else { (p + 1) * per_port };
+                    let rets: Vec<f64> = pairs[start..end].iter().map(|(_, r)| *r).collect();
+                    let n = rets.len();
+                    let mean = rets.iter().sum::<f64>() / n as f64;
+                    let var = rets.iter().map(|r| (r - mean).powi(2)).sum::<f64>() / (n as f64 - 1.0).max(1.0);
+                    let se = (var / n as f64).sqrt();
+                    ports.push(PortStats { mean, se, n });
+                }
+
+                // spread H-L
+                let hl_mean = ports.last().unwrap().mean - ports[0].mean;
+                let hl_se = (ports.last().unwrap().se.powi(2) + ports[0].se.powi(2)).sqrt();
+                let hl_t = if hl_se > 1e-15 { hl_mean / hl_se } else { f64::NAN };
+                let hl_p = t_pvalue_two(hl_t, (ports.last().unwrap().n + ports[0].n - 2) as f64);
+
+                let thick = "═".repeat(60);
+                let thin  = "─".repeat(60);
+                println!("\n{thick}");
+                println!("{:^60}", format!(" Portfolio Sort: {ret_name} by {sort_name} ({n_ports} groups) "));
+                println!("{thin}");
+                println!("{:<12} {:>8} {:>12} {:>10} {:>10}", "Portfolio", "N", "Mean", "SE", "t");
+                println!("{thin}");
+                for (i, ps) in ports.iter().enumerate() {
+                    let t = if ps.se > 1e-15 { ps.mean / ps.se } else { f64::NAN };
+                    let label = if i == 0 { "Low".to_string() }
+                        else if i == n_ports - 1 { "High".to_string() }
+                        else { format!("P{}", i + 1) };
+                    println!("{:<12} {:>8} {:>12.4} {:>10.4} {:>10.4}", label, ps.n, ps.mean, ps.se, t);
+                }
+                println!("{thin}");
+                let sig = if hl_p < 0.01 { "***" } else if hl_p < 0.05 { "**" } else if hl_p < 0.10 { "*" } else { "" };
+                println!("{:<12} {:>8} {:>12.4} {:>10.4} {:>10.4} {sig}", "H-L", "", hl_mean, hl_se, hl_t);
+                println!("{thick}\n");
+                Ok(Value::Nil)
+            }
+
             // ── OLS ───────────────────────────────────────────────────────────
             "ols" => {
                 if args.len() < 2 {
