@@ -3634,3 +3634,58 @@ fn help_format() {
 fn help_label() {
     assert_ok_contains("help_label", "help(label)", "label");
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// REGEX — paridade com Stata regexm/regexr/regexs
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn regex_regexm_true() {
+    assert_ok_contains("regexm_true", r#"display regexm("hello123", "[0-9]+")"#, "true");
+}
+
+#[test]
+fn regex_regexm_false() {
+    assert_ok_contains("regexm_false", r#"display regexm("hello", "[0-9]+")"#, "false");
+}
+
+#[test]
+fn regex_regexr() {
+    assert_ok_contains("regexr", r#"display regexr("abc 123 def", "[0-9]+", "NUM")"#, "abc NUM def");
+}
+
+#[test]
+fn regex_regexra() {
+    assert_ok_contains("regexra", r#"display regexra("aaa bbb aaa", "aaa", "x")"#, "x bbb x");
+}
+
+#[test]
+fn regex_regexs_capture() {
+    assert_ok_contains("regexs_capture", r#"display regexs("price: 42.50 usd", "([0-9]+.[0-9]+)")"#, "42.50");
+}
+
+#[test]
+fn regex_regexs_no_match() {
+    assert_ok("regexs_no_match", r#"let r = regexs("hello", "[0-9]+")"#);
+}
+
+#[test]
+fn regex_in_if() {
+    assert_ok_contains("regex_if", r#"
+if regexm("test@email.com", "@") {
+    display "email"
+}
+"#, "email");
+}
+
+#[test]
+fn regex_email_pattern() {
+    assert_ok_contains("regex_email", r#"display regexm("user@host.com", "^[^@]+@[^@]+$")"#, "true");
+}
+
+#[test]
+fn smoke_regex() {
+    let (ok, out) = run_hy("exemplos/regex.hy");
+    assert!(ok, "regex.hy failed:\n{out}");
+    assert!(out.contains("42.50"));
+}
