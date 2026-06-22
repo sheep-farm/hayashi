@@ -19,3 +19,4 @@ dta = "0.6.0"
 ureq = "2"
 tempfile = "3"
 rand = "0.8"
+plotters = { version = "0.3", default-features = false, features = ["svg_backend", "line_series"] }
