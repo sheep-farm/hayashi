@@ -20,13 +20,24 @@ fn main() {
             print_help();
             return;
         }
-        Some(path) if path.ends_with(".hy") => {
+        Some("-") => {
+            use std::io::Read;
+            let mut src = String::new();
+            std::io::stdin().read_to_string(&mut src).expect("failed to read stdin");
+            let mut interp = Interpreter::new();
+            if let Err(e) = lang::run_source(&src, &mut interp) {
+                eprintln!("error: {e}");
+                std::process::exit(1);
+            }
+            return;
+        }
+        Some(path) if !path.starts_with('-') => {
             run_script(path);
             return;
         }
         Some(unknown) => {
             eprintln!("hayashi: unknown argument '{unknown}'");
-            eprintln!("Usage: hayashi [script.hy]");
+            eprintln!("Usage: hayashi [script.hy | -]");
             std::process::exit(1);
         }
         None => {}

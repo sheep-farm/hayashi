@@ -38,6 +38,9 @@ test(m3, white)
 test(m3, Treated, medu)
 test(m3, "Treated = 0.5")
 
+// ── Visualização de coeficientes ─────────────────────────────
+coefplot(m3)
+
 // ── Cluster-robust SEs ──────────────────────────────────────
 let m4 = reg(Y ~ Treated + medu + mage, df, cov=robust)
 print(m4)
