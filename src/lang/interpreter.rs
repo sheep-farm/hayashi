@@ -6609,6 +6609,122 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── winsor: winsoriza coluna no percentil p e 1-p ──────────────
+            // winsor(df, var, p=0.01)       → in-place, corta 1% em cada cauda
+            // winsor(df, var, p=0.05, gen=var_w)  → cria nova coluna
+            "winsor" | "winsorize" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("winsor(df, var, p=0.01 [, gen=new])".into()));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())),
+                };
+                let mut df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                };
+                let var_name = match &args[1] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())),
+                };
+                let p = match opt_map.get("p") {
+                    Some(Value::Float(v)) => *v,
+                    Some(Value::Int(v)) => *v as f64,
+                    _ => 0.01,
+                };
+                let gen_name = match opt_map.get("gen") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => var_name.clone(),
+                };
+
+                let col = Self::get_col_f64(&df, &var_name)?;
+                let mut sorted: Vec<f64> = col.iter().filter(|v| v.is_finite()).cloned().collect();
+                sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                let n = sorted.len();
+                let lo_idx = ((p) * n as f64).floor() as usize;
+                let hi_idx = ((1.0 - p) * n as f64).ceil() as usize;
+                let lo = sorted[lo_idx.min(n - 1)];
+                let hi = sorted[hi_idx.min(n - 1).max(lo_idx)];
+
+                let winsorized: Vec<f64> = col.iter().map(|&v| {
+                    if !v.is_finite() { v }
+                    else if v < lo { lo }
+                    else if v > hi { hi }
+                    else { v }
+                }).collect();
+
+                let n_lo = col.iter().filter(|&&v| v.is_finite() && v < lo).count();
+                let n_hi = col.iter().filter(|&&v| v.is_finite() && v > hi).count();
+
+                df.insert(gen_name.clone(), ndarray::Array1::from(winsorized))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                self.env.set(&df_name, Value::DataFrame(df));
+                println!("winsor {var_name} → {gen_name}  (p={p}, lo={lo:.4}, hi={hi:.4}, {n_lo}+{n_hi} obs clipped)");
+                Ok(Value::Nil)
+            }
+
+            // ── tabgen: gera dummies a partir de coluna categórica ────────────
+            // tabgen(df, var)              → cria var_0, var_1, ...
+            // tabgen(df, var, prefix=d)    → cria d_0, d_1, ...
+            "tabgen" | "tab_gen" | "xi" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("tabgen(df, var [, prefix=nome])".into()));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())),
+                };
+                let mut df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                };
+                let var_name = match &args[1] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())),
+                };
+                let prefix = match opt_map.get("prefix") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => var_name.clone(),
+                };
+
+                // tentar como numérica, fallback para string
+                let n_rows = df.n_rows();
+                let categories: Vec<String> = if let Ok(arr) = df.get(&var_name) {
+                    let mut unique: Vec<i64> = arr.iter().map(|&v| v as i64).collect::<std::collections::HashSet<_>>().into_iter().collect();
+                    unique.sort();
+                    unique.iter().map(|v| v.to_string()).collect()
+                } else if let Ok(arr) = df.get_string(&var_name) {
+                    let mut unique: Vec<String> = arr.iter().cloned().collect::<std::collections::HashSet<_>>().into_iter().collect();
+                    unique.sort();
+                    unique
+                } else {
+                    return Err(HayashiError::Runtime(format!("coluna '{var_name}' não encontrada")));
+                };
+
+                // gerar dummies
+                for cat in &categories {
+                    let dummy: Vec<f64> = if let Ok(arr) = df.get(&var_name) {
+                        let cat_val: f64 = cat.parse().unwrap_or(f64::NAN);
+                        arr.iter().map(|&v| if (v - cat_val).abs() < 0.5 { 1.0 } else { 0.0 }).collect()
+                    } else if let Ok(arr) = df.get_string(&var_name) {
+                        arr.iter().map(|s| if s == cat { 1.0 } else { 0.0 }).collect()
+                    } else {
+                        vec![0.0; n_rows]
+                    };
+                    let col_name = format!("{prefix}_{cat}");
+                    df.insert(col_name, ndarray::Array1::from(dummy))
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                }
+
+                self.env.set(&df_name, Value::DataFrame(df));
+                println!("tabgen {var_name}: {} dummies geradas (prefix={prefix}_)", categories.len());
+                for cat in &categories {
+                    println!("  {prefix}_{cat}");
+                }
+                Ok(Value::Nil)
+            }
+
             // ── dropna ───────────────────────────────────────────────────────
             "dropna" => {
                 if args.is_empty() {
