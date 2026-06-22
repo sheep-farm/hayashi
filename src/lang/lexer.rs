@@ -57,6 +57,8 @@ pub enum Token {
     GtEq,     // >=
     And,      // &&
     Or,       // ||
+    FatArrow, // =>
+    PipeRight,// |>
 
     // Delimitadores
     LParen,
@@ -237,6 +239,7 @@ impl Lexer {
                 }
                 Some('=') => {
                     if self.peek() == Some('=') { self.advance(); tokens.push((Token::EqEq, line)); }
+                    else if self.peek() == Some('>') { self.advance(); tokens.push((Token::FatArrow, line)); }
                     else { tokens.push((Token::Eq, line)); }
                 }
                 Some('!') => {
@@ -257,6 +260,7 @@ impl Lexer {
                 }
                 Some('|') => {
                     if self.peek() == Some('|') { self.advance(); tokens.push((Token::Or, line)); }
+                    else if self.peek() == Some('>') { self.advance(); tokens.push((Token::PipeRight, line)); }
                     else { tokens.push((Token::Pipe, line)); }
                 }
                 Some('.') => {

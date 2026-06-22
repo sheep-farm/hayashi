@@ -3864,6 +3864,120 @@ print(m)"#);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// MATCH — pattern matching
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn match_basic() {
+    assert_ok_contains("match_basic", r#"let x = 2
+let r = match x { 1 => "one", 2 => "two", _ => "other" }
+display r"#, "two");
+}
+
+#[test]
+fn match_wildcard() {
+    assert_ok_contains("match_wild", r#"let r = match 99 { 1 => "a", _ => "default" }
+display r"#, "default");
+}
+
+#[test]
+fn match_string() {
+    assert_ok_contains("match_str", r#"let s = "hello"
+let r = match s { "hi" => 1, "hello" => 2, _ => 0 }
+display r"#, "2");
+}
+
+#[test]
+fn match_no_arm_error() {
+    let (ok, out) = run_inline(r#"let r = match 5 { 1 => "a", 2 => "b" }"#);
+    assert!(!ok, "match without matching arm should fail:\n{out}");
+    assert!(out.contains("no arm matched"), "expected 'no arm matched':\n{out}");
+}
+
+#[test]
+fn match_with_expr() {
+    assert_ok_contains("match_expr", r#"let x = 3
+let r = match x * 2 { 4 => "four", 6 => "six", _ => "?" }
+display r"#, "six");
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TRY/CATCH — error handling
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn try_catch_basic() {
+    assert_ok_contains("try_catch", r#"try {
+    load "nonexistent.csv" as df
+} catch e {
+    display "caught"
+}"#, "caught");
+}
+
+#[test]
+fn try_catch_error_var() {
+    assert_ok_contains("try_err_var", r#"try {
+    display undefined_var
+} catch e {
+    display f"error: {e}"
+}"#, "error:");
+}
+
+#[test]
+fn try_catch_no_error() {
+    assert_ok_contains("try_no_err", r#"try {
+    let x = 42
+    display x
+} catch e {
+    display "should not reach"
+}"#, "42");
+}
+
+#[test]
+fn try_catch_continues() {
+    assert_ok_contains("try_continues", r#"try {
+    load "bad.csv" as df
+} catch e {
+    let x = 1
+}
+display "alive""#, "alive");
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PIPE — |> operator
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn pipe_sort() {
+    assert_ok_contains("pipe_sort", r#"let r = [3, 1, 2] |> sort
+display r[0]"#, "1");
+}
+
+#[test]
+fn pipe_chain() {
+    assert_ok_contains("pipe_chain", r#"let r = [3, 1, 2] |> sort |> reverse
+display r[0]"#, "3");
+}
+
+#[test]
+fn pipe_with_args() {
+    assert_ok_contains("pipe_args", r#"let r = [1, 2, 3] |> push(4)
+display len(r)"#, "4");
+}
+
+#[test]
+fn pipe_map_closure() {
+    assert_ok_contains("pipe_map", r#"let r = [1, 2, 3] |> map(|x| x * 10)
+display r[1]"#, "20");
+}
+
+#[test]
+fn pipe_filter_map() {
+    assert_ok_contains("pipe_fm", r#"let r = [1, 2, 3, 4, 5] |> filter(|x| x > 2) |> map(|x| x * 10)
+display r[0]"#, "30");
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // F-STRING — string interpolation
 // ══════════════════════════════════════════════════════════════════════════════
 

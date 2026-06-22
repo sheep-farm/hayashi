@@ -87,6 +87,9 @@ pub enum Expr {
     // closure: |x, y| x + y
     Closure { params: Vec<String>, body: Box<Expr> },
 
+    // match expr { pattern => result, ... }
+    Match { expr: Box<Expr>, arms: Vec<(Expr, Expr)> },
+
     // operadores de série temporal: L.price, L2.price, F.gdp, D.wage
     TsOp { op: TsOpKind, var: String, n: usize },
 }
@@ -163,6 +166,13 @@ pub enum Stmt {
     // break / continue
     Break,
     Continue,
+
+    // try { ... } catch e { ... }
+    TryCatch {
+        try_body: Vec<Spanned>,
+        error_var: String,
+        catch_body: Vec<Spanned>,
+    },
 
     // input df
     // Y X u

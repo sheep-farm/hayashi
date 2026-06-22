@@ -630,6 +630,23 @@ impl Interpreter {
                 })))
             }
 
+            Expr::Match { expr, arms } => {
+                let scrutinee = self.eval_expr(expr)?;
+                let scrutinee_str = format!("{scrutinee}");
+                for (pattern, result) in arms {
+                    let is_wildcard = matches!(pattern, Expr::Var(n) if n == "_");
+                    if is_wildcard {
+                        return self.eval_expr(result);
+                    }
+                    let pat_val = self.eval_expr(pattern)?;
+                    let pat_str = format!("{pat_val}");
+                    if scrutinee_str == pat_str {
+                        return self.eval_expr(result);
+                    }
+                }
+                Err(self.rt_err("match: no arm matched"))
+            }
+
             // ── Aritmética / lógica escalar ───────────────────────────────────
             Expr::BinOp { op, lhs, rhs } => {
                 // Short-circuit para And/Or
@@ -13860,8 +13877,29 @@ impl Interpreter {
                 }
             }
 
+            Stmt::TryCatch { try_body, error_var, catch_body } => {
+                self.env.push_scope();
+                let mut caught = None;
+                for s in try_body {
+                    match self.exec(s) {
+                        Ok(()) => {}
+                        Err(HayashiError::Return | HayashiError::Break | HayashiError::Continue) => {
+                            self.env.pop_scope();
+                            return Err(HayashiError::Return);
+                        }
+                        Err(e) => { caught = Some(format!("{e}")); break; }
+                    }
+                }
+                self.env.pop_scope();
+                if let Some(err_msg) = caught {
+                    self.env.push_scope();
+                    self.env.declare(error_var, Value::Str(err_msg))?;
+                    for s in catch_body { self.exec(s)?; }
+                    self.env.pop_scope();
+                }
+            }
+
             // ── for var in iter { ... } ───────────────────────────────────────
-            // Variáveis declaradas no corpo persistem no escopo externo (R-style).
             Stmt::For { var, iter, body } => {
                 macro_rules! run_body {
                     () => {{
