@@ -420,13 +420,14 @@ impl Parser {
 
     // ── Bloco { stmt* } ───────────────────────────────────────────────────────
 
-    fn parse_block(&mut self) -> Result<Vec<Stmt>> {
+    fn parse_block(&mut self) -> Result<Vec<Spanned>> {
         self.expect(&Token::LBrace)?;
         self.skip_newlines();
         let mut stmts = Vec::new();
         while !matches!(self.peek(), Token::RBrace | Token::Eof) {
+            let line = self.line();
             if let Some(s) = self.parse_stmt()? {
-                stmts.push(s);
+                stmts.push((s, line));
             }
             self.skip_newlines();
         }
@@ -597,11 +598,11 @@ impl Parser {
                 let else_body = if self.peek() == &Token::Else {
                     self.advance();
                     if self.peek() == &Token::If {
-                        // else if → parseia como Stmt::If recursivo
+                        let inner_line = self.line();
                         let inner = self.parse_stmt()?.ok_or_else(|| HayashiError::Parse {
                             line, msg: "expected statement after 'else if'".into()
                         })?;
-                        Some(vec![inner])
+                        Some(vec![(inner, inner_line)])
                     } else {
                         Some(self.parse_block()?)
                     }
@@ -753,12 +754,13 @@ impl Parser {
         }
     }
 
-    pub fn parse_program(&mut self) -> Result<Vec<Stmt>> {
+    pub fn parse_program(&mut self) -> Result<Vec<Spanned>> {
         let mut stmts = Vec::new();
         loop {
+            let line = self.line();
             match self.parse_stmt()? {
                 None => break,
-                Some(s) => stmts.push(s),
+                Some(s) => stmts.push((s, line)),
             }
         }
         Ok(stmts)

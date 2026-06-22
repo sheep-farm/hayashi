@@ -4004,14 +4004,14 @@ display b[0]"#, "0");
 fn list_pop_empty_error() {
     let (ok, out) = run_inline("let a = []\nlet b = pop(a)");
     assert!(!ok, "pop on empty should fail:\n{out}");
-    assert!(out.contains("vazia"), "expected 'vazia':\n{out}");
+    assert!(out.contains("empty list"), "expected 'empty list':\n{out}");
 }
 
 #[test]
 fn list_remove_out_of_bounds() {
     let (ok, out) = run_inline("let a = [1, 2]\nlet b = remove(a, 5)");
     assert!(!ok, "remove OOB should fail:\n{out}");
-    assert!(out.contains("fora"), "expected 'fora':\n{out}");
+    assert!(out.contains("out of range"), "expected 'out of range':\n{out}");
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

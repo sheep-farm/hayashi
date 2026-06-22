@@ -87,6 +87,8 @@ pub enum Expr {
     TsOp { op: TsOpKind, var: String, n: usize },
 }
 
+pub type Spanned = (Stmt, usize);
+
 /// Comandos (statements) da linguagem
 #[derive(Debug, Clone)]
 pub enum Stmt {
@@ -127,28 +129,28 @@ pub enum Stmt {
     // if cond { ... } [else if cond { ... }]* [else { ... }]
     If {
         cond: Expr,
-        then_body: Vec<Stmt>,
-        else_body: Option<Vec<Stmt>>,
+        then_body: Vec<Spanned>,
+        else_body: Option<Vec<Spanned>>,
     },
 
     // for var in iter { ... }
     For {
         var: String,
         iter: ForIter,
-        body: Vec<Stmt>,
+        body: Vec<Spanned>,
     },
 
     // while cond { ... }
     While {
         cond: Expr,
-        body: Vec<Stmt>,
+        body: Vec<Spanned>,
     },
 
     // fn nome(p1, p2) { corpo }
     Fn {
         name: String,
         params: Vec<String>,
-        body: Vec<Stmt>,
+        body: Vec<Spanned>,
     },
 
     // return [expr]

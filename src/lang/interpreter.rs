@@ -19,9 +19,9 @@ fn rd_kernel_opt(opt: Option<&Value>) -> std::result::Result<greeners::RdKernel,
             "triangular"   | "tri" => Ok(greeners::RdKernel::Triangular),
             "uniform"      | "uni" => Ok(greeners::RdKernel::Uniform),
             "epanechnikov" | "epa" => Ok(greeners::RdKernel::Epanechnikov),
-            other => Err(format!("kernel '{other}' desconhecido (triangular|uniform|epanechnikov)")),
+            other => Err(format!("kernel '{other}' unknown (triangular|uniform|epanechnikov)")),
         },
-        _ => Err("kernel deve ser string".into()),
+        _ => Err("kernel must be string".into()),
     }
 }
 
@@ -178,7 +178,7 @@ impl std::fmt::Display for FactorModel {
 #[derive(Debug, Clone)]
 pub struct UserFn {
     pub params: Vec<String>,
-    pub body:   Vec<Stmt>,
+    pub body:   Vec<Spanned>,
 }
 
 // ── Resultado de testes de diagnóstico (print-on-demand) ─────────────────────
@@ -477,6 +477,7 @@ pub struct Interpreter {
     stored_models: Vec<Value>,
     return_value: Option<Value>,
     labels: HashMap<String, HashMap<String, String>>,
+    current_line: usize,
 }
 
 impl Interpreter {
@@ -490,6 +491,25 @@ impl Interpreter {
             stored_models: Vec::new(),
             return_value: None,
             labels: HashMap::new(),
+            current_line: 0,
+        }
+    }
+
+    fn rt_err(&self, msg: impl Into<String>) -> HayashiError {
+        let m = msg.into();
+        if self.current_line > 0 {
+            HayashiError::Runtime(format!("line {}: {}", self.current_line, m))
+        } else {
+            HayashiError::Runtime(m)
+        }
+    }
+
+    fn type_err(&self, msg: impl Into<String>) -> HayashiError {
+        let m = msg.into();
+        if self.current_line > 0 {
+            HayashiError::Type(format!("line {}: {}", self.current_line, m))
+        } else {
+            HayashiError::Type(m)
         }
     }
 
@@ -513,7 +533,7 @@ impl Interpreter {
             Expr::Var(name) => {
                 self.env.get(name)
                     .cloned()
-                    .ok_or_else(|| HayashiError::Runtime(format!("undefined variable '{name}'")))
+                    .ok_or_else(|| self.rt_err(format!("undefined variable '{name}'")))
             }
 
             Expr::Formula(_f) => {
@@ -547,7 +567,7 @@ impl Interpreter {
                 match self.eval_expr(inner)? {
                     Value::Int(v)   => Ok(Value::Int(-v)),
                     Value::Float(v) => Ok(Value::Float(-v)),
-                    _ => Err(HayashiError::Type("negação unária requer número".into())),
+                    _ => Err(HayashiError::Type("negação unária requires number".into())),
                 }
             }
 
@@ -603,12 +623,12 @@ impl Interpreter {
                         let real = if i < 0 { len + i } else { i };
                         if real < 0 || real >= len {
                             return Err(HayashiError::Runtime(
-                                format!("índice {i} fora do intervalo (len={len})")
+                                format!("index out of range (len={len})")
                             ));
                         }
                         Ok(v[real as usize].clone())
                     }
-                    _ => Err(HayashiError::Type("indexação requer lista ou dict".into())),
+                    _ => Err(HayashiError::Type("indexação requires list ou dict".into())),
                 }
             }
 
@@ -652,11 +672,11 @@ impl Interpreter {
     fn get_col_f64(df: &DataFrame, name: &str) -> Result<ndarray::Array1<f64>> {
         use greeners::Column;
         let col = df.get_column(name)
-            .map_err(|_| HayashiError::Runtime(format!("coluna '{name}' não encontrada")))?;
+            .map_err(|_| HayashiError::Runtime(format!("column '{name}' not found")))?;
         match col {
             Column::Float(arr) => Ok(arr.clone()),
             Column::Int(arr)   => Ok(arr.mapv(|v| v as f64)),
-            _ => Err(HayashiError::Type(format!("coluna '{name}' não é numérica"))),
+            _ => Err(HayashiError::Type(format!("column '{name}' is not numeric"))),
         }
     }
 
@@ -674,7 +694,7 @@ impl Interpreter {
                 other => {
                     let col = Self::get_col_f64(df, other)
                         .map_err(|_| HayashiError::Runtime(
-                            format!("predict: coluna '{other}' não encontrada no DataFrame")
+                            format!("predict: column '{other}' not found no DataFrame")
                         ))?;
                     x.column_mut(j).assign(&col);
                 }
@@ -765,14 +785,14 @@ impl Interpreter {
             // ── Builtins de lista ─────────────────────────────────────────────
             "len" => {
                 if args.len() != 1 {
-                    return Err(HayashiError::Runtime("len() requer exatamente 1 argumento".into()));
+                    return Err(HayashiError::Runtime("len() requires exactly 1 argumento".into()));
                 }
                 let v = self.eval_expr(&args[0])?;
                 match v {
                     Value::List(lst) => Ok(Value::Int(lst.len() as i64)),
                     Value::Dict(m)   => Ok(Value::Int(m.len() as i64)),
                     Value::Str(s)    => Ok(Value::Int(s.chars().count() as i64)),
-                    _ => Err(HayashiError::Type("len() requer lista, dict ou string".into())),
+                    _ => Err(HayashiError::Type("len() requires list, dict, or string".into())),
                 }
             }
 
@@ -786,7 +806,7 @@ impl Interpreter {
                         ks.sort();
                         Ok(Value::List(Rc::new(ks.into_iter().map(Value::Str).collect())))
                     }
-                    _ => Err(HayashiError::Type("keys() requer dict".into())),
+                    _ => Err(HayashiError::Type("keys() requires dict".into())),
                 }
             }
 
@@ -800,13 +820,13 @@ impl Interpreter {
                         pairs.sort_by_key(|(k, _)| (*k).clone());
                         Ok(Value::List(Rc::new(pairs.into_iter().map(|(_, v)| v.clone()).collect())))
                     }
-                    _ => Err(HayashiError::Type("values() requer dict".into())),
+                    _ => Err(HayashiError::Type("values() requires dict".into())),
                 }
             }
 
             "has_key" => {
                 if args.len() != 2 {
-                    return Err(HayashiError::Runtime("has_key(dict, \"key\")".into()));
+                    return Err(self.rt_err("has_key(dict, \"key\")"));
                 }
                 let d = self.eval_expr(&args[0])?;
                 let k = match self.eval_expr(&args[1])? {
@@ -815,7 +835,7 @@ impl Interpreter {
                 };
                 match d {
                     Value::Dict(m) => Ok(Value::Bool(m.contains_key(&k))),
-                    _ => Err(HayashiError::Type("has_key() requer dict".into())),
+                    _ => Err(HayashiError::Type("has_key() requires dict".into())),
                 }
             }
 
@@ -833,7 +853,7 @@ impl Interpreter {
                         }
                         Ok(Value::Dict(Rc::new(merged)))
                     }
-                    _ => Err(HayashiError::Type("dict_merge() requer dois dicts".into())),
+                    _ => Err(HayashiError::Type("dict_merge() requires two dicts".into())),
                 }
             }
 
@@ -853,13 +873,13 @@ impl Interpreter {
                         new_m.insert(k, v);
                         Ok(Value::Dict(Rc::new(new_m)))
                     }
-                    _ => Err(HayashiError::Type("dict_set() requer dict".into())),
+                    _ => Err(HayashiError::Type("dict_set() requires dict".into())),
                 }
             }
 
             "dict_remove" | "dremove" => {
                 if args.len() != 2 {
-                    return Err(HayashiError::Runtime("dict_remove(dict, \"key\")".into()));
+                    return Err(self.rt_err("dict_remove(dict, \"key\")"));
                 }
                 let d = self.eval_expr(&args[0])?;
                 let k = match self.eval_expr(&args[1])? {
@@ -872,17 +892,17 @@ impl Interpreter {
                         new_m.remove(&k);
                         Ok(Value::Dict(Rc::new(new_m)))
                     }
-                    _ => Err(HayashiError::Type("dict_remove() requer dict".into())),
+                    _ => Err(HayashiError::Type("dict_remove() requires dict".into())),
                 }
             }
 
             // ── Funções de string ─────────────────────────────────────────────
             "upper" | "lower" | "trim" => {
                 let s = match self.eval_expr(args.first().ok_or_else(||
-                    HayashiError::Runtime(format!("{func}() requer 1 argumento")))?)? {
+                    self.rt_err(format!("{func}() requires 1 argument")))?)? {
                     Value::Str(s) => s,
                     v => return Err(HayashiError::Type(
-                        format!("{func}() requer string, recebeu {v}")
+                        format!("{func}() requires string, recebeu {v}")
                     )),
                 };
                 Ok(Value::Str(match func {
@@ -895,30 +915,30 @@ impl Interpreter {
 
             "contains" => {
                 if args.len() != 2 {
-                    return Err(HayashiError::Runtime("contains(s, padrão) requer 2 argumentos".into()));
+                    return Err(HayashiError::Runtime("contains(s, padrão) requires 2 arguments".into()));
                 }
                 let s = match self.eval_expr(&args[0])? {
                     Value::Str(s) => s,
-                    v => return Err(HayashiError::Type(format!("contains: esperado string, recebeu {v}"))),
+                    v => return Err(self.type_err(format!("contains: expected string, got {v}"))),
                 };
                 let pat = match self.eval_expr(&args[1])? {
                     Value::Str(s) => s,
-                    v => return Err(HayashiError::Type(format!("contains: padrão deve ser string, recebeu {v}"))),
+                    v => return Err(self.type_err(format!("contains: pattern must be string, got {v}"))),
                 };
                 Ok(Value::Bool(s.contains(pat.as_str())))
             }
 
             "starts_with" | "ends_with" => {
                 if args.len() != 2 {
-                    return Err(HayashiError::Runtime(format!("{func}(s, padrão) requer 2 argumentos")));
+                    return Err(self.rt_err(format!("{func}(s, padrão) requires 2 arguments")));
                 }
                 let s = match self.eval_expr(&args[0])? {
                     Value::Str(s) => s,
-                    v => return Err(HayashiError::Type(format!("{func}: esperado string, recebeu {v}"))),
+                    v => return Err(self.type_err(format!("{func}: expected string, got {v}"))),
                 };
                 let pat = match self.eval_expr(&args[1])? {
                     Value::Str(s) => s,
-                    v => return Err(HayashiError::Type(format!("{func}: padrão deve ser string, recebeu {v}"))),
+                    v => return Err(self.type_err(format!("{func}: pattern must be string, got {v}"))),
                 };
                 Ok(Value::Bool(match func {
                     "starts_with" => s.starts_with(pat.as_str()),
@@ -936,21 +956,21 @@ impl Interpreter {
                 }
                 let s = match self.eval_expr(&args[0])? {
                     Value::Str(s) => s,
-                    v => return Err(HayashiError::Type(format!("substr: esperado string, recebeu {v}"))),
+                    v => return Err(self.type_err(format!("substr: expected string, got {v}"))),
                 };
                 let chars: Vec<char> = s.chars().collect();
                 let len = chars.len() as i64;
                 let start = match self.eval_expr(&args[1])? {
                     Value::Int(i)   => i,
                     Value::Float(f) => f as i64,
-                    v => return Err(HayashiError::Type(format!("substr: início deve ser inteiro, recebeu {v}"))),
+                    v => return Err(self.type_err(format!("substr: start must be integer, got {v}"))),
                 };
                 let real_start = (if start < 0 { len + start } else { start }).clamp(0, len) as usize;
                 let count = if args.len() == 3 {
                     match self.eval_expr(&args[2])? {
                         Value::Int(i)   => i.max(0) as usize,
                         Value::Float(f) => f.max(0.0) as usize,
-                        v => return Err(HayashiError::Type(format!("substr: comprimento deve ser inteiro, recebeu {v}"))),
+                        v => return Err(self.type_err(format!("substr: length must be integer, got {v}"))),
                     }
                 } else {
                     chars.len().saturating_sub(real_start)
@@ -962,15 +982,15 @@ impl Interpreter {
             // split(s, delimitador) → List de Str
             "split" => {
                 if args.len() != 2 {
-                    return Err(HayashiError::Runtime("split(s, delimitador) requer 2 argumentos".into()));
+                    return Err(HayashiError::Runtime("split(s, delimitador) requires 2 arguments".into()));
                 }
                 let s = match self.eval_expr(&args[0])? {
                     Value::Str(s) => s,
-                    v => return Err(HayashiError::Type(format!("split: esperado string, recebeu {v}"))),
+                    v => return Err(self.type_err(format!("split: expected string, got {v}"))),
                 };
                 let delim = match self.eval_expr(&args[1])? {
                     Value::Str(s) => s,
-                    v => return Err(HayashiError::Type(format!("split: delimitador deve ser string, recebeu {v}"))),
+                    v => return Err(self.type_err(format!("split: delimiter must be string, got {v}"))),
                 };
                 let parts: Vec<Value> = s.split(delim.as_str())
                     .map(|p| Value::Str(p.to_string()))
@@ -981,19 +1001,19 @@ impl Interpreter {
             // str_replace(s, de, para) — "replace" é palavra-chave
             "str_replace" => {
                 if args.len() != 3 {
-                    return Err(HayashiError::Runtime("str_replace(s, de, para) requer 3 argumentos".into()));
+                    return Err(HayashiError::Runtime("str_replace(s, de, para) requires 3 arguments".into()));
                 }
                 let s = match self.eval_expr(&args[0])? {
                     Value::Str(s) => s,
-                    v => return Err(HayashiError::Type(format!("str_replace: esperado string, recebeu {v}"))),
+                    v => return Err(self.type_err(format!("str_replace: expected string, got {v}"))),
                 };
                 let from = match self.eval_expr(&args[1])? {
                     Value::Str(s) => s,
-                    v => return Err(HayashiError::Type(format!("str_replace: 'de' deve ser string, recebeu {v}"))),
+                    v => return Err(self.type_err(format!("str_replace: 'from' must be string, got {v}"))),
                 };
                 let to = match self.eval_expr(&args[2])? {
                     Value::Str(s) => s,
-                    v => return Err(HayashiError::Type(format!("str_replace: 'para' deve ser string, recebeu {v}"))),
+                    v => return Err(self.type_err(format!("str_replace: 'to' must be string, got {v}"))),
                 };
                 Ok(Value::Str(s.replace(from.as_str(), to.as_str())))
             }
@@ -1005,31 +1025,31 @@ impl Interpreter {
             // regexs(s, pattern)            → extrai primeiro grupo de captura
             "regexm" => {
                 if args.len() < 2 { return Err(HayashiError::Runtime("regexm(string, pattern)".into())); }
-                let s = match self.eval_expr(&args[0])? { Value::Str(s) => s, v => return Err(HayashiError::Type(format!("regexm: esperado string, recebeu {v}"))) };
-                let pat = match self.eval_expr(&args[1])? { Value::Str(s) => s, v => return Err(HayashiError::Type(format!("regexm: pattern deve ser string, recebeu {v}"))) };
+                let s = match self.eval_expr(&args[0])? { Value::Str(s) => s, v => return Err(self.type_err(format!("regexm: expected string, got {v}"))) };
+                let pat = match self.eval_expr(&args[1])? { Value::Str(s) => s, v => return Err(self.type_err(format!("regexm: pattern must be string, got {v}"))) };
                 Ok(Value::Bool(greeners::Transforms::regexm(&s, &pat)))
             }
 
             "regexr" => {
                 if args.len() < 3 { return Err(HayashiError::Runtime("regexr(string, pattern, replacement)".into())); }
-                let s = match self.eval_expr(&args[0])? { Value::Str(s) => s, v => return Err(HayashiError::Type(format!("regexr: esperado string, recebeu {v}"))) };
-                let pat = match self.eval_expr(&args[1])? { Value::Str(s) => s, v => return Err(HayashiError::Type(format!("regexr: pattern deve ser string, recebeu {v}"))) };
-                let rep = match self.eval_expr(&args[2])? { Value::Str(s) => s, v => return Err(HayashiError::Type(format!("regexr: replacement deve ser string, recebeu {v}"))) };
+                let s = match self.eval_expr(&args[0])? { Value::Str(s) => s, v => return Err(self.type_err(format!("regexr: expected string, got {v}"))) };
+                let pat = match self.eval_expr(&args[1])? { Value::Str(s) => s, v => return Err(self.type_err(format!("regexr: pattern must be string, got {v}"))) };
+                let rep = match self.eval_expr(&args[2])? { Value::Str(s) => s, v => return Err(self.type_err(format!("regexr: replacement must be string, got {v}"))) };
                 Ok(Value::Str(greeners::Transforms::regexr(&s, &pat, &rep)))
             }
 
             "regexra" => {
                 if args.len() < 3 { return Err(HayashiError::Runtime("regexra(string, pattern, replacement)".into())); }
-                let s = match self.eval_expr(&args[0])? { Value::Str(s) => s, v => return Err(HayashiError::Type(format!("regexra: esperado string, recebeu {v}"))) };
-                let pat = match self.eval_expr(&args[1])? { Value::Str(s) => s, v => return Err(HayashiError::Type(format!("regexra: pattern deve ser string, recebeu {v}"))) };
-                let rep = match self.eval_expr(&args[2])? { Value::Str(s) => s, v => return Err(HayashiError::Type(format!("regexra: replacement deve ser string, recebeu {v}"))) };
+                let s = match self.eval_expr(&args[0])? { Value::Str(s) => s, v => return Err(self.type_err(format!("regexra: expected string, got {v}"))) };
+                let pat = match self.eval_expr(&args[1])? { Value::Str(s) => s, v => return Err(self.type_err(format!("regexra: pattern must be string, got {v}"))) };
+                let rep = match self.eval_expr(&args[2])? { Value::Str(s) => s, v => return Err(self.type_err(format!("regexra: replacement must be string, got {v}"))) };
                 Ok(Value::Str(greeners::Transforms::regexra(&s, &pat, &rep)))
             }
 
             "regexs" => {
                 if args.len() < 2 { return Err(HayashiError::Runtime("regexs(string, pattern)".into())); }
-                let s = match self.eval_expr(&args[0])? { Value::Str(s) => s, v => return Err(HayashiError::Type(format!("regexs: esperado string, recebeu {v}"))) };
-                let pat = match self.eval_expr(&args[1])? { Value::Str(s) => s, v => return Err(HayashiError::Type(format!("regexs: pattern deve ser string, recebeu {v}"))) };
+                let s = match self.eval_expr(&args[0])? { Value::Str(s) => s, v => return Err(self.type_err(format!("regexs: expected string, got {v}"))) };
+                let pat = match self.eval_expr(&args[1])? { Value::Str(s) => s, v => return Err(self.type_err(format!("regexs: pattern must be string, got {v}"))) };
                 match greeners::Transforms::regexs(&s, &pat) {
                     Some(m) => Ok(Value::Str(m)),
                     None => Ok(Value::Str(String::new())),
@@ -1039,14 +1059,14 @@ impl Interpreter {
             // ── Conversões de tipo ────────────────────────────────────────────
             "str" => {
                 if args.len() != 1 {
-                    return Err(HayashiError::Runtime("str() requer 1 argumento".into()));
+                    return Err(HayashiError::Runtime("str() requires 1 argument".into()));
                 }
                 Ok(Value::Str(format!("{}", self.eval_expr(&args[0])?)))
             }
 
             "int" => {
                 if args.len() != 1 {
-                    return Err(HayashiError::Runtime("int() requer 1 argumento".into()));
+                    return Err(HayashiError::Runtime("int() requires 1 argument".into()));
                 }
                 match self.eval_expr(&args[0])? {
                     Value::Int(i)   => Ok(Value::Int(i)),
@@ -1056,13 +1076,13 @@ impl Interpreter {
                         .map_err(|_| HayashiError::Runtime(
                             format!("int(): não foi possível converter \"{s}\" para inteiro")
                         )),
-                    v => Err(HayashiError::Type(format!("int(): não converte {v}"))),
+                    v => Err(self.type_err(format!("int(): não converte {v}"))),
                 }
             }
 
             "float" => {
                 if args.len() != 1 {
-                    return Err(HayashiError::Runtime("float() requer 1 argumento".into()));
+                    return Err(HayashiError::Runtime("float() requires 1 argument".into()));
                 }
                 match self.eval_expr(&args[0])? {
                     Value::Float(f) => Ok(Value::Float(f)),
@@ -1072,7 +1092,7 @@ impl Interpreter {
                         .map_err(|_| HayashiError::Runtime(
                             format!("float(): não foi possível converter \"{s}\" para número")
                         )),
-                    v => Err(HayashiError::Type(format!("float(): não converte {v}"))),
+                    v => Err(self.type_err(format!("float(): não converte {v}"))),
                 }
             }
 
@@ -1084,9 +1104,9 @@ impl Interpreter {
                 // Forma 2: mean(df, var)  ou  mean(df, var, if=cond)
                 let nums: Vec<f64> = if args.len() >= 2 {
                     // forma DataFrame
-                    let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type(format!("{func}: primeiro arg deve ser DataFrame"))) };
-                    let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                    let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type(format!("{func}: segundo arg deve ser nome de variável"))) };
+                    let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(self.type_err(format!("{func}: first argument must be a DataFrame"))) };
+                    let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
+                    let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(self.type_err(format!("{func}: second argument must be a variable name"))) };
                     let col = Self::get_col_f64(&df, &var_name)?;
                     // filtro opcional: if=cond
                     if let Some(cond_opt) = opts.iter().find(|o| o.name == "if") {
@@ -1099,13 +1119,13 @@ impl Interpreter {
                     let v = self.eval_expr(&args[0])?;
                     match v {
                         Value::List(lst) => lst.iter().map(Self::value_as_f64).collect::<Result<_>>()?,
-                        other => return Err(HayashiError::Type(format!("{func}() requer lista numérica, recebeu {other}"))),
+                        other => return Err(self.type_err(format!("{func}() requires numeric list, got {other}"))),
                     }
                 } else {
-                    return Err(HayashiError::Runtime(format!("{func}() requer pelo menos 1 argumento")));
+                    return Err(self.rt_err(format!("{func}() requires at least 1 argument")));
                 };
                 if nums.is_empty() {
-                    return Err(HayashiError::Runtime(format!("{func}(): nenhum valor (lista vazia ou filtro excluiu tudo)")));
+                    return Err(self.rt_err(format!("{func}(): nenhum valor (empty list ou filtro excluiu tudo)")));
                 }
                 let result = match func {
                     "sum" | "total" => nums.iter().sum::<f64>(),
@@ -1134,7 +1154,7 @@ impl Interpreter {
                         new_v.push(item);
                         Ok(Value::List(Rc::new(new_v)))
                     }
-                    _ => Err(HayashiError::Type("push() requer lista".into())),
+                    _ => Err(HayashiError::Type("push() requires list".into())),
                 }
             }
 
@@ -1145,13 +1165,13 @@ impl Interpreter {
                 match self.eval_expr(&args[0])? {
                     Value::List(v) => {
                         if v.is_empty() {
-                            return Err(HayashiError::Runtime("pop() em lista vazia".into()));
+                            return Err(HayashiError::Runtime("pop() em empty list".into()));
                         }
                         let mut new_v = (*v).clone();
                         new_v.pop();
                         Ok(Value::List(Rc::new(new_v)))
                     }
-                    _ => Err(HayashiError::Type("pop() requer lista".into())),
+                    _ => Err(HayashiError::Type("pop() requires list".into())),
                 }
             }
 
@@ -1163,7 +1183,7 @@ impl Interpreter {
                 let idx = match self.eval_expr(&args[1])? {
                     Value::Int(i) => i as usize,
                     Value::Float(f) => f as usize,
-                    _ => return Err(HayashiError::Type("insert: índice deve ser inteiro".into())),
+                    _ => return Err(HayashiError::Type("insert: index must be integer".into())),
                 };
                 let item = self.eval_expr(&args[2])?;
                 match lst {
@@ -1171,13 +1191,13 @@ impl Interpreter {
                         let mut new_v = (*v).clone();
                         if idx > new_v.len() {
                             return Err(HayashiError::Runtime(format!(
-                                "insert: índice {idx} fora do intervalo (len={})", new_v.len()
+                                "insert: index out of range (len={})", new_v.len()
                             )));
                         }
                         new_v.insert(idx, item);
                         Ok(Value::List(Rc::new(new_v)))
                     }
-                    _ => Err(HayashiError::Type("insert() requer lista".into())),
+                    _ => Err(HayashiError::Type("insert() requires list".into())),
                 }
             }
 
@@ -1189,20 +1209,20 @@ impl Interpreter {
                 let idx = match self.eval_expr(&args[1])? {
                     Value::Int(i) => i as usize,
                     Value::Float(f) => f as usize,
-                    _ => return Err(HayashiError::Type("remove: índice deve ser inteiro".into())),
+                    _ => return Err(HayashiError::Type("remove: index must be integer".into())),
                 };
                 match lst {
                     Value::List(v) => {
                         if idx >= v.len() {
                             return Err(HayashiError::Runtime(format!(
-                                "remove: índice {idx} fora do intervalo (len={})", v.len()
+                                "remove: index out of range (len={})", v.len()
                             )));
                         }
                         let mut new_v = (*v).clone();
                         new_v.remove(idx);
                         Ok(Value::List(Rc::new(new_v)))
                     }
-                    _ => Err(HayashiError::Type("remove() requer lista".into())),
+                    _ => Err(HayashiError::Type("remove() requires list".into())),
                 }
             }
 
@@ -1212,7 +1232,7 @@ impl Interpreter {
                 }
                 match self.eval_expr(&args[0])? {
                     Value::List(_) => Ok(Value::List(Rc::new(Vec::new()))),
-                    _ => Err(HayashiError::Type("clear() requer lista".into())),
+                    _ => Err(HayashiError::Type("clear() requires list".into())),
                 }
             }
 
@@ -1226,7 +1246,7 @@ impl Interpreter {
                         new_v.reverse();
                         Ok(Value::List(Rc::new(new_v)))
                     }
-                    _ => Err(HayashiError::Type("reverse() requer lista".into())),
+                    _ => Err(HayashiError::Type("reverse() requires list".into())),
                 }
             }
 
@@ -1241,7 +1261,7 @@ impl Interpreter {
                         let pos = v.iter().position(|x| format!("{x}") == format!("{needle}"));
                         Ok(Value::Int(pos.map(|p| p as i64).unwrap_or(-1)))
                     }
-                    _ => Err(HayashiError::Type("index() requer lista".into())),
+                    _ => Err(HayashiError::Type("index() requires list".into())),
                 }
             }
 
@@ -1253,7 +1273,7 @@ impl Interpreter {
                 let start = match self.eval_expr(&args[1])? {
                     Value::Int(i) => i as usize,
                     Value::Float(f) => f as usize,
-                    _ => return Err(HayashiError::Type("slice: início deve ser inteiro".into())),
+                    _ => return Err(HayashiError::Type("slice: start must be integer".into())),
                 };
                 match lst {
                     Value::List(v) => {
@@ -1261,7 +1281,7 @@ impl Interpreter {
                             match self.eval_expr(&args[2])? {
                                 Value::Int(i) => (i as usize).min(v.len()),
                                 Value::Float(f) => (f as usize).min(v.len()),
-                                _ => return Err(HayashiError::Type("slice: fim deve ser inteiro".into())),
+                                _ => return Err(HayashiError::Type("slice: end must be integer".into())),
                             }
                         } else {
                             v.len()
@@ -1269,7 +1289,7 @@ impl Interpreter {
                         let s = start.min(v.len());
                         Ok(Value::List(Rc::new(v[s..end].to_vec())))
                     }
-                    _ => Err(HayashiError::Type("slice() requer lista".into())),
+                    _ => Err(HayashiError::Type("slice() requires list".into())),
                 }
             }
 
@@ -1281,7 +1301,7 @@ impl Interpreter {
                 let sep = if args.len() == 2 {
                     match self.eval_expr(&args[1])? {
                         Value::Str(s) => s,
-                        _ => return Err(HayashiError::Type("join: separador deve ser string".into())),
+                        _ => return Err(HayashiError::Type("join: separator must be string".into())),
                     }
                 } else {
                     ", ".to_string()
@@ -1291,7 +1311,7 @@ impl Interpreter {
                         let strs: Vec<String> = v.iter().map(|x| format!("{x}")).collect();
                         Ok(Value::Str(strs.join(&sep)))
                     }
-                    _ => Err(HayashiError::Type("join() requer lista".into())),
+                    _ => Err(HayashiError::Type("join() requires list".into())),
                 }
             }
 
@@ -1301,12 +1321,12 @@ impl Interpreter {
                 }
                 let lst = match self.eval_expr(&args[0])? {
                     Value::List(v) => v,
-                    _ => return Err(HayashiError::Type("map() requer lista".into())),
+                    _ => return Err(HayashiError::Type("map() requires list".into())),
                 };
                 let func_name = match &args[1] {
                     Expr::Var(n) => n.clone(),
                     Expr::Str(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("map: segundo argumento deve ser nome de função".into())),
+                    _ => return Err(HayashiError::Type("map: second argument must be a function name".into())),
                 };
                 let mut result = Vec::with_capacity(lst.len());
                 for item in lst.iter() {
@@ -1343,7 +1363,7 @@ impl Interpreter {
                         }
                         Ok(Value::List(Rc::new(result)))
                     }
-                    _ => Err(HayashiError::Type("unique() requer lista".into())),
+                    _ => Err(HayashiError::Type("unique() requires list".into())),
                 }
             }
 
@@ -1362,7 +1382,7 @@ impl Interpreter {
                         }
                         Ok(Value::List(Rc::new(result)))
                     }
-                    _ => Err(HayashiError::Type("flatten() requer lista".into())),
+                    _ => Err(HayashiError::Type("flatten() requires list".into())),
                 }
             }
 
@@ -1375,22 +1395,22 @@ impl Interpreter {
                 let start = match self.eval_expr(&args[0])? {
                     Value::Int(i) => i,
                     Value::Float(f) => f as i64,
-                    _ => return Err(HayashiError::Type("range: start deve ser inteiro".into())),
+                    _ => return Err(HayashiError::Type("range: start must be integer".into())),
                 };
                 let end = match self.eval_expr(&args[1])? {
                     Value::Int(i) => i,
                     Value::Float(f) => f as i64,
-                    _ => return Err(HayashiError::Type("range: end deve ser inteiro".into())),
+                    _ => return Err(HayashiError::Type("range: end must be integer".into())),
                 };
                 let step: i64 = if args.len() == 3 {
                     match self.eval_expr(&args[2])? {
                         Value::Int(i) => i,
                         Value::Float(f) => f as i64,
-                        _ => return Err(HayashiError::Type("range: step deve ser inteiro".into())),
+                        _ => return Err(HayashiError::Type("range: step must be integer".into())),
                     }
                 } else if start <= end { 1 } else { -1 };
                 if step == 0 {
-                    return Err(HayashiError::Runtime("range: step não pode ser zero".into()));
+                    return Err(HayashiError::Runtime("range: step cannot be zero".into()));
                 }
                 let mut v = Vec::new();
                 let mut cur = start;
@@ -1424,7 +1444,7 @@ impl Interpreter {
                 };
                 let df = match self.env.get(&df_name) {
                     Some(Value::DataFrame(d)) => d.clone(),
-                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' is not a DataFrame"))),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
                 let time_col = match opt_map.get("time") {
                     Some(Value::Str(s)) => s.clone(),
@@ -1462,20 +1482,20 @@ impl Interpreter {
                 }
                 let df_name = match &args[0] {
                     Expr::Var(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())),
+                    _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())),
                 };
                 let df_raw = match self.env.get(&df_name) {
                     Some(Value::DataFrame(d)) => d.clone(),
-                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
                 let df = self.maybe_filter_df(&df_raw, opts)?;
                 let ret_name = match &args[1] {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("segundo arg deve ser variável de retorno".into())),
+                    _ => return Err(HayashiError::Type("second argument must be return variable".into())),
                 };
                 let sort_name = match &args[2] {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("terceiro arg deve ser variável de sort".into())),
+                    _ => return Err(HayashiError::Type("third argument must be sort variable".into())),
                 };
                 let n_ports: usize = match opt_map.get("n") {
                     Some(Value::Int(v)) => (*v).max(2) as usize,
@@ -1548,8 +1568,8 @@ impl Interpreter {
                 if args.len() < 4 {
                     return Err(HayashiError::Runtime("doublesort(df, ret, sort1, sort2, n1=5, n2=5)".into()));
                 }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
-                let df_raw = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())) };
+                let df_raw = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
                 let df = self.maybe_filter_df(&df_raw, opts)?;
                 let ret_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("ret var".into())) };
                 let s1_name = match &args[2] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("sort1 var".into())) };
@@ -1628,7 +1648,7 @@ impl Interpreter {
                 };
                 let df_raw = match self.env.get(&df_name) {
                     Some(Value::DataFrame(df)) => df.clone(),
-                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' is not a DataFrame"))),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
                 let df = self.maybe_filter_df(&df_raw, opts)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
@@ -1674,7 +1694,7 @@ impl Interpreter {
                 };
                 let df = match self.env.get(&df_name) {
                     Some(Value::DataFrame(df)) => df.clone(),
-                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' is not a DataFrame"))),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
                 let cov = Self::resolve_cov_full(&opt_map, &df)?;
 
@@ -1717,19 +1737,19 @@ impl Interpreter {
                 }
                 let endog_ast = match &args[0] {
                     Expr::Formula(f) => f.clone(),
-                    _ => return Err(HayashiError::Type("weak_iv(): primeiro arg deve ser fórmula".into())),
+                    _ => return Err(HayashiError::Type("weak_iv(): first argument must be a formula".into())),
                 };
                 let instr_ast = match &args[1] {
                     Expr::Formula(f) => f.clone(),
-                    _ => return Err(HayashiError::Type("weak_iv(): segundo arg deve ser fórmula de instrumentos".into())),
+                    _ => return Err(HayashiError::Type("weak_iv(): second argument must be fórmula de instrumentos".into())),
                 };
                 let df_name = match &args[2] {
                     Expr::Var(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("weak_iv(): terceiro arg deve ser DataFrame".into())),
+                    _ => return Err(HayashiError::Type("weak_iv(): third argument must be DataFrame".into())),
                 };
                 let df = match self.env.get(&df_name) {
                     Some(Value::DataFrame(df)) => df.clone(),
-                    _ => return Err(HayashiError::Runtime(format!("weak_iv: '{df_name}' não é um DataFrame"))),
+                    _ => return Err(self.rt_err(format!("weak_iv: '{df_name}' is not a DataFrame"))),
                 };
 
                 // ── Identifica variáveis ──
@@ -1886,7 +1906,7 @@ impl Interpreter {
                             l, cvs[0], cvs[1], cvs[2], cvs[3]
                         )
                     } else {
-                        format!("   Stock-Yogo (2005): tabela disponível para L=1..10 (L={} fora do intervalo).\n   Regra de bolso (Staiger & Stock 1997): F > 10.\n", l)
+                        format!("   Stock-Yogo (2005): tabela disponível para L=1..10 (L={} out of range).\n   Regra de bolso (Staiger & Stock 1997): F > 10.\n", l)
                     }
                 } else {
                     format!("   Stock-Yogo (2005): valores críticos para k_endog=1 apenas.\n   Para k_endog={}, consulte tabelas de Andrews, Stock & Sun (2019).\n", k_endog)
@@ -1957,7 +1977,7 @@ impl Interpreter {
                 let sel_ast = match &args[1] {
                     Expr::Formula(f) => f.clone(),
                     _ => return Err(HayashiError::Type(
-                        "heckman(): segundo argumento deve ser fórmula de seleção (z ~ w1+w2)".into()
+                        "heckman(): second argument must be fórmula de seleção (z ~ w1+w2)".into()
                     )),
                 };
                 let df_name = match &args[2] {
@@ -1969,7 +1989,7 @@ impl Interpreter {
                 let df = match self.env.get(&df_name) {
                     Some(Value::DataFrame(df)) => df.clone(),
                     _ => return Err(HayashiError::Runtime(
-                        format!("heckman: '{df_name}' não é um DataFrame")
+                        format!("heckman: '{df_name}' is not a DataFrame")
                     )),
                 };
 
@@ -2020,7 +2040,7 @@ impl Interpreter {
                     Some(Value::Int(v))   => *v as f64,
                     None => 0.0,
                     _ => return Err(HayashiError::Runtime(
-                        "tobit(): ll deve ser numérico".into()
+                        "tobit(): ll must be numeric".into()
                     )),
                 };
                 let result = greeners::Tobit::fit(&y_vec, &x_mat, ll_limit, Some(var_names))
@@ -2038,16 +2058,16 @@ impl Interpreter {
                 }
                 let formula_ast = match &args[0] {
                     Expr::Formula(f) => f.clone(),
-                    _ => return Err(HayashiError::Type("rd(): primeiro arg deve ser fórmula".into())),
+                    _ => return Err(HayashiError::Type("rd(): first argument must be a formula".into())),
                 };
                 let cutoff = match self.eval_expr(&args[1])? {
                     Value::Float(v) => v,
                     Value::Int(v)   => v as f64,
-                    _ => return Err(HayashiError::Type("rd(): segundo arg deve ser o cutoff (número)".into())),
+                    _ => return Err(HayashiError::Type("rd(): second argument must be o cutoff (número)".into())),
                 };
                 let df = match self.eval_expr(&args[2])? {
                     Value::DataFrame(df) => df,
-                    _ => return Err(HayashiError::Type("rd(): terceiro arg deve ser DataFrame".into())),
+                    _ => return Err(HayashiError::Type("rd(): third argument must be DataFrame".into())),
                 };
 
                 // Extrair nomes diretamente do AST da fórmula Hayashi
@@ -2069,13 +2089,13 @@ impl Interpreter {
                     Some(Value::Float(v)) => Some(*v),
                     Some(Value::Int(v))   => Some(*v as f64),
                     None => None,
-                    _ => return Err(HayashiError::Runtime("rd: bw deve ser numérico".into())),
+                    _ => return Err(HayashiError::Runtime("rd: bw must be numeric".into())),
                 };
                 let poly = match opt_map.get("poly") {
                     Some(Value::Int(v))   => *v as usize,
                     Some(Value::Float(v)) => *v as usize,
                     None => 1,
-                    _ => return Err(HayashiError::Runtime("rd: poly deve ser inteiro".into())),
+                    _ => return Err(HayashiError::Runtime("rd: poly must be integer".into())),
                 };
                 let kernel = rd_kernel_opt(opt_map.get("kernel"))
                     .map_err(|e| HayashiError::Runtime(e))?;
@@ -2097,22 +2117,22 @@ impl Interpreter {
                 }
                 let formula_ast = match &args[0] {
                     Expr::Formula(f) => f.clone(),
-                    _ => return Err(HayashiError::Type("fuzzy_rd(): primeiro arg deve ser fórmula".into())),
+                    _ => return Err(HayashiError::Type("fuzzy_rd(): first argument must be a formula".into())),
                 };
                 let treatment_name = match self.eval_expr(&args[1])? {
                     Value::Str(s) => s,
                     _ => return Err(HayashiError::Type(
-                        "fuzzy_rd(): segundo arg deve ser o nome da coluna de tratamento (string)".into()
+                        "fuzzy_rd(): second argument must be o nome da coluna de tratamento (string)".into()
                     )),
                 };
                 let cutoff = match self.eval_expr(&args[2])? {
                     Value::Float(v) => v,
                     Value::Int(v)   => v as f64,
-                    _ => return Err(HayashiError::Type("fuzzy_rd(): terceiro arg deve ser cutoff (número)".into())),
+                    _ => return Err(HayashiError::Type("fuzzy_rd(): third argument must be cutoff (número)".into())),
                 };
                 let df = match self.eval_expr(&args[3])? {
                     Value::DataFrame(df) => df,
-                    _ => return Err(HayashiError::Type("fuzzy_rd(): quarto arg deve ser DataFrame".into())),
+                    _ => return Err(HayashiError::Type("fuzzy_rd(): fourth argument must be DataFrame".into())),
                 };
 
                 let outcome_name = formula_ast.lhs.clone();
@@ -2136,13 +2156,13 @@ impl Interpreter {
                     Some(Value::Float(v)) => Some(*v),
                     Some(Value::Int(v))   => Some(*v as f64),
                     None => None,
-                    _ => return Err(HayashiError::Runtime("fuzzy_rd: bw deve ser numérico".into())),
+                    _ => return Err(HayashiError::Runtime("fuzzy_rd: bw must be numeric".into())),
                 };
                 let poly = match opt_map.get("poly") {
                     Some(Value::Int(v))   => *v as usize,
                     Some(Value::Float(v)) => *v as usize,
                     None => 1,
-                    _ => return Err(HayashiError::Runtime("fuzzy_rd: poly deve ser inteiro".into())),
+                    _ => return Err(HayashiError::Runtime("fuzzy_rd: poly must be integer".into())),
                 };
                 let kernel = rd_kernel_opt(opt_map.get("kernel"))
                     .map_err(|e| HayashiError::Runtime(e))?;
@@ -2165,11 +2185,11 @@ impl Interpreter {
                 }
                 let formula_ast = match &args[0] {
                     Expr::Formula(f) => f.clone(),
-                    _ => return Err(HayashiError::Type("psm(): primeiro arg deve ser fórmula".into())),
+                    _ => return Err(HayashiError::Type("psm(): first argument must be a formula".into())),
                 };
                 let df = match self.eval_expr(&args[1])? {
                     Value::DataFrame(df) => df,
-                    _ => return Err(HayashiError::Type("psm(): segundo arg deve ser DataFrame".into())),
+                    _ => return Err(HayashiError::Type("psm(): second argument must be DataFrame".into())),
                 };
 
                 let outcome_name = formula_ast.lhs.clone();
@@ -2212,24 +2232,24 @@ impl Interpreter {
                     Some(Value::Int(v))   => *v as usize,
                     Some(Value::Float(v)) => *v as usize,
                     None => 1,
-                    _ => return Err(HayashiError::Runtime("psm: k deve ser inteiro".into())),
+                    _ => return Err(HayashiError::Runtime("psm: k must be integer".into())),
                 };
                 let caliper: Option<f64> = match opt_map.get("caliper") {
                     Some(Value::Float(v)) => Some(*v),
                     Some(Value::Int(v))   => Some(*v as f64),
                     None => None,
-                    _ => return Err(HayashiError::Runtime("psm: caliper deve ser numérico".into())),
+                    _ => return Err(HayashiError::Runtime("psm: caliper must be numeric".into())),
                 };
                 let with_replacement = match opt_map.get("replace") {
                     Some(Value::Bool(b)) => *b,
                     None => false,
-                    _ => return Err(HayashiError::Runtime("psm: replace deve ser booleano".into())),
+                    _ => return Err(HayashiError::Runtime("psm: replace must be boolean".into())),
                 };
                 let n_boot = match opt_map.get("boot") {
                     Some(Value::Int(v))   => *v as usize,
                     Some(Value::Float(v)) => *v as usize,
                     None => 200,
-                    _ => return Err(HayashiError::Runtime("psm: boot deve ser inteiro".into())),
+                    _ => return Err(HayashiError::Runtime("psm: boot must be integer".into())),
                 };
 
                 let result = greeners::PSM::fit(
@@ -2252,7 +2272,7 @@ impl Interpreter {
                 let outcome_col = match self.eval_expr(&args[0])? {
                     Value::Str(s) => s,
                     _ => return Err(HayashiError::Type(
-                        "synth(): primeiro arg deve ser nome da coluna de resultado (string)".into()
+                        "synth(): first argument must be nome da coluna de resultado (string)".into()
                     )),
                 };
                 let treated_unit = match self.eval_expr(&args[1])? {
@@ -2260,20 +2280,20 @@ impl Interpreter {
                     Value::Int(v)  => v.to_string(),
                     Value::Float(v) => (v as i64).to_string(),
                     _ => return Err(HayashiError::Type(
-                        "synth(): segundo arg deve ser o ID da unidade tratada".into()
+                        "synth(): second argument must be o ID da unidade tratada".into()
                     )),
                 };
                 let t0 = match self.eval_expr(&args[2])? {
                     Value::Float(v) => v,
                     Value::Int(v)   => v as f64,
                     _ => return Err(HayashiError::Type(
-                        "synth(): terceiro arg deve ser o período de início do tratamento (número)".into()
+                        "synth(): third argument must be o período de início do tratamento (número)".into()
                     )),
                 };
                 let df = match self.eval_expr(&args[3])? {
                     Value::DataFrame(df) => df,
                     _ => return Err(HayashiError::Type(
-                        "synth(): quarto arg deve ser DataFrame".into()
+                        "synth(): fourth argument must be DataFrame".into()
                     )),
                 };
 
@@ -2294,12 +2314,12 @@ impl Interpreter {
                         lst.iter().map(|v| match v {
                             Value::Str(s) => Ok(s.clone()),
                             _ => Err(HayashiError::Type(
-                                "synth(): covs deve ser lista de strings".into()
+                                "synth(): covs must be a list de strings".into()
                             )),
                         }).collect::<Result<Vec<_>>>()?
                     ),
                     None => None,
-                    _ => return Err(HayashiError::Runtime("synth(): covs deve ser lista".into())),
+                    _ => return Err(HayashiError::Runtime("synth(): covs must be a list".into())),
                 };
 
                 let result = greeners::SyntheticControl::fit(
@@ -2393,11 +2413,11 @@ impl Interpreter {
                 }
                 let formula_ast = match &args[0] {
                     Expr::Formula(f) => f.clone(),
-                    _ => return Err(HayashiError::Type("did(): primeiro arg deve ser fórmula".into())),
+                    _ => return Err(HayashiError::Type("did(): first argument must be a formula".into())),
                 };
                 let df = match self.eval_expr(&args[1])? {
                     Value::DataFrame(d) => d,
-                    _ => return Err(HayashiError::Type("did(): segundo arg deve ser DataFrame".into())),
+                    _ => return Err(HayashiError::Type("did(): second argument must be DataFrame".into())),
                 };
                 // formula: outcome ~ treated_col + post_col
                 let rhs_vars: Vec<&str> = formula_ast.rhs.iter().filter_map(|t| {
@@ -2425,13 +2445,13 @@ impl Interpreter {
                     Some(Value::Float(v)) => *v,
                     Some(Value::Int(v))   => *v as f64,
                     None                  => 0.5,
-                    _ => return Err(HayashiError::Type("tau= deve ser numérico".into())),
+                    _ => return Err(HayashiError::Type("tau= must be numeric".into())),
                 };
                 let n_boot = match opt_map.get("boot") {
                     Some(Value::Int(v))   => *v as usize,
                     Some(Value::Float(v)) => *v as usize,
                     None                  => 200,
-                    _ => return Err(HayashiError::Type("boot= deve ser inteiro".into())),
+                    _ => return Err(HayashiError::Type("boot= must be integer".into())),
                 };
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
@@ -2450,20 +2470,20 @@ impl Interpreter {
             "km" => {
                 if args.len() < 3 {
                     return Err(HayashiError::Runtime(
-                        "km(time, event, df) requer 3 argumentos".into()
+                        "km(time, event, df) requires 3 arguments".into()
                     ));
                 }
                 let time_name = match &args[0] {
                     Expr::Var(v) | Expr::Str(v) => v.clone(),
-                    _ => return Err(HayashiError::Type("km(): primeiro arg deve ser nome da coluna de tempo".into())),
+                    _ => return Err(HayashiError::Type("km(): first argument must be nome da coluna de tempo".into())),
                 };
                 let event_name = match &args[1] {
                     Expr::Var(v) | Expr::Str(v) => v.clone(),
-                    _ => return Err(HayashiError::Type("km(): segundo arg deve ser nome da coluna de evento".into())),
+                    _ => return Err(HayashiError::Type("km(): second argument must be nome da coluna de evento".into())),
                 };
                 let df = match self.eval_expr(&args[2])? {
                     Value::DataFrame(d) => d,
-                    _ => return Err(HayashiError::Type("km(): terceiro arg deve ser DataFrame".into())),
+                    _ => return Err(HayashiError::Type("km(): third argument must be DataFrame".into())),
                 };
                 let times  = Self::get_col_f64(&df, &time_name)?;
                 let events_f = Self::get_col_f64(&df, &event_name)?;
@@ -2483,18 +2503,18 @@ impl Interpreter {
                 }
                 let formula_ast = match &args[0] {
                     Expr::Formula(f) => f.clone(),
-                    _ => return Err(HayashiError::Type("cox(): primeiro arg deve ser fórmula".into())),
+                    _ => return Err(HayashiError::Type("cox(): first argument must be a formula".into())),
                 };
                 let df = match self.eval_expr(&args[1])? {
                     Value::DataFrame(d) => d,
-                    _ => return Err(HayashiError::Type("cox(): segundo arg deve ser DataFrame".into())),
+                    _ => return Err(HayashiError::Type("cox(): second argument must be DataFrame".into())),
                 };
                 let event_col = match opt_map.get("event") {
                     Some(Value::Str(s)) => s.clone(),
                     None => return Err(HayashiError::Runtime(
                         "cox() requer opção event=nome_coluna".into()
                     )),
-                    _ => return Err(HayashiError::Type("event= deve ser string".into())),
+                    _ => return Err(HayashiError::Type("event= must be string".into())),
                 };
                 let times    = Self::get_col_f64(&df, &formula_ast.lhs)?;
                 let events_f = Self::get_col_f64(&df, &event_col)?;
@@ -2543,10 +2563,10 @@ impl Interpreter {
                         "hampel"              => greeners::RobustNorm::Hampel(2.0, 4.0, 8.0),
                         "ols" | "leastsq"     => greeners::RobustNorm::LeastSquares,
                         other => return Err(HayashiError::Runtime(
-                            format!("norm='{other}' desconhecido — use: huber, tukey, andrews, hampel, ols")
+                            format!("norm='{other}' unknown — use: huber, tukey, andrews, hampel, ols")
                         )),
                     },
-                    _ => return Err(HayashiError::Type("norm= deve ser string".into())),
+                    _ => return Err(HayashiError::Type("norm= must be string".into())),
                 };
                 let cov = Self::resolve_cov_full(&opt_map, &df)?;
                 let result = greeners::RLM::fit_with_names(&y_vec, &x_mat, &norm, cov, Some(var_names))
@@ -2565,7 +2585,7 @@ impl Interpreter {
                     None => return Err(HayashiError::Runtime(
                         "gee() requer opção id=coluna_grupo".into()
                     )),
-                    _ => return Err(HayashiError::Type("id= deve ser string".into())),
+                    _ => return Err(HayashiError::Type("id= must be string".into())),
                 };
                 let family_str = match opt_map.get("family") {
                     None => "gaussian",
@@ -2574,10 +2594,10 @@ impl Interpreter {
                         "binomial" | "logit"  => "binomial",
                         "poisson"             => "poisson",
                         other => return Err(HayashiError::Runtime(
-                            format!("family='{other}' desconhecido — use: gaussian, binomial, poisson")
+                            format!("family='{other}' unknown — use: gaussian, binomial, poisson")
                         )),
                     },
-                    _ => return Err(HayashiError::Type("family= deve ser string".into())),
+                    _ => return Err(HayashiError::Type("family= must be string".into())),
                 };
                 let corr_str = match opt_map.get("corr") {
                     None => "independence",
@@ -2590,7 +2610,7 @@ impl Interpreter {
                     "ar1" | "ar(1)"        => greeners::CorrStructure::AR1,
                     "unstructured" | "uns" => greeners::CorrStructure::Unstructured,
                     other => return Err(HayashiError::Runtime(
-                        format!("corr='{other}' desconhecido — use: independence, exchangeable, ar1, unstructured")
+                        format!("corr='{other}' unknown — use: independence, exchangeable, ar1, unstructured")
                     )),
                 };
                 let (family, link) = match family_str {
@@ -2631,7 +2651,7 @@ impl Interpreter {
                     None => return Err(HayashiError::Runtime(
                         "wls() requer opção weights=\"coluna_pesos\"".into()
                     )),
-                    _ => return Err(HayashiError::Type("weights= deve ser string".into())),
+                    _ => return Err(HayashiError::Type("weights= must be string".into())),
                 };
                 let weights = Self::get_col_f64(&df, &w_name)?;
                 let cov = Self::resolve_cov_full(&opt_map, &df)?;
@@ -2667,7 +2687,7 @@ impl Interpreter {
                         Some(Value::List(lst)) => {
                             let inames: Vec<String> = lst.iter().map(|v| match v {
                                 Value::Str(s) => Ok(s.clone()),
-                                _ => Err(HayashiError::Type("inflate= deve ser lista de strings".into())),
+                                _ => Err(HayashiError::Type("inflate= must be a list de strings".into())),
                             }).collect::<Result<_>>()?;
                             // intercept + colunas especificadas
                             let n = df.n_rows();
@@ -2681,7 +2701,7 @@ impl Interpreter {
                             (Some(xi), Some(full_names))
                         }
                         None => (None, None),
-                        _ => return Err(HayashiError::Type("inflate= deve ser lista de strings".into())),
+                        _ => return Err(HayashiError::Type("inflate= must be a list de strings".into())),
                     };
 
                 let use_negbin = func == "zinb";
@@ -2714,7 +2734,7 @@ impl Interpreter {
                     None => return Err(HayashiError::Runtime(
                         "mixed() requer opção id=\"coluna_grupo\"".into()
                     )),
-                    _ => return Err(HayashiError::Type("id= deve ser string".into())),
+                    _ => return Err(HayashiError::Type("id= must be string".into())),
                 };
 
                 // re= opcional: lista de variáveis com efeito aleatório de slope
@@ -2722,10 +2742,10 @@ impl Interpreter {
                 let re_vars: Vec<String> = match opt_map.get("re") {
                     Some(Value::List(lst)) => lst.iter().map(|v| match v {
                         Value::Str(s) => Ok(s.clone()),
-                        _ => Err(HayashiError::Type("re= deve ser lista de strings".into())),
+                        _ => Err(HayashiError::Type("re= must be a list de strings".into())),
                     }).collect::<Result<_>>()?,
                     None => vec![],
-                    _ => return Err(HayashiError::Type("re= deve ser lista de strings".into())),
+                    _ => return Err(HayashiError::Type("re= must be a list de strings".into())),
                 };
 
                 let (y_vec, x_fixed) = df.to_design_matrix(&g_formula)
@@ -2772,7 +2792,7 @@ impl Interpreter {
                         _ => Err(HayashiError::Type("testparm: lista deve conter strings".into())),
                     }).collect::<Result<_>>()?,
                     _ => return Err(HayashiError::Type(
-                        "testparm: segundo argumento deve ser lista de strings".into()
+                        "testparm: second argument must be lista de strings".into()
                     )),
                 };
                 match &model_val {
@@ -2781,7 +2801,7 @@ impl Interpreter {
                         let indices: Vec<usize> = tested.iter().map(|v| {
                             vnames.iter().position(|n| n == v)
                                 .ok_or_else(|| HayashiError::Runtime(
-                                    format!("testparm: variável '{v}' não encontrada no modelo")
+                                    format!("testparm: variável '{v}' not found no modelo")
                                 ))
                         }).collect::<Result<_>>()?;
                         let (f_stat, p_val) = m.result.f_test(&indices, &m.x)
@@ -2820,12 +2840,12 @@ impl Interpreter {
                 let ar_order = match opt_map.get("ar") {
                     Some(Value::Int(n)) => *n as usize,
                     None => 1,
-                    _ => return Err(HayashiError::Type("ar= deve ser inteiro".into())),
+                    _ => return Err(HayashiError::Type("ar= must be integer".into())),
                 };
                 let max_iter = match opt_map.get("iter") {
                     Some(Value::Int(n)) => *n as usize,
                     None => 50,
-                    _ => return Err(HayashiError::Type("iter= deve ser inteiro".into())),
+                    _ => return Err(HayashiError::Type("iter= must be integer".into())),
                 };
                 let result = greeners::GLSAR::fit_with_names(
                     &y_vec, &x_mat, ar_order, max_iter, Some(var_names)
@@ -2847,11 +2867,11 @@ impl Interpreter {
                 };
                 let df = match self.env.get(&df_name) {
                     Some(Value::DataFrame(d)) => d.clone(),
-                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
                 let outcome_name = match &args[1] {
                     Expr::Var(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("segundo argumento deve ser nome da variável outcome".into())),
+                    _ => return Err(HayashiError::Type("second argument must be outcome variable name".into())),
                 };
                 let outcome = Self::get_col_f64(&df, &outcome_name)?;
                 let by_col = match opt_map.get("by") {
@@ -2859,7 +2879,7 @@ impl Interpreter {
                     None => return Err(HayashiError::Runtime(
                         "anova() requer by=\"coluna_grupo\"".into()
                     )),
-                    _ => return Err(HayashiError::Type("by= deve ser string".into())),
+                    _ => return Err(HayashiError::Type("by= must be string".into())),
                 };
                 let group_vals = Self::get_col_f64(&df, &by_col)?;
                 let mut gmap: std::collections::HashMap<i64, usize> = std::collections::HashMap::new();
@@ -2895,7 +2915,7 @@ impl Interpreter {
                         "probit"  => greeners::BetaLink::Probit,
                         "cloglog" => greeners::BetaLink::CLogLog,
                         other => return Err(HayashiError::Runtime(
-                            format!("betareg: link='{other}' desconhecido — use: logit, probit, cloglog")
+                            format!("betareg: link='{other}' unknown — use: logit, probit, cloglog")
                         )),
                     },
                     _ => greeners::BetaLink::Logit,
@@ -2945,7 +2965,7 @@ impl Interpreter {
                         "negbin" | "negative_binomial" => greeners::Family::NegativeBinomial(alpha_val),
                         "tweedie" => greeners::Family::Tweedie(power_val),
                         other => return Err(HayashiError::Runtime(
-                            format!("glm: family='{other}' desconhecido — use: gaussian, binomial, poisson, gamma, inverse_gaussian, negbin, tweedie")
+                            format!("glm: family='{other}' unknown — use: gaussian, binomial, poisson, gamma, inverse_gaussian, negbin, tweedie")
                         )),
                     },
                     _ => greeners::Family::Gaussian,
@@ -2963,7 +2983,7 @@ impl Interpreter {
                             "inverse"   => greeners::Link::InversePower,
                             "cloglog"   => greeners::Link::CLogLog,
                             other => return Err(HayashiError::Runtime(
-                                format!("glm: link='{other}' desconhecido — use: identity, log, logit, probit, inverse, cloglog")
+                                format!("glm: link='{other}' unknown — use: identity, log, logit, probit, inverse, cloglog")
                             )),
                         };
                         // fit_with_link não aceita var_names; setar após
@@ -3013,19 +3033,19 @@ impl Interpreter {
                 }
                 let df_name = match &args[0] {
                     Expr::Var(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("lowess: primeiro arg deve ser DataFrame".into())),
+                    _ => return Err(HayashiError::Type("lowess: first argument must be a DataFrame".into())),
                 };
                 let df = match self.env.get(&df_name) {
                     Some(Value::DataFrame(d)) => d.clone(),
-                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
                 let y_name = match &args[1] {
                     Expr::Var(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("lowess: segundo arg deve ser nome de coluna y".into())),
+                    _ => return Err(HayashiError::Type("lowess: second argument must be nome de coluna y".into())),
                 };
                 let x_name = match &args[2] {
                     Expr::Var(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("lowess: terceiro arg deve ser nome de coluna x".into())),
+                    _ => return Err(HayashiError::Type("lowess: third argument must be nome de coluna x".into())),
                 };
                 let y_vec = ndarray::Array1::from(Self::get_col_f64(&df, &y_name)?);
                 let x_vec = ndarray::Array1::from(Self::get_col_f64(&df, &x_name)?);
@@ -3057,15 +3077,15 @@ impl Interpreter {
                 }
                 let df_name = match &args[0] {
                     Expr::Var(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("kde: primeiro arg deve ser DataFrame".into())),
+                    _ => return Err(HayashiError::Type("kde: first argument must be a DataFrame".into())),
                 };
                 let df = match self.env.get(&df_name) {
                     Some(Value::DataFrame(d)) => d.clone(),
-                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
                 let var_name = match &args[1] {
                     Expr::Var(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("kde: segundo arg deve ser nome de coluna".into())),
+                    _ => return Err(HayashiError::Type("kde: second argument must be nome de coluna".into())),
                 };
                 let data = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?);
                 let bw_opt = match opt_map.get("bw") {
@@ -3080,7 +3100,7 @@ impl Interpreter {
                         "triangular"   => greeners::Kernel::Triangular,
                         "uniform"      => greeners::Kernel::Uniform,
                         other => return Err(HayashiError::Runtime(
-                            format!("kde: kernel='{other}' desconhecido — use: gaussian, epanechnikov, triangular, uniform")
+                            format!("kde: kernel='{other}' unknown — use: gaussian, epanechnikov, triangular, uniform")
                         )),
                     },
                     _ => greeners::Kernel::Gaussian,
@@ -3118,7 +3138,7 @@ impl Interpreter {
                 }
                 let df = match self.eval_expr(&args[0])? {
                     Value::DataFrame(d) => d,
-                    _ => return Err(HayashiError::Type("pca: primeiro arg deve ser DataFrame".into())),
+                    _ => return Err(HayashiError::Type("pca: first argument must be a DataFrame".into())),
                 };
                 let var_names: Vec<String> = args[1..].iter()
                     .map(|a| match a {
@@ -3156,7 +3176,7 @@ impl Interpreter {
                 }
                 let df = match self.eval_expr(&args[0])? {
                     Value::DataFrame(d) => d,
-                    _ => return Err(HayashiError::Type("factor: primeiro arg deve ser DataFrame".into())),
+                    _ => return Err(HayashiError::Type("factor: first argument must be a DataFrame".into())),
                 };
                 let var_names: Vec<String> = args[1..].iter()
                     .map(|a| match a {
@@ -3176,7 +3196,7 @@ impl Interpreter {
                         "varimax" => greeners::Rotation::Varimax,
                         "none"    => greeners::Rotation::None,
                         other => return Err(HayashiError::Runtime(
-                            format!("factor: rotation='{other}' desconhecido — use: none, varimax")
+                            format!("factor: rotation='{other}' unknown — use: none, varimax")
                         )),
                     },
                     _ => greeners::Rotation::None,
@@ -3203,12 +3223,12 @@ impl Interpreter {
                 }
                 let df = match self.eval_expr(&args[0])? {
                     Value::DataFrame(d) => d,
-                    _ => return Err(HayashiError::Type("manova: primeiro arg deve ser DataFrame".into())),
+                    _ => return Err(HayashiError::Type("manova: first argument must be a DataFrame".into())),
                 };
                 let group_col = match opt_map.get("by") {
                     Some(Value::Str(s)) => s.clone(),
                     None => return Err(HayashiError::Runtime("manova requer by=\"coluna_grupo\"".into())),
-                    _ => return Err(HayashiError::Type("manova: by= deve ser string".into())),
+                    _ => return Err(HayashiError::Type("manova: by= must be string".into())),
                 };
                 let outcome_names: Vec<String> = args[1..].iter()
                     .map(|a| match a {
@@ -3269,20 +3289,20 @@ impl Interpreter {
                     let estimator_name = match &args[0] {
                         Expr::Var(n) | Expr::Str(n) => n.clone(),
                         _ => return Err(HayashiError::Type(
-                            "bootstrap: primeiro arg deve ser nome do estimador (ols, logit, ...)".into()
+                            "bootstrap: first argument must be nome do estimador (ols, logit, ...)".into()
                         )),
                     };
                     let formula_expr = args[1].clone();
                     let df_name = match &args[2] {
                         Expr::Var(n) => n.clone(),
                         _ => return Err(HayashiError::Type(
-                            "bootstrap: terceiro arg deve ser nome do DataFrame".into()
+                            "bootstrap: third argument must be nome do DataFrame".into()
                         )),
                     };
                     let df = match self.env.get(&df_name) {
                         Some(Value::DataFrame(d)) => d.clone(),
                         _ => return Err(HayashiError::Runtime(
-                            format!("'{df_name}' não é DataFrame")
+                            format!("'{df_name}' is not a DataFrame")
                         )),
                     };
 
@@ -3297,7 +3317,7 @@ impl Interpreter {
                     )?;
                     let full_params = Self::extract_params(&full_result)
                         .ok_or_else(|| HayashiError::Runtime(
-                            "bootstrap: modelo não suportado (sem params extraíveis)".into()
+                            "bootstrap: modelo not supportado (sem params extraíveis)".into()
                         ))?;
                     let full_se = Self::extract_se(&full_result).unwrap_or_default();
                     let var_names = Self::extract_var_names(&full_result);
@@ -3433,11 +3453,11 @@ impl Interpreter {
                 }
                 let df = match self.eval_expr(&args[0])? {
                     Value::DataFrame(d) => d,
-                    _ => return Err(HayashiError::Type("markov: primeiro arg deve ser DataFrame".into())),
+                    _ => return Err(HayashiError::Type("markov: first argument must be a DataFrame".into())),
                 };
                 let y_name = match &args[1] {
                     Expr::Var(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("markov: segundo arg deve ser nome da variável".into())),
+                    _ => return Err(HayashiError::Type("markov: second argument must be variable name".into())),
                 };
                 let y_vec = ndarray::Array1::from(Self::get_col_f64(&df, &y_name)?);
                 let k = match opt_map.get("k") {
@@ -3451,7 +3471,7 @@ impl Interpreter {
                     _ => 1,
                 };
                 let result = greeners::MarkovSwitching::fit(&y_vec, k, p)
-                    .map_err(|e| HayashiError::Runtime(format!("markov: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("markov: {e}")))?;
                 Ok(Value::MarkovResult(Rc::new(result)))
             }
 
@@ -3465,7 +3485,7 @@ impl Interpreter {
                 let group_col = match opt_map.get("group") {
                     Some(Value::Str(s)) => s.clone(),
                     None => return Err(HayashiError::Runtime("clogit requer group=\"coluna_id\"".into())),
-                    _ => return Err(HayashiError::Type("clogit: group= deve ser string".into())),
+                    _ => return Err(HayashiError::Type("clogit: group= must be string".into())),
                 };
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
@@ -3483,7 +3503,7 @@ impl Interpreter {
                 }).collect();
                 let result = greeners::ConditionalLogit::fit_with_names(
                     &y_vec, &x_mat, &groups, Some(var_names)
-                ).map_err(|e| HayashiError::Runtime(format!("clogit: {e}")))?;
+                ).map_err(|e| self.rt_err(format!("clogit: {e}")))?;
                 Ok(Value::ConditionalResult(Rc::new(result)))
             }
 
@@ -3496,7 +3516,7 @@ impl Interpreter {
                 let group_col = match opt_map.get("group") {
                     Some(Value::Str(s)) => s.clone(),
                     None => return Err(HayashiError::Runtime("cpoisson requer group=\"coluna_id\"".into())),
-                    _ => return Err(HayashiError::Type("cpoisson: group= deve ser string".into())),
+                    _ => return Err(HayashiError::Type("cpoisson: group= must be string".into())),
                 };
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
@@ -3514,7 +3534,7 @@ impl Interpreter {
                 }).collect();
                 let result = greeners::ConditionalPoisson::fit_with_names(
                     &y_vec, &x_mat, &groups, Some(var_names)
-                ).map_err(|e| HayashiError::Runtime(format!("cpoisson: {e}")))?;
+                ).map_err(|e| self.rt_err(format!("cpoisson: {e}")))?;
                 Ok(Value::ConditionalResult(Rc::new(result)))
             }
 
@@ -3540,7 +3560,7 @@ impl Interpreter {
                 };
                 let (f, p, df1, df2) = greeners::SpecificationTests::goldfeld_quandt_test(
                     &ols.residuals, split
-                ).map_err(|e| HayashiError::Runtime(format!("gqtest: {e}")))?;
+                ).map_err(|e| self.rt_err(format!("gqtest: {e}")))?;
                 let sig = |p: f64| if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
                 let sep = "─".repeat(56);
                 println!("\nGoldfeld-Quandt Test  —  split = {split:.2}");
@@ -3570,7 +3590,7 @@ impl Interpreter {
                     _ => return Err(HayashiError::Type("bphet(): suporta apenas modelos OLS".into())),
                 };
                 let (lm, p) = greeners::Diagnostics::breusch_pagan(&ols.residuals, &ols.x)
-                    .map_err(|e| HayashiError::Runtime(format!("bphet: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("bphet: {e}")))?;
                 let k = ols.x.ncols().saturating_sub(1);
                 let sig = |p: f64| if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
                 let sep = "─".repeat(56);
@@ -3598,10 +3618,10 @@ impl Interpreter {
                         "bptest(df, y ~ x1+x2, id=\"entity_col\")".into()
                     ));
                 }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let formula_ast = match &args[1] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser fórmula".into())) };
-                let id_col = match opt_map.get("id") { Some(Value::Str(s)) => s.clone(), _ => self.panel_info.get(&df_name).map(|(id,_)| id.clone()).filter(|s| !s.is_empty()).ok_or_else(|| HayashiError::Runtime(format!("bptest requer id= ou xtset({df_name}, id, time)")))? };
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
+                let formula_ast = match &args[1] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("second argument must be fórmula".into())) };
+                let id_col = match opt_map.get("id") { Some(Value::Str(s)) => s.clone(), _ => self.panel_info.get(&df_name).map(|(id,_)| id.clone()).filter(|s| !s.is_empty()).ok_or_else(|| self.rt_err(format!("bptest requer id= ou xtset({df_name}, id, time)")))? };
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let (y_vec, x_mat) = df.to_design_matrix(&g_formula).map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -3633,12 +3653,12 @@ impl Interpreter {
             // H0: sem correlação serial de 1ª ordem nos erros idiossincráticos
             // wooldridge(df, y ~ x1+x2, id="entity", time="time")
             "wooldridge" | "xtserial" | "wooldridge_serial" | "xtwooldridge" => {
-                if args.len() < 2 { return Err(HayashiError::Runtime("wooldridge(df, y~x, id=\"entity\", time=\"time\")".into())); }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let formula_ast = match &args[1] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser fórmula".into())) };
-                let id_col   = match opt_map.get("id")   { Some(Value::Str(s)) => s.clone(), _ => self.panel_info.get(&df_name).map(|(id,_)| id.clone()).filter(|s| !s.is_empty()).ok_or_else(|| HayashiError::Runtime(format!("wooldridge requer id= ou xtset({df_name}, id, time)")))? };
-                let time_col = match opt_map.get("time") { Some(Value::Str(s)) => s.clone(), _ => self.panel_info.get(&df_name).map(|(_,t)| t.clone()).filter(|s| !s.is_empty()).ok_or_else(|| HayashiError::Runtime(format!("wooldridge requer time= ou xtset({df_name}, id, time)")))? };
+                if args.len() < 2 { return Err(self.rt_err("wooldridge(df, y~x, id=\"entity\", time=\"time\")")); }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
+                let formula_ast = match &args[1] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("second argument must be fórmula".into())) };
+                let id_col   = match opt_map.get("id")   { Some(Value::Str(s)) => s.clone(), _ => self.panel_info.get(&df_name).map(|(id,_)| id.clone()).filter(|s| !s.is_empty()).ok_or_else(|| self.rt_err(format!("wooldridge requer id= ou xtset({df_name}, id, time)")))? };
+                let time_col = match opt_map.get("time") { Some(Value::Str(s)) => s.clone(), _ => self.panel_info.get(&df_name).map(|(_,t)| t.clone()).filter(|s| !s.is_empty()).ok_or_else(|| self.rt_err(format!("wooldridge requer time= ou xtset({df_name}, id, time)")))? };
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let (y_vec, x_mat) = df.to_design_matrix(&g_formula).map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -3662,11 +3682,11 @@ impl Interpreter {
             // H0: sem dependência cross-sectional
             // pesaran(df, y ~ x1+x2, id="entity", time="time")
             "pesaran" | "xtcd" => {
-                if args.len() < 2 { return Err(HayashiError::Runtime("pesaran(df, y~x, id=\"entity\", time=\"time\")".into())); }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let formula_ast = match &args[1] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser fórmula".into())) };
-                let id_col = match opt_map.get("id") { Some(Value::Str(s)) => s.clone(), _ => self.panel_info.get(&df_name).map(|(id,_)| id.clone()).filter(|s| !s.is_empty()).ok_or_else(|| HayashiError::Runtime(format!("pesaran requer id= ou xtset({df_name}, id, time)")))? };
+                if args.len() < 2 { return Err(self.rt_err("pesaran(df, y~x, id=\"entity\", time=\"time\")")); }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
+                let formula_ast = match &args[1] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("second argument must be fórmula".into())) };
+                let id_col = match opt_map.get("id") { Some(Value::Str(s)) => s.clone(), _ => self.panel_info.get(&df_name).map(|(id,_)| id.clone()).filter(|s| !s.is_empty()).ok_or_else(|| self.rt_err(format!("pesaran requer id= ou xtset({df_name}, id, time)")))? };
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let (y_vec, x_mat) = df.to_design_matrix(&g_formula).map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -3696,11 +3716,11 @@ impl Interpreter {
             // H0: médias de grupo não correlacionadas com regressores (RE ok)
             // mundlak(df, y ~ x1+x2, id="entity")
             "mundlak" => {
-                if args.len() < 2 { return Err(HayashiError::Runtime("mundlak(df, y~x, id=\"entity\")".into())); }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let formula_ast = match &args[1] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser fórmula".into())) };
-                let id_col = match opt_map.get("id") { Some(Value::Str(s)) => s.clone(), _ => self.panel_info.get(&df_name).map(|(id,_)| id.clone()).filter(|s| !s.is_empty()).ok_or_else(|| HayashiError::Runtime(format!("mundlak requer id= ou xtset({df_name}, id, time)")))? };
+                if args.len() < 2 { return Err(self.rt_err("mundlak(df, y~x, id=\"entity\")")); }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
+                let formula_ast = match &args[1] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("second argument must be fórmula".into())) };
+                let id_col = match opt_map.get("id") { Some(Value::Str(s)) => s.clone(), _ => self.panel_info.get(&df_name).map(|(id,_)| id.clone()).filter(|s| !s.is_empty()).ok_or_else(|| self.rt_err(format!("mundlak requer id= ou xtset({df_name}, id, time)")))? };
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let (y_vec, x_mat) = df.to_design_matrix(&g_formula).map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -3734,12 +3754,12 @@ impl Interpreter {
             // m1 deve rejeitar H0 (FD induz AR(1) por construção)
             // m2 NÃO deve rejeitar H0 (valida instrumentos y_{i,t-2})
             "abtest" | "abar" | "abond" | "xtabond_test" | "arellano_bond" => {
-                if args.len() < 2 { return Err(HayashiError::Runtime("abtest(df, y~x, id=\"entity\", time=\"time\")".into())); }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let formula_ast = match &args[1] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser fórmula".into())) };
-                let id_col   = match opt_map.get("id")   { Some(Value::Str(s)) => s.clone(), _ => self.panel_info.get(&df_name).map(|(id,_)| id.clone()).filter(|s| !s.is_empty()).ok_or_else(|| HayashiError::Runtime(format!("abtest requer id= ou xtset({df_name}, id, time)")))? };
-                let time_col = match opt_map.get("time") { Some(Value::Str(s)) => s.clone(), _ => self.panel_info.get(&df_name).map(|(_,t)| t.clone()).filter(|s| !s.is_empty()).ok_or_else(|| HayashiError::Runtime(format!("abtest requer time= ou xtset({df_name}, id, time)")))? };
+                if args.len() < 2 { return Err(self.rt_err("abtest(df, y~x, id=\"entity\", time=\"time\")")); }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
+                let formula_ast = match &args[1] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("second argument must be fórmula".into())) };
+                let id_col   = match opt_map.get("id")   { Some(Value::Str(s)) => s.clone(), _ => self.panel_info.get(&df_name).map(|(id,_)| id.clone()).filter(|s| !s.is_empty()).ok_or_else(|| self.rt_err(format!("abtest requer id= ou xtset({df_name}, id, time)")))? };
+                let time_col = match opt_map.get("time") { Some(Value::Str(s)) => s.clone(), _ => self.panel_info.get(&df_name).map(|(_,t)| t.clone()).filter(|s| !s.is_empty()).ok_or_else(|| self.rt_err(format!("abtest requer time= ou xtset({df_name}, id, time)")))? };
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let (y_vec, x_mat) = df.to_design_matrix(&g_formula).map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -3777,7 +3797,7 @@ impl Interpreter {
                 };
                 let df = match self.env.get(&df_name) {
                     Some(Value::DataFrame(d)) => d.clone(),
-                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
                 let mut equations: Vec<greeners::SurEquation> = Vec::new();
                 let mut eq_var_names: Vec<Vec<String>> = Vec::new();
@@ -3827,7 +3847,7 @@ impl Interpreter {
                     None => return Err(HayashiError::Runtime(
                         "rolling() requer window=N (ex: window=30)".into()
                     )),
-                    _ => return Err(HayashiError::Type("window= deve ser inteiro".into())),
+                    _ => return Err(HayashiError::Type("window= must be integer".into())),
                 };
                 let result = greeners::RollingOLS::fit(&y_vec, &x_mat, window)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -4009,7 +4029,7 @@ impl Interpreter {
                     floats.iter().map(|&v| v as i64).collect()
                 } else {
                     return Err(HayashiError::Runtime(
-                        format!("ftest_fe: coluna '{id_col}' não encontrada")
+                        format!("ftest_fe: column '{id_col}' not found")
                     ));
                 };
 
@@ -4087,7 +4107,7 @@ impl Interpreter {
                     floats.iter().map(|&v| v as usize).collect()
                 } else {
                     return Err(HayashiError::Runtime(
-                        format!("pesaran_cd: coluna '{id_col}' não encontrada")
+                        format!("pesaran_cd: column '{id_col}' not found")
                     ));
                 };
 
@@ -4154,7 +4174,7 @@ impl Interpreter {
                     floats.iter().map(|&v| v as usize).collect()
                 } else {
                     return Err(HayashiError::Runtime(
-                        format!("bplm: coluna '{id_col}' não encontrada ou não usável como ID")
+                        format!("bplm: column '{id_col}' not found ou não usável como ID")
                     ));
                 };
 
@@ -4217,7 +4237,7 @@ impl Interpreter {
                     floats.iter().map(|&v| v as i64).collect()
                 } else {
                     return Err(HayashiError::Runtime(
-                        format!("chamberlain: coluna id '{id_col}' não encontrada")
+                        format!("chamberlain: coluna id '{id_col}' not found")
                     ));
                 };
 
@@ -4227,7 +4247,7 @@ impl Interpreter {
                     arr.iter().map(|&v| v as f64).collect()
                 } else {
                     return Err(HayashiError::Runtime(
-                        format!("chamberlain: coluna time '{time_col}' não encontrada")
+                        format!("chamberlain: coluna time '{time_col}' not found")
                     ));
                 };
 
@@ -4284,7 +4304,7 @@ impl Interpreter {
                     floats.iter().map(|&v| v as i64).collect()
                 } else {
                     return Err(HayashiError::Runtime(
-                        format!("mundlak: coluna '{id_col}' não encontrada")
+                        format!("mundlak: column '{id_col}' not found")
                     ));
                 };
 
@@ -4357,7 +4377,7 @@ impl Interpreter {
                     Some(Value::Float(v)) => (*v as i64).max(1) as usize,
                     None => 2,
                     _ => return Err(HayashiError::Runtime(
-                        "ab(): lags deve ser inteiro positivo".into()
+                        "ab(): lags must be integer positivo".into()
                     )),
                 };
 
@@ -4383,7 +4403,7 @@ impl Interpreter {
                     floats.iter().map(|&v| v as i64).collect()
                 } else {
                     return Err(HayashiError::Runtime(
-                        format!("ab: coluna id '{id_col}' não encontrada")
+                        format!("ab: coluna id '{id_col}' not found")
                     ));
                 };
 
@@ -4393,7 +4413,7 @@ impl Interpreter {
                     floats.iter().map(|&v| v as i64).collect()
                 } else {
                     return Err(HayashiError::Runtime(
-                        format!("ab: coluna time '{time_col}' não encontrada")
+                        format!("ab: coluna time '{time_col}' not found")
                     ));
                 };
 
@@ -4426,7 +4446,7 @@ impl Interpreter {
                     Some(Value::Float(v)) => (*v as i64).max(1) as usize,
                     None => 2,
                     _ => return Err(HayashiError::Runtime(
-                        "sysgmm(): lags deve ser inteiro positivo".into()
+                        "sysgmm(): lags must be integer positivo".into()
                     )),
                 };
 
@@ -4452,7 +4472,7 @@ impl Interpreter {
                     floats.iter().map(|&v| v as i64).collect()
                 } else {
                     return Err(HayashiError::Runtime(
-                        format!("sysgmm: coluna id '{id_col}' não encontrada")
+                        format!("sysgmm: coluna id '{id_col}' not found")
                     ));
                 };
 
@@ -4462,7 +4482,7 @@ impl Interpreter {
                     floats.iter().map(|&v| v as i64).collect()
                 } else {
                     return Err(HayashiError::Runtime(
-                        format!("sysgmm: coluna time '{time_col}' não encontrada")
+                        format!("sysgmm: coluna time '{time_col}' not found")
                     ));
                 };
 
@@ -4502,7 +4522,7 @@ impl Interpreter {
                 let instr_ast = match &args[1] {
                     Expr::Formula(f) => f.clone(),
                     _ => return Err(HayashiError::Type(
-                        "feiv(): segundo argumento deve ser fórmula dos instrumentos (~ x1 + z1 + z2)".into()
+                        "feiv(): second argument must be fórmula dos instrumentos (~ x1 + z1 + z2)".into()
                     )),
                 };
                 let df_name = match &args[2] {
@@ -4514,7 +4534,7 @@ impl Interpreter {
                 let df = match self.env.get(&df_name) {
                     Some(Value::DataFrame(df)) => df.clone(),
                     _ => return Err(HayashiError::Runtime(
-                        format!("feiv: '{df_name}' não é um DataFrame")
+                        format!("feiv: '{df_name}' is not a DataFrame")
                     )),
                 };
 
@@ -4551,7 +4571,7 @@ impl Interpreter {
                 for (j, col_name) in instr_vars.iter().enumerate() {
                     let col = df.get(col_name)
                         .map_err(|_| HayashiError::Runtime(
-                            format!("feiv: instrumento '{col_name}' não encontrado no DataFrame")
+                            format!("feiv: instrumento '{col_name}' not found no DataFrame")
                         ))?;
                     for (i, &v) in col.iter().enumerate() {
                         z_mat[[i, j]] = v;
@@ -4565,7 +4585,7 @@ impl Interpreter {
                     floats.iter().map(|&v| v as i64).collect()
                 } else {
                     return Err(HayashiError::Runtime(
-                        format!("feiv: coluna id '{id_col}' não encontrada")
+                        format!("feiv: coluna id '{id_col}' not found")
                     ));
                 };
 
@@ -4658,7 +4678,7 @@ impl Interpreter {
                     floats.iter().map(|&v| v as i64).collect()
                 } else {
                     return Err(HayashiError::Runtime(
-                        format!("ab_test: coluna id '{id_col}' não encontrada")
+                        format!("ab_test: coluna id '{id_col}' not found")
                     ));
                 };
 
@@ -4668,7 +4688,7 @@ impl Interpreter {
                     arr.iter().map(|&v| v as f64).collect()
                 } else {
                     return Err(HayashiError::Runtime(
-                        format!("ab_test: coluna time '{time_col}' não encontrada")
+                        format!("ab_test: coluna time '{time_col}' not found")
                     ));
                 };
 
@@ -4735,7 +4755,7 @@ impl Interpreter {
                     floats.iter().map(|&v| v as i64).collect()
                 } else {
                     return Err(HayashiError::Runtime(
-                        format!("wooldridge: coluna id '{id_col}' não encontrada")
+                        format!("wooldridge: coluna id '{id_col}' not found")
                     ));
                 };
 
@@ -4745,7 +4765,7 @@ impl Interpreter {
                     arr.iter().map(|&v| v as f64).collect()
                 } else {
                     return Err(HayashiError::Runtime(
-                        format!("wooldridge: coluna time '{time_col}' não encontrada")
+                        format!("wooldridge: coluna time '{time_col}' not found")
                     ));
                 };
 
@@ -4805,7 +4825,7 @@ impl Interpreter {
                 let re = match self.eval_expr(&args[1])? {
                     Value::ReResult(r) => r,
                     _ => return Err(HayashiError::Type(
-                        "hausman(): segundo argumento deve ser um modelo RE".into()
+                        "hausman(): second argument must be um modelo RE".into()
                     )),
                 };
 
@@ -5002,8 +5022,7 @@ impl Interpreter {
                                 println!("  {sig}");
                             }
                         } else {
-                            // joint F-test: test(model, var1, var2, ...) — first var already parsed as `other`
-                            let mut indices = vec![find_idx(other)?];
+                            let mut extra_names: Vec<String> = Vec::new();
                             for arg in &args[2..] {
                                 let name = match self.eval_expr(arg)? {
                                     Value::Str(s) => s,
@@ -5011,7 +5030,11 @@ impl Interpreter {
                                         "test() variable names must be strings, got {other}"
                                     ))),
                                 };
-                                indices.push(find_idx(&name)?);
+                                extra_names.push(name);
+                            }
+                            let mut indices = vec![find_idx(other)?];
+                            for name in &extra_names {
+                                indices.push(find_idx(name)?);
                             }
                             let (f, p) = ols.result.f_test(&indices, &ols.x)
                                 .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -5041,7 +5064,7 @@ impl Interpreter {
                 let s = match self.eval_expr(&args[0])? {
                     Value::Int(v) => v as u64,
                     Value::Float(v) => v as u64,
-                    _ => return Err(HayashiError::Type("seed deve ser inteiro".into())),
+                    _ => return Err(HayashiError::Type("seed must be integer".into())),
                 };
                 self.rng_seed = Some(s);
                 println!("set seed {s}");
@@ -5110,7 +5133,7 @@ impl Interpreter {
                     _ => return Err(HayashiError::Type("preserve() requires a variable name".into())),
                 };
                 let val = self.env.get(&name)
-                    .ok_or_else(|| HayashiError::Runtime(format!("'{name}' not found")))?
+                    .ok_or_else(|| self.rt_err(format!("'{name}' not found")))?
                     .clone();
                 self.preserved.insert(name.clone(), val);
                 println!("preserve {name}");
@@ -5126,7 +5149,7 @@ impl Interpreter {
                     _ => return Err(HayashiError::Type("restore() requires a variable name".into())),
                 };
                 let val = self.preserved.remove(&name)
-                    .ok_or_else(|| HayashiError::Runtime(format!("'{name}' was not preserved")))?;
+                    .ok_or_else(|| self.rt_err(format!("'{name}' was not preserved")))?;
                 self.env.set(&name, val)?;
                 println!("restore {name}");
                 Ok(Value::Nil)
@@ -5135,14 +5158,14 @@ impl Interpreter {
             // ── source/do: executa script .hy no ambiente atual ─────────────
             "source" | "do" | "run" | "include" => {
                 if args.is_empty() {
-                    return Err(HayashiError::Runtime("source(\"script.hy\")".into()));
+                    return Err(self.rt_err("source(\"script.hy\")"));
                 }
                 let path = match self.eval_expr(&args[0])? {
                     Value::Str(s) => s,
                     _ => return Err(HayashiError::Type("source() requires a string path".into())),
                 };
                 let src = std::fs::read_to_string(&path)
-                    .map_err(|e| HayashiError::Runtime(format!("cannot read '{path}': {e}")))?;
+                    .map_err(|e| self.rt_err(format!("cannot read '{path}': {e}")))?;
                 println!("source {path}");
                 crate::lang::run_source(&src, self)?;
                 Ok(Value::Nil)
@@ -5481,13 +5504,13 @@ impl Interpreter {
                     Value::Float(f) => f,
                     Value::Int(i)   => i as f64,
                     other => return Err(HayashiError::Type(
-                        format!("format(): primeiro argumento deve ser numérico, não {other}")
+                        format!("format(): primeiro argumento must be numeric, não {other}")
                     )),
                 };
                 let fmt_s = match self.eval_expr(&args[1])? {
                     Value::Str(s) => s,
                     _ => return Err(HayashiError::Type(
-                        "format(): segundo argumento deve ser string (ex: \"%.2f\")".into()
+                        "format(): second argument must be string (ex: \"%.2f\")".into()
                     )),
                 };
                 // parse "%.Nf" → N decimal places
@@ -5514,19 +5537,19 @@ impl Interpreter {
                 let df_name = match &args[0] {
                     Expr::Var(n) => n.clone(),
                     _ => return Err(HayashiError::Type(
-                        "duplicates(): primeiro argumento deve ser nome de variável".into()
+                        "duplicates(): primeiro argumento deve ser variable name".into()
                     )),
                 };
                 let df = match self.env.get(&df_name) {
                     Some(Value::DataFrame(d)) => d.clone(),
                     _ => return Err(HayashiError::Runtime(
-                        format!("'{df_name}' não é um DataFrame")
+                        format!("'{df_name}' is not a DataFrame")
                     )),
                 };
                 let var_name = match &args[1] {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
                     _ => return Err(HayashiError::Type(
-                        "duplicates(): segundo argumento deve ser nome de coluna".into()
+                        "duplicates(): second argument must be nome de coluna".into()
                     )),
                 };
                 let action = match opt_map.get("action") {
@@ -5603,13 +5626,13 @@ impl Interpreter {
                 let var_name = match &args[1] {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
                     _ => return Err(HayashiError::Type(
-                        "label(): segundo argumento deve ser nome da variável".into()
+                        "label(): second argument must be variable name".into()
                     )),
                 };
                 let description = match self.eval_expr(&args[2])? {
                     Value::Str(s) => s,
                     _ => return Err(HayashiError::Type(
-                        "label(): terceiro argumento deve ser string".into()
+                        "label(): terceiro argumento must be string".into()
                     )),
                 };
                 self.labels
@@ -6058,12 +6081,12 @@ impl Interpreter {
                         }
                         Value::LowessResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() não suporta lowess — use predict para extrair valores suavizados".into()
+                                "esttab() not supporta lowess — use predict para extrair valores suavizados".into()
                             ));
                         }
                         Value::PcaResult(_) | Value::FactorResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() não suporta PCA/Factor — use print() para ver cargas e variância explicada".into()
+                                "esttab() not supporta PCA/Factor — use print() para ver cargas e variância explicada".into()
                             ));
                         }
                         Value::ConditionalResult(r) => {
@@ -6072,7 +6095,7 @@ impl Interpreter {
                         }
                         Value::MarkovResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() não suporta Markov Switching — use print() para ver parâmetros por regime".into()
+                                "esttab() not supporta Markov Switching — use print() para ver parâmetros por regime".into()
                             ));
                         }
                         Value::GlsarResult(r) => {
@@ -6086,91 +6109,91 @@ impl Interpreter {
                         }
                         Value::ZeroInflatedResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() não suporta zip/zinb (duas equações) — use print()".into()
+                                "esttab() not supporta zip/zinb (duas equações) — use print()".into()
                             ));
                         }
                         Value::SurResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() não suporta sur (múltiplas equações) — use print()".into()
+                                "esttab() not supporta sur (múltiplas equações) — use print()".into()
                             ));
                         }
                         Value::RollingResult(_) | Value::RecursiveLSResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() não suporta rolling/recursive — coeficientes variam ao longo do tempo; use print()".into()
+                                "esttab() not supporta rolling/recursive — coeficientes variam ao longo do tempo; use print()".into()
                             ));
                         }
                         Value::MNLogitResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() não suporta mlogit (múltiplas equações) — use print()".into()
+                                "esttab() not supporta mlogit (múltiplas equações) — use print()".into()
                             ));
                         }
                         Value::DidResult(_) | Value::KMResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() não suporta did/km — resultado tem formato próprio; use print()".into()
+                                "esttab() not supporta did/km — resultado tem formato próprio; use print()".into()
                             ));
                         }
                         Value::RdResult(_) | Value::SynthResult(_) | Value::PsmResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() não suporta estimadores causais (rd, psm, synth) — use print()".into()
+                                "esttab() not supporta estimadores causais (rd, psm, synth) — use print()".into()
                             ));
                         }
                         Value::VarmaResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() não suporta VARMA (coeficientes matriciais) — use print()".into()
+                                "esttab() not supporta VARMA (coeficientes matriciais) — use print()".into()
                             ));
                         }
                         Value::DecompResult(_) | Value::MstlResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() não suporta decomposição sazonal — use print()".into()
+                                "esttab() not supporta decomposição sazonal — use print()".into()
                             ));
                         }
                         Value::UCResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() não suporta UCM (parâmetros de variância, não β) — use print()".into()
+                                "esttab() not supporta UCM (parâmetros de variância, não β) — use print()".into()
                             ));
                         }
                         Value::GamResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() não suporta GAM (termos smooth não têm tabela β padrão) — use print()".into()
+                                "esttab() not supporta GAM (termos smooth não têm tabela β padrão) — use print()".into()
                             ));
                         }
                         Value::MiceResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() não suporta MICE (múltiplos datasets) — estime modelo em cada dataset e use Rubin's rules".into()
+                                "esttab() not supporta MICE (múltiplos datasets) — estime modelo em cada dataset e use Rubin's rules".into()
                             ));
                         }
                         Value::MSARResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() não suporta Markov-AR (parâmetros por regime) — use print()".into()
+                                "esttab() not supporta Markov-AR (parâmetros por regime) — use print()".into()
                             ));
                         }
                         Value::SVarResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() não suporta SVAR (matrizes A/B estruturais) — use print()".into()
+                                "esttab() not supporta SVAR (matrizes A/B estruturais) — use print()".into()
                             ));
                         }
                         Value::ThreeSLSResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() não suporta 3SLS (múltiplas equações) — use print()".into()
+                                "esttab() not supporta 3SLS (múltiplas equações) — use print()".into()
                             ));
                         }
                         Value::DFMResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() não suporta DFM (fatores latentes) — use print()".into()
+                                "esttab() not supporta DFM (fatores latentes) — use print()".into()
                             ));
                         }
                         Value::EtsResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() não suporta ETS (parâmetros de suavização) — use print()".into()
+                                "esttab() not supporta ETS (parâmetros de suavização) — use print()".into()
                             ));
                         }
                         Value::ThresholdResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() não suporta panel threshold (dois regimes) — use print()".into()
+                                "esttab() not supporta panel threshold (dois regimes) — use print()".into()
                             ));
                         }
                         _ => return Err(HayashiError::Type(
-                            "esttab(): tipo de modelo não suportado — use print()".into()
+                            "esttab(): tipo de modelo not supportado — use print()".into()
                         )),
                     }
                 }
@@ -6629,7 +6652,7 @@ impl Interpreter {
                 }
 
                 let result = greeners::VECM::fit(&data, lags, rank)
-                    .map_err(|e| HayashiError::Runtime(format!("VECM: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("VECM: {e}")))?;
 
                 Ok(Value::VecmResult(Rc::new(result)))
             }
@@ -6674,7 +6697,7 @@ impl Interpreter {
                 }
 
                 let result = greeners::VAR::fit(&data, lags, Some(var_names))
-                    .map_err(|e| HayashiError::Runtime(format!("VAR: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("VAR: {e}")))?;
 
                 Ok(Value::VarResult(Rc::new(result)))
             }
@@ -6697,7 +6720,7 @@ impl Interpreter {
                 };
 
                 let tensor = model.irf(steps)
-                    .map_err(|e| HayashiError::Runtime(format!("IRF: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("IRF: {e}")))?;
 
                 let k = model.n_vars;
                 let names = &model.var_names;
@@ -6744,7 +6767,7 @@ impl Interpreter {
                 };
 
                 let tensor = model.fevd(steps)
-                    .map_err(|e| HayashiError::Runtime(format!("FEVD: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("FEVD: {e}")))?;
 
                 let k = model.n_vars;
                 let names = &model.var_names;
@@ -6791,7 +6814,7 @@ impl Interpreter {
 
                 let col_name = match &args[1] {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("segundo argumento deve ser o nome da variável".into())),
+                    _ => return Err(HayashiError::Type("second argument must be o variable name".into())),
                 };
 
                 // extrai série como Array1<f64>
@@ -6817,10 +6840,10 @@ impl Interpreter {
                     let sq = get_usize("Q", 0);
                     let s  = get_usize("s", 12);
                     greeners::ARIMA::fit_sarimax(&y, (p, d, q), (sp, sd, sq, s), None)
-                        .map_err(|e| HayashiError::Runtime(format!("SARIMA: {e}")))?
+                        .map_err(|e| self.rt_err(format!("SARIMA: {e}")))?
                 } else {
                     greeners::ARIMA::fit(&y, (p, d, q))
-                        .map_err(|e| HayashiError::Runtime(format!("ARIMA: {e}")))?
+                        .map_err(|e| self.rt_err(format!("ARIMA: {e}")))?
                 };
 
                 Ok(Value::ArimaResult(Rc::new(result)))
@@ -6852,7 +6875,7 @@ impl Interpreter {
 
                 let (fc, lo, hi) = model
                     .predict_with_ci(steps, None, alpha)
-                    .map_err(|e| HayashiError::Runtime(format!("forecast: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("forecast: {e}")))?;
 
                 let sep = "─".repeat(52);
                 println!("\nForecast — {} passos à frente  (IC {}%)",
@@ -6928,7 +6951,7 @@ impl Interpreter {
 
                 // V = σ²(X'X)⁻¹
                 let xt_x = ols.x.t().dot(&ols.x);
-                let xt_x_inv = xt_x.inv().map_err(|e| HayashiError::Runtime(format!("nlcom: {e}")))?;
+                let xt_x_inv = xt_x.inv().map_err(|e| self.rt_err(format!("nlcom: {e}")))?;
                 let sigma2 = ols.result.sigma * ols.result.sigma;
                 let vcov = &xt_x_inv * sigma2;
 
@@ -6980,7 +7003,7 @@ impl Interpreter {
                             Value::Float(f) => *f,
                             Value::Int(i)   => *i as f64,
                             _ => return Err(HayashiError::Type(
-                                format!("{greeners_name}= deve ser numérico")
+                                format!("{greeners_name}= must be numeric")
                             )),
                         };
                         c[idx] = mult;
@@ -7002,7 +7025,7 @@ impl Interpreter {
 
                 // inferência delegada ao Greeners: t_test usa (X'X)⁻¹σ² internamente
                 let (t, p) = ols.result.t_test(&c, 0.0, &ols.x)
-                    .map_err(|e| HayashiError::Runtime(format!("lincom: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("lincom: {e}")))?;
 
                 let se = if t.abs() > 1e-15 { estimate / t } else { 0.0 };
                 let df_t = ols.result.df_resid as f64;
@@ -7063,7 +7086,7 @@ impl Interpreter {
                             Ok(a.iter().copied().collect())
                         }
                         Ok(Column::Int(a)) => Ok(a.iter().map(|&x| x as f64).collect()),
-                        _ => Err(HayashiError::Type(format!("'{col}' is not numeric"))),
+                        _ => Err(self.type_err(format!("'{col}' is not numeric"))),
                     }
                 };
 
@@ -7244,7 +7267,7 @@ impl Interpreter {
                     match df.get_column(col) {
                         Ok(Column::Float(a)) => Ok(a.to_vec()),
                         Ok(Column::Int(a))   => Ok(a.iter().map(|&x| x as f64).collect()),
-                        _ => Err(HayashiError::Type(format!("'{col}' is not numeric"))),
+                        _ => Err(self.type_err(format!("'{col}' is not numeric"))),
                     }
                 }).collect::<Result<_>>()?;
 
@@ -7525,12 +7548,12 @@ impl Interpreter {
                 let i_col = match opt_map.get("i") {
                     Some(Value::Str(s)) => s.clone(),
                     None => return Err(HayashiError::Runtime("reshape() requer opção i=coluna_id".into())),
-                    _ => return Err(HayashiError::Type("i= deve ser string".into())),
+                    _ => return Err(HayashiError::Type("i= must be string".into())),
                 };
                 let j_col = match opt_map.get("j") {
                     Some(Value::Str(s)) => s.clone(),
                     None => return Err(HayashiError::Runtime("reshape() requer opção j=coluna_tempo".into())),
-                    _ => return Err(HayashiError::Type("j= deve ser string".into())),
+                    _ => return Err(HayashiError::Type("j= must be string".into())),
                 };
 
                 match direction.as_str() {
@@ -7539,12 +7562,12 @@ impl Interpreter {
                         let stubs: Vec<String> = match opt_map.get("stubs") {
                             Some(Value::List(lst)) => lst.iter().map(|v| match v {
                                 Value::Str(s) => Ok(s.clone()),
-                                _ => Err(HayashiError::Type("stubs= deve ser lista de strings".into())),
+                                _ => Err(HayashiError::Type("stubs= must be a list de strings".into())),
                             }).collect::<Result<_>>()?,
                             None => return Err(HayashiError::Runtime(
                                 "reshape long requer opção stubs=[\"var1\", \"var2\", ...]".into()
                             )),
-                            _ => return Err(HayashiError::Type("stubs= deve ser lista".into())),
+                            _ => return Err(HayashiError::Type("stubs= must be a list".into())),
                         };
 
                         // Para cada stub, detectar colunas e extrair sufixos
@@ -7582,7 +7605,7 @@ impl Interpreter {
                             _ => if let Ok(arr) = df.get_string(&i_col) {
                                 arr.to_vec()
                             } else {
-                                return Err(HayashiError::Runtime(format!("reshape: coluna id '{i_col}' não encontrada")));
+                                return Err(self.rt_err(format!("reshape: coluna id '{i_col}' not found")));
                             }
                         };
 
@@ -7659,12 +7682,12 @@ impl Interpreter {
                         let values: Vec<String> = match opt_map.get("values") {
                             Some(Value::List(lst)) => lst.iter().map(|v| match v {
                                 Value::Str(s) => Ok(s.clone()),
-                                _ => Err(HayashiError::Type("values= deve ser lista de strings".into())),
+                                _ => Err(HayashiError::Type("values= must be a list de strings".into())),
                             }).collect::<Result<_>>()?,
                             None => return Err(HayashiError::Runtime(
                                 "reshape wide requer opção values=[\"var1\", \"var2\", ...]".into()
                             )),
-                            _ => return Err(HayashiError::Type("values= deve ser lista".into())),
+                            _ => return Err(HayashiError::Type("values= must be a list".into())),
                         };
 
                         use greeners::Column;
@@ -7694,7 +7717,7 @@ impl Interpreter {
                                         }
                                     } else {
                                         return Err(HayashiError::Runtime(
-                                            format!("reshape wide: coluna j '{j_col}' não encontrada")
+                                            format!("reshape wide: coluna j '{j_col}' not found")
                                         ));
                                     }
                                 }
@@ -7846,7 +7869,7 @@ impl Interpreter {
                         Ok(Column::Int(arr))   => Ok(SortKey::Num(arr.iter().map(|&x| x as f64).collect())),
                         _ => df.get_string(v)
                                 .map(|arr| SortKey::Str(arr.to_vec()))
-                                .map_err(|_| HayashiError::Runtime(format!("column '{v}' not found"))),
+                                .map_err(|_| self.rt_err(format!("column '{v}' not found"))),
                     }
                 }).collect::<Result<_>>()?;
 
@@ -8008,15 +8031,15 @@ impl Interpreter {
                 }
                 let df_name = match &args[0] {
                     Expr::Var(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())),
+                    _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())),
                 };
                 let mut df = match self.env.get(&df_name) {
                     Some(Value::DataFrame(d)) => d.clone(),
-                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
                 let var_name = match &args[1] {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())),
+                    _ => return Err(HayashiError::Type("second argument must be a variable name".into())),
                 };
                 let p = match opt_map.get("p") {
                     Some(Value::Float(v)) => *v,
@@ -8051,15 +8074,15 @@ impl Interpreter {
                 }
                 let df_name = match &args[0] {
                     Expr::Var(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())),
+                    _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())),
                 };
                 let mut df = match self.env.get(&df_name) {
                     Some(Value::DataFrame(d)) => d.clone(),
-                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
                 let var_name = match &args[1] {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())),
+                    _ => return Err(HayashiError::Type("second argument must be a variable name".into())),
                 };
                 let prefix = match opt_map.get("prefix") {
                     Some(Value::Str(s)) => s.clone(),
@@ -8144,7 +8167,7 @@ impl Interpreter {
                     return Err(HayashiError::Runtime("recode(df, var, from=[...], to=[...])".into()));
                 }
                 let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("df".into())) };
-                let mut df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let mut df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
                 let var = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("var".into())) };
                 let from_vals: Vec<f64> = match opt_map.get("from") {
                     Some(Value::List(lst)) => lst.iter().filter_map(|v| match v { Value::Int(i) => Some(*i as f64), Value::Float(f) => Some(*f), _ => None }).collect(),
@@ -8314,15 +8337,15 @@ impl Interpreter {
                 }
                 let df_name = match &args[0] {
                     Expr::Var(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())),
+                    _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())),
                 };
                 let mut df = match self.env.get(&df_name) {
                     Some(Value::DataFrame(d)) => d.clone(),
-                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
                 let col_name = match &args[1] {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("segundo arg deve ser nome de coluna".into())),
+                    _ => return Err(HayashiError::Type("second argument must be nome de coluna".into())),
                 };
                 let gen_name = match opt_map.get("gen") {
                     Some(Value::Str(s)) => Some(s.clone()),
@@ -8354,15 +8377,15 @@ impl Interpreter {
                 }
                 let df_name = match &args[0] {
                     Expr::Var(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())),
+                    _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())),
                 };
                 let mut df = match self.env.get(&df_name) {
                     Some(Value::DataFrame(d)) => d.clone(),
-                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
                 let col_name = match &args[1] {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("segundo arg deve ser nome de coluna".into())),
+                    _ => return Err(HayashiError::Type("second argument must be nome de coluna".into())),
                 };
                 let labels: Vec<String> = match opt_map.get("labels") {
                     Some(Value::List(lst)) => lst.iter().filter_map(|v| match v {
@@ -8491,14 +8514,14 @@ impl Interpreter {
                     Some(Value::List(lst)) => lst.iter().map(|v| match v {
                         Value::Str(s) => Ok(s.clone()),
                         _ => Err(HayashiError::Type(
-                            "drop_collinear(): vars deve ser lista de nomes de colunas".into()
+                            "drop_collinear(): vars must be a list de nomes de colunas".into()
                         )),
                     }).collect::<Result<_>>()?,
                     None => df.column_names().into_iter()
                         .filter(|name| df.get(name).is_ok())
                         .collect(),
                     _ => return Err(HayashiError::Type(
-                        "drop_collinear(): vars deve ser lista de strings".into()
+                        "drop_collinear(): vars must be a list de strings".into()
                     )),
                 };
 
@@ -8513,7 +8536,7 @@ impl Interpreter {
                 for (j, col) in check_cols.iter().enumerate() {
                     let col_data = df.get(col)
                         .map_err(|_| HayashiError::Runtime(
-                            format!("drop_collinear: coluna '{col}' não encontrada ou não numérica")
+                            format!("drop_collinear: column '{col}' not found ou não numérica")
                         ))?;
                     for (i, &v) in col_data.iter().enumerate() {
                         mat[[i, j]] = v;
@@ -8614,7 +8637,7 @@ impl Interpreter {
             "garch" | "egarch" | "gjrgarch" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
-                        format!("{func}() requer df e nome da variável")
+                        format!("{func}() requer df e variable name")
                     ));
                 }
 
@@ -8628,7 +8651,7 @@ impl Interpreter {
                 let col_name = match &args[1] {
                     Expr::Var(n) => n.clone(),
                     _ => return Err(HayashiError::Type(
-                        format!("{func}(): segundo argumento deve ser o nome de uma coluna")
+                        format!("{func}(): second argument must be o nome de uma coluna")
                     )),
                 };
 
@@ -8660,7 +8683,7 @@ impl Interpreter {
                 };
 
                 Ok(Value::GarchResult(Rc::new(
-                    result.map_err(|e| HayashiError::Runtime(format!("{func}: {e}")))?
+                    result.map_err(|e| self.rt_err(format!("{func}: {e}")))?
                 )))
             }
 
@@ -8679,7 +8702,7 @@ impl Interpreter {
                         let col_name = match args.get(1) {
                             Some(Expr::Var(n)) => n.clone(),
                             _ => return Err(HayashiError::Runtime(
-                                "ljungbox(df, varname): segundo argumento deve ser o nome da coluna".into()
+                                "ljungbox(df, varname): second argument must be o nome da coluna".into()
                             )),
                         };
                         Array1::from(Self::eval_col_expr(&Expr::Var(col_name), &df)?)
@@ -8702,7 +8725,7 @@ impl Interpreter {
                 };
 
                 let res = greeners::Diagnostics::ljung_box(&series, lags)
-                    .map_err(|e| HayashiError::Runtime(format!("ljungbox: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("ljungbox: {e}")))?;
 
                 let sig = |p: f64| if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
                 let sep = "─".repeat(62);
@@ -8750,7 +8773,7 @@ impl Interpreter {
                 };
 
                 let h = greeners::Diagnostics::leverage(&ols.x)
-                    .map_err(|e| HayashiError::Runtime(format!("leverage: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("leverage: {e}")))?;
 
                 let n = h.len();
                 let k = ols.x.ncols();
@@ -8796,7 +8819,7 @@ impl Interpreter {
 
                 let mse = ols.result.sigma * ols.result.sigma;
                 let d = greeners::Diagnostics::cooks_distance(&ols.residuals, &ols.x, mse)
-                    .map_err(|e| HayashiError::Runtime(format!("cooks: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("cooks: {e}")))?;
 
                 let n = d.len();
                 let k = ols.x.ncols();
@@ -8845,7 +8868,7 @@ impl Interpreter {
                 };
 
                 let vifs = greeners::Diagnostics::vif(&ols.x)
-                    .map_err(|e| HayashiError::Runtime(format!("vif: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("vif: {e}")))?;
 
                 let names = ols.result.variable_names.as_deref()
                     .unwrap_or(&[]);
@@ -8894,7 +8917,7 @@ impl Interpreter {
                 };
 
                 let kappa = greeners::Diagnostics::condition_number(&ols.x)
-                    .map_err(|e| HayashiError::Runtime(format!("condnum: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("condnum: {e}")))?;
 
                 let diag = if kappa.is_infinite() || kappa > 100.0 {
                     "multicolinearidade severa"
@@ -8974,7 +8997,7 @@ impl Interpreter {
                 };
 
                 let (lm, p, df) = greeners::SpecificationTests::white_test(&ols.residuals, &ols.x)
-                    .map_err(|e| HayashiError::Runtime(format!("white: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("white: {e}")))?;
 
                 let sig = |p: f64| if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
                 let sep = "─".repeat(54);
@@ -9018,7 +9041,7 @@ impl Interpreter {
 
                 let (f, p, df1, df2) = greeners::SpecificationTests::reset_test(
                     &y, &ols.x, &fitted, power
-                ).map_err(|e| HayashiError::Runtime(format!("reset: {e}")))?;
+                ).map_err(|e| self.rt_err(format!("reset: {e}")))?;
 
                 let sig = |p: f64| if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
                 let sep = "─".repeat(54);
@@ -9050,7 +9073,7 @@ impl Interpreter {
                         let col_name = match args.get(1) {
                             Some(Expr::Var(n)) => n.clone(),
                             _ => return Err(HayashiError::Runtime(
-                                "jb(df, varname): segundo argumento deve ser o nome da coluna".into()
+                                "jb(df, varname): second argument must be o nome da coluna".into()
                             )),
                         };
                         Array1::from(Self::eval_col_expr(&Expr::Var(col_name), &df)?)
@@ -9064,7 +9087,7 @@ impl Interpreter {
                 };
 
                 let (jb, p) = greeners::Diagnostics::jarque_bera(&series)
-                    .map_err(|e| HayashiError::Runtime(format!("jb: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("jb: {e}")))?;
 
                 let sig = |p: f64| if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
                 let sep = "─".repeat(50);
@@ -9108,7 +9131,7 @@ impl Interpreter {
 
                 let (lm, p, df) = greeners::SpecificationTests::breusch_godfrey_test(
                     &ols.residuals, &ols.x, lags
-                ).map_err(|e| HayashiError::Runtime(format!("bgodfrey: {e}")))?;
+                ).map_err(|e| self.rt_err(format!("bgodfrey: {e}")))?;
 
                 let sig = |p: f64| if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
                 let sep = "─".repeat(54);
@@ -9148,7 +9171,7 @@ impl Interpreter {
                         let col_name = match args.get(1) {
                             Some(Expr::Var(n)) => n.clone(),
                             _ => return Err(HayashiError::Runtime(
-                                "archtest(df, varname): segundo argumento deve ser o nome da coluna".into()
+                                "archtest(df, varname): second argument must be o nome da coluna".into()
                             )),
                         };
                         Array1::from(Self::eval_col_expr(&Expr::Var(col_name), &df)?)
@@ -9169,7 +9192,7 @@ impl Interpreter {
                 };
 
                 let res = greeners::Diagnostics::arch_test(&series, lags)
-                    .map_err(|e| HayashiError::Runtime(format!("archtest: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("archtest: {e}")))?;
 
                 let sep = "─".repeat(54);
                 let sig = |p: f64| if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
@@ -9642,11 +9665,11 @@ impl Interpreter {
                 }
                 let df_name = match &args[0] {
                     Expr::Var(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())),
+                    _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())),
                 };
                 let df = match self.env.get(&df_name) {
                     Some(Value::DataFrame(d)) => d.clone(),
-                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
                 let var_names: Vec<String> = args[1..].iter().map(|a| match a {
                     Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
@@ -9672,7 +9695,7 @@ impl Interpreter {
                     }
                 }
                 let result = greeners::VARMA::fit(&data, p, q)
-                    .map_err(|e| HayashiError::Runtime(format!("VARMA: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("VARMA: {e}")))?;
                 Ok(Value::VarmaResult(Rc::new(result)))
             }
 
@@ -9686,15 +9709,15 @@ impl Interpreter {
                 }
                 let df_name = match &args[0] {
                     Expr::Var(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())),
+                    _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())),
                 };
                 let df = match self.env.get(&df_name) {
                     Some(Value::DataFrame(d)) => d.clone(),
-                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
                 let var_name = match &args[1] {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())),
+                    _ => return Err(HayashiError::Type("second argument must be a variable name".into())),
                 };
                 let series = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?);
                 let period = match opt_map.get("period") {
@@ -9707,7 +9730,7 @@ impl Interpreter {
                     _ => "additive",
                 };
                 let result = greeners::Decomposition::seasonal_decompose(&series, period, model_str)
-                    .map_err(|e| HayashiError::Runtime(format!("decompose: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("decompose: {e}")))?;
                 Ok(Value::DecompResult(Rc::new(result)))
             }
 
@@ -9720,15 +9743,15 @@ impl Interpreter {
                 }
                 let df_name = match &args[0] {
                     Expr::Var(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())),
+                    _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())),
                 };
                 let df = match self.env.get(&df_name) {
                     Some(Value::DataFrame(d)) => d.clone(),
-                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
                 let var_name = match &args[1] {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())),
+                    _ => return Err(HayashiError::Type("second argument must be a variable name".into())),
                 };
                 let series = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?);
                 let period = match opt_map.get("period") {
@@ -9747,7 +9770,7 @@ impl Interpreter {
                     _ => 0,
                 };
                 let result = greeners::Decomposition::stl(&series, period, sw, tw)
-                    .map_err(|e| HayashiError::Runtime(format!("stl: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("stl: {e}")))?;
                 Ok(Value::DecompResult(Rc::new(result)))
             }
 
@@ -9761,29 +9784,29 @@ impl Interpreter {
                 }
                 let df_name = match &args[0] {
                     Expr::Var(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())),
+                    _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())),
                 };
                 let df = match self.env.get(&df_name) {
                     Some(Value::DataFrame(d)) => d.clone(),
-                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
                 let var_name = match &args[1] {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())),
+                    _ => return Err(HayashiError::Type("second argument must be a variable name".into())),
                 };
                 let series = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?);
                 let periods: Vec<usize> = match opt_map.get("periods") {
                     Some(Value::List(lst)) => lst.iter().map(|v| match v {
                         Value::Int(i)   => Ok(*i as usize),
                         Value::Float(f) => Ok(*f as usize),
-                        _ => Err(HayashiError::Type("periods= deve ser lista de inteiros".into())),
+                        _ => Err(HayashiError::Type("periods= must be a list de inteiros".into())),
                     }).collect::<Result<_>>()?,
                     Some(Value::Int(i))   => vec![*i as usize],
                     Some(Value::Float(f)) => vec![*f as usize],
                     _ => vec![7, 365],
                 };
                 let result = greeners::MSTL::fit(&series, &periods)
-                    .map_err(|e| HayashiError::Runtime(format!("mstl: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("mstl: {e}")))?;
                 Ok(Value::MstlResult(Rc::new(result)))
             }
 
@@ -9798,12 +9821,12 @@ impl Interpreter {
                 let count = match self.eval_expr(&args[0])? {
                     Value::Int(v)   => v as usize,
                     Value::Float(v) => v as usize,
-                    _ => return Err(HayashiError::Type("count deve ser inteiro".into())),
+                    _ => return Err(HayashiError::Type("count must be integer".into())),
                 };
                 let n = match self.eval_expr(&args[1])? {
                     Value::Int(v)   => v as usize,
                     Value::Float(v) => v as usize,
-                    _ => return Err(HayashiError::Type("n deve ser inteiro".into())),
+                    _ => return Err(HayashiError::Type("n must be integer".into())),
                 };
                 let mu = match opt_map.get("mu") {
                     Some(Value::Float(v)) => *v,
@@ -9811,7 +9834,7 @@ impl Interpreter {
                     _ => 0.5,
                 };
                 let (z, p) = greeners::ProportionTests::proportions_ztest_1samp(count, n, mu)
-                    .map_err(|e| HayashiError::Runtime(format!("proptest: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("proptest: {e}")))?;
                 let p_hat = count as f64 / n as f64;
                 let sig = |p: f64| if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
                 let sep = "─".repeat(56);
@@ -9846,7 +9869,7 @@ impl Interpreter {
                 let c2 = to_usize(self.eval_expr(&args[2])?)?;
                 let n2 = to_usize(self.eval_expr(&args[3])?)?;
                 let (z, p) = greeners::ProportionTests::proportions_ztest_2samp(c1, n1, c2, n2)
-                    .map_err(|e| HayashiError::Runtime(format!("proptest2: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("proptest2: {e}")))?;
                 let p1 = c1 as f64 / n1 as f64;
                 let p2 = c2 as f64 / n2 as f64;
                 let sig = |p: f64| if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
@@ -9874,12 +9897,12 @@ impl Interpreter {
                 let count = match self.eval_expr(&args[0])? {
                     Value::Int(v)   => v as usize,
                     Value::Float(v) => v as usize,
-                    _ => return Err(HayashiError::Type("count deve ser inteiro".into())),
+                    _ => return Err(HayashiError::Type("count must be integer".into())),
                 };
                 let n = match self.eval_expr(&args[1])? {
                     Value::Int(v)   => v as usize,
                     Value::Float(v) => v as usize,
-                    _ => return Err(HayashiError::Type("n deve ser inteiro".into())),
+                    _ => return Err(HayashiError::Type("n must be integer".into())),
                 };
                 let alpha = match opt_map.get("alpha") {
                     Some(Value::Float(v)) => *v,
@@ -9887,7 +9910,7 @@ impl Interpreter {
                     _ => 0.05,
                 };
                 let (lo, hi) = greeners::ProportionTests::proportion_confint(count, n, alpha)
-                    .map_err(|e| HayashiError::Runtime(format!("propci: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("propci: {e}")))?;
                 let p_hat = count as f64 / n as f64;
                 let pct = (1.0 - alpha) * 100.0;
                 let sep = "─".repeat(56);
@@ -9916,7 +9939,7 @@ impl Interpreter {
                 let d = to_usize(self.eval_expr(&args[3])?)?;
                 let table = [[a, b], [c, d]];
                 let (chi2, p) = greeners::ProportionTests::chi2_contingency(&table)
-                    .map_err(|e| HayashiError::Runtime(format!("chisq2x2: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("chisq2x2: {e}")))?;
                 let sig = |p: f64| if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
                 let sep = "─".repeat(56);
                 println!("\nTeste Qui-Quadrado — Tabela 2×2");
@@ -9948,9 +9971,9 @@ impl Interpreter {
                     Value::List(lst) => lst.iter().map(|v| match v {
                         Value::Float(f) => Ok(*f),
                         Value::Int(i)   => Ok(*i as f64),
-                        _ => Err(HayashiError::Type("pvalues deve ser lista de floats".into())),
+                        _ => Err(HayashiError::Type("pvalues must be a list de floats".into())),
                     }).collect::<Result<_>>()?,
-                    _ => return Err(HayashiError::Type("primeiro arg deve ser lista de p-values".into())),
+                    _ => return Err(HayashiError::Type("first argument must be lista de p-values".into())),
                 };
                 let alpha = match opt_map.get("alpha") {
                     Some(Value::Float(v)) => *v,
@@ -9965,14 +9988,14 @@ impl Interpreter {
                         "bh" | "benjamini_hochberg" | "fdr_bh"        => greeners::MultiTestMethod::BenjaminiHochberg,
                         "by" | "benjamini_yekutieli" | "fdr_by"       => greeners::MultiTestMethod::BenjaminiYekutieli,
                         other => return Err(HayashiError::Runtime(
-                            format!("método desconhecido: '{other}' — use bonferroni, sidak, holm, bh, by")
+                            format!("método unknown: '{other}' — use bonferroni, sidak, holm, bh, by")
                         )),
                     },
                     _ => greeners::MultiTestMethod::Bonferroni,
                 };
                 let method_name = format!("{:?}", method);
                 let (rejects, pvals_adj) = greeners::MultipleTests::multipletests(&pvals, alpha, method)
-                    .map_err(|e| HayashiError::Runtime(format!("multipletests: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("multipletests: {e}")))?;
                 let sep = "─".repeat(64);
                 println!("\nMúltiplos Testes — {method_name}  (α={alpha})");
                 println!("{sep}");
@@ -9997,15 +10020,15 @@ impl Interpreter {
                 }
                 let df_name = match &args[0] {
                     Expr::Var(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())),
+                    _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())),
                 };
                 let df = match self.env.get(&df_name) {
                     Some(Value::DataFrame(d)) => d.clone(),
-                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
                 let var_name = match &args[1] {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())),
+                    _ => return Err(HayashiError::Type("second argument must be a variable name".into())),
                 };
                 let y = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?);
 
@@ -10016,7 +10039,7 @@ impl Interpreter {
                         "smooth_trend" | "st"           => greeners::UCLevel::SmoothTrend,
                         "random_walk" | "rw"            => greeners::UCLevel::RandomWalk,
                         other => return Err(HayashiError::Runtime(format!(
-                            "ucm: level='{other}' desconhecido — use: local_level, local_linear, smooth_trend, random_walk"
+                            "ucm: level='{other}' unknown — use: local_level, local_linear, smooth_trend, random_walk"
                         ))),
                     },
                     _ => greeners::UCLevel::LocalLinearTrend,
@@ -10034,14 +10057,14 @@ impl Interpreter {
                         "deterministic"     => greeners::UCSeasonal::Deterministic(period),
                         "stochastic"        => greeners::UCSeasonal::Stochastic(period),
                         other => return Err(HayashiError::Runtime(format!(
-                            "ucm: seasonal='{other}' desconhecido — use: none, deterministic, stochastic"
+                            "ucm: seasonal='{other}' unknown — use: none, deterministic, stochastic"
                         ))),
                     },
                     _ => greeners::UCSeasonal::None,
                 };
 
                 let result = greeners::UnobservedComponents::fit(&y, level, seasonal)
-                    .map_err(|e| HayashiError::Runtime(format!("ucm: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("ucm: {e}")))?;
                 Ok(Value::UCResult(Rc::new(result)))
             }
 
@@ -10063,10 +10086,10 @@ impl Interpreter {
                     Some(Value::Str(s))  => vec![s.clone()],
                     Some(Value::List(lst)) => lst.iter().map(|v| match v {
                         Value::Str(s) => Ok(s.clone()),
-                        _ => Err(HayashiError::Type("smooth= deve ser string ou lista de strings".into())),
+                        _ => Err(HayashiError::Type("smooth= must be string ou lista de strings".into())),
                     }).collect::<Result<_>>()?,
                     None => vec![],
-                    _ => return Err(HayashiError::Type("smooth= deve ser string ou lista de strings".into())),
+                    _ => return Err(HayashiError::Type("smooth= must be string ou lista de strings".into())),
                 };
 
                 if smooth_names.is_empty() && x_linear.ncols() == 0 {
@@ -10096,7 +10119,7 @@ impl Interpreter {
                 for (k, sname) in smooth_names.iter().enumerate() {
                     let col = ndarray::Array1::from(Self::get_col_f64(&df, sname)?);
                     let basis = greeners::BSplineBasis::generate(&col, q_per, degree)
-                        .map_err(|e| HayashiError::Runtime(format!("gam spline ({sname}): {e}")))?;
+                        .map_err(|e| self.rt_err(format!("gam spline ({sname}): {e}")))?;
                     for i in 0..n {
                         for j in 0..q_per {
                             x_smooth[[i, k * q_per + j]] = basis[[i, j]];
@@ -10125,7 +10148,7 @@ impl Interpreter {
                         "negbin"                => greeners::Family::NegativeBinomial(alpha_val),
                         "tweedie"               => greeners::Family::Tweedie(power_val),
                         other => return Err(HayashiError::Runtime(format!(
-                            "gam: family='{other}' desconhecido — use: gaussian, binomial, poisson, gamma, negbin"
+                            "gam: family='{other}' unknown — use: gaussian, binomial, poisson, gamma, negbin"
                         ))),
                     },
                     _ => greeners::Family::Gaussian,
@@ -10139,7 +10162,7 @@ impl Interpreter {
                         "inverse"   => greeners::Link::InversePower,
                         "cloglog"   => greeners::Link::CLogLog,
                         other => return Err(HayashiError::Runtime(format!(
-                            "gam: link='{other}' desconhecido — use: identity, log, logit, probit, inverse, cloglog"
+                            "gam: link='{other}' unknown — use: identity, log, logit, probit, inverse, cloglog"
                         ))),
                     },
                     _ => greeners::Link::Identity,
@@ -10148,7 +10171,7 @@ impl Interpreter {
                 let result = greeners::GLMGam::fit_with_names(
                     &y_vec, &x_linear, &x_smooth_ref, &family, &link, alpha_pen_used,
                     Some(linear_names),
-                ).map_err(|e| HayashiError::Runtime(format!("gam: {e}")))?;
+                ).map_err(|e| self.rt_err(format!("gam: {e}")))?;
                 Ok(Value::GamResult(Rc::new(result)))
             }
 
@@ -10162,16 +10185,16 @@ impl Interpreter {
                 }
                 let df_name = match &args[0] {
                     Expr::Var(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())),
+                    _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())),
                 };
                 let df = match self.env.get(&df_name) {
                     Some(Value::DataFrame(d)) => d.clone(),
-                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
                 let var_names: Vec<String> = match opt_map.get("vars") {
                     Some(Value::List(lst)) => lst.iter().map(|v| match v {
                         Value::Str(s) => Ok(s.clone()),
-                        _ => Err(HayashiError::Type("vars= deve ser lista de strings".into())),
+                        _ => Err(HayashiError::Type("vars= must be a list de strings".into())),
                     }).collect::<Result<_>>()?,
                     Some(Value::Str(s)) => vec![s.clone()],
                     None => {
@@ -10187,7 +10210,7 @@ impl Interpreter {
                             ));
                         }
                     }
-                    _ => return Err(HayashiError::Type("vars= deve ser lista de strings".into())),
+                    _ => return Err(HayashiError::Type("vars= must be a list de strings".into())),
                 };
                 let m = match opt_map.get("m") {
                     Some(Value::Int(v))   => *v as usize,
@@ -10206,7 +10229,7 @@ impl Interpreter {
                 }
 
                 let result = greeners::MICE::impute(&data, m, iter)
-                    .map_err(|e| HayashiError::Runtime(format!("mice: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("mice: {e}")))?;
                 println!("{result}");
                 Ok(Value::MiceResult(Rc::new(result)))
             }
@@ -10221,15 +10244,15 @@ impl Interpreter {
                 }
                 let df_name = match &args[0] {
                     Expr::Var(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())),
+                    _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())),
                 };
                 let df = match self.env.get(&df_name) {
                     Some(Value::DataFrame(d)) => d.clone(),
-                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
                 let var_name = match &args[1] {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())),
+                    _ => return Err(HayashiError::Type("second argument must be a variable name".into())),
                 };
                 let y = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?);
                 let k = match opt_map.get("k") {
@@ -10243,7 +10266,7 @@ impl Interpreter {
                     _ => 1,
                 };
                 let result = greeners::MarkovAutoregression::fit(&y, k, p)
-                    .map_err(|e| HayashiError::Runtime(format!("msauto: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("msauto: {e}")))?;
                 Ok(Value::MSARResult(Rc::new(result)))
             }
 
@@ -10259,11 +10282,11 @@ impl Interpreter {
                 }
                 let df_name = match &args[0] {
                     Expr::Var(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())),
+                    _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())),
                 };
                 let df = match self.env.get(&df_name) {
                     Some(Value::DataFrame(d)) => d.clone(),
-                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
                 let var_names: Vec<String> = args[1..].iter().map(|a| match a {
                     Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
@@ -10289,13 +10312,13 @@ impl Interpreter {
                             greeners::SVarIdentification::LongRun(mask)
                         }
                         other => return Err(HayashiError::Runtime(format!(
-                            "svar: id='{other}' desconhecido — use: cholesky, longrun"
+                            "svar: id='{other}' unknown — use: cholesky, longrun"
                         ))),
                     },
                     _ => greeners::SVarIdentification::Cholesky,
                 };
                 let result = greeners::SVAR::fit(&data, lags, identification)
-                    .map_err(|e| HayashiError::Runtime(format!("svar: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("svar: {e}")))?;
                 Ok(Value::SVarResult(Rc::new(result)))
             }
 
@@ -10314,7 +10337,7 @@ impl Interpreter {
                     _ => 10,
                 };
                 let tensor = model.structural_irf(steps)
-                    .map_err(|e| HayashiError::Runtime(format!("sirf: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("sirf: {e}")))?;
                 let k = model.var_result.n_vars;
                 let names = &model.var_result.var_names;
                 let sep = "─".repeat(14 + k * 12);
@@ -10350,7 +10373,7 @@ impl Interpreter {
                     _ => 10,
                 };
                 let tensor = model.structural_fevd(steps)
-                    .map_err(|e| HayashiError::Runtime(format!("sfevd: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("sfevd: {e}")))?;
                 let k = model.var_result.n_vars;
                 let names = &model.var_result.var_names;
                 let sep = "─".repeat(14 + k * 12);
@@ -10380,24 +10403,24 @@ impl Interpreter {
                 }
                 let df_name = match &args[0] {
                     Expr::Var(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())),
+                    _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())),
                 };
                 let df = match self.env.get(&df_name) {
                     Some(Value::DataFrame(d)) => d.clone(),
-                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
 
                 // Parse instruments= option
                 let instr_names: Vec<String> = match opt_map.get("instruments") {
                     Some(Value::List(lst)) => lst.iter().map(|v| match v {
                         Value::Str(s) => Ok(s.clone()),
-                        _ => Err(HayashiError::Type("instruments= deve ser lista de strings".into())),
+                        _ => Err(HayashiError::Type("instruments= must be a list de strings".into())),
                     }).collect::<Result<_>>()?,
                     Some(Value::Str(s)) => vec![s.clone()],
                     None => return Err(HayashiError::Runtime(
                         "threesl requer instruments=[\"z1\",\"z2\",...] — lista de variáveis exógenas".into()
                     )),
-                    _ => return Err(HayashiError::Type("instruments= deve ser lista de strings".into())),
+                    _ => return Err(HayashiError::Type("instruments= must be a list de strings".into())),
                 };
 
                 // Build global instrument matrix Z (n × q)
@@ -10433,7 +10456,7 @@ impl Interpreter {
                     });
                 }
                 let result = greeners::ThreeSLS::fit(&equations, &z_instr)
-                    .map_err(|e| HayashiError::Runtime(format!("threesl: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("threesl: {e}")))?;
                 Ok(Value::ThreeSLSResult(ThreeSLSModel {
                     result: Rc::new(result),
                     eq_var_names,
@@ -10450,11 +10473,11 @@ impl Interpreter {
                 }
                 let df_name = match &args[0] {
                     Expr::Var(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())),
+                    _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())),
                 };
                 let df = match self.env.get(&df_name) {
                     Some(Value::DataFrame(d)) => d.clone(),
-                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
                 let var_names: Vec<String> = args[1..].iter().map(|a| match a {
                     Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
@@ -10478,7 +10501,7 @@ impl Interpreter {
                     for (i, &v) in col.iter().enumerate() { data[[i, j]] = v; }
                 }
                 let result = greeners::DynamicFactor::fit(&data, k_factors, factor_order)
-                    .map_err(|e| HayashiError::Runtime(format!("dfm: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("dfm: {e}")))?;
                 Ok(Value::DFMResult(DFMModel { result: Rc::new(result), var_names }))
             }
 
@@ -10489,12 +10512,12 @@ impl Interpreter {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime("adtest(df, var)".into()));
                 }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())) };
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("second argument must be a variable name".into())) };
                 let data = Self::get_col_f64(&df, &var_name)?;
                 let r = greeners::Diagnostics::anderson_darling(&ndarray::Array1::from(data))
-                    .map_err(|e| HayashiError::Runtime(format!("adtest: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("adtest: {e}")))?;
                 let sep = "─".repeat(56);
                 println!("\nAnderson-Darling Test (normalidade)");
                 println!("{sep}");
@@ -10518,12 +10541,12 @@ impl Interpreter {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime("lilliefors(df, var)".into()));
                 }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())) };
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("second argument must be a variable name".into())) };
                 let data = Self::get_col_f64(&df, &var_name)?;
                 let (stat, p) = greeners::Diagnostics::lilliefors(&ndarray::Array1::from(data))
-                    .map_err(|e| HayashiError::Runtime(format!("lilliefors: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("lilliefors: {e}")))?;
                 let sig = if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
                 let sep = "─".repeat(56);
                 println!("\nLilliefors Test (normalidade — KS com parâmetros estimados)");
@@ -10549,7 +10572,7 @@ impl Interpreter {
                     _ => return Err(HayashiError::Type("omnibus() suporta apenas modelos OLS".into())),
                 };
                 let (k2, p) = greeners::Diagnostics::omnibus(&ndarray::Array1::from(resids))
-                    .map_err(|e| HayashiError::Runtime(format!("omnibus: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("omnibus: {e}")))?;
                 let sig = if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
                 let sep = "─".repeat(56);
                 println!("\nD'Agostino-Pearson Omnibus Test (normalidade dos resíduos)");
@@ -10579,7 +10602,7 @@ impl Interpreter {
                 let y_hat = ols.x.dot(&ols.result.params);
                 let y_obs = y_hat + &ols.residuals;
                 let (t, p) = greeners::Diagnostics::harvey_collier(&y_obs, &ols.x)
-                    .map_err(|e| HayashiError::Runtime(format!("harveycollier: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("harveycollier: {e}")))?;
                 let sig = if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
                 let sep = "─".repeat(56);
                 println!("\nHarvey-Collier Test (linearidade da especificação)");
@@ -10604,9 +10627,9 @@ impl Interpreter {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime("ets(df, var, trend=add, seasonal=add, period=12, damped=false)".into()));
                 }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())) };
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("second argument must be a variable name".into())) };
                 let y = Self::get_col_f64(&df, &var_name)?;
                 // Regra para aliases:
                 //   ses         → trend=none, seasonal=none
@@ -10627,7 +10650,7 @@ impl Interpreter {
                 let result = greeners::ExponentialSmoothing::fit(
                     &ndarray::Array1::from(y.to_vec()),
                     trend_opt, seas_opt, seas_period, damped,
-                ).map_err(|e| HayashiError::Runtime(format!("ets: {e}")))?;
+                ).map_err(|e| self.rt_err(format!("ets: {e}")))?;
                 Ok(Value::EtsResult(Rc::new(result)))
             }
 
@@ -10640,10 +10663,10 @@ impl Interpreter {
                 }
                 let formula = match &args[0] {
                     Expr::Formula(f) => f.clone(),
-                    _ => return Err(HayashiError::Type("primeiro arg deve ser fórmula y ~ x1 + x2".into())),
+                    _ => return Err(HayashiError::Type("first argument must be a formula y ~ x1 + x2".into())),
                 };
-                let df_name = match &args[1] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let df_name = match &args[1] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("second argument must be DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
                 let q_name = match opt_map.get("q") { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("pthresh requer q=variavel_threshold".into())) };
                 let id_name = match opt_map.get("id") { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("pthresh requer id=coluna_entidade".into())) };
                 let formula_str = Self::formula_to_string(&formula);
@@ -10656,7 +10679,7 @@ impl Interpreter {
                 let entity_ids: ndarray::Array1<i64> = ndarray::Array1::from(id_col.iter().map(|&v| v as i64).collect::<Vec<_>>());
                 let q_arr = ndarray::Array1::from(q_col.to_vec());
                 let result = greeners::PanelThreshold::fit(&y_vec, &x_mat, &q_arr, &entity_ids)
-                    .map_err(|e| HayashiError::Runtime(format!("pthresh: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("pthresh: {e}")))?;
                 Ok(Value::ThresholdResult(Rc::new(result)))
             }
 
@@ -10668,16 +10691,16 @@ impl Interpreter {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime("cancorr(df, xvars=[\"x1\",\"x2\"], yvars=[\"y1\",\"y2\"])".into()));
                 }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
                 let x_names: Vec<String> = match opt_map.get("xvars") {
-                    Some(Value::List(lst)) => lst.iter().map(|v| match v { Value::Str(s) => Ok(s.clone()), _ => Err(HayashiError::Type("xvars deve ser lista de strings".into())) }).collect::<Result<_>>()?,
+                    Some(Value::List(lst)) => lst.iter().map(|v| match v { Value::Str(s) => Ok(s.clone()), _ => Err(HayashiError::Type("xvars must be a list de strings".into())) }).collect::<Result<_>>()?,
                     Some(Value::Str(s)) => vec![s.clone()],
                     None => args[1..].iter().map(|a| match a { Expr::Var(n) | Expr::Str(n) => Ok(n.clone()), _ => Err(HayashiError::Type("args devem ser nomes de variáveis".into())) }).collect::<Result<_>>()?,
-                    _ => return Err(HayashiError::Type("xvars= deve ser lista de strings".into())),
+                    _ => return Err(HayashiError::Type("xvars= must be a list de strings".into())),
                 };
                 let y_names: Vec<String> = match opt_map.get("yvars") {
-                    Some(Value::List(lst)) => lst.iter().map(|v| match v { Value::Str(s) => Ok(s.clone()), _ => Err(HayashiError::Type("yvars deve ser lista de strings".into())) }).collect::<Result<_>>()?,
+                    Some(Value::List(lst)) => lst.iter().map(|v| match v { Value::Str(s) => Ok(s.clone()), _ => Err(HayashiError::Type("yvars must be a list de strings".into())) }).collect::<Result<_>>()?,
                     Some(Value::Str(s)) => vec![s.clone()],
                     _ => return Err(HayashiError::Runtime("cancorr requer yvars=[\"y1\",\"y2\"]".into())),
                 };
@@ -10689,7 +10712,7 @@ impl Interpreter {
                 for (j, name) in x_names.iter().enumerate() { let c = Self::get_col_f64(&df, name)?; for (i, &v) in c.iter().enumerate() { x_mat[[i, j]] = v; } }
                 for (j, name) in y_names.iter().enumerate() { let c = Self::get_col_f64(&df, name)?; for (i, &v) in c.iter().enumerate() { y_mat[[i, j]] = v; } }
                 let result = greeners::CanCorr::fit(&x_mat, &y_mat)
-                    .map_err(|e| HayashiError::Runtime(format!("cancorr: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("cancorr: {e}")))?;
                 println!("{result}");
                 println!("  X vars: {}", x_names.join(", "));
                 println!("  Y vars: {}", y_names.join(", "));
@@ -10703,9 +10726,9 @@ impl Interpreter {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime("summarize_w(df, var, weight=wvar, mu0=0, alpha=0.05)".into()));
                 }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())) };
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("second argument must be a variable name".into())) };
                 let data = Self::get_col_f64(&df, &var_name)?;
                 let weights = match opt_map.get("weight").or_else(|| opt_map.get("weights").or_else(|| opt_map.get("w"))) {
                     Some(Value::Str(wname)) => {
@@ -10716,11 +10739,11 @@ impl Interpreter {
                 };
                 let w_ref = weights.as_ref();
                 let ds = greeners::DescrStatsW::new(&ndarray::Array1::from(data.to_vec()), w_ref)
-                    .map_err(|e| HayashiError::Runtime(format!("summarize_w: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("summarize_w: {e}")))?;
                 let mu0 = match opt_map.get("mu0") { Some(Value::Float(v)) => *v, Some(Value::Int(v)) => *v as f64, _ => 0.0 };
                 let alpha = match opt_map.get("alpha") { Some(Value::Float(v)) => *v, Some(Value::Int(v)) => *v as f64, _ => 0.05 };
-                let (t_stat, t_p) = ds.ttest_mean(mu0).map_err(|e| HayashiError::Runtime(format!("summarize_w t-test: {e}")))?;
-                let (ci_lo, ci_hi) = ds.conf_int_mean(alpha).map_err(|e| HayashiError::Runtime(format!("summarize_w CI: {e}")))?;
+                let (t_stat, t_p) = ds.ttest_mean(mu0).map_err(|e| self.rt_err(format!("summarize_w t-test: {e}")))?;
+                let (ci_lo, ci_hi) = ds.conf_int_mean(alpha).map_err(|e| self.rt_err(format!("summarize_w CI: {e}")))?;
                 let label = w_ref.map_or("(pesos iguais)".to_string(), |_| format!("(ponderado)"));
                 println!("\n{:=^60}", format!(" DescrStats {label} — {var_name} "));
                 println!("{:<20} {:>12}   {:<20} {:>12}", "N", ds.nobs as usize, "Σ pesos", format!("{:.2}", ds.sum_weights));
@@ -10743,8 +10766,8 @@ impl Interpreter {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime("tabstat(df, var1, ..., by=grupo, stats=[mean,sd,n])".into()));
                 }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
                 let var_names: Vec<String> = {
                     let mut v = Vec::new();
                     for a in &args[1..] {
@@ -10753,7 +10776,7 @@ impl Interpreter {
                     }
                     v
                 };
-                if var_names.is_empty() { return Err(HayashiError::Runtime("tabstat: forneça ao menos uma variável".into())); }
+                if var_names.is_empty() { return Err(HayashiError::Runtime("tabstat: provide at least one variable".into())); }
                 // stats= lista de estatísticas a mostrar
                 let default_stats = vec!["mean".to_string(), "sd".to_string(), "n".to_string()];
                 let stat_list: Vec<String> = match opt_map.get("stats") {
@@ -10830,11 +10853,11 @@ impl Interpreter {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime("xtsum(df, var1, var2, ..., id=entity_col)".into()));
                 }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
                 let id_name = match opt_map.get("id") { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("xtsum requer id=coluna_entidade".into())) };
                 let var_names: Vec<String> = { let mut v = Vec::new(); for a in &args[1..] { match a { Expr::Var(n) | Expr::Str(n) => v.push(n.clone()), _ => {} } } v };
-                if var_names.is_empty() { return Err(HayashiError::Runtime("xtsum: forneça ao menos uma variável".into())); }
+                if var_names.is_empty() { return Err(HayashiError::Runtime("xtsum: provide at least one variable".into())); }
                 let id_col = Self::get_col_f64(&df, &id_name)?;
                 // Identifica entidades únicas
                 let mut ids_uniq: Vec<f64> = id_col.to_vec(); ids_uniq.sort_by(|a,b| a.partial_cmp(b).unwrap()); ids_uniq.dedup();
@@ -10894,10 +10917,10 @@ impl Interpreter {
                 if args.len() < 3 {
                     return Err(HayashiError::Runtime("spearman(df, var1, var2)".into()));
                 }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let v1 = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg: nome de variável".into())) };
-                let v2 = match &args[2] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("terceiro arg: nome de variável".into())) };
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
+                let v1 = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("second argument must be a variable name".into())) };
+                let v2 = match &args[2] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("third argument must be a variable name".into())) };
                 let x = Self::get_col_f64(&df, &v1)?.to_vec();
                 let y = Self::get_col_f64(&df, &v2)?.to_vec();
                 let n = x.len().min(y.len());
@@ -10939,16 +10962,16 @@ impl Interpreter {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime("ranksum(df, var, by=group_col)".into()));
                 }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg: nome de variável".into())) };
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("second argument must be a variable name".into())) };
                 let by_name = match opt_map.get("by") { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("ranksum requer by=coluna_grupo".into())) };
                 let y_col   = Self::get_col_f64(&df, &var_name)?;
                 let grp_col = Self::get_col_f64(&df, &by_name)?;
                 let n_total = y_col.len();
                 // Separar em dois grupos pelo valor único
                 let mut gvals: Vec<f64> = grp_col.to_vec(); gvals.sort_by(|a,b| a.partial_cmp(b).unwrap()); gvals.dedup();
-                if gvals.len() != 2 { return Err(HayashiError::Runtime(format!("ranksum: by= deve ter exatamente 2 grupos únicos; encontrou {}", gvals.len()))); }
+                if gvals.len() != 2 { return Err(self.rt_err(format!("ranksum: by= deve ter exatamente 2 grupos únicos; encontrou {}", gvals.len()))); }
                 let g0: Vec<f64> = (0..n_total).filter(|&i| (grp_col[i] - gvals[0]).abs() < 1e-9).map(|i| y_col[i]).collect();
                 let g1: Vec<f64> = (0..n_total).filter(|&i| (grp_col[i] - gvals[1]).abs() < 1e-9).map(|i| y_col[i]).collect();
                 let n1 = g0.len(); let n2 = g1.len();
@@ -10993,9 +11016,9 @@ impl Interpreter {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime("kruskal(df, var, by=group_col)".into()));
                 }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg: nome de variável".into())) };
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("second argument must be a variable name".into())) };
                 let by_name = match opt_map.get("by") { Some(Value::Str(s)) => s.clone(), _ => return Err(HayashiError::Runtime("kruskal requer by=coluna_grupo".into())) };
                 let y_col   = Self::get_col_f64(&df, &var_name)?;
                 let grp_col = Self::get_col_f64(&df, &by_name)?;
@@ -11048,9 +11071,9 @@ impl Interpreter {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime("signrank(df, var, mu0=0)  ou  signrank(df, d)  onde d = x - y".into()));
                 }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg: nome de variável".into())) };
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("second argument must be a variable name".into())) };
                 let mu0 = match opt_map.get("mu0") { Some(Value::Float(v)) => *v, Some(Value::Int(v)) => *v as f64, _ => 0.0 };
                 let data = Self::get_col_f64(&df, &var_name)?;
                 let diffs: Vec<f64> = data.iter().map(|&v| v - mu0).filter(|v| v.abs() > 1e-15).collect();
@@ -11111,9 +11134,9 @@ impl Interpreter {
                     }
                     Value::DataFrame(_) | Value::Nil => {
                         // Tentativa de modo 2: bitest(df, var, mu=0)
-                        let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
-                        let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                        let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg: nome de variável".into())) };
+                        let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())) };
+                        let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
+                        let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("second argument must be a variable name".into())) };
                         let mu0 = match opt_map.get("mu").or_else(|| opt_map.get("mu0")) { Some(Value::Float(v)) => *v, Some(Value::Int(v)) => *v as f64, _ => 0.0 };
                         let data = Self::get_col_f64(&df, &var_name)?;
                         let pos = data.iter().filter(|&&v| v > mu0).count();
@@ -11129,7 +11152,7 @@ impl Interpreter {
                         println!("  p̂(+) = {phat:.4}   z = {z:.4}   p = {p:.4}");
                         println!("  H₀: P(X > {mu0}) = 0.5");
                     }
-                    _ => return Err(HayashiError::Type("bitest: primeiro arg deve ser inteiro (count) ou DataFrame".into())),
+                    _ => return Err(HayashiError::Type("bitest: first argument must be inteiro (count) ou DataFrame".into())),
                 }
                 Ok(Value::Nil)
             }
@@ -11145,9 +11168,9 @@ impl Interpreter {
             // hpfilter(df, var, lambda=1600)  →  cria df.var_trend e df.var_cycle
             "hpfilter" | "hp_filter" | "hprescott" => {
                 if args.len() < 2 { return Err(HayashiError::Runtime("hpfilter(df, var, lambda=1600)".into())); }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("hpfilter: primeiro arg deve ser DataFrame".into())) };
-                let mut df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("hpfilter: segundo arg deve ser nome de variável".into())) };
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("hpfilter: first argument must be a DataFrame".into())) };
+                let mut df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("hpfilter: second argument must be a variable name".into())) };
                 let lambda = match opt_map.get("lambda") { Some(Value::Float(v)) => *v, Some(Value::Int(v)) => *v as f64, _ => 1600.0 };
                 let series = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?.to_vec());
                 let (trend, cycle) = greeners::TimeSeries::hp_filter(&series, lambda).map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -11163,9 +11186,9 @@ impl Interpreter {
             // bkfilter(df, var, low=6, high=32, k=12)  →  cria df.var_cycle
             "bkfilter" | "bk_filter" | "baxter_king" => {
                 if args.len() < 2 { return Err(HayashiError::Runtime("bkfilter(df, var, low=6, high=32, k=12)".into())); }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("bkfilter: primeiro arg deve ser DataFrame".into())) };
-                let mut df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("bkfilter: segundo arg deve ser nome de variável".into())) };
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("bkfilter: first argument must be a DataFrame".into())) };
+                let mut df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("bkfilter: second argument must be a variable name".into())) };
                 let low  = match opt_map.get("low")  { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 6 };
                 let high = match opt_map.get("high") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 32 };
                 let k    = match opt_map.get("k")    { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 12 };
@@ -11181,9 +11204,9 @@ impl Interpreter {
             // cffilter(df, var, low=6, high=32, drift=false)  →  cria df.var_cycle
             "cffilter" | "cf_filter" | "christiano_fitzgerald" => {
                 if args.len() < 2 { return Err(HayashiError::Runtime("cffilter(df, var, low=6, high=32, drift=false)".into())); }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("cffilter: primeiro arg deve ser DataFrame".into())) };
-                let mut df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("cffilter: segundo arg deve ser nome de variável".into())) };
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("cffilter: first argument must be a DataFrame".into())) };
+                let mut df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("cffilter: second argument must be a variable name".into())) };
                 let low   = match opt_map.get("low")  { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 6 };
                 let high  = match opt_map.get("high") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 32 };
                 let drift = matches!(opt_map.get("drift"), Some(Value::Bool(true)));
@@ -11204,9 +11227,9 @@ impl Interpreter {
             // β_ridge = (X'X + αI)^{-1} X'y  (forma fechada)
             "ridge" | "ridge_reg" => {
                 if args.len() < 2 { return Err(HayashiError::Runtime("ridge(formula, df, alpha=1.0)".into())); }
-                let formula = match &args[0] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("ridge: primeiro arg deve ser fórmula".into())) };
-                let df_name = match &args[1] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("ridge: segundo arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let formula = match &args[0] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("ridge: first argument must be a formula".into())) };
+                let df_name = match &args[1] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("ridge: second argument must be DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
                 let alpha = match opt_map.get("alpha") { Some(Value::Float(v)) => *v, Some(Value::Int(v)) => *v as f64, _ => 1.0_f64 };
                 let formula_str = Self::formula_to_string(&formula);
                 let gformula = GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -11243,9 +11266,9 @@ impl Interpreter {
             // Coordinate descent para Lasso (L1), com intercept não penalizado
             "lasso" | "lasso_reg" => {
                 if args.len() < 2 { return Err(HayashiError::Runtime("lasso(formula, df, alpha=1.0, tol=1e-6, max_iter=10000)".into())); }
-                let formula = match &args[0] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("lasso: primeiro arg deve ser fórmula".into())) };
-                let df_name = match &args[1] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("lasso: segundo arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let formula = match &args[0] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("lasso: first argument must be a formula".into())) };
+                let df_name = match &args[1] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("lasso: second argument must be DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
                 let alpha    = match opt_map.get("alpha")    { Some(Value::Float(v)) => *v, Some(Value::Int(v)) => *v as f64, _ => 1.0_f64 };
                 let tol      = match opt_map.get("tol")      { Some(Value::Float(v)) => *v, _ => 1e-6_f64 };
                 let max_iter = match opt_map.get("max_iter") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 10_000usize };
@@ -11329,9 +11352,9 @@ impl Interpreter {
             // Combina L1 e L2: penalty = l1_ratio*α*|β| + (1-l1_ratio)*α/2*β²
             "elasticnet" | "elastic_net" | "enet" => {
                 if args.len() < 2 { return Err(HayashiError::Runtime("elasticnet(formula, df, alpha=1.0, l1_ratio=0.5)".into())); }
-                let formula = match &args[0] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("elasticnet: primeiro arg deve ser fórmula".into())) };
-                let df_name = match &args[1] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("elasticnet: segundo arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let formula = match &args[0] { Expr::Formula(f) => f.clone(), _ => return Err(HayashiError::Type("elasticnet: first argument must be a formula".into())) };
+                let df_name = match &args[1] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("elasticnet: second argument must be DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
                 let alpha    = match opt_map.get("alpha")    { Some(Value::Float(v)) => *v, Some(Value::Int(v)) => *v as f64, _ => 1.0_f64 };
                 let l1_ratio = match opt_map.get("l1_ratio") { Some(Value::Float(v)) => *v, Some(Value::Int(v)) => *v as f64, _ => 0.5_f64 };
                 let tol      = match opt_map.get("tol")      { Some(Value::Float(v)) => *v, _ => 1e-6_f64 };
@@ -11400,9 +11423,9 @@ impl Interpreter {
             // adf(df, var, lags=N)
             "adf" | "dickey_fuller" | "augmented_df" => {
                 if args.len() < 2 { return Err(HayashiError::Runtime("adf(df, var, lags=N)".into())); }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("adf: primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("adf: segundo arg deve ser nome de variável".into())) };
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("adf: first argument must be a DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("adf: second argument must be a variable name".into())) };
                 let series = Self::get_col_f64(&df, &var_name)?;
                 let max_lags = match opt_map.get("lags") { Some(Value::Int(v)) => Some(*v as usize), Some(Value::Float(v)) => Some(*v as usize), _ => None };
                 let arr = ndarray::Array1::from(series.to_vec());
@@ -11421,9 +11444,9 @@ impl Interpreter {
             // kpss(df, var, regression=c, lags=N)
             "kpss" => {
                 if args.len() < 2 { return Err(HayashiError::Runtime("kpss(df, var, regression=c|ct, lags=N)".into())); }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("kpss: primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("kpss: segundo arg deve ser nome de variável".into())) };
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("kpss: first argument must be a DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("kpss: second argument must be a variable name".into())) };
                 let series = Self::get_col_f64(&df, &var_name)?;
                 let regression = match opt_map.get("regression") { Some(Value::Str(s)) => s.clone(), _ => "c".to_string() };
                 let max_lags = match opt_map.get("lags") { Some(Value::Int(v)) => Some(*v as usize), Some(Value::Float(v)) => Some(*v as usize), _ => None };
@@ -11442,9 +11465,9 @@ impl Interpreter {
             // pp(df, var, lags=N)
             "pp" | "phillips_perron" => {
                 if args.len() < 2 { return Err(HayashiError::Runtime("pp(df, var, lags=N)".into())); }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("pp: primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("pp: segundo arg deve ser nome de variável".into())) };
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("pp: first argument must be a DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("pp: second argument must be a variable name".into())) };
                 let series = Self::get_col_f64(&df, &var_name)?;
                 let max_lags = match opt_map.get("lags") { Some(Value::Int(v)) => Some(*v as usize), Some(Value::Float(v)) => Some(*v as usize), _ => None };
                 let arr = ndarray::Array1::from(series.to_vec());
@@ -11463,9 +11486,9 @@ impl Interpreter {
             // za(df, var, trim=0.15)
             "za" | "zivot_andrews" | "zivot" => {
                 if args.len() < 2 { return Err(HayashiError::Runtime("za(df, var, trim=0.15)".into())); }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("za: primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("za: segundo arg deve ser nome de variável".into())) };
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("za: first argument must be a DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("za: second argument must be a variable name".into())) };
                 let series = Self::get_col_f64(&df, &var_name)?;
                 let trim = match opt_map.get("trim") { Some(Value::Float(v)) => *v, Some(Value::Int(v)) => *v as f64, _ => 0.15 };
                 let arr = ndarray::Array1::from(series.to_vec());
@@ -11486,10 +11509,10 @@ impl Interpreter {
             // granger(df, y, x, lags=N)
             "granger" | "granger_causality" => {
                 if args.len() < 3 { return Err(HayashiError::Runtime("granger(df, y, x, lags=N)".into())); }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("granger: primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let y_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("granger: segundo arg deve ser nome de variável".into())) };
-                let x_name = match &args[2] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("granger: terceiro arg deve ser nome de variável".into())) };
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("granger: first argument must be a DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
+                let y_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("granger: second argument must be a variable name".into())) };
+                let x_name = match &args[2] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("granger: third argument must be variable name".into())) };
                 let lags = match opt_map.get("lags") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 4 };
                 let y_arr = ndarray::Array1::from(Self::get_col_f64(&df, &y_name)?.to_vec());
                 let x_arr = ndarray::Array1::from(Self::get_col_f64(&df, &x_name)?.to_vec());
@@ -11504,10 +11527,10 @@ impl Interpreter {
             // engle_granger(df, y1, y2)
             "engle_granger" | "coint" | "egtest" => {
                 if args.len() < 3 { return Err(HayashiError::Runtime("engle_granger(df, y1, y2)".into())); }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("engle_granger: primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let y1_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("engle_granger: segundo arg deve ser nome de variável".into())) };
-                let y2_name = match &args[2] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("engle_granger: terceiro arg deve ser nome de variável".into())) };
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("engle_granger: first argument must be a DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
+                let y1_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("engle_granger: second argument must be a variable name".into())) };
+                let y2_name = match &args[2] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("engle_granger: third argument must be variable name".into())) };
                 let y1_arr = ndarray::Array1::from(Self::get_col_f64(&df, &y1_name)?.to_vec());
                 let y2_arr = ndarray::Array1::from(Self::get_col_f64(&df, &y2_name)?.to_vec());
                 let r = greeners::TimeSeries::engle_granger(&y1_arr, &y2_arr).map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -11526,11 +11549,11 @@ impl Interpreter {
             // johansen(df, [var1, var2, ...], lags=N, det=0)
             "johansen" | "johansen_trace" | "vecrank" => {
                 if args.len() < 2 { return Err(HayashiError::Runtime("johansen(df, [var1, var2, ...], lags=N, det=0)".into())); }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("johansen: primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("johansen: first argument must be a DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
                 let var_names: Vec<String> = match self.eval_expr(&args[1])? {
                     Value::List(lst) => lst.iter().map(|v| format!("{v}")).collect(),
-                    _ => return Err(HayashiError::Type("johansen: segundo arg deve ser lista de variáveis".into())),
+                    _ => return Err(HayashiError::Type("johansen: second argument must be lista de variáveis".into())),
                 };
                 let lags = match opt_map.get("lags") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 2 };
                 let det = match opt_map.get("det") { Some(Value::Int(v)) => *v as i32, Some(Value::Float(v)) => *v as i32, _ => 0i32 };
@@ -11574,11 +11597,11 @@ impl Interpreter {
                 }
                 let df_name = match &args[0] {
                     Expr::Var(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("primeiro arg deve ser nome do DataFrame".into())),
+                    _ => return Err(HayashiError::Type("first argument must be nome do DataFrame".into())),
                 };
                 match self.env.get(&df_name) {
                     Some(Value::DataFrame(_)) => {}
-                    _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é um DataFrame"))),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
                 let id_col = match &args[1] {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
@@ -11608,9 +11631,9 @@ impl Interpreter {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime("acfplot(df, var, lags=20, width=50)".into()));
                 }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())) };
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("second argument must be a variable name".into())) };
                 let data = Self::get_col_f64(&df, &var_name)?;
                 let max_lag = match opt_map.get("lags") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 20 };
                 let width  = match opt_map.get("width")  { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 50 };
@@ -11625,9 +11648,9 @@ impl Interpreter {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime("pacfplot(df, var, lags=20, width=50)".into()));
                 }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())) };
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("second argument must be a variable name".into())) };
                 let data = Self::get_col_f64(&df, &var_name)?;
                 let max_lag = match opt_map.get("lags") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 20 };
                 let width  = match opt_map.get("width")  { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 50 };
@@ -11642,9 +11665,9 @@ impl Interpreter {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime("qqplot(df, var, width=50, height=20)".into()));
                 }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())) };
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("second argument must be a variable name".into())) };
                 let data = Self::get_col_f64(&df, &var_name)?;
                 let w = match opt_map.get("width")  { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 50 };
                 let h = match opt_map.get("height") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 20 };
@@ -11659,8 +11682,8 @@ impl Interpreter {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime("corrplot(df, var1, var2, ...)".into()));
                 }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
                 let var_names: Vec<String> = {
                     let mut v = Vec::new();
                     for a in &args[1..] {
@@ -11690,9 +11713,9 @@ impl Interpreter {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime("histogram(df, var, bins=20, width=50)".into()));
                 }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())) };
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("second argument must be a variable name".into())) };
                 let data = Self::get_col_f64(&df, &var_name)?;
                 let bins = match opt_map.get("bins") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 20 };
                 let width = match opt_map.get("width") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 50 };
@@ -11707,10 +11730,10 @@ impl Interpreter {
                 if args.len() < 3 {
                     return Err(HayashiError::Runtime("scatter(df, x, y, width=60, height=20)".into()));
                 }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let xname = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável (x)".into())) };
-                let yname = match &args[2] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("terceiro arg deve ser nome de variável (y)".into())) };
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
+                let xname = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("second argument must be a variable name (x)".into())) };
+                let yname = match &args[2] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("third argument must be variable name (y)".into())) };
                 let xs = Self::get_col_f64(&df, &xname)?;
                 let ys = Self::get_col_f64(&df, &yname)?;
                 let w = match opt_map.get("width")  { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 60 };
@@ -11725,10 +11748,10 @@ impl Interpreter {
                 if args.len() < 3 {
                     return Err(HayashiError::Runtime("lineplot(df, x, y, width=60, height=20)".into()));
                 }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let xname = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável (x/tempo)".into())) };
-                let yname = match &args[2] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("terceiro arg deve ser nome de variável (y)".into())) };
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
+                let xname = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("second argument must be a variable name (x/tempo)".into())) };
+                let yname = match &args[2] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("third argument must be variable name (y)".into())) };
                 let xs = Self::get_col_f64(&df, &xname)?;
                 let ys = Self::get_col_f64(&df, &yname)?;
                 let w = match opt_map.get("width")  { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 60 };
@@ -11743,9 +11766,9 @@ impl Interpreter {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime("boxplot(df, var, width=60)".into()));
                 }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())) };
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("second argument must be a variable name".into())) };
                 let data = Self::get_col_f64(&df, &var_name)?;
                 let w = match opt_map.get("width") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 60 };
                 let title = match opt_map.get("title") { Some(Value::Str(s)) => s.clone(), _ => format!("Boxplot — {var_name}") };
@@ -11759,9 +11782,9 @@ impl Interpreter {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime("kdensity(df, var, width=60, height=20)".into()));
                 }
-                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
-                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
-                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("segundo arg deve ser nome de variável".into())) };
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())) };
+                let df = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("second argument must be a variable name".into())) };
                 let data = Self::get_col_f64(&df, &var_name)?;
                 let w = match opt_map.get("width")  { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 60 };
                 let h = match opt_map.get("height") { Some(Value::Int(v)) => *v as usize, Some(Value::Float(v)) => *v as usize, _ => 20 };
@@ -11781,7 +11804,7 @@ impl Interpreter {
                 if n < 4 { return Err(HayashiError::Runtime("kdensity: poucos dados".into())); }
                 // Estimar KDE — usa support/density já calculados no fit (512 pontos)
                 let result = greeners::KDEUnivariate::fit(&ndarray::Array1::from(clean.clone()), bw_opt, kernel)
-                    .map_err(|e| HayashiError::Runtime(format!("kdensity: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("kdensity: {e}")))?;
                 let xs: Vec<f64> = result.support.to_vec();
                 let ys: Vec<f64> = result.density.to_vec();
                 let title = match opt_map.get("title") { Some(Value::Str(s)) => s.clone(), _ => format!("KDE — {var_name}  (bw={:.4})", result.bandwidth) };
@@ -11892,9 +11915,9 @@ impl Interpreter {
             // graph_scatter(df, X, Y, path="plot.svg" [, title="", width=800, height=600])
             "graph_scatter" | "gscatter" => {
                 if args.len() < 3 {
-                    return Err(HayashiError::Runtime("graph_scatter(df, x_var, y_var, path=\"plot.svg\")".into()));
+                    return Err(self.rt_err("graph_scatter(df, x_var, y_var, path=\"plot.svg\")"));
                 }
-                let df = match self.eval_expr(&args[0])? { Value::DataFrame(d) => d, _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let df = match self.eval_expr(&args[0])? { Value::DataFrame(d) => d, _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())) };
                 let x_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("x var".into())) };
                 let y_name = match &args[2] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("y var".into())) };
                 let path = match opt_map.get("path") { Some(Value::Str(s)) => s.clone(), _ => format!("{x_name}_{y_name}.svg") };
@@ -11912,9 +11935,9 @@ impl Interpreter {
             // graph_line(df, X, Y, path="plot.svg")
             "graph_line" | "gline" => {
                 if args.len() < 3 {
-                    return Err(HayashiError::Runtime("graph_line(df, x_var, y_var, path=\"plot.svg\")".into()));
+                    return Err(self.rt_err("graph_line(df, x_var, y_var, path=\"plot.svg\")"));
                 }
-                let df = match self.eval_expr(&args[0])? { Value::DataFrame(d) => d, _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let df = match self.eval_expr(&args[0])? { Value::DataFrame(d) => d, _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())) };
                 let x_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("x var".into())) };
                 let y_name = match &args[2] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("y var".into())) };
                 let path = match opt_map.get("path") { Some(Value::Str(s)) => s.clone(), _ => format!("{y_name}_line.svg") };
@@ -11932,9 +11955,9 @@ impl Interpreter {
             // graph_hist(df, var, path="hist.svg" [, bins=30])
             "graph_hist" | "ghist" => {
                 if args.len() < 2 {
-                    return Err(HayashiError::Runtime("graph_hist(df, var, path=\"hist.svg\")".into()));
+                    return Err(self.rt_err("graph_hist(df, var, path=\"hist.svg\")"));
                 }
-                let df = match self.eval_expr(&args[0])? { Value::DataFrame(d) => d, _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let df = match self.eval_expr(&args[0])? { Value::DataFrame(d) => d, _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())) };
                 let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("var".into())) };
                 let path = match opt_map.get("path") { Some(Value::Str(s)) => s.clone(), _ => format!("{var_name}_hist.svg") };
                 let title = match opt_map.get("title") { Some(Value::Str(s)) => s.clone(), _ => format!("Histogram — {var_name}") };
@@ -11951,7 +11974,7 @@ impl Interpreter {
             // graph_coef(model, path="coef.svg")
             "graph_coef" | "gcoefplot" => {
                 if args.is_empty() {
-                    return Err(HayashiError::Runtime("graph_coef(model, path=\"coef.svg\")".into()));
+                    return Err(self.rt_err("graph_coef(model, path=\"coef.svg\")"));
                 }
                 let model = self.eval_expr(&args[0])?;
                 let path = match opt_map.get("path") { Some(Value::Str(s)) => s.clone(), _ => "coefplot.svg".to_string() };
@@ -11986,7 +12009,7 @@ impl Interpreter {
                 let user_fn = match self.env.get(other).cloned() {
                     Some(Value::UserFn(f)) => f,
                     _ => return Err(HayashiError::Runtime(
-                        format!("função '{other}' não encontrada")
+                        format!("função '{other}' not found")
                     )),
                 };
 
@@ -12015,7 +12038,7 @@ impl Interpreter {
                         Err(HayashiError::Return) => break,
                         Err(HayashiError::Break | HayashiError::Continue) => {
                             exec_err = Some(HayashiError::Runtime(
-                                "break/continue fora de um loop".into()
+                                "break/continue outside of a loop".into()
                             ));
                             break;
                         }
@@ -12096,7 +12119,7 @@ impl Interpreter {
             Value::Float(f) => Ok(*f),
             Value::Int(i)   => Ok(*i as f64),
             Value::Bool(b)  => Ok(if *b { 1.0 } else { 0.0 }),
-            _ => Err(HayashiError::Type("esperado valor numérico".into())),
+            _ => Err(HayashiError::Type("expected numeric value".into())),
         }
     }
 
@@ -12189,7 +12212,7 @@ impl Interpreter {
         };
         let df = match self.env.get(&df_name) {
             Some(Value::DataFrame(df)) => df.clone(),
-            _ => return Err(HayashiError::Runtime(format!("'{df_name}' is not a DataFrame"))),
+            _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
         };
         let id_col = match opt_map.get("id") {
             Some(Value::Str(s)) => s.clone(),
@@ -12250,7 +12273,7 @@ impl Interpreter {
                     let v = arr.to_vec();
                     idx.sort_by(|&a, &b| v[a].cmp(&v[b]));
                 } else {
-                    return Err(HayashiError::Runtime(format!("coluna '{col}' não encontrada")));
+                    return Err(HayashiError::Runtime(format!("column '{col}' not found")));
                 }
             }
         }
@@ -12814,7 +12837,7 @@ impl Interpreter {
                     Value::Str(s) => {
                         let parts: Vec<&str> = s.splitn(2, '~').collect();
                         if parts.len() != 2 {
-                            return Err(HayashiError::Type(format!("string '{s}' is not a valid formula (needs ~)")));
+                            return Err(self.type_err(format!("string '{s}' is not a valid formula (needs ~)")));
                         }
                         let lhs = parts[0].trim().to_string();
                         let rhs_str = parts[1].trim();
@@ -12840,7 +12863,7 @@ impl Interpreter {
         };
         let df_raw = match self.env.get(&df_name) {
             Some(Value::DataFrame(df)) => df.clone(),
-            _ => return Err(HayashiError::Runtime(format!("'{df_name}' is not a DataFrame"))),
+            _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
         };
         let df = self.maybe_filter_df(&df_raw, opts)?;
         Ok((formula_ast, df))
@@ -12856,7 +12879,7 @@ impl Interpreter {
             (Value::BinaryResult(m), "summary") => { println!("{m}"); Ok(Value::Nil) }
             (Value::PanelResult(r), "summary")  => { println!("{r}"); Ok(Value::Nil) }
             (Value::ReResult(r), "summary")     => { println!("{r}"); Ok(Value::Nil) }
-            (_, f) => Err(HayashiError::Runtime(format!("unknown method '{f}'"))),
+            (_, f) => Err(self.rt_err(format!("unknown method '{f}'"))),
         }
     }
 
@@ -12959,7 +12982,7 @@ impl Interpreter {
                         if let Ok(str_col) = df.get_string(col_name) {
                             let pattern = match &args[1] {
                                 Expr::Str(s) => s.clone(),
-                                _ => return Err(HayashiError::Type("regexm: pattern deve ser string literal".into())),
+                                _ => return Err(HayashiError::Type("regexm: pattern must be string literal".into())),
                             };
                             return Ok(greeners::Transforms::regexm_vec(&str_col.to_vec(), &pattern));
                         }
@@ -13050,7 +13073,7 @@ impl Interpreter {
                     match greeners::Transforms::apply2(&a, &b, func) {
                         Ok(result) => Ok(result),
                         Err(_) => Err(HayashiError::Runtime(
-                            format!("função '{func}' não suportada em generate")
+                            format!("função '{func}' not supportada em generate")
                         )),
                     }
                 } else if args.len() == 3 {
@@ -13060,12 +13083,12 @@ impl Interpreter {
                     match greeners::Transforms::apply3(&a, &b, &c, func) {
                         Ok(result) => Ok(result),
                         Err(_) => Err(HayashiError::Runtime(
-                            format!("função '{func}' não suportada em generate")
+                            format!("função '{func}' not supportada em generate")
                         )),
                     }
                 } else {
                     Err(HayashiError::Runtime(format!(
-                        "função '{func}' não suportada em generate"
+                        "função '{func}' not supportada em generate"
                     )))
                 }
             }
@@ -13075,11 +13098,11 @@ impl Interpreter {
             Expr::TsOp { op, var, n } => {
                 use greeners::Column;
                 let col = df.get_column(var)
-                    .map_err(|_| HayashiError::Runtime(format!("coluna '{var}' não encontrada")))?;
+                    .map_err(|_| HayashiError::Runtime(format!("column '{var}' not found")))?;
                 let vals: Vec<f64> = match col {
                     Column::Float(arr) => arr.to_vec(),
                     Column::Int(arr)   => arr.iter().map(|&x| x as f64).collect(),
-                    _ => return Err(HayashiError::Type(format!("coluna '{var}' não é numérica"))),
+                    _ => return Err(HayashiError::Type(format!("column '{var}' is not numeric"))),
                 };
                 let len = vals.len();
                 let n = *n;
@@ -13104,7 +13127,9 @@ impl Interpreter {
 
     // ── Executa statement ─────────────────────────────────────────────────────
 
-    pub fn exec(&mut self, stmt: &Stmt) -> Result<()> {
+    pub fn exec(&mut self, spanned: &Spanned) -> Result<()> {
+        let (stmt, line) = spanned;
+        self.current_line = *line;
         match stmt {
             Stmt::Let { name, value } => {
                 let val = self.eval_expr(value)?;
@@ -13124,10 +13149,10 @@ impl Interpreter {
             // ── input df \n headers \n rows \n end ───────────────────────────
             Stmt::Input { alias, headers, rows } => {
                 if headers.is_empty() {
-                    return Err(HayashiError::Runtime("input: nenhuma variável no cabeçalho".into()));
+                    return Err(self.rt_err("input: no variables in header"));
                 }
                 if rows.is_empty() {
-                    return Err(HayashiError::Runtime("input: nenhuma linha de dados".into()));
+                    return Err(self.rt_err("input: no data rows"));
                 }
                 let k = headers.len();
                 // Verifica que todas as linhas têm o mesmo número de colunas
@@ -13149,7 +13174,7 @@ impl Interpreter {
                     col_map.insert(name.clone(), col);
                 }
                 let df = greeners::DataFrame::new(col_map)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    .map_err(|e| self.rt_err(e.to_string()))?;
                 println!("input → {alias} ({n} obs, {} vars: {})", k, headers.join(", "));
                 self.env.set(&alias, Value::DataFrame(Rc::new(df)))?;
             }
@@ -13174,7 +13199,7 @@ impl Interpreter {
             Stmt::Load { path, alias, opts } => {
                 let path_str = match self.eval_expr(path)? {
                     Value::Str(s) => s,
-                    _ => return Err(HayashiError::Type("load requires a string path".into())),
+                    _ => return Err(self.type_err("load requires a string path")),
                 };
 
                 let mut opt_sheet: Option<String> = None;
@@ -13231,7 +13256,7 @@ impl Interpreter {
                 let local_path: &str = if crate::io::fetch::is_url(&path_str) {
                     println!("Downloading '{}'…", path_str);
                     _tmp = crate::io::fetch::download_to_temp(&path_str)?;
-                    _tmp.to_str().ok_or_else(|| HayashiError::Runtime("temp path is not UTF-8".into()))?
+                    _tmp.to_str().ok_or_else(|| self.rt_err("temp path is not UTF-8"))?
                 } else {
                     &path_str
                 };
@@ -13252,7 +13277,7 @@ impl Interpreter {
                     }
                     "json" => {
                         let df = DataFrame::from_json(local_path)
-                            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                            .map_err(|e| self.rt_err(e.to_string()))?;
                         let n = df.n_rows();
                         (df, n)
                     }
@@ -13270,7 +13295,7 @@ impl Interpreter {
                         };
                         if delim == b',' {
                             let df = DataFrame::from_csv(local_path)
-                                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                                .map_err(|e| self.rt_err(e.to_string()))?;
                             let n = df.n_rows();
                             (df, n)
                         } else {
@@ -13287,7 +13312,7 @@ impl Interpreter {
             Stmt::Predict { df, varname, model, kind } => {
                 let mut df_val = match self.env.get(df) {
                     Some(Value::DataFrame(d)) => d.clone(),
-                    _ => return Err(HayashiError::Runtime(format!("'{df}' is not a DataFrame"))),
+                    _ => return Err(self.rt_err(format!("'{df}' is not a DataFrame"))),
                 };
                 let model_val = self.eval_expr(model)?;
                 let kind_str = match self.eval_expr(kind)? {
@@ -13306,7 +13331,7 @@ impl Interpreter {
                         m.residuals.to_vec()
                     }
                     (Value::OlsResult(_), k) => return Err(HayashiError::Runtime(
-                        format!("predict OLS: kind '{k}' desconhecido — use: xb, residuals")
+                        format!("predict OLS: kind '{k}' unknown — use: xb, residuals")
                     )),
 
                     // ── Logit / Probit ────────────────────────────────────────
@@ -13314,7 +13339,7 @@ impl Interpreter {
                         m.result.predict_proba(&m.x).to_vec()
                     }
                     (Value::BinaryResult(_), k) => return Err(HayashiError::Runtime(
-                        format!("predict logit/probit: kind '{k}' desconhecido — use: pr")
+                        format!("predict logit/probit: kind '{k}' unknown — use: pr")
                     )),
 
                     // ── Poisson / NegBin ──────────────────────────────────────
@@ -13325,7 +13350,7 @@ impl Interpreter {
                         r.x_data().dot(&r.params).to_vec()
                     }
                     (Value::PoissonResult(_), k) => return Err(HayashiError::Runtime(
-                        format!("predict Poisson: kind '{k}' desconhecido — use: count, xb")
+                        format!("predict Poisson: kind '{k}' unknown — use: count, xb")
                     )),
                     (Value::NegBinResult(r), "count" | "mu" | "fitted") => {
                         r.fitted_values().to_vec()
@@ -13334,7 +13359,7 @@ impl Interpreter {
                         r.x_data().dot(&r.params).to_vec()
                     }
                     (Value::NegBinResult(_), k) => return Err(HayashiError::Runtime(
-                        format!("predict NegBin: kind '{k}' desconhecido — use: count, xb")
+                        format!("predict NegBin: kind '{k}' unknown — use: count, xb")
                     )),
 
                     // ── Ordered Logit / Probit ────────────────────────────────
@@ -13364,7 +13389,7 @@ impl Interpreter {
                                     ))?;
                                 if cat == 0 || cat > r.n_categories {
                                     return Err(HayashiError::Runtime(
-                                        format!("predict Ordered: categoria {cat} fora do intervalo 1..{}", r.n_categories)
+                                        format!("predict Ordered: categoria {cat} out of range 1..{}", r.n_categories)
                                     ));
                                 }
                                 let probs = r.predict_proba(&x);
@@ -13377,7 +13402,7 @@ impl Interpreter {
                                 (0..probs.nrows()).map(|i| probs[[i, last]]).collect()
                             }
                             k => return Err(HayashiError::Runtime(
-                                format!("predict Ordered: kind '{k}' desconhecido — use: pr, prN, yhat, xb")
+                                format!("predict Ordered: kind '{k}' unknown — use: pr, prN, yhat, xb")
                             )),
                         }
                     }
@@ -13389,7 +13414,7 @@ impl Interpreter {
                         x.dot(&r.params).to_vec()
                     }
                     (Value::IvResult(_), k) => return Err(HayashiError::Runtime(
-                        format!("predict IV: kind '{k}' desconhecido — use: xb")
+                        format!("predict IV: kind '{k}' unknown — use: xb")
                     )),
 
                     // ── Panel FE / RE ─────────────────────────────────────────
@@ -13399,7 +13424,7 @@ impl Interpreter {
                         x.dot(&r.params).to_vec()
                     }
                     (Value::PanelResult(_), k) => return Err(HayashiError::Runtime(
-                        format!("predict FE: kind '{k}' desconhecido — use: xb")
+                        format!("predict FE: kind '{k}' unknown — use: xb")
                     )),
                     (Value::ReResult(r), "xb" | "fitted") => {
                         let names = r.variable_names.as_deref().unwrap_or(&[]);
@@ -13407,7 +13432,7 @@ impl Interpreter {
                         x.dot(&r.params).to_vec()
                     }
                     (Value::ReResult(_), k) => return Err(HayashiError::Runtime(
-                        format!("predict RE: kind '{k}' desconhecido — use: xb")
+                        format!("predict RE: kind '{k}' unknown — use: xb")
                     )),
 
                     // ── Tobit ─────────────────────────────────────────────────
@@ -13417,7 +13442,7 @@ impl Interpreter {
                         x.dot(&r.params).to_vec()
                     }
                     (Value::TobitResult(_), k) => return Err(HayashiError::Runtime(
-                        format!("predict Tobit: kind '{k}' desconhecido — use: xb")
+                        format!("predict Tobit: kind '{k}' unknown — use: xb")
                     )),
 
                     // ── Heckman ───────────────────────────────────────────────
@@ -13427,7 +13452,7 @@ impl Interpreter {
                         x.dot(&r.params).to_vec()
                     }
                     (Value::HeckmanResult(_), k) => return Err(HayashiError::Runtime(
-                        format!("predict Heckman: kind '{k}' desconhecido — use: xb")
+                        format!("predict Heckman: kind '{k}' unknown — use: xb")
                     )),
 
                     // ── Cox PH ────────────────────────────────────────────────
@@ -13442,7 +13467,7 @@ impl Interpreter {
                         r.predict_hazard_ratio(&x).to_vec()
                     }
                     (Value::CoxResult(_), k) => return Err(HayashiError::Runtime(
-                        format!("predict Cox: kind '{k}' desconhecido — use: loghr, hr")
+                        format!("predict Cox: kind '{k}' unknown — use: loghr, hr")
                     )),
 
                     // ── Quantile Regression ───────────────────────────────────
@@ -13452,7 +13477,7 @@ impl Interpreter {
                         x.dot(&r.params).to_vec()
                     }
                     (Value::QuantileResult(_), k) => return Err(HayashiError::Runtime(
-                        format!("predict QReg: kind '{k}' desconhecido — use: xb")
+                        format!("predict QReg: kind '{k}' unknown — use: xb")
                     )),
 
                     // ── RLM ──────────────────────────────────────────────────
@@ -13462,7 +13487,7 @@ impl Interpreter {
                         x.dot(&r.params).to_vec()
                     }
                     (Value::RlmResult(_), k) => return Err(HayashiError::Runtime(
-                        format!("predict RLM: kind '{k}' desconhecido — use: xb")
+                        format!("predict RLM: kind '{k}' unknown — use: xb")
                     )),
 
                     // ── GEE ──────────────────────────────────────────────────
@@ -13472,7 +13497,7 @@ impl Interpreter {
                         x.dot(&r.params).to_vec()
                     }
                     (Value::GeeResult(_), k) => return Err(HayashiError::Runtime(
-                        format!("predict GEE: kind '{k}' desconhecido — use: xb")
+                        format!("predict GEE: kind '{k}' unknown — use: xb")
                     )),
 
                     // ── Beta Regression ───────────────────────────────────────
@@ -13487,7 +13512,7 @@ impl Interpreter {
                         x.dot(&r.params).to_vec()
                     }
                     (Value::BetaResult(_), k) => return Err(HayashiError::Runtime(
-                        format!("predict BetaReg: kind '{k}' desconhecido — use: pr, xb")
+                        format!("predict BetaReg: kind '{k}' unknown — use: pr, xb")
                     )),
 
                     // ── GLSAR ────────────────────────────────────────────────
@@ -13503,7 +13528,7 @@ impl Interpreter {
                         r.residuals(&y, &x).to_vec()
                     }
                     (Value::GlsarResult(_), k) => return Err(HayashiError::Runtime(
-                        format!("predict GLSAR: kind '{k}' desconhecido — use: xb, residuals")
+                        format!("predict GLSAR: kind '{k}' unknown — use: xb, residuals")
                     )),
 
                     // ── MixedLM ───────────────────────────────────────────────
@@ -13513,7 +13538,7 @@ impl Interpreter {
                         x.dot(&r.fixed_effects).to_vec()
                     }
                     (Value::MixedResult(_), k) => return Err(HayashiError::Runtime(
-                        format!("predict MixedLM: kind '{k}' desconhecido — use: xb")
+                        format!("predict MixedLM: kind '{k}' unknown — use: xb")
                     )),
 
                     // ── ZIP / ZINB ────────────────────────────────────────────
@@ -13534,7 +13559,7 @@ impl Interpreter {
                         r.predict_proba_zero(&x_c, &x_i).to_vec()
                     }
                     (Value::ZeroInflatedResult(_), k) => return Err(HayashiError::Runtime(
-                        format!("predict ZIP/ZINB: kind '{k}' desconhecido — use: count, pr0")
+                        format!("predict ZIP/ZINB: kind '{k}' unknown — use: count, pr0")
                     )),
 
                     // ── Rolling OLS ───────────────────────────────────────────
@@ -13542,7 +13567,7 @@ impl Interpreter {
                         r.residuals.to_vec()
                     }
                     (Value::RollingResult(_), k) => return Err(HayashiError::Runtime(
-                        format!("predict RollingOLS: kind '{k}' desconhecido — use: residuals")
+                        format!("predict RollingOLS: kind '{k}' unknown — use: residuals")
                     )),
 
                     // ── Recursive LS ──────────────────────────────────────────
@@ -13556,7 +13581,7 @@ impl Interpreter {
                         r.cusum_squares.to_vec()
                     }
                     (Value::RecursiveLSResult(_), k) => return Err(HayashiError::Runtime(
-                        format!("predict RecursiveLS: kind '{k}' desconhecido — use: residuals, cusum, cusum_sq")
+                        format!("predict RecursiveLS: kind '{k}' unknown — use: residuals, cusum, cusum_sq")
                     )),
 
                     // ── GLM ──────────────────────────────────────────────────────
@@ -13585,7 +13610,7 @@ impl Interpreter {
                         r.working_residuals().to_vec()
                     }
                     (Value::GlmResult(_), k) => return Err(HayashiError::Runtime(
-                        format!("predict GLM: kind '{k}' desconhecido — use: pr, xb, residuals, pearson, working")
+                        format!("predict GLM: kind '{k}' unknown — use: pr, xb, residuals, pearson, working")
                     )),
 
                     // ── LOWESS ───────────────────────────────────────────────────
@@ -13598,7 +13623,7 @@ impl Interpreter {
                         r.residuals.to_vec()
                     }
                     (Value::LowessResult(_), k) => return Err(HayashiError::Runtime(
-                        format!("predict LOWESS: kind '{k}' desconhecido — use: smoothed, residuals")
+                        format!("predict LOWESS: kind '{k}' unknown — use: smoothed, residuals")
                     )),
 
                     // ── PCA ──────────────────────────────────────────────────────
@@ -13612,13 +13637,13 @@ impl Interpreter {
                                 ))?;
                             if comp == 0 || comp > m.result.n_components {
                                 return Err(HayashiError::Runtime(
-                                    format!("predict PCA: componente {comp} fora do intervalo 1..{}", m.result.n_components)
+                                    format!("predict PCA: componente {comp} out of range 1..{}", m.result.n_components)
                                 ));
                             }
                             m.result.scores.column(comp - 1).to_vec()
                         } else {
                             return Err(HayashiError::Runtime(
-                                format!("predict PCA: kind '{kind_s}' desconhecido — use: pc1, pc2, ..., pc{}", m.result.n_components)
+                                format!("predict PCA: kind '{kind_s}' unknown — use: pc1, pc2, ..., pc{}", m.result.n_components)
                             ));
                         }
                     }
@@ -13650,13 +13675,13 @@ impl Interpreter {
                             ))?;
                         if idx == 0 || idx > r.n_regimes {
                             return Err(HayashiError::Runtime(
-                                format!("predict MarkovSwitching: regime {idx} fora do intervalo 1..{}", r.n_regimes)
+                                format!("predict MarkovSwitching: regime {idx} out of range 1..{}", r.n_regimes)
                             ));
                         }
                         r.smoothed_probs.column(idx - 1).to_vec()
                     }
                     (Value::MarkovResult(_), k) => return Err(HayashiError::Runtime(
-                        format!("predict MarkovSwitching: kind '{k}' desconhecido — use: regime, regime1, regime2, ...")
+                        format!("predict MarkovSwitching: kind '{k}' unknown — use: regime, regime1, regime2, ...")
                     )),
 
                     // ── Conditional Logit / Poisson ───────────────────────────────
@@ -13667,7 +13692,7 @@ impl Interpreter {
 
                     // ── VARMA ─────────────────────────────────────────────────────
                     (Value::VarmaResult(_), _) => return Err(HayashiError::Runtime(
-                        "predict varma: predição multivariada não suportada como coluna — use print() para diagnóstico".into()
+                        "predict varma: predição multivariada not supportada como coluna — use print() para diagnóstico".into()
                     )),
 
                     // ── UCM ───────────────────────────────────────────────────────
@@ -13680,7 +13705,7 @@ impl Interpreter {
                         .unwrap_or_else(|| vec![f64::NAN; r.n_obs]),
                     (Value::UCResult(r), "residuals" | "resid" | "e") => r.residuals.to_vec(),
                     (Value::UCResult(_), k) => return Err(HayashiError::Runtime(
-                        format!("predict ucm: kind '{k}' desconhecido — use: level, trend, seasonal, residuals")
+                        format!("predict ucm: kind '{k}' unknown — use: level, trend, seasonal, residuals")
                     )),
 
                     // ── GAM ───────────────────────────────────────────────────────
@@ -13717,7 +13742,7 @@ impl Interpreter {
                         m.result.factors.column(idx).to_vec()
                     }
                     (Value::DFMResult(_), k) => return Err(HayashiError::Runtime(
-                        format!("predict dfm: kind '{k}' desconhecido — use: f1, f2, ... (índice 1-based do fator latente)")
+                        format!("predict dfm: kind '{k}' unknown — use: f1, f2, ... (índice 1-based do fator latente)")
                     )),
 
                     // ── MarkovAutoregression ───────────────────────────────────────
@@ -13730,14 +13755,14 @@ impl Interpreter {
                             .unwrap_or(0);
                         if idx >= r.k_regimes {
                             return Err(HayashiError::Runtime(format!(
-                                "predict msauto: regime{} fora do intervalo 1..{}",
+                                "predict msauto: regime{} out of range 1..{}",
                                 idx + 1, r.k_regimes
                             )));
                         }
                         r.smoothed_probs.column(idx).to_vec()
                     }
                     (Value::MSARResult(_), k) => return Err(HayashiError::Runtime(
-                        format!("predict msauto: kind '{k}' desconhecido — use: regime, regime1, regime2, ...")
+                        format!("predict msauto: kind '{k}' unknown — use: regime, regime1, regime2, ...")
                     )),
 
                     // ── Decomposição sazonal ──────────────────────────────────────
@@ -13746,7 +13771,7 @@ impl Interpreter {
                     (Value::DecompResult(r), "residual" | "resid" | "e") => r.residual.to_vec(),
                     (Value::DecompResult(r), "observed" | "fitted") => r.observed.to_vec(),
                     (Value::DecompResult(_), k) => return Err(HayashiError::Runtime(
-                        format!("predict decompose: kind '{k}' desconhecido — use: trend, seasonal, residual, observed")
+                        format!("predict decompose: kind '{k}' unknown — use: trend, seasonal, residual, observed")
                     )),
 
                     // ── MSTL ─────────────────────────────────────────────────────
@@ -13770,7 +13795,7 @@ impl Interpreter {
                         r.seasonal[idx].to_vec()
                     }
                     (Value::MstlResult(_), k) => return Err(HayashiError::Runtime(
-                        format!("predict mstl: kind '{k}' desconhecido — use: trend, resid, seasonal, seasonal1, seasonal2, ...")
+                        format!("predict mstl: kind '{k}' unknown — use: trend, resid, seasonal, seasonal1, seasonal2, ...")
                     )),
 
                     // ── ETS (suavização exponencial) ──────────────────────────
@@ -13780,7 +13805,7 @@ impl Interpreter {
                     (Value::EtsResult(r), "trend")    => r.trend.to_vec(),
                     (Value::EtsResult(r), "seasonal") => r.seasonal.to_vec(),
                     (Value::EtsResult(_), k) => return Err(HayashiError::Runtime(
-                        format!("predict ets: kind '{k}' desconhecido — use: fitted, residuals, level, trend, seasonal")
+                        format!("predict ets: kind '{k}' unknown — use: fitted, residuals, level, trend, seasonal")
                     )),
 
                     // ── PanelThreshold ────────────────────────────────────────
@@ -13789,13 +13814,13 @@ impl Interpreter {
                     )),
 
                     _ => return Err(HayashiError::Type(
-                        "predict: tipo de modelo não suportado".into()
+                        "predict: tipo de modelo not supportado".into()
                     )),
                 };
 
                 let arr = ndarray::Array1::from(vals);
                 Rc::make_mut(&mut df_val).insert(varname.clone(), arr)
-                    .map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
+                    .map_err(|e: greeners::GreenersError| self.rt_err(e.to_string()))?;
                 println!("({} obs)  {df}.{varname} ({kind_str}) predicted", df_val.n_rows());
                 self.env.set(df, Value::DataFrame(df_val))?;
             }
@@ -13803,7 +13828,7 @@ impl Interpreter {
             Stmt::Count { df, cond } => {
                 let df_val = match self.env.get(df) {
                     Some(Value::DataFrame(d)) => d.clone(),
-                    _ => return Err(HayashiError::Runtime(format!("'{df}' is not a DataFrame"))),
+                    _ => return Err(self.rt_err(format!("'{df}' is not a DataFrame"))),
                 };
                 let n = if let Some(cond_expr) = cond {
                     let mask = Self::eval_col_expr(cond_expr, &df_val)?;
@@ -13817,7 +13842,7 @@ impl Interpreter {
             Stmt::Replace { df, varname, expr, cond } => {
                 let mut df_val = match self.env.get(df) {
                     Some(Value::DataFrame(d)) => d.clone(),
-                    _ => return Err(HayashiError::Runtime(format!("'{df}' is not a DataFrame"))),
+                    _ => return Err(self.rt_err(format!("'{df}' is not a DataFrame"))),
                 };
                 let new_vals = Self::eval_col_expr(expr, &df_val)?;
 
@@ -13843,19 +13868,19 @@ impl Interpreter {
 
                 let arr = ndarray::Array1::from(final_vals);
                 Rc::make_mut(&mut df_val).insert(varname.clone(), arr)
-                    .map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
+                    .map_err(|e: greeners::GreenersError| self.rt_err(e.to_string()))?;
                 self.env.set(df, Value::DataFrame(df_val))?;
             }
 
             Stmt::Generate { df, varname, expr } => {
                 let mut df_val = match self.env.get(df) {
                     Some(Value::DataFrame(d)) => d.clone(),
-                    _ => return Err(HayashiError::Runtime(format!("'{df}' is not a DataFrame"))),
+                    _ => return Err(self.rt_err(format!("'{df}' is not a DataFrame"))),
                 };
                 let vals = Self::eval_col_expr(expr, &df_val)?;
                 let arr = ndarray::Array1::from(vals);
                 Rc::make_mut(&mut df_val).insert(varname.clone(), arr)
-                    .map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
+                    .map_err(|e: greeners::GreenersError| self.rt_err(e.to_string()))?;
                 println!("({} obs)  {df}.{varname} generated", df_val.n_rows());
                 self.env.set(df, Value::DataFrame(df_val))?;
             }
@@ -13875,7 +13900,7 @@ impl Interpreter {
                 };
                 let path_str = match self.eval_expr(path)? {
                     Value::Str(s) => s,
-                    _ => return Err(HayashiError::Type("export path must be a string".into())),
+                    _ => return Err(self.type_err("export path must be a string")),
                 };
 
                 use greeners::ExportableResult;
@@ -13888,12 +13913,12 @@ impl Interpreter {
                     // ── DataFrame ─────────────────────────────────────────────
                     (Value::DataFrame(df), "csv" | "delimited") => {
                         df.to_csv(&path_str)
-                            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                            .map_err(|e| self.rt_err(e.to_string()))?;
                         println!("Exported DataFrame → '{path_str}' ({} rows)", df.n_rows());
                     }
                     (Value::DataFrame(df), "json") => {
                         df.to_json(&path_str)
-                            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                            .map_err(|e| self.rt_err(e.to_string()))?;
                         println!("Exported DataFrame → '{path_str}' ({} rows)", df.n_rows());
                     }
                     (Value::DataFrame(df), "tsv" | "tab") => {
@@ -13970,10 +13995,10 @@ impl Interpreter {
 
             Stmt::Tsset { df, t_var } => {
                 let frame = match self.env.get(df)
-                    .ok_or_else(|| HayashiError::Runtime(format!("'{df}' não definido")))?
+                    .ok_or_else(|| self.rt_err(format!("'{df}' not defined")))?
                 {
                     Value::DataFrame(d) => d.clone(),
-                    _ => return Err(HayashiError::Type(format!("'{df}' não é um DataFrame"))),
+                    _ => return Err(self.type_err(format!("'{df}' is not a DataFrame"))),
                 };
 
                 // ordena por t_var (sort_df_by reporta erro se coluna não existe)
@@ -14033,14 +14058,14 @@ impl Interpreter {
                             Value::Int(i) => i,
                             Value::Float(f) => f as i64,
                             v => return Err(HayashiError::Type(
-                                format!("for: início do range deve ser inteiro, não {v}")
+                                format!("for: início do range must be integer, não {v}")
                             )),
                         };
                         let end = match self.eval_expr(end_expr)? {
                             Value::Int(i) => i,
                             Value::Float(f) => f as i64,
                             v => return Err(HayashiError::Type(
-                                format!("for: fim do range deve ser inteiro, não {v}")
+                                format!("for: fim do range must be integer, não {v}")
                             )),
                         };
                         let step: i64 = if start <= end { 1 } else { -1 };
@@ -14055,7 +14080,7 @@ impl Interpreter {
                         let items = match self.eval_expr(iter_expr)? {
                             Value::List(v) => (*v).clone(),
                             other => return Err(HayashiError::Type(
-                                format!("for: iterador deve ser lista, não {other}")
+                                format!("for: iterador must be a list, não {other}")
                             )),
                         };
                         for item in items {
