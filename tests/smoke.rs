@@ -3864,6 +3864,38 @@ print(m)"#);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// PARQUET — load/export
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn export_parquet() {
+    let (ok, out) = run_inline(r#"load "exemplos/data/sample.db" as df
+export(df, "parquet", "/tmp/hayashi_test.parquet")"#);
+    assert!(ok, "export parquet failed:\n{out}");
+    assert!(std::path::Path::new("/tmp/hayashi_test.parquet").exists());
+}
+
+#[test]
+fn parquet_roundtrip() {
+    let (ok, out) = run_inline(r#"load "exemplos/data/sample.db" as df
+export(df, "parquet", "/tmp/hayashi_rt.parquet")
+load "/tmp/hayashi_rt.parquet" as df2
+display mean(df2, preco)"#);
+    assert!(ok, "parquet roundtrip failed:\n{out}");
+    assert!(out.contains("88.4"), "expected mean ~88.4:\n{out}");
+}
+
+#[test]
+fn load_parquet() {
+    let (ok, out) = run_inline(r#"load "exemplos/data/sample.db" as df
+export(df, "parquet", "/tmp/hayashi_load.parquet")
+load "/tmp/hayashi_load.parquet" as df2
+print(df2)"#);
+    assert!(ok, "load parquet failed:\n{out}");
+    assert!(out.contains("8 rows"), "expected 8 rows:\n{out}");
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // LIST — operações de lista
 // ══════════════════════════════════════════════════════════════════════════════
 

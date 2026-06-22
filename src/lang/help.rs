@@ -12,7 +12,7 @@ pub fn help_text(topic: &str) -> Option<&'static str> {
             "  test  nlcom  margins  predict  esttab  estat  hausman  lincom\n",
             "  bootstrap  bootse  influence  vif  irf  fevd  coefplot\n\n",
             "DATA:\n",
-            "  load (csv/tsv/json/dta/xlsx/sqlite/odbc)  export\n",
+            "  load (csv/tsv/json/dta/xlsx/parquet/sqlite/odbc)  export\n",
             "  generate  replace  drop  keep  dropna  rename  sort  filter\n",
             "  merge  append  collapse  reshape  encode  decode  winsor  tabgen\n",
             "  summarize  tabulate  tabstat  xtsum  ttest  correlate  pwcorr\n",
@@ -145,7 +145,7 @@ pub fn help_text(topic: &str) -> Option<&'static str> {
         "load" => concat!(
             "load \"path\" as alias [, opts...]\n",
             "  Load data into DataFrame.\n\n",
-            "  Formats: CSV, TSV, JSON, DTA (Stata), Excel (xlsx/xls/ods), SQLite, ODBC.\n",
+            "  Formats: CSV, TSV, JSON, DTA (Stata), Excel (xlsx/xls/ods), Parquet, SQLite, ODBC.\n",
             "  URLs are downloaded automatically.\n\n",
             "  Options:\n",
             "    sheet=Plan1       Excel sheet (default: first)\n",
@@ -167,7 +167,7 @@ pub fn help_text(topic: &str) -> Option<&'static str> {
         "export" => concat!(
             "export(value, \"format\", \"path\")\n",
             "  Export DataFrame or results to file.\n\n",
-            "  DataFrame: csv, json, tsv, xlsx, sqlite\n",
+            "  DataFrame: csv, json, tsv, xlsx, parquet, sqlite\n",
             "  OLS:       csv, latex, html\n",
             "  Models:    txt\n\n",
             "  Examples:\n",
