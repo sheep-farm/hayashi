@@ -400,6 +400,7 @@ pub struct Interpreter {
     panel_info: HashMap<String, (String, String)>,
     rng_seed: Option<u64>,
     preserved: HashMap<String, Value>,
+    stored_models: Vec<Value>,
     return_value: Option<Value>,
 }
 
@@ -411,6 +412,7 @@ impl Interpreter {
             panel_info: HashMap::new(),
             rng_seed: None,
             preserved: HashMap::new(),
+            stored_models: Vec::new(),
             return_value: None,
         }
     }
@@ -5029,9 +5031,32 @@ impl Interpreter {
             }
 
             // ── esttab ───────────────────────────────────────────────────────
-            "esttab" => {
+            // ── eststo: acumula modelo para esttab posterior ──────────────
+            "eststo" | "est_store" => {
                 if args.is_empty() {
-                    return Err(HayashiError::Runtime("esttab() requires at least one model".into()));
+                    return Err(HayashiError::Runtime("eststo(model)".into()));
+                }
+                let val = self.eval_expr(&args[0])?;
+                let n = self.stored_models.len() + 1;
+                self.stored_models.push(val);
+                println!("eststo: modelo {n} armazenado ({} total)", self.stored_models.len());
+                Ok(Value::Nil)
+            }
+
+            "estclear" => {
+                let n = self.stored_models.len();
+                self.stored_models.clear();
+                println!("estclear: {n} modelos removidos");
+                Ok(Value::Nil)
+            }
+
+            "esttab" => {
+                // sem args → usa modelos acumulados via eststo
+                let use_stored = args.is_empty();
+                if use_stored && self.stored_models.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "esttab() requires models — pass as args or use eststo() first".into()
+                    ));
                 }
 
                 let fmt = match opt_map.get("fmt") {
@@ -5105,8 +5130,12 @@ impl Interpreter {
                 };
 
                 let mut models: Vec<ModelInfo> = Vec::new();
-                for arg in args {
-                    let val = self.eval_expr(arg)?;
+                let model_vals: Vec<Value> = if use_stored {
+                    self.stored_models.clone()
+                } else {
+                    args.iter().map(|a| self.eval_expr(a)).collect::<Result<_>>()?
+                };
+                for val in model_vals {
                     match val {
                         Value::OlsResult(m) => {
                             use greeners::ExportableResult;
