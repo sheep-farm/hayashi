@@ -12488,6 +12488,19 @@ impl Interpreter {
                 }).collect())
             }
             Expr::Call { func, args, .. } => {
+                // ── regex row-wise sobre colunas string ──
+                if func == "regexm" && args.len() >= 2 {
+                    if let Expr::Var(col_name) = &args[0] {
+                        if let Ok(str_col) = df.get_string(col_name) {
+                            let pattern = match &args[1] {
+                                Expr::Str(s) => s.clone(),
+                                _ => return Err(HayashiError::Type("regexm: pattern deve ser string literal".into())),
+                            };
+                            return Ok(greeners::Transforms::regexm_vec(&str_col.to_vec(), &pattern));
+                        }
+                    }
+                }
+
                 // ── geradores aleatórios (tamanho = n_rows do df) ──
                 if matches!(func.as_str(), "uniform" | "runiform" | "rnormal" | "rbernoulli") {
                     let n = df.n_rows();
