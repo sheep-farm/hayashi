@@ -901,6 +901,11 @@ impl Interpreter {
                 Ok(Value::List(Rc::new(v)))
             }
 
+            // ── reg → alias para ols ──────────────────────────────────────────
+            "reg" | "regress" => {
+                return self.eval_call("ols", args, opts);
+            }
+
             // ── OLS ───────────────────────────────────────────────────────────
             "ols" => {
                 if args.len() < 2 {
@@ -4504,8 +4509,16 @@ impl Interpreter {
 
                 // (nome_variável, coef, se_opt, pval_opt)
                 type CoefRow = (String, f64, Option<f64>, Option<f64>);
-                // (label, coefs, n_obs)
-                type ModelInfo = (String, Vec<CoefRow>, usize);
+                // (label, coefs, n_obs, fit_stats)
+                struct ModelInfo {
+                    label: String,
+                    coefs: Vec<CoefRow>,
+                    n: usize,
+                    r2: Option<f64>,
+                    adj_r2: Option<f64>,
+                    #[allow(dead_code)]
+                    ll: Option<f64>,
+                }
 
                 // parseia CSV do OlsResult: variable,coef,se,t,p
                 let parse_csv = |csv: &str| -> Vec<CoefRow> {
@@ -4535,7 +4548,6 @@ impl Interpreter {
                     _ => "",
                 };
 
-                // extrai (label, coefs, n_obs) de tipos com campos padronizados
                 let extract_std = |label: &str,
                                    vnames: &Option<Vec<String>>,
                                    params: &ndarray::Array1<f64>,
@@ -4551,7 +4563,7 @@ impl Interpreter {
                         .zip(pv.iter())
                         .map(|(((n, &c), &s), &p)| (n.clone(), c, Some(s), Some(p)))
                         .collect();
-                    (label.to_string(), coefs, n)
+                    ModelInfo { label: label.to_string(), coefs, n, r2: None, adj_r2: None, ll: None }
                 };
 
                 let mut models: Vec<ModelInfo> = Vec::new();
@@ -4562,7 +4574,12 @@ impl Interpreter {
                             use greeners::ExportableResult;
                             let coefs = parse_csv(&m.result.to_csv());
                             let n = m.residuals.len();
-                            models.push(("OLS".into(), coefs, n));
+                            models.push(ModelInfo {
+                                label: "OLS".into(), coefs, n,
+                                r2: Some(m.result.r_squared),
+                                adj_r2: Some(m.result.adj_r_squared),
+                                ll: Some(m.result.log_likelihood),
+                            });
                         }
                         Value::BinaryResult(bm) => {
                             let label = if bm.kind == "logit" { "Logit" } else { "Probit" }.to_string();
@@ -4588,14 +4605,14 @@ impl Interpreter {
                             for (i, (&thr, &thr_se)) in r.thresholds.iter()
                                 .zip(r.threshold_std_errors.iter()).enumerate()
                             {
-                                info.1.push((format!("_cut{}", i + 1), thr, Some(thr_se), None));
+                                info.coefs.push((format!("_cut{}", i + 1), thr, Some(thr_se), None));
                             }
                             models.push(info);
                         }
                         Value::TobitResult(r) => {
                             let mut info = extract_std("Tobit", &r.variable_names,
                                 &r.params, &r.std_errors, &r.p_values, r.n_obs);
-                            info.1.push(("_sigma".into(), r.sigma, None, None));
+                            info.coefs.push(("_sigma".into(), r.sigma, None, None));
                             models.push(info);
                         }
                         Value::HeckmanResult(r) => {
@@ -4605,7 +4622,7 @@ impl Interpreter {
                             let dp = if dz.is_finite() {
                                 t_pvalue_two(dz, r.n_selected as f64)
                             } else { f64::NAN };
-                            info.1.push(("_lambda".into(), r.delta, Some(r.delta_se), Some(dp)));
+                            info.coefs.push(("_lambda".into(), r.delta, Some(r.delta_se), Some(dp)));
                             models.push(info);
                         }
                         Value::PanelResult(r) => {
@@ -4789,7 +4806,7 @@ impl Interpreter {
                 // união dos nomes de variáveis na ordem de primeira ocorrência
                 let mut all_vars: Vec<String> = Vec::new();
                 let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
-                for (_, coefs, _) in &models {
+                for mi in &models { let coefs = &mi.coefs;
                     for (nm, _, _, _) in coefs {
                         if seen.insert(nm.clone()) { all_vars.push(nm.clone()); }
                     }
@@ -4809,7 +4826,7 @@ impl Interpreter {
                     buf.push_str("}\n\\hline\\hline\n");
                     // cabeçalho
                     buf.push_str(" &");
-                    for (i, (label, _, _)) in models.iter().enumerate() {
+                    for (i, mi) in models.iter().enumerate() { let label = &mi.label;
                         buf.push_str(&format!(" ({}) {}", i + 1, label));
                         if i + 1 < n_models { buf.push('&'); }
                     }
@@ -4818,7 +4835,7 @@ impl Interpreter {
                     for var in &all_vars {
                         if var == "_cons" { continue; } // _cons vai no final
                         buf.push_str(&format!("{var}"));
-                        for (_, coefs, _) in &models {
+                        for mi in &models { let coefs = &mi.coefs;
                             let row = coefs.iter().find(|(nm, _, _, _)| nm == var);
                             match row {
                                 Some((_, c, _, p)) => buf.push_str(&format!(" & {:.4}{}", c, stars(*p))),
@@ -4827,12 +4844,12 @@ impl Interpreter {
                         }
                         buf.push_str(" \\\\\n");
                         // SE linha
-                        let has_se = models.iter().any(|(_, coefs, _)|
-                            coefs.iter().find(|(nm, _, _, _)| nm == var)
+                        let has_se = models.iter().any(|mi|
+                            mi.coefs.iter().find(|(nm, _, _, _)| nm == var)
                                  .and_then(|(_, _, se, _)| *se).is_some());
                         if has_se {
                             buf.push_str(" ");
-                            for (_, coefs, _) in &models {
+                            for mi in &models { let coefs = &mi.coefs;
                                 let row = coefs.iter().find(|(nm, _, _, _)| nm == var);
                                 match row.and_then(|(_, _, se, _)| *se) {
                                     Some(se) => buf.push_str(&format!(" & ({:.4})", se)),
@@ -4845,7 +4862,7 @@ impl Interpreter {
                     // _cons no final
                     if all_vars.iter().any(|v| v == "_cons") {
                         buf.push_str("Constant");
-                        for (_, coefs, _) in &models {
+                        for mi in &models { let coefs = &mi.coefs;
                             let row = coefs.iter().find(|(nm, _, _, _)| nm == "_cons");
                             match row {
                                 Some((_, c, _, p)) => buf.push_str(&format!(" & {:.4}{}", c, stars(*p))),
@@ -4853,12 +4870,12 @@ impl Interpreter {
                             }
                         }
                         buf.push_str(" \\\\\n");
-                        let has_se = models.iter().any(|(_, coefs, _)|
-                            coefs.iter().find(|(nm, _, _, _)| nm == "_cons")
+                        let has_se = models.iter().any(|mi|
+                            mi.coefs.iter().find(|(nm, _, _, _)| nm == "_cons")
                                  .and_then(|(_, _, se, _)| *se).is_some());
                         if has_se {
                             buf.push_str(" ");
-                            for (_, coefs, _) in &models {
+                            for mi in &models { let coefs = &mi.coefs;
                                 let row = coefs.iter().find(|(nm, _, _, _)| nm == "_cons");
                                 match row.and_then(|(_, _, se, _)| *se) {
                                     Some(se) => buf.push_str(&format!(" & ({:.4})", se)),
@@ -4869,8 +4886,23 @@ impl Interpreter {
                         }
                     }
                     buf.push_str("\\hline\nN");
-                    for (_, _, n) in &models { buf.push_str(&format!(" & {n}")); }
-                    buf.push_str(" \\\\\n\\hline\\hline\n\\end{tabular}\n");
+                    for mi in &models { buf.push_str(&format!(" & {}", mi.n)); }
+                    buf.push_str(" \\\\\n");
+                    if models.iter().any(|mi| mi.r2.is_some()) {
+                        buf.push_str("$R^2$");
+                        for mi in &models {
+                            match mi.r2 { Some(v) => buf.push_str(&format!(" & {:.4}", v)), None => buf.push_str(" &") }
+                        }
+                        buf.push_str(" \\\\\n");
+                    }
+                    if models.iter().any(|mi| mi.adj_r2.is_some()) {
+                        buf.push_str("Adj. $R^2$");
+                        for mi in &models {
+                            match mi.adj_r2 { Some(v) => buf.push_str(&format!(" & {:.4}", v)), None => buf.push_str(" &") }
+                        }
+                        buf.push_str(" \\\\\n");
+                    }
+                    buf.push_str("\\hline\\hline\n\\end{tabular}\n");
                     buf.push_str("\\footnotesize{* p$<$0.10, ** p$<$0.05, *** p$<$0.01}\n");
 
                 } else {
@@ -4884,7 +4916,7 @@ impl Interpreter {
 
                     // cabeçalho: labels
                     let mut line = format!("{:<lw$}", "", lw = label_w);
-                    for (label, _, _) in &models { line.push_str(&format!(" {:>cw$}", label, cw = col_w)); }
+                    for mi in &models { line.push_str(&format!(" {:>cw$}", mi.label, cw = col_w)); }
                     buf.push_str(&format!("{line}\n"));
                     buf.push_str(&format!("{sep}\n"));
 
@@ -4892,7 +4924,7 @@ impl Interpreter {
                         // linha de coeficientes
                         let display_name = if var == "_cons" { "Constant" } else { var };
                         let mut line = format!("{:<lw$}", display_name, lw = label_w);
-                        for (_, coefs, _) in &models {
+                        for mi in &models { let coefs = &mi.coefs;
                             let row = coefs.iter().find(|(nm, _, _, _)| nm == var);
                             match row {
                                 Some((_, c, _, p)) => {
@@ -4906,12 +4938,12 @@ impl Interpreter {
                         buf.push_str(&format!("{line}\n"));
 
                         // linha de erros padrão
-                        let has_se = models.iter().any(|(_, coefs, _)|
-                            coefs.iter().find(|(nm, _, _, _)| nm == var)
+                        let has_se = models.iter().any(|mi|
+                            mi.coefs.iter().find(|(nm, _, _, _)| nm == var)
                                  .and_then(|(_, _, se, _)| *se).is_some());
                         if has_se {
                             let mut line = format!("{:<lw$}", "", lw = label_w);
-                            for (_, coefs, _) in &models {
+                            for mi in &models { let coefs = &mi.coefs;
                                 let row = coefs.iter().find(|(nm, _, _, _)| nm == var);
                                 match row.and_then(|(_, _, se, _)| *se) {
                                     Some(se) => line.push_str(&format!(" {:>cw$}", format!("({:.4})", se), cw = col_w)),
@@ -4932,8 +4964,22 @@ impl Interpreter {
 
                     buf.push_str(&format!("{sep}\n"));
                     let mut line = format!("{:<lw$}", "N", lw = label_w);
-                    for (_, _, n) in &models { line.push_str(&format!(" {:>cw$}", n, cw = col_w)); }
+                    for mi in &models { line.push_str(&format!(" {:>cw$}", mi.n, cw = col_w)); }
                     buf.push_str(&format!("{line}\n"));
+                    if models.iter().any(|mi| mi.r2.is_some()) {
+                        let mut line = format!("{:<lw$}", "R²", lw = label_w);
+                        for mi in &models {
+                            match mi.r2 { Some(v) => line.push_str(&format!(" {:>cw$.4}", v, cw = col_w)), None => line.push_str(&format!(" {:>cw$}", "", cw = col_w)) }
+                        }
+                        buf.push_str(&format!("{line}\n"));
+                    }
+                    if models.iter().any(|mi| mi.adj_r2.is_some()) {
+                        let mut line = format!("{:<lw$}", "Adj. R²", lw = label_w);
+                        for mi in &models {
+                            match mi.adj_r2 { Some(v) => line.push_str(&format!(" {:>cw$.4}", v, cw = col_w)), None => line.push_str(&format!(" {:>cw$}", "", cw = col_w)) }
+                        }
+                        buf.push_str(&format!("{line}\n"));
+                    }
                     buf.push_str(&format!("{sep}\n"));
                     buf.push_str("* p<0.10  ** p<0.05  *** p<0.01\n");
                 }
