@@ -513,6 +513,30 @@ impl Interpreter {
         }
     }
 
+    fn call_value_fn(&mut self, f: &Value, args: &[Value]) -> Result<Value> {
+        match f {
+            Value::UserFn(uf) => {
+                self.env.push_scope();
+                for (param, val) in uf.params.iter().zip(args.iter()) {
+                    self.env.declare_const(param, val.clone());
+                }
+                let body = uf.body.clone();
+                let mut ret = Value::Nil;
+                for s in &body {
+                    match self.exec(s) {
+                        Ok(()) => {}
+                        Err(HayashiError::Return) => break,
+                        Err(e) => { self.env.pop_scope(); return Err(e); }
+                    }
+                }
+                if let Some(rv) = self.return_value.take() { ret = rv; }
+                self.env.pop_scope();
+                Ok(ret)
+            }
+            _ => Err(self.rt_err("expected a function or closure")),
+        }
+    }
+
     pub fn get_rng(&self) -> Box<dyn rand::RngCore> {
         use rand::SeedableRng;
         match self.rng_seed {
@@ -530,6 +554,65 @@ impl Interpreter {
             Expr::Bool(v)  => Ok(Value::Bool(*v)),
             Expr::Str(v)   => Ok(Value::Str(v.clone())),
 
+            Expr::FString(template) => {
+                let mut result = String::new();
+                let mut chars = template.chars().peekable();
+                while let Some(c) = chars.next() {
+                    if c == '{' {
+                        if chars.peek() == Some(&'{') {
+                            chars.next();
+                            result.push('{');
+                            continue;
+                        }
+                        let mut expr_str = String::new();
+                        let mut fmt_spec = String::new();
+                        let mut in_fmt = false;
+                        let mut depth = 1;
+                        for c2 in chars.by_ref() {
+                            if c2 == '{' { depth += 1; }
+                            if c2 == '}' { depth -= 1; if depth == 0 { break; } }
+                            if c2 == ':' && depth == 1 && !in_fmt {
+                                in_fmt = true;
+                                continue;
+                            }
+                            if in_fmt { fmt_spec.push(c2); } else { expr_str.push(c2); }
+                        }
+                        let mut lexer = crate::lang::lexer::Lexer::new(&expr_str);
+                        let tokens = lexer.tokenize()?;
+                        let mut parser = crate::lang::parser::Parser::new(tokens);
+                        let expr = parser.parse_expr()?;
+                        let val = self.eval_expr(&expr)?;
+                        if fmt_spec.is_empty() {
+                            result.push_str(&format!("{val}"));
+                        } else {
+                            let num = match &val {
+                                Value::Float(f) => *f,
+                                Value::Int(i) => *i as f64,
+                                _ => { result.push_str(&format!("{val}")); continue; }
+                            };
+                            let formatted = match fmt_spec.as_str() {
+                                s if s.starts_with('.') && s.ends_with('f') => {
+                                    let prec: usize = s[1..s.len()-1].parse().unwrap_or(2);
+                                    format!("{num:.prec$}")
+                                }
+                                s if s.starts_with('.') && s.ends_with('e') => {
+                                    let prec: usize = s[1..s.len()-1].parse().unwrap_or(2);
+                                    format!("{num:.prec$e}")
+                                }
+                                _ => format!("{val}"),
+                            };
+                            result.push_str(&formatted);
+                        }
+                    } else if c == '}' {
+                        if chars.peek() == Some(&'}') { chars.next(); }
+                        result.push('}');
+                    } else {
+                        result.push(c);
+                    }
+                }
+                Ok(Value::Str(result))
+            }
+
             Expr::Var(name) => {
                 self.env.get(name)
                     .cloned()
@@ -538,6 +621,13 @@ impl Interpreter {
 
             Expr::Formula(_f) => {
                 Err(HayashiError::Runtime("formula must be used inside an estimator call".into()))
+            }
+
+            Expr::Closure { params, body } => {
+                Ok(Value::UserFn(Rc::new(UserFn {
+                    params: params.clone(),
+                    body: vec![(Stmt::Return(Some(*body.clone())), 0)],
+                })))
             }
 
             // ── Aritmética / lógica escalar ───────────────────────────────────
@@ -782,6 +872,63 @@ impl Interpreter {
             .collect::<Result<_>>()?;
 
         match func {
+            // ── Type conversions ─────────────────────────────────────────────
+            "int" => {
+                if args.len() != 1 { return Err(HayashiError::Runtime("int(x)".into())); }
+                let v = self.eval_expr(&args[0])?;
+                Ok(Value::Int(match v {
+                    Value::Int(i) => i,
+                    Value::Float(f) => f as i64,
+                    Value::Bool(b) => if b { 1 } else { 0 },
+                    Value::Str(s) => s.trim().parse::<i64>()
+                        .or_else(|_| s.trim().parse::<f64>().map(|f| f as i64))
+                        .map_err(|_| self.type_err(format!("cannot convert '{s}' to int")))?,
+                    other => return Err(self.type_err(format!("cannot convert {other} to int"))),
+                }))
+            }
+
+            "float" => {
+                if args.len() != 1 { return Err(HayashiError::Runtime("float(x)".into())); }
+                let v = self.eval_expr(&args[0])?;
+                Ok(Value::Float(match v {
+                    Value::Float(f) => f,
+                    Value::Int(i) => i as f64,
+                    Value::Bool(b) => if b { 1.0 } else { 0.0 },
+                    Value::Str(s) => s.trim().parse::<f64>()
+                        .map_err(|_| self.type_err(format!("cannot convert '{s}' to float")))?,
+                    other => return Err(self.type_err(format!("cannot convert {other} to float"))),
+                }))
+            }
+
+            "str" | "string" => {
+                if args.len() != 1 { return Err(HayashiError::Runtime("str(x)".into())); }
+                let v = self.eval_expr(&args[0])?;
+                Ok(Value::Str(format!("{v}")))
+            }
+
+            "bool" => {
+                if args.len() != 1 { return Err(HayashiError::Runtime("bool(x)".into())); }
+                let v = self.eval_expr(&args[0])?;
+                Ok(Value::Bool(Self::value_as_bool(&v)))
+            }
+
+            "type" | "typeof" => {
+                if args.len() != 1 { return Err(HayashiError::Runtime("type(x)".into())); }
+                let v = self.eval_expr(&args[0])?;
+                Ok(Value::Str(match v {
+                    Value::Float(_) => "float",
+                    Value::Int(_) => "int",
+                    Value::Bool(_) => "bool",
+                    Value::Str(_) => "string",
+                    Value::List(_) => "list",
+                    Value::Dict(_) => "dict",
+                    Value::DataFrame(_) => "dataframe",
+                    Value::UserFn(_) => "function",
+                    Value::Nil => "nil",
+                    _ => "model",
+                }.to_string()))
+            }
+
             // ── Builtins de lista ─────────────────────────────────────────────
             "len" => {
                 if args.len() != 1 {
@@ -1056,46 +1203,6 @@ impl Interpreter {
                 }
             }
 
-            // ── Conversões de tipo ────────────────────────────────────────────
-            "str" => {
-                if args.len() != 1 {
-                    return Err(HayashiError::Runtime("str() requires 1 argument".into()));
-                }
-                Ok(Value::Str(format!("{}", self.eval_expr(&args[0])?)))
-            }
-
-            "int" => {
-                if args.len() != 1 {
-                    return Err(HayashiError::Runtime("int() requires 1 argument".into()));
-                }
-                match self.eval_expr(&args[0])? {
-                    Value::Int(i)   => Ok(Value::Int(i)),
-                    Value::Float(f) => Ok(Value::Int(f as i64)),
-                    Value::Bool(b)  => Ok(Value::Int(if b { 1 } else { 0 })),
-                    Value::Str(s)   => s.trim().parse::<i64>().map(Value::Int)
-                        .map_err(|_| HayashiError::Runtime(
-                            format!("int(): não foi possível converter \"{s}\" para inteiro")
-                        )),
-                    v => Err(self.type_err(format!("int(): não converte {v}"))),
-                }
-            }
-
-            "float" => {
-                if args.len() != 1 {
-                    return Err(HayashiError::Runtime("float() requires 1 argument".into()));
-                }
-                match self.eval_expr(&args[0])? {
-                    Value::Float(f) => Ok(Value::Float(f)),
-                    Value::Int(i)   => Ok(Value::Float(i as f64)),
-                    Value::Bool(b)  => Ok(Value::Float(if b { 1.0 } else { 0.0 })),
-                    Value::Str(s)   => s.trim().parse::<f64>().map(Value::Float)
-                        .map_err(|_| HayashiError::Runtime(
-                            format!("float(): não foi possível converter \"{s}\" para número")
-                        )),
-                    v => Err(self.type_err(format!("float(): não converte {v}"))),
-                }
-            }
-
             // ── Agregações sobre List ─────────────────────────────────────────
             // "sum" fica para summarize(df) — Stata-style
             // "total" é a soma de uma lista numérica
@@ -1317,31 +1424,17 @@ impl Interpreter {
 
             "map" => {
                 if args.len() != 2 {
-                    return Err(HayashiError::Runtime("map(lista, fn)".into()));
+                    return Err(HayashiError::Runtime("map(list, fn) or map(list, |x| expr)".into()));
                 }
                 let lst = match self.eval_expr(&args[0])? {
                     Value::List(v) => v,
                     _ => return Err(HayashiError::Type("map() requires list".into())),
                 };
-                let func_name = match &args[1] {
-                    Expr::Var(n) => n.clone(),
-                    Expr::Str(n) => n.clone(),
-                    _ => return Err(HayashiError::Type("map: second argument must be a function name".into())),
-                };
+                let fn_val = self.eval_expr(&args[1])?;
                 let mut result = Vec::with_capacity(lst.len());
                 for item in lst.iter() {
-                    let call = Expr::Call {
-                        func: func_name.clone(),
-                        args: vec![match item {
-                            Value::Float(f) => Expr::Float(*f),
-                            Value::Int(i) => Expr::Int(*i),
-                            Value::Str(s) => Expr::Str(s.clone()),
-                            Value::Bool(b) => Expr::Bool(*b),
-                            _ => Expr::Float(0.0),
-                        }],
-                        opts: vec![],
-                    };
-                    result.push(self.eval_expr(&call)?);
+                    let val = self.call_value_fn(&fn_val, &[item.clone()])?;
+                    result.push(val);
                 }
                 Ok(Value::List(Rc::new(result)))
             }
@@ -7996,15 +8089,22 @@ impl Interpreter {
             // filter(df, condition_expr) → DataFrame com linhas onde cond ≠ 0
             "filter" => {
                 if args.len() < 2 {
-                    return Err(HayashiError::Runtime(
-                        "filter(df, cond) requer um DataFrame e uma expressão de condição".into(),
-                    ));
+                    return Err(HayashiError::Runtime("filter(list|df, fn|cond)".into()));
+                }
+                if let Value::List(lst) = self.eval_expr(&args[0])? {
+                    let fn_val = self.eval_expr(&args[1])?;
+                    let mut result = Vec::new();
+                    for item in lst.iter() {
+                        let pred = self.call_value_fn(&fn_val, &[item.clone()])?;
+                        if Self::value_as_bool(&pred) {
+                            result.push(item.clone());
+                        }
+                    }
+                    return Ok(Value::List(Rc::new(result)));
                 }
                 let df = match self.eval_expr(&args[0])? {
                     Value::DataFrame(df) => df,
-                    _ => return Err(HayashiError::Type(
-                        "filter(): primeiro argumento deve ser um DataFrame".into(),
-                    )),
+                    _ => return Err(HayashiError::Type("filter() requires list or DataFrame".into())),
                 };
                 let mask = Self::eval_col_expr(&args[1], &df)?;
                 let keep: Vec<bool> = mask.iter().map(|&v| v != 0.0 && !v.is_nan()).collect();

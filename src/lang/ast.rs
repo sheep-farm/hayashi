@@ -47,6 +47,7 @@ pub enum Expr {
     Int(i64),
     Bool(bool),
     Str(String),
+    FString(String),
     Var(String),
     Formula(Formula),
 
@@ -82,6 +83,9 @@ pub enum Expr {
         args: Vec<Expr>,
         opts: Vec<Opt>,
     },
+
+    // closure: |x, y| x + y
+    Closure { params: Vec<String>, body: Box<Expr> },
 
     // operadores de série temporal: L.price, L2.price, F.gdp, D.wage
     TsOp { op: TsOpKind, var: String, n: usize },
