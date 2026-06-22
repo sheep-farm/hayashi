@@ -2847,3 +2847,190 @@ let s = str(3.14)
 display len(s)
 "#, "4");
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GRÁFICOS SVG — plotters backend
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn graph_scatter_svg() {
+    let (ok, out) = run_inline(r#"
+input df
+Y X
+10 2
+12 3
+8 1
+15 5
+11 2
+14 4
+end
+graph_scatter(df, X, Y, path="/tmp/test_scatter.svg")
+"#);
+    assert!(ok, "graph_scatter failed:\n{out}");
+    assert!(out.contains("graph saved"));
+    assert!(std::path::Path::new("/tmp/test_scatter.svg").exists());
+}
+
+#[test]
+fn graph_line_svg() {
+    let (ok, out) = run_inline(r#"
+input df
+Y X
+1 1
+4 2
+9 3
+16 4
+25 5
+end
+graph_line(df, X, Y, path="/tmp/test_line.svg")
+"#);
+    assert!(ok, "graph_line failed:\n{out}");
+    assert!(out.contains("graph saved"));
+    assert!(std::path::Path::new("/tmp/test_line.svg").exists());
+}
+
+#[test]
+fn graph_hist_svg() {
+    let (ok, out) = run_inline(r#"
+input df
+Y
+1
+2
+3
+4
+5
+6
+7
+8
+end
+graph_hist(df, Y, path="/tmp/test_hist.svg", bins=4)
+"#);
+    assert!(ok, "graph_hist failed:\n{out}");
+    assert!(out.contains("graph saved"));
+    assert!(std::path::Path::new("/tmp/test_hist.svg").exists());
+}
+
+#[test]
+fn graph_coef_svg() {
+    let (ok, out) = run_inline(r#"
+input df
+Y X1 X2
+10 2 5
+12 3 3
+8 1 7
+15 5 2
+11 2 6
+14 4 4
+end
+let m = ols(Y ~ X1 + X2, df)
+graph_coef(m, path="/tmp/test_coef.svg")
+"#);
+    assert!(ok, "graph_coef failed:\n{out}");
+    assert!(out.contains("graph saved"));
+    assert!(std::path::Path::new("/tmp/test_coef.svg").exists());
+}
+
+#[test]
+fn graph_scatter_custom_title() {
+    let (ok, out) = run_inline(r#"
+input df
+Y X
+10 2
+12 3
+8 1
+15 5
+end
+graph_scatter(df, X, Y, path="/tmp/test_scatter_title.svg", title="Custom Title")
+"#);
+    assert!(ok, "graph_scatter title failed:\n{out}");
+    let svg = std::fs::read_to_string("/tmp/test_scatter_title.svg").unwrap();
+    assert!(svg.contains("Custom Title"));
+}
+
+#[test]
+fn graph_hist_custom_bins() {
+    let (ok, out) = run_inline(r#"
+input df
+Y
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+end
+graph_hist(df, Y, path="/tmp/test_hist_bins.svg", bins=2)
+"#);
+    assert!(ok, "graph_hist bins failed:\n{out}");
+    assert!(std::path::Path::new("/tmp/test_hist_bins.svg").exists());
+}
+
+#[test]
+fn graph_coef_svg_valid() {
+    let (ok, _) = run_inline(r#"
+input df
+Y X1 X2 X3
+10 2 5 3
+12 3 3 5
+8 1 7 2
+15 5 2 8
+11 2 6 4
+14 4 4 6
+end
+let m = ols(Y ~ X1 + X2 + X3, df)
+graph_coef(m, path="/tmp/test_coef_valid.svg", title="3 Variables")
+"#);
+    assert!(ok);
+    let svg = std::fs::read_to_string("/tmp/test_coef_valid.svg").unwrap();
+    assert!(svg.contains("<svg"));
+    assert!(svg.contains("3 Variables"));
+    assert!(svg.contains("Coefficient"));
+}
+
+#[test]
+fn graph_line_default_path() {
+    let (ok, out) = run_inline(r#"
+input df
+Y X
+1 1
+2 2
+3 3
+end
+graph_line(df, X, Y)
+"#);
+    assert!(ok, "graph_line default failed:\n{out}");
+    assert!(out.contains("graph saved: Y_line.svg"));
+    let _ = std::fs::remove_file("Y_line.svg");
+}
+
+#[test]
+fn graph_scatter_gscatter_alias() {
+    let (ok, out) = run_inline(r#"
+input df
+Y X
+10 2
+12 3
+8 1
+end
+gscatter(df, X, Y, path="/tmp/test_gscatter.svg")
+"#);
+    assert!(ok, "gscatter alias failed:\n{out}");
+    assert!(out.contains("graph saved"));
+}
+
+#[test]
+fn smoke_graficos_svg() {
+    let (ok, out) = run_hy("exemplos/graficos_svg.hy");
+    assert!(ok, "graficos_svg.hy failed:\n{out}");
+    assert!(out.contains("graph saved: scatter.svg"));
+    assert!(out.contains("graph saved: coefplot.svg"));
+    // cleanup
+    let _ = std::fs::remove_file("scatter.svg");
+    let _ = std::fs::remove_file("line.svg");
+    let _ = std::fs::remove_file("hist.svg");
+    let _ = std::fs::remove_file("coefplot.svg");
+}
