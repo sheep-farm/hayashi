@@ -381,18 +381,28 @@ impl std::fmt::Display for Value {
 
 // ── Ambiente de variáveis ─────────────────────────────────────────────────────
 
+struct Scope {
+    vars: HashMap<String, Value>,
+    consts: HashSet<String>,
+}
+
+impl Scope {
+    fn new() -> Self {
+        Self { vars: HashMap::new(), consts: HashSet::new() }
+    }
+}
+
 pub struct Env {
-    scopes: Vec<HashMap<String, Value>>,
-    constants: HashSet<String>,
+    scopes: Vec<Scope>,
 }
 
 impl Env {
     pub fn new() -> Self {
-        Self { scopes: vec![HashMap::new()], constants: HashSet::new() }
+        Self { scopes: vec![Scope::new()] }
     }
 
     pub fn push_scope(&mut self) {
-        self.scopes.push(HashMap::new());
+        self.scopes.push(Scope::new());
     }
 
     pub fn pop_scope(&mut self) {
@@ -402,40 +412,44 @@ impl Env {
     }
 
     pub fn declare(&mut self, name: &str, val: Value) -> Result<()> {
-        if self.constants.contains(name) {
-            return Err(HayashiError::Runtime(format!(
-                "cannot redeclare const '{name}'"
-            )));
+        for scope in self.scopes.iter().rev() {
+            if scope.consts.contains(name) {
+                return Err(HayashiError::Runtime(format!(
+                    "cannot redeclare const '{name}'"
+                )));
+            }
         }
-        self.scopes.last_mut().unwrap().insert(name.to_string(), val);
+        self.scopes.last_mut().unwrap().vars.insert(name.to_string(), val);
         Ok(())
     }
 
     pub fn declare_const(&mut self, name: &str, val: Value) {
-        self.scopes.last_mut().unwrap().insert(name.to_string(), val);
-        self.constants.insert(name.to_string());
+        let scope = self.scopes.last_mut().unwrap();
+        scope.vars.insert(name.to_string(), val);
+        scope.consts.insert(name.to_string());
     }
 
     pub fn set(&mut self, name: &str, val: Value) -> Result<()> {
-        if self.constants.contains(name) {
-            return Err(HayashiError::Runtime(format!(
-                "cannot reassign const '{name}'"
-            )));
+        for scope in self.scopes.iter().rev() {
+            if scope.consts.contains(name) {
+                return Err(HayashiError::Runtime(format!(
+                    "cannot reassign const '{name}'"
+                )));
+            }
         }
         for scope in self.scopes.iter_mut().rev() {
-            if scope.contains_key(name) {
-                scope.insert(name.to_string(), val);
+            if scope.vars.contains_key(name) {
+                scope.vars.insert(name.to_string(), val);
                 return Ok(());
             }
         }
-        self.scopes.last_mut().unwrap().insert(name.to_string(), val);
+        self.scopes.last_mut().unwrap().vars.insert(name.to_string(), val);
         Ok(())
     }
 
-    /// Busca do topo pra base (lexical scoping)
     pub fn get(&self, name: &str) -> Option<&Value> {
         for scope in self.scopes.iter().rev() {
-            if let Some(v) = scope.get(name) {
+            if let Some(v) = scope.vars.get(name) {
                 return Some(v);
             }
         }
@@ -444,7 +458,8 @@ impl Env {
 
     pub fn remove(&mut self, name: &str) {
         for scope in self.scopes.iter_mut().rev() {
-            if scope.remove(name).is_some() {
+            if scope.vars.remove(name).is_some() {
+                scope.consts.remove(name);
                 return;
             }
         }
@@ -11989,7 +12004,7 @@ impl Interpreter {
 
                 self.env.push_scope();
                 for (param, val) in user_fn.params.iter().zip(arg_vals) {
-                    self.env.declare(param, val)?;
+                    self.env.declare_const(param, val);
                 }
 
                 let body = user_fn.body.clone();
