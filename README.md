@@ -43,6 +43,116 @@ export(df, "parquet", "data.parquet")
 export(m1, "latex", "table.tex")
 ```
 
+## Language
+
+Hayashi is a dynamically-typed, block-scoped interpreted language. It combines Stata-like econometrics syntax with modern programming constructs.
+
+### Type system
+
+| Type | Literal | Notes |
+|---|---|---|
+| `int` | `42` | 64-bit signed integer |
+| `float` | `3.14` | 64-bit IEEE 754 |
+| `bool` | `true` / `false` | |
+| `string` | `"hello"` | UTF-8, immutable |
+| `list` | `[1, 2, 3]` | Heterogeneous, immutable (COW) |
+| `dict` | `{"key": value}` | String keys, any values, immutable (COW) |
+| `nil` | | Absence of value |
+| `dataframe` | via `load` / `input` | Tabular data, copy-on-write (`Rc`) |
+| `function` | `fn name(x) { }` or `\|x\| expr` | Named or anonymous (closure) |
+
+Explicit conversions: `int(x)`, `float(x)`, `str(x)`, `bool(x)`.
+Introspection: `type(x)` returns the type name as a string.
+
+### Variables and mutability
+
+```
+let x = 10              // mutable — can be reassigned
+const PI = 3.14159       // immutable — error on reassign or redeclare
+x = 20                   // assign without let — searches outer scopes
+```
+
+No variable shadowing: `let x` over an existing `const x` is an error, even in an inner scope. This prevents subtle bugs common in C/C++.
+
+### Scoping
+
+Block-scoped with deterministic destruction. No garbage collector.
+
+```
+let x = 10
+if true {
+    let temp = 42        // lives only in this block
+    x = x + temp         // modifies outer x
+}
+// temp is gone, x = 52
+```
+
+Function parameters are `const` by default — data enters immutable, result exits via `return`. DataFrames use `Rc<DataFrame>` for zero-copy passing and copy-on-write mutation.
+
+### Control flow
+
+| Construct | Syntax | Returns value? |
+|---|---|---|
+| If statement | `if cond { } else if { } else { }` | No |
+| If expression | `if cond { a } else { b }` | Yes |
+| Match | `match expr { pat => result, _ => default }` | Yes |
+| For loop | `for i in 1..10 { }` / `for v in list { }` | No |
+| While loop | `while cond { }` | No |
+| Try/catch | `try { } catch e { }` | No |
+| Break/continue | `break` / `continue` | — |
+| Return | `return expr` | — |
+
+### Functions and closures
+
+```
+// Named function — parameters are const
+fn add(a, b) {
+    let result = a + b
+    return result
+}
+
+// Closure — anonymous, captures outer scope
+let double = |x| x * 2
+let big = filter(list, |x| x > 10)
+```
+
+### Operators
+
+| Category | Operators |
+|---|---|
+| Arithmetic | `+` `-` `*` `/` `^` |
+| Comparison | `==` `!=` `>` `<` `>=` `<=` |
+| Logical | `&&` (or `&`) `\|\|` `!` |
+| Membership | `in` — works with list, dict (key), string (substring) |
+| Pipe | `\|>` — passes left side as first argument to right side |
+| Index | `list[i]` `dict["key"]` |
+| String | `+` for concatenation |
+
+### String interpolation
+
+```
+let msg = f"mean = {mu:.2f}, n = {n}, p-value = {p:.4e}"
+```
+
+F-strings support any expression inside `{}` and format specifiers: `.Nf` (decimal places), `.Ne` (scientific notation). Escape braces with `{{` and `}}`.
+
+### Collections
+
+All collection operations are **immutable** — they return a new collection, leaving the original unchanged.
+
+**List operations:** `push` `pop` `insert` `remove` `clear` `reverse` `index` `slice` `join` `map` `filter` `unique` `flatten` `sort` `range` `len`
+
+**Dict operations:** `keys` `values` `has_key` `dict_set` `dict_remove` `dict_merge` `len`
+
+**Pipe chaining:**
+```
+[5, 3, 1, 4, 2]
+    |> filter(|x| x > 2)
+    |> sort
+    |> map(|x| x * 10)
+    |> reverse
+```
+
 ## Data I/O
 
 ```
