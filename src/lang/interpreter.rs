@@ -5036,8 +5036,18 @@ impl Interpreter {
                             use greeners::ExportableResult;
                             let coefs = parse_csv(&m.result.to_csv());
                             let n = m.residuals.len();
+                            let cov_label = match &m.result.cov_type {
+                                CovarianceType::NonRobust => "",
+                                CovarianceType::HC1 => " (robust)",
+                                CovarianceType::HC2 => " (HC2)",
+                                CovarianceType::HC3 => " (HC3)",
+                                CovarianceType::HC4 => " (HC4)",
+                                CovarianceType::NeweyWest(l) => { let _ = l; " (NW)" },
+                                CovarianceType::Clustered(_) => " (cluster)",
+                                CovarianceType::ClusteredTwoWay(_, _) => " (2w-cluster)",
+                            };
                             models.push(ModelInfo {
-                                label: "OLS".into(), coefs, n,
+                                label: format!("OLS{cov_label}"), coefs, n,
                                 r2: Some(m.result.r_squared),
                                 adj_r2: Some(m.result.adj_r_squared),
                                 ll: Some(m.result.log_likelihood),
