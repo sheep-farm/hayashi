@@ -397,6 +397,7 @@ pub struct Interpreter {
     ts_info: HashMap<String, String>,
     panel_info: HashMap<String, (String, String)>,
     rng_seed: Option<u64>,
+    preserved: HashMap<String, Value>,
     return_value: Option<Value>,
 }
 
@@ -407,6 +408,7 @@ impl Interpreter {
             ts_info: HashMap::new(),
             panel_info: HashMap::new(),
             rng_seed: None,
+            preserved: HashMap::new(),
             return_value: None,
         }
     }
@@ -4513,6 +4515,38 @@ impl Interpreter {
                 let elapsed = start.elapsed();
                 println!("  elapsed: {:.4}s", elapsed.as_secs_f64());
                 Ok(result)
+            }
+
+            // ── preserve/restore: salvar e restaurar estado de variáveis ───
+            "preserve" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("preserve(df) — salva cópia do DataFrame".into()));
+                }
+                let name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("preserve() requires a variable name".into())),
+                };
+                let val = self.env.get(&name)
+                    .ok_or_else(|| HayashiError::Runtime(format!("'{name}' not found")))?
+                    .clone();
+                self.preserved.insert(name.clone(), val);
+                println!("preserve {name}");
+                Ok(Value::Nil)
+            }
+
+            "restore" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("restore(df) — restaura DataFrame salvo".into()));
+                }
+                let name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("restore() requires a variable name".into())),
+                };
+                let val = self.preserved.remove(&name)
+                    .ok_or_else(|| HayashiError::Runtime(format!("'{name}' was not preserved")))?;
+                self.env.set(&name, val);
+                println!("restore {name}");
+                Ok(Value::Nil)
             }
 
             // ── source/do: executa script .hy no ambiente atual ─────────────
