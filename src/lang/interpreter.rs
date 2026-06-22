@@ -4637,13 +4637,33 @@ impl Interpreter {
                 println!();
                 println!("{}-+{}", "-".repeat(row_label_w), "-".repeat((col_w + 1) * sorted_names.len()));
 
-                // triângulo inferior (estilo Stata)
+                // p-value: t = r*sqrt(n-2)/sqrt(1-r²), df=n-2
+                let show_stars = func == "pwcorr" || matches!(opt_map.get("star"), Some(Value::Bool(true)));
+                let n_obs = df.n_rows() as f64;
+                let corr_pval = |r: f64| -> f64 {
+                    if n_obs <= 2.0 || (1.0 - r * r) <= 0.0 { return 1.0; }
+                    let t = r * (n_obs - 2.0).sqrt() / (1.0 - r * r).sqrt();
+                    t_pvalue_two(t, n_obs - 2.0)
+                };
+                let star = |p: f64| -> &str {
+                    if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" }
+                };
+
                 for (i, row_name) in sorted_names.iter().enumerate() {
                     print!("{:>width$} |", trunc(row_name, row_label_w), width = row_label_w);
                     for j in 0..=i {
-                        print!(" {:>10.4}", mat[[i, j]]);
+                        let r = mat[[i, j]];
+                        if show_stars && i != j {
+                            let s = star(corr_pval(r));
+                            print!(" {:>7.4}{:<3}", r, s);
+                        } else {
+                            print!(" {:>10.4}", r);
+                        }
                     }
                     println!();
+                }
+                if show_stars {
+                    println!("* p<0.10  ** p<0.05  *** p<0.01");
                 }
                 println!();
                 Ok(Value::Nil)
