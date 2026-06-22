@@ -1015,17 +1015,40 @@ impl Interpreter {
                 }
                 for j in 0..k { mean_coef[j] /= t_f; }
 
-                let mut fm_se = vec![0.0; k];
-                for coefs in &all_coefs {
-                    for j in 0..k { fm_se[j] += (coefs[j] - mean_coef[j]).powi(2); }
-                }
-                for j in 0..k { fm_se[j] = (fm_se[j] / (t_f * (t_f - 1.0))).sqrt(); }
+                // Newey-West lags para autocorrelação nos β̂_t
+                let nw_lags: usize = match opt_map.get("nw") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    Some(Value::Str(s)) => s.parse().unwrap_or(0),
+                    _ => 0,
+                };
 
-                // output
+                // Variância de Fama-MacBeth (com Newey-West se nw>0)
+                let mut fm_se = vec![0.0; k];
+                for j in 0..k {
+                    // variância base: (1/T) * Σ(β̂_t - β̄)²
+                    let var_j: f64 = all_coefs.iter().map(|c| (c[j] - mean_coef[j]).powi(2)).sum::<f64>() / t_f;
+                    if nw_lags > 0 {
+                        // Newey-West: adiciona autocovariances com kernel de Bartlett
+                        let mut nw_var = var_j;
+                        for lag in 1..=nw_lags.min(t_ok - 1) {
+                            let w = 1.0 - lag as f64 / (nw_lags as f64 + 1.0);
+                            let gamma: f64 = (lag..t_ok).map(|t| {
+                                (all_coefs[t][j] - mean_coef[j]) * (all_coefs[t - lag][j] - mean_coef[j])
+                            }).sum::<f64>() / t_f;
+                            nw_var += 2.0 * w * gamma;
+                        }
+                        fm_se[j] = (nw_var / t_f).max(0.0).sqrt();
+                    } else {
+                        fm_se[j] = (var_j / (t_f - 1.0)).sqrt();
+                    }
+                }
+
+                let nw_label = if nw_lags > 0 { format!("  NW({nw_lags})") } else { String::new() };
                 let thick = "═".repeat(70);
                 let thin  = "─".repeat(70);
                 println!("\n{thick}");
-                println!("{:^70}", " Fama-MacBeth (1973) ");
+                println!("{:^70}", format!(" Fama-MacBeth (1973){nw_label} "));
                 println!("{thin}");
                 println!("  Períodos: {t_ok}   N total: {n_total}");
                 println!("{thin}");
@@ -4669,6 +4692,24 @@ impl Interpreter {
                         "    let m = logit(Y ~ X1 + X2, df)\n",
                         "    margins(m)\n",
                         "    predict df yhat = m, pr\n",
+                    ),
+                    "fmb" | "fama_macbeth" | "xtfmb" => concat!(
+                        "fmb(formula, df, time=col [, nw=lags])\n",
+                        "  Fama-MacBeth (1973): OLS cross-sectional por período\n",
+                        "  SE = σ(β̂_t)/√T  (com Newey-West opcional)\n\n",
+                        "  Opções:\n",
+                        "    time=col    Coluna de tempo (ou via xtset)\n",
+                        "    nw=3        Newey-West lags para autocorrelação nos β̂_t\n\n",
+                        "  Exemplo:\n",
+                        "    fmb(ret ~ beta + size + bm, df, time=month)\n",
+                        "    fmb(ret ~ beta + size, df, time=month, nw=4)\n",
+                    ),
+                    "coefplot" | "coef_plot" => concat!(
+                        "coefplot(model [, width=50])\n",
+                        "  Gráfico ASCII de coeficientes com IC 95%\n\n",
+                        "  Exemplo:\n",
+                        "    let m = ols(Y ~ X1 + X2, df)\n",
+                        "    coefplot(m)\n",
                     ),
                     "predict" => concat!(
                         "predict df varname = model [, kind]\n",
