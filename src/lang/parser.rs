@@ -839,6 +839,14 @@ impl Parser {
                 Ok(Some(Stmt::Expr(expr)))
             }
 
+            Token::Int(_) | Token::Float(_) | Token::Bool(_)
+            | Token::StringLit(_) | Token::FStringLit(_)
+            | Token::LBracket | Token::LBrace | Token::LParen
+            | Token::Minus | Token::Bang | Token::Pipe => {
+                let expr = self.parse_expr()?;
+                Ok(Some(Stmt::Expr(expr)))
+            }
+
             t => Err(HayashiError::Parse { line, msg: format!("unexpected token at statement level: {t:?}") }),
         }
     }
