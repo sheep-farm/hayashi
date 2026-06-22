@@ -832,6 +832,44 @@ impl Interpreter {
                 Ok(Value::Str(s.replace(from.as_str(), to.as_str())))
             }
 
+            // ── Regex ─────────────────────────────────────────────────────────
+            // regexm(s, pattern)            → 1 se match, 0 se não
+            // regexr(s, pattern, replace)   → substitui primeira ocorrência
+            // regexra(s, pattern, replace)  → substitui todas
+            // regexs(s, pattern)            → extrai primeiro grupo de captura
+            "regexm" => {
+                if args.len() < 2 { return Err(HayashiError::Runtime("regexm(string, pattern)".into())); }
+                let s = match self.eval_expr(&args[0])? { Value::Str(s) => s, v => return Err(HayashiError::Type(format!("regexm: esperado string, recebeu {v}"))) };
+                let pat = match self.eval_expr(&args[1])? { Value::Str(s) => s, v => return Err(HayashiError::Type(format!("regexm: pattern deve ser string, recebeu {v}"))) };
+                Ok(Value::Bool(greeners::Transforms::regexm(&s, &pat)))
+            }
+
+            "regexr" => {
+                if args.len() < 3 { return Err(HayashiError::Runtime("regexr(string, pattern, replacement)".into())); }
+                let s = match self.eval_expr(&args[0])? { Value::Str(s) => s, v => return Err(HayashiError::Type(format!("regexr: esperado string, recebeu {v}"))) };
+                let pat = match self.eval_expr(&args[1])? { Value::Str(s) => s, v => return Err(HayashiError::Type(format!("regexr: pattern deve ser string, recebeu {v}"))) };
+                let rep = match self.eval_expr(&args[2])? { Value::Str(s) => s, v => return Err(HayashiError::Type(format!("regexr: replacement deve ser string, recebeu {v}"))) };
+                Ok(Value::Str(greeners::Transforms::regexr(&s, &pat, &rep)))
+            }
+
+            "regexra" => {
+                if args.len() < 3 { return Err(HayashiError::Runtime("regexra(string, pattern, replacement)".into())); }
+                let s = match self.eval_expr(&args[0])? { Value::Str(s) => s, v => return Err(HayashiError::Type(format!("regexra: esperado string, recebeu {v}"))) };
+                let pat = match self.eval_expr(&args[1])? { Value::Str(s) => s, v => return Err(HayashiError::Type(format!("regexra: pattern deve ser string, recebeu {v}"))) };
+                let rep = match self.eval_expr(&args[2])? { Value::Str(s) => s, v => return Err(HayashiError::Type(format!("regexra: replacement deve ser string, recebeu {v}"))) };
+                Ok(Value::Str(greeners::Transforms::regexra(&s, &pat, &rep)))
+            }
+
+            "regexs" => {
+                if args.len() < 2 { return Err(HayashiError::Runtime("regexs(string, pattern)".into())); }
+                let s = match self.eval_expr(&args[0])? { Value::Str(s) => s, v => return Err(HayashiError::Type(format!("regexs: esperado string, recebeu {v}"))) };
+                let pat = match self.eval_expr(&args[1])? { Value::Str(s) => s, v => return Err(HayashiError::Type(format!("regexs: pattern deve ser string, recebeu {v}"))) };
+                match greeners::Transforms::regexs(&s, &pat) {
+                    Some(m) => Ok(Value::Str(m)),
+                    None => Ok(Value::Str(String::new())),
+                }
+            }
+
             // ── Conversões de tipo ────────────────────────────────────────────
             "str" => {
                 if args.len() != 1 {
