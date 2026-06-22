@@ -1158,6 +1158,80 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── doublesort: portfolio sort bidimensional (Fama-French) ─────
+            // doublesort(df, ret, sort1, sort2, n1=5, n2=5)
+            "doublesort" | "double_sort" | "bivariate_sort" => {
+                if args.len() < 4 {
+                    return Err(HayashiError::Runtime("doublesort(df, ret, sort1, sort2, n1=5, n2=5)".into()));
+                }
+                let df_name = match &args[0] { Expr::Var(n) => n.clone(), _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let df_raw = match self.env.get(&df_name) { Some(Value::DataFrame(d)) => d.clone(), _ => return Err(HayashiError::Runtime(format!("'{df_name}' não é DataFrame"))) };
+                let df = self.maybe_filter_df(&df_raw, opts)?;
+                let ret_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("ret var".into())) };
+                let s1_name = match &args[2] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("sort1 var".into())) };
+                let s2_name = match &args[3] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("sort2 var".into())) };
+                let n1: usize = match opt_map.get("n1") { Some(Value::Int(v)) => (*v).max(2) as usize, _ => 5 };
+                let n2: usize = match opt_map.get("n2") { Some(Value::Int(v)) => (*v).max(2) as usize, _ => 5 };
+
+                let ret_col = Self::get_col_f64(&df, &ret_name)?;
+                let s1_col = Self::get_col_f64(&df, &s1_name)?;
+                let s2_col = Self::get_col_f64(&df, &s2_name)?;
+
+                // atribuir quantis independentes
+                let assign_quantile = |vals: &[f64], n_q: usize| -> Vec<usize> {
+                    let mut indexed: Vec<(usize, f64)> = vals.iter().enumerate()
+                        .filter(|(_, v)| v.is_finite())
+                        .map(|(i, &v)| (i, v))
+                        .collect();
+                    indexed.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+                    let n = indexed.len();
+                    let mut q = vec![usize::MAX; vals.len()];
+                    for (rank, &(orig_i, _)) in indexed.iter().enumerate() {
+                        q[orig_i] = (rank * n_q / n).min(n_q - 1);
+                    }
+                    q
+                };
+
+                let s1_vec: Vec<f64> = s1_col.to_vec();
+                let s2_vec: Vec<f64> = s2_col.to_vec();
+                let q1 = assign_quantile(&s1_vec, n1);
+                let q2 = assign_quantile(&s2_vec, n2);
+
+                // médias por célula (q1 x q2)
+                let mut cell_sum = vec![vec![0.0; n2]; n1];
+                let mut cell_n = vec![vec![0usize; n2]; n1];
+                for i in 0..ret_col.len() {
+                    if q1[i] < n1 && q2[i] < n2 && ret_col[i].is_finite() {
+                        cell_sum[q1[i]][q2[i]] += ret_col[i];
+                        cell_n[q1[i]][q2[i]] += 1;
+                    }
+                }
+
+                let thick = "═".repeat(12 + n2 * 10);
+                let thin  = "─".repeat(12 + n2 * 10);
+                println!("\n{thick}");
+                println!(" Double Sort: {ret_name} by {s1_name} (rows) × {s2_name} (cols)");
+                println!("{thin}");
+                print!("{:<12}", format!("{s1_name}\\{s2_name}"));
+                for j in 0..n2 {
+                    let label = if j == 0 { "Low" } else if j == n2 - 1 { "High" } else { &format!("Q{}", j + 1) };
+                    print!("{:>10}", label);
+                }
+                println!();
+                println!("{thin}");
+                for i in 0..n1 {
+                    let label = if i == 0 { "Low".to_string() } else if i == n1 - 1 { "High".to_string() } else { format!("Q{}", i + 1) };
+                    print!("{:<12}", label);
+                    for j in 0..n2 {
+                        let mean = if cell_n[i][j] > 0 { cell_sum[i][j] / cell_n[i][j] as f64 } else { f64::NAN };
+                        if mean.is_nan() { print!("{:>10}", "."); } else { print!("{:>10.4}", mean); }
+                    }
+                    println!();
+                }
+                println!("{thick}\n");
+                Ok(Value::Nil)
+            }
+
             // ── OLS ───────────────────────────────────────────────────────────
             "ols" => {
                 if args.len() < 2 {
