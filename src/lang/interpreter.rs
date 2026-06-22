@@ -11573,6 +11573,11 @@ impl Interpreter {
                 let n = df.n_rows();
                 Ok(vec![if *v { 1.0 } else { 0.0 }; n])
             }
+            Expr::Str(s) => {
+                Err(HayashiError::Type(format!(
+                    "string literal \"{s}\" cannot be used as numeric — se comparando com coluna string, use: col == \"{s}\""
+                )))
+            }
             Expr::Var(name) => {
                 use greeners::Column;
                 let col = df.get_column(name)

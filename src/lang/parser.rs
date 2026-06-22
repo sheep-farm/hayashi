@@ -327,13 +327,25 @@ impl Parser {
         while !matches!(self.peek(), Token::RParen | Token::Eof | Token::Newline) {
             // opt=value  ou  expr normal
             // Caso especial: keyword `if` usada como chave de opção (ex: mean(df, y, if=x==1))
-            let is_kw_opt = matches!(self.peek(), Token::If | Token::Else)
+            let is_kw_opt = matches!(self.peek(), Token::If | Token::Else | Token::Generate | Token::For | Token::In | Token::Return | Token::Break | Token::Continue | Token::Count)
                 && self.tokens.get(self.pos + 1).map(|(t, _)| t == &Token::Eq).unwrap_or(false);
             if is_kw_opt {
-                let kw_name = match self.peek() { Token::If => "if", _ => "else" }.to_string();
+                let kw_name = match self.peek() {
+                    Token::If => "if", Token::Else => "else", Token::Generate => "gen",
+                    Token::For => "for", Token::In => "in", Token::Return => "return",
+                    Token::Break => "break", Token::Continue => "continue", Token::Count => "count",
+                    _ => "?",
+                }.to_string();
                 self.advance(); // keyword
                 self.advance(); // =
-                let val = self.parse_expr()?;
+                let val = if kw_name == "if" || kw_name == "else" {
+                    self.parse_expr()?
+                } else if let Token::Ident(s) = self.peek().clone() {
+                    self.advance();
+                    Expr::Str(s)
+                } else {
+                    self.parse_expr()?
+                };
                 opts.push(Opt { name: kw_name, value: val });
             } else if let Token::Ident(name) = self.peek().clone() {
                 // lookahead: é opt=val?
@@ -349,13 +361,10 @@ impl Parser {
                     };
                     opts.push(Opt { name, value: val });
                 } else {
-                    // parse_primary dentro de args para evitar que '+' de fórmula
-                    // y ~ x1 + x2 seja interpretado como adição antes de checar '~'.
-                    // A fórmula é consumida inteira em parse_primary quando vê '~'.
-                    args.push(self.parse_primary()?);
+                    args.push(self.parse_expr()?);
                 }
             } else {
-                args.push(self.parse_primary()?);
+                args.push(self.parse_expr()?);
             }
 
             if self.peek() == &Token::Comma { self.advance(); }
@@ -626,7 +635,11 @@ impl Parser {
                                 row.push(v);
                             }
                             Token::Dot => { self.advance(); row.push(f64::NAN); } // . = missing
-                            _ => break,
+                            _ => {
+                                // pular tokens desconhecidos até fim da linha
+                                while !matches!(self.peek(), Token::Newline | Token::Eof) { self.advance(); }
+                                break;
+                            }
                         }
                     }
                     if !row.is_empty() { rows.push(row); }
