@@ -2,8 +2,12 @@
 name = "hayashi"
 version = "0.1.0"
 edition = "2021"
-description = "An interpreted, statically-typed language for applied econometrics"
+description = "An interpreted language for applied econometrics — Stata-like syntax, modern features, zero cost"
 license = "GPL-3.0-only"
+repository = "https://github.com/sheep-farm/hayashi"
+homepage = "https://github.com/sheep-farm/hayashi"
+keywords = ["econometrics", "statistics", "stata", "repl", "language"]
+categories = ["science", "command-line-utilities"]
 
 [[bin]]
 name = "hayashi"
