@@ -395,9 +395,8 @@ impl Env {
 pub struct Interpreter {
     pub env: Env,
     ts_info: HashMap<String, String>,
-    // estrutura de painel declarada via xtset(df, id, time)
     panel_info: HashMap<String, (String, String)>,
-    // valor capturado pelo Stmt::Return — consumido em eval_call
+    rng_seed: Option<u64>,
     return_value: Option<Value>,
 }
 
@@ -407,7 +406,16 @@ impl Interpreter {
             env: Env::new(),
             ts_info: HashMap::new(),
             panel_info: HashMap::new(),
+            rng_seed: None,
             return_value: None,
+        }
+    }
+
+    pub fn get_rng(&self) -> Box<dyn rand::RngCore> {
+        use rand::SeedableRng;
+        match self.rng_seed {
+            Some(seed) => Box::new(rand::rngs::StdRng::seed_from_u64(seed)),
+            None => Box::new(rand::thread_rng()),
         }
     }
 
@@ -2600,7 +2608,7 @@ impl Interpreter {
 
                     // bootstrap loop
                     use rand::seq::SliceRandom;
-                    let mut rng = rand::thread_rng();
+                    let mut rng = self.get_rng();
                     let n = df.n_rows();
                     let indices: Vec<usize> = (0..n).collect();
                     let mut boot_coefs = ndarray::Array2::<f64>::zeros((n_boot, k));
@@ -4326,6 +4334,33 @@ impl Interpreter {
                 }
 
                 Ok(Value::Nil)
+            }
+
+            // ── set_seed: reprodutibilidade ────────────────────────────────
+            "set_seed" | "seed" | "setseed" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("set_seed(N) — define semente do RNG".into()));
+                }
+                let s = match self.eval_expr(&args[0])? {
+                    Value::Int(v) => v as u64,
+                    Value::Float(v) => v as u64,
+                    _ => return Err(HayashiError::Type("seed deve ser inteiro".into())),
+                };
+                self.rng_seed = Some(s);
+                println!("set seed {s}");
+                Ok(Value::Nil)
+            }
+
+            // ── timer: mede tempo de execução ─────────────────────────────
+            "timer" | "time" | "bench" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("timer(expr) — mede tempo de avaliação".into()));
+                }
+                let start = std::time::Instant::now();
+                let result = self.eval_expr(&args[0])?;
+                let elapsed = start.elapsed();
+                println!("  elapsed: {:.4}s", elapsed.as_secs_f64());
+                Ok(result)
             }
 
             // ── source/do: executa script .hy no ambiente atual ─────────────
