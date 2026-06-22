@@ -6,16 +6,9 @@ Single binary, no dependencies, Stata-like syntax. Built in Rust on top of [Gree
 
 ## Install
 
-Requires Rust toolchain and system BLAS/LAPACK:
+Requires only the Rust toolchain. No system dependencies.
 
 ```bash
-# Arch Linux
-sudo pacman -S openblas lapack gcc-fortran
-
-# Ubuntu/Debian
-sudo apt install libopenblas-dev liblapack-dev gfortran
-
-# Build
 git clone https://github.com/sheep-farm/hayashi.git
 cd hayashi
 cargo build --release
