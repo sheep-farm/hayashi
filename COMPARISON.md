@@ -8,9 +8,9 @@
 | Binário | ~18 MB, zero deps (ODBC opcional) | ~500 MB + licença |
 | Linguagem | Rust | C/Java |
 | Interface | Terminal (REPL + script) + VS Code | GUI + terminal |
-| I/O | CSV, TSV, JSON, DTA, Excel, SQLite, ODBC | DTA, CSV, Excel, ODBC |
+| I/O | CSV, TSV, JSON, DTA, Excel, Parquet, SQLite, ODBC | DTA, CSV, Excel, ODBC |
 | Gráficos | SVG vetorial + ASCII | PNG/SVG/PDF nativos |
-| Testes | 294 automatizados + 59 exemplos | Suite interna proprietária |
+| Testes | 338 automatizados + 59 exemplos | Suite interna proprietária |
 | Scoping | Block-scoped, sem GC | Global |
 | DataFrames | Rc + copy-on-write | Único dataset ativo |
 
@@ -104,9 +104,10 @@ esttab m_*
 - **Block scoping**: lifetime determinístico sem GC
 - **Regex row-wise**: `ols(Y ~ X, df, if = regexm(name, "Dr"))`
 - **Copy-on-write**: `Rc<DataFrame>` — zero-copy em funções
-- **I/O multi-formato**: CSV, TSV, JSON, DTA, Excel, SQLite, ODBC
-- **Export multi-formato**: CSV, JSON, TSV, XLSX, SQLite, LaTeX, HTML
-- **294 testes + 59 exemplos**: `cargo test` em <1s
+- **I/O multi-formato**: CSV, TSV, JSON, DTA, Excel, Parquet, SQLite, ODBC
+- **Export multi-formato**: CSV, JSON, TSV, XLSX, Parquet, SQLite, LaTeX, HTML
+- **338 testes + 59 exemplos**: `cargo test` em <1s
+- **help() completo**: ~95 tópicos com assinatura + exemplo no REPL
 
 ## Onde Stata ganha
 
