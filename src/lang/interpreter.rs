@@ -627,6 +627,24 @@ impl Interpreter {
         }
     }
 
+    fn filter_df_by_mask(df: &DataFrame, mask: &[f64]) -> Result<DataFrame> {
+        let keep: Vec<usize> = mask.iter().enumerate()
+            .filter(|(_, &m)| m != 0.0)
+            .map(|(i, _)| i)
+            .collect();
+        df.iloc(Some(&keep), None)
+            .map_err(|e| HayashiError::Runtime(e.to_string()))
+    }
+
+    fn maybe_filter_df(&self, df: &DataFrame, opts: &[Opt]) -> Result<DataFrame> {
+        if let Some(if_opt) = opts.iter().find(|o| o.name == "if") {
+            let mask = Self::eval_col_expr(&if_opt.value, df)?;
+            Self::filter_df_by_mask(df, &mask)
+        } else {
+            Ok(df.clone())
+        }
+    }
+
     // ── Funções built-in ──────────────────────────────────────────────────────
 
     fn eval_call(&mut self, func: &str, args: &[Expr], opts: &[Opt]) -> Result<Value> {
@@ -927,10 +945,11 @@ impl Interpreter {
                     Expr::Var(name) => name.clone(),
                     _ => return Err(HayashiError::Type("second argument must be a DataFrame variable".into())),
                 };
-                let df = match self.env.get(&df_name) {
+                let df_raw = match self.env.get(&df_name) {
                     Some(Value::DataFrame(df)) => df.clone(),
                     _ => return Err(HayashiError::Runtime(format!("'{df_name}' is not a DataFrame"))),
                 };
+                let df = self.maybe_filter_df(&df_raw, opts)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let cov = Self::resolve_cov_full(&opt_map, &df)?;
 
@@ -1212,7 +1231,7 @@ impl Interpreter {
 
             // ── Logit ─────────────────────────────────────────────────────────
             "logit" => {
-                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1226,7 +1245,7 @@ impl Interpreter {
 
             // ── Probit ────────────────────────────────────────────────────────
             "probit" => {
-                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1302,7 +1321,7 @@ impl Interpreter {
             // ── Tobit — MLE com censura esquerda ──────────────────────────────
             // tobit(formula, df [, ll=0])
             "tobit" => {
-                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1611,7 +1630,7 @@ impl Interpreter {
 
             // ── Poisson ───────────────────────────────────────────────────────
             "poisson" => {
-                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1627,7 +1646,7 @@ impl Interpreter {
 
             // ── Negative Binomial (NB2) ───────────────────────────────────────
             "nbreg" | "negbin" => {
-                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1643,7 +1662,7 @@ impl Interpreter {
 
             // ── Ordered Logit ─────────────────────────────────────────────────
             "ologit" => {
-                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1658,7 +1677,7 @@ impl Interpreter {
 
             // ── Ordered Probit ────────────────────────────────────────────────
             "oprobit" => {
-                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1673,7 +1692,7 @@ impl Interpreter {
 
             // ── Multinomial Logit ─────────────────────────────────────────────
             "mlogit" => {
-                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1723,7 +1742,7 @@ impl Interpreter {
             // ── Quantile Regression ───────────────────────────────────────────
             // qreg(y ~ x1 + x2, df, tau=0.5, boot=200)
             "qreg" => {
-                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
                 let tau = match opt_map.get("tau") {
                     Some(Value::Float(v)) => *v,
                     Some(Value::Int(v))   => *v as f64,
@@ -1829,7 +1848,7 @@ impl Interpreter {
             // rlm(y ~ x1 + x2, df, norm=huber|tukey|andrews|hampel, cov=HC3)
             // norm padrão: Huber (c=1.345)
             "rlm" => {
-                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1862,7 +1881,7 @@ impl Interpreter {
             // family: gaussian (padrão), binomial, poisson
             // corr:   independence (padrão), exchangeable, ar1, unstructured
             "gee" => {
-                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
                 let id_col = match opt_map.get("id") {
                     Some(Value::Str(s)) => s.clone(),
                     None => return Err(HayashiError::Runtime(
@@ -1925,7 +1944,7 @@ impl Interpreter {
             // ── WLS (Weighted Least Squares) ──────────────────────────────────
             // wls(y ~ x1 + x2, df, weights="w_col", cov=HC3)
             "wls" => {
-                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1954,7 +1973,7 @@ impl Interpreter {
             // zip(y ~ x1 + x2, df, inflate=["x3", "x4"])
             // zinb(y ~ x1 + x2, df)
             "zip" | "zinb" => {
-                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -2006,7 +2025,7 @@ impl Interpreter {
             // mixed(y ~ x1 + x2, df, id="group")           # intercept aleatório
             // mixed(y ~ x1 + x2, df, id="group", re=["x1"]) # + slope aleatório
             "mixed" | "mixedlm" => {
-                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -2112,7 +2131,7 @@ impl Interpreter {
             // ── GLSAR — GLS com erros AR(p) (Cochrane-Orcutt/Prais-Winsten) ─
             // glsar(y ~ x1 + x2, df, ar=1, iter=50)
             "glsar" | "prais" => {
-                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -2183,7 +2202,7 @@ impl Interpreter {
             // betareg(y ~ x1 + x2, df, link=cloglog)
             // Requer y ∈ (0,1) estritamente (proporções, probabilidades)
             "betareg" | "beta" => {
-                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -2214,7 +2233,7 @@ impl Interpreter {
             // Links: identity, log, logit, probit, inverse, cloglog
             // Se link omitido usa link canônico da família
             "glm" => {
-                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -2764,7 +2783,7 @@ impl Interpreter {
             // Grupos sem variação em y são automaticamente excluídos
             // Sem intercepto — absorvido pelo FE
             "clogit" | "xtlogit_fe" => {
-                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
                 let group_col = match opt_map.get("group") {
                     Some(Value::Str(s)) => s.clone(),
                     None => return Err(HayashiError::Runtime("clogit requer group=\"coluna_id\"".into())),
@@ -2795,7 +2814,7 @@ impl Interpreter {
             // Equivalente a FE Poisson; consistente sob heterogeidade não observada
             // Só requer que E[y|x,c] = exp(c + xβ) — não requer y ~ Poisson (PPML)
             "cpoisson" | "xtpoisson_fe" | "ppml" => {
-                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
                 let group_col = match opt_map.get("group") {
                     Some(Value::Str(s)) => s.clone(),
                     None => return Err(HayashiError::Runtime("cpoisson requer group=\"coluna_id\"".into())),
@@ -3119,7 +3138,7 @@ impl Interpreter {
             // Estima OLS para cada janela de tamanho `window`
             // Útil para: coeficientes time-varying, testes de estabilidade
             "rolling" | "rols" => {
-                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -3141,7 +3160,7 @@ impl Interpreter {
             // recursive(y ~ x1 + x2, df)
             // Expande a janela de 1 em 1 — base para CUSUM e estabilidade
             "recursive" | "recols" => {
-                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -8878,7 +8897,7 @@ impl Interpreter {
             // ── GAM — Generalized Additive Model (P-splines) ─────────────────
             // gam(y ~ x2, df, smooth="x1", spline_df=10, alpha=0.1, family=gaussian, link=log)
             "gam" | "gamfit" => {
-                let (formula_ast, df) = self.extract_binary_args(args)?;
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -11544,7 +11563,7 @@ impl Interpreter {
         println!();
     }
 
-    fn extract_binary_args(&mut self, args: &[Expr]) -> Result<(Formula, DataFrame)> {
+    fn extract_binary_args_filtered(&mut self, args: &[Expr], opts: &[Opt]) -> Result<(Formula, DataFrame)> {
         if args.len() < 2 {
             return Err(HayashiError::Runtime("estimator requires (formula, dataframe)".into()));
         }
@@ -11556,10 +11575,11 @@ impl Interpreter {
             Expr::Var(name) => name.clone(),
             _ => return Err(HayashiError::Type("second argument must be a DataFrame variable".into())),
         };
-        let df = match self.env.get(&df_name) {
+        let df_raw = match self.env.get(&df_name) {
             Some(Value::DataFrame(df)) => df.clone(),
             _ => return Err(HayashiError::Runtime(format!("'{df_name}' is not a DataFrame"))),
         };
+        let df = self.maybe_filter_df(&df_raw, opts)?;
         Ok((formula_ast, df))
     }
 
