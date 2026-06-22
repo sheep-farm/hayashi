@@ -273,6 +273,21 @@ impl Parser {
                 Ok(Expr::List(items))
             }
 
+            // Dict literal: {"key": value, ...}
+            Token::LBrace => {
+                self.advance();
+                let mut pairs = Vec::new();
+                while !matches!(self.peek(), Token::RBrace | Token::Eof) {
+                    let key = self.parse_expr()?;
+                    self.expect(&Token::Colon)?;
+                    let val = self.parse_expr()?;
+                    pairs.push((key, val));
+                    if self.peek() == &Token::Comma { self.advance(); }
+                }
+                self.expect(&Token::RBrace)?;
+                Ok(Expr::Dict(pairs))
+            }
+
             // Fórmula sem LHS: ~ z1 + z2
             Token::Tilde => {
                 let formula = self.parse_formula(String::new())?;
@@ -448,6 +463,14 @@ impl Parser {
                 self.expect(&Token::Eq)?;
                 let value = self.parse_expr()?;
                 Ok(Some(Stmt::Let { name, value }))
+            }
+
+            Token::Ident(ref s) if s == "const" => {
+                self.advance();
+                let name = self.expect_ident()?;
+                self.expect(&Token::Eq)?;
+                let value = self.parse_expr()?;
+                Ok(Some(Stmt::Const { name, value }))
             }
 
             Token::Load => {
