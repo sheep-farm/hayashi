@@ -10995,6 +10995,101 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ══════════════════════════════════════════════════════════════════
+            // Gráficos SVG (publicáveis) — exporta para arquivo
+            // ══════════════════════════════════════════════════════════════════
+
+            // graph_scatter(df, X, Y, path="plot.svg" [, title="", width=800, height=600])
+            "graph_scatter" | "gscatter" => {
+                if args.len() < 3 {
+                    return Err(HayashiError::Runtime("graph_scatter(df, x_var, y_var, path=\"plot.svg\")".into()));
+                }
+                let df = match self.eval_expr(&args[0])? { Value::DataFrame(d) => d, _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let x_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("x var".into())) };
+                let y_name = match &args[2] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("y var".into())) };
+                let path = match opt_map.get("path") { Some(Value::Str(s)) => s.clone(), _ => format!("{x_name}_{y_name}.svg") };
+                let title = match opt_map.get("title") { Some(Value::Str(s)) => s.clone(), _ => format!("{y_name} vs {x_name}") };
+                let w = match opt_map.get("width") { Some(Value::Int(v)) => *v as u32, _ => 800 };
+                let h = match opt_map.get("height") { Some(Value::Int(v)) => *v as u32, _ => 600 };
+                let x = Self::get_col_f64(&df, &x_name)?;
+                let y = Self::get_col_f64(&df, &y_name)?;
+                crate::io::plot::Plot::scatter(&x.to_vec(), &y.to_vec(), &x_name, &y_name, &title, &path, w, h)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                println!("graph saved: {path}");
+                Ok(Value::Nil)
+            }
+
+            // graph_line(df, X, Y, path="plot.svg")
+            "graph_line" | "gline" => {
+                if args.len() < 3 {
+                    return Err(HayashiError::Runtime("graph_line(df, x_var, y_var, path=\"plot.svg\")".into()));
+                }
+                let df = match self.eval_expr(&args[0])? { Value::DataFrame(d) => d, _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let x_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("x var".into())) };
+                let y_name = match &args[2] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("y var".into())) };
+                let path = match opt_map.get("path") { Some(Value::Str(s)) => s.clone(), _ => format!("{y_name}_line.svg") };
+                let title = match opt_map.get("title") { Some(Value::Str(s)) => s.clone(), _ => format!("{y_name}") };
+                let w = match opt_map.get("width") { Some(Value::Int(v)) => *v as u32, _ => 800 };
+                let h = match opt_map.get("height") { Some(Value::Int(v)) => *v as u32, _ => 600 };
+                let x = Self::get_col_f64(&df, &x_name)?;
+                let y = Self::get_col_f64(&df, &y_name)?;
+                crate::io::plot::Plot::line(&x.to_vec(), &y.to_vec(), &x_name, &y_name, &title, &path, w, h)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                println!("graph saved: {path}");
+                Ok(Value::Nil)
+            }
+
+            // graph_hist(df, var, path="hist.svg" [, bins=30])
+            "graph_hist" | "ghist" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("graph_hist(df, var, path=\"hist.svg\")".into()));
+                }
+                let df = match self.eval_expr(&args[0])? { Value::DataFrame(d) => d, _ => return Err(HayashiError::Type("primeiro arg deve ser DataFrame".into())) };
+                let var_name = match &args[1] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => return Err(HayashiError::Type("var".into())) };
+                let path = match opt_map.get("path") { Some(Value::Str(s)) => s.clone(), _ => format!("{var_name}_hist.svg") };
+                let title = match opt_map.get("title") { Some(Value::Str(s)) => s.clone(), _ => format!("Histogram — {var_name}") };
+                let bins = match opt_map.get("bins") { Some(Value::Int(v)) => *v as usize, _ => 30 };
+                let w = match opt_map.get("width") { Some(Value::Int(v)) => *v as u32, _ => 800 };
+                let h = match opt_map.get("height") { Some(Value::Int(v)) => *v as u32, _ => 600 };
+                let vals = Self::get_col_f64(&df, &var_name)?;
+                crate::io::plot::Plot::histogram(&vals.to_vec(), &var_name, &title, &path, w, h, bins)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                println!("graph saved: {path}");
+                Ok(Value::Nil)
+            }
+
+            // graph_coef(model, path="coef.svg")
+            "graph_coef" | "gcoefplot" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("graph_coef(model, path=\"coef.svg\")".into()));
+                }
+                let model = self.eval_expr(&args[0])?;
+                let path = match opt_map.get("path") { Some(Value::Str(s)) => s.clone(), _ => "coefplot.svg".to_string() };
+                let title = match opt_map.get("title") { Some(Value::Str(s)) => s.clone(), _ => "Coefficient Plot".to_string() };
+                let w = match opt_map.get("width") { Some(Value::Int(v)) => *v as u32, _ => 700 };
+                let h = match opt_map.get("height") { Some(Value::Int(v)) => *v as u32, _ => 500 };
+                let params = Self::extract_params(&model).ok_or_else(|| HayashiError::Runtime("model sem params".into()))?;
+                let se = Self::extract_se(&model).unwrap_or_default();
+                let names = Self::extract_var_names(&model);
+                let z = 1.96_f64;
+                let mut plot_names = Vec::new();
+                let mut plot_coefs = Vec::new();
+                let mut plot_lo = Vec::new();
+                let mut plot_hi = Vec::new();
+                for i in 0..params.len() {
+                    let name = names.get(i).map(|s| s.as_str()).unwrap_or("?");
+                    if name == "_cons" || name == "const" { continue; }
+                    plot_names.push(name.to_string());
+                    plot_coefs.push(params[i]);
+                    plot_lo.push(params[i] - z * se.get(i).unwrap_or(&0.0));
+                    plot_hi.push(params[i] + z * se.get(i).unwrap_or(&0.0));
+                }
+                crate::io::plot::Plot::coefplot(&plot_names, &plot_coefs, &plot_lo, &plot_hi, &title, &path, w, h)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                println!("graph saved: {path}");
+                Ok(Value::Nil)
+            }
+
             // ── Função definida pelo usuário ──────────────────────────────────
             other => {
                 // Recupera a função do env (se existir)
