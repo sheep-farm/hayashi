@@ -3435,3 +3435,202 @@ end
 generate df T = invttail(10, X)
 "#);
 }
+
+// ── Stata-parity features ───────────────────────────────────────────────────
+
+#[test]
+fn quietly_suppresses_output() {
+    let (ok, out) = run_inline(r#"
+input df
+Y X
+1 2
+3 4
+5 6
+7 8
+end
+quietly(ols(Y ~ X, df))
+"#);
+    assert!(ok, "quietly failed:\n{out}");
+    // OLS output should NOT appear because quietly returns Nil
+    assert!(!out.contains("Coef"), "quietly should suppress OLS output:\n{out}");
+}
+
+#[test]
+fn quietly_in_let_works() {
+    assert_ok("quietly_let", r#"
+let x = 42
+let y = quietly(x)
+"#);
+}
+
+#[test]
+fn capture_ignores_error() {
+    let (ok, _out) = run_inline(r#"
+capture(undefined_var_xyz)
+display "ok"
+"#);
+    assert!(ok, "capture should not propagate error");
+}
+
+#[test]
+fn capture_passes_value() {
+    assert_ok_contains("capture_pass", r#"
+let x = capture(42)
+display x
+"#, "42");
+}
+
+#[test]
+fn assert_true_passes() {
+    assert_ok("assert_true", r#"
+assert(1 > 0)
+assert(true)
+"#);
+}
+
+#[test]
+fn assert_false_fails() {
+    let (ok, _) = run_inline("assert(1 > 2)");
+    assert!(!ok, "assert(false) should fail");
+}
+
+#[test]
+fn assert_custom_message() {
+    let (ok, out) = run_inline(r#"assert(false, "minha msg")"#);
+    assert!(!ok, "assert(false) should fail");
+    assert!(out.contains("minha msg"), "should show custom message:\n{out}");
+}
+
+#[test]
+fn format_decimals() {
+    assert_ok_contains("format_2f", r#"
+let s = format(3.14159, "%.2f")
+display s
+"#, "3.14");
+}
+
+#[test]
+fn format_zero_decimals() {
+    assert_ok_contains("format_0f", r#"
+let s = format(99.7, "%.0f")
+display s
+"#, "100");
+}
+
+#[test]
+fn duplicates_report() {
+    assert_ok_contains("dup_report", r#"
+input df
+X
+1
+2
+2
+3
+3
+3
+end
+duplicates(df, X)
+"#, "duplicatas");
+}
+
+#[test]
+fn duplicates_drop() {
+    assert_ok_contains("dup_drop", r#"
+input df
+X Y
+1 10
+2 20
+2 30
+3 40
+3 50
+3 60
+end
+duplicates(df, X, action=drop)
+"#, "3 obs removidas");
+}
+
+#[test]
+fn duplicates_tag() {
+    assert_ok_contains("dup_tag", r#"
+input df
+X
+1
+2
+2
+3
+3
+3
+end
+duplicates(df, X, action=tag)
+"#, "_dup");
+}
+
+#[test]
+fn label_and_describe() {
+    assert_ok_contains("label_describe", r#"
+input df
+Y X
+1 2
+3 4
+end
+label(df, Y, "Variável dependente")
+label(df, X, "Variável independente")
+describe(df)
+"#, "Variável dependente");
+}
+
+#[test]
+fn rowtotal_treats_nan_as_zero() {
+    assert_ok("rowtotal", r#"
+input df
+A B
+1 2
+3 .
+. 5
+end
+generate df RT = rowtotal(A, B)
+"#);
+}
+
+#[test]
+fn rowmiss_counts_nan() {
+    assert_ok("rowmiss", r#"
+input df
+A B C
+1 2 3
+. 2 .
+. . .
+end
+generate df M = rowmiss(A, B, C)
+"#);
+}
+
+#[test]
+fn help_quietly() {
+    assert_ok_contains("help_quietly", "help(quietly)", "quietly");
+}
+
+#[test]
+fn help_capture() {
+    assert_ok_contains("help_capture", "help(capture)", "capture");
+}
+
+#[test]
+fn help_assert() {
+    assert_ok_contains("help_assert", "help(assert)", "assert");
+}
+
+#[test]
+fn help_duplicates() {
+    assert_ok_contains("help_duplicates", "help(duplicates)", "duplicates");
+}
+
+#[test]
+fn help_format() {
+    assert_ok_contains("help_format", "help(format)", "format");
+}
+
+#[test]
+fn help_label() {
+    assert_ok_contains("help_label", "help(label)", "label");
+}
