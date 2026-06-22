@@ -963,61 +963,6 @@ impl Interpreter {
                             "fmb requires time=col or xtset(df, id, time)".into()
                         ))?,
                 };
-
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-
-                // períodos únicos
-                let t_vals = Self::get_col_f64(&df, &time_col)?;
-                let mut periods: Vec<i64> = t_vals.iter().map(|&v| v as i64).collect::<std::collections::HashSet<_>>().into_iter().collect();
-                periods.sort();
-                let n_periods = periods.len();
-
-                if n_periods < 2 {
-                    return Err(HayashiError::Runtime("fmb requires at least 2 time periods".into()));
-                }
-
-                // cross-sectional OLS por período
-                let mut all_coefs: Vec<Vec<f64>> = Vec::new();
-                let mut var_names: Vec<String> = Vec::new();
-                let mut n_total = 0usize;
-
-                for &t in &periods {
-                    let mask: Vec<f64> = t_vals.iter().map(|&v| if v as i64 == t { 1.0 } else { 0.0 }).collect();
-                    let sub_df = Self::filter_df_by_mask(&df, &mask)?;
-                    let n_t = sub_df.n_rows();
-                    if n_t < 3 { continue; }
-                    n_total += n_t;
-                    match OLS::from_formula(&g_formula, &sub_df, CovarianceType::NonRobust) {
-                        Ok(result) => {
-                            if var_names.is_empty() {
-                                var_names = result.variable_names.clone().unwrap_or_default();
-                            }
-                            all_coefs.push(result.params.to_vec());
-                        }
-                        Err(_) => {} // pular períodos com problemas
-                    }
-                }
-
-                let t_ok = all_coefs.len();
-                if t_ok < 2 {
-                    return Err(HayashiError::Runtime(
-                        format!("fmb: only {t_ok} periods converged, need at least 2")
-                    ));
-                }
-
-                let k = all_coefs[0].len();
-                let t_f = t_ok as f64;
-
-                // média e SE de Fama-MacBeth
-                let mut mean_coef = vec![0.0; k];
-                for coefs in &all_coefs {
-                    for j in 0..k { mean_coef[j] += coefs[j]; }
-                }
-                for j in 0..k { mean_coef[j] /= t_f; }
-
-                // Newey-West lags para autocorrelação nos β̂_t
                 let nw_lags: usize = match opt_map.get("nw") {
                     Some(Value::Int(v)) => *v as usize,
                     Some(Value::Float(v)) => *v as usize,
@@ -1025,45 +970,13 @@ impl Interpreter {
                     _ => 0,
                 };
 
-                // Variância de Fama-MacBeth (com Newey-West se nw>0)
-                let mut fm_se = vec![0.0; k];
-                for j in 0..k {
-                    // variância base: (1/T) * Σ(β̂_t - β̄)²
-                    let var_j: f64 = all_coefs.iter().map(|c| (c[j] - mean_coef[j]).powi(2)).sum::<f64>() / t_f;
-                    if nw_lags > 0 {
-                        // Newey-West: adiciona autocovariances com kernel de Bartlett
-                        let mut nw_var = var_j;
-                        for lag in 1..=nw_lags.min(t_ok - 1) {
-                            let w = 1.0 - lag as f64 / (nw_lags as f64 + 1.0);
-                            let gamma: f64 = (lag..t_ok).map(|t| {
-                                (all_coefs[t][j] - mean_coef[j]) * (all_coefs[t - lag][j] - mean_coef[j])
-                            }).sum::<f64>() / t_f;
-                            nw_var += 2.0 * w * gamma;
-                        }
-                        fm_se[j] = (nw_var / t_f).max(0.0).sqrt();
-                    } else {
-                        fm_se[j] = (var_j / (t_f - 1.0)).sqrt();
-                    }
-                }
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-                let nw_label = if nw_lags > 0 { format!("  NW({nw_lags})") } else { String::new() };
-                let thick = "═".repeat(70);
-                let thin  = "─".repeat(70);
-                println!("\n{thick}");
-                println!("{:^70}", format!(" Fama-MacBeth (1973){nw_label} "));
-                println!("{thin}");
-                println!("  Períodos: {t_ok}   N total: {n_total}");
-                println!("{thin}");
-                println!("{:<18} {:>10} {:>10} {:>10} {:>10}", "Variable", "Coef", "FM-SE", "t", "p");
-                println!("{thin}");
-                for j in 0..k {
-                    let name = var_names.get(j).map(|s| s.as_str()).unwrap_or("?");
-                    let t_stat = if fm_se[j] > 1e-15 { mean_coef[j] / fm_se[j] } else { f64::NAN };
-                    let p = t_pvalue_two(t_stat, (t_ok - 1) as f64);
-                    let sig = if p < 0.01 { "***" } else if p < 0.05 { "**" } else if p < 0.10 { "*" } else { "" };
-                    println!("{:<18} {:>10.4} {:>10.4} {:>10.4} {:>10.4} {sig}", name, mean_coef[j], fm_se[j], t_stat, p);
-                }
-                println!("{thick}\n");
+                let result = greeners::FamaMacBeth::fit(&g_formula, &df, &time_col, nw_lags)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                println!("{result}");
                 Ok(Value::Nil)
             }
 
@@ -5677,29 +5590,17 @@ impl Interpreter {
                 match model {
                     // ── Logit / Probit ────────────────────────────────────────
                     Value::BinaryResult(bm) => {
-                        let n    = bm.x.nrows();
-                        let k    = bm.x.ncols();
-                        let beta = &bm.result.params;
-
-                        // aplicar at_* → copiar X e substituir colunas fixadas
-                        let x_use = if at_vals.is_empty() {
-                            bm.x.clone()
-                        } else {
-                            let mut x_mod = bm.x.clone();
-                            for (var, val) in &at_vals {
-                                if let Some(idx) = bm.coef_names.iter().position(|n| n == var) {
-                                    x_mod.column_mut(idx).fill(*val);
-                                }
+                        let mut x_use = bm.x.clone();
+                        for (var, val) in &at_vals {
+                            if let Some(idx) = bm.coef_names.iter().position(|n| n == var) {
+                                x_use = greeners::Margins::with_at(&x_use, idx, *val);
                             }
-                            x_mod
+                        }
+                        let ame_result = if bm.kind == "logit" {
+                            greeners::Margins::ame_logit(&bm.result.params, &x_use, &bm.coef_names)
+                        } else {
+                            greeners::Margins::ame_probit(&bm.result.params, &x_use, &bm.coef_names)
                         };
-
-                        let eta: Vec<f64> = (0..n).map(|i| x_use.row(i).dot(beta)).collect();
-                        let deriv: Vec<f64> = eta.iter().map(|&e| match bm.kind.as_str() {
-                            "logit"  => { let p = logistic(e); p * (1.0 - p) }
-                            "probit" => norm_pdf(e),
-                            _        => 0.0,
-                        }).collect();
                         let at_label = if at_vals.is_empty() { String::new() }
                             else { format!("  at({})", at_vals.iter().map(|(k,v)| format!("{k}={v}")).collect::<Vec<_>>().join(", ")) };
                         println!("\n{sep2}");
@@ -5707,33 +5608,27 @@ impl Interpreter {
                         println!("{sep2}");
                         println!("{:<22} {:>14}", "Variable", "dy/dx");
                         println!("{sep}");
-                        for k_idx in 0..k {
-                            let name = bm.coef_names.get(k_idx).map(String::as_str).unwrap_or("?");
+                        for (i, name) in ame_result.variable_names.iter().enumerate() {
                             if !show_var(name) { continue; }
-                            let ame: f64 = deriv.iter().map(|&d| d * beta[k_idx]).sum::<f64>() / n as f64;
-                            println!("{:<22} {:>14.6}", name, ame);
+                            println!("{:<22} {:>14.6}", name, ame_result.effects[i]);
                         }
                         println!("{sep}");
-                        println!("n = {n}");
+                        println!("n = {}", ame_result.n_obs);
                         println!("{sep2}\n");
                     }
 
                     // ── Poisson / NegBin ──────────────────────────────────────
-                    // AME_k = β_k * (1/n) Σ_i exp(X_iβ)  [derivada de E[y]=exp(Xβ)]
                     Value::PoissonResult(r) => {
-                        let x    = r.x_data();
-                        let n    = x.nrows();
-                        let beta = &r.params;
-                        let fb: Vec<String> = (0..beta.len()).map(|i| format!("x{i}")).collect();
+                        let x = r.x_data();
+                        let fb: Vec<String> = (0..r.params.len()).map(|i| format!("x{i}")).collect();
                         let names = r.variable_names.as_ref().unwrap_or(&fb);
-                        let x_use = if at_vals.is_empty() { x.to_owned() } else {
-                            let mut xm = x.to_owned();
-                            for (var, val) in &at_vals {
-                                if let Some(idx) = names.iter().position(|n| n == var) { xm.column_mut(idx).fill(*val); }
+                        let mut x_use = x.to_owned();
+                        for (var, val) in &at_vals {
+                            if let Some(idx) = names.iter().position(|n| n == var) {
+                                x_use = greeners::Margins::with_at(&x_use, idx, *val);
                             }
-                            xm
-                        };
-                        let mu_bar: f64 = (0..n).map(|i| x_use.row(i).dot(beta).exp()).sum::<f64>() / n as f64;
+                        }
+                        let ame_result = greeners::Margins::ame_exponential(&r.params, &x_use, names);
                         let at_label = if at_vals.is_empty() { String::new() }
                             else { format!("  at({})", at_vals.iter().map(|(k,v)| format!("{k}={v}")).collect::<Vec<_>>().join(", ")) };
                         println!("\n{sep2}");
@@ -5741,30 +5636,26 @@ impl Interpreter {
                         println!("{sep2}");
                         println!("{:<22} {:>14}", "Variable", "dy/dx");
                         println!("{sep}");
-                        for (k_idx, name) in names.iter().enumerate() {
+                        for (k_idx, name) in ame_result.variable_names.iter().enumerate() {
                             if !show_var(name) { continue; }
-                            if k_idx >= beta.len() { break; }
-                            let ame = beta[k_idx] * mu_bar;
+                            let ame = ame_result.effects[k_idx];
                             println!("{:<22} {:>14.6}", name, ame);
                         }
                         println!("{sep}");
-                        println!("n = {n}   μ̄ = {mu_bar:.4}");
+                        println!("n = {}", ame_result.n_obs);
                         println!("{sep2}\n");
                     }
                     Value::NegBinResult(r) => {
-                        let x    = r.x_data();
-                        let n    = x.nrows();
-                        let beta = &r.params;
-                        let fb: Vec<String> = (0..beta.len()).map(|i| format!("x{i}")).collect();
+                        let x = r.x_data();
+                        let fb: Vec<String> = (0..r.params.len()).map(|i| format!("x{i}")).collect();
                         let names = r.variable_names.as_ref().unwrap_or(&fb);
-                        let x_use = if at_vals.is_empty() { x.to_owned() } else {
-                            let mut xm = x.to_owned();
-                            for (var, val) in &at_vals {
-                                if let Some(idx) = names.iter().position(|n| n == var) { xm.column_mut(idx).fill(*val); }
+                        let mut x_use = x.to_owned();
+                        for (var, val) in &at_vals {
+                            if let Some(idx) = names.iter().position(|n| n == var) {
+                                x_use = greeners::Margins::with_at(&x_use, idx, *val);
                             }
-                            xm
-                        };
-                        let mu_bar: f64 = (0..n).map(|i| x_use.row(i).dot(beta).exp()).sum::<f64>() / n as f64;
+                        }
+                        let ame_result = greeners::Margins::ame_exponential(&r.params, &x_use, names);
                         let at_label = if at_vals.is_empty() { String::new() }
                             else { format!("  at({})", at_vals.iter().map(|(k,v)| format!("{k}={v}")).collect::<Vec<_>>().join(", ")) };
                         println!("\n{sep2}");
@@ -5772,14 +5663,13 @@ impl Interpreter {
                         println!("{sep2}");
                         println!("{:<22} {:>14}", "Variable", "dy/dx");
                         println!("{sep}");
-                        for (k_idx, name) in names.iter().enumerate() {
+                        for (k_idx, name) in ame_result.variable_names.iter().enumerate() {
                             if !show_var(name) { continue; }
-                            if k_idx >= beta.len() { break; }
-                            let ame = beta[k_idx] * mu_bar;
+                            let ame = ame_result.effects[k_idx];
                             println!("{:<22} {:>14.6}", name, ame);
                         }
                         println!("{sep}");
-                        println!("n = {n}   μ̄ = {mu_bar:.4}  α = {:.4}", r.alpha);
+                        println!("n = {}   α = {:.4}", ame_result.n_obs, r.alpha);
                         println!("{sep2}\n");
                     }
 
