@@ -4328,6 +4328,22 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── source/do: executa script .hy no ambiente atual ─────────────
+            "source" | "do" | "run" | "include" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("source(\"script.hy\")".into()));
+                }
+                let path = match self.eval_expr(&args[0])? {
+                    Value::Str(s) => s,
+                    _ => return Err(HayashiError::Type("source() requires a string path".into())),
+                };
+                let src = std::fs::read_to_string(&path)
+                    .map_err(|e| HayashiError::Runtime(format!("cannot read '{path}': {e}")))?;
+                println!("source {path}");
+                crate::lang::run_source(&src, self)?;
+                Ok(Value::Nil)
+            }
+
             // ── help: sistema de ajuda inline ──────────────────────────────
             "help" => {
                 let topic = if args.is_empty() { String::new() }
@@ -4350,7 +4366,8 @@ impl Interpreter {
                         "  adf  kpss  pp  za  ljungbox  archtest  granger  johansen\n",
                         "  bptest  pesaran_cd  wooldridge  abtest  white  jb  reset\n\n",
                         "LINGUAGEM:\n",
-                        "  let  if/else  for  while  fn  return  display  scalar  input\n\n",
+                        "  let  if/else  for  while  fn  return  display  scalar  input\n",
+                        "  source(\"script.hy\")  export  print\n\n",
                         "Use help(comando) para detalhes. Ex: help(ols)\n",
                     ),
                     "ols" | "reg" | "regress" => concat!(
