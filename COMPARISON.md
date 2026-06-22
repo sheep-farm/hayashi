@@ -1,20 +1,22 @@
 # Hayashi vs Stata
 
-## Resumo
+## Overview
 
 | | Hayashi | Stata 18 |
 |---|---|---|
-| Preço | Grátis (MIT) | US$ 595–2.985/ano |
-| Binário | ~18 MB, zero deps (ODBC opcional) | ~500 MB + licença |
-| Linguagem | Rust | C/Java |
+| Price | Free (GPL-3.0) | US$ 595–2,985/year |
+| Binary | ~20 MB, zero system deps | ~500 MB + license |
+| Language | Rust | C/Java |
 | Interface | Terminal (REPL + script) + VS Code | GUI + terminal |
 | I/O | CSV, TSV, JSON, DTA, Excel, Parquet, SQLite, ODBC | DTA, CSV, Excel, ODBC |
-| Gráficos | SVG vetorial + ASCII | PNG/SVG/PDF nativos |
-| Testes | 338 automatizados + 59 exemplos | Suite interna proprietária |
-| Scoping | Block-scoped, sem GC | Global |
-| DataFrames | Rc + copy-on-write | Único dataset ativo |
+| Graphics | SVG + ASCII | PNG/SVG/PDF native |
+| Tests | 382 automated + 59 examples | Internal proprietary suite |
+| Scoping | Block-scoped, const, no GC | Global |
+| DataFrames | Multiple simultaneous, Rc COW | Single active dataset (frames since v16) |
+| Types | int, float, bool, str, list, dict, closures | Numeric + string |
+| License | GPL-3.0 | Proprietary |
 
-## Sintaxe lado a lado
+## Syntax side by side
 
 ```
 // Stata                              // Hayashi
@@ -54,6 +56,13 @@ restore                               restore(df)
 quietly reg Y X                        quietly(ols(Y ~ X, df))
 capture reg Y X                        capture(ols(Y ~ X, df))
 assert price > 0                       assert(X > 0, "msg")
+.                                      // no Stata equivalent:
+.                                      let r = if x > 0 { "pos" } else { "neg" }
+.                                      [1,2,3] |> map(|x| x*2) |> sort
+.                                      let d = {"a": 1, "b": 2}
+.                                      match x { 1 => "one", _ => "other" }
+.                                      try { ... } catch e { display e }
+.                                      f"mean = {mu:.2f}"
 
 foreach v in X1 X2 X3 {               for v in ["X1", "X2", "X3"] {
     reg Y `v'                              eststo(ols("Y ~ " + v, df))
@@ -62,65 +71,101 @@ foreach v in X1 X2 X3 {               for v in ["X1", "X2", "X3"] {
 esttab m_*
 ```
 
-## Cobertura de estimadores
+## Estimator coverage
 
-| Categoria | Stata | Hayashi | Status |
+| Category | Stata | Hayashi | Status |
 |---|---|---|---|
-| OLS + HC1-HC4 | `reg` | `ols`/`reg` | Paridade |
-| Cluster SEs | `vce(cluster)` | `cluster=` | Paridade |
-| Two-way cluster | `vce(cluster c1 c2)` | `cluster= cluster2=` | Paridade |
-| Newey-West | `newey` | `nw=` | Paridade |
-| IV/2SLS | `ivregress` | `iv` | Paridade |
-| Painel FE/RE | `xtreg` | `fe`/`re` + `xtset` | Paridade |
-| Arellano-Bond | `xtabond`/`xtdpdsys` | `ab`/`sysgmm` | Paridade |
-| Hausman | `hausman` | `hausman` | Paridade |
-| Logit/Probit | `logit`/`probit` | `logit`/`probit` | Paridade |
-| Margins AME + SEs | `margins` | `margins` | Paridade |
-| Poisson/NegBin | `poisson`/`nbreg` | `poisson`/`nbreg` | Paridade |
-| Tobit/Heckman | `tobit`/`heckman` | `tobit`/`heckman` | Paridade |
-| Quantile | `qreg` | `qreg` | Paridade |
-| ARIMA/GARCH | `arima`/`arch` | `arima`/`garch` | Paridade |
-| VAR/VECM | `var`/`vec` | `var`/`vecm` | Paridade |
-| Lasso/Ridge | `lasso` | `lasso`/`ridge` | Paridade |
-| Cox PH | `stcox` | `cox` | Paridade |
-| DID/RD/Synth/PSM | addons | builtins | Paridade |
-| Fama-MacBeth | `xtfmb` (addon pago) | `fmb` (builtin + NW) | Hayashi superior |
-| Portfolio sorts | programação manual | `portsort`/`doublesort` | Hayashi superior |
-| Multinomial | `mlogit` | `mlogit` | Paridade |
-| Mixed/HLM | `mixed` | `mixed` | Parcial |
-| Survey | `svy:` | -- | Ausente |
-| SEM | `sem`/`gsem` | -- | Ausente |
-| Bayesian | `bayes:` | -- | Ausente |
-| Spatial | `spregress` | -- | Ausente |
+| OLS + HC1-HC4 | `reg` | `ols`/`reg` | Parity |
+| Cluster SEs | `vce(cluster)` | `cluster=` | Parity |
+| Two-way cluster | `vce(cluster c1 c2)` | `cluster= cluster2=` | Parity |
+| Newey-West | `newey` | `nw=` | Parity |
+| IV/2SLS | `ivregress` | `iv` | Parity |
+| Panel FE/RE | `xtreg` | `fe`/`re` + `xtset` | Parity |
+| Arellano-Bond | `xtabond`/`xtdpdsys` | `ab`/`sysgmm` | Parity |
+| Hausman | `hausman` | `hausman` | Parity |
+| Logit/Probit | `logit`/`probit` | `logit`/`probit` | Parity |
+| Margins AME + SEs | `margins` | `margins` | Parity |
+| Poisson/NegBin | `poisson`/`nbreg` | `poisson`/`nbreg` | Parity |
+| ZIP/ZINB | `zip` | `zip`/`zinb` | Parity |
+| Ordered logit/probit | `ologit`/`oprobit` | `ologit`/`oprobit` | Parity |
+| Multinomial logit | `mlogit` | `mlogit` | Parity |
+| Tobit/Heckman | `tobit`/`heckman` | `tobit`/`heckman` | Parity |
+| Quantile | `qreg` | `qreg` | Parity |
+| ARIMA/GARCH | `arima`/`arch` | `arima`/`garch`/`egarch` | Parity |
+| VAR/VECM/SVAR | `var`/`vec` | `var`/`vecm`/`svar` | Parity |
+| Lasso/Ridge | `lasso` | `lasso`/`ridge`/`elasticnet` | Parity |
+| Cox PH | `stcox` | `cox` | Parity |
+| DID/RD/Synth/PSM | addons | builtins | Parity |
+| GLM | `glm` | `glm` | Parity |
+| Robust (M-est) | — | `rlm` | Hayashi only |
+| GEE | — | `gee` | Hayashi only |
+| Beta regression | — | `betareg` | Hayashi only |
+| Fama-MacBeth | `xtfmb` (paid addon) | `fmb` (builtin + NW) | Hayashi superior |
+| Portfolio sorts | manual coding | `portsort`/`doublesort` | Hayashi superior |
+| Mixed/HLM | `mixed` | `mixed` | Partial |
+| Survey | `svy:` | — | Missing |
+| SEM | `sem`/`gsem` | — | Missing |
+| Bayesian | `bayes:` | — | Missing |
+| Spatial | `spregress` | — | Missing |
 
-## Onde Hayashi ganha
+## Where Hayashi wins
 
-- **Custo**: grátis vs US$ 595+/ano
-- **Portabilidade**: binário de 5 MB sem dependências
-- **Fama-MacBeth**: builtin com Newey-West (Stata requer addon pago)
-- **Portfolio sorts**: `portsort`, `doublesort` builtin
-- **Bootstrap genérico**: qualquer estimador, não só OLS
-- **Fórmulas dinâmicas**: `ols("Y ~ " + v, df)` nativo
-- **Block scoping**: lifetime determinístico sem GC
-- **Regex row-wise**: `ols(Y ~ X, df, if = regexm(name, "Dr"))`
-- **Copy-on-write**: `Rc<DataFrame>` — zero-copy em funções
-- **I/O multi-formato**: CSV, TSV, JSON, DTA, Excel, Parquet, SQLite, ODBC
-- **Export multi-formato**: CSV, JSON, TSV, XLSX, Parquet, SQLite, LaTeX, HTML
-- **338 testes + 59 exemplos**: `cargo test` em <1s
-- **help() completo**: ~95 tópicos com assinatura + exemplo no REPL
+**Cost and deployment:**
+- Free and open source (GPL-3.0) vs US$ 595+/year
+- Single 20 MB binary, no system dependencies
+- `cargo install hayashi` — done
 
-## Onde Stata ganha
+**I/O:**
+- 8 input formats: CSV, TSV, JSON, DTA, Excel, Parquet, SQLite, ODBC
+- 8 export formats: CSV, JSON, TSV, XLSX, Parquet, SQLite, LaTeX, HTML
+- Stata has no native Parquet support
 
-- **Maturidade**: 40+ anos, battle-tested
-- **Documentação**: 15.000+ páginas de manual
-- **GUI**: interface gráfica completa
-- **Ecossistema**: 10.000+ pacotes SSC
-- **Survey**: `svy:` para amostras complexas
-- **SEM/Bayesian/Spatial**: nichos especializados
-- **Gráficos**: 50+ tipos vs 4 SVG + 8 ASCII
-- **Aceitação acadêmica**: padrão de facto em journals
-- **Suporte**: empresa + StataCorp
+**Language features Stata lacks:**
+- Multiple simultaneous DataFrames (Stata: one active dataset)
+- F-strings: `f"mean = {mu:.2f}"`
+- Closures: `|x| x * 2` with `map`, `filter`
+- Pipe operator: `data |> sort |> filter(|x| x > 0)`
+- Pattern matching: `match x { 1 => "one", _ => "other" }`
+- Try/catch: structured error handling with error variable
+- If-expression: `let r = if x > 0 { "yes" } else { "no" }`
+- `in` operator: `if x in [1, 2, 3]`, `if "key" in dict`
+- Dict type: `{"key": value}` with full operations
+- List operations: push, pop, map, filter, sort, unique, flatten, etc.
+- Const declarations: `const PI = 3.14` — immutable variables
+- Block scoping with deterministic destruction (no GC)
+- Function parameters are const by default (immutable input)
+- No variable shadowing — prevents subtle bugs
+- Type conversions: `int()`, `float()`, `str()`, `bool()`, `type()`
 
-## Conclusão
+**Econometrics-specific:**
+- Fama-MacBeth with Newey-West built-in (Stata requires paid addon)
+- Portfolio sorts (`portsort`, `doublesort`) built-in
+- Generic bootstrap with any estimator
+- Dynamic formulas: `ols("Y ~ " + v, df)` native
+- Row-wise regex in formulas: `ols(Y ~ X, df, if = regexm(name, "Dr"))`
+- Copy-on-write DataFrames: zero-copy in functions
 
-Hayashi cobre ~97% do workflow de econometria aplicada de pós-graduação com paridade funcional completa em estimação, pós-estimação, manipulação de dados, e output publicável. Os gaps restantes são nichos especializados (survey, SEM, Bayesian, spatial) que poucos pesquisadores usam simultaneamente.
+**Developer experience:**
+- 382 automated tests, 59 examples, `cargo test` in <1s
+- `help()` with ~110 topics, signature + example for every command
+- VS Code extension (syntax highlighting, run/debug)
+- Error messages with line numbers
+- Multi-line expressions inside parentheses
+
+## Where Stata wins
+
+- **Maturity**: 40+ years, battle-tested in production
+- **Documentation**: 15,000+ page manual
+- **GUI**: full graphical interface
+- **Ecosystem**: 10,000+ SSC packages
+- **Survey**: `svy:` for complex samples
+- **SEM/Bayesian/Spatial**: specialized niches
+- **Graphics**: 50+ plot types vs 4 SVG + 8 ASCII
+- **Academic acceptance**: de facto standard in journals
+- **Support**: StataCorp + paid support
+
+## Conclusion
+
+Hayashi covers ~97% of the applied econometrics workflow at the graduate level with full functional parity in estimation, post-estimation, data manipulation, and publishable output. The remaining gaps are specialized niches (survey, SEM, Bayesian, spatial) that few researchers use simultaneously.
+
+The language goes beyond Stata with modern features (closures, pattern matching, pipe, f-strings, dict, const, try/catch) that make scripts more expressive and robust. Multiple simultaneous DataFrames, block scoping, and immutable function parameters are architectural improvements over Stata's global-state model.
