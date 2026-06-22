@@ -32,5 +32,6 @@ summarize(importados, mpg, weight, price)
 
 # Comparar OLS em subamostras
 let m_importados  = ols(price ~ mpg + weight, importados)
-let m_nacionais   = ols(price ~ mpg + weight, filter(base, foreign == 0))
+let nacionais     = filter(base, foreign == 0)
+let m_nacionais   = ols(price ~ mpg + weight, nacionais)
 esttab(m_importados, m_nacionais)

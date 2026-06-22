@@ -62,8 +62,8 @@ print(m_ar2)
 esttab(m_ols_ts, m_ar1, m_ar2)
 
 # Predição pós-GLSAR
-predict serie yhat_ar1  = m_ar1, xb
-predict serie ehat_ar1  = m_ar1, residuals
+predict serie yhat_ar1  = m_ar1, "xb"
+predict serie ehat_ar1  = m_ar1, "residuals"
 summarize(serie, pib, yhat_ar1, ehat_ar1)
 
 # ══════════════════════════════════════════════════════════════════════════════

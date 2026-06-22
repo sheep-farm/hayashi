@@ -183,7 +183,8 @@ fn print_help() {
     println!("    test  nlcom  margins  bootstrap  esttab  estat  predict");
     println!();
     println!("DATA:");
-    println!("    load  generate  replace  drop  keep  dropna  encode  winsor");
+    println!("    load (csv/tsv/json/dta/xlsx/xls/ods/sqlite)");
+    println!("    generate  replace  drop  keep  dropna  encode  winsor");
     println!("    summarize  tabulate  ttest  correlate  list  describe");
     println!();
     println!("In REPL, type help() for full command list or help(cmd) for details.");

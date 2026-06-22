@@ -79,7 +79,7 @@ print(m_tw)
 # pearson      → resíduos de Pearson (y-μ)/√V(μ)
 # working      → resíduos de trabalho do IRLS
 
-predict auto   p_hat     = m_glm_logit, pr        # P(foreign=1|X)
+predict auto   p_hat     = m_glm_logit, "pr"        # P(foreign=1|X)
 predict saude  mu_pois   = m_glm_pois,  mu        # E[visitas|X]
 predict saude  xb_pois   = m_glm_pois,  xb        # log(E[visitas|X])
 predict saude  dev_resid = m_glm_pois,  residuals # deviance residuals
@@ -143,18 +143,18 @@ load "macro.csv" as macro
 let m_low = lowess(macro, pib_growth, inflation, frac=0.5)
 
 # Extrair valores suavizados
-predict macro yhat_low = m_low, smoothed
-predict macro resid_low = m_low, residuals
+predict macro yhat_low = m_low, "smoothed"
+predict macro resid_low = m_low, "residuals"
 summarize(macro, pib_growth, yhat_low, resid_low)
 
 # LOWESS com mais suavização (frac maior)
 let m_low_smooth = lowess(macro, pib_growth, inflation, frac=0.8, it=0)
-predict macro yhat_smooth = m_low_smooth, smoothed
+predict macro yhat_smooth = m_low_smooth, "smoothed"
 
 # LOWESS vs OLS — comparar resíduos
 let m_ols_macro = ols(pib_growth ~ inflation, macro, cov=nonrobust)
-predict macro yhat_ols = m_ols_macro, xb
-predict macro resid_ols = m_ols_macro, residuals
+predict macro yhat_ols = m_ols_macro, "xb"
+predict macro resid_ols = m_ols_macro, "residuals"
 
 # Se LOWESS ≈ OLS → relação linear bem capturada
 # Se LOWESS difere muito de OLS → forma funcional inadequada
@@ -162,12 +162,12 @@ summarize(macro, yhat_ols, yhat_low)
 
 # LOWESS dos resíduos vs fitted (especificação)
 let m_ols2 = ols(pib_growth ~ inflation + unemployment, macro, cov=nonrobust)
-predict macro fitted2 = m_ols2, xb
-predict macro resid2  = m_ols2, residuals
+predict macro fitted2 = m_ols2, "xb"
+predict macro resid2  = m_ols2, "residuals"
 
 # Se m_resid_lowess for plana → regressão bem especificada
 let m_resid_low = lowess(macro, resid2, fitted2, frac=0.5)
-predict macro smoothed_resid = m_resid_low, smoothed
+predict macro smoothed_resid = m_resid_low, "smoothed"
 # smoothed_resid deveria ser ≈ 0 por toda parte
 
 # ══════════════════════════════════════════════════════════════════════════════

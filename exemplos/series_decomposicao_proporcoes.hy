@@ -73,9 +73,9 @@ let m_dec_mul = decompose(vendas, receita, period=12, model=multiplicative)
 print(m_dec_mul)
 
 # Extrair componentes como colunas
-predict vendas trend_lin    = m_dec_add, trend
-predict vendas seasonal_lin = m_dec_add, seasonal
-predict vendas resid_lin    = m_dec_add, residual
+predict vendas trend_lin    = m_dec_add, "trend"
+predict vendas seasonal_lin = m_dec_add, "seasonal"
+predict vendas resid_lin    = m_dec_add, "residual"
 
 summarize(vendas, receita, trend_lin, seasonal_lin, resid_lin)
 # Se max(abs(resid_lin)) >> max(abs(seasonal_lin)) → outliers na série
@@ -93,9 +93,9 @@ summarize(vendas, receita, trend_lin, seasonal_lin, resid_lin)
 let m_stl = stl(vendas, receita, period=12, sw=7)
 print(m_stl)
 
-predict vendas trend_stl    = m_stl, trend
-predict vendas seasonal_stl = m_stl, seasonal
-predict vendas resid_stl    = m_stl, residual
+predict vendas trend_stl    = m_stl, "trend"
+predict vendas seasonal_stl = m_stl, "seasonal"
+predict vendas resid_stl    = m_stl, "residual"
 
 # Comparar resíduos STL vs clássica
 summarize(vendas, resid_lin, resid_stl)
@@ -135,10 +135,10 @@ let m_mstl = mstl(energia, consumo_mwh, periods=[7, 365])
 print(m_mstl)
 
 # Extrair componentes
-predict energia trend_e     = m_mstl, trend
-predict energia sazon_sem   = m_mstl, seasonal1   # ciclo semanal (dom < seg...)
-predict energia sazon_anual = m_mstl, seasonal2   # ciclo anual (jan > jul no BR)
-predict energia resid_e     = m_mstl, resid
+predict energia trend_e     = m_mstl, "trend"
+predict energia sazon_sem   = m_mstl, "seasonal1" # ciclo semanal (dom < seg...)
+predict energia sazon_anual = m_mstl, "seasonal2" # ciclo anual (jan > jul no BR)
+predict energia resid_e     = m_mstl, "resid"
 
 summarize(energia, consumo_mwh, trend_e, sazon_sem, sazon_anual, resid_e)
 # trend_e: crescimento tendencial do consumo
@@ -156,8 +156,8 @@ load "trafego_hora.csv" as trafego
 # MSTL: ciclo diário (24h) + ciclo semanal (168h = 24*7)
 let m_mstl_traf = mstl(trafego, volume_veiculos, periods=[24, 168])
 print(m_mstl_traf)
-predict trafego sazon_diario  = m_mstl_traf, seasonal1
-predict trafego sazon_semanal = m_mstl_traf, seasonal2
+predict trafego sazon_diario  = m_mstl_traf, "seasonal1"
+predict trafego sazon_semanal = m_mstl_traf, "seasonal2"
 summarize(trafego, volume_veiculos, sazon_diario, sazon_semanal)
 
 # ══════════════════════════════════════════════════════════════════════════════

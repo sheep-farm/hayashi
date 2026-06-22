@@ -69,7 +69,7 @@ let m_logit = logit(market_share ~ renda + preco + pub, prop)
 ic(m_beta, m_beta_probit)
 
 # Predição
-predict prop mu_hat = m_beta, pr  # E[y|x] ∈ (0,1)
+predict prop mu_hat = m_beta, "pr" # E[y|x] ∈ (0,1)
 summarize(prop, market_share, mu_hat)
 
 # esttab suporta betareg diretamente

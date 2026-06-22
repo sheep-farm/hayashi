@@ -244,8 +244,8 @@ impl Lexer {
                     else { tokens.push((Token::Gt, line)); }
                 }
                 Some('&') => {
-                    if self.peek() == Some('&') { self.advance(); tokens.push((Token::And, line)); }
-                    else { return Err(HayashiError::Lex { line, msg: "use '&&' para 'e' lógico".into() }); }
+                    if self.peek() == Some('&') { self.advance(); }
+                    tokens.push((Token::And, line));
                 }
                 Some('|') => {
                     if self.peek() == Some('|') { self.advance(); tokens.push((Token::Or, line)); }

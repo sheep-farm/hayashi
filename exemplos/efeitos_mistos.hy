@@ -41,7 +41,7 @@ let m_re = re(nota ~ ses + genero, alunos, id=escola, time=ano)
 esttab(m_re, m_ri, m_rs)
 
 # ── Predição: Xβ (parte fixa, sem efeitos aleatórios) ─────────────────────────
-predict alunos yhat_fixed = m_ri, xb
+predict alunos yhat_fixed = m_ri, "xb"
 correlate(alunos, nota, yhat_fixed)
 
 # ══════════════════════════════════════════════════════════════════════════════

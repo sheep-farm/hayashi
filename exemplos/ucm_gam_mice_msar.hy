@@ -58,13 +58,13 @@ let m_ucm_smooth = ucm(vendas, receita, level=smooth_trend, seasonal=stochastic,
 print(m_ucm_smooth)
 
 # ── Extrair componentes ───────────────────────────────────────────────────────
-predict pib nivel_ucm   = m_ucm, level
-predict pib tend_ucm    = m_ucm, trend
-predict pib irr_ucm     = m_ucm, residuals
+predict pib nivel_ucm   = m_ucm, "level"
+predict pib tend_ucm    = m_ucm, "trend"
+predict pib irr_ucm     = m_ucm, "residuals"
 
-predict vendas nivel_s  = m_ucm_saz, level
-predict vendas sazon_s  = m_ucm_saz, seasonal
-predict vendas irr_s    = m_ucm_saz, residuals
+predict vendas nivel_s  = m_ucm_saz, "level"
+predict vendas sazon_s  = m_ucm_saz, "seasonal"
+predict vendas irr_s    = m_ucm_saz, "residuals"
 
 summarize(vendas, receita, nivel_s, sazon_s, irr_s)
 
@@ -73,15 +73,15 @@ load "energia_diaria.csv" as energia
 let m_ucm_dia = ucm(energia, consumo_mwh, level=local_linear,
                     seasonal=stochastic, period=7)
 print(m_ucm_dia)
-predict energia ciclo_sem = m_ucm_dia, seasonal
+predict energia ciclo_sem = m_ucm_dia, "seasonal"
 
 # ── UCM como filtro HP (caso limite) ─────────────────────────────────────────
 # Hodrick-Prescott: caso especial com σ²_ε=0, σ²_η=0, σ²_ζ/σ²_ε = λ
 # UCM smooth_trend → estimador MLE que generaliza HP com λ otimizado
 let m_hp_ucm = ucm(pib, pib_real, level=smooth_trend)
 print(m_hp_ucm)
-predict pib tendencia_hp = m_hp_ucm, level
-predict pib ciclo_hp     = m_hp_ucm, residuals
+predict pib tendencia_hp = m_hp_ucm, "level"
+predict pib ciclo_hp     = m_hp_ucm, "residuals"
 
 # Compara filtro HP (λ=1600) com UCM smooth_trend (λ estimado por MLE)
 summarize(pib, pib_real, tendencia_hp, nivel_ucm)
@@ -263,9 +263,9 @@ print(m_msar)
 # Regime 2 (recessão): φ_1 ≈ -0.2 (reversão mais rápida), σ₂ maior
 
 # Extrair probabilidades suavizadas
-predict pib2 prob_exp    = m_msar, regime1    # P(s_t=1|Y) — expansão
-predict pib2 prob_rec    = m_msar, regime2    # P(s_t=2|Y) — recessão
-predict pib2 regime_hat  = m_msar, regime     # regime mais provável (1 ou 2)
+predict pib2 prob_exp    = m_msar, "regime1" # P(s_t=1|Y) — expansão
+predict pib2 prob_rec    = m_msar, "regime2" # P(s_t=2|Y) — recessão
+predict pib2 regime_hat  = m_msar, "regime" # regime mais provável (1 ou 2)
 
 summarize(pib2, pib_growth, prob_exp, prob_rec, regime_hat)
 
@@ -281,7 +281,7 @@ print(m_msar3)
 # Regime 1: expansão forte  (φ alto, σ pequeno)
 # Regime 2: expansão fraca  (φ médio)
 # Regime 3: recessão        (φ baixo ou negativo, σ alto)
-predict pib2 prob_r3 = m_msar3, regime3
+predict pib2 prob_r3 = m_msar3, "regime3"
 
 # ── Comparação msauto vs markov ───────────────────────────────────────────────
 # markov() = MarkovSwitching: muda apenas a média (intercept) e σ por regime
@@ -301,6 +301,6 @@ print(m_vol)
 # Regime 1: baixa volatilidade (σ₁ pequeno, persistência baixa)
 # Regime 2: alta volatilidade  (σ₂ grande, clustering de volatilidade)
 
-predict ret2 high_vol = m_vol, regime2
+predict ret2 high_vol = m_vol, "regime2"
 summarize(ret2, ret_ibov, high_vol)
 # Período 2008, 2020: P(regime 2) alto → crises identificadas automaticamente

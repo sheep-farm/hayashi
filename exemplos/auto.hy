@@ -11,12 +11,12 @@ correlate(auto, price, mpg, weight)
 let m = ols(price ~ mpg + weight, auto, cov=HC3)
 print(m)
 
-test(m, bp)
-test(m, dw)
+test(m, "bp")
+test(m, "dw")
 
 # Valores ajustados e resíduos
 predict auto yhat = m
-predict auto ehat = m, residuals
+predict auto ehat = m, "residuals"
 
 summarize(auto, price, yhat, ehat)
 
@@ -25,5 +25,5 @@ generate auto log_price  = log(price)
 generate auto weight_ton = weight / 2000
 
 # Exportar dados e tabela
-export(auto, csv, "/tmp/auto.csv")
-export(m,    latex, "/tmp/auto_ols.tex")
+export(auto, "csv", "/tmp/auto.csv")
+export(m,    "latex", "/tmp/auto_ols.tex")
