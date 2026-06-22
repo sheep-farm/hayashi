@@ -23,7 +23,29 @@
 # AIC e BIC para comparar com VAR:
 #   AIC(VARMA) < AIC(VAR) → componente MA acrescenta poder explicativo
 
-load "macro_tri.csv" as macro
+input macro
+pib inflation juros
+100.0 3.5 10.5
+101.2 3.8 10.8
+102.5 3.2 10.2
+103.1 4.0 11.0
+104.8 3.6 10.6
+105.5 4.2 11.2
+106.2 3.9 10.9
+107.0 3.4 10.4
+108.5 4.5 11.5
+109.2 3.7 10.7
+110.0 4.1 11.1
+111.5 3.3 10.3
+112.0 3.8 10.8
+113.2 4.3 11.3
+114.5 3.5 10.5
+115.0 4.0 11.0
+116.8 3.6 10.6
+117.5 4.4 11.4
+118.2 3.2 10.2
+119.0 3.9 10.9
+end
 # Variáveis: pib, inflation, juros — séries trimestrais
 
 # ── VARMA(1,1) base ──────────────────────────────────────────────────────────
@@ -39,7 +61,8 @@ print(m_varma21)
 
 # ── Univariado: VARMA degenerado em ARMA ──────────────────────────────────────
 # Se k=1 variável → equivale a ARMA(p,q)
-let m_arma = varma(macro, pib, p=1, q=1)
+# varma requer >= 2 variáveis; para univariado usar arima()
+let m_arma = arima(macro, pib, p=1, d=0, q=1)
 print(m_arma)
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -61,7 +84,39 @@ print(m_arma)
 #   period=52 → semanal (52 semanas por ano)
 #   period=7  → diário com ciclo semanal
 
-load "vendas_mensais.csv" as vendas
+input vendas
+receita
+120.5
+135.2
+128.8
+142.1
+155.3
+148.7
+160.2
+175.8
+168.4
+150.1
+138.9
+185.6
+125.3
+140.8
+133.5
+147.2
+160.8
+153.4
+165.9
+181.2
+173.8
+155.7
+143.5
+190.2
+130.1
+145.5
+138.2
+152.0
+165.5
+158.1
+end
 # Variável: receita — vendas mensais de um varejista
 
 # Decomposição aditiva
@@ -127,38 +182,66 @@ print(m_arima_sa)
 # predict seasonal1  → idem (explícito)
 # predict seasonal2  → componente do segundo período
 
-load "energia_diaria.csv" as energia
+input energia
+consumo_mwh
+450.2
+430.5
+465.8
+480.1
+470.3
+420.6
+410.8
+455.1
+435.4
+470.7
+485.0
+475.2
+425.5
+415.7
+460.0
+440.3
+475.6
+490.9
+480.1
+430.4
+420.6
+465.9
+445.2
+480.5
+495.8
+485.0
+435.3
+425.5
+470.8
+450.1
+end
 # Variável: consumo_mwh — consumo de energia elétrica em MWh (dados diários)
 
-# MSTL com dois ciclos: semanal (7) e anual (365)
-let m_mstl = mstl(energia, consumo_mwh, periods=[7, 365])
+# MSTL com ciclo semanal (7) — anual (365) requer dados com >= 365 observações
+let m_mstl = mstl(energia, consumo_mwh, periods=[7])
 print(m_mstl)
 
 # Extrair componentes
 predict energia trend_e     = m_mstl, "trend"
 predict energia sazon_sem   = m_mstl, "seasonal1" # ciclo semanal (dom < seg...)
-predict energia sazon_anual = m_mstl, "seasonal2" # ciclo anual (jan > jul no BR)
 predict energia resid_e     = m_mstl, "resid"
 
-summarize(energia, consumo_mwh, trend_e, sazon_sem, sazon_anual, resid_e)
+summarize(energia, consumo_mwh, trend_e, sazon_sem, resid_e)
 # trend_e: crescimento tendencial do consumo
 # sazon_sem: padrão de final de semana (consumo cai no domingo)
-# sazon_anual: sazonalidade climática (inverno vs verão)
 # resid_e: choques aleatórios (feriados, temperaturas extremas)
 
-# Dessazonalização total (remover ambos os ciclos)
-generate energia consumo_sa = consumo_mwh - sazon_sem - sazon_anual
+# Dessazonalização (remover ciclo semanal)
+generate energia consumo_sa = consumo_mwh - sazon_sem
 
-# Dados horários de tráfego (ex: Waze, pedágio)
-load "trafego_hora.csv" as trafego
-# Variável: volume_veiculos — contagem por hora
-
-# MSTL: ciclo diário (24h) + ciclo semanal (168h = 24*7)
-let m_mstl_traf = mstl(trafego, volume_veiculos, periods=[24, 168])
-print(m_mstl_traf)
-predict trafego sazon_diario  = m_mstl_traf, "seasonal1"
-predict trafego sazon_semanal = m_mstl_traf, "seasonal2"
-summarize(trafego, volume_veiculos, sazon_diario, sazon_semanal)
+# Dados horários de tráfego — requer ~500+ linhas para periods=[24, 168]
+# Exemplo comentado por necessitar de arquivo externo (trafego_hora.csv)
+# load "trafego_hora.csv" as trafego
+# let m_mstl_traf = mstl(trafego, volume_veiculos, periods=[24, 168])
+# print(m_mstl_traf)
+# predict trafego sazon_diario  = m_mstl_traf, "seasonal1"
+# predict trafego sazon_semanal = m_mstl_traf, "seasonal2"
+# summarize(trafego, volume_veiculos, sazon_diario, sazon_semanal)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 4. TESTES DE PROPORÇÃO
@@ -229,7 +312,34 @@ chisq2x2(120, 80, 30, 70)
 # Input: lista de p-values de testes independentes (ou correlacionados para by)
 
 # ── Exemplo 1: testes de coeficientes em múltiplas regressões ────────────────
-load "painel.csv" as painel
+input painel
+retorno tamanho alavancagem liquidez beta bm_ratio
+0.12 8.5 0.35 1.20 0.95 0.80
+0.08 7.2 0.55 0.85 1.30 0.65
+0.15 9.1 0.28 1.50 0.70 1.10
+-0.03 6.8 0.72 0.60 1.50 0.45
+0.10 8.0 0.40 1.10 1.05 0.75
+0.05 7.5 0.60 0.75 1.25 0.55
+0.18 9.5 0.22 1.65 0.65 1.20
+-0.02 6.5 0.78 0.50 1.55 0.40
+0.09 7.8 0.45 1.00 1.10 0.70
+0.14 8.8 0.32 1.35 0.80 0.95
+0.06 7.0 0.58 0.80 1.35 0.60
+0.11 8.3 0.38 1.15 0.90 0.85
+-0.01 6.6 0.75 0.55 1.45 0.42
+0.16 9.3 0.25 1.55 0.68 1.15
+0.07 7.4 0.52 0.90 1.20 0.62
+0.13 8.6 0.30 1.30 0.85 0.90
+0.04 7.1 0.62 0.70 1.40 0.50
+0.17 9.4 0.20 1.60 0.60 1.18
+0.02 6.9 0.68 0.65 1.42 0.48
+0.10 8.1 0.42 1.05 1.00 0.78
+0.08 7.6 0.50 0.88 1.15 0.68
+0.15 9.0 0.27 1.45 0.75 1.05
+-0.04 6.4 0.80 0.48 1.58 0.38
+0.11 8.2 0.36 1.18 0.92 0.82
+0.06 7.3 0.56 0.82 1.28 0.58
+end
 
 # Estima 5 modelos separados (uma variável de interesse por vez)
 let m1 = ols(retorno ~ tamanho,      painel)

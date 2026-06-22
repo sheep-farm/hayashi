@@ -1583,7 +1583,7 @@ impl Interpreter {
                 let out_str = Self::formula_to_string(&out_ast);
                 let g_out = GFormula::parse(&out_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let (y_vec, x_out) = df.to_design_matrix(&g_out)
+                let (y_vec_raw, x_out) = df.to_design_matrix(&g_out)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let out_names = df.formula_var_names(&g_out)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1596,6 +1596,11 @@ impl Interpreter {
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let sel_names = df.formula_var_names(&g_sel)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                // Heckman: y e x_out podem conter NaN para obs não-selecionadas (z=0).
+                // Substituir NaN/Inf por 0.0 nessas linhas (valores não são usados na equação de resultado).
+                let y_vec = y_vec_raw.mapv(|v| if v.is_finite() { v } else { 0.0 });
+                let x_out = x_out.mapv(|v| if v.is_finite() { v } else { 0.0 });
 
                 let result = greeners::Heckman::fit(
                     &y_vec, &x_out, &z_vec, &x_sel,
@@ -1953,11 +1958,7 @@ impl Interpreter {
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let (y_vec, x_mat) = df.to_design_matrix(&g_formula)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let var_names = df.formula_var_names(&g_formula)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let result = greeners::OrderedLogit::fit_with_names(&y_vec, &x_mat, Some(var_names))
+                let result = greeners::OrderedLogit::from_formula(&g_formula, &df)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 Ok(Value::OrderedResult(Rc::new(result)))
             }
@@ -1968,11 +1969,7 @@ impl Interpreter {
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let (y_vec, x_mat) = df.to_design_matrix(&g_formula)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let var_names = df.formula_var_names(&g_formula)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let result = greeners::OrderedProbit::fit_with_names(&y_vec, &x_mat, Some(var_names))
+                let result = greeners::OrderedProbit::from_formula(&g_formula, &df)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 Ok(Value::OrderedResult(Rc::new(result)))
             }

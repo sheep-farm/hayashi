@@ -5,6 +5,7 @@
 
 load "https://www.stata-press.com/data/r14/sp500.dta" as sp
 
+let sp = dropna(sp, change)
 list(sp, 5)
 count sp
 

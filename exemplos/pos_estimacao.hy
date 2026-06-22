@@ -34,7 +34,7 @@ predict dados xb_hat = m_pois, "xb" # preditor linear Xβ (log da média)
 
 # ── Ordered Logit ──────────────────────────────────────────────────────────────
 let auto2 = dropna(auto, rep78)
-let m_olog = ologit(rep78 ~ mpg + weight, auto2)
+let m_olog = ologit(rep78 ~ mpg + foreign, auto2)
 predict auto2 yhat_cat = m_olog, "yhat" # categoria predita (argmax)
 predict auto2 pr5      = m_olog, "pr5" # P(rep78 = 5) — categoria mais alta
 predict auto2 pr1      = m_olog, "pr1" # P(rep78 = 1) — categoria mais baixa

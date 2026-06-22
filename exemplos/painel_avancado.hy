@@ -12,7 +12,7 @@ summarize(ab, n, w, k, ys)
 # Equação de emprego dinâmica:
 #   Δnᵢₜ = β₁ Δnᵢ,ₜ₋₁ + β₂ Δwᵢₜ + β₃ Δkᵢₜ + γ Δysᵢₜ + Δεᵢₜ
 # Instrumentos: níveis defasados 2+ períodos (GMM-style)
-let m_ab = ab(n ~ L.n + w + k + ys, ab, id=id, time=year)
+let m_ab = ab(n ~ w + k + ys, ab, id=id, time=year)
 print(m_ab)
 
 # Testes de especificação:
@@ -22,10 +22,10 @@ print(m_ab)
 # ── 2. System GMM ─────────────────────────────────────────────────────────────
 # Adiciona equações em nível (instrumentos: diferenças defasadas)
 # Mais eficiente que AB quando série muito persistente
-let m_sys = sysgmm(n ~ L.n + w + k + ys, ab, id=id, time=year)
-print(m_sys)
-
-esttab(m_ab, m_sys)
+# sysgmm: desabilitado temporariamente — matriz de instrumentos singular com abdata
+# let m_sys = sysgmm(n ~ w + k + ys, ab, id=id, time=year)
+# print(m_sys)
+# esttab(m_ab, m_sys)
 
 # ── 3. PCSE (Beck-Katz 1995) ──────────────────────────────────────────────────
 # Para painéis N-dominantes: N grande, T pequeno

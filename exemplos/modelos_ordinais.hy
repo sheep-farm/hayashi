@@ -13,19 +13,24 @@ tabulate(auto, rep78)
 
 # ── Ordered Logit ──────────────────────────────────────────────────────────────
 # P(rep78 ≤ j | X) = σ(α_j − X'β)  com limiares α₁ < α₂ < α₃ < α₄
-let m_ologit = ologit(rep78 ~ mpg + weight + foreign, auto)
+# Nota: mpg e weight são altamente colineares — usar apenas mpg + foreign
+let m_ologit = ologit(rep78 ~ mpg + foreign, auto)
 print(m_ologit)
 
 # ── Ordered Probit ─────────────────────────────────────────────────────────────
 # Idêntico mas com Φ no lugar de σ — normalmente resulta em coeficientes menores
-let m_oprobit = oprobit(rep78 ~ mpg + weight + foreign, auto)
+let m_oprobit = oprobit(rep78 ~ mpg + foreign, auto)
 print(m_oprobit)
 
 # ── Multinomial Logit ──────────────────────────────────────────────────────────
 # Trata rep78 como nominal (ignora ordenação)
 # Categoria base: menor valor
 # Interprete odds ratios exp(β) como razão de prob categoria j vs base
-let m_mlogit = mlogit(rep78 ~ mpg + weight + foreign, auto)
+# Nota: rep78 com 5 categorias e n=69 gera quasi-separação → agrupar em 3 níveis
+# rep3: 1 (rep78=1,2: ruim), 2 (rep78=3: médio), 3 (rep78=4,5: bom)
+# Usar apenas mpg — foreign causa separação perfeita (nenhum importado tem rep3=1)
+generate auto rep3 = (rep78 >= 3) + (rep78 >= 4) + 1.0
+let m_mlogit = mlogit(rep3 ~ mpg, auto)
 print(m_mlogit)
 
 # ── Comparação ordered ─────────────────────────────────────────────────────────

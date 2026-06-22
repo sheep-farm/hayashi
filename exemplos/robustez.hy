@@ -21,7 +21,8 @@ let m_ols = ols(price ~ mpg + weight + C(foreign), auto, cov=HC3)
 print(m_ols)
 
 # Huber (padrão — mais eficiente)
-let m_huber = rlm(price ~ mpg + weight + C(foreign), auto)
+# Usa foreign diretamente (já é 0/1) para que predict funcione após a estimação
+let m_huber = rlm(price ~ mpg + weight + foreign, auto)
 print(m_huber)
 
 # Tukey bisquare (mais robusto a outliers extremos)
