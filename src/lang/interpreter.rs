@@ -5058,6 +5058,43 @@ impl Interpreter {
                         "{:<16} {:>9}  {:>7}  {:>12.4} {:>12.4} {:>12.4} {:>12.4}",
                         name, n, miss_str, mean, sd, min, max
                     );
+
+                    // detail: percentis, skewness, kurtosis
+                    if matches!(opt_map.get("detail"), Some(Value::Bool(true))) || matches!(opt_map.get("d"), Some(Value::Bool(true))) {
+                        let mut sorted = vals.clone();
+                        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                        let pctile = |p: f64| -> f64 {
+                            let idx = (p * (n - 1) as f64).round() as usize;
+                            sorted[idx.min(n - 1)]
+                        };
+                        let p1  = pctile(0.01);
+                        let p5  = pctile(0.05);
+                        let p10 = pctile(0.10);
+                        let p25 = pctile(0.25);
+                        let p50 = pctile(0.50);
+                        let p75 = pctile(0.75);
+                        let p90 = pctile(0.90);
+                        let p95 = pctile(0.95);
+                        let p99 = pctile(0.99);
+                        let skew = if n > 2 {
+                            let m3 = vals.iter().map(|x| ((x - mean) / sd).powi(3)).sum::<f64>();
+                            m3 * n as f64 / ((n - 1) as f64 * (n - 2) as f64)
+                        } else { f64::NAN };
+                        let kurt = if n > 3 {
+                            let m4 = vals.iter().map(|x| ((x - mean) / sd).powi(4)).sum::<f64>() / n as f64;
+                            m4
+                        } else { f64::NAN };
+                        println!("         Percentiles:");
+                        println!("          1%  {:>10.4}       Skewness  {:>10.4}", p1, skew);
+                        println!("          5%  {:>10.4}       Kurtosis  {:>10.4}", p5, kurt);
+                        println!("         10%  {:>10.4}", p10);
+                        println!("         25%  {:>10.4}       Variance  {:>10.4}", p25, variance);
+                        println!("         50%  {:>10.4}", p50);
+                        println!("         75%  {:>10.4}", p75);
+                        println!("         90%  {:>10.4}", p90);
+                        println!("         95%  {:>10.4}", p95);
+                        println!("         99%  {:>10.4}", p99);
+                    }
                 }
                 println!();
                 Ok(Value::Nil)
@@ -12056,7 +12093,28 @@ impl Interpreter {
                 }).collect())
             }
             Expr::Call { func, args, .. } => {
-                // funções escalares aplicadas elemento-a-elemento
+                // ── geradores aleatórios (tamanho = n_rows do df) ──
+                if matches!(func.as_str(), "uniform" | "runiform" | "rnormal" | "rbernoulli") {
+                    let n = df.n_rows();
+                    use rand::Rng;
+                    let mut rng = rand::thread_rng();
+                    return Ok(match func.as_str() {
+                        "uniform" | "runiform" => (0..n).map(|_| rng.gen::<f64>()).collect(),
+                        "rnormal" => {
+                            use rand::distributions::Distribution;
+                            let normal = rand::distributions::Standard;
+                            (0..n).map(|_| { let v: f64 = normal.sample(&mut rng); v }).collect()
+                        }
+                        "rbernoulli" => {
+                            let p = if !args.is_empty() {
+                                match Self::eval_col_expr(&args[0], df)?[0] { v => v }
+                            } else { 0.5 };
+                            (0..n).map(|_| if rng.gen::<f64>() < p { 1.0 } else { 0.0 }).collect()
+                        }
+                        _ => unreachable!(),
+                    });
+                }
+
                 // ── funções multi-coluna (rowmean / rowsum / rowmin / rowmax) ──
                 if matches!(func.as_str(), "rowmean" | "rowsum" | "rowmin" | "rowmax") {
                     if args.is_empty() {
@@ -12170,15 +12228,49 @@ impl Interpreter {
                         "round"         => f64::round,
                         "sin"           => f64::sin,
                         "cos"           => f64::cos,
+                        "tan"           => f64::tan,
+                        "asin"          => f64::asin,
+                        "acos"          => f64::acos,
+                        "atan"          => f64::atan,
+                        "sign" | "signum" => f64::signum,
+                        "factorial"     => |x: f64| {
+                            let n = x as u64;
+                            (1..=n).product::<u64>() as f64
+                        },
+                        "normal" | "normalden" => greeners::norm_pdf,
+                        "invnormal" | "qnorm" => |p: f64| greeners::t_quantile(p, 1e12),
                         other => return Err(HayashiError::Runtime(
                             format!("função de coluna desconhecida '{other}'")
                         )),
                     };
                     Ok(vals.into_iter().map(f).collect())
-                } else if args.len() == 2 && func == "pow" {
-                    let base = Self::eval_col_expr(&args[0], df)?;
-                    let exp  = Self::eval_col_expr(&args[1], df)?;
-                    Ok(base.into_iter().zip(exp).map(|(a, b)| a.powf(b)).collect())
+                } else if args.len() == 2 {
+                    let a = Self::eval_col_expr(&args[0], df)?;
+                    let b = Self::eval_col_expr(&args[1], df)?;
+                    let f: fn(f64, f64) -> f64 = match func.as_str() {
+                        "pow"           => f64::powf,
+                        "mod" | "fmod"  => f64::rem_euclid,
+                        "atan2"         => f64::atan2,
+                        "max"           => f64::max,
+                        "min"           => f64::min,
+                        "comb"          => |n: f64, k: f64| {
+                            let (n, k) = (n as u64, k as u64);
+                            if k > n { return 0.0; }
+                            let k = k.min(n - k);
+                            (1..=k).fold(1u64, |acc, i| acc * (n - k + i) / i) as f64
+                        },
+                        other => return Err(HayashiError::Runtime(
+                            format!("função '{other}' não suportada em generate")
+                        )),
+                    };
+                    Ok(a.into_iter().zip(b).map(|(x, y)| f(x, y)).collect())
+                } else if args.len() == 3 && func == "cond" {
+                    let cond = Self::eval_col_expr(&args[0], df)?;
+                    let if_true = Self::eval_col_expr(&args[1], df)?;
+                    let if_false = Self::eval_col_expr(&args[2], df)?;
+                    Ok(cond.into_iter().zip(if_true.into_iter().zip(if_false))
+                        .map(|(c, (t, f))| if c != 0.0 { t } else { f })
+                        .collect())
                 } else {
                     Err(HayashiError::Runtime(format!(
                         "função '{func}' não suportada em generate"

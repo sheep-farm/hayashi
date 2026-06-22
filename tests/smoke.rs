@@ -3034,3 +3034,250 @@ fn smoke_graficos_svg() {
     let _ = std::fs::remove_file("hist.svg");
     let _ = std::fs::remove_file("coefplot.svg");
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// FUNÇÕES MATEMÁTICAS — paridade com Stata
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn math_tan() {
+    assert_ok_contains("tan", r#"
+input df
+X
+0
+1
+end
+generate df T = tan(X)
+"#, "generated");
+}
+
+#[test]
+fn math_asin_acos_atan() {
+    assert_ok("asin_acos_atan", r#"
+input df
+X
+0.5
+0.9
+end
+generate df A = asin(X)
+generate df B = acos(X)
+generate df C = atan(X)
+"#);
+}
+
+#[test]
+fn math_sign() {
+    assert_ok_contains("sign", r#"
+input df
+X
+-3
+0
+5
+end
+generate df S = sign(X)
+list(df)
+"#, "-1");
+}
+
+#[test]
+fn math_mod() {
+    assert_ok_contains("mod", r#"
+input df
+X
+7
+10
+15
+end
+generate df M = mod(X, 3)
+"#, "generated");
+}
+
+#[test]
+fn math_factorial() {
+    assert_ok_contains("factorial", r#"
+input df
+X
+5
+end
+generate df F = factorial(X)
+list(df)
+"#, "120");
+}
+
+#[test]
+fn math_cond() {
+    assert_ok_contains("cond", r#"
+input df
+X
+1
+5
+10
+end
+generate df C = cond(X > 3, 100, 0)
+list(df)
+"#, "100");
+}
+
+#[test]
+fn math_max_min_two_args() {
+    assert_ok_contains("max_min", r#"
+input df
+X
+1
+5
+10
+end
+generate df MX = max(X, 5)
+generate df MN = min(X, 5)
+list(df)
+"#, "generated");
+}
+
+#[test]
+fn math_comb() {
+    assert_ok_contains("comb", r#"
+input df
+N K
+10 3
+5 2
+end
+generate df C = comb(N, K)
+list(df)
+"#, "120");
+}
+
+#[test]
+fn math_uniform() {
+    assert_ok("uniform", r#"
+input df
+X
+1
+2
+3
+end
+generate df U = uniform()
+"#);
+}
+
+#[test]
+fn math_rnormal() {
+    assert_ok("rnormal", r#"
+input df
+X
+1
+2
+3
+end
+generate df N = rnormal()
+"#);
+}
+
+#[test]
+fn math_normal_pdf() {
+    assert_ok_contains("normal_pdf", r#"
+input df
+X
+0
+end
+generate df P = normal(X)
+list(df)
+"#, "0.3989");
+}
+
+#[test]
+fn math_atan2() {
+    assert_ok("atan2", r#"
+input df
+Y X
+1 1
+0 1
+end
+generate df A = atan2(Y, X)
+"#);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SUMMARIZE DETAIL — percentis, skewness, kurtosis
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn summarize_detail() {
+    assert_ok_contains("summarize_detail", r#"
+input df
+X
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+end
+summarize(df, X, detail=true)
+"#, "Skewness");
+}
+
+#[test]
+fn summarize_detail_percentiles() {
+    assert_ok_contains("detail_pctiles", r#"
+input df
+X
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+end
+summarize(df, X, detail=true)
+"#, "50%");
+}
+
+#[test]
+fn summarize_detail_kurtosis() {
+    assert_ok_contains("detail_kurt", r#"
+input df
+X
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+end
+summarize(df, X, detail=true)
+"#, "Kurtosis");
+}
+
+#[test]
+fn summarize_detail_variance() {
+    assert_ok_contains("detail_var", r#"
+input df
+X
+1
+2
+3
+4
+5
+end
+summarize(df, X, detail=true)
+"#, "Variance");
+}
+
+#[test]
+fn smoke_funcoes_matematicas() {
+    let (ok, out) = run_hy("exemplos/funcoes_matematicas.hy");
+    assert!(ok, "funcoes_matematicas.hy failed:\n{out}");
+    assert!(out.contains("Skewness"));
+}
