@@ -54,6 +54,7 @@ fn stmt_label(s: &ast::Stmt) -> &'static str {
         ast::Stmt::Return(_) => "return",
         ast::Stmt::Break => "break",
         ast::Stmt::Continue => "continue",
+        ast::Stmt::TryCatch { .. } => "try/catch",
         ast::Stmt::Input { .. } => "input",
         ast::Stmt::Display(_) => "display",
         ast::Stmt::Expr(_) => "expr",

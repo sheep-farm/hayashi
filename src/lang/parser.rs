@@ -130,7 +130,25 @@ impl Parser {
     //   primary
 
     pub fn parse_expr(&mut self) -> Result<Expr> {
-        self.parse_or()
+        let mut lhs = self.parse_or()?;
+        while self.peek() == &Token::PipeRight {
+            self.advance();
+            let rhs = self.parse_or()?;
+            lhs = match rhs {
+                Expr::Call { func, mut args, opts } => {
+                    args.insert(0, lhs);
+                    Expr::Call { func, args, opts }
+                }
+                Expr::Var(name) => {
+                    Expr::Call { func: name, args: vec![lhs], opts: vec![] }
+                }
+                _ => return Err(HayashiError::Parse {
+                    line: self.line(),
+                    msg: "|> right side must be a function call".into(),
+                }),
+            };
+        }
+        Ok(lhs)
     }
 
     fn parse_or(&mut self) -> Result<Expr> {
@@ -293,6 +311,25 @@ impl Parser {
             Token::Tilde => {
                 let formula = self.parse_formula(String::new())?;
                 Ok(Expr::Formula(formula))
+            }
+
+            // Match expression: match expr { pat => result, ... }
+            Token::Ident(ref s) if s == "match" => {
+                self.advance();
+                let scrutinee = self.parse_expr()?;
+                self.expect(&Token::LBrace)?;
+                self.skip_newlines();
+                let mut arms = Vec::new();
+                while !matches!(self.peek(), Token::RBrace | Token::Eof) {
+                    let pattern = self.parse_expr()?;
+                    self.expect(&Token::FatArrow)?;
+                    let result = self.parse_expr()?;
+                    arms.push((pattern, result));
+                    if self.peek() == &Token::Comma { self.advance(); }
+                    self.skip_newlines();
+                }
+                self.expect(&Token::RBrace)?;
+                Ok(Expr::Match { expr: Box::new(scrutinee), arms })
             }
 
             Token::Ident(name) => {
@@ -732,6 +769,22 @@ impl Parser {
                     if !row.is_empty() { rows.push(row); }
                 }
                 Ok(Some(Stmt::Input { alias, headers, rows }))
+            }
+
+            // ── try { ... } catch e { ... } ──────────────────────────────────
+            Token::Ident(ref s) if s == "try" => {
+                self.advance();
+                let try_body = self.parse_block()?;
+                let catch_kw = match self.peek().clone() {
+                    Token::Ident(s) if s == "catch" => { self.advance(); true }
+                    _ => false,
+                };
+                if !catch_kw {
+                    return Err(HayashiError::Parse { line, msg: "expected 'catch' after try block".into() });
+                }
+                let error_var = self.expect_ident()?;
+                let catch_body = self.parse_block()?;
+                Ok(Some(Stmt::TryCatch { try_body, error_var, catch_body }))
             }
 
             // ── display expr  (sem parênteses) ───────────────────────────────
