@@ -10,7 +10,7 @@ name = "hayashi"
 path = "src/main.rs"
 
 [dependencies]
-greeners = { path = "../Greeners" }
+greeners = "1.4.4"
 ndarray = "0.17"
 thiserror = "2"
 rustyline = "14"
