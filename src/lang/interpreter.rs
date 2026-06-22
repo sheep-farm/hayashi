@@ -198,6 +198,7 @@ impl std::fmt::Display for DiagResult {
 #[derive(Clone)]
 pub struct DFMModel {
     pub result: Rc<greeners::DynamicFactorResult>,
+    #[allow(dead_code)]
     pub var_names: Vec<String>,
 }
 
@@ -211,6 +212,7 @@ impl std::fmt::Display for DFMModel {
 #[derive(Clone)]
 pub struct ThreeSLSModel {
     pub result: Rc<greeners::three_sls::ThreeSLSResult>,
+    #[allow(dead_code)]
     pub eq_var_names: Vec<Vec<String>>,
 }
 
@@ -1013,7 +1015,6 @@ impl Interpreter {
 
                 let ret_col = Self::get_col_f64(&df, &ret_name)?;
                 let sort_col = Self::get_col_f64(&df, &sort_name)?;
-                let n_obs = ret_col.len();
 
                 // pares (sort_val, ret_val) — excluir NaN
                 let mut pairs: Vec<(f64, f64)> = sort_col.iter().zip(ret_col.iter())
@@ -1150,10 +1151,7 @@ impl Interpreter {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime("ols() requires (formula, dataframe)".into()));
                 }
-                let formula_ast = match &args[0] {
-                    Expr::Formula(f) => f.clone(),
-                    _ => return Err(HayashiError::Type("first argument must be a formula".into())),
-                };
+                let formula_ast = self.resolve_formula(&args[0])?;
                 let df_name = match &args[1] {
                     Expr::Var(name) => name.clone(),
                     _ => return Err(HayashiError::Type("second argument must be a DataFrame variable".into())),
@@ -11764,14 +11762,35 @@ impl Interpreter {
         println!();
     }
 
+    fn resolve_formula(&mut self, expr: &Expr) -> Result<Formula> {
+        match expr {
+            Expr::Formula(f) => Ok(f.clone()),
+            other => {
+                let val = self.eval_expr(other)?;
+                match val {
+                    Value::Str(s) => {
+                        let parts: Vec<&str> = s.splitn(2, '~').collect();
+                        if parts.len() != 2 {
+                            return Err(HayashiError::Type(format!("string '{s}' is not a valid formula (needs ~)")));
+                        }
+                        let lhs = parts[0].trim().to_string();
+                        let rhs_str = parts[1].trim();
+                        let rhs: Vec<RhsTerm> = rhs_str.split('+')
+                            .map(|t| RhsTerm::Var(t.trim().to_string()))
+                            .collect();
+                        Ok(Formula { lhs, rhs, fe: vec![] })
+                    }
+                    _ => Err(HayashiError::Type("first argument must be a formula or string".into())),
+                }
+            }
+        }
+    }
+
     fn extract_binary_args_filtered(&mut self, args: &[Expr], opts: &[Opt]) -> Result<(Formula, DataFrame)> {
         if args.len() < 2 {
             return Err(HayashiError::Runtime("estimator requires (formula, dataframe)".into()));
         }
-        let formula_ast = match &args[0] {
-            Expr::Formula(f) => f.clone(),
-            _ => return Err(HayashiError::Type("first argument must be a formula".into())),
-        };
+        let formula_ast = self.resolve_formula(&args[0])?;
         let df_name = match &args[1] {
             Expr::Var(name) => name.clone(),
             _ => return Err(HayashiError::Type("second argument must be a DataFrame variable".into())),
