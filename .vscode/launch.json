@@ -1,0 +1,38 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run Hayashi",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/target/release/hayashi",
+      "args": ["${file}"],
+      "cwd": "${fileDirname}",
+      "externalConsole": false,
+      "MIMode": "gdb"
+    },
+    {
+      "name": "Run Hayashi (verbose)",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/target/release/hayashi",
+      "args": ["-v", "${file}"],
+      "cwd": "${fileDirname}",
+      "externalConsole": false,
+      "MIMode": "gdb"
+    },
+    {
+      "name": "Debug Hayashi (gdb)",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/target/debug/hayashi",
+      "args": ["${file}"],
+      "cwd": "${fileDirname}",
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "setupCommands": [
+        { "text": "-enable-pretty-printing", "ignoreFailures": true }
+      ]
+    }
+  ]
+}
