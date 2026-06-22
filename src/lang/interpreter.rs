@@ -10618,6 +10618,83 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── coefplot: gráfico ASCII de coeficientes ──────────────────────
+            "coefplot" | "coef_plot" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("coefplot(model [, width=50])".into()));
+                }
+                let model = self.eval_expr(&args[0])?;
+                let width = match opt_map.get("width") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 50,
+                };
+
+                let params = Self::extract_params(&model)
+                    .ok_or_else(|| HayashiError::Runtime("coefplot: modelo sem params".into()))?;
+                let se = Self::extract_se(&model).unwrap_or_default();
+                let names = Self::extract_var_names(&model);
+                let k = params.len();
+                let z = 1.96_f64;
+
+                // coletar (nome, coef, ci_lo, ci_hi) excluindo constante
+                let mut rows: Vec<(&str, f64, f64, f64)> = Vec::new();
+                for i in 0..k {
+                    let name = names.get(i).map(|s| s.as_str()).unwrap_or("?");
+                    if name == "_cons" || name == "const" { continue; }
+                    let ci_lo = params[i] - z * se.get(i).unwrap_or(&0.0);
+                    let ci_hi = params[i] + z * se.get(i).unwrap_or(&0.0);
+                    rows.push((name, params[i], ci_lo, ci_hi));
+                }
+                if rows.is_empty() {
+                    println!("(no coefficients to plot)");
+                    return Ok(Value::Nil);
+                }
+
+                let label_w = rows.iter().map(|(n, _, _, _)| n.len()).max().unwrap_or(4).max(8);
+                let all_lo = rows.iter().map(|(_, _, lo, _)| *lo).fold(f64::INFINITY, f64::min);
+                let all_hi = rows.iter().map(|(_, _, _, hi)| *hi).fold(f64::NEG_INFINITY, f64::max);
+                let range = (all_hi - all_lo).max(1e-15);
+                // expandir para incluir zero se não está no range
+                let plot_lo = all_lo.min(0.0) - range * 0.05;
+                let plot_hi = all_hi.max(0.0) + range * 0.05;
+                let plot_range = (plot_hi - plot_lo).max(1e-15);
+
+                let to_col = |v: f64| -> usize {
+                    ((v - plot_lo) / plot_range * (width - 1) as f64).round().clamp(0.0, (width - 1) as f64) as usize
+                };
+                let zero_col = to_col(0.0);
+
+                println!();
+                for (name, coef, ci_lo, ci_hi) in &rows {
+                    let c_lo = to_col(*ci_lo);
+                    let c_hi = to_col(*ci_hi);
+                    let c_pt = to_col(*coef);
+                    let mut line = vec![' '; width];
+                    // zero line
+                    if zero_col < width { line[zero_col] = '│'; }
+                    // CI bar
+                    for j in c_lo..=c_hi.min(width - 1) { line[j] = '─'; }
+                    // point estimate
+                    if c_pt < width { line[c_pt] = '●'; }
+                    let bar: String = line.into_iter().collect();
+                    println!("{:>lw$} │{bar}  {coef:>8.3}", name, lw = label_w);
+                }
+                // axis
+                print!("{:>lw$} │", "", lw = label_w);
+                let mut axis = vec![' '; width];
+                if zero_col < width { axis[zero_col] = '0'; }
+                println!("{}", axis.iter().collect::<String>());
+                // range labels
+                let lo_s = format!("{:.1}", plot_lo);
+                let hi_s = format!("{:.1}", plot_hi);
+                let pad = width.saturating_sub(lo_s.len() + hi_s.len());
+                println!("{:>lw$}  {lo_s}{:>pad$}", "", hi_s, lw = label_w, pad = pad);
+                println!();
+
+                Ok(Value::Nil)
+            }
+
             // ── Função definida pelo usuário ──────────────────────────────────
             other => {
                 // Recupera a função do env (se existir)
