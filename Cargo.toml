@@ -3,7 +3,7 @@ name = "hayashi"
 version = "0.1.1-dev"
 edition = "2021"
 description = "An interpreted, statically-typed language for applied econometrics"
-license = "MIT"
+license = "GPL-3.0-only"
 
 [[bin]]
 name = "hayashi"
