@@ -12453,20 +12453,14 @@ impl Interpreter {
                 // ── geradores aleatórios (tamanho = n_rows do df) ──
                 if matches!(func.as_str(), "uniform" | "runiform" | "rnormal" | "rbernoulli") {
                     let n = df.n_rows();
-                    use rand::Rng;
-                    let mut rng = rand::thread_rng();
                     return Ok(match func.as_str() {
-                        "uniform" | "runiform" => (0..n).map(|_| rng.gen::<f64>()).collect(),
-                        "rnormal" => {
-                            use rand::distributions::Distribution;
-                            let normal = rand::distributions::Standard;
-                            (0..n).map(|_| { let v: f64 = normal.sample(&mut rng); v }).collect()
-                        }
+                        "uniform" | "runiform" => greeners::Transforms::uniform(n),
+                        "rnormal" => greeners::Transforms::rnormal(n),
                         "rbernoulli" => {
                             let p = if !args.is_empty() {
-                                match Self::eval_col_expr(&args[0], df)?[0] { v => v }
+                                Self::eval_col_expr(&args[0], df)?[0]
                             } else { 0.5 };
-                            (0..n).map(|_| if rng.gen::<f64>() < p { 1.0 } else { 0.0 }).collect()
+                            greeners::Transforms::rbernoulli(n, p)
                         }
                         _ => unreachable!(),
                     });
@@ -12482,88 +12476,37 @@ impl Interpreter {
                     let cols: Vec<Vec<f64>> = args.iter()
                         .map(|a| Self::eval_col_expr(a, df))
                         .collect::<Result<_>>()?;
-                    let n = df.n_rows();
-                    return Ok((0..n).map(|i| {
-                        let row: Vec<f64> = cols.iter().map(|c| c[i]).collect();
-                        match func.as_str() {
-                            "rowtotal" => row.iter().map(|v| if v.is_finite() { *v } else { 0.0 }).sum::<f64>(),
-                            "rowmiss"  => row.iter().filter(|v| !v.is_finite()).count() as f64,
-                            _ => {
-                                if row.iter().any(|v| !v.is_finite()) { return f64::NAN; }
-                                match func.as_str() {
-                                    "rowmean" => row.iter().sum::<f64>() / row.len() as f64,
-                                    "rowsum"  => row.iter().sum::<f64>(),
-                                    "rowmin"  => row.iter().cloned().fold(f64::INFINITY,     f64::min),
-                                    "rowmax"  => row.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
-                                    _ => f64::NAN,
-                                }
-                            }
-                        }
-                    }).collect());
+                    return Ok(match func.as_str() {
+                        "rowmean"  => greeners::Transforms::row_mean(&cols),
+                        "rowsum"   => greeners::Transforms::row_sum(&cols),
+                        "rowmin"   => greeners::Transforms::row_min(&cols),
+                        "rowmax"   => greeners::Transforms::row_max(&cols),
+                        "rowtotal" => greeners::Transforms::row_total(&cols),
+                        "rowmiss"  => greeners::Transforms::row_miss(&cols),
+                        _ => unreachable!(),
+                    });
                 }
 
                 if args.len() == 1 {
                     // ── funções que precisam de toda a coluna ──────────────────
                     match func.as_str() {
-                        // rank com média para empates (ascendente; NaN vão ao fim)
                         "rank" => {
                             let vals = Self::eval_col_expr(&args[0], df)?;
-                            let n = vals.len();
-                            let mut order: Vec<usize> = (0..n).collect();
-                            order.sort_by(|&a, &b| {
-                                match (vals[a].is_nan(), vals[b].is_nan()) {
-                                    (true, true)   => std::cmp::Ordering::Equal,
-                                    (true, false)  => std::cmp::Ordering::Greater,
-                                    (false, true)  => std::cmp::Ordering::Less,
-                                    (false, false) => vals[a].partial_cmp(&vals[b]).unwrap(),
-                                }
-                            });
-                            let mut ranks = vec![0.0f64; n];
-                            let mut i = 0;
-                            while i < n {
-                                if vals[order[i]].is_nan() {
-                                    for k in i..n { ranks[order[k]] = f64::NAN; }
-                                    break;
-                                }
-                                let mut j = i;
-                                while j < n
-                                    && !vals[order[j]].is_nan()
-                                    && (vals[order[j]] - vals[order[i]]).abs() < 1e-10
-                                {
-                                    j += 1;
-                                }
-                                let avg = ((i + 1) as f64 + j as f64) / 2.0;
-                                for k in i..j { ranks[order[k]] = avg; }
-                                i = j;
-                            }
-                            return Ok(ranks);
+                            return Ok(greeners::Transforms::rank(&vals));
                         }
-                        // cumsum: soma cumulativa
                         "cumsum" => {
                             let vals = Self::eval_col_expr(&args[0], df)?;
-                            let mut s = 0.0f64;
-                            return Ok(vals.into_iter().map(|v| { s += v; s }).collect());
+                            return Ok(greeners::Transforms::cumsum(&vals));
                         }
-                        // std: standardize (z-score)
                         "std" | "standardize" | "zscore" => {
                             let vals = Self::eval_col_expr(&args[0], df)?;
-                            let clean: Vec<f64> = vals.iter().filter(|v| v.is_finite()).copied().collect();
-                            let n = clean.len() as f64;
-                            let mean = clean.iter().sum::<f64>() / n;
-                            let sd = (clean.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n - 1.0)).sqrt();
-                            return Ok(vals.iter().map(|&v| if v.is_finite() && sd > 1e-15 { (v - mean) / sd } else { f64::NAN }).collect());
+                            return Ok(greeners::Transforms::standardize(&vals));
                         }
-                        // iqr: interquartile range (scalar broadcast)
                         "iqr" => {
                             let vals = Self::eval_col_expr(&args[0], df)?;
-                            let mut sorted: Vec<f64> = vals.iter().filter(|v| v.is_finite()).copied().collect();
-                            sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
-                            let n = sorted.len();
-                            let q25 = sorted[(0.25 * (n - 1) as f64).round() as usize];
-                            let q75 = sorted[(0.75 * (n - 1) as f64).round() as usize];
-                            return Ok(vec![q75 - q25; df.n_rows()]);
+                            let iqr_val = greeners::Transforms::iqr(&vals);
+                            return Ok(vec![iqr_val; df.n_rows()]);
                         }
-                        // group: ID inteiro (1-based) para cada valor único
                         "group" => {
                             let col_name = match &args[0] {
                                 Expr::Var(name) => name.clone(),
@@ -12572,109 +12515,37 @@ impl Interpreter {
                                 )),
                             };
                             let strs = Self::col_to_strings(df, &col_name)?;
-                            let mut unique: Vec<String> = strs.iter().cloned()
-                                .collect::<std::collections::HashSet<_>>()
-                                .into_iter()
-                                .collect();
-                            if unique.iter().all(|s| s.parse::<f64>().is_ok()) {
-                                unique.sort_by(|a, b| {
-                                    a.parse::<f64>().unwrap()
-                                        .partial_cmp(&b.parse::<f64>().unwrap())
-                                        .unwrap()
-                                });
-                            } else {
-                                unique.sort();
-                            }
-                            let lookup: HashMap<String, f64> = unique.into_iter()
-                                .enumerate()
-                                .map(|(i, v)| (v, (i + 1) as f64))
-                                .collect();
-                            return Ok(strs.iter()
-                                .map(|v| *lookup.get(v).unwrap_or(&f64::NAN))
-                                .collect());
+                            return Ok(greeners::Transforms::group(&strs));
                         }
                         _ => {}
                     }
 
-                    // ── funções escalares elemento-a-elemento ──────────────────
+                    // ── funções escalares elemento-a-elemento (1-arg) ─────────
                     let vals = Self::eval_col_expr(&args[0], df)?;
-                    let f: fn(f64) -> f64 = match func.as_str() {
-                        "log"  | "ln"   => f64::ln,
-                        "log2"          => f64::log2,
-                        "log10"         => f64::log10,
-                        "exp"           => f64::exp,
-                        "sqrt"          => f64::sqrt,
-                        "abs"           => f64::abs,
-                        "floor"         => f64::floor,
-                        "ceil"          => f64::ceil,
-                        "round"         => f64::round,
-                        "sin"           => f64::sin,
-                        "cos"           => f64::cos,
-                        "tan"           => f64::tan,
-                        "asin"          => f64::asin,
-                        "acos"          => f64::acos,
-                        "atan"          => f64::atan,
-                        "sign" | "signum" => f64::signum,
-                        "factorial"     => |x: f64| {
-                            let n = x as u64;
-                            (1..=n).product::<u64>() as f64
-                        },
-                        "normal" | "normalden" => greeners::norm_pdf,
-                        "invnormal" | "qnorm" => |p: f64| greeners::t_quantile(p, 1e12),
-                        other => return Err(HayashiError::Runtime(
-                            format!("função de coluna desconhecida '{other}'")
+                    match greeners::Transforms::apply(&vals, func) {
+                        Ok(result) => Ok(result),
+                        Err(_) => Err(HayashiError::Runtime(
+                            format!("função de coluna desconhecida '{func}'")
                         )),
-                    };
-                    Ok(vals.into_iter().map(f).collect())
+                    }
                 } else if args.len() == 2 {
                     let a = Self::eval_col_expr(&args[0], df)?;
                     let b = Self::eval_col_expr(&args[1], df)?;
-                    let f: fn(f64, f64) -> f64 = match func.as_str() {
-                        "pow"           => f64::powf,
-                        "mod" | "fmod"  => f64::rem_euclid,
-                        "atan2"         => f64::atan2,
-                        "max"           => f64::max,
-                        "min"           => f64::min,
-                        "comb"          => |n: f64, k: f64| {
-                            let (n, k) = (n as u64, k as u64);
-                            if k > n { return 0.0; }
-                            let k = k.min(n - k);
-                            (1..=k).fold(1u64, |acc, i| acc * (n - k + i) / i) as f64
-                        },
-                        "ttail"         => |df_v: f64, x: f64| 1.0 - greeners::t_pvalue_two(x, df_v) / 2.0,
-                        "invttail"      => |df_v: f64, p: f64| greeners::t_quantile(1.0 - p, df_v),
-                        "chi2tail"      => |df_v: f64, x: f64| greeners::chi2_pvalue(x, df_v),
-                        "Ftail" | "ftail" => |df1: f64, x: f64| greeners::f_pvalue(x, df1, 1000.0),
-                        other => return Err(HayashiError::Runtime(
-                            format!("função '{other}' não suportada em generate")
+                    match greeners::Transforms::apply2(&a, &b, func) {
+                        Ok(result) => Ok(result),
+                        Err(_) => Err(HayashiError::Runtime(
+                            format!("função '{func}' não suportada em generate")
                         )),
-                    };
-                    Ok(a.into_iter().zip(b).map(|(x, y)| f(x, y)).collect())
+                    }
                 } else if args.len() == 3 {
                     let a = Self::eval_col_expr(&args[0], df)?;
                     let b = Self::eval_col_expr(&args[1], df)?;
                     let c = Self::eval_col_expr(&args[2], df)?;
-                    match func.as_str() {
-                        "cond" => Ok(a.into_iter().zip(b.into_iter().zip(c))
-                            .map(|(cond, (t, f))| if cond != 0.0 { t } else { f })
-                            .collect()),
-                        "Ftail" | "ftail" => Ok(a.into_iter().zip(b.into_iter().zip(c))
-                            .map(|(df1, (df2, x))| greeners::f_pvalue(x, df1, df2))
-                            .collect()),
-                        "binomial" | "binomialp" => Ok(a.into_iter().zip(b.into_iter().zip(c))
-                            .map(|(n, (k, p))| {
-                                let (n, k) = (n as u64, k as u64);
-                                if k > n { return 0.0; }
-                                let comb = {
-                                    let kk = k.min(n - k);
-                                    (1..=kk).fold(1u64, |acc, i| acc * (n - kk + i) / i) as f64
-                                };
-                                comb * p.powi(k as i32) * (1.0 - p).powi((n - k) as i32)
-                            })
-                            .collect()),
-                        _ => Err(HayashiError::Runtime(format!(
-                            "função '{func}' não suportada em generate"
-                        ))),
+                    match greeners::Transforms::apply3(&a, &b, &c, func) {
+                        Ok(result) => Ok(result),
+                        Err(_) => Err(HayashiError::Runtime(
+                            format!("função '{func}' não suportada em generate")
+                        )),
                     }
                 } else {
                     Err(HayashiError::Runtime(format!(
