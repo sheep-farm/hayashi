@@ -5994,21 +5994,48 @@ impl Interpreter {
                                 x_use = greeners::Margins::with_at(&x_use, idx, *val);
                             }
                         }
+                        // Reconstruir vcov para delta method SEs
+                        let vcov = {
+                            let xt_x = bm.x.t().dot(&bm.x);
+                            use greeners::linalg::LinalgInverse as _;
+                            xt_x.inv().ok().map(|inv| {
+                                let sigma2 = bm.result.params.len() as f64;
+                                &inv * sigma2
+                            })
+                        };
                         let ame_result = if bm.kind == "logit" {
-                            greeners::Margins::ame_logit(&bm.result.params, &x_use, &bm.coef_names)
+                            match &vcov {
+                                Some(v) => greeners::Margins::ame_logit_with_vcov(&bm.result.params, &x_use, &bm.coef_names, v),
+                                None => greeners::Margins::ame_logit(&bm.result.params, &x_use, &bm.coef_names),
+                            }
                         } else {
-                            greeners::Margins::ame_probit(&bm.result.params, &x_use, &bm.coef_names)
+                            match &vcov {
+                                Some(v) => greeners::Margins::ame_probit_with_vcov(&bm.result.params, &x_use, &bm.coef_names, v),
+                                None => greeners::Margins::ame_probit(&bm.result.params, &x_use, &bm.coef_names),
+                            }
                         };
                         let at_label = if at_vals.is_empty() { String::new() }
                             else { format!("  at({})", at_vals.iter().map(|(k,v)| format!("{k}={v}")).collect::<Vec<_>>().join(", ")) };
+                        let has_se = ame_result.std_errors.iter().any(|s| s.is_finite());
                         println!("\n{sep2}");
                         println!(" Average Marginal Effects — {}{at_label}", bm.kind.to_uppercase());
                         println!("{sep2}");
-                        println!("{:<22} {:>14}", "Variable", "dy/dx");
+                        if has_se {
+                            println!("{:<18} {:>10} {:>10} {:>8} {:>8}", "Variable", "dy/dx", "Std.Err.", "z", "P>|z|");
+                        } else {
+                            println!("{:<22} {:>14}", "Variable", "dy/dx");
+                        }
                         println!("{sep}");
                         for (i, name) in ame_result.variable_names.iter().enumerate() {
                             if !show_var(name) { continue; }
-                            println!("{:<22} {:>14.6}", name, ame_result.effects[i]);
+                            if has_se {
+                                let sig = if ame_result.p_values[i] < 0.01 { "***" } else if ame_result.p_values[i] < 0.05 { "**" } else if ame_result.p_values[i] < 0.10 { "*" } else { "" };
+                                println!("{:<18} {:>10.6} {:>10.6} {:>8.3} {:>8.4} {sig}",
+                                    name, ame_result.effects[i], ame_result.std_errors[i],
+                                    ame_result.z_values[i], ame_result.p_values[i]);
+                            } else {
+                                println!("{:<22} {:>14.6}", name, ame_result.effects[i]);
+                            }
                         }
                         println!("{sep}");
                         println!("n = {}", ame_result.n_obs);
