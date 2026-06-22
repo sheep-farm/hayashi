@@ -1,5 +1,5 @@
 [package]
-name = "hayashi"
+name = "hayashi-lang"
 version = "0.1.0"
 edition = "2021"
 description = "An interpreted language for applied econometrics — Stata-like syntax, modern features, zero cost"
