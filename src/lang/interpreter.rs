@@ -4328,6 +4328,192 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── help: sistema de ajuda inline ──────────────────────────────
+            "help" => {
+                let topic = if args.is_empty() { String::new() }
+                else { match &args[0] { Expr::Var(n) | Expr::Str(n) => n.clone(), _ => String::new() } };
+                let h = match topic.as_str() {
+                    "" => concat!(
+                        "Hayashi — Applied Econometrics Language\n\n",
+                        "ESTIMADORES:\n",
+                        "  ols/reg  logit  probit  iv  poisson  nbreg  tobit  qreg\n",
+                        "  fe  re  ab  sysgmm  pcse  xtgls  heckman  cox\n",
+                        "  lasso  ridge  elasticnet  garch  arima  var  vecm\n\n",
+                        "PÓS-ESTIMAÇÃO:\n",
+                        "  test  nlcom  margins  predict  esttab  estat  hausman  lincom\n",
+                        "  bootstrap  bootse  diagnostics  vif  durbinwatson\n\n",
+                        "DADOS:\n",
+                        "  load  generate  replace  drop  keep  dropna  rename  sort\n",
+                        "  merge  append  collapse  reshape  encode  decode  winsor  tabgen\n",
+                        "  summarize  tabulate  tabstat  xtsum  ttest  correlate  list\n\n",
+                        "TESTES:\n",
+                        "  adf  kpss  pp  za  ljungbox  archtest  granger  johansen\n",
+                        "  bptest  pesaran_cd  wooldridge  abtest  white  jb  reset\n\n",
+                        "LINGUAGEM:\n",
+                        "  let  if/else  for  while  fn  return  display  scalar  input\n\n",
+                        "Use help(comando) para detalhes. Ex: help(ols)\n",
+                    ),
+                    "ols" | "reg" | "regress" => concat!(
+                        "ols(formula, df [, opções])\n",
+                        "  Aliases: reg, regress\n\n",
+                        "  Opções:\n",
+                        "    cov=nonrobust|HC1|HC2|HC3|HC4|robust   (default: nonrobust)\n",
+                        "    cluster=var       Cluster-robust SEs (one-way)\n",
+                        "    cluster2=var      Two-way clustering\n",
+                        "    nw=lags           Newey-West HAC\n\n",
+                        "  Exemplo:\n",
+                        "    let m = ols(Y ~ X1 + X2, df)\n",
+                        "    let m = ols(Y ~ X1 + X2, df, cluster=firm)\n",
+                        "    print(m)\n",
+                    ),
+                    "test" => concat!(
+                        "test(model, ...)\n\n",
+                        "  Diagnósticos:\n",
+                        "    test(m, white)    White heteroskedasticity\n",
+                        "    test(m, bp)       Breusch-Pagan\n",
+                        "    test(m, dw)       Durbin-Watson\n\n",
+                        "  Wald / F-test:\n",
+                        "    test(m, X1)              H₀: β_X1 = 0\n",
+                        "    test(m, X1, X2)          H₀: β_X1 = β_X2 = 0 (joint)\n",
+                        "    test(m, \"X1 = X2\")       H₀: β_X1 = β_X2\n",
+                        "    test(m, \"X1 = 0.5\")      H₀: β_X1 = 0.5\n",
+                    ),
+                    "nlcom" => concat!(
+                        "nlcom(model, expr)\n",
+                        "  Combinação não-linear de coeficientes (delta method)\n\n",
+                        "  Exemplo:\n",
+                        "    nlcom(m, X1 / X2)         Razão de coeficientes\n",
+                        "    nlcom(m, exp(_cons))       Exponencial do intercepto\n",
+                    ),
+                    "margins" => concat!(
+                        "margins(model [, dydx=[vars], at_var=val])\n",
+                        "  Average Marginal Effects para logit/probit/poisson/negbin\n\n",
+                        "  Opções:\n",
+                        "    dydx=[X1, X2]     Mostrar apenas variáveis selecionadas\n",
+                        "    at_X1=0.5         Fixar X1 em 0.5 para cálculo\n\n",
+                        "  Exemplo:\n",
+                        "    margins(m_logit)\n",
+                        "    margins(m_logit, dydx=[age], at_educ=12)\n",
+                    ),
+                    "bootstrap" | "boot" => concat!(
+                        "bootstrap(estimator, formula, df, n=1000)\n",
+                        "  Bootstrap genérico — funciona com qualquer estimador\n\n",
+                        "  Exemplo:\n",
+                        "    bootstrap(ols, Y ~ X1 + X2, df, n=500)\n",
+                        "    bootstrap(logit, Y ~ X1, df, n=1000, alpha=0.10)\n",
+                    ),
+                    "esttab" => concat!(
+                        "esttab(m1, m2, ... [, fmt=txt|latex, path=\"file\"])\n",
+                        "  Tabela comparativa de modelos (com R², Adj.R², N)\n\n",
+                        "  Exemplo:\n",
+                        "    esttab(m1, m2, m3)\n",
+                        "    esttab(m1, m2, fmt=latex, path=\"tabela.tex\")\n",
+                    ),
+                    "fe" => concat!(
+                        "fe(formula, df [, id=col])\n",
+                        "  Fixed Effects (within estimator)\n",
+                        "  Se xtset(df, id, time) declarado, id= é opcional.\n\n",
+                        "  Exemplo:\n",
+                        "    xtset(df, firm, year)\n",
+                        "    let m = fe(Y ~ X1 + X2, df)\n",
+                    ),
+                    "re" => concat!(
+                        "re(formula, df [, id=col])\n",
+                        "  Random Effects (GLS)\n",
+                        "  Se xtset(df, id, time) declarado, id= é opcional.\n",
+                    ),
+                    "xtset" => concat!(
+                        "xtset(df, id_col, time_col)\n",
+                        "  Declara estrutura de painel. Após xtset, estimadores\n",
+                        "  de painel (fe, re, ab, etc.) não precisam de id=/time=.\n\n",
+                        "  Exemplo:\n",
+                        "    xtset(df, firm, year)\n",
+                        "    let m = fe(Y ~ X1 + X2, df)\n",
+                    ),
+                    "cluster" => concat!(
+                        "Cluster-robust standard errors\n\n",
+                        "  ols(Y ~ X, df, cluster=firm)\n",
+                        "  ols(Y ~ X, df, cluster=firm, cluster2=year)   two-way\n",
+                        "  ols(Y ~ X, df, nw=4)                          Newey-West\n",
+                        "  ols(Y ~ X, df, cov=robust)                    HC1\n",
+                    ),
+                    "winsor" | "winsorize" => concat!(
+                        "winsor(df, var, p=0.01 [, gen=new])\n",
+                        "  Winsoriza nos percentis p e 1-p\n\n",
+                        "  Exemplo:\n",
+                        "    winsor(df, ret, p=0.05)             in-place\n",
+                        "    winsor(df, ret, p=0.01, gen=ret_w)  nova coluna\n",
+                    ),
+                    "encode" => concat!(
+                        "encode(df, col [, gen=new])\n",
+                        "  Converte coluna string para numérica (0, 1, 2...)\n\n",
+                        "  Exemplo:\n",
+                        "    encode(df, region)                  in-place\n",
+                        "    encode(df, region, gen=region_num)  nova coluna\n",
+                    ),
+                    "tabgen" | "xi" => concat!(
+                        "tabgen(df, var [, prefix=nome])\n",
+                        "  Gera variáveis dummy a partir de categórica\n\n",
+                        "  Exemplo:\n",
+                        "    tabgen(df, region)             → region_1, region_2, ...\n",
+                        "    tabgen(df, region, prefix=d)   → d_1, d_2, ...\n",
+                    ),
+                    "load" => concat!(
+                        "load \"path\" as alias\n",
+                        "  Carrega CSV, DTA ou URL.\n\n",
+                        "  Exemplo:\n",
+                        "    load \"dados.csv\" as df\n",
+                        "    load \"painel.dta\" as panel\n",
+                        "    load \"https://...data.csv\" as df\n",
+                    ),
+                    "generate" | "gen" => concat!(
+                        "generate df varname = expr\n",
+                        "  Cria coluna no DataFrame. Suporta aritmética, funções,\n",
+                        "  comparações (incluindo strings: col == \"valor\").\n\n",
+                        "  Exemplo:\n",
+                        "    generate df lnY = log(Y)\n",
+                        "    generate df treat = (group == \"treated\")\n",
+                        "    generate df interact = X1 * X2\n",
+                    ),
+                    "iv" => concat!(
+                        "iv(endog_formula, instr_formula, df [, cov=...])\n",
+                        "  IV / 2SLS estimation\n\n",
+                        "  Exemplo:\n",
+                        "    let m = iv(Y ~ X1 + X_endog, ~ Z1 + Z2, df)\n",
+                    ),
+                    "logit" | "probit" => concat!(
+                        "logit(formula, df [, cov=...])\n",
+                        "probit(formula, df [, cov=...])\n\n",
+                        "  Exemplo:\n",
+                        "    let m = logit(Y ~ X1 + X2, df)\n",
+                        "    margins(m)\n",
+                        "    predict df yhat = m, pr\n",
+                    ),
+                    "predict" => concat!(
+                        "predict df varname = model [, kind]\n",
+                        "  kind: xb (default), residuals, pr, count, yhat\n\n",
+                        "  Exemplo:\n",
+                        "    predict df yhat = m_ols\n",
+                        "    predict df resid = m_ols, residuals\n",
+                        "    predict df prob = m_logit, pr\n",
+                    ),
+                    "list" => concat!(
+                        "list(df [, vars=[A,B], n=10])\n",
+                        "  Mostra observações do DataFrame\n\n",
+                        "  Exemplo:\n",
+                        "    list(df)\n",
+                        "    list(df, Y, X, 5)\n",
+                        "    list(df, vars=[Y, X], n=20)\n",
+                    ),
+                    other => {
+                        println!("help: comando '{other}' não documentado. Use help() para lista completa.");
+                        return Ok(Value::Nil);
+                    }
+                };
+                println!("{h}");
+                Ok(Value::Nil)
+            }
+
             // ── describe ─────────────────────────────────────────────────────
             "describe" => {
                 if args.len() != 1 {
