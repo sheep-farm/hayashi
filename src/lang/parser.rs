@@ -129,7 +129,7 @@ impl Parser {
     //   unary       - !
     //   primary
 
-    fn parse_expr(&mut self) -> Result<Expr> {
+    pub fn parse_expr(&mut self) -> Result<Expr> {
         self.parse_or()
     }
 
@@ -252,6 +252,7 @@ impl Parser {
             Token::Int(i)   => { self.advance(); Ok(Expr::Int(i)) }
             Token::Bool(b)  => { self.advance(); Ok(Expr::Bool(b)) }
             Token::StringLit(s) => { self.advance(); Ok(Expr::Str(s)) }
+            Token::FStringLit(s) => { self.advance(); Ok(Expr::FString(s)) }
 
             // Agrupamento: (expr)
             Token::LParen => {
@@ -342,6 +343,19 @@ impl Parser {
                 self.advance();
                 let var = self.expect_ident()?;
                 Ok(Expr::TsOp { op: TsOpKind::Diff, var, n })
+            }
+
+            // Closure: |x, y| expr
+            Token::Pipe => {
+                self.advance();
+                let mut params = Vec::new();
+                while !matches!(self.peek(), Token::Pipe | Token::Eof) {
+                    params.push(self.expect_ident()?);
+                    if self.peek() == &Token::Comma { self.advance(); }
+                }
+                self.expect(&Token::Pipe)?;
+                let body = self.parse_expr()?;
+                Ok(Expr::Closure { params, body: Box::new(body) })
             }
 
             // Keywords usadas como identificadores em contexto de expressão

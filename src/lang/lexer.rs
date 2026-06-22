@@ -5,6 +5,7 @@ pub enum Token {
     // Literais
     Ident(String),
     StringLit(String),
+    FStringLit(String),
     Float(f64),
     Int(i64),
     Bool(bool),
@@ -222,6 +223,13 @@ impl Lexer {
                 Some('\n') => tokens.push((Token::Newline, line)),
                 Some('"') => tokens.push((self.read_string()?, line)),
                 Some(c) if c.is_ascii_digit() => tokens.push((self.read_number(c), line)),
+                Some('f') if self.peek() == Some('"') => {
+                    self.advance(); // consume "
+                    match self.read_string()? {
+                        Token::StringLit(s) => tokens.push((Token::FStringLit(s), line)),
+                        _ => unreachable!(),
+                    }
+                }
                 Some(c) if c.is_alphabetic() || c == '_' => {
                     let tok = self.read_ident(c);
                     let tok = self.maybe_ts_op(tok);

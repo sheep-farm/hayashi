@@ -3864,6 +3864,128 @@ print(m)"#);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// F-STRING — string interpolation
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn fstring_basic() {
+    assert_ok_contains("fstr_basic", r#"let x = 42
+display f"value = {x}""#, "value = 42");
+}
+
+#[test]
+fn fstring_expr() {
+    assert_ok_contains("fstr_expr", r#"display f"sum = {2 + 3}""#, "sum = 5");
+}
+
+#[test]
+fn fstring_format_spec() {
+    assert_ok_contains("fstr_fmt", r#"let pi = 3.14159
+display f"{pi:.2f}""#, "3.14");
+}
+
+#[test]
+fn fstring_multiple() {
+    assert_ok_contains("fstr_multi", r#"let a = 1
+let b = 2
+display f"{a} + {b} = {a + b}""#, "1 + 2 = 3");
+}
+
+#[test]
+fn fstring_escape_braces() {
+    assert_ok_contains("fstr_escape", r#"display f"{{literal}}""#, "{literal}");
+}
+
+#[test]
+fn fstring_scientific() {
+    assert_ok_contains("fstr_sci", r#"display f"{0.00123:.2e}""#, "1.23e-3");
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CLOSURES — |x| expr
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn closure_map() {
+    assert_ok_contains("closure_map", r#"let r = map([1,2,3], |x| x * 10)
+display r[0]"#, "10");
+}
+
+#[test]
+fn closure_filter() {
+    assert_ok_contains("closure_filter", r#"let r = filter([1,2,3,4,5], |x| x > 3)
+display len(r)"#, "2");
+}
+
+#[test]
+fn closure_multi_param() {
+    assert_ok_contains("closure_multi", r#"let add = |a, b| a + b
+let nums = [1, 2, 3]
+let result = map(nums, |x| add(x, 10))
+display result[1]"#, "12");
+}
+
+#[test]
+fn closure_as_variable() {
+    assert_ok_contains("closure_var", r#"let sq = |x| x * x
+display sq(5)"#, "25");
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TYPE CONVERSIONS — int(), float(), str(), bool(), type()
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn type_conv_int() {
+    assert_ok_contains("conv_int", "display int(3.9)", "3");
+}
+
+#[test]
+fn type_conv_float() {
+    assert_ok_contains("conv_float", "display float(42)", "42");
+}
+
+#[test]
+fn type_conv_str() {
+    assert_ok_contains("conv_str", "display str(3.14)", "3.14");
+}
+
+#[test]
+fn type_conv_bool() {
+    assert_ok_contains("conv_bool_f", "display bool(0)", "false");
+}
+
+#[test]
+fn type_conv_bool_true() {
+    assert_ok_contains("conv_bool_t", "display bool(1)", "true");
+}
+
+#[test]
+fn type_conv_str_to_int() {
+    assert_ok_contains("conv_s2i", r#"display int("42")"#, "42");
+}
+
+#[test]
+fn type_conv_str_to_float() {
+    assert_ok_contains("conv_s2f", r#"display float("3.14")"#, "3.14");
+}
+
+#[test]
+fn typeof_check() {
+    assert_ok_contains("typeof", r#"display type(42)"#, "int");
+}
+
+#[test]
+fn typeof_list() {
+    assert_ok_contains("typeof_list", "display type([1,2])", "list");
+}
+
+#[test]
+fn typeof_dict() {
+    assert_ok_contains("typeof_dict", r#"display type({"a": 1})"#, "dict");
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // PARQUET — load/export
 // ══════════════════════════════════════════════════════════════════════════════
 
