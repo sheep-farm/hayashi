@@ -1,3 +1,8 @@
+pub mod dsv;
 pub mod dta;
+pub mod excel;
 pub mod fetch;
+#[cfg(feature = "odbc")]
+pub mod odbc;
 pub mod plot;
+pub mod sqlite;

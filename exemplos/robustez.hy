@@ -33,7 +33,7 @@ print(m_tukey)
 esttab(m_ols, m_huber, m_tukey)
 
 # Predição pós-RLM
-predict auto yhat_rlm = m_huber, xb
+predict auto yhat_rlm = m_huber, "xb"
 correlate(auto, price, yhat_rlm)
 
 
@@ -69,4 +69,4 @@ let m_re = re(lucro ~ alavancagem + tamanho, painel, id=empresa, time=ano)
 esttab(m_re, m_gee_gauss)
 
 # Predição pós-GEE
-predict painel yhat_gee = m_gee_gauss, xb
+predict painel yhat_gee = m_gee_gauss, "xb"

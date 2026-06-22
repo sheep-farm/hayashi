@@ -1,0 +1,7 @@
+[
+  {"id": 1, "city": "São Paulo", "pop": 12.3, "capital": false},
+  {"id": 2, "city": "Brasília",  "pop": 3.1,  "capital": true},
+  {"id": 3, "city": "Rio de Janeiro", "pop": 6.7, "capital": false},
+  {"id": 4, "city": "Salvador", "pop": 2.9, "capital": false},
+  {"id": 5, "city": "Curitiba", "pop": 1.9, "capital": false}
+]

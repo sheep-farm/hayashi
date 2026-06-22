@@ -4523,10 +4523,11 @@ impl Interpreter {
                     )),
                 };
 
-                let test_name = match &args[1] {
-                    Expr::Var(s) => s.clone(),
-                    Expr::Str(s) => s.clone(),
-                    _ => return Err(HayashiError::Type("second argument must be a name or string".into())),
+                let test_name = match self.eval_expr(&args[1])? {
+                    Value::Str(s) => s,
+                    other => return Err(HayashiError::Type(format!(
+                        "test name must be a string (e.g. \"white\"), got {other}"
+                    ))),
                 };
 
                 match test_name.as_str() {
@@ -4613,12 +4614,11 @@ impl Interpreter {
                             // joint F-test: test(model, var1, var2, ...) — first var already parsed as `other`
                             let mut indices = vec![find_idx(other)?];
                             for arg in &args[2..] {
-                                let name = match arg {
-                                    Expr::Var(n) | Expr::Str(n) => n.clone(),
-                                    _ => match self.eval_expr(arg)? {
-                                        Value::Str(s) => s,
-                                        _ => return Err(HayashiError::Type("test() arguments must be variable names".into())),
-                                    },
+                                let name = match self.eval_expr(arg)? {
+                                    Value::Str(s) => s,
+                                    other => return Err(HayashiError::Type(format!(
+                                        "test() variable names must be strings, got {other}"
+                                    ))),
                                 };
                                 indices.push(find_idx(&name)?);
                             }
@@ -4891,12 +4891,45 @@ impl Interpreter {
                         "    tabgen(df, region, prefix=d)   → d_1, d_2, ...\n",
                     ),
                     "load" => concat!(
-                        "load \"path\" as alias\n",
-                        "  Carrega CSV, DTA ou URL.\n\n",
-                        "  Exemplo:\n",
+                        "load \"path\" as alias [, opts...]\n",
+                        "  Carrega dados em DataFrame.\n\n",
+                        "  Formatos: CSV, TSV, JSON, DTA (Stata), Excel (xlsx/xls/ods), SQLite, ODBC.\n",
+                        "  URLs são baixadas automaticamente.\n\n",
+                        "  Opções:\n",
+                        "    sheet=Plan1       → aba do Excel (padrão: primeira)\n",
+                        "    table=prices      → tabela SQLite/ODBC\n",
+                        "    query=\"SELECT..\" → query SQL (SQLite/ODBC)\n",
+                        "    sep=\";\"          → delimitador para CSV (padrão: vírgula)\n\n",
+                        "  Exemplos:\n",
                         "    load \"dados.csv\" as df\n",
+                        "    load \"dados.tsv\" as df\n",
+                        "    load \"dados.json\" as df\n",
                         "    load \"painel.dta\" as panel\n",
-                        "    load \"https://...data.csv\" as df\n",
+                        "    load \"planilha.xlsx\" as df, sheet=Dados\n",
+                        "    load \"banco.db\" as df, table=precos\n",
+                        "    load \"banco.db\" as df, query=\"SELECT * FROM precos WHERE ano > 2020\"\n",
+                        "    load \"odbc://DSN=meudb\" as df, query=\"SELECT * FROM retornos\"\n",
+                        "    load \"https://...data.csv\" as df\n\n",
+                        "  ODBC requer: cargo build --features odbc + unixodbc instalado.\n",
+                    ),
+                    "export" => concat!(
+                        "export(value, \"format\", \"path\")\n",
+                        "  Exporta DataFrame ou resultados para arquivo.\n\n",
+                        "  DataFrame → csv, json, tsv, xlsx, sqlite\n",
+                        "  OLS       → csv, latex, html\n",
+                        "  Models    → txt\n\n",
+                        "  Exemplos:\n",
+                        "    export(df, \"csv\", \"dados.csv\")\n",
+                        "    export(df, \"json\", \"dados.json\")\n",
+                        "    export(df, \"tsv\", \"dados.tsv\")\n",
+                        "    export(df, \"xlsx\", \"dados.xlsx\")\n",
+                        "    export(df, \"sqlite\", \"dados.db\")\n",
+                        "    export(m, \"latex\", \"tabela.tex\")\n",
+                        "    export(m, \"html\", \"tabela.html\")\n",
+                        "    export(m, \"txt\", \"resultado.txt\")\n\n",
+                        "  O formato pode vir de uma variável:\n",
+                        "    let f = \"csv\"\n",
+                        "    export(df, f, \"dados.csv\")\n",
                     ),
                     "generate" | "gen" => concat!(
                         "generate df varname = expr\n",
@@ -12728,14 +12761,63 @@ impl Interpreter {
                 }
             }
 
-            Stmt::Load { path, alias } => {
+            Stmt::Load { path, alias, opts } => {
                 let path_str = match self.eval_expr(path)? {
                     Value::Str(s) => s,
                     _ => return Err(HayashiError::Type("load requires a string path".into())),
                 };
 
-                // Para URLs: baixa para arquivo temporário e usa o caminho local
-                let _tmp; // mantém o TempPath vivo durante a leitura
+                let mut opt_sheet: Option<String> = None;
+                let mut opt_table: Option<String> = None;
+                let mut opt_query: Option<String> = None;
+                let mut opt_sep: Option<String> = None;
+                for o in opts {
+                    let val = match self.eval_expr(&o.value)? {
+                        Value::Str(s) => s,
+                        Value::Float(f) => format!("{f}"),
+                        Value::Int(i) => format!("{i}"),
+                        other => format!("{other}"),
+                    };
+                    match o.name.as_str() {
+                        "sheet" => opt_sheet = Some(val),
+                        "table" => opt_table = Some(val),
+                        "query" => opt_query = Some(val),
+                        "sep" | "delimiter" => opt_sep = Some(val),
+                        k => return Err(HayashiError::Runtime(
+                            format!("load: unknown option '{k}' — use: sheet, table, query, sep")
+                        )),
+                    }
+                }
+
+                // ── ODBC ────────────────────────────────────────────────
+                if path_str.starts_with("odbc://") {
+                    #[cfg(feature = "odbc")]
+                    {
+                        let conn_str = &path_str["odbc://".len()..];
+                        let sql = if let Some(q) = &opt_query {
+                            q.clone()
+                        } else if let Some(t) = &opt_table {
+                            format!("SELECT * FROM \"{t}\"")
+                        } else {
+                            return Err(HayashiError::Runtime(
+                                "load odbc: requires query= or table= option".into()
+                            ));
+                        };
+                        let (df, n_rows) = crate::io::odbc::load_odbc(conn_str, &sql)?;
+                        println!("Loaded ODBC → {alias} ({n_rows} rows)");
+                        self.env.set(alias, Value::DataFrame(Rc::new(df)));
+                    }
+                    #[cfg(not(feature = "odbc"))]
+                    {
+                        return Err(HayashiError::Runtime(
+                            "ODBC support not enabled. Rebuild with: cargo build --features odbc\n\
+                             Requires: unixodbc (pacman -S unixodbc)".into()
+                        ));
+                    }
+                } else {
+
+                // ── Arquivo / URL ───────────────────────────────────────
+                let _tmp;
                 let local_path: &str = if crate::io::fetch::is_url(&path_str) {
                     println!("Downloading '{}'…", path_str);
                     _tmp = crate::io::fetch::download_to_temp(&path_str)?;
@@ -12744,16 +12826,52 @@ impl Interpreter {
                     &path_str
                 };
 
-                let (df, n_rows) = if local_path.ends_with(".dta") {
-                    crate::io::dta::load_dta(local_path)?
-                } else {
-                    let df = DataFrame::from_csv(local_path)
-                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                    let n = df.n_rows();
-                    (df, n)
+                let ext = local_path.rsplit('.').next().unwrap_or("").to_lowercase();
+
+                let (df, n_rows) = match ext.as_str() {
+                    "dta" => crate::io::dta::load_dta(local_path)?,
+                    "xlsx" | "xls" | "ods" => {
+                        crate::io::excel::load_excel(local_path, opt_sheet.as_deref())?
+                    }
+                    "sqlite" | "sqlite3" | "db" => {
+                        crate::io::sqlite::load_sqlite(
+                            local_path,
+                            opt_table.as_deref(),
+                            opt_query.as_deref(),
+                        )?
+                    }
+                    "json" => {
+                        let df = DataFrame::from_json(local_path)
+                            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                        let n = df.n_rows();
+                        (df, n)
+                    }
+                    "tsv" | "tab" => {
+                        crate::io::dsv::load_dsv(local_path, b'\t')?
+                    }
+                    _ => {
+                        let delim = match opt_sep.as_deref() {
+                            Some("\\t") | Some("tab") => b'\t',
+                            Some(s) if s.len() == 1 => s.as_bytes()[0],
+                            Some(s) => return Err(HayashiError::Runtime(
+                                format!("load: sep must be a single character, got '{s}'")
+                            )),
+                            None => b',',
+                        };
+                        if delim == b',' {
+                            let df = DataFrame::from_csv(local_path)
+                                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                            let n = df.n_rows();
+                            (df, n)
+                        } else {
+                            crate::io::dsv::load_dsv(local_path, delim)?
+                        }
+                    }
                 };
                 println!("Loaded '{}' → {alias} ({} rows)", path_str, n_rows);
                 self.env.set(alias, Value::DataFrame(Rc::new(df)));
+
+                } // else (não-ODBC)
             }
 
             Stmt::Predict { df, varname, model, kind } => {
@@ -12762,8 +12880,14 @@ impl Interpreter {
                     _ => return Err(HayashiError::Runtime(format!("'{df}' is not a DataFrame"))),
                 };
                 let model_val = self.eval_expr(model)?;
+                let kind_str = match self.eval_expr(kind)? {
+                    Value::Str(s) => s,
+                    other => return Err(HayashiError::Type(format!(
+                        "predict kind must be a string, got {other}"
+                    ))),
+                };
 
-                let vals: Vec<f64> = match (&model_val, kind.as_str()) {
+                let vals: Vec<f64> = match (&model_val, kind_str.as_str()) {
                     // ── OLS ──────────────────────────────────────────────────
                     (Value::OlsResult(m), "xb" | "fitted") => {
                         m.x.dot(&m.result.params).to_vec()
@@ -13262,7 +13386,7 @@ impl Interpreter {
                 let arr = ndarray::Array1::from(vals);
                 Rc::make_mut(&mut df_val).insert(varname.clone(), arr)
                     .map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
-                println!("({} obs)  {df}.{varname} ({kind}) predicted", df_val.n_rows());
+                println!("({} obs)  {df}.{varname} ({kind_str}) predicted", df_val.n_rows());
                 self.env.set(df, Value::DataFrame(df_val));
             }
 
@@ -13333,6 +13457,12 @@ impl Interpreter {
 
             Stmt::Export { value, fmt, path } => {
                 let val = self.eval_expr(value)?;
+                let fmt_str = match self.eval_expr(fmt)? {
+                    Value::Str(s) => s,
+                    other => return Err(HayashiError::Type(format!(
+                        "export format must be a string, got {other}"
+                    ))),
+                };
                 let path_str = match self.eval_expr(path)? {
                     Value::Str(s) => s,
                     _ => return Err(HayashiError::Type("export path must be a string".into())),
@@ -13340,11 +13470,32 @@ impl Interpreter {
 
                 use greeners::ExportableResult;
 
-                match (val, fmt.as_str()) {
-                    // ── DataFrame → CSV ───────────────────────────────────────
+                let ext = path_str.rsplit('.').next().unwrap_or("").to_lowercase();
+                let fmt_lower = fmt_str.to_lowercase();
+                let effective_fmt = if fmt_lower == "auto" { ext.as_str() } else { fmt_lower.as_str() };
+
+                match (val, effective_fmt) {
+                    // ── DataFrame ─────────────────────────────────────────────
                     (Value::DataFrame(df), "csv" | "delimited") => {
                         df.to_csv(&path_str)
                             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                        println!("Exported DataFrame → '{path_str}' ({} rows)", df.n_rows());
+                    }
+                    (Value::DataFrame(df), "json") => {
+                        df.to_json(&path_str)
+                            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                        println!("Exported DataFrame → '{path_str}' ({} rows)", df.n_rows());
+                    }
+                    (Value::DataFrame(df), "tsv" | "tab") => {
+                        crate::io::dsv::write_dsv(&df, &path_str, b'\t')?;
+                        println!("Exported DataFrame → '{path_str}' ({} rows)", df.n_rows());
+                    }
+                    (Value::DataFrame(df), "xlsx" | "xls") => {
+                        crate::io::excel::write_excel(&df, &path_str)?;
+                        println!("Exported DataFrame → '{path_str}' ({} rows)", df.n_rows());
+                    }
+                    (Value::DataFrame(df), "sqlite" | "sqlite3" | "db") => {
+                        crate::io::sqlite::write_sqlite(&df, &path_str, "data")?;
                         println!("Exported DataFrame → '{path_str}' ({} rows)", df.n_rows());
                     }
 
@@ -13353,22 +13504,22 @@ impl Interpreter {
                         let content = m.result.to_csv();
                         std::fs::write(&path_str, &content)
                             .map_err(|e| HayashiError::Io(e))?;
-                        println!("Exported OLS coefficients → '{path_str}'");
+                        println!("Exported OLS → '{path_str}'");
                     }
                     (Value::OlsResult(m), "latex" | "tex") => {
                         let content = m.result.to_latex();
                         std::fs::write(&path_str, &content)
                             .map_err(|e| HayashiError::Io(e))?;
-                        println!("Exported OLS LaTeX table → '{path_str}'");
+                        println!("Exported OLS → '{path_str}'");
                     }
-                    (Value::OlsResult(m), "html") => {
+                    (Value::OlsResult(m), "html" | "htm") => {
                         let content = m.result.to_html();
                         std::fs::write(&path_str, &content)
                             .map_err(|e| HayashiError::Io(e))?;
-                        println!("Exported OLS HTML table → '{path_str}'");
+                        println!("Exported OLS → '{path_str}'");
                     }
 
-                    // ── Outros modelos: texto plain ───────────────────────────
+                    // ── Qualquer modelo → txt ─────────────────────────────────
                     (Value::IvResult(r), "txt" | "text") => {
                         std::fs::write(&path_str, format!("{r}"))
                             .map_err(|e| HayashiError::Io(e))?;
@@ -13389,10 +13540,20 @@ impl Interpreter {
                             .map_err(|e| HayashiError::Io(e))?;
                         println!("Exported RE results → '{path_str}'");
                     }
+                    (val @ (Value::PoissonResult(_) | Value::NegBinResult(_) |
+                            Value::TobitResult(_) | Value::HeckmanResult(_) |
+                            Value::CoxResult(_) | Value::QuantileResult(_)),
+                     "txt" | "text") => {
+                        std::fs::write(&path_str, format!("{val}"))
+                            .map_err(|e| HayashiError::Io(e))?;
+                        println!("Exported results → '{path_str}'");
+                    }
 
                     (_, fmt) => return Err(HayashiError::Runtime(format!(
                         "unsupported export format '{fmt}' for this value type\n\
-                         Available: DataFrame→csv  |  OLS→csv,latex,html  |  other models→txt"
+                         DataFrame → csv, json, tsv, xlsx, sqlite\n\
+                         OLS       → csv, latex, html\n\
+                         Models    → txt"
                     ))),
                 }
             }

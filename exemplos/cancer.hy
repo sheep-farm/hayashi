@@ -15,15 +15,15 @@ correlate(cancer, studytime, age, drug)
 let m_ols = ols(studytime ~ age + C(drug), cancer, cov=HC3)
 print(m_ols)
 
-test(m_ols, bp)
-test(m_ols, dw)
+test(m_ols, "bp")
+test(m_ols, "dw")
 
 # Logit: probabilidade de óbito
 let m_logit = logit(died ~ age + C(drug), cancer)
 print(m_logit)
 
-predict cancer pr_obito = m_logit, pr
+predict cancer pr_obito = m_logit, "pr"
 summarize(cancer, died, pr_obito)
 
-export(m_ols,   latex, "/tmp/cancer_ols.tex")
-export(m_logit, txt,   "/tmp/cancer_logit.txt")
+export(m_ols,   "latex", "/tmp/cancer_ols.tex")
+export(m_logit, "txt",   "/tmp/cancer_logit.txt")

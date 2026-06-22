@@ -5,14 +5,20 @@ use crate::lang::lexer::Token;
 pub struct Parser {
     tokens: Vec<(Token, usize)>,
     pos: usize,
+    paren_depth: usize,
 }
 
 impl Parser {
     pub fn new(tokens: Vec<(Token, usize)>) -> Self {
-        Self { tokens, pos: 0 }
+        Self { tokens, pos: 0, paren_depth: 0 }
     }
 
-    fn peek(&self) -> &Token {
+    fn peek(&mut self) -> &Token {
+        if self.paren_depth > 0 {
+            while self.tokens.get(self.pos).map(|(t, _)| t) == Some(&Token::Newline) {
+                self.pos += 1;
+            }
+        }
         self.tokens.get(self.pos).map(|(t, _)| t).unwrap_or(&Token::Eof)
     }
 
@@ -21,7 +27,14 @@ impl Parser {
     }
 
     fn advance(&mut self) -> &Token {
+        if self.paren_depth > 0 {
+            while self.tokens.get(self.pos).map(|(t, _)| t) == Some(&Token::Newline) {
+                self.pos += 1;
+            }
+        }
         let t = self.tokens.get(self.pos).map(|(t, _)| t).unwrap_or(&Token::Eof);
+        if t == &Token::LParen { self.paren_depth += 1; }
+        if t == &Token::RParen && self.paren_depth > 0 { self.paren_depth -= 1; }
         self.pos += 1;
         t
     }
@@ -316,6 +329,22 @@ impl Parser {
                 Ok(Expr::TsOp { op: TsOpKind::Diff, var, n })
             }
 
+            // Keywords usadas como identificadores em contexto de expressão
+            Token::Count | Token::Replace | Token::Load | Token::Export
+            | Token::Print | Token::Predict | Token::Generate | Token::Return
+            | Token::Break | Token::Continue | Token::In => {
+                let name = match self.peek() {
+                    Token::Count => "count", Token::Replace => "replace",
+                    Token::Load => "load", Token::Export => "export",
+                    Token::Print => "print", Token::Predict => "predict",
+                    Token::Generate => "generate", Token::Return => "return",
+                    Token::Break => "break", Token::Continue => "continue",
+                    Token::In => "in", _ => "?",
+                }.to_string();
+                self.advance();
+                Ok(Expr::Var(name))
+            }
+
             _ => Err(HayashiError::Parse { line, msg: format!("unexpected token {:?}", self.peek()) }),
         }
     }
@@ -327,13 +356,15 @@ impl Parser {
         while !matches!(self.peek(), Token::RParen | Token::Eof | Token::Newline) {
             // opt=value  ou  expr normal
             // Caso especial: keyword `if` usada como chave de opção (ex: mean(df, y, if=x==1))
-            let is_kw_opt = matches!(self.peek(), Token::If | Token::Else | Token::Generate | Token::For | Token::In | Token::Return | Token::Break | Token::Continue | Token::Count)
+            let is_kw_opt = matches!(self.peek(), Token::If | Token::Else | Token::Generate | Token::For | Token::In | Token::Return | Token::Break | Token::Continue | Token::Count | Token::Replace | Token::Load | Token::Export | Token::Print | Token::Predict)
                 && self.tokens.get(self.pos + 1).map(|(t, _)| t == &Token::Eq).unwrap_or(false);
             if is_kw_opt {
                 let kw_name = match self.peek() {
                     Token::If => "if", Token::Else => "else", Token::Generate => "gen",
                     Token::For => "for", Token::In => "in", Token::Return => "return",
                     Token::Break => "break", Token::Continue => "continue", Token::Count => "count",
+                    Token::Replace => "replace", Token::Load => "load", Token::Export => "export",
+                    Token::Print => "print", Token::Predict => "predict",
                     _ => "?",
                 }.to_string();
                 self.advance(); // keyword
@@ -433,7 +464,26 @@ impl Parser {
                 } else {
                     "df".to_string()
                 };
-                Ok(Some(Stmt::Load { path, alias }))
+                // opções: , key=value, ...
+                let mut opts = Vec::new();
+                while *self.peek() == Token::Comma {
+                    self.advance();
+                    let key = self.expect_ident()?;
+                    self.expect(&Token::Eq)?;
+                    let val = match key.as_str() {
+                        "sheet" | "table" => {
+                            if let Token::Ident(s) = self.peek().clone() {
+                                self.advance();
+                                Expr::Str(s)
+                            } else {
+                                self.parse_expr()?
+                            }
+                        }
+                        _ => self.parse_expr()?,
+                    };
+                    opts.push(Opt { name: key, value: val });
+                }
+                Ok(Some(Stmt::Load { path, alias, opts }))
             }
 
             Token::Print => {
@@ -449,7 +499,7 @@ impl Parser {
                 self.expect(&Token::LParen)?;
                 let value = self.parse_expr()?;
                 self.expect(&Token::Comma)?;
-                let fmt = self.expect_ident()?;
+                let fmt = self.parse_expr()?;
                 self.expect(&Token::Comma)?;
                 let path = self.parse_expr()?;
                 self.expect(&Token::RParen)?;
@@ -471,12 +521,11 @@ impl Parser {
                 let varname = self.expect_ident()?;
                 self.expect(&Token::Eq)?;
                 let model = self.parse_primary()?;
-                // opcional: , kind
                 let kind = if self.peek() == &Token::Comma {
                     self.advance();
-                    self.expect_ident()?
+                    self.parse_expr()?
                 } else {
-                    "xb".to_string()
+                    Expr::Str("xb".to_string())
                 };
                 Ok(Some(Stmt::Predict { df, varname, model, kind }))
             }

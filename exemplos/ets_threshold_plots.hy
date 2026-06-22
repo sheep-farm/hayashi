@@ -42,9 +42,9 @@ print(m_ses)
 # α perto de 1 → reativo a mudanças recentes (memória curta)
 # α perto de 0 → suavização pesada (memória longa)
 
-predict v fitted_ses  = m_ses, fitted
-predict v resid_ses   = m_ses, residuals
-predict v level_ses   = m_ses, level
+predict v fitted_ses  = m_ses, "fitted"
+predict v resid_ses   = m_ses, "residuals"
+predict v level_ses   = m_ses, "level"
 
 lineplot(v, t, receita,     title="Receita — série original")
 lineplot(v, t, fitted_ses,  title="Receita — SES (ŷ)")
@@ -55,7 +55,7 @@ histogram(v, resid_ses, bins=15, title="Resíduos SES")
 let m_holt = ets(v, receita, trend=add, seasonal=none)
 print(m_holt)
 
-predict v trend_holt = m_holt, trend
+predict v trend_holt = m_holt, "trend"
 lineplot(v, t, trend_holt, title="Receita — tendência Holt")
 
 # ── Holt-Winters aditivo (ETS A,A,A) ─────────────────────────────────────────
@@ -68,10 +68,10 @@ lineplot(v, t, trend_holt, title="Receita — tendência Holt")
 let m_hw = hwes(v, receita, period=12)
 print(m_hw)
 
-predict v fitted_hw   = m_hw, fitted
-predict v trend_hw    = m_hw, trend
-predict v seasonal_hw = m_hw, seasonal
-predict v resid_hw    = m_hw, residuals
+predict v fitted_hw   = m_hw, "fitted"
+predict v trend_hw    = m_hw, "trend"
+predict v seasonal_hw = m_hw, "seasonal"
+predict v resid_hw    = m_hw, "residuals"
 
 lineplot(v, t, receita,     title="Receita — observado")
 lineplot(v, t, fitted_hw,   title="Receita — Holt-Winters ŷ")
@@ -224,14 +224,14 @@ pacfplot(mac, dpib, lags=20, title="PACF — ΔPIB")
 
 # Depois de estimar ARIMA, verificar resíduos:
 let m_ar = arima(mac, dpib, p=2, d=0, q=0)
-predict mac resid_ar = m_ar, residuals
+predict mac resid_ar = m_ar, "residuals"
 acfplot(mac, resid_ar, lags=20, title="ACF dos Resíduos AR(2)")
 # Se lags dentro da banda → modelo adequado (sem autocorrelação residual)
 # Complementar com teste formal:
 ljungbox(m_ar, lags=10)    # H₀: resíduos i.i.d.
 
 # ACF de resíduos ETS
-predict v resid_hwv = m_hw, residuals
+predict v resid_hwv = m_hw, "residuals"
 acfplot(v, resid_hwv, lags=20, title="ACF Resíduos Holt-Winters")
 # Bom modelo ETS: resíduos sem autocorrelação em nenhum lag
 
@@ -255,7 +255,7 @@ acfplot(v, resid_hwv, lags=20, title="ACF Resíduos Holt-Winters")
 load "auto.csv" as auto
 
 let m_a = ols(price ~ mpg + weight + C(foreign), auto)
-predict auto resid_a = m_a, residuals
+predict auto resid_a = m_a, "residuals"
 
 qqplot(auto, resid_a, title="QQ-plot — Resíduos OLS (price)")
 # Se caudas se afastam da diagonal → violação de normalidade
@@ -328,7 +328,7 @@ acfplot(mac, pib,    lags=16, title="ACF PIB — estacionariedade?")
 pacfplot(mac, dpib,  lags=16, title="PACF ΔPIB — ordem AR?")
 
 # 6. Ajustar ETS e verificar resíduos
-predict v resid2 = m_hw, residuals
+predict v resid2 = m_hw, "residuals"
 acfplot(v,  resid2,    lags=20, title="ACF Resíduos HW")
 qqplot(v,   resid2,    title="QQ Resíduos HW")
 histogram(v, resid2,   bins=15, title="Distribuição Resíduos HW")

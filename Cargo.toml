@@ -20,3 +20,12 @@ ureq = "2"
 tempfile = "3"
 rand = "0.8"
 plotters = { version = "0.3", default-features = false, features = ["svg_backend", "line_series"] }
+calamine = "0.35"
+rust_xlsxwriter = "0.95"
+csv = "1"
+rusqlite = { version = "0.33", features = ["bundled"] }
+odbc-api = { version = "28", optional = true }
+
+[features]
+default = []
+odbc = ["dep:odbc-api"]

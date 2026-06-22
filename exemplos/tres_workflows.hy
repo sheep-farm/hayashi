@@ -23,7 +23,7 @@ end
 let m1 = reg(wage ~ educ + exper + tenure, cs)
 let m2 = reg(wage ~ educ + exper, cs)
 esttab(m1, m2)
-test(m1, exper, tenure)
+test(m1, "exper", "tenure")
 coefplot(m1)
 
 // ═══════════════════════════════════════════════════

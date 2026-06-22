@@ -47,9 +47,9 @@ print(m_ms3)
 # regime2: P(s_t=2 | y_1..y_T) — prob do regime 2
 # regime: regime mais provável em cada t (1-indexed, argmax)
 
-predict pib prob_expansao = m_ms, regime1
-predict pib prob_recessao = m_ms, regime2
-predict pib regime_hat    = m_ms, regime     # 1=expansão, 2=recessão
+predict pib prob_expansao = m_ms, "regime1"
+predict pib prob_recessao = m_ms, "regime2"
+predict pib regime_hat    = m_ms, "regime" # 1=expansão, 2=recessão
 
 summarize(pib, pib_growth, prob_expansao, prob_recessao, regime_hat)
 
@@ -59,7 +59,7 @@ summarize(pib, pib_growth, prob_expansao, prob_recessao, regime_hat)
 # Modelo AR(2) — permite dinâmica mais rica
 let m_ms_ar2 = markov(pib, pib_growth, k=2, p=2)
 print(m_ms_ar2)
-predict pib prob_rec_ar2 = m_ms_ar2, regime2
+predict pib prob_rec_ar2 = m_ms_ar2, "regime2"
 summarize(pib, prob_recessao, prob_rec_ar2)
 
 # Aplicação financeira: volatilidade de retornos
@@ -71,8 +71,8 @@ let m_ms_ret = markov(ret, ret_ibov, k=2, p=0)
 print(m_ms_ret)
 # Regime 1: baixa volatilidade (σ² pequeno)
 # Regime 2: alta volatilidade (σ² grande)
-predict ret vol_baixa = m_ms_ret, regime1
-predict ret vol_alta  = m_ms_ret, regime2
+predict ret vol_baixa = m_ms_ret, "regime1"
+predict ret vol_alta  = m_ms_ret, "regime2"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 2. CONDITIONAL LOGIT — FE Logit (Chamberlain 1980)

@@ -515,7 +515,7 @@ Y X1 X2
 13 4 3
 end
 let m = ols(Y ~ X1 + X2, df)
-test(m, X1)
+test(m, "X1")
 "#, "H₀");
 }
 
@@ -553,7 +553,7 @@ Y X
 13 4
 end
 let m = ols(Y ~ X, df)
-test(m, white)
+test(m, "white")
 "#, "White Test");
 }
 
@@ -625,7 +625,7 @@ Y X
 end
 let m = ols(Y ~ X, df)
 predict df yhat = m
-predict df resid = m, residuals
+predict df resid = m, "residuals"
 list(df, n=2)
 "#, "predicted");
 }
@@ -1841,7 +1841,7 @@ Y X
 end
 let m = ols(Y ~ X, df)
 predict df yhat = m
-predict df resid = m, residuals
+predict df resid = m, "residuals"
 summarize(df)
 "#, "resid");
 }
@@ -1894,7 +1894,7 @@ Y X
 13 4
 end
 let m = ols(Y ~ X, df)
-test(m, bp)
+test(m, "bp")
 "#, "Breusch-Pagan");
 }
 
@@ -1913,7 +1913,7 @@ Y X
 13 4
 end
 let m = ols(Y ~ X, df)
-test(m, dw)
+test(m, "dw")
 "#, "Durbin-Watson");
 }
 
@@ -2024,7 +2024,7 @@ Y X
 14 4
 end
 let m = ols(Y ~ X, df)
-predict df resid = m, residuals
+predict df resid = m, "residuals"
 summarize(df, resid)
 "#, "Mean");
 }
@@ -3688,4 +3688,177 @@ fn smoke_regex() {
     let (ok, out) = run_hy("exemplos/regex.hy");
     assert!(ok, "regex.hy failed:\n{out}");
     assert!(out.contains("42.50"));
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LOAD — multi-format
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn load_json() {
+    let (ok, out) = run_inline(r#"load "exemplos/data/sample.json" as df
+print(df)"#);
+    assert!(ok, "load json failed:\n{out}");
+    assert!(out.contains("5 rows"), "expected 5 rows:\n{out}");
+}
+
+#[test]
+fn load_tsv() {
+    let (ok, out) = run_inline(r#"load "exemplos/data/sample.tsv" as df
+print(df)"#);
+    assert!(ok, "load tsv failed:\n{out}");
+    assert!(out.contains("5 rows"), "expected 5 rows:\n{out}");
+}
+
+#[test]
+fn load_sqlite_default_table() {
+    let (ok, out) = run_inline(r#"load "exemplos/data/sample.db" as df
+print(df)"#);
+    assert!(ok, "load sqlite failed:\n{out}");
+    assert!(out.contains("8 rows"), "expected 8 rows:\n{out}");
+}
+
+#[test]
+fn load_sqlite_table_option() {
+    let (ok, out) = run_inline(r#"load "exemplos/data/sample.db" as df, table=precos
+print(df)"#);
+    assert!(ok, "load sqlite table= failed:\n{out}");
+    assert!(out.contains("8 rows"), "expected 8 rows:\n{out}");
+}
+
+#[test]
+fn load_sqlite_query() {
+    let (ok, out) = run_inline(r#"load "exemplos/data/sample.db" as df, query="SELECT * FROM precos WHERE produto = 'Soja'"
+print(df)"#);
+    assert!(ok, "load sqlite query= failed:\n{out}");
+    assert!(out.contains("4 rows"), "expected 4 rows:\n{out}");
+}
+
+#[test]
+fn load_csv_semicolon_sep() {
+    let (ok, out) = run_inline(r#"load "exemplos/data/sample_semicolon.csv" as df, sep=";"
+print(df)"#);
+    assert!(ok, "load csv sep=; failed:\n{out}");
+    assert!(out.contains("4 rows"), "expected 4 rows:\n{out}");
+}
+
+#[test]
+fn load_unknown_option_error() {
+    let (ok, out) = run_inline(r#"load "exemplos/data/sample.json" as df, bogus=1"#);
+    assert!(!ok, "should fail with unknown option:\n{out}");
+    assert!(out.contains("unknown option"), "expected 'unknown option':\n{out}");
+}
+
+#[test]
+fn load_json_then_summarize() {
+    let (ok, out) = run_inline(r#"load "exemplos/data/sample.json" as df
+summarize(df, pop)"#);
+    assert!(ok, "load json + summarize failed:\n{out}");
+    assert!(out.contains("pop"), "expected 'pop' in output:\n{out}");
+}
+
+#[test]
+fn load_sqlite_then_generate() {
+    let (ok, out) = run_inline(r#"load "exemplos/data/sample.db" as df
+generate df preco2 = preco * 2
+display mean(df, preco2)"#);
+    assert!(ok, "load sqlite + generate failed:\n{out}");
+}
+
+#[test]
+fn load_odbc_without_feature_gives_clear_error() {
+    let (ok, out) = run_inline(r#"load "odbc://DSN=test" as df, query="SELECT 1""#);
+    if cfg!(feature = "odbc") {
+        // com feature ativa, vai falhar por falta de driver — mas não por "not enabled"
+        assert!(!out.contains("not enabled"), "should not say 'not enabled' with feature on:\n{out}");
+    } else {
+        assert!(!ok, "should fail without odbc feature:\n{out}");
+        assert!(out.contains("not enabled"), "expected 'not enabled' message:\n{out}");
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// EXPORT — multi-format
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn export_csv() {
+    let (ok, out) = run_inline(r#"load "exemplos/data/sample.db" as df
+export(df, "csv", "/tmp/hayashi_test_export.csv")"#);
+    assert!(ok, "export csv failed:\n{out}");
+    assert!(out.contains("Exported"), "expected 'Exported':\n{out}");
+    let content = std::fs::read_to_string("/tmp/hayashi_test_export.csv").unwrap();
+    assert!(content.contains("Soja"), "csv missing data:\n{content}");
+}
+
+#[test]
+fn export_json() {
+    let (ok, out) = run_inline(r#"load "exemplos/data/sample.db" as df
+export(df, "json", "/tmp/hayashi_test_export.json")"#);
+    assert!(ok, "export json failed:\n{out}");
+    let content = std::fs::read_to_string("/tmp/hayashi_test_export.json").unwrap();
+    assert!(content.contains("Soja"), "json missing data:\n{content}");
+}
+
+#[test]
+fn export_tsv() {
+    let (ok, out) = run_inline(r#"load "exemplos/data/sample.db" as df
+export(df, "tsv", "/tmp/hayashi_test_export.tsv")"#);
+    assert!(ok, "export tsv failed:\n{out}");
+    let content = std::fs::read_to_string("/tmp/hayashi_test_export.tsv").unwrap();
+    assert!(content.contains('\t'), "tsv missing tabs:\n{content}");
+}
+
+#[test]
+fn export_xlsx() {
+    let (ok, out) = run_inline(r#"load "exemplos/data/sample.db" as df
+export(df, "xlsx", "/tmp/hayashi_test_export.xlsx")"#);
+    assert!(ok, "export xlsx failed:\n{out}");
+    assert!(std::path::Path::new("/tmp/hayashi_test_export.xlsx").exists());
+}
+
+#[test]
+fn export_sqlite() {
+    let (ok, out) = run_inline(r#"load "exemplos/data/sample.db" as df
+export(df, "sqlite", "/tmp/hayashi_test_export_out.db")"#);
+    assert!(ok, "export sqlite failed:\n{out}");
+    assert!(std::path::Path::new("/tmp/hayashi_test_export_out.db").exists());
+}
+
+#[test]
+fn export_roundtrip_tsv() {
+    let (ok, out) = run_inline(r#"load "exemplos/data/sample.db" as df
+export(df, "tsv", "/tmp/hayashi_rt.tsv")
+load "/tmp/hayashi_rt.tsv" as df2
+display mean(df2, preco)"#);
+    assert!(ok, "roundtrip tsv failed:\n{out}");
+    assert!(out.contains("88.4"), "expected mean ~88.4:\n{out}");
+}
+
+#[test]
+fn export_roundtrip_xlsx() {
+    let (ok, out) = run_inline(r#"load "exemplos/data/sample.db" as df
+export(df, "xlsx", "/tmp/hayashi_rt.xlsx")
+load "/tmp/hayashi_rt.xlsx" as df2
+display mean(df2, preco)"#);
+    assert!(ok, "roundtrip xlsx failed:\n{out}");
+    assert!(out.contains("88.4"), "expected mean ~88.4:\n{out}");
+}
+
+#[test]
+fn export_roundtrip_sqlite() {
+    let (ok, out) = run_inline(r#"load "exemplos/data/sample.db" as df
+export(df, "sqlite", "/tmp/hayashi_rt_out.db")
+load "/tmp/hayashi_rt_out.db" as df2
+display mean(df2, preco)"#);
+    assert!(ok, "roundtrip sqlite failed:\n{out}");
+    assert!(out.contains("88.4"), "expected mean ~88.4:\n{out}");
+}
+
+#[test]
+fn load_tsv_then_regression() {
+    let (ok, out) = run_inline(r#"load "exemplos/data/sample.tsv" as df
+let m = ols(score ~ id, df)
+print(m)"#);
+    assert!(ok, "load tsv + ols failed:\n{out}");
 }

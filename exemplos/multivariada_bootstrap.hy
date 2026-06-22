@@ -30,16 +30,16 @@ let m_pca2 = pca(macro, pib_growth, inflation, unemployment, interest_rate, trad
 print(m_pca2)
 
 # Extrair escores dos componentes como novas colunas
-predict macro pc1_scores = m_pca2, pc1   # projeção no 1º componente
-predict macro pc2_scores = m_pca2, pc2   # projeção no 2º componente
+predict macro pc1_scores = m_pca2, "pc1" # projeção no 1º componente
+predict macro pc2_scores = m_pca2, "pc2" # projeção no 2º componente
 summarize(macro, pc1_scores, pc2_scores)
 
 # Usar escores como regressores (elimina multicolinearidade)
 # PC1 pode capturar fator cíclico geral; PC2 pode capturar pressão inflacionária
 load "bonds.csv" as bonds
 let m_pca_bonds = pca(bonds, spread1, spread2, spread3, duration, n=2)
-predict bonds factor1 = m_pca_bonds, pc1
-predict bonds factor2 = m_pca_bonds, pc2
+predict bonds factor1 = m_pca_bonds, "pc1"
+predict bonds factor2 = m_pca_bonds, "pc2"
 
 let m_bond_ols = ols(yield ~ factor1 + factor2, bonds)
 print(m_bond_ols)

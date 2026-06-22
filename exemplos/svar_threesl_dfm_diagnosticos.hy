@@ -168,15 +168,15 @@ print(m_dfm1)
 # Factor loadings Λ: quanto cada série carrega no fator comum
 # Fator 1: provavelmente ciclo geral de atividade econômica
 
-predict mp atividade = m_dfm1, f1    # índice de atividade latente
+predict mp atividade = m_dfm1, "f1" # índice de atividade latente
 summarize(mp, pib, atividade)
 
 # DFM com 2 fatores
 let m_dfm2 = dfm(mp, pib, consumo, investimento, exportacoes, producao_ind,
                  factors=2, order=1)
 print(m_dfm2)
-predict mp fator1 = m_dfm2, f1   # fator doméstico (consumo + PIB)
-predict mp fator2 = m_dfm2, f2   # fator externo (exportações)
+predict mp fator1 = m_dfm2, "f1" # fator doméstico (consumo + PIB)
+predict mp fator2 = m_dfm2, "f2" # fator externo (exportações)
 summarize(mp, fator1, fator2)
 
 # DFM para nowcasting: fator latente como variável auxiliar em regressão
@@ -191,7 +191,7 @@ load "spreads.csv" as spr
 let m_risco = dfm(spr, cds_brazil, cds_mexico, cds_argentina, embi, vix,
                   factors=1, order=1)
 print(m_risco)
-predict spr risco_global = m_risco, f1
+predict spr risco_global = m_risco, "f1"
 summarize(spr, risco_global, vix, cds_brazil)
 # Se loadings do VIX > 0 e CDS > 0 → fator comum = aversão ao risco global
 
@@ -211,7 +211,7 @@ let m_ols = ols(price ~ mpg + weight + C(foreign), auto, cov=nonrobust)
 # Quando usar: dados brutos (não resíduos) onde suspeita de não-normalidade
 # → para resíduos de OLS, usar jb(), omnibus() ou lilliefors()
 
-predict auto resid_ols = m_ols, residuals
+predict auto resid_ols = m_ols, "residuals"
 adtest(auto, resid_ols)    # AD nos resíduos
 adtest(auto, price)        # AD no nível — obviamente não-normal
 

@@ -41,8 +41,8 @@ let m_zip2 = zip(visitas ~ doenca + idade, saude,
 print(m_zip2)
 
 # ── Predições pós-ZIP ─────────────────────────────────────────────────────────
-predict saude mu_zip  = m_zip, count  # E[y|x] incondicional (inclui zeros)
-predict saude pr0_zip = m_zip, pr0    # P(y=0|x) total
+predict saude mu_zip  = m_zip, "count" # E[y|x] incondicional (inclui zeros)
+predict saude pr0_zip = m_zip, "pr0" # P(y=0|x) total
 
 summarize(saude, visitas, mu_zip, pr0_zip)
 

@@ -93,21 +93,21 @@ pub enum Stmt {
     // nome = expr (modifica variável existente no escopo mais próximo)
     Assign { name: String, value: Expr },
 
-    // load "arquivo.csv" as nome
-    Load { path: Expr, alias: String },
+    // load "arquivo.csv" as nome [, sheet=Plan1, table=t, query="..."]
+    Load { path: Expr, alias: String, opts: Vec<Opt> },
 
     // generate df newvar = expr
     Generate { df: String, varname: String, expr: Expr },
 
-    // predict df newvar = model [, kind]
-    // kind: xb (default) | residuals | pr
-    Predict { df: String, varname: String, model: Expr, kind: String },
+    // predict df newvar = model [, "kind"]
+    // kind: "xb" (default) | "residuals" | "pr"
+    Predict { df: String, varname: String, model: Expr, kind: Expr },
 
     // print(expr)
     Print(Expr),
 
     // export(expr, formato, "arquivo")
-    Export { value: Expr, fmt: String, path: Expr },
+    Export { value: Expr, fmt: Expr, path: Expr },
 
     // replace df varname = expr [if cond]
     Replace { df: String, varname: String, expr: Expr, cond: Option<Expr> },

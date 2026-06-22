@@ -58,7 +58,7 @@ scatter(auto, weight, mpg)
 
 # ── Resíduos vs regressor ─────────────────────────────────────────────────────
 let m = ols(price ~ weight + mpg, auto)
-predict auto e = m, residuals
+predict auto e = m, "residuals"
 scatter(auto, weight, e, title="Resíduos vs Weight")
 # Padrão em leque → heteroskedasticidade (confirmar com white() ou bphet())
 # Curvatura → forma funcional errada (confirmar com reset() ou harveycollier())
@@ -84,9 +84,9 @@ load "vendas_mensais.csv" as vendas
 generate vendas t = _n                          # índice temporal 1..N
 
 let m_stl = stl(vendas, receita, period=12, sw=7)
-predict vendas trend_v    = m_stl, trend
-predict vendas seasonal_v = m_stl, seasonal
-predict vendas resid_v    = m_stl, residual
+predict vendas trend_v    = m_stl, "trend"
+predict vendas seasonal_v = m_stl, "seasonal"
+predict vendas resid_v    = m_stl, "residual"
 
 lineplot(vendas, t, receita,    title="Vendas — série original")
 lineplot(vendas, t, trend_v,    title="Vendas — tendência STL")
@@ -98,7 +98,7 @@ load "macro_painel.csv" as mp
 generate mp t = _n
 let m_dfm = dfm(mp, pib, consumo, investimento, exportacoes, producao_ind,
                 factors=1, order=1)
-predict mp atividade = m_dfm, f1
+predict mp atividade = m_dfm, "f1"
 
 lineplot(mp, t, atividade, title="Índice de Atividade Econômica (DFM)")
 lineplot(mp, t, pib, title="PIB observado")
@@ -171,7 +171,7 @@ kdensity(auto, price, title="price — KDE gaussian")
 
 # ── Diagnóstico de normalidade visual ────────────────────────────────────────
 let m_ols2 = ols(price ~ mpg + weight, auto)
-predict auto resid2 = m_ols2, residuals
+predict auto resid2 = m_ols2, "residuals"
 kdensity(auto, resid2, title="Resíduos OLS — KDE (verificar normalidade)")
 # Uma curva aproximadamente em sino → consistente com normalidade
 # Caudas pesadas ou assimetria → violação → usar HC3 ou bootstrap
@@ -202,8 +202,8 @@ residplot(m3, width=70, height=25)
 # 3. boxplot    → outliers nos resíduos
 # 4. histogram  → distribuição da variável dependente
 # 5. scatter    → cada regressor vs y (para detectar curvatura)
-predict auto resid3  = m3, residuals
-predict auto yhat3   = m3, xb
+predict auto resid3  = m3, "residuals"
+predict auto yhat3   = m3, "xb"
 
 residplot(m3, title="Resíduos vs Ŷ — modelo base")
 kdensity(auto, resid3,  title="Resíduos — KDE")
@@ -240,7 +240,7 @@ load "pib.csv" as pib2
 generate pib2 t3 = _n
 
 let m_ms = msauto(pib2, pib_growth, k=2, p=1)
-predict pib2 prob_rec = m_ms, regime2
+predict pib2 prob_rec = m_ms, "regime2"
 
 lineplot(pib2, t3, pib_growth,  title="PIB — crescimento trimestral")
 lineplot(pib2, t3, prob_rec,    title="P(recessão) — Markov AR(1)")
@@ -251,8 +251,8 @@ load "ibov.csv" as ibov
 generate ibov t4 = _n
 
 let m_uc = ucm(ibov, nivel, level=local_linear, seasonal=stochastic, period=12)
-predict ibov nivel_uc = m_uc, level
-predict ibov trend_uc = m_uc, trend
+predict ibov nivel_uc = m_uc, "level"
+predict ibov trend_uc = m_uc, "trend"
 
 lineplot(ibov, t4, nivel,    title="Ibovespa — observado")
 lineplot(ibov, t4, nivel_uc, title="Ibovespa — nível UCM")

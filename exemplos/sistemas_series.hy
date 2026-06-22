@@ -43,7 +43,7 @@ let m_rolling = rolling(pib_growth ~ inflation + interest_rate, macro, window=20
 print(m_rolling)
 
 # Extrair resíduos (one-step-ahead prediction errors)
-predict macro resid_roll = m_rolling, residuals
+predict macro resid_roll = m_rolling, "residuals"
 summarize(macro, pib_growth, resid_roll)
 
 # Inspecionar estabilidade: se coeficientes variam muito ao longo do tempo
@@ -60,9 +60,9 @@ let m_rec = recursive(pib_growth ~ inflation + interest_rate, macro)
 print(m_rec)
 
 # CUSUM e CUSUM-of-Squares como colunas para visualização externa
-predict macro cusum_vals  = m_rec, cusum
-predict macro cusum_sq    = m_rec, cusum_sq
-predict macro resid_rec   = m_rec, residuals
+predict macro cusum_vals  = m_rec, "cusum"
+predict macro cusum_sq    = m_rec, "cusum_sq"
+predict macro resid_rec   = m_rec, "residuals"
 
 # Se CUSUM cruzar bandas ±0.948·√T → rejeita estabilidade a 5%
 # (bandas de Brown-Durbin-Evans)

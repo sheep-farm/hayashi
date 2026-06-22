@@ -11,7 +11,6 @@ generate df Y = bweight
 generate df Treated = mbsmoke
 generate df lnY = log(Y)
 
-// Winsorizar para robustez
 winsor(df, Y, p=0.01, gen=Y_w)
 
 // Estatísticas descritivas
@@ -34,8 +33,8 @@ let m3 = reg(Y ~ Treated + medu + mage, df)
 esttab(m1, m2, m3)
 
 // ── Testes pós-estimação ────────────────────────────────────
-test(m3, white)
-test(m3, Treated, medu)
+test(m3, "white")
+test(m3, "Treated", "medu")
 test(m3, "Treated = 0.5")
 
 // ── Visualização de coeficientes ─────────────────────────────
@@ -53,7 +52,7 @@ estat(m1, m2, m3)
 
 // ── Predição e diagnóstico ──────────────────────────────────
 predict df yhat = m3
-predict df resid = m3, residuals
+predict df resid = m3, "residuals"
 
 // ── Bootstrap ───────────────────────────────────────────────
 bootstrap(ols, Y ~ Treated + medu, df, n=200)
