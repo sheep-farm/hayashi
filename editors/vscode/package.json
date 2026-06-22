@@ -1,0 +1,51 @@
+{
+  "name": "hayashi-lang",
+  "displayName": "Hayashi",
+  "description": "Language support for Hayashi (.hy) — applied econometrics DSL",
+  "version": "0.1.0",
+  "publisher": "sheep-farm",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sheep-farm/hayashi"
+  },
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": ["Programming Languages"],
+  "contributes": {
+    "languages": [
+      {
+        "id": "hayashi",
+        "aliases": ["Hayashi", "hayashi"],
+        "extensions": [".hy"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "hayashi",
+        "scopeName": "source.hayashi",
+        "path": "./syntaxes/hayashi.tmLanguage.json"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "workbench.action.tasks.runTask",
+        "key": "ctrl+shift+r",
+        "when": "editorLangId == hayashi"
+      }
+    ],
+    "taskDefinitions": [
+      {
+        "type": "hayashi",
+        "properties": {
+          "script": {
+            "type": "string",
+            "description": "The .hy file to run"
+          }
+        }
+      }
+    ]
+  }
+}
