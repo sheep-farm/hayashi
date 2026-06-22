@@ -435,6 +435,7 @@ pub struct Interpreter {
     preserved: HashMap<String, Value>,
     stored_models: Vec<Value>,
     return_value: Option<Value>,
+    labels: HashMap<String, HashMap<String, String>>,
 }
 
 impl Interpreter {
@@ -447,6 +448,7 @@ impl Interpreter {
             preserved: HashMap::new(),
             stored_models: Vec::new(),
             return_value: None,
+            labels: HashMap::new(),
         }
     }
 
@@ -4629,6 +4631,46 @@ impl Interpreter {
                 Ok(result)
             }
 
+            // ── quietly: avalia expressão, suprime saída ──────────────────
+            "quietly" | "quiet" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("quietly(expr) — avalia sem imprimir".into()));
+                }
+                self.eval_expr(&args[0])?;
+                Ok(Value::Nil)
+            }
+
+            // ── capture: avalia expressão, ignora erros ───────────────────
+            "capture" | "cap" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("capture(expr) — avalia ignorando erros".into()));
+                }
+                match self.eval_expr(&args[0]) {
+                    Ok(v)  => Ok(v),
+                    Err(e) => { eprintln!("(captured: {e})"); Ok(Value::Nil) }
+                }
+            }
+
+            // ── assert: erro se condição é falsa ──────────────────────────
+            "assert" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("assert(cond [, msg]) — erro se condição falsa".into()));
+                }
+                let val = self.eval_expr(&args[0])?;
+                if !Self::value_as_bool(&val) {
+                    let msg = if args.len() >= 2 {
+                        match self.eval_expr(&args[1])? {
+                            Value::Str(s) => s,
+                            _ => "assertion failed".into(),
+                        }
+                    } else {
+                        "assertion failed".into()
+                    };
+                    return Err(HayashiError::Runtime(msg));
+                }
+                Ok(Value::Nil)
+            }
+
             // ── preserve/restore: salvar e restaurar estado de variáveis ───
             "preserve" => {
                 if args.is_empty() {
@@ -4694,13 +4736,15 @@ impl Interpreter {
                         "DADOS:\n",
                         "  load  generate  replace  drop  keep  dropna  rename  sort\n",
                         "  merge  append  collapse  reshape  encode  decode  winsor  tabgen\n",
-                        "  summarize  tabulate  tabstat  xtsum  ttest  correlate  list\n\n",
+                        "  summarize  tabulate  tabstat  xtsum  ttest  correlate  list\n",
+                        "  duplicates  label  format\n\n",
                         "TESTES:\n",
                         "  adf  kpss  pp  za  ljungbox  archtest  granger  johansen\n",
                         "  bptest  pesaran_cd  wooldridge  abtest  white  jb  reset\n\n",
                         "LINGUAGEM:\n",
                         "  let  if/else  for  while  fn  return  display  scalar  input\n",
-                        "  source(\"script.hy\")  export  print\n\n",
+                        "  source(\"script.hy\")  export  print\n",
+                        "  quietly  capture  assert  timer\n\n",
                         "Use help(comando) para detalhes. Ex: help(ols)\n",
                     ),
                     "ols" | "reg" | "regress" => concat!(
@@ -4873,6 +4917,57 @@ impl Interpreter {
                         "    list(df, Y, X, 5)\n",
                         "    list(df, vars=[Y, X], n=20)\n",
                     ),
+                    "quietly" | "quiet" => concat!(
+                        "quietly(expr)\n",
+                        "  Avalia a expressão sem imprimir o resultado.\n",
+                        "  Útil para suprimir saída de estimadores.\n\n",
+                        "  Exemplo:\n",
+                        "    quietly(ols(Y ~ X, df))\n",
+                        "    let m = quietly(ols(Y ~ X, df))  // equivalente a let\n",
+                    ),
+                    "capture" | "cap" => concat!(
+                        "capture(expr)\n",
+                        "  Avalia a expressão ignorando erros.\n",
+                        "  Retorna o resultado se sucesso, Nil se erro.\n\n",
+                        "  Exemplo:\n",
+                        "    capture(load \"maybe.csv\" as df)\n",
+                        "    capture(ols(Y ~ X, df))\n",
+                    ),
+                    "assert" => concat!(
+                        "assert(cond [, msg])\n",
+                        "  Erro se condição é falsa.\n\n",
+                        "  Exemplo:\n",
+                        "    assert(n > 0)\n",
+                        "    assert(n > 0, \"amostra vazia\")\n",
+                    ),
+                    "duplicates" => concat!(
+                        "duplicates(df, var [, action=report|drop|tag])\n",
+                        "  Reporta, remove ou marca duplicatas.\n\n",
+                        "  Ações:\n",
+                        "    report (default) — conta duplicatas\n",
+                        "    drop  — remove linhas duplicadas\n",
+                        "    tag   — gera coluna _dup com contagem\n\n",
+                        "  Exemplo:\n",
+                        "    duplicates(df, id)\n",
+                        "    duplicates(df, id, action=drop)\n",
+                        "    duplicates(df, id, action=tag)\n",
+                    ),
+                    "format" | "fmt" => concat!(
+                        "format(value, fmt_str)\n",
+                        "  Formata valor numérico como string.\n\n",
+                        "  Exemplo:\n",
+                        "    display format(3.14159, \"%.2f\")  // \"3.14\"\n",
+                        "    let s = format(pib, \"%.0f\")\n",
+                    ),
+                    "label" => concat!(
+                        "label(df, var, \"descrição\")\n",
+                        "  Armazena rótulo para variável do DataFrame.\n",
+                        "  Rótulos aparecem em describe().\n\n",
+                        "  Exemplo:\n",
+                        "    label(df, lnY, \"Log do PIB per capita\")\n",
+                        "    label(df, X1, \"Taxa de alfabetização\")\n",
+                        "    describe(df)\n",
+                    ),
                     other => {
                         println!("help: comando '{other}' não documentado. Use help() para lista completa.");
                         return Ok(Value::Nil);
@@ -4887,13 +4982,180 @@ impl Interpreter {
                 if args.len() != 1 {
                     return Err(HayashiError::Runtime("describe() takes 1 argument".into()));
                 }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => Some(n.clone()),
+                    _ => None,
+                };
                 match self.eval_expr(&args[0])? {
                     Value::DataFrame(df) => {
                         println!("{}", df);
+                        // mostrar labels se existirem
+                        if let Some(ref name) = df_name {
+                            if let Some(var_labels) = self.labels.get(name) {
+                                if !var_labels.is_empty() {
+                                    println!("\n  Labels:");
+                                    let mut sorted: Vec<_> = var_labels.iter().collect();
+                                    sorted.sort_by_key(|(k, _)| (*k).clone());
+                                    for (var, lbl) in sorted {
+                                        println!("    {:<20} {}", var, lbl);
+                                    }
+                                }
+                            }
+                        }
                         Ok(Value::Nil)
                     }
                     _ => Err(HayashiError::Type("describe() requires a DataFrame".into())),
                 }
+            }
+
+            // ── format: formata valor numérico ──────────────────────────────
+            "format" | "fmt" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "format(value, fmt_str) — Ex: format(3.14, \"%.2f\")".into(),
+                    ));
+                }
+                let val = match self.eval_expr(&args[0])? {
+                    Value::Float(f) => f,
+                    Value::Int(i)   => i as f64,
+                    other => return Err(HayashiError::Type(
+                        format!("format(): primeiro argumento deve ser numérico, não {other}")
+                    )),
+                };
+                let fmt_s = match self.eval_expr(&args[1])? {
+                    Value::Str(s) => s,
+                    _ => return Err(HayashiError::Type(
+                        "format(): segundo argumento deve ser string (ex: \"%.2f\")".into()
+                    )),
+                };
+                // parse "%.Nf" → N decimal places
+                let decimals: usize = if fmt_s.starts_with("%.") && fmt_s.ends_with('f') {
+                    fmt_s[2..fmt_s.len()-1].parse().unwrap_or(4)
+                } else if fmt_s.starts_with('%') && fmt_s.ends_with('f') {
+                    // "%f" sem especificar decimais
+                    6
+                } else {
+                    return Err(HayashiError::Runtime(
+                        format!("format(): string de formato '{fmt_s}' não reconhecida (use \"%.Nf\")")
+                    ));
+                };
+                Ok(Value::Str(format!("{:.prec$}", val, prec = decimals)))
+            }
+
+            // ── duplicates: reportar/dropar/marcar duplicatas ────────────────
+            "duplicates" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "duplicates(df, var [, action=report|drop|tag])".into(),
+                    ));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type(
+                        "duplicates(): primeiro argumento deve ser nome de variável".into()
+                    )),
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(HayashiError::Runtime(
+                        format!("'{df_name}' não é um DataFrame")
+                    )),
+                };
+                let var_name = match &args[1] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => return Err(HayashiError::Type(
+                        "duplicates(): segundo argumento deve ser nome de coluna".into()
+                    )),
+                };
+                let action = match opt_map.get("action") {
+                    Some(Value::Str(s)) => s.clone(),
+                    None => "report".into(),
+                    _ => "report".into(),
+                };
+
+                let col = Self::get_col_f64(&df, &var_name)?;
+                let n = col.len();
+
+                // contar ocorrências de cada valor
+                let mut counts: HashMap<i64, usize> = HashMap::new();
+                for &v in col.iter() {
+                    let key = v.to_bits() as i64;
+                    *counts.entry(key).or_insert(0) += 1;
+                }
+
+                let n_dup: usize = counts.values().filter(|&&c| c > 1).map(|c| c - 1).sum();
+                let n_unique = counts.len();
+
+                match action.as_str() {
+                    "report" => {
+                        println!("duplicates report: {var_name}");
+                        println!("  observações:    {n}");
+                        println!("  valores únicos: {n_unique}");
+                        println!("  duplicatas:     {n_dup}");
+                        Ok(Value::Int(n_dup as i64))
+                    }
+                    "drop" => {
+                        let mut seen: std::collections::HashSet<i64> = std::collections::HashSet::new();
+                        let keep: Vec<usize> = (0..n).filter(|&i| {
+                            let key = col[i].to_bits() as i64;
+                            seen.insert(key)
+                        }).collect();
+                        let new_df = df.iloc(Some(&keep), None)
+                            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                        println!("duplicates drop: {n_dup} obs removidas, {} restantes", new_df.n_rows());
+                        self.env.set(&df_name, Value::DataFrame(Rc::new(new_df)));
+                        Ok(Value::Nil)
+                    }
+                    "tag" => {
+                        let dup_col: Vec<f64> = (0..n).map(|i| {
+                            let key = col[i].to_bits() as i64;
+                            *counts.get(&key).unwrap_or(&1) as f64
+                        }).collect();
+                        let mut df_mut = df.clone();
+                        let arr = ndarray::Array1::from(dup_col);
+                        Rc::make_mut(&mut df_mut).insert("_dup".to_string(), arr)
+                            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                        println!("duplicates tag: coluna _dup gerada ({n_dup} duplicatas)");
+                        self.env.set(&df_name, Value::DataFrame(df_mut));
+                        Ok(Value::Nil)
+                    }
+                    other => Err(HayashiError::Runtime(
+                        format!("duplicates(): action '{other}' desconhecida (report|drop|tag)")
+                    )),
+                }
+            }
+
+            // ── label: armazena rótulos de variáveis ─────────────────────────
+            "label" => {
+                if args.len() < 3 {
+                    return Err(HayashiError::Runtime(
+                        "label(df, var, \"descrição\")".into(),
+                    ));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type(
+                        "label(): primeiro argumento deve ser nome do DataFrame".into()
+                    )),
+                };
+                let var_name = match &args[1] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => return Err(HayashiError::Type(
+                        "label(): segundo argumento deve ser nome da variável".into()
+                    )),
+                };
+                let description = match self.eval_expr(&args[2])? {
+                    Value::Str(s) => s,
+                    _ => return Err(HayashiError::Type(
+                        "label(): terceiro argumento deve ser string".into()
+                    )),
+                };
+                self.labels
+                    .entry(df_name.clone())
+                    .or_insert_with(HashMap::new)
+                    .insert(var_name.clone(), description.clone());
+                println!("label {df_name}.{var_name} = \"{description}\"");
+                Ok(Value::Nil)
             }
 
             // ── correlate ────────────────────────────────────────────────────
@@ -12210,8 +12472,8 @@ impl Interpreter {
                     });
                 }
 
-                // ── funções multi-coluna (rowmean / rowsum / rowmin / rowmax) ──
-                if matches!(func.as_str(), "rowmean" | "rowsum" | "rowmin" | "rowmax") {
+                // ── funções multi-coluna (rowmean / rowsum / rowmin / rowmax / rowtotal / rowmiss) ──
+                if matches!(func.as_str(), "rowmean" | "rowsum" | "rowmin" | "rowmax" | "rowtotal" | "rowmiss") {
                     if args.is_empty() {
                         return Err(HayashiError::Runtime(
                             format!("{func}() requer ao menos uma coluna")
@@ -12223,13 +12485,19 @@ impl Interpreter {
                     let n = df.n_rows();
                     return Ok((0..n).map(|i| {
                         let row: Vec<f64> = cols.iter().map(|c| c[i]).collect();
-                        if row.iter().any(|v| !v.is_finite()) { return f64::NAN; }
                         match func.as_str() {
-                            "rowmean" => row.iter().sum::<f64>() / row.len() as f64,
-                            "rowsum"  => row.iter().sum::<f64>(),
-                            "rowmin"  => row.iter().cloned().fold(f64::INFINITY,     f64::min),
-                            "rowmax"  => row.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
-                            _ => f64::NAN,
+                            "rowtotal" => row.iter().map(|v| if v.is_finite() { *v } else { 0.0 }).sum::<f64>(),
+                            "rowmiss"  => row.iter().filter(|v| !v.is_finite()).count() as f64,
+                            _ => {
+                                if row.iter().any(|v| !v.is_finite()) { return f64::NAN; }
+                                match func.as_str() {
+                                    "rowmean" => row.iter().sum::<f64>() / row.len() as f64,
+                                    "rowsum"  => row.iter().sum::<f64>(),
+                                    "rowmin"  => row.iter().cloned().fold(f64::INFINITY,     f64::min),
+                                    "rowmax"  => row.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+                                    _ => f64::NAN,
+                                }
+                            }
                         }
                     }).collect());
                 }
