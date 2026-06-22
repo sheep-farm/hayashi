@@ -5,11 +5,12 @@
 | | Hayashi | Stata 18 |
 |---|---|---|
 | Preço | Grátis (MIT) | US$ 595–2.985/ano |
-| Binário | ~5 MB, zero dependências | ~500 MB + licença |
+| Binário | ~18 MB, zero deps (ODBC opcional) | ~500 MB + licença |
 | Linguagem | Rust | C/Java |
-| Interface | Terminal (REPL + script) | GUI + terminal |
+| Interface | Terminal (REPL + script) + VS Code | GUI + terminal |
+| I/O | CSV, TSV, JSON, DTA, Excel, SQLite, ODBC | DTA, CSV, Excel, ODBC |
 | Gráficos | SVG vetorial + ASCII | PNG/SVG/PDF nativos |
-| Testes | 275 automatizados | Suite interna proprietária |
+| Testes | 294 automatizados + 59 exemplos | Suite interna proprietária |
 | Scoping | Block-scoped, sem GC | Global |
 | DataFrames | Rc + copy-on-write | Único dataset ativo |
 
@@ -26,14 +27,14 @@ xtset firm year                       xtset(df, firm, year)
 xtreg Y X1 X2, fe                     fe(Y ~ X1 + X2, df)
 xtreg Y X1 X2, re                     re(Y ~ X1 + X2, df)
 hausman fe re                         hausman(m_fe, m_re)
-test X1 X2                            test(m, X1, X2)
+test X1 X2                            test(m, "X1", "X2")
 test X1 = X2                          test(m, "X1 = X2")
 nlcom _b[X1]/_b[X2]                   nlcom(m, X1 / X2)
 margins, dydx(X1)                     margins(m, dydx=[X1])
 margins, at(X2=0)                     margins(m, at_X2=0)
 estat ic                              estat(m1, m2)
 predict yhat                          predict df yhat = m
-predict e, resid                      predict df e = m, residuals
+predict e, resid                      predict df e = m, "residuals"
 eststo: reg Y X1                      eststo(reg(Y ~ X1, df))
 esttab, se                            esttab()
 esttab using "t.tex", tex             esttab(fmt=latex, path="t.tex")
@@ -103,7 +104,9 @@ esttab m_*
 - **Block scoping**: lifetime determinístico sem GC
 - **Regex row-wise**: `ols(Y ~ X, df, if = regexm(name, "Dr"))`
 - **Copy-on-write**: `Rc<DataFrame>` — zero-copy em funções
-- **275 testes automatizados**: `cargo test` em <1s
+- **I/O multi-formato**: CSV, TSV, JSON, DTA, Excel, SQLite, ODBC
+- **Export multi-formato**: CSV, JSON, TSV, XLSX, SQLite, LaTeX, HTML
+- **294 testes + 59 exemplos**: `cargo test` em <1s
 
 ## Onde Stata ganha
 

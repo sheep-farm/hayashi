@@ -2,17 +2,18 @@
 
 An interpreted language for applied econometrics. Named after [Fumio Hayashi](https://en.wikipedia.org/wiki/Fumio_Hayashi).
 
-Single binary, no dependencies, Stata-like syntax. Built in Rust on top of [Greeners](https://github.com/sheep-farm/Greeners).
+Single binary, Stata-like syntax. Built in Rust on top of [Greeners](https://github.com/sheep-farm/Greeners).
 
 ## Install
-
-Requires only the Rust toolchain. No system dependencies.
 
 ```bash
 git clone https://github.com/sheep-farm/hayashi.git
 cd hayashi
 cargo build --release
 # Binary at target/release/hayashi
+
+# Optional: ODBC support (requires unixodbc)
+cargo build --release --features odbc
 ```
 
 ## Usage
@@ -37,8 +38,13 @@ let m2 = reg(Y ~ X1 + X2 + X3, df, cluster=firm)
 esttab(m1, m2)
 esttab(m1, m2, fmt=latex, path="table1.tex")
 
+// Export to multiple formats
+export(df, "csv", "data.csv")
+export(df, "xlsx", "data.xlsx")
+export(m1, "latex", "table.tex")
+
 // Post-estimation
-test(m2, X2, X3)              // joint F-test
+test(m2, "X2", "X3")          // joint F-test
 test(m2, "X2 = X3")           // Wald: beta_X2 = beta_X3
 nlcom(m2, X2 / X3)            // delta method
 margins(m_logit)              // AME with standard errors
@@ -82,11 +88,11 @@ All estimators support `if=` for subsamples and `cov=`/`cluster=`/`nw=` for robu
 ## Post-estimation
 
 ```stata
-test(m, X1, X2)              // joint F-test
+test(m, "X1", "X2")          // joint F-test
 test(m, "X1 = X2")           // linear restriction
-test(m, white)               // White heteroskedasticity
-test(m, bp)                  // Breusch-Pagan
-test(m, dw)                  // Durbin-Watson
+test(m, "white")             // White heteroskedasticity
+test(m, "bp")                // Breusch-Pagan
+test(m, "dw")                // Durbin-Watson
 nlcom(m, X1 / X2)            // nonlinear combination (delta method)
 margins(m)                   // AME with SEs, z-values, p-values
 margins(m, dydx=[X1])        // specific variables
@@ -94,8 +100,8 @@ margins(m, at_X2=0)          // at fixed values
 coefplot(m)                  // ASCII coefficient plot with 95% CI
 estat(m1, m2, m3)            // AIC/BIC comparison
 hausman(m_fe, m_re)          // Hausman test
-predict df yhat = m          // fitted values
-predict df e = m, residuals  // residuals
+predict df yhat = m              // fitted values
+predict df e = m, "residuals"    // residuals
 bootstrap(ols, Y ~ X, df, n=1000)
 ```
 
@@ -103,8 +109,15 @@ bootstrap(ols, Y ~ X, df, n=1000)
 
 ```stata
 load "file.csv" as df
-load "file.dta" as df          // Stata .dta files
-load "https://...csv" as df    // URLs
+load "file.dta" as df                    // Stata .dta files
+load "file.json" as df                   // JSON (array or column-oriented)
+load "file.tsv" as df                    // tab-separated
+load "file.xlsx" as df, sheet=Plan1      // Excel (xlsx/xls/ods)
+load "file.db" as df, table=prices       // SQLite
+load "file.db" as df, query="SELECT * FROM prices WHERE year > 2020"
+load "odbc://DSN=mydb" as df, query="SELECT * FROM t"  // ODBC (feature flag)
+load "https://...csv" as df              // URLs (auto-download)
+load "data.csv" as df, sep=";"           // custom delimiter
 
 generate df lnY = log(Y)
 generate df D = (X == 1)       // dummy from condition
@@ -228,8 +241,10 @@ help(ols)
 
 ```bash
 cargo build --release      # optimized binary
-cargo test                 # 275 tests, <1s
+cargo test                 # 294 tests, <1s
 ```
+
+59 example scripts in `exemplos/`, all passing.
 
 ## License
 
