@@ -50,6 +50,24 @@ fn run_script(path: &str) {
     }
 }
 
+fn brace_depth(s: &str) -> i32 {
+    let mut depth: i32 = 0;
+    let mut in_string = false;
+    let mut prev = '\0';
+    for c in s.chars() {
+        if c == '"' && prev != '\\' { in_string = !in_string; }
+        if !in_string {
+            match c {
+                '{' => depth += 1,
+                '}' => depth -= 1,
+                _ => {}
+            }
+        }
+        prev = c;
+    }
+    depth
+}
+
 fn run_repl() {
     println!("Hayashi {VERSION}  — Applied Econometrics Language");
     println!("In honor of Fumio Hayashi. Type 'exit' or Ctrl-D to quit.\n");
@@ -58,22 +76,64 @@ fn run_repl() {
     let mut rl = DefaultEditor::new().expect("failed to init readline");
     let _ = rl.load_history(HISTORY_FILE);
 
+    let mut buf = String::new();
+    let mut depth: i32 = 0;
+
     loop {
-        match rl.readline("hayashi> ") {
+        let prompt = if depth > 0 { "      > " } else { "hayashi> " };
+        match rl.readline(prompt) {
             Ok(line) => {
-                let line = line.trim();
-                if line.is_empty() { continue; }
-                if line == "exit" || line == "quit" { break; }
+                let trimmed = line.trim();
+                if buf.is_empty() {
+                    if trimmed.is_empty() { continue; }
+                    if trimmed == "exit" || trimmed == "quit" { break; }
+                }
 
-                let _ = rl.add_history_entry(line);
+                // input block: acumula até "end"
+                let in_input = buf.lines().any(|l| {
+                    let t = l.trim();
+                    t.starts_with("input ") && !buf.contains("\nend")
+                });
+                if in_input {
+                    buf.push('\n');
+                    buf.push_str(&line);
+                    if trimmed == "end" {
+                        let _ = rl.add_history_entry(buf.trim());
+                        match lang::run_source(&buf, &mut interp) {
+                            Ok(()) => {}
+                            Err(e) => eprintln!("error: {e}"),
+                        }
+                        buf.clear();
+                        depth = 0;
+                    }
+                    continue;
+                }
 
-                match lang::run_source(line, &mut interp) {
-                    Ok(()) => {}
-                    Err(e) => eprintln!("error: {e}"),
+                buf.push_str(trimmed);
+                buf.push('\n');
+                depth += brace_depth(trimmed);
+
+                if depth <= 0 {
+                    depth = 0;
+                    let source = buf.trim().to_string();
+                    if !source.is_empty() {
+                        let _ = rl.add_history_entry(&source);
+                        match lang::run_source(&source, &mut interp) {
+                            Ok(()) => {}
+                            Err(e) => eprintln!("error: {e}"),
+                        }
+                    }
+                    buf.clear();
                 }
             }
             Err(ReadlineError::Interrupted) => {
-                println!("(Ctrl-C — use 'exit' to quit)");
+                if !buf.is_empty() {
+                    buf.clear();
+                    depth = 0;
+                    println!("(input cancelled)");
+                } else {
+                    println!("(Ctrl-C — use 'exit' to quit)");
+                }
             }
             Err(ReadlineError::Eof) => {
                 println!("exit");
