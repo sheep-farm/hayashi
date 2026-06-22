@@ -867,7 +867,7 @@ fn lang_help() {
 
 #[test]
 fn lang_help_index() {
-    assert_ok_contains("help_index", "help()", "ESTIMADORES");
+    assert_ok_contains("help_index", "help()", "ESTIMATORS");
 }
 
 #[test]
