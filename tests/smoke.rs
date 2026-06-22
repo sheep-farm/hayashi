@@ -3862,3 +3862,330 @@ let m = ols(score ~ id, df)
 print(m)"#);
     assert!(ok, "load tsv + ols failed:\n{out}");
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LIST — operações de lista
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn list_push() {
+    assert_ok_contains("list_push", r#"
+let a = [1, 2, 3]
+let b = push(a, 4)
+display len(b)"#, "4");
+}
+
+#[test]
+fn list_pop() {
+    assert_ok_contains("list_pop", r#"
+let a = [1, 2, 3]
+let b = pop(a)
+display len(b)"#, "2");
+}
+
+#[test]
+fn list_insert() {
+    assert_ok_contains("list_insert", r#"
+let a = [10, 30]
+let b = insert(a, 1, 20)
+display b[1]"#, "20");
+}
+
+#[test]
+fn list_remove() {
+    assert_ok_contains("list_remove", r#"
+let a = [10, 20, 30]
+let b = remove(a, 1)
+display len(b)"#, "2");
+}
+
+#[test]
+fn list_clear() {
+    assert_ok_contains("list_clear", r#"
+let a = [1, 2, 3]
+let b = clear(a)
+display len(b)"#, "0");
+}
+
+#[test]
+fn list_reverse() {
+    assert_ok_contains("list_reverse", r#"
+let a = [1, 2, 3]
+let b = reverse(a)
+display b[0]"#, "3");
+}
+
+#[test]
+fn list_index() {
+    assert_ok_contains("list_index", r#"
+let a = [10, 20, 30]
+display index(a, 20)"#, "1");
+}
+
+#[test]
+fn list_index_not_found() {
+    assert_ok_contains("list_index_not_found", r#"
+let a = [10, 20, 30]
+display index(a, 99)"#, "-1");
+}
+
+#[test]
+fn list_slice() {
+    assert_ok_contains("list_slice", r#"
+let a = [10, 20, 30, 40, 50]
+let b = slice(a, 1, 4)
+display len(b)"#, "3");
+}
+
+#[test]
+fn list_slice_open() {
+    assert_ok_contains("list_slice_open", r#"
+let a = [10, 20, 30, 40]
+let b = slice(a, 2)
+display len(b)"#, "2");
+}
+
+#[test]
+fn list_join() {
+    assert_ok_contains("list_join", r#"
+let a = ["a", "b", "c"]
+display join(a, "-")"#, "a-b-c");
+}
+
+#[test]
+fn list_join_default() {
+    assert_ok_contains("list_join_default", r#"
+let a = [1, 2, 3]
+display join(a)"#, "1, 2, 3");
+}
+
+#[test]
+fn list_unique() {
+    assert_ok_contains("list_unique", r#"
+let a = [1, 2, 2, 3, 1]
+let b = unique(a)
+display len(b)"#, "3");
+}
+
+#[test]
+fn list_flatten() {
+    assert_ok_contains("list_flatten", r#"
+let a = [[1, 2], [3, 4], 5]
+let b = flatten(a)
+display len(b)"#, "5");
+}
+
+#[test]
+fn list_map() {
+    assert_ok_contains("list_map", r#"
+fn double(x) { return x * 2 }
+let a = [1, 2, 3]
+let b = map(a, double)
+display b[2]"#, "6");
+}
+
+#[test]
+fn list_immutability() {
+    assert_ok_contains("list_immut", r#"
+let a = [1, 2, 3]
+let b = push(a, 4)
+display len(a)"#, "3");
+}
+
+#[test]
+fn list_chained() {
+    assert_ok_contains("list_chained", r#"
+let a = [3, 1, 2]
+let b = sort(push(a, 0))
+display b[0]"#, "0");
+}
+
+#[test]
+fn list_pop_empty_error() {
+    let (ok, out) = run_inline("let a = []\nlet b = pop(a)");
+    assert!(!ok, "pop on empty should fail:\n{out}");
+    assert!(out.contains("vazia"), "expected 'vazia':\n{out}");
+}
+
+#[test]
+fn list_remove_out_of_bounds() {
+    let (ok, out) = run_inline("let a = [1, 2]\nlet b = remove(a, 5)");
+    assert!(!ok, "remove OOB should fail:\n{out}");
+    assert!(out.contains("fora"), "expected 'fora':\n{out}");
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DICT — dicionário/mapa
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn dict_literal() {
+    assert_ok_contains("dict_lit", r#"
+let d = {"name": "Alice", "age": 30}
+display d["name"]"#, "Alice");
+}
+
+#[test]
+fn dict_index_int_value() {
+    assert_ok_contains("dict_int_val", r#"
+let d = {"x": 42}
+display d["x"]"#, "42");
+}
+
+#[test]
+fn dict_len() {
+    assert_ok_contains("dict_len", r#"
+let d = {"a": 1, "b": 2, "c": 3}
+display len(d)"#, "3");
+}
+
+#[test]
+fn dict_keys() {
+    assert_ok_contains("dict_keys", r#"
+let d = {"b": 2, "a": 1}
+let k = keys(d)
+display k[0]"#, "a");
+}
+
+#[test]
+fn dict_values() {
+    assert_ok_contains("dict_values", r#"
+let d = {"a": 10, "b": 20}
+let v = values(d)
+display len(v)"#, "2");
+}
+
+#[test]
+fn dict_has_key_true() {
+    assert_ok_contains("dict_has_key_t", r#"
+let d = {"x": 1}
+display has_key(d, "x")"#, "true");
+}
+
+#[test]
+fn dict_has_key_false() {
+    assert_ok_contains("dict_has_key_f", r#"
+let d = {"x": 1}
+display has_key(d, "z")"#, "false");
+}
+
+#[test]
+fn dict_set() {
+    assert_ok_contains("dict_set", r#"
+let d = {"a": 1}
+let d2 = dict_set(d, "b", 2)
+display len(d2)"#, "2");
+}
+
+#[test]
+fn dict_set_overwrite() {
+    assert_ok_contains("dict_set_ow", r#"
+let d = {"a": 1}
+let d2 = dict_set(d, "a", 99)
+display d2["a"]"#, "99");
+}
+
+#[test]
+fn dict_remove() {
+    assert_ok_contains("dict_remove", r#"
+let d = {"a": 1, "b": 2}
+let d2 = dict_remove(d, "a")
+display len(d2)"#, "1");
+}
+
+#[test]
+fn dict_merge() {
+    assert_ok_contains("dict_merge", r#"
+let d1 = {"a": 1, "b": 2}
+let d2 = {"b": 99, "c": 3}
+let d3 = dict_merge(d1, d2)
+display d3["b"]"#, "99");
+}
+
+#[test]
+fn dict_immutability() {
+    assert_ok_contains("dict_immut", r#"
+let d = {"a": 1}
+let d2 = dict_set(d, "b", 2)
+display len(d)"#, "1");
+}
+
+#[test]
+fn dict_nested() {
+    assert_ok_contains("dict_nested", r#"
+let inner = {"x": 42}
+let outer = {"data": inner}
+display outer["data"]"#, "\"x\": 42");
+}
+
+#[test]
+fn dict_empty() {
+    assert_ok_contains("dict_empty", r#"
+let d = {}
+display len(d)"#, "0");
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CONST — variáveis imutáveis
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn const_declare() {
+    assert_ok_contains("const_decl", r#"
+const PI = 3.14159
+display PI"#, "3.14159");
+}
+
+#[test]
+fn const_reassign_error() {
+    let (ok, out) = run_inline("const X = 10\nX = 20");
+    assert!(!ok, "reassign const should fail:\n{out}");
+    assert!(out.contains("cannot reassign const"), "expected const error:\n{out}");
+}
+
+#[test]
+fn const_let_redeclare_error() {
+    let (ok, out) = run_inline("const X = 10\nlet X = 20");
+    assert!(!ok, "let over const should fail:\n{out}");
+    assert!(out.contains("cannot redeclare const"), "expected const error:\n{out}");
+}
+
+#[test]
+fn const_in_expression() {
+    assert_ok_contains("const_expr", r#"
+const TAX = 0.1
+let price = 100
+display price * (1 + TAX)"#, "110");
+}
+
+#[test]
+fn const_let_same_name_different_scope() {
+    assert_ok_contains("const_scope", r#"
+const G = 10
+if true {
+    let x = G * 2
+    display x
+}"#, "20");
+}
+
+#[test]
+fn dict_missing_key_error() {
+    let (ok, out) = run_inline(r#"let d = {"a": 1}
+display d["z"]"#);
+    assert!(!ok, "missing key should fail:\n{out}");
+    assert!(out.contains("not found"), "expected 'not found':\n{out}");
+}
+
+#[test]
+fn dict_display() {
+    assert_ok_contains("dict_display", r#"
+let d = {"name": "Bob", "age": 25}
+display d"#, "\"age\": 25");
+}
+
+#[test]
+fn dict_in_list() {
+    assert_ok_contains("dict_in_list", r#"
+let items = [{"name": "A", "val": 1}, {"name": "B", "val": 2}]
+display items[1]["name"]"#, "B");
+}

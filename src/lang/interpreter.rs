@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use ndarray::{Array1, Array2};
 use greeners::{DataFrame, Formula as GFormula, OLS, CovarianceType, IV, Logit, Probit, FixedEffects, RandomEffects};
@@ -287,6 +287,7 @@ pub enum Value {
     EtsResult(Rc<greeners::ETSResult>),
     ThresholdResult(Rc<greeners::threshold::ThresholdResult>),
     List(Rc<Vec<Value>>),
+    Dict(Rc<std::collections::HashMap<String, Value>>),
     UserFn(Rc<UserFn>),
     Nil,
 }
@@ -362,6 +363,16 @@ impl std::fmt::Display for Value {
                 }
                 write!(f, "]")
             }
+            Value::Dict(m) => {
+                write!(f, "{{")?;
+                let mut sorted: Vec<_> = m.iter().collect();
+                sorted.sort_by_key(|(k, _)| (*k).clone());
+                for (i, (k, v)) in sorted.iter().enumerate() {
+                    if i > 0 { write!(f, ", ")?; }
+                    write!(f, "\"{k}\": {v}")?;
+                }
+                write!(f, "}}")
+            }
             Value::UserFn(f_) => write!(f, "<fn({})>", f_.params.join(", ")),
             Value::Nil             => write!(f, "nil"),
         }
@@ -372,11 +383,12 @@ impl std::fmt::Display for Value {
 
 pub struct Env {
     scopes: Vec<HashMap<String, Value>>,
+    constants: HashSet<String>,
 }
 
 impl Env {
     pub fn new() -> Self {
-        Self { scopes: vec![HashMap::new()] }
+        Self { scopes: vec![HashMap::new()], constants: HashSet::new() }
     }
 
     pub fn push_scope(&mut self) {
@@ -389,21 +401,35 @@ impl Env {
         }
     }
 
-    /// `let x = val` — cria no escopo atual (topo)
-    pub fn declare(&mut self, name: &str, val: Value) {
+    pub fn declare(&mut self, name: &str, val: Value) -> Result<()> {
+        if self.constants.contains(name) {
+            return Err(HayashiError::Runtime(format!(
+                "cannot redeclare const '{name}'"
+            )));
+        }
         self.scopes.last_mut().unwrap().insert(name.to_string(), val);
+        Ok(())
     }
 
-    /// `x = val` (sem let) — busca do topo pra base e modifica onde encontrar.
-    /// Se não encontrar, insere no escopo atual.
-    pub fn set(&mut self, name: &str, val: Value) {
+    pub fn declare_const(&mut self, name: &str, val: Value) {
+        self.scopes.last_mut().unwrap().insert(name.to_string(), val);
+        self.constants.insert(name.to_string());
+    }
+
+    pub fn set(&mut self, name: &str, val: Value) -> Result<()> {
+        if self.constants.contains(name) {
+            return Err(HayashiError::Runtime(format!(
+                "cannot reassign const '{name}'"
+            )));
+        }
         for scope in self.scopes.iter_mut().rev() {
             if scope.contains_key(name) {
                 scope.insert(name.to_string(), val);
-                return;
+                return Ok(());
             }
         }
         self.scopes.last_mut().unwrap().insert(name.to_string(), val);
+        Ok(())
     }
 
     /// Busca do topo pra base (lexical scoping)
@@ -523,17 +549,41 @@ impl Interpreter {
                 Ok(Value::List(Rc::new(vals)))
             }
 
-            // ── Indexação: lista[idx] ─────────────────────────────────────────
+            // ── Dict literal ─────────────────────────────────────────────────
+            Expr::Dict(pairs) => {
+                let mut map = std::collections::HashMap::new();
+                for (k_expr, v_expr) in pairs {
+                    let key = match self.eval_expr(k_expr)? {
+                        Value::Str(s) => s,
+                        Value::Int(i) => format!("{i}"),
+                        Value::Float(f) => format!("{f}"),
+                        other => return Err(HayashiError::Type(format!(
+                            "dict key must be string, got {other}"
+                        ))),
+                    };
+                    let val = self.eval_expr(v_expr)?;
+                    map.insert(key, val);
+                }
+                Ok(Value::Dict(Rc::new(map)))
+            }
+
+            // ── Indexação: lista[idx] ou dict["key"] ─────────────────────────
             Expr::Index { obj, idx } => {
                 let obj_val = self.eval_expr(obj)?;
                 let idx_val = self.eval_expr(idx)?;
-                let i = match idx_val {
-                    Value::Int(i) => i,
-                    Value::Float(f) => f as i64,
-                    _ => return Err(HayashiError::Type("índice deve ser inteiro".into())),
-                };
-                match obj_val {
-                    Value::List(v) => {
+                match (&obj_val, &idx_val) {
+                    (Value::Dict(m), Value::Str(key)) => {
+                        m.get(key).cloned().ok_or_else(|| HayashiError::Runtime(
+                            format!("key '{key}' not found in dict")
+                        ))
+                    }
+                    (Value::Dict(_), _) => Err(HayashiError::Type("dict index must be a string".into())),
+                    (Value::List(v), _) => {
+                        let i = match idx_val {
+                            Value::Int(i) => i,
+                            Value::Float(f) => f as i64,
+                            _ => return Err(HayashiError::Type("list index must be integer".into())),
+                        };
                         let len = v.len() as i64;
                         let real = if i < 0 { len + i } else { i };
                         if real < 0 || real >= len {
@@ -543,7 +593,7 @@ impl Interpreter {
                         }
                         Ok(v[real as usize].clone())
                     }
-                    _ => Err(HayashiError::Type("indexação requer uma lista".into())),
+                    _ => Err(HayashiError::Type("indexação requer lista ou dict".into())),
                 }
             }
 
@@ -705,8 +755,109 @@ impl Interpreter {
                 let v = self.eval_expr(&args[0])?;
                 match v {
                     Value::List(lst) => Ok(Value::Int(lst.len() as i64)),
+                    Value::Dict(m)   => Ok(Value::Int(m.len() as i64)),
                     Value::Str(s)    => Ok(Value::Int(s.chars().count() as i64)),
-                    _ => Err(HayashiError::Type("len() requer lista ou string".into())),
+                    _ => Err(HayashiError::Type("len() requer lista, dict ou string".into())),
+                }
+            }
+
+            "keys" => {
+                if args.len() != 1 {
+                    return Err(HayashiError::Runtime("keys(dict)".into()));
+                }
+                match self.eval_expr(&args[0])? {
+                    Value::Dict(m) => {
+                        let mut ks: Vec<String> = m.keys().cloned().collect();
+                        ks.sort();
+                        Ok(Value::List(Rc::new(ks.into_iter().map(Value::Str).collect())))
+                    }
+                    _ => Err(HayashiError::Type("keys() requer dict".into())),
+                }
+            }
+
+            "values" => {
+                if args.len() != 1 {
+                    return Err(HayashiError::Runtime("values(dict)".into()));
+                }
+                match self.eval_expr(&args[0])? {
+                    Value::Dict(m) => {
+                        let mut pairs: Vec<_> = m.iter().collect();
+                        pairs.sort_by_key(|(k, _)| (*k).clone());
+                        Ok(Value::List(Rc::new(pairs.into_iter().map(|(_, v)| v.clone()).collect())))
+                    }
+                    _ => Err(HayashiError::Type("values() requer dict".into())),
+                }
+            }
+
+            "has_key" => {
+                if args.len() != 2 {
+                    return Err(HayashiError::Runtime("has_key(dict, \"key\")".into()));
+                }
+                let d = self.eval_expr(&args[0])?;
+                let k = match self.eval_expr(&args[1])? {
+                    Value::Str(s) => s,
+                    _ => return Err(HayashiError::Type("has_key: key must be string".into())),
+                };
+                match d {
+                    Value::Dict(m) => Ok(Value::Bool(m.contains_key(&k))),
+                    _ => Err(HayashiError::Type("has_key() requer dict".into())),
+                }
+            }
+
+            "dict_merge" | "dmerge" => {
+                if args.len() != 2 {
+                    return Err(HayashiError::Runtime("dict_merge(dict1, dict2)".into()));
+                }
+                let d1 = self.eval_expr(&args[0])?;
+                let d2 = self.eval_expr(&args[1])?;
+                match (d1, d2) {
+                    (Value::Dict(m1), Value::Dict(m2)) => {
+                        let mut merged = (*m1).clone();
+                        for (k, v) in m2.iter() {
+                            merged.insert(k.clone(), v.clone());
+                        }
+                        Ok(Value::Dict(Rc::new(merged)))
+                    }
+                    _ => Err(HayashiError::Type("dict_merge() requer dois dicts".into())),
+                }
+            }
+
+            "dict_set" | "dset" => {
+                if args.len() != 3 {
+                    return Err(HayashiError::Runtime("dict_set(dict, \"key\", value)".into()));
+                }
+                let d = self.eval_expr(&args[0])?;
+                let k = match self.eval_expr(&args[1])? {
+                    Value::Str(s) => s,
+                    _ => return Err(HayashiError::Type("dict_set: key must be string".into())),
+                };
+                let v = self.eval_expr(&args[2])?;
+                match d {
+                    Value::Dict(m) => {
+                        let mut new_m = (*m).clone();
+                        new_m.insert(k, v);
+                        Ok(Value::Dict(Rc::new(new_m)))
+                    }
+                    _ => Err(HayashiError::Type("dict_set() requer dict".into())),
+                }
+            }
+
+            "dict_remove" | "dremove" => {
+                if args.len() != 2 {
+                    return Err(HayashiError::Runtime("dict_remove(dict, \"key\")".into()));
+                }
+                let d = self.eval_expr(&args[0])?;
+                let k = match self.eval_expr(&args[1])? {
+                    Value::Str(s) => s,
+                    _ => return Err(HayashiError::Type("dict_remove: key must be string".into())),
+                };
+                match d {
+                    Value::Dict(m) => {
+                        let mut new_m = (*m).clone();
+                        new_m.remove(&k);
+                        Ok(Value::Dict(Rc::new(new_m)))
+                    }
+                    _ => Err(HayashiError::Type("dict_remove() requer dict".into())),
                 }
             }
 
@@ -958,7 +1109,7 @@ impl Interpreter {
 
             "push" => {
                 if args.len() != 2 {
-                    return Err(HayashiError::Runtime("push() requer (lista, item)".into()));
+                    return Err(HayashiError::Runtime("push(lista, item)".into()));
                 }
                 let lst = self.eval_expr(&args[0])?;
                 let item = self.eval_expr(&args[1])?;
@@ -968,7 +1119,235 @@ impl Interpreter {
                         new_v.push(item);
                         Ok(Value::List(Rc::new(new_v)))
                     }
-                    _ => Err(HayashiError::Type("push() requer lista como primeiro argumento".into())),
+                    _ => Err(HayashiError::Type("push() requer lista".into())),
+                }
+            }
+
+            "pop" => {
+                if args.len() != 1 {
+                    return Err(HayashiError::Runtime("pop(lista)".into()));
+                }
+                match self.eval_expr(&args[0])? {
+                    Value::List(v) => {
+                        if v.is_empty() {
+                            return Err(HayashiError::Runtime("pop() em lista vazia".into()));
+                        }
+                        let mut new_v = (*v).clone();
+                        new_v.pop();
+                        Ok(Value::List(Rc::new(new_v)))
+                    }
+                    _ => Err(HayashiError::Type("pop() requer lista".into())),
+                }
+            }
+
+            "insert" => {
+                if args.len() != 3 {
+                    return Err(HayashiError::Runtime("insert(lista, indice, item)".into()));
+                }
+                let lst = self.eval_expr(&args[0])?;
+                let idx = match self.eval_expr(&args[1])? {
+                    Value::Int(i) => i as usize,
+                    Value::Float(f) => f as usize,
+                    _ => return Err(HayashiError::Type("insert: índice deve ser inteiro".into())),
+                };
+                let item = self.eval_expr(&args[2])?;
+                match lst {
+                    Value::List(v) => {
+                        let mut new_v = (*v).clone();
+                        if idx > new_v.len() {
+                            return Err(HayashiError::Runtime(format!(
+                                "insert: índice {idx} fora do intervalo (len={})", new_v.len()
+                            )));
+                        }
+                        new_v.insert(idx, item);
+                        Ok(Value::List(Rc::new(new_v)))
+                    }
+                    _ => Err(HayashiError::Type("insert() requer lista".into())),
+                }
+            }
+
+            "remove" => {
+                if args.len() != 2 {
+                    return Err(HayashiError::Runtime("remove(lista, indice)".into()));
+                }
+                let lst = self.eval_expr(&args[0])?;
+                let idx = match self.eval_expr(&args[1])? {
+                    Value::Int(i) => i as usize,
+                    Value::Float(f) => f as usize,
+                    _ => return Err(HayashiError::Type("remove: índice deve ser inteiro".into())),
+                };
+                match lst {
+                    Value::List(v) => {
+                        if idx >= v.len() {
+                            return Err(HayashiError::Runtime(format!(
+                                "remove: índice {idx} fora do intervalo (len={})", v.len()
+                            )));
+                        }
+                        let mut new_v = (*v).clone();
+                        new_v.remove(idx);
+                        Ok(Value::List(Rc::new(new_v)))
+                    }
+                    _ => Err(HayashiError::Type("remove() requer lista".into())),
+                }
+            }
+
+            "clear" => {
+                if args.len() != 1 {
+                    return Err(HayashiError::Runtime("clear(lista)".into()));
+                }
+                match self.eval_expr(&args[0])? {
+                    Value::List(_) => Ok(Value::List(Rc::new(Vec::new()))),
+                    _ => Err(HayashiError::Type("clear() requer lista".into())),
+                }
+            }
+
+            "reverse" => {
+                if args.len() != 1 {
+                    return Err(HayashiError::Runtime("reverse(lista)".into()));
+                }
+                match self.eval_expr(&args[0])? {
+                    Value::List(v) => {
+                        let mut new_v = (*v).clone();
+                        new_v.reverse();
+                        Ok(Value::List(Rc::new(new_v)))
+                    }
+                    _ => Err(HayashiError::Type("reverse() requer lista".into())),
+                }
+            }
+
+            "index" | "indexof" => {
+                if args.len() != 2 {
+                    return Err(HayashiError::Runtime("index(lista, item) → posição ou -1".into()));
+                }
+                let lst = self.eval_expr(&args[0])?;
+                let needle = self.eval_expr(&args[1])?;
+                match lst {
+                    Value::List(v) => {
+                        let pos = v.iter().position(|x| format!("{x}") == format!("{needle}"));
+                        Ok(Value::Int(pos.map(|p| p as i64).unwrap_or(-1)))
+                    }
+                    _ => Err(HayashiError::Type("index() requer lista".into())),
+                }
+            }
+
+            "slice" => {
+                if args.len() < 2 || args.len() > 3 {
+                    return Err(HayashiError::Runtime("slice(lista, inicio [, fim])".into()));
+                }
+                let lst = self.eval_expr(&args[0])?;
+                let start = match self.eval_expr(&args[1])? {
+                    Value::Int(i) => i as usize,
+                    Value::Float(f) => f as usize,
+                    _ => return Err(HayashiError::Type("slice: início deve ser inteiro".into())),
+                };
+                match lst {
+                    Value::List(v) => {
+                        let end = if args.len() == 3 {
+                            match self.eval_expr(&args[2])? {
+                                Value::Int(i) => (i as usize).min(v.len()),
+                                Value::Float(f) => (f as usize).min(v.len()),
+                                _ => return Err(HayashiError::Type("slice: fim deve ser inteiro".into())),
+                            }
+                        } else {
+                            v.len()
+                        };
+                        let s = start.min(v.len());
+                        Ok(Value::List(Rc::new(v[s..end].to_vec())))
+                    }
+                    _ => Err(HayashiError::Type("slice() requer lista".into())),
+                }
+            }
+
+            "join" => {
+                if args.len() < 1 || args.len() > 2 {
+                    return Err(HayashiError::Runtime("join(lista [, separador])".into()));
+                }
+                let lst = self.eval_expr(&args[0])?;
+                let sep = if args.len() == 2 {
+                    match self.eval_expr(&args[1])? {
+                        Value::Str(s) => s,
+                        _ => return Err(HayashiError::Type("join: separador deve ser string".into())),
+                    }
+                } else {
+                    ", ".to_string()
+                };
+                match lst {
+                    Value::List(v) => {
+                        let strs: Vec<String> = v.iter().map(|x| format!("{x}")).collect();
+                        Ok(Value::Str(strs.join(&sep)))
+                    }
+                    _ => Err(HayashiError::Type("join() requer lista".into())),
+                }
+            }
+
+            "map" => {
+                if args.len() != 2 {
+                    return Err(HayashiError::Runtime("map(lista, fn)".into()));
+                }
+                let lst = match self.eval_expr(&args[0])? {
+                    Value::List(v) => v,
+                    _ => return Err(HayashiError::Type("map() requer lista".into())),
+                };
+                let func_name = match &args[1] {
+                    Expr::Var(n) => n.clone(),
+                    Expr::Str(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("map: segundo argumento deve ser nome de função".into())),
+                };
+                let mut result = Vec::with_capacity(lst.len());
+                for item in lst.iter() {
+                    let call = Expr::Call {
+                        func: func_name.clone(),
+                        args: vec![match item {
+                            Value::Float(f) => Expr::Float(*f),
+                            Value::Int(i) => Expr::Int(*i),
+                            Value::Str(s) => Expr::Str(s.clone()),
+                            Value::Bool(b) => Expr::Bool(*b),
+                            _ => Expr::Float(0.0),
+                        }],
+                        opts: vec![],
+                    };
+                    result.push(self.eval_expr(&call)?);
+                }
+                Ok(Value::List(Rc::new(result)))
+            }
+
+            "unique" => {
+                if args.len() != 1 {
+                    return Err(HayashiError::Runtime("unique(lista)".into()));
+                }
+                match self.eval_expr(&args[0])? {
+                    Value::List(v) => {
+                        let mut seen = Vec::new();
+                        let mut result = Vec::new();
+                        for item in v.iter() {
+                            let key = format!("{item}");
+                            if !seen.contains(&key) {
+                                seen.push(key);
+                                result.push(item.clone());
+                            }
+                        }
+                        Ok(Value::List(Rc::new(result)))
+                    }
+                    _ => Err(HayashiError::Type("unique() requer lista".into())),
+                }
+            }
+
+            "flatten" => {
+                if args.len() != 1 {
+                    return Err(HayashiError::Runtime("flatten(lista)".into()));
+                }
+                match self.eval_expr(&args[0])? {
+                    Value::List(v) => {
+                        let mut result = Vec::new();
+                        for item in v.iter() {
+                            match item {
+                                Value::List(inner) => result.extend(inner.iter().cloned()),
+                                other => result.push(other.clone()),
+                            }
+                        }
+                        Ok(Value::List(Rc::new(result)))
+                    }
+                    _ => Err(HayashiError::Type("flatten() requer lista".into())),
                 }
             }
 
@@ -2925,7 +3304,7 @@ impl Interpreter {
                             Ok(d) => d,
                             Err(_) => continue,
                         };
-                        self.env.set("__boot_df__", Value::DataFrame(Rc::new(boot_df)));
+                        self.env.set("__boot_df__", Value::DataFrame(Rc::new(boot_df)))?;
                         match self.eval_call(
                             &estimator_name,
                             &[formula_expr.clone(), Expr::Var("__boot_df__".into())],
@@ -4733,7 +5112,7 @@ impl Interpreter {
                 };
                 let val = self.preserved.remove(&name)
                     .ok_or_else(|| HayashiError::Runtime(format!("'{name}' was not preserved")))?;
-                self.env.set(&name, val);
+                self.env.set(&name, val)?;
                 println!("restore {name}");
                 Ok(Value::Nil)
             }
@@ -5171,7 +5550,7 @@ impl Interpreter {
                         let new_df = df.iloc(Some(&keep), None)
                             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                         println!("duplicates drop: {n_dup} obs removidas, {} restantes", new_df.n_rows());
-                        self.env.set(&df_name, Value::DataFrame(Rc::new(new_df)));
+                        self.env.set(&df_name, Value::DataFrame(Rc::new(new_df)))?;
                         Ok(Value::Nil)
                     }
                     "tag" => {
@@ -5184,7 +5563,7 @@ impl Interpreter {
                         Rc::make_mut(&mut df_mut).insert("_dup".to_string(), arr)
                             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                         println!("duplicates tag: coluna _dup gerada ({n_dup} duplicatas)");
-                        self.env.set(&df_name, Value::DataFrame(df_mut));
+                        self.env.set(&df_name, Value::DataFrame(df_mut))?;
                         Ok(Value::Nil)
                     }
                     other => Err(HayashiError::Runtime(
@@ -6499,7 +6878,7 @@ impl Interpreter {
                 let mut saved: Vec<(String, Option<Value>)> = Vec::new();
                 for (i, name) in names.iter().enumerate() {
                     saved.push((name.clone(), self.env.get(name).cloned()));
-                    self.env.set(name, Value::Float(params[i]));
+                    self.env.set(name, Value::Float(params[i]))?;
                 }
 
                 // avaliar g(β̂)
@@ -6508,7 +6887,7 @@ impl Interpreter {
                     Value::Int(i) => i as f64,
                     _ => {
                         for (name, old) in &saved {
-                            match old { Some(v) => self.env.set(name, v.clone()), None => { self.env.remove(name); } }
+                            match old { Some(v) => { self.env.set(name, v.clone())?; }, None => { self.env.remove(name); } }
                         }
                         return Err(HayashiError::Type("nlcom: expression must evaluate to a number".into()));
                     }
@@ -6519,17 +6898,17 @@ impl Interpreter {
                 let mut grad = ndarray::Array1::<f64>::zeros(k);
                 for j in 0..k {
                     let orig = params[j];
-                    self.env.set(&names[j], Value::Float(orig + h));
+                    self.env.set(&names[j], Value::Float(orig + h))?;
                     let g_plus = match self.eval_expr(expr)? { Value::Float(f) => f, Value::Int(i) => i as f64, _ => g };
-                    self.env.set(&names[j], Value::Float(orig - h));
+                    self.env.set(&names[j], Value::Float(orig - h))?;
                     let g_minus = match self.eval_expr(expr)? { Value::Float(f) => f, Value::Int(i) => i as f64, _ => g };
                     grad[j] = (g_plus - g_minus) / (2.0 * h);
-                    self.env.set(&names[j], Value::Float(orig));
+                    self.env.set(&names[j], Value::Float(orig))?;
                 }
 
                 // restaurar variáveis
                 for (name, old) in &saved {
-                    match old { Some(v) => self.env.set(name, v.clone()), None => { self.env.remove(name); } }
+                    match old { Some(v) => { self.env.set(name, v.clone())?; }, None => { self.env.remove(name); } }
                 }
 
                 // V = σ²(X'X)⁻¹
@@ -7412,14 +7791,28 @@ impl Interpreter {
 
             // ── sort ─────────────────────────────────────────────────────────
             "sort" => {
+                if args.len() == 1 {
+                    if let Value::List(v) = self.eval_expr(&args[0])? {
+                        let mut new_v = (*v).clone();
+                        new_v.sort_by(|a, b| {
+                            let fa = match a { Value::Float(f) => Some(*f), Value::Int(i) => Some(*i as f64), _ => None };
+                            let fb = match b { Value::Float(f) => Some(*f), Value::Int(i) => Some(*i as f64), _ => None };
+                            match (fa, fb) {
+                                (Some(a), Some(b)) => a.partial_cmp(&b).unwrap_or(std::cmp::Ordering::Equal),
+                                _ => format!("{a}").cmp(&format!("{b}")),
+                            }
+                        });
+                        return Ok(Value::List(Rc::new(new_v)));
+                    }
+                }
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
-                        "sort() requires (dataframe, var1, ...)".into(),
+                        "sort(list) or sort(dataframe, var1, ...)".into(),
                     ));
                 }
                 let df = match self.eval_expr(&args[0])? {
                     Value::DataFrame(df) => df,
-                    _ => return Err(HayashiError::Type("first argument must be a DataFrame".into())),
+                    _ => return Err(HayashiError::Type("first argument must be a DataFrame or List".into())),
                 };
                 let sort_vars: Vec<String> = args[1..].iter()
                     .map(|a| match a {
@@ -7629,7 +8022,7 @@ impl Interpreter {
 
                 Rc::make_mut(&mut df).insert(gen_name.clone(), winsorized)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                self.env.set(&df_name, Value::DataFrame(df));
+                self.env.set(&df_name, Value::DataFrame(df))?;
                 println!("winsor {var_name} → {gen_name}  (p={p}, range=[{lo:.4}, {hi:.4}], {n_clip} obs clipped)");
                 Ok(Value::Nil)
             }
@@ -7666,7 +8059,7 @@ impl Interpreter {
                     Rc::make_mut(&mut df).insert(col_name, vals)
                         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 }
-                self.env.set(&df_name, Value::DataFrame(df));
+                self.env.set(&df_name, Value::DataFrame(df))?;
                 println!("tabgen {var_name}: {n_dummies} dummies geradas (prefix={prefix}_)");
                 for name in &dummy_names {
                     println!("  {name}");
@@ -7756,7 +8149,7 @@ impl Interpreter {
                 let n_changed = col.iter().zip(recoded.iter()).filter(|(a, b)| a != b).count();
                 Rc::make_mut(&mut df).insert(var.clone(), ndarray::Array1::from(recoded))
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                self.env.set(&df_name, Value::DataFrame(df));
+                self.env.set(&df_name, Value::DataFrame(df))?;
                 println!("recode {var}: {n_changed} changes");
                 Ok(Value::Nil)
             }
@@ -7929,7 +8322,7 @@ impl Interpreter {
                 let target_col = gen_name.unwrap_or_else(|| col_name.clone());
                 Rc::make_mut(&mut df).insert(target_col.clone(), numeric)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                self.env.set(&df_name, Value::DataFrame(df));
+                self.env.set(&df_name, Value::DataFrame(df))?;
 
                 println!("encode {col_name} → {target_col}");
                 for (i, label) in label_map.iter().enumerate() {
@@ -7970,7 +8363,7 @@ impl Interpreter {
                 }).collect();
                 Rc::make_mut(&mut df).insert_column(col_name.clone(), greeners::Column::String(ndarray::Array1::from(str_vals)))
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                self.env.set(&df_name, Value::DataFrame(df));
+                self.env.set(&df_name, Value::DataFrame(df))?;
                 println!("decode {col_name}: {} labels applied", labels.len());
                 Ok(Value::Nil)
             }
@@ -10748,7 +11141,7 @@ impl Interpreter {
                 Rc::make_mut(&mut df).insert(trend_name.clone(), trend).map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
                 Rc::make_mut(&mut df).insert(cycle_name.clone(), cycle).map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
                 println!("hpfilter: λ={lambda}  →  {trend_name} e {cycle_name} adicionadas a {df_name}");
-                self.env.set(&df_name, Value::DataFrame(df));
+                self.env.set(&df_name, Value::DataFrame(df))?;
                 Ok(Value::Nil)
             }
 
@@ -10766,7 +11159,7 @@ impl Interpreter {
                 let cycle_name = format!("{var_name}_cycle");
                 Rc::make_mut(&mut df).insert(cycle_name.clone(), cycle).map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
                 println!("bkfilter: períodos [{low},{high}] k={k}  →  {cycle_name} adicionada a {df_name}");
-                self.env.set(&df_name, Value::DataFrame(df));
+                self.env.set(&df_name, Value::DataFrame(df))?;
                 Ok(Value::Nil)
             }
 
@@ -10784,7 +11177,7 @@ impl Interpreter {
                 let cycle_name = format!("{var_name}_cycle");
                 Rc::make_mut(&mut df).insert(cycle_name.clone(), cycle).map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
                 println!("cffilter: períodos [{low},{high}] drift={drift}  →  {cycle_name} adicionada a {df_name}");
-                self.env.set(&df_name, Value::DataFrame(df));
+                self.env.set(&df_name, Value::DataFrame(df))?;
                 Ok(Value::Nil)
             }
 
@@ -11596,7 +11989,7 @@ impl Interpreter {
 
                 self.env.push_scope();
                 for (param, val) in user_fn.params.iter().zip(arg_vals) {
-                    self.env.declare(param, val);
+                    self.env.declare(param, val)?;
                 }
 
                 let body = user_fn.body.clone();
@@ -12700,12 +13093,17 @@ impl Interpreter {
         match stmt {
             Stmt::Let { name, value } => {
                 let val = self.eval_expr(value)?;
-                self.env.declare(name, val);
+                self.env.declare(name, val)?;
+            }
+
+            Stmt::Const { name, value } => {
+                let val = self.eval_expr(value)?;
+                self.env.declare_const(name, val);
             }
 
             Stmt::Assign { name, value } => {
                 let val = self.eval_expr(value)?;
-                self.env.set(name, val);
+                self.env.set(name, val)?;
             }
 
             // ── input df \n headers \n rows \n end ───────────────────────────
@@ -12738,7 +13136,7 @@ impl Interpreter {
                 let df = greeners::DataFrame::new(col_map)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 println!("input → {alias} ({n} obs, {} vars: {})", k, headers.join(", "));
-                self.env.set(&alias, Value::DataFrame(Rc::new(df)));
+                self.env.set(&alias, Value::DataFrame(Rc::new(df)))?;
             }
 
             // ── display expr ─────────────────────────────────────────────────
@@ -12802,7 +13200,7 @@ impl Interpreter {
                         };
                         let (df, n_rows) = crate::io::odbc::load_odbc(conn_str, &sql)?;
                         println!("Loaded ODBC → {alias} ({n_rows} rows)");
-                        self.env.set(alias, Value::DataFrame(Rc::new(df)));
+                        self.env.set(alias, Value::DataFrame(Rc::new(df)))?;
                     }
                     #[cfg(not(feature = "odbc"))]
                     {
@@ -12866,7 +13264,7 @@ impl Interpreter {
                     }
                 };
                 println!("Loaded '{}' → {alias} ({} rows)", path_str, n_rows);
-                self.env.set(alias, Value::DataFrame(Rc::new(df)));
+                self.env.set(alias, Value::DataFrame(Rc::new(df)))?;
 
                 } // else (não-ODBC)
             }
@@ -13384,7 +13782,7 @@ impl Interpreter {
                 Rc::make_mut(&mut df_val).insert(varname.clone(), arr)
                     .map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
                 println!("({} obs)  {df}.{varname} ({kind_str}) predicted", df_val.n_rows());
-                self.env.set(df, Value::DataFrame(df_val));
+                self.env.set(df, Value::DataFrame(df_val))?;
             }
 
             Stmt::Count { df, cond } => {
@@ -13431,7 +13829,7 @@ impl Interpreter {
                 let arr = ndarray::Array1::from(final_vals);
                 Rc::make_mut(&mut df_val).insert(varname.clone(), arr)
                     .map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
-                self.env.set(df, Value::DataFrame(df_val));
+                self.env.set(df, Value::DataFrame(df_val))?;
             }
 
             Stmt::Generate { df, varname, expr } => {
@@ -13444,7 +13842,7 @@ impl Interpreter {
                 Rc::make_mut(&mut df_val).insert(varname.clone(), arr)
                     .map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
                 println!("({} obs)  {df}.{varname} generated", df_val.n_rows());
-                self.env.set(df, Value::DataFrame(df_val));
+                self.env.set(df, Value::DataFrame(df_val))?;
             }
 
             Stmt::Print(expr) => {
@@ -13573,7 +13971,7 @@ impl Interpreter {
                 let n = sorted.n_rows();
 
                 self.ts_info.insert(df.clone(), t_var.clone());
-                self.env.set(df, Value::DataFrame(Rc::new(sorted)));
+                self.env.set(df, Value::DataFrame(Rc::new(sorted)))?;
 
                 println!("tsset {df}");
                 println!("  variável de tempo : {t_var}  ({t_min} a {t_max})");
@@ -13633,7 +14031,7 @@ impl Interpreter {
                         let step: i64 = if start <= end { 1 } else { -1 };
                         let mut cur = start;
                         while if step > 0 { cur < end } else { cur > end } {
-                            self.env.set(var, Value::Int(cur));
+                            self.env.set(var, Value::Int(cur))?;
                             if run_body!() { break; }
                             cur += step;
                         }
@@ -13646,7 +14044,7 @@ impl Interpreter {
                             )),
                         };
                         for item in items {
-                            self.env.set(var, item);
+                            self.env.set(var, item)?;
                             if run_body!() { break; }
                         }
                     }
@@ -13658,7 +14056,7 @@ impl Interpreter {
                 self.env.set(name, Value::UserFn(Rc::new(UserFn {
                     params: params.clone(),
                     body: body.clone(),
-                })));
+                })))?;
             }
 
             // ── return [expr] ─────────────────────────────────────────────────

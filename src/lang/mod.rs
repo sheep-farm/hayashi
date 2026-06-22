@@ -36,6 +36,7 @@ pub fn run_source_verbose(src: &str, interp: &mut Interpreter, verbose: bool) ->
 fn stmt_label(s: &ast::Stmt) -> &'static str {
     match s {
         ast::Stmt::Let { .. } => "let",
+        ast::Stmt::Const { .. } => "const",
         ast::Stmt::Assign { .. } => "assign",
         ast::Stmt::Load { .. } => "load",
         ast::Stmt::Generate { .. } => "generate",

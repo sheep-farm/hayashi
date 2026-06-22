@@ -62,7 +62,10 @@ pub enum Expr {
     // lista literal: [1, 2, 3]  ou  [ols(...), fe(...)]
     List(Vec<Expr>),
 
-    // indexação: lista[0]
+    // dict literal: {"key": value, "k2": v2}
+    Dict(Vec<(Expr, Expr)>),
+
+    // indexação: lista[0] ou dict["key"]
     Index { obj: Box<Expr>, idx: Box<Expr> },
 
     // chamada de função/estimador: ols(fórmula, df, cov=HC3)
@@ -89,6 +92,9 @@ pub enum Expr {
 pub enum Stmt {
     // let nome = expr (declara no escopo atual)
     Let { name: String, value: Expr },
+
+    // const nome = expr (declara imutável no escopo atual)
+    Const { name: String, value: Expr },
 
     // nome = expr (modifica variável existente no escopo mais próximo)
     Assign { name: String, value: Expr },
