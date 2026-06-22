@@ -181,6 +181,7 @@ impl Parser {
                 Token::LtEq  => BinOp::LtEq,
                 Token::EqEq  => BinOp::Eq,
                 Token::BangEq => BinOp::Ne,
+                Token::In    => BinOp::In,
                 _ => break,
             };
             self.advance();
@@ -270,6 +271,27 @@ impl Parser {
             Token::Int(i)   => { self.advance(); Ok(Expr::Int(i)) }
             Token::Bool(b)  => { self.advance(); Ok(Expr::Bool(b)) }
             Token::StringLit(s) => { self.advance(); Ok(Expr::Str(s)) }
+
+            // if cond { then_expr } else { else_expr }  (expression)
+            Token::If => {
+                self.advance();
+                let cond = self.parse_expr()?;
+                self.expect(&Token::LBrace)?;
+                let then_expr = self.parse_expr()?;
+                self.expect(&Token::RBrace)?;
+                if self.peek() != &Token::Else {
+                    return Err(HayashiError::Parse { line, msg: "if-expression requires else branch".into() });
+                }
+                self.advance();
+                self.expect(&Token::LBrace)?;
+                let else_expr = self.parse_expr()?;
+                self.expect(&Token::RBrace)?;
+                Ok(Expr::IfExpr {
+                    cond: Box::new(cond),
+                    then_expr: Box::new(then_expr),
+                    else_expr: Box::new(else_expr),
+                })
+            }
             Token::FStringLit(s) => { self.advance(); Ok(Expr::FString(s)) }
 
             // Agrupamento: (expr)

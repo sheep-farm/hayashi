@@ -26,7 +26,7 @@ pub struct Opt {
 pub enum BinOp {
     Add, Sub, Mul, Div, Pow,
     Gt, Lt, GtEq, LtEq, Eq, Ne,
-    And, Or,
+    And, Or, In,
 }
 
 /// Operador de série temporal
@@ -89,6 +89,9 @@ pub enum Expr {
 
     // match expr { pattern => result, ... }
     Match { expr: Box<Expr>, arms: Vec<(Expr, Expr)> },
+
+    // if cond { expr } else { expr }  (expression, returns value)
+    IfExpr { cond: Box<Expr>, then_expr: Box<Expr>, else_expr: Box<Expr> },
 
     // operadores de série temporal: L.price, L2.price, F.gdp, D.wage
     TsOp { op: TsOpKind, var: String, n: usize },
