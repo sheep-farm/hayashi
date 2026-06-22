@@ -41,6 +41,7 @@ esttab(m1, m2, fmt=latex, path="table1.tex")
 // Export to multiple formats
 export(df, "csv", "data.csv")
 export(df, "xlsx", "data.xlsx")
+export(df, "parquet", "data.parquet")
 export(m1, "latex", "table.tex")
 
 // Post-estimation
@@ -113,6 +114,7 @@ load "file.dta" as df                    // Stata .dta files
 load "file.json" as df                   // JSON (array or column-oriented)
 load "file.tsv" as df                    // tab-separated
 load "file.xlsx" as df, sheet=Plan1      // Excel (xlsx/xls/ods)
+load "file.parquet" as df                // Apache Parquet
 load "file.db" as df, table=prices       // SQLite
 load "file.db" as df, query="SELECT * FROM prices WHERE year > 2020"
 load "odbc://DSN=mydb" as df, query="SELECT * FROM t"  // ODBC (feature flag)
@@ -241,7 +243,7 @@ help(ols)
 
 ```bash
 cargo build --release      # optimized binary
-cargo test                 # 294 tests, <1s
+cargo test                 # 338 tests, <1s
 ```
 
 59 example scripts in `exemplos/`, all passing.

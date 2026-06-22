@@ -13004,6 +13004,9 @@ impl Interpreter {
                     "tsv" | "tab" => {
                         crate::io::dsv::load_dsv(local_path, b'\t')?
                     }
+                    "parquet" | "pq" => {
+                        crate::io::parquet::load_parquet(local_path)?
+                    }
                     _ => {
                         let delim = match opt_sep.as_deref() {
                             Some("\\t") | Some("tab") => b'\t',
@@ -13651,6 +13654,10 @@ impl Interpreter {
                     }
                     (Value::DataFrame(df), "sqlite" | "sqlite3" | "db") => {
                         crate::io::sqlite::write_sqlite(&df, &path_str, "data")?;
+                        println!("Exported DataFrame → '{path_str}' ({} rows)", df.n_rows());
+                    }
+                    (Value::DataFrame(df), "parquet" | "pq") => {
+                        crate::io::parquet::write_parquet(&df, &path_str)?;
                         println!("Exported DataFrame → '{path_str}' ({} rows)", df.n_rows());
                     }
 
