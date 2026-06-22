@@ -663,6 +663,15 @@ impl Parser {
                 Ok(Some(Stmt::Let { name, value }))
             }
 
+            // nome = expr (assignment sem let — modifica variável existente)
+            Token::Ident(ref name) if self.tokens.get(self.pos + 1).map(|(t, _)| t == &Token::Eq).unwrap_or(false) => {
+                let name = name.clone();
+                self.advance(); // ident
+                self.advance(); // =
+                let value = self.parse_expr()?;
+                Ok(Some(Stmt::Assign { name, value }))
+            }
+
             Token::Ident(_) => {
                 let expr = self.parse_expr()?;
                 Ok(Some(Stmt::Expr(expr)))

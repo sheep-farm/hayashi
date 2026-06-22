@@ -87,8 +87,11 @@ pub enum Expr {
 /// Comandos (statements) da linguagem
 #[derive(Debug, Clone)]
 pub enum Stmt {
-    // let nome = expr
+    // let nome = expr (declara no escopo atual)
     Let { name: String, value: Expr },
+
+    // nome = expr (modifica variável existente no escopo mais próximo)
+    Assign { name: String, value: Expr },
 
     // load "arquivo.csv" as nome
     Load { path: Expr, alias: String },
