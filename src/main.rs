@@ -11,7 +11,13 @@ const HISTORY_FILE: &str = ".hayashi_history";
 fn main() {
     let args: Vec<String> = std::env::args().collect();
 
-    match args.get(1).map(String::as_str) {
+    let verbose = args.iter().any(|a| a == "--verbose" || a == "-v");
+    let args_clean: Vec<&str> = args.iter()
+        .map(String::as_str)
+        .filter(|a| *a != "--verbose" && *a != "-v")
+        .collect();
+
+    match args_clean.get(1).copied() {
         Some("--version") | Some("-V") => {
             println!("hayashi {VERSION}");
             return;
@@ -25,14 +31,14 @@ fn main() {
             let mut src = String::new();
             std::io::stdin().read_to_string(&mut src).expect("failed to read stdin");
             let mut interp = Interpreter::new();
-            if let Err(e) = lang::run_source(&src, &mut interp) {
+            if let Err(e) = lang::run_source_verbose(&src, &mut interp, verbose) {
                 eprintln!("error: {e}");
                 std::process::exit(1);
             }
             return;
         }
         Some(path) if !path.starts_with('-') => {
-            run_script(path);
+            run_script(path, verbose);
             return;
         }
         Some(unknown) => {
@@ -46,7 +52,7 @@ fn main() {
     run_repl();
 }
 
-fn run_script(path: &str) {
+fn run_script(path: &str, verbose: bool) {
     let src = match std::fs::read_to_string(path) {
         Ok(s) => s,
         Err(e) => {
@@ -55,7 +61,7 @@ fn run_script(path: &str) {
         }
     };
     let mut interp = Interpreter::new();
-    if let Err(e) = lang::run_source(&src, &mut interp) {
+    if let Err(e) = lang::run_source_verbose(&src, &mut interp, verbose) {
         eprintln!("error: {e}");
         std::process::exit(1);
     }
