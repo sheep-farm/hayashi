@@ -231,10 +231,10 @@ fn pkg_install(spec: &str) {
         std::process::exit(1);
     };
 
-    let dest = packages_dir().join(repo);
+    let dest = packages_dir().join(user).join(repo);
     if dest.exists() {
-        println!("{repo}: already installed at {}", dest.display());
-        println!("  use 'hayashi remove {repo}' first to reinstall");
+        println!("{user}/{repo}: already installed at {}", dest.display());
+        println!("  use 'hayashi remove {user}/{repo}' first to reinstall");
         return;
     }
 
@@ -262,11 +262,20 @@ fn pkg_install(spec: &str) {
         }
     };
 
-    let hy_files: Vec<&GhEntry> = entries.iter()
-        .filter(|e| e.name.ends_with(".hy") && e.r#type == "file" && e.download_url.is_some())
+    let dominated = |name: &str| -> bool {
+        let lower = name.to_lowercase();
+        lower.ends_with(".hy")
+            || lower == "readme.md" || lower == "readme" || lower == "readme.txt"
+            || lower == "license" || lower == "license.md" || lower == "license.txt"
+            || lower == "licence" || lower == "licence.md"
+    };
+
+    let files: Vec<&GhEntry> = entries.iter()
+        .filter(|e| e.r#type == "file" && e.download_url.is_some() && dominated(&e.name))
         .collect();
 
-    if hy_files.is_empty() {
+    let n_hy = files.iter().filter(|e| e.name.ends_with(".hy")).count();
+    if n_hy == 0 {
         eprintln!("hayashi install: no .hy files found in {user}/{repo}");
         std::process::exit(1);
     }
@@ -277,7 +286,7 @@ fn pkg_install(spec: &str) {
     });
 
     let mut installed = 0;
-    for file in &hy_files {
+    for file in &files {
         let url = file.download_url.as_ref().unwrap();
         print!("  {} ... ", file.name);
         match ureq::get(url).call() {
@@ -295,21 +304,29 @@ fn pkg_install(spec: &str) {
         }
     }
 
-    println!("Installed {repo}: {installed} file(s) → {}", dest.display());
-    println!("  use: import(\"{repo}/module\")");
+    println!("Installed {user}/{repo}: {installed} file(s) → {}", dest.display());
+    println!("  use: import(\"{user}/{repo}/module\")");
 }
 
-fn pkg_remove(name: &str) {
-    let dest = packages_dir().join(name);
+fn pkg_remove(spec: &str) {
+    let dest = if let Some(pos) = spec.find('/') {
+        packages_dir().join(&spec[..pos]).join(&spec[pos+1..])
+    } else {
+        packages_dir().join(spec)
+    };
     if !dest.exists() {
-        eprintln!("hayashi remove: package '{name}' not installed");
+        eprintln!("hayashi remove: package '{spec}' not installed");
         std::process::exit(1);
     }
     std::fs::remove_dir_all(&dest).unwrap_or_else(|e| {
         eprintln!("hayashi remove: cannot remove {}: {e}", dest.display());
         std::process::exit(1);
     });
-    println!("Removed {name}");
+    // remove empty user dir
+    if let Some(parent) = dest.parent() {
+        let _ = std::fs::remove_dir(parent);
+    }
+    println!("Removed {spec}");
 }
 
 fn pkg_list() {
@@ -318,27 +335,36 @@ fn pkg_list() {
         println!("No packages installed.");
         return;
     }
-    let mut entries: Vec<_> = match std::fs::read_dir(&dir) {
-        Ok(rd) => rd.filter_map(|e| e.ok())
-            .filter(|e| e.path().is_dir())
-            .collect(),
-        Err(_) => { println!("No packages installed."); return; }
-    };
-    if entries.is_empty() {
-        println!("No packages installed.");
-        return;
+    let mut found = false;
+    let mut users: Vec<_> = std::fs::read_dir(&dir)
+        .map(|rd| rd.filter_map(|e| e.ok()).filter(|e| e.path().is_dir()).collect())
+        .unwrap_or_default();
+    users.sort_by_key(|e: &std::fs::DirEntry| e.file_name());
+
+    for user_entry in &users {
+        let user = user_entry.file_name();
+        let mut repos: Vec<_> = std::fs::read_dir(user_entry.path())
+            .map(|rd| rd.filter_map(|e| e.ok()).filter(|e| e.path().is_dir()).collect())
+            .unwrap_or_default();
+        repos.sort_by_key(|e: &std::fs::DirEntry| e.file_name());
+
+        for repo_entry in &repos {
+            if !found {
+                println!("Installed packages (~/.hayashi/packages/):\n");
+                found = true;
+            }
+            let repo = repo_entry.file_name();
+            let n_hy = std::fs::read_dir(repo_entry.path())
+                .map(|rd| rd.filter_map(|e| e.ok())
+                    .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("hy"))
+                    .count())
+                .unwrap_or(0);
+            println!("  {}/{}  ({} file{})",
+                user.to_string_lossy(), repo.to_string_lossy(),
+                n_hy, if n_hy == 1 { "" } else { "s" });
+        }
     }
-    entries.sort_by_key(|e| e.file_name());
-    println!("Installed packages (~/.hayashi/packages/):\n");
-    for entry in entries {
-        let name = entry.file_name();
-        let n_files = std::fs::read_dir(entry.path())
-            .map(|rd| rd.filter_map(|e| e.ok())
-                .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("hy"))
-                .count())
-            .unwrap_or(0);
-        println!("  {:<20} ({} file{})", name.to_string_lossy(), n_files, if n_files == 1 { "" } else { "s" });
-    }
+    if !found { println!("No packages installed."); }
 }
 
 #[derive(serde::Deserialize)]
