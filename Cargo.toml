@@ -1,6 +1,6 @@
 [package]
 name = "hayashi-lang"
-version = "0.1.0"
+version = "0.1.1-dev"
 edition = "2021"
 description = "An interpreted language for applied econometrics — Stata-like syntax, modern features, zero cost"
 license = "GPL-3.0-only"
