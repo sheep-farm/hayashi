@@ -781,6 +781,40 @@ impl Interpreter {
                 body: vec![(Stmt::Return(Some(*body.clone())), 0)],
             }))),
 
+            Expr::Apply { func, args } => {
+                let closure_val = self.eval_expr(func)?;
+                let uf = match closure_val {
+                    Value::UserFn(f) => f,
+                    _ => return Err(self.rt_err("apply: expected function or closure")),
+                };
+                let arg_vals: Vec<Value> = args
+                    .iter()
+                    .map(|a| self.eval_expr(a))
+                    .collect::<Result<_>>()?;
+
+                self.env.push_scope();
+                for (param, val) in uf.params.iter().zip(arg_vals) {
+                    self.env.declare_const(param, val);
+                }
+                let body = uf.body.clone();
+                let mut exec_err: Option<HayashiError> = None;
+                for s in &body {
+                    match self.exec(s) {
+                        Ok(()) => {}
+                        Err(HayashiError::Return) => break,
+                        Err(e) => {
+                            exec_err = Some(e);
+                            break;
+                        }
+                    }
+                }
+                self.env.pop_scope();
+                if let Some(e) = exec_err {
+                    return Err(e);
+                }
+                Ok(self.return_value.take().unwrap_or(Value::Nil))
+            }
+
             Expr::Match { expr, arms } => {
                 let scrutinee = self.eval_expr(expr)?;
                 let scrutinee_str = format!("{scrutinee}");
@@ -1112,9 +1146,9 @@ impl Interpreter {
             .map_err(|e| HayashiError::Runtime(e.to_string()))
     }
 
-    fn maybe_filter_df(&self, df: &Rc<DataFrame>, opts: &[Opt]) -> Result<Rc<DataFrame>> {
+    fn maybe_filter_df(&mut self, df: &Rc<DataFrame>, opts: &[Opt]) -> Result<Rc<DataFrame>> {
         if let Some(if_opt) = opts.iter().find(|o| o.name == "if") {
-            let mask = Self::eval_col_expr(&if_opt.value, df)?;
+            let mask = self.eval_col_expr(&if_opt.value, df)?;
             Self::filter_df_by_mask(df, &mask)
         } else {
             Ok(df.clone())
@@ -1648,7 +1682,7 @@ impl Interpreter {
                     let col = Self::get_col_f64(&df, &var_name)?;
                     // filtro opcional: if=cond
                     if let Some(cond_opt) = opts.iter().find(|o| o.name == "if") {
-                        let mask = Self::eval_col_expr(&cond_opt.value, &df)?;
+                        let mask = self.eval_col_expr(&cond_opt.value, &df)?;
                         col.iter()
                             .zip(mask.iter())
                             .filter(|(_, &m)| m != 0.0)
@@ -8840,7 +8874,7 @@ impl Interpreter {
                 let k = var_names.len();
                 let mut data = ndarray::Array2::<f64>::zeros((n, k));
                 for (j, vname) in var_names.iter().enumerate() {
-                    let col = Self::eval_col_expr(&Expr::Var(vname.clone()), &df)?;
+                    let col = self.eval_col_expr(&Expr::Var(vname.clone()), &df)?;
                     for (i, &v) in col.iter().enumerate() {
                         data[[i, j]] = v;
                     }
@@ -8892,7 +8926,7 @@ impl Interpreter {
                 let k = var_names.len();
                 let mut data = ndarray::Array2::<f64>::zeros((n, k));
                 for (j, vname) in var_names.iter().enumerate() {
-                    let col = Self::eval_col_expr(&Expr::Var(vname.clone()), &df)?;
+                    let col = self.eval_col_expr(&Expr::Var(vname.clone()), &df)?;
                     for (i, &v) in col.iter().enumerate() {
                         data[[i, j]] = v;
                     }
@@ -9039,7 +9073,7 @@ impl Interpreter {
                 };
 
                 // extrai série como Array1<f64>
-                let y = Self::eval_col_expr(&Expr::Var(col_name.clone()), &df)?;
+                let y = self.eval_col_expr(&Expr::Var(col_name.clone()), &df)?;
                 let y = ndarray::Array1::from(y);
 
                 // opts: p, d, q (ARIMA); P, D, Q, s (SARIMA)
@@ -11082,7 +11116,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let mask = Self::eval_col_expr(&args[1], &df)?;
+                let mask = self.eval_col_expr(&args[1], &df)?;
                 let keep: Vec<bool> = mask.iter().map(|&v| v != 0.0 && !v.is_nan()).collect();
                 let n = keep.len();
                 let n_kept = keep.iter().filter(|&&k| k).count();
@@ -11566,7 +11600,7 @@ impl Interpreter {
                     Some(Value::Str(s)) if s == "t"
                 );
 
-                let y = Array1::from(Self::eval_col_expr(&Expr::Var(col_name), &df)?);
+                let y = Array1::from(self.eval_col_expr(&Expr::Var(col_name), &df)?);
 
                 let result = match (func, use_t_dist) {
                     ("garch", false) => greeners::GARCH::fit(&y, p, q),
@@ -11602,7 +11636,7 @@ impl Interpreter {
                                     .into(),
                             )),
                         };
-                        Array1::from(Self::eval_col_expr(&Expr::Var(col_name), &df)?)
+                        Array1::from(self.eval_col_expr(&Expr::Var(col_name), &df)?)
                     }
                     // resíduos padronizados de GARCH
                     Value::GarchResult(m) => m.standardized_residuals.clone(),
@@ -12081,7 +12115,7 @@ impl Interpreter {
                                 ))
                             }
                         };
-                        Array1::from(Self::eval_col_expr(&Expr::Var(col_name), &df)?)
+                        Array1::from(self.eval_col_expr(&Expr::Var(col_name), &df)?)
                     }
                     Value::OlsResult(m) => m.residuals.clone(),
                     Value::ArimaResult(m) => Array1::from_vec(m.residuals().to_vec()),
@@ -12221,7 +12255,7 @@ impl Interpreter {
                                     .into(),
                             )),
                         };
-                            Array1::from(Self::eval_col_expr(&Expr::Var(col_name), &df)?)
+                            Array1::from(self.eval_col_expr(&Expr::Var(col_name), &df)?)
                         }
                         // resíduos de GARCH: archtest(model, lags=5)
                         // usa resíduos padronizados z_t = ε_t/√h_t — sob H₀ de
@@ -18409,7 +18443,7 @@ impl Interpreter {
 
     // ── Avalia expressão elemento-a-elemento sobre colunas de um DataFrame ───
 
-    fn eval_col_expr(expr: &Expr, df: &DataFrame) -> Result<Vec<f64>> {
+    fn eval_col_expr(&mut self, expr: &Expr, df: &DataFrame) -> Result<Vec<f64>> {
         match expr {
             Expr::Float(v) => {
                 let n = df.n_rows();
@@ -18446,11 +18480,11 @@ impl Interpreter {
                 }
             }
             Expr::Neg(inner) => {
-                let vals = Self::eval_col_expr(inner, df)?;
+                let vals = self.eval_col_expr(inner, df)?;
                 Ok(vals.into_iter().map(|x| -x).collect())
             }
             Expr::Not(inner) => {
-                let vals = Self::eval_col_expr(inner, df)?;
+                let vals = self.eval_col_expr(inner, df)?;
                 Ok(vals.into_iter().map(|x| if x == 0.0 { 1.0 } else { 0.0 }).collect())
             }
             Expr::BinOp { op, lhs, rhs } => {
@@ -18478,8 +18512,8 @@ impl Interpreter {
                         }
                     }
                 }
-                let l = Self::eval_col_expr(lhs, df)?;
-                let r = Self::eval_col_expr(rhs, df)?;
+                let l = self.eval_col_expr(lhs, df)?;
+                let r = self.eval_col_expr(rhs, df)?;
                 if l.len() != r.len() {
                     return Err(HayashiError::Runtime("mismatched column lengths".into()));
                 }
@@ -18522,7 +18556,7 @@ impl Interpreter {
                         "rnormal" => greeners::Transforms::rnormal(n),
                         "rbernoulli" => {
                             let p = if !args.is_empty() {
-                                Self::eval_col_expr(&args[0], df)?[0]
+                                self.eval_col_expr(&args[0], df)?[0]
                             } else { 0.5 };
                             greeners::Transforms::rbernoulli(n, p)
                         }
@@ -18538,7 +18572,7 @@ impl Interpreter {
                         ));
                     }
                     let cols: Vec<Vec<f64>> = args.iter()
-                        .map(|a| Self::eval_col_expr(a, df))
+                        .map(|a| self.eval_col_expr(a, df))
                         .collect::<Result<_>>()?;
                     return Ok(match func.as_str() {
                         "rowmean"  => greeners::Transforms::row_mean(&cols),
@@ -18555,19 +18589,19 @@ impl Interpreter {
                     // ── funções que precisam de toda a coluna ──────────────────
                     match func.as_str() {
                         "rank" => {
-                            let vals = Self::eval_col_expr(&args[0], df)?;
+                            let vals = self.eval_col_expr(&args[0], df)?;
                             return Ok(greeners::Transforms::rank(&vals));
                         }
                         "cumsum" => {
-                            let vals = Self::eval_col_expr(&args[0], df)?;
+                            let vals = self.eval_col_expr(&args[0], df)?;
                             return Ok(greeners::Transforms::cumsum(&vals));
                         }
                         "std" | "standardize" | "zscore" => {
-                            let vals = Self::eval_col_expr(&args[0], df)?;
+                            let vals = self.eval_col_expr(&args[0], df)?;
                             return Ok(greeners::Transforms::standardize(&vals));
                         }
                         "iqr" => {
-                            let vals = Self::eval_col_expr(&args[0], df)?;
+                            let vals = self.eval_col_expr(&args[0], df)?;
                             let iqr_val = greeners::Transforms::iqr(&vals);
                             return Ok(vec![iqr_val; df.n_rows()]);
                         }
@@ -18585,16 +18619,47 @@ impl Interpreter {
                     }
 
                     // ── funções escalares elemento-a-elemento (1-arg) ─────────
-                    let vals = Self::eval_col_expr(&args[0], df)?;
+                    let vals = self.eval_col_expr(&args[0], df)?;
                     match greeners::Transforms::apply(&vals, func) {
                         Ok(result) => Ok(result),
-                        Err(_) => Err(HayashiError::Runtime(
-                            format!("função de coluna desconhecida '{func}'")
-                        )),
+                        Err(_) => {
+                            if let Some(Value::UserFn(uf)) = self.env.get(func).cloned() {
+                                let mut result = Vec::with_capacity(vals.len());
+                                for &v in &vals {
+                                    self.env.push_scope();
+                                    if let Some(p) = uf.params.first() {
+                                        self.env.declare_const(p, Value::Float(v));
+                                    }
+                                    let body = uf.body.clone();
+                                    let mut exec_err = None;
+                                    for s in &body {
+                                        match self.exec(s) {
+                                            Ok(()) => {}
+                                            Err(HayashiError::Return) => break,
+                                            Err(e) => { exec_err = Some(e); break; }
+                                        }
+                                    }
+                                    self.env.pop_scope();
+                                    if let Some(e) = exec_err {
+                                        return Err(e);
+                                    }
+                                    match self.return_value.take().unwrap_or(Value::Float(f64::NAN)) {
+                                        Value::Float(f) => result.push(f),
+                                        Value::Int(i) => result.push(i as f64),
+                                        _ => result.push(f64::NAN),
+                                    }
+                                }
+                                Ok(result)
+                            } else {
+                                Err(HayashiError::Runtime(
+                                    format!("função de coluna desconhecida '{func}'")
+                                ))
+                            }
+                        }
                     }
                 } else if args.len() == 2 {
-                    let a = Self::eval_col_expr(&args[0], df)?;
-                    let b = Self::eval_col_expr(&args[1], df)?;
+                    let a = self.eval_col_expr(&args[0], df)?;
+                    let b = self.eval_col_expr(&args[1], df)?;
                     match greeners::Transforms::apply2(&a, &b, func) {
                         Ok(result) => Ok(result),
                         Err(_) => Err(HayashiError::Runtime(
@@ -18602,9 +18667,9 @@ impl Interpreter {
                         )),
                     }
                 } else if args.len() == 3 {
-                    let a = Self::eval_col_expr(&args[0], df)?;
-                    let b = Self::eval_col_expr(&args[1], df)?;
-                    let c = Self::eval_col_expr(&args[2], df)?;
+                    let a = self.eval_col_expr(&args[0], df)?;
+                    let b = self.eval_col_expr(&args[1], df)?;
+                    let c = self.eval_col_expr(&args[2], df)?;
                     match greeners::Transforms::apply3(&a, &b, &c, func) {
                         Ok(result) => Ok(result),
                         Err(_) => Err(HayashiError::Runtime(
@@ -18642,6 +18707,43 @@ impl Interpreter {
                         .map(|i| if i >= n { vals[i] - vals[i - n] } else { f64::NAN })
                         .collect(),
                 })
+            }
+
+            Expr::Apply { func, args } => {
+                let closure_val = self.eval_expr(func)?;
+                let uf = match closure_val {
+                    Value::UserFn(f) => f,
+                    _ => return Err(HayashiError::Runtime(
+                        "generate: pipe target must be a function or closure".into(),
+                    )),
+                };
+                let vals = self.eval_col_expr(&args[0], df)?;
+                let mut result = Vec::with_capacity(vals.len());
+                for &v in &vals {
+                    self.env.push_scope();
+                    if let Some(p) = uf.params.first() {
+                        self.env.declare_const(p, Value::Float(v));
+                    }
+                    let body = uf.body.clone();
+                    let mut exec_err = None;
+                    for s in &body {
+                        match self.exec(s) {
+                            Ok(()) => {}
+                            Err(HayashiError::Return) => break,
+                            Err(e) => { exec_err = Some(e); break; }
+                        }
+                    }
+                    self.env.pop_scope();
+                    if let Some(e) = exec_err {
+                        return Err(e);
+                    }
+                    match self.return_value.take().unwrap_or(Value::Float(f64::NAN)) {
+                        Value::Float(f) => result.push(f),
+                        Value::Int(i) => result.push(i as f64),
+                        _ => result.push(f64::NAN),
+                    }
+                }
+                Ok(result)
             }
 
             _ => Err(HayashiError::Runtime(
@@ -19381,7 +19483,7 @@ impl Interpreter {
                     _ => return Err(self.rt_err(format!("'{df}' is not a DataFrame"))),
                 };
                 let n = if let Some(cond_expr) = cond {
-                    let mask = Self::eval_col_expr(cond_expr, &df_val)?;
+                    let mask = self.eval_col_expr(cond_expr, &df_val)?;
                     mask.iter().filter(|&&v| v != 0.0).count()
                 } else {
                     df_val.n_rows()
@@ -19399,10 +19501,10 @@ impl Interpreter {
                     Some(Value::DataFrame(d)) => d.clone(),
                     _ => return Err(self.rt_err(format!("'{df}' is not a DataFrame"))),
                 };
-                let new_vals = Self::eval_col_expr(expr, &df_val)?;
+                let new_vals = self.eval_col_expr(expr, &df_val)?;
 
                 let final_vals: Vec<f64> = if let Some(cond_expr) = cond {
-                    let mask = Self::eval_col_expr(cond_expr, &df_val)?;
+                    let mask = self.eval_col_expr(cond_expr, &df_val)?;
                     // lê coluna original para preservar onde mask == 0
                     use greeners::Column;
                     let old_vals: Vec<f64> = match df_val.get_column(varname) {
@@ -19435,7 +19537,7 @@ impl Interpreter {
                     Some(Value::DataFrame(d)) => d.clone(),
                     _ => return Err(self.rt_err(format!("'{df}' is not a DataFrame"))),
                 };
-                let vals = Self::eval_col_expr(expr, &df_val)?;
+                let vals = self.eval_col_expr(expr, &df_val)?;
                 let arr = ndarray::Array1::from(vals);
                 Rc::make_mut(&mut df_val)
                     .insert(varname.clone(), arr)
@@ -19580,7 +19682,7 @@ impl Interpreter {
                 let sorted = Self::sort_df_by(&frame, t_var)?;
 
                 // estatísticas da variável de tempo para o sumário
-                let t_vals = Self::eval_col_expr(&Expr::Var(t_var.clone()), &sorted)?;
+                let t_vals = self.eval_col_expr(&Expr::Var(t_var.clone()), &sorted)?;
                 let t_min = t_vals.iter().cloned().fold(f64::INFINITY, f64::min);
                 let t_max = t_vals.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
                 let n = sorted.n_rows();

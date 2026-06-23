@@ -176,10 +176,14 @@ impl Parser {
                     args: vec![lhs],
                     opts: vec![],
                 },
+                closure @ Expr::Closure { .. } => Expr::Apply {
+                    func: Box::new(closure),
+                    args: vec![lhs],
+                },
                 _ => {
                     return Err(HayashiError::Parse {
                         line: self.line(),
-                        msg: "|> right side must be a function call".into(),
+                        msg: "|> right side must be a function call or closure".into(),
                     })
                 }
             };
