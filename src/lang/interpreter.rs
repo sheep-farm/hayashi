@@ -1695,13 +1695,26 @@ impl Interpreter {
                 if args.len() != 2 {
                     return Err(HayashiError::Runtime("push(lista, item)".into()));
                 }
-                let lst = self.eval_expr(&args[0])?;
+                let var_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(
+                            "push() first argument must be a variable".into(),
+                        ))
+                    }
+                };
                 let item = self.eval_expr(&args[1])?;
+                let lst = self
+                    .env
+                    .get(&var_name)
+                    .cloned()
+                    .ok_or_else(|| self.rt_err(format!("undefined variable '{var_name}'")))?;
                 match lst {
                     Value::List(v) => {
                         let mut new_v = (*v).clone();
                         new_v.push(item);
-                        Ok(Value::List(Rc::new(new_v)))
+                        self.env.set(&var_name, Value::List(Rc::new(new_v)))?;
+                        Ok(Value::Nil)
                     }
                     _ => Err(HayashiError::Type("push() requires list".into())),
                 }
@@ -1711,14 +1724,28 @@ impl Interpreter {
                 if args.len() != 1 {
                     return Err(HayashiError::Runtime("pop(lista)".into()));
                 }
-                match self.eval_expr(&args[0])? {
+                let var_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(
+                            "pop() argument must be a variable".into(),
+                        ))
+                    }
+                };
+                let lst = self
+                    .env
+                    .get(&var_name)
+                    .cloned()
+                    .ok_or_else(|| self.rt_err(format!("undefined variable '{var_name}'")))?;
+                match lst {
                     Value::List(v) => {
                         if v.is_empty() {
-                            return Err(HayashiError::Runtime("pop() em empty list".into()));
+                            return Err(HayashiError::Runtime("pop() on empty list".into()));
                         }
                         let mut new_v = (*v).clone();
-                        new_v.pop();
-                        Ok(Value::List(Rc::new(new_v)))
+                        let removed = new_v.pop().unwrap();
+                        self.env.set(&var_name, Value::List(Rc::new(new_v)))?;
+                        Ok(removed)
                     }
                     _ => Err(HayashiError::Type("pop() requires list".into())),
                 }
@@ -7770,9 +7797,16 @@ impl Interpreter {
                 let model_vals: Vec<Value> = if use_stored {
                     self.stored_models.clone()
                 } else {
-                    args.iter()
-                        .map(|a| self.eval_expr(a))
-                        .collect::<Result<_>>()?
+                    let mut vals = Vec::new();
+                    for a in args {
+                        let v = self.eval_expr(a)?;
+                        if let Value::List(items) = v {
+                            vals.extend(items.iter().cloned());
+                        } else {
+                            vals.push(v);
+                        }
+                    }
+                    vals
                 };
                 for val in model_vals {
                     match val {
