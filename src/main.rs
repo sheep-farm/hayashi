@@ -38,13 +38,33 @@ fn main() {
             }
             return;
         }
+        Some("install") => {
+            let pkg = args_clean.get(2).unwrap_or_else(|| {
+                eprintln!("Usage: hayashi install user/repo");
+                std::process::exit(1);
+            });
+            pkg_install(pkg);
+            return;
+        }
+        Some("remove") | Some("uninstall") => {
+            let pkg = args_clean.get(2).unwrap_or_else(|| {
+                eprintln!("Usage: hayashi remove package_name");
+                std::process::exit(1);
+            });
+            pkg_remove(pkg);
+            return;
+        }
+        Some("list") | Some("packages") => {
+            pkg_list();
+            return;
+        }
         Some(path) if !path.starts_with('-') => {
             run_script(path, verbose);
             return;
         }
         Some(unknown) => {
             eprintln!("hayashi: unknown argument '{unknown}'");
-            eprintln!("Usage: hayashi [script.hy | -]");
+            eprintln!("Usage: hayashi [script.hy | - | install | remove | list]");
             std::process::exit(1);
         }
         None => {}
@@ -186,9 +206,144 @@ fn print_help() {
     println!("    test  nlcom  margins  bootstrap  esttab  estat  predict");
     println!();
     println!("DATA:");
-    println!("    load (csv/tsv/json/dta/xlsx/xls/ods/sqlite)");
+    println!("    load (csv/tsv/json/dta/xlsx/parquet/sqlite/odbc)");
     println!("    generate  replace  drop  keep  dropna  encode  winsor");
     println!("    summarize  tabulate  ttest  correlate  list  describe");
     println!();
+    println!("PACKAGES:");
+    println!("    hayashi install user/repo    Install from GitHub");
+    println!("    hayashi remove  name         Uninstall a package");
+    println!("    hayashi list                 List installed packages");
+    println!();
     println!("In REPL, type help() for full command list or help(cmd) for details.");
+}
+
+fn packages_dir() -> std::path::PathBuf {
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+    std::path::Path::new(&home).join(".hayashi").join("packages")
+}
+
+fn pkg_install(spec: &str) {
+    let (user, repo) = if let Some(pos) = spec.find('/') {
+        (&spec[..pos], &spec[pos+1..])
+    } else {
+        eprintln!("hayashi install: expected 'user/repo', got '{spec}'");
+        std::process::exit(1);
+    };
+
+    let dest = packages_dir().join(repo);
+    if dest.exists() {
+        println!("{repo}: already installed at {}", dest.display());
+        println!("  use 'hayashi remove {repo}' first to reinstall");
+        return;
+    }
+
+    let api_url = format!("https://api.github.com/repos/{user}/{repo}/contents/");
+    println!("Fetching {user}/{repo}...");
+
+    let resp = match ureq::get(&api_url)
+        .set("User-Agent", "hayashi")
+        .set("Accept", "application/vnd.github.v3+json")
+        .call()
+    {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("hayashi install: cannot reach GitHub API: {e}");
+            std::process::exit(1);
+        }
+    };
+
+    let body: String = resp.into_string().unwrap_or_default();
+    let entries: Vec<GhEntry> = match serde_json::from_str(&body) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("hayashi install: cannot parse GitHub response: {e}");
+            std::process::exit(1);
+        }
+    };
+
+    let hy_files: Vec<&GhEntry> = entries.iter()
+        .filter(|e| e.name.ends_with(".hy") && e.r#type == "file" && e.download_url.is_some())
+        .collect();
+
+    if hy_files.is_empty() {
+        eprintln!("hayashi install: no .hy files found in {user}/{repo}");
+        std::process::exit(1);
+    }
+
+    std::fs::create_dir_all(&dest).unwrap_or_else(|e| {
+        eprintln!("hayashi install: cannot create {}: {e}", dest.display());
+        std::process::exit(1);
+    });
+
+    let mut installed = 0;
+    for file in &hy_files {
+        let url = file.download_url.as_ref().unwrap();
+        print!("  {} ... ", file.name);
+        match ureq::get(url).call() {
+            Ok(resp) => {
+                let content = resp.into_string().unwrap_or_default();
+                let path = dest.join(&file.name);
+                if std::fs::write(&path, &content).is_ok() {
+                    println!("ok");
+                    installed += 1;
+                } else {
+                    println!("write error");
+                }
+            }
+            Err(e) => println!("download error: {e}"),
+        }
+    }
+
+    println!("Installed {repo}: {installed} file(s) → {}", dest.display());
+    println!("  use: import(\"{repo}/module\")");
+}
+
+fn pkg_remove(name: &str) {
+    let dest = packages_dir().join(name);
+    if !dest.exists() {
+        eprintln!("hayashi remove: package '{name}' not installed");
+        std::process::exit(1);
+    }
+    std::fs::remove_dir_all(&dest).unwrap_or_else(|e| {
+        eprintln!("hayashi remove: cannot remove {}: {e}", dest.display());
+        std::process::exit(1);
+    });
+    println!("Removed {name}");
+}
+
+fn pkg_list() {
+    let dir = packages_dir();
+    if !dir.is_dir() {
+        println!("No packages installed.");
+        return;
+    }
+    let mut entries: Vec<_> = match std::fs::read_dir(&dir) {
+        Ok(rd) => rd.filter_map(|e| e.ok())
+            .filter(|e| e.path().is_dir())
+            .collect(),
+        Err(_) => { println!("No packages installed."); return; }
+    };
+    if entries.is_empty() {
+        println!("No packages installed.");
+        return;
+    }
+    entries.sort_by_key(|e| e.file_name());
+    println!("Installed packages (~/.hayashi/packages/):\n");
+    for entry in entries {
+        let name = entry.file_name();
+        let n_files = std::fs::read_dir(entry.path())
+            .map(|rd| rd.filter_map(|e| e.ok())
+                .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("hy"))
+                .count())
+            .unwrap_or(0);
+        println!("  {:<20} ({} file{})", name.to_string_lossy(), n_files, if n_files == 1 { "" } else { "s" });
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct GhEntry {
+    name: String,
+    r#type: String,
+    download_url: Option<String>,
 }

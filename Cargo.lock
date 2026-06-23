@@ -1382,8 +1382,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "hayashi"
-version = "0.1.0"
+name = "hayashi-lang"
+version = "0.1.1-dev"
 dependencies = [
  "anyhow",
  "arrow",
@@ -1399,6 +1399,8 @@ dependencies = [
  "rusqlite",
  "rust_xlsxwriter",
  "rustyline",
+ "serde",
+ "serde_json",
  "tempfile",
  "thiserror 2.0.18",
  "ureq",

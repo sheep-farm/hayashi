@@ -585,7 +585,18 @@ impl Interpreter {
             }
         }
 
-        // 3. User-declared plugin_paths
+        // 3. ~/.hayashi/packages/ (installed packages)
+        if let Some(home) = std::env::var_os("HOME") {
+            let pkg_path = std::path::Path::new(&home)
+                .join(".hayashi")
+                .join("packages")
+                .join(name);
+            if pkg_path.exists() {
+                return Ok(pkg_path.to_string_lossy().to_string());
+            }
+        }
+
+        // 4. User-declared plugin_paths
         for dir in &self.plugin_paths {
             let p = std::path::Path::new(dir).join(name);
             if p.exists() {
