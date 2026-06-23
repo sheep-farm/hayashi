@@ -620,14 +620,7 @@ impl Parser {
                 .to_string();
                 self.advance(); // keyword
                 self.advance(); // =
-                let val = if kw_name == "if" || kw_name == "else" {
-                    self.parse_expr()?
-                } else if let Token::Ident(s) = self.peek().clone() {
-                    self.advance();
-                    Expr::Str(s)
-                } else {
-                    self.parse_expr()?
-                };
+                let val = self.parse_expr()?;
                 opts.push(Opt {
                     name: kw_name,
                     value: val,
@@ -642,13 +635,7 @@ impl Parser {
                 {
                     self.advance(); // nome
                     self.advance(); // =
-                                    // Identificador bare em posição de opção é átomo de string (ex: cov=HC3)
-                    let val = if let Token::Ident(kw) = self.peek().clone() {
-                        self.advance();
-                        Expr::Str(kw)
-                    } else {
-                        self.parse_expr()?
-                    };
+                    let val = self.parse_expr()?;
                     opts.push(Opt { name, value: val });
                 } else {
                     args.push(self.parse_expr()?);

@@ -1128,7 +1128,16 @@ impl Interpreter {
         let opt_map: HashMap<String, Value> = opts
             .iter()
             .filter(|o| o.name != "if" && o.name != "vars" && o.name != "dydx")
-            .map(|o| Ok((o.name.clone(), self.eval_expr(&o.value)?)))
+            .map(|o| {
+                let val = self.eval_expr(&o.value).or_else(|e| {
+                    if let Expr::Var(name) = &o.value {
+                        Ok(Value::Str(name.clone()))
+                    } else {
+                        Err(e)
+                    }
+                })?;
+                Ok((o.name.clone(), val))
+            })
             .collect::<Result<_>>()?;
 
         match func {
@@ -2330,13 +2339,14 @@ impl Interpreter {
                 let result = OLS::from_formula(&g_formula, &df, cov)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-                let fitted = x.dot(&result.params);
+                let fitted = result.x_clean.as_ref().unwrap_or(&x).dot(&result.params);
                 let residuals = &y - &fitted;
+                let x_used = result.x_clean.clone().unwrap_or(x);
 
                 Ok(Value::OlsResult(OlsModel {
                     result: Rc::new(result),
                     residuals,
-                    x,
+                    x: x_used,
                 }))
             }
 
