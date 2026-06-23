@@ -9,6 +9,22 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 const HISTORY_FILE: &str = ".hayashi_history";
 
 fn main() {
+    const STACK_SIZE: usize = 32 * 1024 * 1024;
+    let handler = std::thread::Builder::new()
+        .stack_size(STACK_SIZE)
+        .spawn(run)
+        .expect("failed to spawn main thread");
+    if let Err(e) = handler.join() {
+        if let Some(msg) = e.downcast_ref::<&str>() {
+            eprintln!("fatal: {msg}");
+        } else if let Some(msg) = e.downcast_ref::<String>() {
+            eprintln!("fatal: {msg}");
+        }
+        std::process::exit(1);
+    }
+}
+
+fn run() {
     let args: Vec<String> = std::env::args().collect();
 
     let verbose = args.iter().any(|a| a == "--verbose" || a == "-v");
