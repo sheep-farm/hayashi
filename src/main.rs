@@ -31,6 +31,7 @@ fn main() {
             let mut src = String::new();
             std::io::stdin().read_to_string(&mut src).expect("failed to read stdin");
             let mut interp = Interpreter::new();
+            interp.load_plugins();
             if let Err(e) = lang::run_source_verbose(&src, &mut interp, verbose) {
                 eprintln!("error: {e}");
                 std::process::exit(1);
@@ -61,6 +62,7 @@ fn run_script(path: &str, verbose: bool) {
         }
     };
     let mut interp = Interpreter::new();
+    interp.load_plugins();
     if let Err(e) = lang::run_source_verbose(&src, &mut interp, verbose) {
         eprintln!("error: {e}");
         std::process::exit(1);
@@ -90,6 +92,7 @@ fn run_repl() {
     println!("In honor of Fumio Hayashi. Type 'exit' or Ctrl-D to quit.\n");
 
     let mut interp = Interpreter::new();
+    interp.load_plugins();
     let mut rl = DefaultEditor::new().expect("failed to init readline");
     let _ = rl.load_history(HISTORY_FILE);
 
