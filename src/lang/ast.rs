@@ -112,6 +112,12 @@ pub enum Expr {
         body: Box<Expr>,
     },
 
+    // closure application: expr |> |x| body
+    Apply {
+        func: Box<Expr>,
+        args: Vec<Expr>,
+    },
+
     // match expr { pattern => result, ... }
     Match {
         expr: Box<Expr>,
