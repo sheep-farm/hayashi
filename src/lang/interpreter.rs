@@ -478,6 +478,7 @@ pub struct Interpreter {
     return_value: Option<Value>,
     labels: HashMap<String, HashMap<String, String>>,
     current_line: usize,
+    imported: HashSet<String>,
 }
 
 impl Interpreter {
@@ -492,6 +493,7 @@ impl Interpreter {
             return_value: None,
             labels: HashMap::new(),
             current_line: 0,
+            imported: HashSet::new(),
         }
     }
 
@@ -535,6 +537,66 @@ impl Interpreter {
             }
             _ => Err(self.rt_err("expected a function or closure")),
         }
+    }
+
+    pub fn load_plugins(&mut self) {
+        let home = match std::env::var_os("HOME") {
+            Some(h) => h,
+            None => return,
+        };
+        let plugin_dir = std::path::Path::new(&home).join(".hayashi").join("plugins");
+        if !plugin_dir.is_dir() { return; }
+
+        let mut entries: Vec<_> = match std::fs::read_dir(&plugin_dir) {
+            Ok(rd) => rd.filter_map(|e| e.ok()).collect(),
+            Err(_) => return,
+        };
+        entries.sort_by_key(|e| e.file_name());
+
+        for entry in entries {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) == Some("hy") {
+                let name = path.file_stem().unwrap_or_default().to_string_lossy().to_string();
+                if self.imported.contains(&name) { continue; }
+                if let Ok(src) = std::fs::read_to_string(&path) {
+                    self.imported.insert(name);
+                    let _ = crate::lang::run_source(&src, self);
+                }
+            }
+        }
+    }
+
+    fn resolve_import(name: &str) -> Result<String> {
+        // 1. Current directory
+        if std::path::Path::new(name).exists() {
+            return Ok(name.to_string());
+        }
+
+        // 2. ~/.hayashi/plugins/
+        if let Some(home) = std::env::var_os("HOME") {
+            let plugin_path = std::path::Path::new(&home)
+                .join(".hayashi")
+                .join("plugins")
+                .join(name);
+            if plugin_path.exists() {
+                return Ok(plugin_path.to_string_lossy().to_string());
+            }
+        }
+
+        // 3. HAYASHI_PATH env var (colon-separated)
+        if let Ok(paths) = std::env::var("HAYASHI_PATH") {
+            for dir in paths.split(':') {
+                let p = std::path::Path::new(dir).join(name);
+                if p.exists() {
+                    return Ok(p.to_string_lossy().to_string());
+                }
+            }
+        }
+
+        Err(HayashiError::Runtime(format!(
+            "import: module '{}' not found (searched: ./, ~/.hayashi/plugins/, $HAYASHI_PATH)",
+            name.trim_end_matches(".hy")
+        )))
     }
 
     pub fn get_rng(&self) -> Box<dyn rand::RngCore> {
@@ -5304,6 +5366,31 @@ impl Interpreter {
                 let src = std::fs::read_to_string(&path)
                     .map_err(|e| self.rt_err(format!("cannot read '{path}': {e}")))?;
                 println!("source {path}");
+                crate::lang::run_source(&src, self)?;
+                Ok(Value::Nil)
+            }
+
+            "import" | "require" => {
+                if args.is_empty() {
+                    return Err(self.rt_err("import(\"module\")"));
+                }
+                let module = match self.eval_expr(&args[0])? {
+                    Value::Str(s) => s,
+                    _ => return Err(HayashiError::Type("import() requires a string".into())),
+                };
+
+                if self.imported.contains(&module) {
+                    return Ok(Value::Nil);
+                }
+
+                let name = if module.ends_with(".hy") { module.clone() } else { format!("{module}.hy") };
+
+                let resolved = Self::resolve_import(&name)?;
+
+                let src = std::fs::read_to_string(&resolved)
+                    .map_err(|e| self.rt_err(format!("import: cannot read '{resolved}': {e}")))?;
+
+                self.imported.insert(module.clone());
                 crate::lang::run_source(&src, self)?;
                 Ok(Value::Nil)
             }

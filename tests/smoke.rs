@@ -4045,6 +4045,42 @@ display r[0]"#, "30");
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// IMPORT — plugin system
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn import_basic() {
+    assert_ok_contains("import_basic", r#"import("exemplos/data/test_module")
+display double(21)"#, "42");
+}
+
+#[test]
+fn import_const_available() {
+    assert_ok_contains("import_const", r#"import("exemplos/data/test_module")
+display MODULE_LOADED"#, "true");
+}
+
+#[test]
+fn import_dedup() {
+    assert_ok_contains("import_dedup", r#"import("exemplos/data/test_module")
+import("exemplos/data/test_module")
+display double(5)"#, "10");
+}
+
+#[test]
+fn import_not_found() {
+    let (ok, out) = run_inline(r#"import("nonexistent_module")"#);
+    assert!(!ok, "import nonexistent should fail:\n{out}");
+    assert!(out.contains("not found"), "expected 'not found':\n{out}");
+}
+
+#[test]
+fn import_with_extension() {
+    assert_ok_contains("import_ext", r#"import("exemplos/data/test_module.hy")
+display double(3)"#, "6");
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // F-STRING — string interpolation
 // ══════════════════════════════════════════════════════════════════════════════
 
