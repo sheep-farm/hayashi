@@ -479,6 +479,7 @@ pub struct Interpreter {
     labels: HashMap<String, HashMap<String, String>>,
     current_line: usize,
     imported: HashSet<String>,
+    plugin_paths: Vec<String>,
 }
 
 impl Interpreter {
@@ -494,6 +495,7 @@ impl Interpreter {
             labels: HashMap::new(),
             current_line: 0,
             imported: HashSet::new(),
+            plugin_paths: Vec::new(),
         }
     }
 
@@ -566,7 +568,7 @@ impl Interpreter {
         }
     }
 
-    fn resolve_import(name: &str) -> Result<String> {
+    fn resolve_import(&self, name: &str) -> Result<String> {
         // 1. Current directory
         if std::path::Path::new(name).exists() {
             return Ok(name.to_string());
@@ -583,7 +585,15 @@ impl Interpreter {
             }
         }
 
-        // 3. HAYASHI_PATH env var (colon-separated)
+        // 3. User-declared plugin_paths
+        for dir in &self.plugin_paths {
+            let p = std::path::Path::new(dir).join(name);
+            if p.exists() {
+                return Ok(p.to_string_lossy().to_string());
+            }
+        }
+
+        // 4. HAYASHI_PATH env var (colon-separated)
         if let Ok(paths) = std::env::var("HAYASHI_PATH") {
             for dir in paths.split(':') {
                 let p = std::path::Path::new(dir).join(name);
@@ -594,7 +604,7 @@ impl Interpreter {
         }
 
         Err(HayashiError::Runtime(format!(
-            "import: module '{}' not found (searched: ./, ~/.hayashi/plugins/, $HAYASHI_PATH)",
+            "import: module '{}' not found (searched: ./, ~/.hayashi/plugins/, plugin_path, $HAYASHI_PATH)",
             name.trim_end_matches(".hy")
         )))
     }
@@ -5372,7 +5382,7 @@ impl Interpreter {
 
             "import" | "require" => {
                 if args.is_empty() {
-                    return Err(self.rt_err("import(\"module\")"));
+                    return Err(self.rt_err("import(\"module_or_url\")"));
                 }
                 let module = match self.eval_expr(&args[0])? {
                     Value::Str(s) => s,
@@ -5383,15 +5393,43 @@ impl Interpreter {
                     return Ok(Value::Nil);
                 }
 
-                let name = if module.ends_with(".hy") { module.clone() } else { format!("{module}.hy") };
-
-                let resolved = Self::resolve_import(&name)?;
-
-                let src = std::fs::read_to_string(&resolved)
-                    .map_err(|e| self.rt_err(format!("import: cannot read '{resolved}': {e}")))?;
+                let src = if crate::io::fetch::is_url(&module) {
+                    let _tmp = crate::io::fetch::download_to_temp(&module)?;
+                    let path = _tmp.to_str().ok_or_else(|| self.rt_err("temp path is not UTF-8"))?;
+                    std::fs::read_to_string(path)
+                        .map_err(|e| self.rt_err(format!("import: cannot read downloaded module: {e}")))?
+                } else {
+                    let name = if module.ends_with(".hy") { module.clone() } else { format!("{module}.hy") };
+                    let resolved = self.resolve_import(&name)?;
+                    std::fs::read_to_string(&resolved)
+                        .map_err(|e| self.rt_err(format!("import: cannot read '{resolved}': {e}")))?
+                };
 
                 self.imported.insert(module.clone());
                 crate::lang::run_source(&src, self)?;
+                Ok(Value::Nil)
+            }
+
+            "plugin_path" => {
+                if args.is_empty() {
+                    if self.plugin_paths.is_empty() {
+                        println!("plugin_path: (none)");
+                    } else {
+                        for p in &self.plugin_paths {
+                            println!("  {p}");
+                        }
+                    }
+                    return Ok(Value::Nil);
+                }
+                for arg in args {
+                    let path = match self.eval_expr(arg)? {
+                        Value::Str(s) => s,
+                        other => return Err(self.type_err(format!("plugin_path: expected string, got {other}"))),
+                    };
+                    if !self.plugin_paths.contains(&path) {
+                        self.plugin_paths.push(path);
+                    }
+                }
                 Ok(Value::Nil)
             }
 
