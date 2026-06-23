@@ -5074,9 +5074,9 @@ display r[0]"#,
 fn pipe_with_args() {
     assert_ok_contains(
         "pipe_args",
-        r#"let r = [1, 2, 3] |> push(4)
-display len(r)"#,
-        "4",
+        r#"let r = [3, 1, 2] |> sort()
+display r[0]"#,
+        "1",
     );
 }
 
@@ -5350,8 +5350,8 @@ fn list_push() {
         "list_push",
         r#"
 let a = [1, 2, 3]
-let b = push(a, 4)
-display len(b)"#,
+push(a, 4)
+display len(a)"#,
         "4",
     );
 }
@@ -5363,7 +5363,8 @@ fn list_pop() {
         r#"
 let a = [1, 2, 3]
 let b = pop(a)
-display len(b)"#,
+display b
+display len(a)"#,
         "2",
     );
 }
@@ -5522,26 +5523,28 @@ display b[2]"#,
 }
 
 #[test]
-fn list_immutability() {
+fn list_push_mutates() {
     assert_ok_contains(
-        "list_immut",
+        "list_push_mut",
         r#"
 let a = [1, 2, 3]
-let b = push(a, 4)
+push(a, 4)
 display len(a)"#,
-        "3",
+        "4",
     );
 }
 
 #[test]
-fn list_chained() {
+fn list_push_loop() {
     assert_ok_contains(
-        "list_chained",
+        "list_push_loop",
         r#"
-let a = [3, 1, 2]
-let b = sort(push(a, 0))
-display b[0]"#,
-        "0",
+let a = []
+for i in 1..4 {
+    push(a, i * 10)
+}
+display len(a)"#,
+        "3",
     );
 }
 
