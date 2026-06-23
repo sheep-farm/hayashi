@@ -1,5 +1,4 @@
-use std::fs::File;
-use std::sync::Arc;
+use crate::lang::error::{HayashiError, Result};
 use arrow::array::{self, Array, AsArray};
 use arrow::datatypes::DataType as ArrowType;
 use greeners::DataFrame;
@@ -7,7 +6,8 @@ use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use parquet::arrow::ArrowWriter;
 use parquet::basic::Compression;
 use parquet::file::properties::WriterProperties;
-use crate::lang::error::{HayashiError, Result};
+use std::fs::File;
+use std::sync::Arc;
 
 pub fn load_parquet(path: &str) -> Result<(DataFrame, usize)> {
     let file = File::open(path)
@@ -24,8 +24,8 @@ pub fn load_parquet(path: &str) -> Result<(DataFrame, usize)> {
     let mut initialized = false;
 
     for batch_result in reader {
-        let batch = batch_result
-            .map_err(|e| HayashiError::Runtime(format!("parquet batch error: {e}")))?;
+        let batch =
+            batch_result.map_err(|e| HayashiError::Runtime(format!("parquet batch error: {e}")))?;
 
         let schema = batch.schema();
         if !initialized {
@@ -33,12 +33,27 @@ pub fn load_parquet(path: &str) -> Result<(DataFrame, usize)> {
                 let name = field.name().clone();
                 let is_num = matches!(
                     field.data_type(),
-                    ArrowType::Float16 | ArrowType::Float32 | ArrowType::Float64
-                    | ArrowType::Int8 | ArrowType::Int16 | ArrowType::Int32 | ArrowType::Int64
-                    | ArrowType::UInt8 | ArrowType::UInt16 | ArrowType::UInt32 | ArrowType::UInt64
-                    | ArrowType::Boolean
+                    ArrowType::Float16
+                        | ArrowType::Float32
+                        | ArrowType::Float64
+                        | ArrowType::Int8
+                        | ArrowType::Int16
+                        | ArrowType::Int32
+                        | ArrowType::Int64
+                        | ArrowType::UInt8
+                        | ArrowType::UInt16
+                        | ArrowType::UInt32
+                        | ArrowType::UInt64
+                        | ArrowType::Boolean
                 );
-                col_data.push((name, if is_num { ColAccum::Floats(Vec::new()) } else { ColAccum::Strings(Vec::new()) }));
+                col_data.push((
+                    name,
+                    if is_num {
+                        ColAccum::Floats(Vec::new())
+                    } else {
+                        ColAccum::Strings(Vec::new())
+                    },
+                ));
             }
             initialized = true;
         }
@@ -61,19 +76,24 @@ pub fn load_parquet(path: &str) -> Result<(DataFrame, usize)> {
 
     for (name, accum) in col_data {
         match accum {
-            ColAccum::Floats(vals) => { builder = builder.add_column(&name, vals); }
-            ColAccum::Strings(vals) => { builder = builder.add_string(&name, vals); }
+            ColAccum::Floats(vals) => {
+                builder = builder.add_column(&name, vals);
+            }
+            ColAccum::Strings(vals) => {
+                builder = builder.add_string(&name, vals);
+            }
         }
     }
 
-    let df = builder.build()
+    let df = builder
+        .build()
         .map_err(|e| HayashiError::Runtime(format!("DataFrame build error: {e}")))?;
 
     Ok((df, n_rows))
 }
 
 pub fn write_parquet(df: &DataFrame, path: &str) -> Result<()> {
-    use arrow::datatypes::{Schema, Field};
+    use arrow::datatypes::{Field, Schema};
     use arrow::record_batch::RecordBatch;
 
     let col_names = df.column_names();
@@ -134,10 +154,12 @@ pub fn write_parquet(df: &DataFrame, path: &str) -> Result<()> {
     let mut writer = ArrowWriter::try_new(file, schema, Some(props))
         .map_err(|e| HayashiError::Runtime(format!("parquet writer error: {e}")))?;
 
-    writer.write(&batch)
+    writer
+        .write(&batch)
         .map_err(|e| HayashiError::Runtime(format!("parquet write error: {e}")))?;
 
-    writer.close()
+    writer
+        .close()
         .map_err(|e| HayashiError::Runtime(format!("parquet close error: {e}")))?;
 
     Ok(())
@@ -153,59 +175,99 @@ fn append_as_f64(col: &dyn Array, out: &mut Vec<f64>) {
         ArrowType::Float64 => {
             let arr = col.as_primitive::<arrow::datatypes::Float64Type>();
             for i in 0..arr.len() {
-                out.push(if arr.is_null(i) { f64::NAN } else { arr.value(i) });
+                out.push(if arr.is_null(i) {
+                    f64::NAN
+                } else {
+                    arr.value(i)
+                });
             }
         }
         ArrowType::Float32 => {
             let arr = col.as_primitive::<arrow::datatypes::Float32Type>();
             for i in 0..arr.len() {
-                out.push(if arr.is_null(i) { f64::NAN } else { arr.value(i) as f64 });
+                out.push(if arr.is_null(i) {
+                    f64::NAN
+                } else {
+                    arr.value(i) as f64
+                });
             }
         }
         ArrowType::Int64 => {
             let arr = col.as_primitive::<arrow::datatypes::Int64Type>();
             for i in 0..arr.len() {
-                out.push(if arr.is_null(i) { f64::NAN } else { arr.value(i) as f64 });
+                out.push(if arr.is_null(i) {
+                    f64::NAN
+                } else {
+                    arr.value(i) as f64
+                });
             }
         }
         ArrowType::Int32 => {
             let arr = col.as_primitive::<arrow::datatypes::Int32Type>();
             for i in 0..arr.len() {
-                out.push(if arr.is_null(i) { f64::NAN } else { arr.value(i) as f64 });
+                out.push(if arr.is_null(i) {
+                    f64::NAN
+                } else {
+                    arr.value(i) as f64
+                });
             }
         }
         ArrowType::Int16 => {
             let arr = col.as_primitive::<arrow::datatypes::Int16Type>();
             for i in 0..arr.len() {
-                out.push(if arr.is_null(i) { f64::NAN } else { arr.value(i) as f64 });
+                out.push(if arr.is_null(i) {
+                    f64::NAN
+                } else {
+                    arr.value(i) as f64
+                });
             }
         }
         ArrowType::Int8 => {
             let arr = col.as_primitive::<arrow::datatypes::Int8Type>();
             for i in 0..arr.len() {
-                out.push(if arr.is_null(i) { f64::NAN } else { arr.value(i) as f64 });
+                out.push(if arr.is_null(i) {
+                    f64::NAN
+                } else {
+                    arr.value(i) as f64
+                });
             }
         }
         ArrowType::UInt64 => {
             let arr = col.as_primitive::<arrow::datatypes::UInt64Type>();
             for i in 0..arr.len() {
-                out.push(if arr.is_null(i) { f64::NAN } else { arr.value(i) as f64 });
+                out.push(if arr.is_null(i) {
+                    f64::NAN
+                } else {
+                    arr.value(i) as f64
+                });
             }
         }
         ArrowType::UInt32 => {
             let arr = col.as_primitive::<arrow::datatypes::UInt32Type>();
             for i in 0..arr.len() {
-                out.push(if arr.is_null(i) { f64::NAN } else { arr.value(i) as f64 });
+                out.push(if arr.is_null(i) {
+                    f64::NAN
+                } else {
+                    arr.value(i) as f64
+                });
             }
         }
         ArrowType::Boolean => {
             let arr = col.as_boolean();
             for i in 0..arr.len() {
-                out.push(if arr.is_null(i) { f64::NAN } else if arr.value(i) { 1.0 } else { 0.0 });
+                out.push(if arr.is_null(i) {
+                    f64::NAN
+                } else if arr.value(i) {
+                    1.0
+                } else {
+                    0.0
+                });
             }
         }
         _ => {
-            for _ in 0..col.len() { out.push(f64::NAN); }
+            for _ in 0..col.len() {
+                out.push(f64::NAN);
+            }
         }
     }
 }
@@ -215,18 +277,30 @@ fn append_as_string(col: &dyn Array, out: &mut Vec<String>) {
         ArrowType::Utf8 => {
             let arr = col.as_string::<i32>();
             for i in 0..arr.len() {
-                out.push(if arr.is_null(i) { String::new() } else { arr.value(i).to_string() });
+                out.push(if arr.is_null(i) {
+                    String::new()
+                } else {
+                    arr.value(i).to_string()
+                });
             }
         }
         ArrowType::LargeUtf8 => {
             let arr = col.as_string::<i64>();
             for i in 0..arr.len() {
-                out.push(if arr.is_null(i) { String::new() } else { arr.value(i).to_string() });
+                out.push(if arr.is_null(i) {
+                    String::new()
+                } else {
+                    arr.value(i).to_string()
+                });
             }
         }
         _ => {
             for i in 0..col.len() {
-                out.push(if col.is_null(i) { String::new() } else { format!("{:?}", col) });
+                out.push(if col.is_null(i) {
+                    String::new()
+                } else {
+                    format!("{:?}", col)
+                });
             }
         }
     }

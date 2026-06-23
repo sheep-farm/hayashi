@@ -1,6 +1,6 @@
-use calamine::{open_workbook_auto, Reader, Data};
-use greeners::DataFrame;
 use crate::lang::error::{HayashiError, Result};
+use calamine::{open_workbook_auto, Data, Reader};
+use greeners::DataFrame;
 
 pub fn load_excel(path: &str, sheet: Option<&str>) -> Result<(DataFrame, usize)> {
     let mut workbook = open_workbook_auto(path)
@@ -17,24 +17,30 @@ pub fn load_excel(path: &str, sheet: Option<&str>) -> Result<(DataFrame, usize)>
             }
             s.to_string()
         }
-        None => sheet_names.first()
+        None => sheet_names
+            .first()
             .ok_or_else(|| HayashiError::Runtime("workbook has no sheets".into()))?
             .clone(),
     };
 
-    let range = workbook.worksheet_range(&sheet_name)
+    let range = workbook
+        .worksheet_range(&sheet_name)
         .map_err(|e| HayashiError::Runtime(format!("cannot read sheet '{sheet_name}': {e}")))?;
 
     let mut rows_iter = range.rows();
-    let header_row = rows_iter.next()
+    let header_row = rows_iter
+        .next()
         .ok_or_else(|| HayashiError::Runtime("sheet is empty".into()))?;
 
-    let headers: Vec<String> = header_row.iter().map(|c| match c {
-        Data::String(s) => s.clone(),
-        Data::Float(f) => format!("{f}"),
-        Data::Int(i) => format!("{i}"),
-        _ => "unnamed".into(),
-    }).collect();
+    let headers: Vec<String> = header_row
+        .iter()
+        .map(|c| match c {
+            Data::String(s) => s.clone(),
+            Data::Float(f) => format!("{f}"),
+            Data::Int(i) => format!("{i}"),
+            _ => "unnamed".into(),
+        })
+        .collect();
 
     let data_rows: Vec<&[Data]> = rows_iter.collect();
     let n_rows = data_rows.len();
@@ -44,7 +50,10 @@ pub fn load_excel(path: &str, sheet: Option<&str>) -> Result<(DataFrame, usize)>
         for (col_idx, cell) in row.iter().enumerate() {
             if col_idx < headers.len() {
                 match cell {
-                    Data::String(_) | Data::Bool(_) | Data::DateTimeIso(_) | Data::DurationIso(_) => {
+                    Data::String(_)
+                    | Data::Bool(_)
+                    | Data::DateTimeIso(_)
+                    | Data::DurationIso(_) => {
                         is_numeric[col_idx] = false;
                     }
                     _ => {}
@@ -56,36 +65,42 @@ pub fn load_excel(path: &str, sheet: Option<&str>) -> Result<(DataFrame, usize)>
     let mut builder = DataFrame::builder();
     for (col_idx, name) in headers.iter().enumerate() {
         if is_numeric[col_idx] {
-            let vals: Vec<f64> = data_rows.iter().map(|row| {
-                if col_idx < row.len() {
-                    match &row[col_idx] {
-                        Data::Float(f) => *f,
-                        Data::Int(i) => *i as f64,
-                        Data::Empty => f64::NAN,
-                        _ => f64::NAN,
+            let vals: Vec<f64> = data_rows
+                .iter()
+                .map(|row| {
+                    if col_idx < row.len() {
+                        match &row[col_idx] {
+                            Data::Float(f) => *f,
+                            Data::Int(i) => *i as f64,
+                            Data::Empty => f64::NAN,
+                            _ => f64::NAN,
+                        }
+                    } else {
+                        f64::NAN
                     }
-                } else {
-                    f64::NAN
-                }
-            }).collect();
+                })
+                .collect();
             builder = builder.add_column(name, vals);
         } else {
-            let vals: Vec<String> = data_rows.iter().map(|row| {
-                if col_idx < row.len() {
-                    match &row[col_idx] {
-                        Data::String(s) => s.clone(),
-                        Data::Float(f) => format!("{f}"),
-                        Data::Int(i) => format!("{i}"),
-                        Data::Bool(b) => format!("{b}"),
-                        Data::DateTimeIso(s) => s.clone(),
-                        Data::DurationIso(s) => s.clone(),
-                        Data::Empty => String::new(),
-                        _ => String::new(),
+            let vals: Vec<String> = data_rows
+                .iter()
+                .map(|row| {
+                    if col_idx < row.len() {
+                        match &row[col_idx] {
+                            Data::String(s) => s.clone(),
+                            Data::Float(f) => format!("{f}"),
+                            Data::Int(i) => format!("{i}"),
+                            Data::Bool(b) => format!("{b}"),
+                            Data::DateTimeIso(s) => s.clone(),
+                            Data::DurationIso(s) => s.clone(),
+                            Data::Empty => String::new(),
+                            _ => String::new(),
+                        }
+                    } else {
+                        String::new()
                     }
-                } else {
-                    String::new()
-                }
-            }).collect();
+                })
+                .collect();
             builder = builder.add_string(name, vals);
         }
     }
@@ -98,7 +113,7 @@ pub fn load_excel(path: &str, sheet: Option<&str>) -> Result<(DataFrame, usize)>
 }
 
 pub fn write_excel(df: &DataFrame, path: &str) -> Result<()> {
-    use rust_xlsxwriter::{Workbook, Format};
+    use rust_xlsxwriter::{Format, Workbook};
 
     let mut workbook = Workbook::new();
     let worksheet = workbook.add_worksheet();
@@ -107,7 +122,8 @@ pub fn write_excel(df: &DataFrame, path: &str) -> Result<()> {
     let bold = Format::new().set_bold();
 
     for (c, name) in col_names.iter().enumerate() {
-        worksheet.write_string_with_format(0, c as u16, name, &bold)
+        worksheet
+            .write_string_with_format(0, c as u16, name, &bold)
             .map_err(|e| HayashiError::Runtime(format!("xlsx write error: {e}")))?;
     }
 
@@ -118,16 +134,19 @@ pub fn write_excel(df: &DataFrame, path: &str) -> Result<()> {
             let r = (row + 1) as u32;
             let col = c as u16;
             if let Ok(num) = val.parse::<f64>() {
-                worksheet.write_number(r, col, num)
+                worksheet
+                    .write_number(r, col, num)
                     .map_err(|e| HayashiError::Runtime(format!("xlsx write error: {e}")))?;
             } else {
-                worksheet.write_string(r, col, &val)
+                worksheet
+                    .write_string(r, col, &val)
                     .map_err(|e| HayashiError::Runtime(format!("xlsx write error: {e}")))?;
             }
         }
     }
 
-    workbook.save(path)
+    workbook
+        .save(path)
         .map_err(|e| HayashiError::Runtime(format!("xlsx save error: {e}")))?;
 
     Ok(())

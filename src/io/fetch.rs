@@ -1,12 +1,15 @@
-use std::io::Write;
 use crate::lang::error::{HayashiError, Result};
+use std::io::Write;
 
 /// Baixa `url` para um arquivo temporário e retorna o caminho.
 /// O arquivo temporário é mantido vivo enquanto o `TempPath` existir.
 pub fn download_to_temp(url: &str) -> Result<tempfile::TempPath> {
     let ext = url
-        .split('?').next().unwrap_or(url)
-        .rsplit('.').next()
+        .split('?')
+        .next()
+        .unwrap_or(url)
+        .rsplit('.')
+        .next()
         .unwrap_or("tmp");
 
     let mut tmp = tempfile::Builder::new()

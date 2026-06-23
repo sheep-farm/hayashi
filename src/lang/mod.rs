@@ -27,7 +27,12 @@ pub fn run_source_verbose(src: &str, interp: &mut Interpreter, verbose: bool) ->
     }
     for (i, spanned) in stmts.iter().enumerate() {
         if verbose {
-            eprintln!("[hayashi] exec #{} (line {}): {:?}", i + 1, spanned.1, stmt_label(&spanned.0));
+            eprintln!(
+                "[hayashi] exec #{} (line {}): {:?}",
+                i + 1,
+                spanned.1,
+                stmt_label(&spanned.0)
+            );
         }
         interp.exec(spanned)?;
     }

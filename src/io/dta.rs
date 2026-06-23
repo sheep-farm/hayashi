@@ -1,9 +1,9 @@
-use std::collections::HashMap;
+use crate::lang::error::{HayashiError, Result};
 use dta::stata::dta::dta_reader::DtaReader;
 use dta::stata::dta::value::Value as DtaValue;
 use dta::stata::dta::variable_type::VariableType;
 use greeners::DataFrame;
-use crate::lang::error::{HayashiError, Result};
+use std::collections::HashMap;
 
 /// Lê um arquivo .dta e converte para DataFrame do Greeners.
 ///
@@ -38,8 +38,8 @@ pub fn load_dta(path: &str) -> Result<(DataFrame, usize)> {
 
     // acumuladores por coluna
     let mut float_cols: HashMap<String, Vec<f64>> = HashMap::new();
-    let mut str_cols:   HashMap<String, Vec<String>> = HashMap::new();
-    let mut col_order:  Vec<(String, bool)> = Vec::new(); // (nome, is_numeric)
+    let mut str_cols: HashMap<String, Vec<String>> = HashMap::new();
+    let mut col_order: Vec<(String, bool)> = Vec::new(); // (nome, is_numeric)
 
     for (name, vtype) in &variables {
         match vtype {
