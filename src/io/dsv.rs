@@ -1,5 +1,5 @@
-use greeners::DataFrame;
 use crate::lang::error::{HayashiError, Result};
+use greeners::DataFrame;
 
 pub fn load_dsv(path: &str, delimiter: u8) -> Result<(DataFrame, usize)> {
     let mut reader = csv::ReaderBuilder::new()
@@ -8,7 +8,8 @@ pub fn load_dsv(path: &str, delimiter: u8) -> Result<(DataFrame, usize)> {
         .from_path(path)
         .map_err(|e| HayashiError::Runtime(format!("cannot read '{path}': {e}")))?;
 
-    let headers = reader.headers()
+    let headers = reader
+        .headers()
         .map_err(|e| HayashiError::Runtime(format!("header error: {e}")))?
         .clone();
 
@@ -30,9 +31,10 @@ pub fn load_dsv(path: &str, delimiter: u8) -> Result<(DataFrame, usize)> {
     for (i, name) in col_names.iter().enumerate() {
         let vals = &raw_columns[i];
         if is_numeric_column(vals) {
-            let floats: Vec<f64> = vals.iter().map(|s| {
-                s.parse::<f64>().unwrap_or(f64::NAN)
-            }).collect();
+            let floats: Vec<f64> = vals
+                .iter()
+                .map(|s| s.parse::<f64>().unwrap_or(f64::NAN))
+                .collect();
             builder = builder.add_column(name, floats);
         } else {
             builder = builder.add_string(name, vals.clone());
@@ -53,19 +55,24 @@ pub fn write_dsv(df: &DataFrame, path: &str, delimiter: u8) -> Result<()> {
         .map_err(|e| HayashiError::Runtime(format!("cannot write '{path}': {e}")))?;
 
     let col_names = df.column_names();
-    writer.write_record(&col_names)
+    writer
+        .write_record(&col_names)
         .map_err(|e| HayashiError::Runtime(format!("write header error: {e}")))?;
 
     let n_rows = df.n_rows();
     for row in 0..n_rows {
-        let record: Vec<String> = col_names.iter().map(|name| {
-            col_value_at(df, name, row)
-        }).collect();
-        writer.write_record(&record)
+        let record: Vec<String> = col_names
+            .iter()
+            .map(|name| col_value_at(df, name, row))
+            .collect();
+        writer
+            .write_record(&record)
             .map_err(|e| HayashiError::Runtime(format!("write row error: {e}")))?;
     }
 
-    writer.flush().map_err(|e| HayashiError::Runtime(format!("flush error: {e}")))?;
+    writer
+        .flush()
+        .map_err(|e| HayashiError::Runtime(format!("flush error: {e}")))?;
     Ok(())
 }
 
@@ -74,7 +81,11 @@ pub(crate) fn col_value_at(df: &DataFrame, col: &str, row: usize) -> String {
     match df.get_column(col) {
         Ok(Column::Float(arr)) => {
             let v = arr[row];
-            if v.is_nan() { String::new() } else { format!("{v}") }
+            if v.is_nan() {
+                String::new()
+            } else {
+                format!("{v}")
+            }
         }
         Ok(Column::Int(arr)) => format!("{}", arr[row]),
         Ok(Column::Bool(arr)) => format!("{}", arr[row]),
@@ -86,7 +97,9 @@ pub(crate) fn col_value_at(df: &DataFrame, col: &str, row: usize) -> String {
 }
 
 fn is_numeric_column(vals: &[String]) -> bool {
-    if vals.is_empty() { return true; }
+    if vals.is_empty() {
+        return true;
+    }
     let mut num_count = 0;
     for v in vals {
         let t = v.trim();

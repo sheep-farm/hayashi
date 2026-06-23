@@ -2,8 +2,8 @@ mod io;
 mod lang;
 
 use lang::interpreter::Interpreter;
-use rustyline::DefaultEditor;
 use rustyline::error::ReadlineError;
+use rustyline::DefaultEditor;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const HISTORY_FILE: &str = ".hayashi_history";
@@ -12,7 +12,8 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
 
     let verbose = args.iter().any(|a| a == "--verbose" || a == "-v");
-    let args_clean: Vec<&str> = args.iter()
+    let args_clean: Vec<&str> = args
+        .iter()
         .map(String::as_str)
         .filter(|a| *a != "--verbose" && *a != "-v")
         .collect();
@@ -29,7 +30,9 @@ fn main() {
         Some("-") => {
             use std::io::Read;
             let mut src = String::new();
-            std::io::stdin().read_to_string(&mut src).expect("failed to read stdin");
+            std::io::stdin()
+                .read_to_string(&mut src)
+                .expect("failed to read stdin");
             let mut interp = Interpreter::new();
             interp.load_plugins();
             if let Err(e) = lang::run_source_verbose(&src, &mut interp, verbose) {
@@ -94,7 +97,9 @@ fn brace_depth(s: &str) -> i32 {
     let mut in_string = false;
     let mut prev = '\0';
     for c in s.chars() {
-        if c == '"' && prev != '\\' { in_string = !in_string; }
+        if c == '"' && prev != '\\' {
+            in_string = !in_string;
+        }
         if !in_string {
             match c {
                 '{' => depth += 1,
@@ -125,8 +130,12 @@ fn run_repl() {
             Ok(line) => {
                 let trimmed = line.trim();
                 if buf.is_empty() {
-                    if trimmed.is_empty() { continue; }
-                    if trimmed == "exit" || trimmed == "quit" { break; }
+                    if trimmed.is_empty() {
+                        continue;
+                    }
+                    if trimmed == "exit" || trimmed == "quit" {
+                        break;
+                    }
                 }
 
                 // input block: acumula até "end"
@@ -220,12 +229,14 @@ fn print_help() {
 
 fn packages_dir() -> std::path::PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
-    std::path::Path::new(&home).join(".hayashi").join("packages")
+    std::path::Path::new(&home)
+        .join(".hayashi")
+        .join("packages")
 }
 
 fn pkg_install(spec: &str) {
     let (user, repo) = if let Some(pos) = spec.find('/') {
-        (&spec[..pos], &spec[pos+1..])
+        (&spec[..pos], &spec[pos + 1..])
     } else {
         eprintln!("hayashi install: expected 'user/repo', got '{spec}'");
         std::process::exit(1);
@@ -265,12 +276,18 @@ fn pkg_install(spec: &str) {
     let dominated = |name: &str| -> bool {
         let lower = name.to_lowercase();
         lower.ends_with(".hy")
-            || lower == "readme.md" || lower == "readme" || lower == "readme.txt"
-            || lower == "license" || lower == "license.md" || lower == "license.txt"
-            || lower == "licence" || lower == "licence.md"
+            || lower == "readme.md"
+            || lower == "readme"
+            || lower == "readme.txt"
+            || lower == "license"
+            || lower == "license.md"
+            || lower == "license.txt"
+            || lower == "licence"
+            || lower == "licence.md"
     };
 
-    let files: Vec<&GhEntry> = entries.iter()
+    let files: Vec<&GhEntry> = entries
+        .iter()
         .filter(|e| e.r#type == "file" && e.download_url.is_some() && dominated(&e.name))
         .collect();
 
@@ -304,13 +321,16 @@ fn pkg_install(spec: &str) {
         }
     }
 
-    println!("Installed {user}/{repo}: {installed} file(s) → {}", dest.display());
+    println!(
+        "Installed {user}/{repo}: {installed} file(s) → {}",
+        dest.display()
+    );
     println!("  use: import(\"{user}/{repo}/module\")");
 }
 
 fn pkg_remove(spec: &str) {
     let dest = if let Some(pos) = spec.find('/') {
-        packages_dir().join(&spec[..pos]).join(&spec[pos+1..])
+        packages_dir().join(&spec[..pos]).join(&spec[pos + 1..])
     } else {
         packages_dir().join(spec)
     };
@@ -337,14 +357,22 @@ fn pkg_list() {
     }
     let mut found = false;
     let mut users: Vec<_> = std::fs::read_dir(&dir)
-        .map(|rd| rd.filter_map(|e| e.ok()).filter(|e| e.path().is_dir()).collect())
+        .map(|rd| {
+            rd.filter_map(|e| e.ok())
+                .filter(|e| e.path().is_dir())
+                .collect()
+        })
         .unwrap_or_default();
     users.sort_by_key(|e: &std::fs::DirEntry| e.file_name());
 
     for user_entry in &users {
         let user = user_entry.file_name();
         let mut repos: Vec<_> = std::fs::read_dir(user_entry.path())
-            .map(|rd| rd.filter_map(|e| e.ok()).filter(|e| e.path().is_dir()).collect())
+            .map(|rd| {
+                rd.filter_map(|e| e.ok())
+                    .filter(|e| e.path().is_dir())
+                    .collect()
+            })
             .unwrap_or_default();
         repos.sort_by_key(|e: &std::fs::DirEntry| e.file_name());
 
@@ -355,16 +383,24 @@ fn pkg_list() {
             }
             let repo = repo_entry.file_name();
             let n_hy = std::fs::read_dir(repo_entry.path())
-                .map(|rd| rd.filter_map(|e| e.ok())
-                    .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("hy"))
-                    .count())
+                .map(|rd| {
+                    rd.filter_map(|e| e.ok())
+                        .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("hy"))
+                        .count()
+                })
                 .unwrap_or(0);
-            println!("  {}/{}  ({} file{})",
-                user.to_string_lossy(), repo.to_string_lossy(),
-                n_hy, if n_hy == 1 { "" } else { "s" });
+            println!(
+                "  {}/{}  ({} file{})",
+                user.to_string_lossy(),
+                repo.to_string_lossy(),
+                n_hy,
+                if n_hy == 1 { "" } else { "s" }
+            );
         }
     }
-    if !found { println!("No packages installed."); }
+    if !found {
+        println!("No packages installed.");
+    }
 }
 
 #[derive(serde::Deserialize)]

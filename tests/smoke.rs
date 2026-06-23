@@ -36,7 +36,10 @@ fn assert_ok(name: &str, src: &str) {
 fn assert_ok_contains(name: &str, src: &str, needle: &str) {
     let (ok, out) = run_inline(src);
     assert!(ok, "{name} failed:\n{out}");
-    assert!(out.contains(needle), "{name}: output missing '{needle}':\n{out}");
+    assert!(
+        out.contains(needle),
+        "{name}: output missing '{needle}':\n{out}"
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -49,24 +52,62 @@ macro_rules! smoke {
         fn $name() {
             let (ok, out) = run_hy($path);
             assert!(ok, "{} failed:\n{}", $path, out);
-            assert!(out.contains($needle), "{}: missing '{}'\n{}", $path, $needle, out);
+            assert!(
+                out.contains($needle),
+                "{}: missing '{}'\n{}",
+                $path,
+                $needle,
+                out
+            );
         }
     };
 }
 
-smoke!(smoke_input_display,     "exemplos/input_display.hy",     "OLS Regression");
-smoke!(smoke_eststo_loop,       "exemplos/eststo_loop.hy",       "estclear");
-smoke!(smoke_foreach_regression,"exemplos/foreach_regression.hy","●");
-smoke!(smoke_portfolio_sort,    "exemplos/portfolio_sort.hy",    "H-L");
-smoke!(smoke_fama_macbeth,      "exemplos/fama_macbeth.hy",      "Fama-MacBeth");
-smoke!(smoke_double_sort,       "exemplos/double_sort.hy",       "Double Sort");
-smoke!(smoke_pwcorr,            "exemplos/pwcorr.hy",            "***");
-smoke!(smoke_missing_values,    "exemplos/missing_values.hy",    "Missing");
-smoke!(smoke_preserve_restore,  "exemplos/preserve_restore.hy",  "restore");
-smoke!(smoke_test_cov_display,  "exemplos/test_cov_display.hy",  "OLS (cluster)");
-smoke!(smoke_tres_workflows,    "exemplos/tres_workflows.hy",    "Hausman");
-smoke!(smoke_modelos_contagem,  "exemplos/modelos_contagem.hy",  "Poisson");
-smoke!(smoke_painel,            "exemplos/painel.hy",            "FE");
+smoke!(
+    smoke_input_display,
+    "exemplos/input_display.hy",
+    "OLS Regression"
+);
+smoke!(smoke_eststo_loop, "exemplos/eststo_loop.hy", "estclear");
+smoke!(
+    smoke_foreach_regression,
+    "exemplos/foreach_regression.hy",
+    "●"
+);
+smoke!(smoke_portfolio_sort, "exemplos/portfolio_sort.hy", "H-L");
+smoke!(
+    smoke_fama_macbeth,
+    "exemplos/fama_macbeth.hy",
+    "Fama-MacBeth"
+);
+smoke!(smoke_double_sort, "exemplos/double_sort.hy", "Double Sort");
+smoke!(smoke_pwcorr, "exemplos/pwcorr.hy", "***");
+smoke!(
+    smoke_missing_values,
+    "exemplos/missing_values.hy",
+    "Missing"
+);
+smoke!(
+    smoke_preserve_restore,
+    "exemplos/preserve_restore.hy",
+    "restore"
+);
+smoke!(
+    smoke_test_cov_display,
+    "exemplos/test_cov_display.hy",
+    "OLS (cluster)"
+);
+smoke!(
+    smoke_tres_workflows,
+    "exemplos/tres_workflows.hy",
+    "Hausman"
+);
+smoke!(
+    smoke_modelos_contagem,
+    "exemplos/modelos_contagem.hy",
+    "Poisson"
+);
+smoke!(smoke_painel, "exemplos/painel.hy", "FE");
 
 // ══════════════════════════════════════════════════════════════════════════════
 // SCOPING — block scoping com destruição determinística
@@ -74,50 +115,66 @@ smoke!(smoke_painel,            "exemplos/painel.hy",            "FE");
 
 #[test]
 fn scope_let_block() {
-    assert_ok_contains("scope_let_block", r#"
+    assert_ok_contains(
+        "scope_let_block",
+        r#"
 let x = 10
 if x > 5 {
     let inner = 42
     display inner
 }
 display x
-"#, "42");
+"#,
+        "42",
+    );
 }
 
 #[test]
 fn scope_assign_outer() {
-    assert_ok_contains("scope_assign_outer", r#"
+    assert_ok_contains(
+        "scope_assign_outer",
+        r#"
 let counter = 0
 for i in 1..4 {
     counter = counter + 1
 }
 display counter
-"#, "3");
+"#,
+        "3",
+    );
 }
 
 #[test]
 fn scope_fn_params_die() {
-    assert_ok_contains("scope_fn_params", r#"
+    assert_ok_contains(
+        "scope_fn_params",
+        r#"
 fn add(a, b) {
     return a + b
 }
 display add(3, 4)
-"#, "7");
+"#,
+        "7",
+    );
 }
 
 #[test]
 fn scope_for_var_dies() {
-    let (_, out) = run_inline(r#"
+    let (_, out) = run_inline(
+        r#"
 for v in [10, 20, 30] {
     display v
 }
-"#);
+"#,
+    );
     assert!(out.contains("10") && out.contains("20") && out.contains("30"));
 }
 
 #[test]
 fn scope_nested_blocks() {
-    assert_ok_contains("nested_blocks", r#"
+    assert_ok_contains(
+        "nested_blocks",
+        r#"
 let x = 1
 if true {
     let x = 2
@@ -128,30 +185,40 @@ if true {
     display x
 }
 display x
-"#, "3");
+"#,
+        "3",
+    );
 }
 
 #[test]
 fn scope_while_cleanup() {
-    assert_ok_contains("while_cleanup", r#"
+    assert_ok_contains(
+        "while_cleanup",
+        r#"
 let n = 0
 while n < 3 {
     let temp = n * 10
     n = n + 1
 }
 display n
-"#, "3");
+"#,
+        "3",
+    );
 }
 
 #[test]
 fn scope_fn_recursive() {
-    assert_ok_contains("fn_recursive", r#"
+    assert_ok_contains(
+        "fn_recursive",
+        r#"
 fn factorial(n) {
     if n <= 1 { return 1 }
     return n * factorial(n - 1)
 }
 display factorial(5)
-"#, "120");
+"#,
+        "120",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -160,55 +227,79 @@ display factorial(5)
 
 #[test]
 fn parser_comments() {
-    assert_ok_contains("comments", r#"
+    assert_ok_contains(
+        "comments",
+        r#"
 // isto é um comentário
 # isto também
 display 42
-"#, "42");
+"#,
+        "42",
+    );
 }
 
 #[test]
 fn parser_string_concat() {
-    assert_ok_contains("string_concat", r#"
+    assert_ok_contains(
+        "string_concat",
+        r#"
 let a = "hello"
 let b = " world"
 display a + b
-"#, "hello world");
+"#,
+        "hello world",
+    );
 }
 
 #[test]
 fn parser_negative_numbers() {
-    assert_ok_contains("negative", r#"
+    assert_ok_contains(
+        "negative",
+        r#"
 display -5 + 3
-"#, "-2");
+"#,
+        "-2",
+    );
 }
 
 #[test]
 fn parser_boolean_ops() {
-    assert_ok_contains("bool_and", r#"
+    assert_ok_contains(
+        "bool_and",
+        r#"
 let x = 5
 if x > 3 && x < 10 {
     display 1
 }
-"#, "1");
+"#,
+        "1",
+    );
 }
 
 #[test]
 fn parser_list_indexing() {
-    assert_ok_contains("list_index", r#"
+    assert_ok_contains(
+        "list_index",
+        r#"
 let v = [10, 20, 30]
 display v[1]
-"#, "20");
+"#,
+        "20",
+    );
 }
 
 #[test]
 fn parser_not_operator() {
-    assert_ok_contains("not_op", r#"
+    assert_ok_contains(
+        "not_op",
+        r#"
 let x = false
 if !x {
     display 99
 }
-"#, "99");
+"#,
+        "99",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -237,17 +328,23 @@ fn expr_float() {
 
 #[test]
 fn expr_comparison() {
-    assert_ok_contains("comparison", r#"
+    assert_ok_contains(
+        "comparison",
+        r#"
 if 5 > 3 { display 1 }
 if 3 >= 3 { display 2 }
 if 2 < 3 { display 3 }
 if 2 != 3 { display 4 }
-"#, "4");
+"#,
+        "4",
+    );
 }
 
 #[test]
 fn expr_math_functions() {
-    assert_ok_contains("math_fns", r#"
+    assert_ok_contains(
+        "math_fns",
+        r#"
 input df
 X
 1
@@ -257,7 +354,9 @@ generate df E = exp(X)
 generate df S = sqrt(X)
 generate df A = abs(X)
 list(df, n=2)
-"#, "generated");
+"#,
+        "generated",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -266,7 +365,9 @@ list(df, n=2)
 
 #[test]
 fn data_input_block() {
-    assert_ok_contains("input", r#"
+    assert_ok_contains(
+        "input",
+        r#"
 input df
 Y X
 1 2
@@ -274,12 +375,16 @@ Y X
 5 6
 end
 display mean(df, Y)
-"#, "3");
+"#,
+        "3",
+    );
 }
 
 #[test]
 fn data_generate() {
-    assert_ok_contains("generate", r#"
+    assert_ok_contains(
+        "generate",
+        r#"
 input df
 X
 2
@@ -288,12 +393,16 @@ X
 end
 generate df Y = X * 2 + 1
 display mean(df, Y)
-"#, "9");
+"#,
+        "9",
+    );
 }
 
 #[test]
 fn data_replace_if() {
-    assert_ok_contains("replace_if", r#"
+    assert_ok_contains(
+        "replace_if",
+        r#"
 input df
 Y group
 10 1
@@ -303,12 +412,16 @@ Y group
 end
 replace df Y = 0 if group == 2
 display mean(df, Y)
-"#, "real changes");
+"#,
+        "real changes",
+    );
 }
 
 #[test]
 fn data_mean_conditional() {
-    assert_ok_contains("mean_if", r#"
+    assert_ok_contains(
+        "mean_if",
+        r#"
 input df
 Y X
 10 1
@@ -318,12 +431,16 @@ Y X
 end
 scalar m = mean(df, Y, if = X == 1)
 display m
-"#, "15");
+"#,
+        "15",
+    );
 }
 
 #[test]
 fn data_summarize() {
-    assert_ok_contains("summarize", r#"
+    assert_ok_contains(
+        "summarize",
+        r#"
 input df
 Y
 1
@@ -333,12 +450,16 @@ Y
 5
 end
 summarize(df)
-"#, "Mean");
+"#,
+        "Mean",
+    );
 }
 
 #[test]
 fn data_tabulate() {
-    assert_ok_contains("tabulate", r#"
+    assert_ok_contains(
+        "tabulate",
+        r#"
 input df
 group
 1
@@ -348,12 +469,16 @@ group
 2
 end
 tabulate(df, group)
-"#, "Freq");
+"#,
+        "Freq",
+    );
 }
 
 #[test]
 fn data_list_n() {
-    assert_ok_contains("list_n", r#"
+    assert_ok_contains(
+        "list_n",
+        r#"
 input df
 Y X
 1 2
@@ -362,12 +487,16 @@ Y X
 7 8
 end
 list(df, n=2)
-"#, "more observations");
+"#,
+        "more observations",
+    );
 }
 
 #[test]
 fn data_missing_nan() {
-    assert_ok_contains("missing", r#"
+    assert_ok_contains(
+        "missing",
+        r#"
 input df
 Y
 1
@@ -375,7 +504,9 @@ Y
 3
 end
 summarize(df)
-"#, "Missing");
+"#,
+        "Missing",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -384,7 +515,9 @@ summarize(df)
 
 #[test]
 fn ols_basic() {
-    assert_ok_contains("ols_basic", r#"
+    assert_ok_contains(
+        "ols_basic",
+        r#"
 input df
 Y X
 10 2
@@ -395,12 +528,16 @@ Y X
 14 4
 end
 ols(Y ~ X, df)
-"#, "R-squared");
+"#,
+        "R-squared",
+    );
 }
 
 #[test]
 fn ols_reg_alias() {
-    assert_ok_contains("reg_alias", r#"
+    assert_ok_contains(
+        "reg_alias",
+        r#"
 input df
 Y X
 10 2
@@ -409,12 +546,16 @@ Y X
 15 5
 end
 reg(Y ~ X, df)
-"#, "OLS Regression");
+"#,
+        "OLS Regression",
+    );
 }
 
 #[test]
 fn ols_robust() {
-    assert_ok_contains("ols_robust", r#"
+    assert_ok_contains(
+        "ols_robust",
+        r#"
 input df
 Y X
 10 2
@@ -425,12 +566,16 @@ Y X
 14 4
 end
 ols(Y ~ X, df, cov=robust)
-"#, "Robust (HC1)");
+"#,
+        "Robust (HC1)",
+    );
 }
 
 #[test]
 fn ols_hc3() {
-    assert_ok_contains("ols_hc3", r#"
+    assert_ok_contains(
+        "ols_hc3",
+        r#"
 input df
 Y X
 10 2
@@ -441,12 +586,16 @@ Y X
 14 4
 end
 ols(Y ~ X, df, cov=HC3)
-"#, "HC3");
+"#,
+        "HC3",
+    );
 }
 
 #[test]
 fn ols_dynamic_formula() {
-    assert_ok_contains("dynamic_formula", r#"
+    assert_ok_contains(
+        "dynamic_formula",
+        r#"
 input df
 Y X1
 10 2
@@ -457,12 +606,16 @@ Y X1
 14 4
 end
 ols("Y ~ X1", df)
-"#, "OLS Regression");
+"#,
+        "OLS Regression",
+    );
 }
 
 #[test]
 fn ols_if_condition() {
-    assert_ok_contains("ols_if", r#"
+    assert_ok_contains(
+        "ols_if",
+        r#"
 input df
 Y X group
 10 2 1
@@ -475,12 +628,16 @@ Y X group
 13 4 2
 end
 ols(Y ~ X, df, if = group == 1)
-"#, "No. Observations:                  4");
+"#,
+        "No. Observations:                  4",
+    );
 }
 
 #[test]
 fn ols_cluster() {
-    assert_ok_contains("ols_cluster", r#"
+    assert_ok_contains(
+        "ols_cluster",
+        r#"
 input df
 Y X firm
 10 2 1
@@ -493,7 +650,9 @@ Y X firm
 13 4 3
 end
 ols(Y ~ X, df, cluster=firm)
-"#, "Clustered");
+"#,
+        "Clustered",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -502,7 +661,9 @@ ols(Y ~ X, df, cluster=firm)
 
 #[test]
 fn post_test_wald() {
-    assert_ok_contains("test_wald", r#"
+    assert_ok_contains(
+        "test_wald",
+        r#"
 input df
 Y X1 X2
 10 2 5
@@ -516,12 +677,16 @@ Y X1 X2
 end
 let m = ols(Y ~ X1 + X2, df)
 test(m, "X1")
-"#, "H₀");
+"#,
+        "H₀",
+    );
 }
 
 #[test]
 fn post_test_restriction() {
-    assert_ok_contains("test_restriction", r#"
+    assert_ok_contains(
+        "test_restriction",
+        r#"
 input df
 Y X1 X2
 10 2 5
@@ -535,12 +700,16 @@ Y X1 X2
 end
 let m = ols(Y ~ X1 + X2, df)
 test(m, "X1 = X2")
-"#, "H₀: X1 = X2");
+"#,
+        "H₀: X1 = X2",
+    );
 }
 
 #[test]
 fn post_test_white() {
-    assert_ok_contains("test_white", r#"
+    assert_ok_contains(
+        "test_white",
+        r#"
 input df
 Y X
 10 2
@@ -554,12 +723,16 @@ Y X
 end
 let m = ols(Y ~ X, df)
 test(m, "white")
-"#, "White Test");
+"#,
+        "White Test",
+    );
 }
 
 #[test]
 fn post_esttab() {
-    assert_ok_contains("esttab", r#"
+    assert_ok_contains(
+        "esttab",
+        r#"
 input df
 Y X1 X2
 10 2 5
@@ -572,12 +745,16 @@ end
 let m1 = ols(Y ~ X1, df)
 let m2 = ols(Y ~ X1 + X2, df)
 esttab(m1, m2)
-"#, "R²");
+"#,
+        "R²",
+    );
 }
 
 #[test]
 fn post_coefplot() {
-    assert_ok_contains("coefplot", r#"
+    assert_ok_contains(
+        "coefplot",
+        r#"
 input df
 Y X1 X2
 10 2 5
@@ -589,12 +766,16 @@ Y X1 X2
 end
 let m = ols(Y ~ X1 + X2, df)
 coefplot(m)
-"#, "●");
+"#,
+        "●",
+    );
 }
 
 #[test]
 fn post_nlcom() {
-    assert_ok_contains("nlcom", r#"
+    assert_ok_contains(
+        "nlcom",
+        r#"
 input df
 Y X1 X2
 10 2 5
@@ -608,12 +789,16 @@ Y X1 X2
 end
 let m = ols(Y ~ X1 + X2, df)
 nlcom(m, X1 / X2)
-"#, "delta method");
+"#,
+        "delta method",
+    );
 }
 
 #[test]
 fn post_predict() {
-    assert_ok_contains("predict", r#"
+    assert_ok_contains(
+        "predict",
+        r#"
 input df
 Y X
 10 2
@@ -627,12 +812,16 @@ let m = ols(Y ~ X, df)
 predict df yhat = m
 predict df resid = m, "residuals"
 list(df, n=2)
-"#, "predicted");
+"#,
+        "predicted",
+    );
 }
 
 #[test]
 fn post_estat() {
-    assert_ok_contains("estat", r#"
+    assert_ok_contains(
+        "estat",
+        r#"
 input df
 Y X
 10 2
@@ -644,7 +833,9 @@ Y X
 end
 let m1 = ols(Y ~ X, df)
 estat(m1)
-"#, "AIC");
+"#,
+        "AIC",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -653,7 +844,9 @@ estat(m1)
 
 #[test]
 fn finance_portsort() {
-    assert_ok_contains("portsort", r#"
+    assert_ok_contains(
+        "portsort",
+        r#"
 input df
 ret beta
 0.05 0.8
@@ -664,12 +857,16 @@ ret beta
 0.10 1.3
 end
 portsort(df, ret, beta, n=3)
-"#, "H-L");
+"#,
+        "H-L",
+    );
 }
 
 #[test]
 fn finance_fmb() {
-    assert_ok_contains("fmb", r#"
+    assert_ok_contains(
+        "fmb",
+        r#"
 input df
 ret beta firm year
 0.05 0.8 1 2020
@@ -682,12 +879,16 @@ ret beta firm year
 0.14 1.6 4 2021
 end
 fmb(ret ~ beta, df, time=year)
-"#, "Fama-MacBeth");
+"#,
+        "Fama-MacBeth",
+    );
 }
 
 #[test]
 fn finance_fmb_nw() {
-    assert_ok_contains("fmb_nw", r#"
+    assert_ok_contains(
+        "fmb_nw",
+        r#"
 input df
 ret beta firm year
 0.05 0.8 1 2020
@@ -704,7 +905,9 @@ ret beta firm year
 0.15 1.7 4 2022
 end
 fmb(ret ~ beta, df, time=year, nw=1)
-"#, "NW(1)");
+"#,
+        "NW(1)",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -713,7 +916,9 @@ fmb(ret ~ beta, df, time=year, nw=1)
 
 #[test]
 fn data_winsor() {
-    assert_ok_contains("winsor", r#"
+    assert_ok_contains(
+        "winsor",
+        r#"
 input df
 Y
 1
@@ -724,12 +929,16 @@ Y
 100
 end
 winsor(df, Y, p=0.10)
-"#, "winsor");
+"#,
+        "winsor",
+    );
 }
 
 #[test]
 fn data_tabgen() {
-    assert_ok_contains("tabgen", r#"
+    assert_ok_contains(
+        "tabgen",
+        r#"
 input df
 group
 1
@@ -739,12 +948,16 @@ group
 3
 end
 tabgen(df, group)
-"#, "dummies");
+"#,
+        "dummies",
+    );
 }
 
 #[test]
 fn data_xtset() {
-    assert_ok_contains("xtset", r#"
+    assert_ok_contains(
+        "xtset",
+        r#"
 input df
 Y X firm year
 10 2 1 2020
@@ -753,7 +966,9 @@ Y X firm year
 17 6 2 2021
 end
 xtset(df, firm, year)
-"#, "xtset df");
+"#,
+        "xtset df",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -762,31 +977,37 @@ xtset(df, firm, year)
 
 #[test]
 fn lang_for_range() {
-    let (ok, out) = run_inline(r#"
+    let (ok, out) = run_inline(
+        r#"
 let s = 0
 for i in 1..6 {
     s = s + i
 }
 display s
-"#);
+"#,
+    );
     assert!(ok);
     assert!(out.contains("15"));
 }
 
 #[test]
 fn lang_for_list() {
-    let (ok, out) = run_inline(r#"
+    let (ok, out) = run_inline(
+        r#"
 for x in [10, 20, 30] {
     display x
 }
-"#);
+"#,
+    );
     assert!(ok);
     assert!(out.contains("10") && out.contains("20") && out.contains("30"));
 }
 
 #[test]
 fn lang_while() {
-    assert_ok_contains("while", r#"
+    assert_ok_contains(
+        "while",
+        r#"
 let i = 0
 let s = 0
 while i < 5 {
@@ -794,34 +1015,46 @@ while i < 5 {
     i = i + 1
 }
 display s
-"#, "10");
+"#,
+        "10",
+    );
 }
 
 #[test]
 fn lang_if_else() {
-    assert_ok_contains("if_else", r#"
+    assert_ok_contains(
+        "if_else",
+        r#"
 let x = 5
 if x > 10 {
     display 1
 } else {
     display 2
 }
-"#, "2");
+"#,
+        "2",
+    );
 }
 
 #[test]
 fn lang_fn_return() {
-    assert_ok_contains("fn_return", r#"
+    assert_ok_contains(
+        "fn_return",
+        r#"
 fn square(x) {
     return x * x
 }
 display square(7)
-"#, "49");
+"#,
+        "49",
+    );
 }
 
 #[test]
 fn lang_break_continue() {
-    assert_ok_contains("break_continue", r#"
+    assert_ok_contains(
+        "break_continue",
+        r#"
 let s = 0
 for i in 1..100 {
     if i > 5 { break }
@@ -829,21 +1062,29 @@ for i in 1..100 {
     s = s + i
 }
 display s
-"#, "12");
+"#,
+        "12",
+    );
 }
 
 #[test]
 fn lang_nested_fn() {
-    assert_ok_contains("nested_fn", r#"
+    assert_ok_contains(
+        "nested_fn",
+        r#"
 fn double(x) { return x * 2 }
 fn quad(x) { return double(double(x)) }
 display quad(3)
-"#, "12");
+"#,
+        "12",
+    );
 }
 
 #[test]
 fn lang_eststo_esttab() {
-    assert_ok_contains("eststo_esttab", r#"
+    assert_ok_contains(
+        "eststo_esttab",
+        r#"
 input df
 Y X1 X2
 10 2 5
@@ -857,7 +1098,9 @@ eststo(ols(Y ~ X1, df))
 eststo(ols(Y ~ X1 + X2, df))
 esttab()
 estclear()
-"#, "estclear");
+"#,
+        "estclear",
+    );
 }
 
 #[test]
@@ -872,7 +1115,9 @@ fn lang_help_index() {
 
 #[test]
 fn lang_timer() {
-    assert_ok_contains("timer", r#"
+    assert_ok_contains(
+        "timer",
+        r#"
 input df
 Y X
 10 2
@@ -881,7 +1126,9 @@ Y X
 15 5
 end
 timer(ols(Y ~ X, df))
-"#, "elapsed");
+"#,
+        "elapsed",
+    );
 }
 
 #[test]
@@ -894,27 +1141,37 @@ fn lang_set_seed() {
 
 #[test]
 fn lang_display_types() {
-    let (ok, out) = run_inline(r#"
+    let (ok, out) = run_inline(
+        r#"
 display 42
 display 3.14
 display "hello"
 display true
-"#);
+"#,
+    );
     assert!(ok);
-    assert!(out.contains("42") && out.contains("3.14") && out.contains("hello") && out.contains("true"));
+    assert!(
+        out.contains("42") && out.contains("3.14") && out.contains("hello") && out.contains("true")
+    );
 }
 
 #[test]
 fn lang_scalar() {
-    assert_ok_contains("scalar", r#"
+    assert_ok_contains(
+        "scalar",
+        r#"
 scalar x = 2 + 3
 display x
-"#, "5");
+"#,
+        "5",
+    );
 }
 
 #[test]
 fn lang_preserve_restore() {
-    assert_ok("preserve_restore", r#"
+    assert_ok(
+        "preserve_restore",
+        r#"
 input df
 Y X
 1 2
@@ -923,7 +1180,8 @@ end
 preserve(df)
 generate df Z = X * 2
 restore(df)
-"#);
+"#,
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -932,18 +1190,24 @@ restore(df)
 
 #[test]
 fn edge_single_observation() {
-    assert_ok_contains("single_obs", r#"
+    assert_ok_contains(
+        "single_obs",
+        r#"
 input df
 Y
 42
 end
 summarize(df)
-"#, "42");
+"#,
+        "42",
+    );
 }
 
 #[test]
 fn edge_single_column() {
-    assert_ok_contains("single_col", r#"
+    assert_ok_contains(
+        "single_col",
+        r#"
 input df
 X
 1
@@ -953,12 +1217,16 @@ X
 5
 end
 display mean(df, X)
-"#, "3");
+"#,
+        "3",
+    );
 }
 
 #[test]
 fn edge_negative_numbers_input() {
-    assert_ok_contains("neg_input", r#"
+    assert_ok_contains(
+        "neg_input",
+        r#"
 input df
 Y
 -10
@@ -968,12 +1236,16 @@ Y
 10
 end
 display mean(df, Y)
-"#, "0");
+"#,
+        "0",
+    );
 }
 
 #[test]
 fn edge_missing_dot_input() {
-    assert_ok_contains("missing_dot", r#"
+    assert_ok_contains(
+        "missing_dot",
+        r#"
 input df
 Y X
 1 10
@@ -981,21 +1253,31 @@ Y X
 3 .
 end
 summarize(df)
-"#, "Missing");
+"#,
+        "Missing",
+    );
 }
 
 #[test]
 fn edge_large_numbers() {
-    assert_ok_contains("large_numbers", r#"
+    assert_ok_contains(
+        "large_numbers",
+        r#"
 display 1000000 * 1000000
-"#, "1000000000000");
+"#,
+        "1000000000000",
+    );
 }
 
 #[test]
 fn edge_float_precision() {
-    assert_ok_contains("float_precision", r#"
+    assert_ok_contains(
+        "float_precision",
+        r#"
 display 0.1 + 0.2
-"#, "0.3");
+"#,
+        "0.3",
+    );
 }
 
 #[test]
@@ -1028,7 +1310,8 @@ fn error_undefined_variable() {
 
 #[test]
 fn error_ols_missing_column() {
-    let (ok, _) = run_inline(r#"
+    let (ok, _) = run_inline(
+        r#"
 input df
 Y X
 1 2
@@ -1037,15 +1320,18 @@ Y X
 7 8
 end
 ols(Y ~ Z, df)
-"#);
+"#,
+    );
     assert!(!ok, "should fail: column Z does not exist");
 }
 
 #[test]
 fn error_wrong_type_to_mean() {
-    let (ok, _) = run_inline(r#"
+    let (ok, _) = run_inline(
+        r#"
 display mean("hello", "world")
-"#);
+"#,
+    );
     assert!(!ok, "should fail: mean on strings");
 }
 
@@ -1067,122 +1353,186 @@ fn error_substr_wrong_type() {
 
 #[test]
 fn string_upper() {
-    assert_ok_contains("str_upper", r#"
+    assert_ok_contains(
+        "str_upper",
+        r#"
 display upper("hello")
-"#, "HELLO");
+"#,
+        "HELLO",
+    );
 }
 
 #[test]
 fn string_lower() {
-    assert_ok_contains("str_lower", r#"
+    assert_ok_contains(
+        "str_lower",
+        r#"
 display lower("WORLD")
-"#, "world");
+"#,
+        "world",
+    );
 }
 
 #[test]
 fn string_trim() {
-    assert_ok_contains("str_trim", r#"
+    assert_ok_contains(
+        "str_trim",
+        r#"
 display trim("  abc  ")
-"#, "abc");
+"#,
+        "abc",
+    );
 }
 
 #[test]
 fn string_contains_true() {
-    assert_ok_contains("str_contains_t", r#"
+    assert_ok_contains(
+        "str_contains_t",
+        r#"
 display contains("hayashi", "ashi")
-"#, "true");
+"#,
+        "true",
+    );
 }
 
 #[test]
 fn string_contains_false() {
-    assert_ok_contains("str_contains_f", r#"
+    assert_ok_contains(
+        "str_contains_f",
+        r#"
 display contains("hayashi", "xyz")
-"#, "false");
+"#,
+        "false",
+    );
 }
 
 #[test]
 fn string_starts_with() {
-    assert_ok_contains("str_starts", r#"
+    assert_ok_contains(
+        "str_starts",
+        r#"
 display starts_with("hayashi", "hay")
-"#, "true");
+"#,
+        "true",
+    );
 }
 
 #[test]
 fn string_ends_with() {
-    assert_ok_contains("str_ends", r#"
+    assert_ok_contains(
+        "str_ends",
+        r#"
 display ends_with("hayashi", "shi")
-"#, "true");
+"#,
+        "true",
+    );
 }
 
 #[test]
 fn string_len() {
-    assert_ok_contains("str_len", r#"
+    assert_ok_contains(
+        "str_len",
+        r#"
 display len("abcdef")
-"#, "6");
+"#,
+        "6",
+    );
 }
 
 #[test]
 fn string_substr_basic() {
-    assert_ok_contains("str_substr", r#"
+    assert_ok_contains(
+        "str_substr",
+        r#"
 display substr("hayashi", 0, 3)
-"#, "hay");
+"#,
+        "hay",
+    );
 }
 
 #[test]
 fn string_substr_negative_index() {
-    assert_ok_contains("str_substr_neg", r#"
+    assert_ok_contains(
+        "str_substr_neg",
+        r#"
 display substr("hayashi", -3)
-"#, "shi");
+"#,
+        "shi",
+    );
 }
 
 #[test]
 fn string_split() {
-    assert_ok_contains("str_split", r#"
+    assert_ok_contains(
+        "str_split",
+        r#"
 let parts = split("a,b,c", ",")
 display len(parts)
-"#, "3");
+"#,
+        "3",
+    );
 }
 
 #[test]
 fn string_str_replace() {
-    assert_ok_contains("str_replace", r#"
+    assert_ok_contains(
+        "str_replace",
+        r#"
 display str_replace("hello world", "world", "hayashi")
-"#, "hello hayashi");
+"#,
+        "hello hayashi",
+    );
 }
 
 #[test]
 fn string_concat_in_loop() {
-    assert_ok_contains("str_concat_loop", r#"
+    assert_ok_contains(
+        "str_concat_loop",
+        r#"
 let s = ""
 for i in 1..4 {
     s = s + str(i)
 }
 display s
-"#, "123");
+"#,
+        "123",
+    );
 }
 
 #[test]
 fn string_str_conversion() {
-    assert_ok_contains("str_conv", r#"
+    assert_ok_contains(
+        "str_conv",
+        r#"
 let x = str(42)
 display x
-"#, "42");
+"#,
+        "42",
+    );
 }
 
 #[test]
 fn string_int_conversion() {
-    assert_ok_contains("int_conv", r#"
+    assert_ok_contains(
+        "int_conv",
+        r#"
 let x = int("123")
 display x + 1
-"#, "124");
+"#,
+        "124",
+    );
 }
 
 #[test]
 fn string_float_conversion() {
-    assert_ok_contains("float_conv", r#"
+    assert_ok_contains(
+        "float_conv",
+        r#"
 let x = float("3.14")
 display x
-"#, "3.14");
+"#,
+        "3.14",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1191,7 +1541,9 @@ display x
 
 #[test]
 fn gen_log() {
-    assert_ok_contains("gen_log", r#"
+    assert_ok_contains(
+        "gen_log",
+        r#"
 input df
 X
 1
@@ -1200,12 +1552,16 @@ X
 end
 generate df LX = log(X)
 list(df)
-"#, "generated");
+"#,
+        "generated",
+    );
 }
 
 #[test]
 fn gen_exp() {
-    assert_ok_contains("gen_exp", r#"
+    assert_ok_contains(
+        "gen_exp",
+        r#"
 input df
 X
 0
@@ -1214,12 +1570,16 @@ X
 end
 generate df EX = exp(X)
 list(df)
-"#, "generated");
+"#,
+        "generated",
+    );
 }
 
 #[test]
 fn gen_sqrt() {
-    assert_ok_contains("gen_sqrt", r#"
+    assert_ok_contains(
+        "gen_sqrt",
+        r#"
 input df
 X
 1
@@ -1229,12 +1589,16 @@ X
 end
 generate df SX = sqrt(X)
 list(df)
-"#, "generated");
+"#,
+        "generated",
+    );
 }
 
 #[test]
 fn gen_abs_negative() {
-    assert_ok_contains("gen_abs", r#"
+    assert_ok_contains(
+        "gen_abs",
+        r#"
 input df
 X
 -5
@@ -1245,12 +1609,16 @@ X
 end
 generate df AX = abs(X)
 list(df)
-"#, "generated");
+"#,
+        "generated",
+    );
 }
 
 #[test]
 fn gen_floor_ceil() {
-    assert_ok_contains("gen_floor_ceil", r#"
+    assert_ok_contains(
+        "gen_floor_ceil",
+        r#"
 input df
 X
 1.3
@@ -1260,12 +1628,16 @@ end
 generate df FL = floor(X)
 generate df CL = ceil(X)
 list(df)
-"#, "generated");
+"#,
+        "generated",
+    );
 }
 
 #[test]
 fn gen_round() {
-    assert_ok_contains("gen_round", r#"
+    assert_ok_contains(
+        "gen_round",
+        r#"
 input df
 X
 1.4
@@ -1274,12 +1646,16 @@ X
 end
 generate df RX = round(X)
 list(df)
-"#, "generated");
+"#,
+        "generated",
+    );
 }
 
 #[test]
 fn gen_arithmetic_chain() {
-    assert_ok_contains("gen_chain", r#"
+    assert_ok_contains(
+        "gen_chain",
+        r#"
 input df
 X
 2
@@ -1289,12 +1665,16 @@ end
 generate df Y = X * 2 + 1
 generate df Z = Y ^ 2
 list(df)
-"#, "generated");
+"#,
+        "generated",
+    );
 }
 
 #[test]
 fn gen_conditional_equality() {
-    assert_ok_contains("gen_cond_eq", r#"
+    assert_ok_contains(
+        "gen_cond_eq",
+        r#"
 input df
 group
 1
@@ -1304,12 +1684,16 @@ group
 end
 generate df dummy = (group == 1)
 summarize(df)
-"#, "dummy");
+"#,
+        "dummy",
+    );
 }
 
 #[test]
 fn gen_nested_functions() {
-    assert_ok_contains("gen_nested", r#"
+    assert_ok_contains(
+        "gen_nested",
+        r#"
 input df
 X
 1
@@ -1318,12 +1702,16 @@ X
 end
 generate df Y = log(sqrt(X))
 list(df)
-"#, "generated");
+"#,
+        "generated",
+    );
 }
 
 #[test]
 fn gen_sin_cos() {
-    assert_ok_contains("gen_trig", r#"
+    assert_ok_contains(
+        "gen_trig",
+        r#"
 input df
 X
 0
@@ -1334,7 +1722,9 @@ end
 generate df SIN = sin(X)
 generate df COS = cos(X)
 list(df)
-"#, "generated");
+"#,
+        "generated",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1343,7 +1733,9 @@ list(df)
 
 #[test]
 fn ols_three_vars() {
-    assert_ok_contains("ols_3vars", r#"
+    assert_ok_contains(
+        "ols_3vars",
+        r#"
 input df
 Y X1 X2 X3
 10 2 5 1
@@ -1356,12 +1748,15 @@ Y X1 X2 X3
 13 4 3 2
 end
 ols(Y ~ X1 + X2 + X3, df)
-"#, "R-squared");
+"#,
+        "R-squared",
+    );
 }
 
 #[test]
 fn ols_r_squared_between_0_1() {
-    let (ok, out) = run_inline(r#"
+    let (ok, out) = run_inline(
+        r#"
 input df
 Y X
 10 2
@@ -1372,14 +1767,17 @@ Y X
 14 4
 end
 ols(Y ~ X, df)
-"#);
+"#,
+    );
     assert!(ok);
     assert!(out.contains("R-squared"));
 }
 
 #[test]
 fn ols_intercept_only_model() {
-    assert_ok_contains("ols_intercept", r#"
+    assert_ok_contains(
+        "ols_intercept",
+        r#"
 input df
 Y X
 10 2
@@ -1392,7 +1790,9 @@ end
 let m1 = ols(Y ~ X, df)
 let m2 = ols(Y ~ X, df, cov=robust)
 esttab(m1, m2)
-"#, "R²");
+"#,
+        "R²",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1401,7 +1801,9 @@ esttab(m1, m2)
 
 #[test]
 fn panel_fe_basic() {
-    assert_ok_contains("panel_fe", r#"
+    assert_ok_contains(
+        "panel_fe",
+        r#"
 input panel
 output capital labor firm year
 10.2 5 8 1 2019
@@ -1423,12 +1825,16 @@ output capital labor firm year
 end
 xtset(panel, firm, year)
 fe(output ~ capital + labor, panel)
-"#, "Fixed Effects");
+"#,
+        "Fixed Effects",
+    );
 }
 
 #[test]
 fn panel_re_basic() {
-    assert_ok_contains("panel_re", r#"
+    assert_ok_contains(
+        "panel_re",
+        r#"
 input panel
 output capital labor firm year
 10.2 5 8 1 2019
@@ -1450,12 +1856,16 @@ output capital labor firm year
 end
 xtset(panel, firm, year)
 re(output ~ capital + labor, panel)
-"#, "Random Effects");
+"#,
+        "Random Effects",
+    );
 }
 
 #[test]
 fn panel_hausman() {
-    assert_ok_contains("panel_hausman", r#"
+    assert_ok_contains(
+        "panel_hausman",
+        r#"
 input panel
 output capital labor firm year
 10.2 5 8 1 2019
@@ -1479,12 +1889,16 @@ xtset(panel, firm, year)
 let mfe = fe(output ~ capital + labor, panel)
 let mre = re(output ~ capital + labor, panel)
 hausman(mfe, mre)
-"#, "Hausman");
+"#,
+        "Hausman",
+    );
 }
 
 #[test]
 fn panel_fe_two_regressors() {
-    assert_ok_contains("panel_fe_2reg", r#"
+    assert_ok_contains(
+        "panel_fe_2reg",
+        r#"
 input panel
 output capital labor firm year
 10.2 5 8 1 2019
@@ -1506,12 +1920,16 @@ output capital labor firm year
 end
 xtset(panel, firm, year)
 fe(output ~ capital + labor, panel)
-"#, "Fixed Effects");
+"#,
+        "Fixed Effects",
+    );
 }
 
 #[test]
 fn panel_esttab_fe_re() {
-    assert_ok_contains("panel_esttab", r#"
+    assert_ok_contains(
+        "panel_esttab",
+        r#"
 input panel
 output capital labor firm year
 10.2 5 8 1 2019
@@ -1535,7 +1953,9 @@ xtset(panel, firm, year)
 let mfe = fe(output ~ capital + labor, panel)
 let mre = re(output ~ capital + labor, panel)
 esttab(mfe, mre)
-"#, "capital");
+"#,
+        "capital",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1544,7 +1964,9 @@ esttab(mfe, mre)
 
 #[test]
 fn esttab_three_models() {
-    assert_ok_contains("esttab_3m", r#"
+    assert_ok_contains(
+        "esttab_3m",
+        r#"
 input df
 Y X1 X2 X3
 10 2 5 1
@@ -1560,12 +1982,16 @@ let m1 = ols(Y ~ X1, df)
 let m2 = ols(Y ~ X1 + X2, df)
 let m3 = ols(Y ~ X1 + X2 + X3, df)
 esttab(m1, m2, m3)
-"#, "R²");
+"#,
+        "R²",
+    );
 }
 
 #[test]
 fn esttab_robust_vs_ols() {
-    assert_ok_contains("esttab_robust", r#"
+    assert_ok_contains(
+        "esttab_robust",
+        r#"
 input df
 Y X
 10 2
@@ -1580,12 +2006,16 @@ end
 let m1 = ols(Y ~ X, df)
 let m2 = ols(Y ~ X, df, cov=robust)
 esttab(m1, m2)
-"#, "R²");
+"#,
+        "R²",
+    );
 }
 
 #[test]
 fn esttab_via_eststo() {
-    assert_ok_contains("esttab_eststo", r#"
+    assert_ok_contains(
+        "esttab_eststo",
+        r#"
 input df
 Y X1 X2
 10 2 5
@@ -1599,7 +2029,9 @@ eststo(ols(Y ~ X1, df))
 eststo(ols(Y ~ X1 + X2, df))
 esttab()
 estclear()
-"#, "R²");
+"#,
+        "R²",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1608,7 +2040,9 @@ estclear()
 
 #[test]
 fn bootstrap_ols_basic() {
-    assert_ok_contains("boot_ols", r#"
+    assert_ok_contains(
+        "boot_ols",
+        r#"
 input df
 Y X
 10 2
@@ -1622,7 +2056,9 @@ Y X
 end
 set_seed(42)
 bootstrap(ols, Y ~ X, df, n=100)
-"#, "Bootstrap");
+"#,
+        "Bootstrap",
+    );
 }
 
 #[test]
@@ -1655,7 +2091,9 @@ bootstrap(ols, Y ~ X, df, n=50)
 
 #[test]
 fn for_nested_loops() {
-    assert_ok_contains("for_nested", r#"
+    assert_ok_contains(
+        "for_nested",
+        r#"
 let s = 0
 for i in 1..4 {
     for j in 1..4 {
@@ -1663,56 +2101,76 @@ for i in 1..4 {
     }
 }
 display s
-"#, "9");
+"#,
+        "9",
+    );
 }
 
 #[test]
 fn for_accumulator_product() {
-    assert_ok_contains("for_product", r#"
+    assert_ok_contains(
+        "for_product",
+        r#"
 let p = 1
 for i in 1..6 {
     p = p * i
 }
 display p
-"#, "120");
+"#,
+        "120",
+    );
 }
 
 #[test]
 fn for_string_list() {
-    assert_ok_contains("for_str_list", r#"
+    assert_ok_contains(
+        "for_str_list",
+        r#"
 for s in ["alpha", "beta", "gamma"] {
     display s
 }
-"#, "gamma");
+"#,
+        "gamma",
+    );
 }
 
 #[test]
 fn for_with_break_accumulator() {
-    assert_ok_contains("for_break_acc", r#"
+    assert_ok_contains(
+        "for_break_acc",
+        r#"
 let total = 0
 for i in 1..100 {
     total = total + i
     if total > 50 { break }
 }
 display total
-"#, "55");
+"#,
+        "55",
+    );
 }
 
 #[test]
 fn for_continue_skip_multiples() {
-    assert_ok_contains("for_skip_mult", r#"
+    assert_ok_contains(
+        "for_skip_mult",
+        r#"
 let s = 0
 for i in 1..11 {
     if i == 2 || i == 4 || i == 6 || i == 8 || i == 10 { continue }
     s = s + i
 }
 display s
-"#, "25");
+"#,
+        "25",
+    );
 }
 
 #[test]
 fn while_nested() {
-    assert_ok_contains("while_nested", r#"
+    assert_ok_contains(
+        "while_nested",
+        r#"
 let total = 0
 let i = 0
 while i < 3 {
@@ -1724,12 +2182,16 @@ while i < 3 {
     i = i + 1
 }
 display total
-"#, "9");
+"#,
+        "9",
+    );
 }
 
 #[test]
 fn for_eststo_loop() {
-    assert_ok_contains("for_eststo_lp", r#"
+    assert_ok_contains(
+        "for_eststo_lp",
+        r#"
 input df
 Y X1 X2 X3
 10 2 5 1
@@ -1746,7 +2208,9 @@ for v in ["X1", "X2", "X3"] {
 }
 esttab()
 estclear()
-"#, "R²");
+"#,
+        "R²",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1755,7 +2219,9 @@ estclear()
 
 #[test]
 fn interact_generate_then_ols() {
-    assert_ok_contains("gen_then_ols", r#"
+    assert_ok_contains(
+        "gen_then_ols",
+        r#"
 input df
 X1 X2
 2 5
@@ -1769,12 +2235,16 @@ X1 X2
 end
 generate df Y = X1 * 2 + X2 * 3 + 1
 ols(Y ~ X1 + X2, df)
-"#, "R-squared");
+"#,
+        "R-squared",
+    );
 }
 
 #[test]
 fn interact_winsor_then_ols() {
-    assert_ok_contains("winsor_ols", r#"
+    assert_ok_contains(
+        "winsor_ols",
+        r#"
 input df
 Y X
 1 2
@@ -1788,12 +2258,16 @@ Y X
 end
 winsor(df, Y, p=0.10)
 ols(Y ~ X, df)
-"#, "R-squared");
+"#,
+        "R-squared",
+    );
 }
 
 #[test]
 fn interact_filter_then_ols() {
-    assert_ok_contains("filter_ols", r#"
+    assert_ok_contains(
+        "filter_ols",
+        r#"
 input df
 Y X group
 10 2 1
@@ -1807,12 +2281,16 @@ Y X group
 end
 let sub = filter(df, group == 1)
 ols(Y ~ X, sub)
-"#, "No. Observations:                  4");
+"#,
+        "No. Observations:                  4",
+    );
 }
 
 #[test]
 fn interact_generate_log_ols() {
-    assert_ok_contains("gen_log_ols", r#"
+    assert_ok_contains(
+        "gen_log_ols",
+        r#"
 input df
 Y X
 10 2
@@ -1824,12 +2302,16 @@ Y X
 end
 generate df LX = log(X)
 ols(Y ~ LX, df)
-"#, "R-squared");
+"#,
+        "R-squared",
+    );
 }
 
 #[test]
 fn interact_predict_summarize() {
-    assert_ok_contains("predict_summarize", r#"
+    assert_ok_contains(
+        "predict_summarize",
+        r#"
 input df
 Y X
 10 2
@@ -1843,12 +2325,16 @@ let m = ols(Y ~ X, df)
 predict df yhat = m
 predict df resid = m, "residuals"
 summarize(df)
-"#, "resid");
+"#,
+        "resid",
+    );
 }
 
 #[test]
 fn interact_xtset_fe_hausman() {
-    assert_ok_contains("xtset_fe_haus", r#"
+    assert_ok_contains(
+        "xtset_fe_haus",
+        r#"
 input panel
 output capital labor firm year
 10.2 5 8 1 2019
@@ -1872,7 +2358,9 @@ xtset(panel, firm, year)
 let mfe = fe(output ~ capital + labor, panel)
 let mre = re(output ~ capital + labor, panel)
 hausman(mfe, mre)
-"#, "Hausman");
+"#,
+        "Hausman",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1881,7 +2369,9 @@ hausman(mfe, mre)
 
 #[test]
 fn diag_breusch_pagan() {
-    assert_ok_contains("test_bp", r#"
+    assert_ok_contains(
+        "test_bp",
+        r#"
 input df
 Y X
 10 2
@@ -1895,12 +2385,16 @@ Y X
 end
 let m = ols(Y ~ X, df)
 test(m, "bp")
-"#, "Breusch-Pagan");
+"#,
+        "Breusch-Pagan",
+    );
 }
 
 #[test]
 fn diag_durbin_watson() {
-    assert_ok_contains("test_dw", r#"
+    assert_ok_contains(
+        "test_dw",
+        r#"
 input df
 Y X
 10 2
@@ -1914,12 +2408,16 @@ Y X
 end
 let m = ols(Y ~ X, df)
 test(m, "dw")
-"#, "Durbin-Watson");
+"#,
+        "Durbin-Watson",
+    );
 }
 
 #[test]
 fn diag_vif() {
-    assert_ok_contains("vif", r#"
+    assert_ok_contains(
+        "vif",
+        r#"
 input df
 Y X1 X2
 10 2 5
@@ -1933,12 +2431,16 @@ Y X1 X2
 end
 let m = ols(Y ~ X1 + X2, df)
 vif(m)
-"#, "VIF");
+"#,
+        "VIF",
+    );
 }
 
 #[test]
 fn diag_condnum() {
-    assert_ok_contains("condnum", r#"
+    assert_ok_contains(
+        "condnum",
+        r#"
 input df
 Y X1 X2
 10 2 5
@@ -1952,12 +2454,16 @@ Y X1 X2
 end
 let m = ols(Y ~ X1 + X2, df)
 condnum(m)
-"#, "Condition Number");
+"#,
+        "Condition Number",
+    );
 }
 
 #[test]
 fn diag_reset() {
-    assert_ok_contains("reset_test", r#"
+    assert_ok_contains(
+        "reset_test",
+        r#"
 input df
 Y X
 10 2
@@ -1971,12 +2477,16 @@ Y X
 end
 let m = ols(Y ~ X, df)
 reset(m)
-"#, "RESET");
+"#,
+        "RESET",
+    );
 }
 
 #[test]
 fn diag_jb_on_model() {
-    assert_ok_contains("jb_model", r#"
+    assert_ok_contains(
+        "jb_model",
+        r#"
 input df
 Y X
 10 2
@@ -1990,12 +2500,16 @@ Y X
 end
 let m = ols(Y ~ X, df)
 jb(m)
-"#, "Jarque-Bera");
+"#,
+        "Jarque-Bera",
+    );
 }
 
 #[test]
 fn diag_jb_on_series() {
-    assert_ok_contains("jb_series", r#"
+    assert_ok_contains(
+        "jb_series",
+        r#"
 input df
 Y
 1
@@ -2008,12 +2522,16 @@ Y
 8
 end
 jb(df, Y)
-"#, "Jarque-Bera");
+"#,
+        "Jarque-Bera",
+    );
 }
 
 #[test]
 fn diag_predict_resid_then_summarize() {
-    assert_ok_contains("resid_sum", r#"
+    assert_ok_contains(
+        "resid_sum",
+        r#"
 input df
 Y X
 10 2
@@ -2026,7 +2544,9 @@ end
 let m = ols(Y ~ X, df)
 predict df resid = m, "residuals"
 summarize(df, resid)
-"#, "Mean");
+"#,
+        "Mean",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2035,30 +2555,40 @@ summarize(df, resid)
 
 #[test]
 fn assign_shadow_inner_scope() {
-    assert_ok_contains("shadow_inner", r#"
+    assert_ok_contains(
+        "shadow_inner",
+        r#"
 let x = 10
 if true {
     let x = 20
     display x
 }
 display x
-"#, "20");
+"#,
+        "20",
+    );
 }
 
 #[test]
 fn assign_outer_from_loop() {
-    assert_ok_contains("assign_from_loop", r#"
+    assert_ok_contains(
+        "assign_from_loop",
+        r#"
 let last = 0
 for i in [10, 20, 30] {
     last = i
 }
 display last
-"#, "30");
+"#,
+        "30",
+    );
 }
 
 #[test]
 fn assign_nested_scope_modify() {
-    assert_ok_contains("nested_modify", r#"
+    assert_ok_contains(
+        "nested_modify",
+        r#"
 let x = 0
 if true {
     if true {
@@ -2066,12 +2596,16 @@ if true {
     }
 }
 display x
-"#, "42");
+"#,
+        "42",
+    );
 }
 
 #[test]
 fn assign_fn_does_not_leak() {
-    assert_ok_contains("fn_no_leak", r#"
+    assert_ok_contains(
+        "fn_no_leak",
+        r#"
 let x = 10
 fn f() {
     let x = 99
@@ -2079,7 +2613,9 @@ fn f() {
 }
 display f()
 display x
-"#, "10");
+"#,
+        "10",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2088,7 +2624,9 @@ display x
 
 #[test]
 fn correlate_basic() {
-    assert_ok_contains("correlate", r#"
+    assert_ok_contains(
+        "correlate",
+        r#"
 input df
 Y X1 X2
 6 2 1
@@ -2101,12 +2639,16 @@ Y X1 X2
 9 0 1
 end
 correlate(df, Y, X1, X2)
-"#, "Y");
+"#,
+        "Y",
+    );
 }
 
 #[test]
 fn pwcorr_with_stars() {
-    assert_ok_contains("pwcorr_stars", r#"
+    assert_ok_contains(
+        "pwcorr_stars",
+        r#"
 input df
 Y X1 X2
 10 2 5
@@ -2121,12 +2663,16 @@ Y X1 X2
 18 6 1
 end
 pwcorr(df, Y, X1, X2)
-"#, "Y");
+"#,
+        "Y",
+    );
 }
 
 #[test]
 fn correlate_two_vars() {
-    assert_ok_contains("corr_two", r#"
+    assert_ok_contains(
+        "corr_two",
+        r#"
 input df
 X Y
 1 2
@@ -2136,7 +2682,9 @@ X Y
 5 10
 end
 correlate(df, X, Y)
-"#, "X");
+"#,
+        "X",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2145,7 +2693,9 @@ correlate(df, X, Y)
 
 #[test]
 fn sort_ascending() {
-    assert_ok_contains("sort_asc", r#"
+    assert_ok_contains(
+        "sort_asc",
+        r#"
 input df
 X
 5
@@ -2156,12 +2706,16 @@ X
 end
 let sorted = sort(df, X)
 list(sorted)
-"#, "1");
+"#,
+        "1",
+    );
 }
 
 #[test]
 fn sort_descending() {
-    assert_ok_contains("sort_desc", r#"
+    assert_ok_contains(
+        "sort_desc",
+        r#"
 input df
 X
 1
@@ -2172,12 +2726,16 @@ X
 end
 let sorted = sort(df, X, desc=true)
 list(sorted, n=1)
-"#, "5");
+"#,
+        "5",
+    );
 }
 
 #[test]
 fn describe_basic() {
-    assert_ok_contains("describe", r#"
+    assert_ok_contains(
+        "describe",
+        r#"
 input df
 Y X group
 10 2 1
@@ -2186,12 +2744,16 @@ Y X group
 15 5 2
 end
 describe(df)
-"#, "Y");
+"#,
+        "Y",
+    );
 }
 
 #[test]
 fn list_full() {
-    assert_ok_contains("list_full", r#"
+    assert_ok_contains(
+        "list_full",
+        r#"
 input df
 A B
 1 10
@@ -2199,12 +2761,16 @@ A B
 3 30
 end
 list(df)
-"#, "A");
+"#,
+        "A",
+    );
 }
 
 #[test]
 fn count_all() {
-    assert_ok_contains("count_all", r#"
+    assert_ok_contains(
+        "count_all",
+        r#"
 input df
 X
 1
@@ -2214,12 +2780,16 @@ X
 5
 end
 count df
-"#, "5");
+"#,
+        "5",
+    );
 }
 
 #[test]
 fn count_conditional() {
-    assert_ok_contains("count_cond", r#"
+    assert_ok_contains(
+        "count_cond",
+        r#"
 input df
 X
 1
@@ -2229,7 +2799,9 @@ X
 5
 end
 count df if X > 3
-"#, "2");
+"#,
+        "2",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2238,18 +2810,24 @@ count df if X > 3
 
 #[test]
 fn input_single_row() {
-    assert_ok_contains("input_1row", r#"
+    assert_ok_contains(
+        "input_1row",
+        r#"
 input df
 X Y
 42 99
 end
 list(df)
-"#, "42");
+"#,
+        "42",
+    );
 }
 
 #[test]
 fn input_all_negative() {
-    assert_ok_contains("input_neg", r#"
+    assert_ok_contains(
+        "input_neg",
+        r#"
 input df
 X
 -1
@@ -2259,12 +2837,16 @@ X
 -5
 end
 display mean(df, X)
-"#, "-3");
+"#,
+        "-3",
+    );
 }
 
 #[test]
 fn input_mixed_missing() {
-    assert_ok_contains("input_mixed_miss", r#"
+    assert_ok_contains(
+        "input_mixed_miss",
+        r#"
 input df
 A B C
 1 . 3
@@ -2272,19 +2854,25 @@ A B C
 3 3 3
 end
 summarize(df)
-"#, "Missing");
+"#,
+        "Missing",
+    );
 }
 
 #[test]
 fn input_many_columns() {
-    assert_ok_contains("input_many_cols", r#"
+    assert_ok_contains(
+        "input_many_cols",
+        r#"
 input df
 A B C D E
 1 2 3 4 5
 6 7 8 9 10
 end
 describe(df)
-"#, "E");
+"#,
+        "E",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2293,7 +2881,9 @@ describe(df)
 
 #[test]
 fn formula_string_multi_term() {
-    assert_ok_contains("formula_str_multi", r#"
+    assert_ok_contains(
+        "formula_str_multi",
+        r#"
 input df
 Y X1 X2 X3
 10 2 5 1
@@ -2306,12 +2896,16 @@ Y X1 X2 X3
 13 4 3 2
 end
 ols("Y ~ X1 + X2 + X3", df)
-"#, "R-squared");
+"#,
+        "R-squared",
+    );
 }
 
 #[test]
 fn formula_concat_dynamic() {
-    assert_ok_contains("formula_concat", r#"
+    assert_ok_contains(
+        "formula_concat",
+        r#"
 input df
 Y X1 X2
 10 2 5
@@ -2323,12 +2917,16 @@ Y X1 X2
 end
 let f = "Y ~ X1 + X2"
 ols(f, df)
-"#, "R-squared");
+"#,
+        "R-squared",
+    );
 }
 
 #[test]
 fn formula_loop_build() {
-    assert_ok_contains("formula_loop", r#"
+    assert_ok_contains(
+        "formula_loop",
+        r#"
 input df
 Y X1 X2 X3
 10 2 5 1
@@ -2346,7 +2944,9 @@ for v in ["X2", "X3"] {
 }
 let formula = "Y ~ " + vars
 ols(formula, df)
-"#, "R-squared");
+"#,
+        "R-squared",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2355,7 +2955,9 @@ ols(formula, df)
 
 #[test]
 fn ttest_one_sample() {
-    assert_ok_contains("ttest_1s", r#"
+    assert_ok_contains(
+        "ttest_1s",
+        r#"
 input df
 Y
 10
@@ -2368,12 +2970,16 @@ Y
 13
 end
 ttest(df, Y, mu=10)
-"#, "H0");
+"#,
+        "H0",
+    );
 }
 
 #[test]
 fn ttest_two_groups() {
-    assert_ok_contains("ttest_2g", r#"
+    assert_ok_contains(
+        "ttest_2g",
+        r#"
 input df
 Y group
 10 1
@@ -2386,12 +2992,16 @@ Y group
 25 2
 end
 ttest(df, Y, by=group)
-"#, "Welch");
+"#,
+        "Welch",
+    );
 }
 
 #[test]
 fn ttest_paired() {
-    assert_ok_contains("ttest_paired", r#"
+    assert_ok_contains(
+        "ttest_paired",
+        r#"
 input df
 before after
 10 12
@@ -2402,7 +3012,9 @@ before after
 14 17
 end
 ttest(df, before, after, paired=true)
-"#, "Paired");
+"#,
+        "Paired",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2411,7 +3023,9 @@ ttest(df, before, after, paired=true)
 
 #[test]
 fn data_filter() {
-    assert_ok_contains("filter", r#"
+    assert_ok_contains(
+        "filter",
+        r#"
 input df
 Y X
 10 1
@@ -2422,12 +3036,16 @@ Y X
 end
 let sub = filter(df, X > 3)
 list(sub)
-"#, "remaining");
+"#,
+        "remaining",
+    );
 }
 
 #[test]
 fn data_drop_columns() {
-    assert_ok_contains("drop_cols", r#"
+    assert_ok_contains(
+        "drop_cols",
+        r#"
 input df
 Y X Z
 1 2 3
@@ -2435,12 +3053,16 @@ Y X Z
 end
 let df2 = drop(df, Z)
 describe(df2)
-"#, "Y");
+"#,
+        "Y",
+    );
 }
 
 #[test]
 fn data_keep_columns() {
-    assert_ok_contains("keep_cols", r#"
+    assert_ok_contains(
+        "keep_cols",
+        r#"
 input df
 Y X Z
 1 2 3
@@ -2448,12 +3070,16 @@ Y X Z
 end
 let df2 = keep(df, Y, X)
 describe(df2)
-"#, "Y");
+"#,
+        "Y",
+    );
 }
 
 #[test]
 fn data_rename() {
-    assert_ok_contains("rename_col", r#"
+    assert_ok_contains(
+        "rename_col",
+        r#"
 input df
 old_name
 1
@@ -2462,12 +3088,16 @@ old_name
 end
 rename(df, old_name, new_name)
 describe(df)
-"#, "new_name");
+"#,
+        "new_name",
+    );
 }
 
 #[test]
 fn data_collapse_mean() {
-    assert_ok_contains("collapse_mean", r#"
+    assert_ok_contains(
+        "collapse_mean",
+        r#"
 input df
 Y group
 10 1
@@ -2477,12 +3107,16 @@ Y group
 end
 let agg = collapse(df, mean, Y, by=group)
 list(agg)
-"#, "group");
+"#,
+        "group",
+    );
 }
 
 #[test]
 fn data_collapse_sum() {
-    assert_ok_contains("collapse_sum", r#"
+    assert_ok_contains(
+        "collapse_sum",
+        r#"
 input df
 Y group
 10 1
@@ -2492,12 +3126,16 @@ Y group
 end
 let agg = collapse(df, sum, Y, by=group)
 list(agg)
-"#, "group");
+"#,
+        "group",
+    );
 }
 
 #[test]
 fn data_append() {
-    assert_ok_contains("append", r#"
+    assert_ok_contains(
+        "append",
+        r#"
 input df1
 X Y
 1 2
@@ -2510,7 +3148,9 @@ X Y
 end
 let combined = append(df1, df2)
 list(combined)
-"#, "5");
+"#,
+        "5",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2519,7 +3159,9 @@ list(combined)
 
 #[test]
 fn egen_rowmean() {
-    assert_ok_contains("egen_rowmean", r#"
+    assert_ok_contains(
+        "egen_rowmean",
+        r#"
 input df
 A B
 2 4
@@ -2528,12 +3170,16 @@ A B
 end
 generate df M = rowmean(A, B)
 list(df)
-"#, "generated");
+"#,
+        "generated",
+    );
 }
 
 #[test]
 fn egen_rowsum() {
-    assert_ok_contains("egen_rowsum", r#"
+    assert_ok_contains(
+        "egen_rowsum",
+        r#"
 input df
 A B C
 1 2 3
@@ -2541,12 +3187,16 @@ A B C
 end
 generate df S = rowsum(A, B, C)
 list(df)
-"#, "generated");
+"#,
+        "generated",
+    );
 }
 
 #[test]
 fn egen_rank() {
-    assert_ok_contains("egen_rank", r#"
+    assert_ok_contains(
+        "egen_rank",
+        r#"
 input df
 X
 30
@@ -2557,12 +3207,16 @@ X
 end
 generate df R = rank(X)
 list(df)
-"#, "generated");
+"#,
+        "generated",
+    );
 }
 
 #[test]
 fn egen_cumsum() {
-    assert_ok_contains("egen_cumsum", r#"
+    assert_ok_contains(
+        "egen_cumsum",
+        r#"
 input df
 X
 1
@@ -2573,7 +3227,9 @@ X
 end
 generate df CS = cumsum(X)
 list(df)
-"#, "generated");
+"#,
+        "generated",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2582,7 +3238,9 @@ list(df)
 
 #[test]
 fn lincom_basic() {
-    assert_ok_contains("lincom", r#"
+    assert_ok_contains(
+        "lincom",
+        r#"
 input df
 Y X1 X2
 10 2 5
@@ -2596,7 +3254,9 @@ Y X1 X2
 end
 let m = ols(Y ~ X1 + X2, df)
 lincom(m, X1=1, X2=1)
-"#, "lincom");
+"#,
+        "lincom",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2605,17 +3265,25 @@ lincom(m, X1=1, X2=1)
 
 #[test]
 fn timer_returns_result() {
-    assert_ok_contains("timer_result", r#"
+    assert_ok_contains(
+        "timer_result",
+        r#"
 let x = timer(2 + 3)
 display x
-"#, "5");
+"#,
+        "5",
+    );
 }
 
 #[test]
 fn seed_display() {
-    assert_ok_contains("seed_display", r#"
+    assert_ok_contains(
+        "seed_display",
+        r#"
 set_seed(12345)
-"#, "12345");
+"#,
+        "12345",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2624,7 +3292,9 @@ set_seed(12345)
 
 #[test]
 fn lang_if_elif_else() {
-    assert_ok_contains("elif", r#"
+    assert_ok_contains(
+        "elif",
+        r#"
 let x = 5
 if x > 10 {
     display "big"
@@ -2633,97 +3303,135 @@ if x > 10 {
 } else {
     display "small"
 }
-"#, "medium");
+"#,
+        "medium",
+    );
 }
 
 #[test]
 fn lang_fn_default_no_return() {
-    assert_ok_contains("fn_no_ret", r#"
+    assert_ok_contains(
+        "fn_no_ret",
+        r#"
 fn greet(name) {
     display "hello " + name
 }
 greet("world")
-"#, "hello world");
+"#,
+        "hello world",
+    );
 }
 
 #[test]
 fn lang_fn_multiple_params() {
-    assert_ok_contains("fn_multi_param", r#"
+    assert_ok_contains(
+        "fn_multi_param",
+        r#"
 fn weighted_avg(a, b, wa, wb) {
     return (a * wa + b * wb) / (wa + wb)
 }
 display weighted_avg(10, 20, 3, 7)
-"#, "17");
+"#,
+        "17",
+    );
 }
 
 #[test]
 fn lang_list_operations() {
-    assert_ok_contains("list_ops", r#"
+    assert_ok_contains(
+        "list_ops",
+        r#"
 let v = [1, 2, 3, 4, 5]
 display len(v)
 display v[0]
 display v[4]
-"#, "5");
+"#,
+        "5",
+    );
 }
 
 #[test]
 fn lang_boolean_or() {
-    assert_ok_contains("bool_or", r#"
+    assert_ok_contains(
+        "bool_or",
+        r#"
 let x = 1
 if x < 0 || x > 0 {
     display "nonzero"
 }
-"#, "nonzero");
+"#,
+        "nonzero",
+    );
 }
 
 #[test]
 fn lang_unary_minus() {
-    assert_ok_contains("unary_minus", r#"
+    assert_ok_contains(
+        "unary_minus",
+        r#"
 let x = 10
 display -x
-"#, "-10");
+"#,
+        "-10",
+    );
 }
 
 #[test]
 fn lang_string_equality() {
-    assert_ok_contains("str_eq", r#"
+    assert_ok_contains(
+        "str_eq",
+        r#"
 let a = "hello"
 let b = "hello"
 if a == b {
     display "equal"
 }
-"#, "equal");
+"#,
+        "equal",
+    );
 }
 
 #[test]
 fn lang_string_inequality() {
-    assert_ok_contains("str_neq", r#"
+    assert_ok_contains(
+        "str_neq",
+        r#"
 let a = "hello"
 let b = "world"
 if a != b {
     display "different"
 }
-"#, "different");
+"#,
+        "different",
+    );
 }
 
 #[test]
 fn lang_nested_fn_calls() {
-    assert_ok_contains("nested_fn_calls", r#"
+    assert_ok_contains(
+        "nested_fn_calls",
+        r#"
 fn add(a, b) { return a + b }
 fn mul(a, b) { return a * b }
 display add(mul(2, 3), mul(4, 5))
-"#, "26");
+"#,
+        "26",
+    );
 }
 
 #[test]
 fn lang_recursive_sum() {
-    assert_ok_contains("rec_sum", r#"
+    assert_ok_contains(
+        "rec_sum",
+        r#"
 fn sum_to(n) {
     if n <= 0 { return 0 }
     return n + sum_to(n - 1)
 }
 display sum_to(10)
-"#, "55");
+"#,
+        "55",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2732,7 +3440,9 @@ display sum_to(10)
 
 #[test]
 fn agg_sum_df() {
-    assert_ok_contains("sum_df", r#"
+    assert_ok_contains(
+        "sum_df",
+        r#"
 input df
 X
 1
@@ -2742,12 +3452,15 @@ X
 5
 end
 display sum(df, X)
-"#, "15");
+"#,
+        "15",
+    );
 }
 
 #[test]
 fn agg_min_max_df() {
-    let (ok, out) = run_inline(r#"
+    let (ok, out) = run_inline(
+        r#"
 input df
 X
 10
@@ -2758,14 +3471,17 @@ X
 end
 display min(df, X)
 display max(df, X)
-"#);
+"#,
+    );
     assert!(ok);
     assert!(out.contains("2") && out.contains("30"));
 }
 
 #[test]
 fn agg_std_df() {
-    assert_ok_contains("std_df", r#"
+    assert_ok_contains(
+        "std_df",
+        r#"
 input df
 X
 1
@@ -2775,12 +3491,16 @@ X
 5
 end
 display std(df, X)
-"#, ".");
+"#,
+        ".",
+    );
 }
 
 #[test]
 fn agg_mean_conditional() {
-    assert_ok_contains("mean_cond2", r#"
+    assert_ok_contains(
+        "mean_cond2",
+        r#"
 input df
 Y group
 10 1
@@ -2790,7 +3510,9 @@ Y group
 end
 scalar m = mean(df, Y, if = group == 2)
 display m
-"#, "35");
+"#,
+        "35",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2818,34 +3540,50 @@ fn help_xtset() {
 
 #[test]
 fn type_int_from_float() {
-    assert_ok_contains("int_from_float", r#"
+    assert_ok_contains(
+        "int_from_float",
+        r#"
 let x = int(3.7)
 display x
-"#, "3");
+"#,
+        "3",
+    );
 }
 
 #[test]
 fn type_float_from_int() {
-    assert_ok_contains("float_from_int", r#"
+    assert_ok_contains(
+        "float_from_int",
+        r#"
 let x = float(42)
 display x
-"#, "42");
+"#,
+        "42",
+    );
 }
 
 #[test]
 fn type_bool_to_int() {
-    assert_ok_contains("bool_to_int", r#"
+    assert_ok_contains(
+        "bool_to_int",
+        r#"
 let x = int(true)
 display x
-"#, "1");
+"#,
+        "1",
+    );
 }
 
 #[test]
 fn type_str_from_number() {
-    assert_ok_contains("str_from_num", r#"
+    assert_ok_contains(
+        "str_from_num",
+        r#"
 let s = str(3.14)
 display len(s)
-"#, "4");
+"#,
+        "4",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2854,7 +3592,8 @@ display len(s)
 
 #[test]
 fn graph_scatter_svg() {
-    let (ok, out) = run_inline(r#"
+    let (ok, out) = run_inline(
+        r#"
 input df
 Y X
 10 2
@@ -2865,7 +3604,8 @@ Y X
 14 4
 end
 graph_scatter(df, X, Y, path="/tmp/test_scatter.svg")
-"#);
+"#,
+    );
     assert!(ok, "graph_scatter failed:\n{out}");
     assert!(out.contains("graph saved"));
     assert!(std::path::Path::new("/tmp/test_scatter.svg").exists());
@@ -2873,7 +3613,8 @@ graph_scatter(df, X, Y, path="/tmp/test_scatter.svg")
 
 #[test]
 fn graph_line_svg() {
-    let (ok, out) = run_inline(r#"
+    let (ok, out) = run_inline(
+        r#"
 input df
 Y X
 1 1
@@ -2883,7 +3624,8 @@ Y X
 25 5
 end
 graph_line(df, X, Y, path="/tmp/test_line.svg")
-"#);
+"#,
+    );
     assert!(ok, "graph_line failed:\n{out}");
     assert!(out.contains("graph saved"));
     assert!(std::path::Path::new("/tmp/test_line.svg").exists());
@@ -2891,7 +3633,8 @@ graph_line(df, X, Y, path="/tmp/test_line.svg")
 
 #[test]
 fn graph_hist_svg() {
-    let (ok, out) = run_inline(r#"
+    let (ok, out) = run_inline(
+        r#"
 input df
 Y
 1
@@ -2904,7 +3647,8 @@ Y
 8
 end
 graph_hist(df, Y, path="/tmp/test_hist.svg", bins=4)
-"#);
+"#,
+    );
     assert!(ok, "graph_hist failed:\n{out}");
     assert!(out.contains("graph saved"));
     assert!(std::path::Path::new("/tmp/test_hist.svg").exists());
@@ -2912,7 +3656,8 @@ graph_hist(df, Y, path="/tmp/test_hist.svg", bins=4)
 
 #[test]
 fn graph_coef_svg() {
-    let (ok, out) = run_inline(r#"
+    let (ok, out) = run_inline(
+        r#"
 input df
 Y X1 X2
 10 2 5
@@ -2924,7 +3669,8 @@ Y X1 X2
 end
 let m = ols(Y ~ X1 + X2, df)
 graph_coef(m, path="/tmp/test_coef.svg")
-"#);
+"#,
+    );
     assert!(ok, "graph_coef failed:\n{out}");
     assert!(out.contains("graph saved"));
     assert!(std::path::Path::new("/tmp/test_coef.svg").exists());
@@ -2932,7 +3678,8 @@ graph_coef(m, path="/tmp/test_coef.svg")
 
 #[test]
 fn graph_scatter_custom_title() {
-    let (ok, out) = run_inline(r#"
+    let (ok, out) = run_inline(
+        r#"
 input df
 Y X
 10 2
@@ -2941,7 +3688,8 @@ Y X
 15 5
 end
 graph_scatter(df, X, Y, path="/tmp/test_scatter_title.svg", title="Custom Title")
-"#);
+"#,
+    );
     assert!(ok, "graph_scatter title failed:\n{out}");
     let svg = std::fs::read_to_string("/tmp/test_scatter_title.svg").unwrap();
     assert!(svg.contains("Custom Title"));
@@ -2949,7 +3697,8 @@ graph_scatter(df, X, Y, path="/tmp/test_scatter_title.svg", title="Custom Title"
 
 #[test]
 fn graph_hist_custom_bins() {
-    let (ok, out) = run_inline(r#"
+    let (ok, out) = run_inline(
+        r#"
 input df
 Y
 1
@@ -2964,14 +3713,16 @@ Y
 10
 end
 graph_hist(df, Y, path="/tmp/test_hist_bins.svg", bins=2)
-"#);
+"#,
+    );
     assert!(ok, "graph_hist bins failed:\n{out}");
     assert!(std::path::Path::new("/tmp/test_hist_bins.svg").exists());
 }
 
 #[test]
 fn graph_coef_svg_valid() {
-    let (ok, _) = run_inline(r#"
+    let (ok, _) = run_inline(
+        r#"
 input df
 Y X1 X2 X3
 10 2 5 3
@@ -2983,7 +3734,8 @@ Y X1 X2 X3
 end
 let m = ols(Y ~ X1 + X2 + X3, df)
 graph_coef(m, path="/tmp/test_coef_valid.svg", title="3 Variables")
-"#);
+"#,
+    );
     assert!(ok);
     let svg = std::fs::read_to_string("/tmp/test_coef_valid.svg").unwrap();
     assert!(svg.contains("<svg"));
@@ -2993,7 +3745,8 @@ graph_coef(m, path="/tmp/test_coef_valid.svg", title="3 Variables")
 
 #[test]
 fn graph_line_default_path() {
-    let (ok, out) = run_inline(r#"
+    let (ok, out) = run_inline(
+        r#"
 input df
 Y X
 1 1
@@ -3001,7 +3754,8 @@ Y X
 3 3
 end
 graph_line(df, X, Y)
-"#);
+"#,
+    );
     assert!(ok, "graph_line default failed:\n{out}");
     assert!(out.contains("graph saved: Y_line.svg"));
     let _ = std::fs::remove_file("Y_line.svg");
@@ -3009,7 +3763,8 @@ graph_line(df, X, Y)
 
 #[test]
 fn graph_scatter_gscatter_alias() {
-    let (ok, out) = run_inline(r#"
+    let (ok, out) = run_inline(
+        r#"
 input df
 Y X
 10 2
@@ -3017,7 +3772,8 @@ Y X
 8 1
 end
 gscatter(df, X, Y, path="/tmp/test_gscatter.svg")
-"#);
+"#,
+    );
     assert!(ok, "gscatter alias failed:\n{out}");
     assert!(out.contains("graph saved"));
 }
@@ -3041,19 +3797,25 @@ fn smoke_graficos_svg() {
 
 #[test]
 fn math_tan() {
-    assert_ok_contains("tan", r#"
+    assert_ok_contains(
+        "tan",
+        r#"
 input df
 X
 0
 1
 end
 generate df T = tan(X)
-"#, "generated");
+"#,
+        "generated",
+    );
 }
 
 #[test]
 fn math_asin_acos_atan() {
-    assert_ok("asin_acos_atan", r#"
+    assert_ok(
+        "asin_acos_atan",
+        r#"
 input df
 X
 0.5
@@ -3062,12 +3824,15 @@ end
 generate df A = asin(X)
 generate df B = acos(X)
 generate df C = atan(X)
-"#);
+"#,
+    );
 }
 
 #[test]
 fn math_sign() {
-    assert_ok_contains("sign", r#"
+    assert_ok_contains(
+        "sign",
+        r#"
 input df
 X
 -3
@@ -3076,12 +3841,16 @@ X
 end
 generate df S = sign(X)
 list(df)
-"#, "-1");
+"#,
+        "-1",
+    );
 }
 
 #[test]
 fn math_mod() {
-    assert_ok_contains("mod", r#"
+    assert_ok_contains(
+        "mod",
+        r#"
 input df
 X
 7
@@ -3089,24 +3858,32 @@ X
 15
 end
 generate df M = mod(X, 3)
-"#, "generated");
+"#,
+        "generated",
+    );
 }
 
 #[test]
 fn math_factorial() {
-    assert_ok_contains("factorial", r#"
+    assert_ok_contains(
+        "factorial",
+        r#"
 input df
 X
 5
 end
 generate df F = factorial(X)
 list(df)
-"#, "120");
+"#,
+        "120",
+    );
 }
 
 #[test]
 fn math_cond() {
-    assert_ok_contains("cond", r#"
+    assert_ok_contains(
+        "cond",
+        r#"
 input df
 X
 1
@@ -3115,12 +3892,16 @@ X
 end
 generate df C = cond(X > 3, 100, 0)
 list(df)
-"#, "100");
+"#,
+        "100",
+    );
 }
 
 #[test]
 fn math_max_min_two_args() {
-    assert_ok_contains("max_min", r#"
+    assert_ok_contains(
+        "max_min",
+        r#"
 input df
 X
 1
@@ -3130,12 +3911,16 @@ end
 generate df MX = max(X, 5)
 generate df MN = min(X, 5)
 list(df)
-"#, "generated");
+"#,
+        "generated",
+    );
 }
 
 #[test]
 fn math_comb() {
-    assert_ok_contains("comb", r#"
+    assert_ok_contains(
+        "comb",
+        r#"
 input df
 N K
 10 3
@@ -3143,12 +3928,16 @@ N K
 end
 generate df C = comb(N, K)
 list(df)
-"#, "120");
+"#,
+        "120",
+    );
 }
 
 #[test]
 fn math_uniform() {
-    assert_ok("uniform", r#"
+    assert_ok(
+        "uniform",
+        r#"
 input df
 X
 1
@@ -3156,12 +3945,15 @@ X
 3
 end
 generate df U = uniform()
-"#);
+"#,
+    );
 }
 
 #[test]
 fn math_rnormal() {
-    assert_ok("rnormal", r#"
+    assert_ok(
+        "rnormal",
+        r#"
 input df
 X
 1
@@ -3169,31 +3961,39 @@ X
 3
 end
 generate df N = rnormal()
-"#);
+"#,
+    );
 }
 
 #[test]
 fn math_normal_pdf() {
-    assert_ok_contains("normal_pdf", r#"
+    assert_ok_contains(
+        "normal_pdf",
+        r#"
 input df
 X
 0
 end
 generate df P = normal(X)
 list(df)
-"#, "0.3989");
+"#,
+        "0.3989",
+    );
 }
 
 #[test]
 fn math_atan2() {
-    assert_ok("atan2", r#"
+    assert_ok(
+        "atan2",
+        r#"
 input df
 Y X
 1 1
 0 1
 end
 generate df A = atan2(Y, X)
-"#);
+"#,
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -3202,7 +4002,9 @@ generate df A = atan2(Y, X)
 
 #[test]
 fn summarize_detail() {
-    assert_ok_contains("summarize_detail", r#"
+    assert_ok_contains(
+        "summarize_detail",
+        r#"
 input df
 X
 1
@@ -3217,12 +4019,16 @@ X
 10
 end
 summarize(df, X, detail=true)
-"#, "Skewness");
+"#,
+        "Skewness",
+    );
 }
 
 #[test]
 fn summarize_detail_percentiles() {
-    assert_ok_contains("detail_pctiles", r#"
+    assert_ok_contains(
+        "detail_pctiles",
+        r#"
 input df
 X
 1
@@ -3237,12 +4043,16 @@ X
 10
 end
 summarize(df, X, detail=true)
-"#, "50%");
+"#,
+        "50%",
+    );
 }
 
 #[test]
 fn summarize_detail_kurtosis() {
-    assert_ok_contains("detail_kurt", r#"
+    assert_ok_contains(
+        "detail_kurt",
+        r#"
 input df
 X
 1
@@ -3257,12 +4067,16 @@ X
 10
 end
 summarize(df, X, detail=true)
-"#, "Kurtosis");
+"#,
+        "Kurtosis",
+    );
 }
 
 #[test]
 fn summarize_detail_variance() {
-    assert_ok_contains("detail_var", r#"
+    assert_ok_contains(
+        "detail_var",
+        r#"
 input df
 X
 1
@@ -3272,7 +4086,9 @@ X
 5
 end
 summarize(df, X, detail=true)
-"#, "Variance");
+"#,
+        "Variance",
+    );
 }
 
 #[test]
@@ -3288,7 +4104,9 @@ fn smoke_funcoes_matematicas() {
 
 #[test]
 fn gen_row_number() {
-    assert_ok_contains("_n", r#"
+    assert_ok_contains(
+        "_n",
+        r#"
 input df
 X
 10
@@ -3297,12 +4115,16 @@ X
 end
 generate df row = _n
 list(df)
-"#, "3");
+"#,
+        "3",
+    );
 }
 
 #[test]
 fn gen_total_rows() {
-    assert_ok_contains("_N", r#"
+    assert_ok_contains(
+        "_N",
+        r#"
 input df
 X
 10
@@ -3311,12 +4133,16 @@ X
 end
 generate df total = _N
 display mean(df, total)
-"#, "3");
+"#,
+        "3",
+    );
 }
 
 #[test]
 fn gen_standardize() {
-    assert_ok_contains("std", r#"
+    assert_ok_contains(
+        "std",
+        r#"
 input df
 X
 1
@@ -3327,12 +4153,16 @@ X
 end
 generate df Z = std(X)
 summarize(df, Z)
-"#, "0.0000");
+"#,
+        "0.0000",
+    );
 }
 
 #[test]
 fn gen_iqr() {
-    assert_ok("iqr", r#"
+    assert_ok(
+        "iqr",
+        r#"
 input df
 X
 1
@@ -3345,12 +4175,15 @@ X
 8
 end
 generate df I = iqr(X)
-"#);
+"#,
+    );
 }
 
 #[test]
 fn ci_means() {
-    assert_ok_contains("ci_means", r#"
+    assert_ok_contains(
+        "ci_means",
+        r#"
 input df
 X
 1
@@ -3360,12 +4193,16 @@ X
 5
 end
 ci(df, X)
-"#, "95% CI");
+"#,
+        "95% CI",
+    );
 }
 
 #[test]
 fn centile_basic() {
-    assert_ok_contains("centile", r#"
+    assert_ok_contains(
+        "centile",
+        r#"
 input df
 X
 1
@@ -3380,12 +4217,16 @@ X
 10
 end
 centile(df, X)
-"#, "50.0%");
+"#,
+        "50.0%",
+    );
 }
 
 #[test]
 fn recode_basic() {
-    assert_ok_contains("recode", r#"
+    assert_ok_contains(
+        "recode",
+        r#"
 input df
 X
 1
@@ -3394,12 +4235,16 @@ X
 4
 end
 recode(df, X, from=[1, 2], to=[10, 20])
-"#, "2 changes");
+"#,
+        "2 changes",
+    );
 }
 
 #[test]
 fn dist_chi2tail() {
-    assert_ok("chi2tail", r#"
+    assert_ok(
+        "chi2tail",
+        r#"
 input df
 X
 1
@@ -3407,12 +4252,15 @@ X
 10
 end
 generate df P = chi2tail(2, X)
-"#);
+"#,
+    );
 }
 
 #[test]
 fn dist_ttail() {
-    assert_ok("ttail", r#"
+    assert_ok(
+        "ttail",
+        r#"
 input df
 X
 1
@@ -3420,12 +4268,15 @@ X
 3
 end
 generate df P = ttail(10, X)
-"#);
+"#,
+    );
 }
 
 #[test]
 fn dist_invttail() {
-    assert_ok("invttail", r#"
+    assert_ok(
+        "invttail",
+        r#"
 input df
 X
 0.05
@@ -3433,14 +4284,16 @@ X
 0.01
 end
 generate df T = invttail(10, X)
-"#);
+"#,
+    );
 }
 
 // ── Stata-parity features ───────────────────────────────────────────────────
 
 #[test]
 fn quietly_suppresses_output() {
-    let (ok, out) = run_inline(r#"
+    let (ok, out) = run_inline(
+        r#"
 input df
 Y X
 1 2
@@ -3449,43 +4302,59 @@ Y X
 7 8
 end
 quietly(ols(Y ~ X, df))
-"#);
+"#,
+    );
     assert!(ok, "quietly failed:\n{out}");
     // OLS output should NOT appear because quietly returns Nil
-    assert!(!out.contains("Coef"), "quietly should suppress OLS output:\n{out}");
+    assert!(
+        !out.contains("Coef"),
+        "quietly should suppress OLS output:\n{out}"
+    );
 }
 
 #[test]
 fn quietly_in_let_works() {
-    assert_ok("quietly_let", r#"
+    assert_ok(
+        "quietly_let",
+        r#"
 let x = 42
 let y = quietly(x)
-"#);
+"#,
+    );
 }
 
 #[test]
 fn capture_ignores_error() {
-    let (ok, _out) = run_inline(r#"
+    let (ok, _out) = run_inline(
+        r#"
 capture(undefined_var_xyz)
 display "ok"
-"#);
+"#,
+    );
     assert!(ok, "capture should not propagate error");
 }
 
 #[test]
 fn capture_passes_value() {
-    assert_ok_contains("capture_pass", r#"
+    assert_ok_contains(
+        "capture_pass",
+        r#"
 let x = capture(42)
 display x
-"#, "42");
+"#,
+        "42",
+    );
 }
 
 #[test]
 fn assert_true_passes() {
-    assert_ok("assert_true", r#"
+    assert_ok(
+        "assert_true",
+        r#"
 assert(1 > 0)
 assert(true)
-"#);
+"#,
+    );
 }
 
 #[test]
@@ -3498,28 +4367,41 @@ fn assert_false_fails() {
 fn assert_custom_message() {
     let (ok, out) = run_inline(r#"assert(false, "minha msg")"#);
     assert!(!ok, "assert(false) should fail");
-    assert!(out.contains("minha msg"), "should show custom message:\n{out}");
+    assert!(
+        out.contains("minha msg"),
+        "should show custom message:\n{out}"
+    );
 }
 
 #[test]
 fn format_decimals() {
-    assert_ok_contains("format_2f", r#"
+    assert_ok_contains(
+        "format_2f",
+        r#"
 let s = format(3.14159, "%.2f")
 display s
-"#, "3.14");
+"#,
+        "3.14",
+    );
 }
 
 #[test]
 fn format_zero_decimals() {
-    assert_ok_contains("format_0f", r#"
+    assert_ok_contains(
+        "format_0f",
+        r#"
 let s = format(99.7, "%.0f")
 display s
-"#, "100");
+"#,
+        "100",
+    );
 }
 
 #[test]
 fn duplicates_report() {
-    assert_ok_contains("dup_report", r#"
+    assert_ok_contains(
+        "dup_report",
+        r#"
 input df
 X
 1
@@ -3530,12 +4412,16 @@ X
 3
 end
 duplicates(df, X)
-"#, "duplicatas");
+"#,
+        "duplicatas",
+    );
 }
 
 #[test]
 fn duplicates_drop() {
-    assert_ok_contains("dup_drop", r#"
+    assert_ok_contains(
+        "dup_drop",
+        r#"
 input df
 X Y
 1 10
@@ -3546,12 +4432,16 @@ X Y
 3 60
 end
 duplicates(df, X, action=drop)
-"#, "3 obs removidas");
+"#,
+        "3 obs removidas",
+    );
 }
 
 #[test]
 fn duplicates_tag() {
-    assert_ok_contains("dup_tag", r#"
+    assert_ok_contains(
+        "dup_tag",
+        r#"
 input df
 X
 1
@@ -3562,12 +4452,16 @@ X
 3
 end
 duplicates(df, X, action=tag)
-"#, "_dup");
+"#,
+        "_dup",
+    );
 }
 
 #[test]
 fn label_and_describe() {
-    assert_ok_contains("label_describe", r#"
+    assert_ok_contains(
+        "label_describe",
+        r#"
 input df
 Y X
 1 2
@@ -3576,12 +4470,16 @@ end
 label(df, Y, "Variável dependente")
 label(df, X, "Variável independente")
 describe(df)
-"#, "Variável dependente");
+"#,
+        "Variável dependente",
+    );
 }
 
 #[test]
 fn rowtotal_treats_nan_as_zero() {
-    assert_ok("rowtotal", r#"
+    assert_ok(
+        "rowtotal",
+        r#"
 input df
 A B
 1 2
@@ -3589,12 +4487,15 @@ A B
 . 5
 end
 generate df RT = rowtotal(A, B)
-"#);
+"#,
+    );
 }
 
 #[test]
 fn rowmiss_counts_nan() {
-    assert_ok("rowmiss", r#"
+    assert_ok(
+        "rowmiss",
+        r#"
 input df
 A B C
 1 2 3
@@ -3602,7 +4503,8 @@ A B C
 . . .
 end
 generate df M = rowmiss(A, B, C)
-"#);
+"#,
+    );
 }
 
 #[test]
@@ -3641,27 +4543,47 @@ fn help_label() {
 
 #[test]
 fn regex_regexm_true() {
-    assert_ok_contains("regexm_true", r#"display regexm("hello123", "[0-9]+")"#, "true");
+    assert_ok_contains(
+        "regexm_true",
+        r#"display regexm("hello123", "[0-9]+")"#,
+        "true",
+    );
 }
 
 #[test]
 fn regex_regexm_false() {
-    assert_ok_contains("regexm_false", r#"display regexm("hello", "[0-9]+")"#, "false");
+    assert_ok_contains(
+        "regexm_false",
+        r#"display regexm("hello", "[0-9]+")"#,
+        "false",
+    );
 }
 
 #[test]
 fn regex_regexr() {
-    assert_ok_contains("regexr", r#"display regexr("abc 123 def", "[0-9]+", "NUM")"#, "abc NUM def");
+    assert_ok_contains(
+        "regexr",
+        r#"display regexr("abc 123 def", "[0-9]+", "NUM")"#,
+        "abc NUM def",
+    );
 }
 
 #[test]
 fn regex_regexra() {
-    assert_ok_contains("regexra", r#"display regexra("aaa bbb aaa", "aaa", "x")"#, "x bbb x");
+    assert_ok_contains(
+        "regexra",
+        r#"display regexra("aaa bbb aaa", "aaa", "x")"#,
+        "x bbb x",
+    );
 }
 
 #[test]
 fn regex_regexs_capture() {
-    assert_ok_contains("regexs_capture", r#"display regexs("price: 42.50 usd", "([0-9]+.[0-9]+)")"#, "42.50");
+    assert_ok_contains(
+        "regexs_capture",
+        r#"display regexs("price: 42.50 usd", "([0-9]+.[0-9]+)")"#,
+        "42.50",
+    );
 }
 
 #[test]
@@ -3671,16 +4593,24 @@ fn regex_regexs_no_match() {
 
 #[test]
 fn regex_in_if() {
-    assert_ok_contains("regex_if", r#"
+    assert_ok_contains(
+        "regex_if",
+        r#"
 if regexm("test@email.com", "@") {
     display "email"
 }
-"#, "email");
+"#,
+        "email",
+    );
 }
 
 #[test]
 fn regex_email_pattern() {
-    assert_ok_contains("regex_email", r#"display regexm("user@host.com", "^[^@]+@[^@]+$")"#, "true");
+    assert_ok_contains(
+        "regex_email",
+        r#"display regexm("user@host.com", "^[^@]+@[^@]+$")"#,
+        "true",
+    );
 }
 
 #[test]
@@ -3696,48 +4626,60 @@ fn smoke_regex() {
 
 #[test]
 fn load_json() {
-    let (ok, out) = run_inline(r#"load "exemplos/data/sample.json" as df
-print(df)"#);
+    let (ok, out) = run_inline(
+        r#"load "exemplos/data/sample.json" as df
+print(df)"#,
+    );
     assert!(ok, "load json failed:\n{out}");
     assert!(out.contains("5 rows"), "expected 5 rows:\n{out}");
 }
 
 #[test]
 fn load_tsv() {
-    let (ok, out) = run_inline(r#"load "exemplos/data/sample.tsv" as df
-print(df)"#);
+    let (ok, out) = run_inline(
+        r#"load "exemplos/data/sample.tsv" as df
+print(df)"#,
+    );
     assert!(ok, "load tsv failed:\n{out}");
     assert!(out.contains("5 rows"), "expected 5 rows:\n{out}");
 }
 
 #[test]
 fn load_sqlite_default_table() {
-    let (ok, out) = run_inline(r#"load "exemplos/data/sample.db" as df
-print(df)"#);
+    let (ok, out) = run_inline(
+        r#"load "exemplos/data/sample.db" as df
+print(df)"#,
+    );
     assert!(ok, "load sqlite failed:\n{out}");
     assert!(out.contains("8 rows"), "expected 8 rows:\n{out}");
 }
 
 #[test]
 fn load_sqlite_table_option() {
-    let (ok, out) = run_inline(r#"load "exemplos/data/sample.db" as df, table=precos
-print(df)"#);
+    let (ok, out) = run_inline(
+        r#"load "exemplos/data/sample.db" as df, table=precos
+print(df)"#,
+    );
     assert!(ok, "load sqlite table= failed:\n{out}");
     assert!(out.contains("8 rows"), "expected 8 rows:\n{out}");
 }
 
 #[test]
 fn load_sqlite_query() {
-    let (ok, out) = run_inline(r#"load "exemplos/data/sample.db" as df, query="SELECT * FROM precos WHERE produto = 'Soja'"
-print(df)"#);
+    let (ok, out) = run_inline(
+        r#"load "exemplos/data/sample.db" as df, query="SELECT * FROM precos WHERE produto = 'Soja'"
+print(df)"#,
+    );
     assert!(ok, "load sqlite query= failed:\n{out}");
     assert!(out.contains("4 rows"), "expected 4 rows:\n{out}");
 }
 
 #[test]
 fn load_csv_semicolon_sep() {
-    let (ok, out) = run_inline(r#"load "exemplos/data/sample_semicolon.csv" as df, sep=";"
-print(df)"#);
+    let (ok, out) = run_inline(
+        r#"load "exemplos/data/sample_semicolon.csv" as df, sep=";"
+print(df)"#,
+    );
     assert!(ok, "load csv sep=; failed:\n{out}");
     assert!(out.contains("4 rows"), "expected 4 rows:\n{out}");
 }
@@ -3746,22 +4688,29 @@ print(df)"#);
 fn load_unknown_option_error() {
     let (ok, out) = run_inline(r#"load "exemplos/data/sample.json" as df, bogus=1"#);
     assert!(!ok, "should fail with unknown option:\n{out}");
-    assert!(out.contains("unknown option"), "expected 'unknown option':\n{out}");
+    assert!(
+        out.contains("unknown option"),
+        "expected 'unknown option':\n{out}"
+    );
 }
 
 #[test]
 fn load_json_then_summarize() {
-    let (ok, out) = run_inline(r#"load "exemplos/data/sample.json" as df
-summarize(df, pop)"#);
+    let (ok, out) = run_inline(
+        r#"load "exemplos/data/sample.json" as df
+summarize(df, pop)"#,
+    );
     assert!(ok, "load json + summarize failed:\n{out}");
     assert!(out.contains("pop"), "expected 'pop' in output:\n{out}");
 }
 
 #[test]
 fn load_sqlite_then_generate() {
-    let (ok, out) = run_inline(r#"load "exemplos/data/sample.db" as df
+    let (ok, out) = run_inline(
+        r#"load "exemplos/data/sample.db" as df
 generate df preco2 = preco * 2
-display mean(df, preco2)"#);
+display mean(df, preco2)"#,
+    );
     assert!(ok, "load sqlite + generate failed:\n{out}");
 }
 
@@ -3770,10 +4719,16 @@ fn load_odbc_without_feature_gives_clear_error() {
     let (ok, out) = run_inline(r#"load "odbc://DSN=test" as df, query="SELECT 1""#);
     if cfg!(feature = "odbc") {
         // com feature ativa, vai falhar por falta de driver — mas não por "not enabled"
-        assert!(!out.contains("not enabled"), "should not say 'not enabled' with feature on:\n{out}");
+        assert!(
+            !out.contains("not enabled"),
+            "should not say 'not enabled' with feature on:\n{out}"
+        );
     } else {
         assert!(!ok, "should fail without odbc feature:\n{out}");
-        assert!(out.contains("not enabled"), "expected 'not enabled' message:\n{out}");
+        assert!(
+            out.contains("not enabled"),
+            "expected 'not enabled' message:\n{out}"
+        );
     }
 }
 
@@ -3783,8 +4738,10 @@ fn load_odbc_without_feature_gives_clear_error() {
 
 #[test]
 fn export_csv() {
-    let (ok, out) = run_inline(r#"load "exemplos/data/sample.db" as df
-export(df, "csv", "/tmp/hayashi_test_export.csv")"#);
+    let (ok, out) = run_inline(
+        r#"load "exemplos/data/sample.db" as df
+export(df, "csv", "/tmp/hayashi_test_export.csv")"#,
+    );
     assert!(ok, "export csv failed:\n{out}");
     assert!(out.contains("Exported"), "expected 'Exported':\n{out}");
     let content = std::fs::read_to_string("/tmp/hayashi_test_export.csv").unwrap();
@@ -3793,8 +4750,10 @@ export(df, "csv", "/tmp/hayashi_test_export.csv")"#);
 
 #[test]
 fn export_json() {
-    let (ok, out) = run_inline(r#"load "exemplos/data/sample.db" as df
-export(df, "json", "/tmp/hayashi_test_export.json")"#);
+    let (ok, out) = run_inline(
+        r#"load "exemplos/data/sample.db" as df
+export(df, "json", "/tmp/hayashi_test_export.json")"#,
+    );
     assert!(ok, "export json failed:\n{out}");
     let content = std::fs::read_to_string("/tmp/hayashi_test_export.json").unwrap();
     assert!(content.contains("Soja"), "json missing data:\n{content}");
@@ -3802,8 +4761,10 @@ export(df, "json", "/tmp/hayashi_test_export.json")"#);
 
 #[test]
 fn export_tsv() {
-    let (ok, out) = run_inline(r#"load "exemplos/data/sample.db" as df
-export(df, "tsv", "/tmp/hayashi_test_export.tsv")"#);
+    let (ok, out) = run_inline(
+        r#"load "exemplos/data/sample.db" as df
+export(df, "tsv", "/tmp/hayashi_test_export.tsv")"#,
+    );
     assert!(ok, "export tsv failed:\n{out}");
     let content = std::fs::read_to_string("/tmp/hayashi_test_export.tsv").unwrap();
     assert!(content.contains('\t'), "tsv missing tabs:\n{content}");
@@ -3811,55 +4772,67 @@ export(df, "tsv", "/tmp/hayashi_test_export.tsv")"#);
 
 #[test]
 fn export_xlsx() {
-    let (ok, out) = run_inline(r#"load "exemplos/data/sample.db" as df
-export(df, "xlsx", "/tmp/hayashi_test_export.xlsx")"#);
+    let (ok, out) = run_inline(
+        r#"load "exemplos/data/sample.db" as df
+export(df, "xlsx", "/tmp/hayashi_test_export.xlsx")"#,
+    );
     assert!(ok, "export xlsx failed:\n{out}");
     assert!(std::path::Path::new("/tmp/hayashi_test_export.xlsx").exists());
 }
 
 #[test]
 fn export_sqlite() {
-    let (ok, out) = run_inline(r#"load "exemplos/data/sample.db" as df
-export(df, "sqlite", "/tmp/hayashi_test_export_out.db")"#);
+    let (ok, out) = run_inline(
+        r#"load "exemplos/data/sample.db" as df
+export(df, "sqlite", "/tmp/hayashi_test_export_out.db")"#,
+    );
     assert!(ok, "export sqlite failed:\n{out}");
     assert!(std::path::Path::new("/tmp/hayashi_test_export_out.db").exists());
 }
 
 #[test]
 fn export_roundtrip_tsv() {
-    let (ok, out) = run_inline(r#"load "exemplos/data/sample.db" as df
+    let (ok, out) = run_inline(
+        r#"load "exemplos/data/sample.db" as df
 export(df, "tsv", "/tmp/hayashi_rt.tsv")
 load "/tmp/hayashi_rt.tsv" as df2
-display mean(df2, preco)"#);
+display mean(df2, preco)"#,
+    );
     assert!(ok, "roundtrip tsv failed:\n{out}");
     assert!(out.contains("88.4"), "expected mean ~88.4:\n{out}");
 }
 
 #[test]
 fn export_roundtrip_xlsx() {
-    let (ok, out) = run_inline(r#"load "exemplos/data/sample.db" as df
+    let (ok, out) = run_inline(
+        r#"load "exemplos/data/sample.db" as df
 export(df, "xlsx", "/tmp/hayashi_rt.xlsx")
 load "/tmp/hayashi_rt.xlsx" as df2
-display mean(df2, preco)"#);
+display mean(df2, preco)"#,
+    );
     assert!(ok, "roundtrip xlsx failed:\n{out}");
     assert!(out.contains("88.4"), "expected mean ~88.4:\n{out}");
 }
 
 #[test]
 fn export_roundtrip_sqlite() {
-    let (ok, out) = run_inline(r#"load "exemplos/data/sample.db" as df
+    let (ok, out) = run_inline(
+        r#"load "exemplos/data/sample.db" as df
 export(df, "sqlite", "/tmp/hayashi_rt_out.db")
 load "/tmp/hayashi_rt_out.db" as df2
-display mean(df2, preco)"#);
+display mean(df2, preco)"#,
+    );
     assert!(ok, "roundtrip sqlite failed:\n{out}");
     assert!(out.contains("88.4"), "expected mean ~88.4:\n{out}");
 }
 
 #[test]
 fn load_tsv_then_regression() {
-    let (ok, out) = run_inline(r#"load "exemplos/data/sample.tsv" as df
+    let (ok, out) = run_inline(
+        r#"load "exemplos/data/sample.tsv" as df
 let m = ols(score ~ id, df)
-print(m)"#);
+print(m)"#,
+    );
     assert!(ok, "load tsv + ols failed:\n{out}");
 }
 
@@ -3869,28 +4842,44 @@ print(m)"#);
 
 #[test]
 fn if_expr_true() {
-    assert_ok_contains("if_expr_t", r#"let r = if 1 > 0 { "yes" } else { "no" }
-display r"#, "yes");
+    assert_ok_contains(
+        "if_expr_t",
+        r#"let r = if 1 > 0 { "yes" } else { "no" }
+display r"#,
+        "yes",
+    );
 }
 
 #[test]
 fn if_expr_false() {
-    assert_ok_contains("if_expr_f", r#"let r = if 1 < 0 { "yes" } else { "no" }
-display r"#, "no");
+    assert_ok_contains(
+        "if_expr_f",
+        r#"let r = if 1 < 0 { "yes" } else { "no" }
+display r"#,
+        "no",
+    );
 }
 
 #[test]
 fn if_expr_nested() {
-    assert_ok_contains("if_expr_nest", r#"let x = 5
+    assert_ok_contains(
+        "if_expr_nest",
+        r#"let x = 5
 let r = if x > 10 { "big" } else { if x > 3 { "mid" } else { "small" } }
-display r"#, "mid");
+display r"#,
+        "mid",
+    );
 }
 
 #[test]
 fn if_expr_arithmetic() {
-    assert_ok_contains("if_expr_arith", r#"let x = -5
+    assert_ok_contains(
+        "if_expr_arith",
+        r#"let x = -5
 let abs = if x < 0 { -x } else { x }
-display abs"#, "5");
+display abs"#,
+        "5",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -3909,14 +4898,22 @@ fn in_list_not_found() {
 
 #[test]
 fn in_dict() {
-    assert_ok_contains("in_dict", r#"let d = {"a": 1, "b": 2}
-display "a" in d"#, "true");
+    assert_ok_contains(
+        "in_dict",
+        r#"let d = {"a": 1, "b": 2}
+display "a" in d"#,
+        "true",
+    );
 }
 
 #[test]
 fn in_dict_missing() {
-    assert_ok_contains("in_dict_f", r#"let d = {"a": 1}
-display "z" in d"#, "false");
+    assert_ok_contains(
+        "in_dict_f",
+        r#"let d = {"a": 1}
+display "z" in d"#,
+        "false",
+    );
 }
 
 #[test]
@@ -3926,8 +4923,12 @@ fn in_string() {
 
 #[test]
 fn in_combined_with_if() {
-    assert_ok_contains("in_if", r#"let r = if 3 in [1, 2, 3] { "found" } else { "nope" }
-display r"#, "found");
+    assert_ok_contains(
+        "in_if",
+        r#"let r = if 3 in [1, 2, 3] { "found" } else { "nope" }
+display r"#,
+        "found",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -3936,36 +4937,55 @@ display r"#, "found");
 
 #[test]
 fn match_basic() {
-    assert_ok_contains("match_basic", r#"let x = 2
+    assert_ok_contains(
+        "match_basic",
+        r#"let x = 2
 let r = match x { 1 => "one", 2 => "two", _ => "other" }
-display r"#, "two");
+display r"#,
+        "two",
+    );
 }
 
 #[test]
 fn match_wildcard() {
-    assert_ok_contains("match_wild", r#"let r = match 99 { 1 => "a", _ => "default" }
-display r"#, "default");
+    assert_ok_contains(
+        "match_wild",
+        r#"let r = match 99 { 1 => "a", _ => "default" }
+display r"#,
+        "default",
+    );
 }
 
 #[test]
 fn match_string() {
-    assert_ok_contains("match_str", r#"let s = "hello"
+    assert_ok_contains(
+        "match_str",
+        r#"let s = "hello"
 let r = match s { "hi" => 1, "hello" => 2, _ => 0 }
-display r"#, "2");
+display r"#,
+        "2",
+    );
 }
 
 #[test]
 fn match_no_arm_error() {
     let (ok, out) = run_inline(r#"let r = match 5 { 1 => "a", 2 => "b" }"#);
     assert!(!ok, "match without matching arm should fail:\n{out}");
-    assert!(out.contains("no arm matched"), "expected 'no arm matched':\n{out}");
+    assert!(
+        out.contains("no arm matched"),
+        "expected 'no arm matched':\n{out}"
+    );
 }
 
 #[test]
 fn match_with_expr() {
-    assert_ok_contains("match_expr", r#"let x = 3
+    assert_ok_contains(
+        "match_expr",
+        r#"let x = 3
 let r = match x * 2 { 4 => "four", 6 => "six", _ => "?" }
-display r"#, "six");
+display r"#,
+        "six",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -3974,40 +4994,56 @@ display r"#, "six");
 
 #[test]
 fn try_catch_basic() {
-    assert_ok_contains("try_catch", r#"try {
+    assert_ok_contains(
+        "try_catch",
+        r#"try {
     load "nonexistent.csv" as df
 } catch e {
     display "caught"
-}"#, "caught");
+}"#,
+        "caught",
+    );
 }
 
 #[test]
 fn try_catch_error_var() {
-    assert_ok_contains("try_err_var", r#"try {
+    assert_ok_contains(
+        "try_err_var",
+        r#"try {
     display undefined_var
 } catch e {
     display f"error: {e}"
-}"#, "error:");
+}"#,
+        "error:",
+    );
 }
 
 #[test]
 fn try_catch_no_error() {
-    assert_ok_contains("try_no_err", r#"try {
+    assert_ok_contains(
+        "try_no_err",
+        r#"try {
     let x = 42
     display x
 } catch e {
     display "should not reach"
-}"#, "42");
+}"#,
+        "42",
+    );
 }
 
 #[test]
 fn try_catch_continues() {
-    assert_ok_contains("try_continues", r#"try {
+    assert_ok_contains(
+        "try_continues",
+        r#"try {
     load "bad.csv" as df
 } catch e {
     let x = 1
 }
-display "alive""#, "alive");
+display "alive""#,
+        "alive",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -4016,32 +5052,52 @@ display "alive""#, "alive");
 
 #[test]
 fn pipe_sort() {
-    assert_ok_contains("pipe_sort", r#"let r = [3, 1, 2] |> sort
-display r[0]"#, "1");
+    assert_ok_contains(
+        "pipe_sort",
+        r#"let r = [3, 1, 2] |> sort
+display r[0]"#,
+        "1",
+    );
 }
 
 #[test]
 fn pipe_chain() {
-    assert_ok_contains("pipe_chain", r#"let r = [3, 1, 2] |> sort |> reverse
-display r[0]"#, "3");
+    assert_ok_contains(
+        "pipe_chain",
+        r#"let r = [3, 1, 2] |> sort |> reverse
+display r[0]"#,
+        "3",
+    );
 }
 
 #[test]
 fn pipe_with_args() {
-    assert_ok_contains("pipe_args", r#"let r = [1, 2, 3] |> push(4)
-display len(r)"#, "4");
+    assert_ok_contains(
+        "pipe_args",
+        r#"let r = [1, 2, 3] |> push(4)
+display len(r)"#,
+        "4",
+    );
 }
 
 #[test]
 fn pipe_map_closure() {
-    assert_ok_contains("pipe_map", r#"let r = [1, 2, 3] |> map(|x| x * 10)
-display r[1]"#, "20");
+    assert_ok_contains(
+        "pipe_map",
+        r#"let r = [1, 2, 3] |> map(|x| x * 10)
+display r[1]"#,
+        "20",
+    );
 }
 
 #[test]
 fn pipe_filter_map() {
-    assert_ok_contains("pipe_fm", r#"let r = [1, 2, 3, 4, 5] |> filter(|x| x > 2) |> map(|x| x * 10)
-display r[0]"#, "30");
+    assert_ok_contains(
+        "pipe_fm",
+        r#"let r = [1, 2, 3, 4, 5] |> filter(|x| x > 2) |> map(|x| x * 10)
+display r[0]"#,
+        "30",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -4050,21 +5106,33 @@ display r[0]"#, "30");
 
 #[test]
 fn import_basic() {
-    assert_ok_contains("import_basic", r#"import("exemplos/data/test_module")
-display double(21)"#, "42");
+    assert_ok_contains(
+        "import_basic",
+        r#"import("exemplos/data/test_module")
+display double(21)"#,
+        "42",
+    );
 }
 
 #[test]
 fn import_const_available() {
-    assert_ok_contains("import_const", r#"import("exemplos/data/test_module")
-display MODULE_LOADED"#, "true");
+    assert_ok_contains(
+        "import_const",
+        r#"import("exemplos/data/test_module")
+display MODULE_LOADED"#,
+        "true",
+    );
 }
 
 #[test]
 fn import_dedup() {
-    assert_ok_contains("import_dedup", r#"import("exemplos/data/test_module")
+    assert_ok_contains(
+        "import_dedup",
+        r#"import("exemplos/data/test_module")
 import("exemplos/data/test_module")
-display double(5)"#, "10");
+display double(5)"#,
+        "10",
+    );
 }
 
 #[test]
@@ -4076,8 +5144,12 @@ fn import_not_found() {
 
 #[test]
 fn import_with_extension() {
-    assert_ok_contains("import_ext", r#"import("exemplos/data/test_module.hy")
-display double(3)"#, "6");
+    assert_ok_contains(
+        "import_ext",
+        r#"import("exemplos/data/test_module.hy")
+display double(3)"#,
+        "6",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -4086,8 +5158,12 @@ display double(3)"#, "6");
 
 #[test]
 fn fstring_basic() {
-    assert_ok_contains("fstr_basic", r#"let x = 42
-display f"value = {x}""#, "value = 42");
+    assert_ok_contains(
+        "fstr_basic",
+        r#"let x = 42
+display f"value = {x}""#,
+        "value = 42",
+    );
 }
 
 #[test]
@@ -4097,15 +5173,23 @@ fn fstring_expr() {
 
 #[test]
 fn fstring_format_spec() {
-    assert_ok_contains("fstr_fmt", r#"let pi = 3.14159
-display f"{pi:.2f}""#, "3.14");
+    assert_ok_contains(
+        "fstr_fmt",
+        r#"let pi = 3.14159
+display f"{pi:.2f}""#,
+        "3.14",
+    );
 }
 
 #[test]
 fn fstring_multiple() {
-    assert_ok_contains("fstr_multi", r#"let a = 1
+    assert_ok_contains(
+        "fstr_multi",
+        r#"let a = 1
 let b = 2
-display f"{a} + {b} = {a + b}""#, "1 + 2 = 3");
+display f"{a} + {b} = {a + b}""#,
+        "1 + 2 = 3",
+    );
 }
 
 #[test]
@@ -4124,28 +5208,44 @@ fn fstring_scientific() {
 
 #[test]
 fn closure_map() {
-    assert_ok_contains("closure_map", r#"let r = map([1,2,3], |x| x * 10)
-display r[0]"#, "10");
+    assert_ok_contains(
+        "closure_map",
+        r#"let r = map([1,2,3], |x| x * 10)
+display r[0]"#,
+        "10",
+    );
 }
 
 #[test]
 fn closure_filter() {
-    assert_ok_contains("closure_filter", r#"let r = filter([1,2,3,4,5], |x| x > 3)
-display len(r)"#, "2");
+    assert_ok_contains(
+        "closure_filter",
+        r#"let r = filter([1,2,3,4,5], |x| x > 3)
+display len(r)"#,
+        "2",
+    );
 }
 
 #[test]
 fn closure_multi_param() {
-    assert_ok_contains("closure_multi", r#"let add = |a, b| a + b
+    assert_ok_contains(
+        "closure_multi",
+        r#"let add = |a, b| a + b
 let nums = [1, 2, 3]
 let result = map(nums, |x| add(x, 10))
-display result[1]"#, "12");
+display result[1]"#,
+        "12",
+    );
 }
 
 #[test]
 fn closure_as_variable() {
-    assert_ok_contains("closure_var", r#"let sq = |x| x * x
-display sq(5)"#, "25");
+    assert_ok_contains(
+        "closure_var",
+        r#"let sq = |x| x * x
+display sq(5)"#,
+        "25",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -4208,28 +5308,34 @@ fn typeof_dict() {
 
 #[test]
 fn export_parquet() {
-    let (ok, out) = run_inline(r#"load "exemplos/data/sample.db" as df
-export(df, "parquet", "/tmp/hayashi_test.parquet")"#);
+    let (ok, out) = run_inline(
+        r#"load "exemplos/data/sample.db" as df
+export(df, "parquet", "/tmp/hayashi_test.parquet")"#,
+    );
     assert!(ok, "export parquet failed:\n{out}");
     assert!(std::path::Path::new("/tmp/hayashi_test.parquet").exists());
 }
 
 #[test]
 fn parquet_roundtrip() {
-    let (ok, out) = run_inline(r#"load "exemplos/data/sample.db" as df
+    let (ok, out) = run_inline(
+        r#"load "exemplos/data/sample.db" as df
 export(df, "parquet", "/tmp/hayashi_rt.parquet")
 load "/tmp/hayashi_rt.parquet" as df2
-display mean(df2, preco)"#);
+display mean(df2, preco)"#,
+    );
     assert!(ok, "parquet roundtrip failed:\n{out}");
     assert!(out.contains("88.4"), "expected mean ~88.4:\n{out}");
 }
 
 #[test]
 fn load_parquet() {
-    let (ok, out) = run_inline(r#"load "exemplos/data/sample.db" as df
+    let (ok, out) = run_inline(
+        r#"load "exemplos/data/sample.db" as df
 export(df, "parquet", "/tmp/hayashi_load.parquet")
 load "/tmp/hayashi_load.parquet" as df2
-print(df2)"#);
+print(df2)"#,
+    );
     assert!(ok, "load parquet failed:\n{out}");
     assert!(out.contains("8 rows"), "expected 8 rows:\n{out}");
 }
@@ -4240,135 +5346,203 @@ print(df2)"#);
 
 #[test]
 fn list_push() {
-    assert_ok_contains("list_push", r#"
+    assert_ok_contains(
+        "list_push",
+        r#"
 let a = [1, 2, 3]
 let b = push(a, 4)
-display len(b)"#, "4");
+display len(b)"#,
+        "4",
+    );
 }
 
 #[test]
 fn list_pop() {
-    assert_ok_contains("list_pop", r#"
+    assert_ok_contains(
+        "list_pop",
+        r#"
 let a = [1, 2, 3]
 let b = pop(a)
-display len(b)"#, "2");
+display len(b)"#,
+        "2",
+    );
 }
 
 #[test]
 fn list_insert() {
-    assert_ok_contains("list_insert", r#"
+    assert_ok_contains(
+        "list_insert",
+        r#"
 let a = [10, 30]
 let b = insert(a, 1, 20)
-display b[1]"#, "20");
+display b[1]"#,
+        "20",
+    );
 }
 
 #[test]
 fn list_remove() {
-    assert_ok_contains("list_remove", r#"
+    assert_ok_contains(
+        "list_remove",
+        r#"
 let a = [10, 20, 30]
 let b = remove(a, 1)
-display len(b)"#, "2");
+display len(b)"#,
+        "2",
+    );
 }
 
 #[test]
 fn list_clear() {
-    assert_ok_contains("list_clear", r#"
+    assert_ok_contains(
+        "list_clear",
+        r#"
 let a = [1, 2, 3]
 let b = clear(a)
-display len(b)"#, "0");
+display len(b)"#,
+        "0",
+    );
 }
 
 #[test]
 fn list_reverse() {
-    assert_ok_contains("list_reverse", r#"
+    assert_ok_contains(
+        "list_reverse",
+        r#"
 let a = [1, 2, 3]
 let b = reverse(a)
-display b[0]"#, "3");
+display b[0]"#,
+        "3",
+    );
 }
 
 #[test]
 fn list_index() {
-    assert_ok_contains("list_index", r#"
+    assert_ok_contains(
+        "list_index",
+        r#"
 let a = [10, 20, 30]
-display index(a, 20)"#, "1");
+display index(a, 20)"#,
+        "1",
+    );
 }
 
 #[test]
 fn list_index_not_found() {
-    assert_ok_contains("list_index_not_found", r#"
+    assert_ok_contains(
+        "list_index_not_found",
+        r#"
 let a = [10, 20, 30]
-display index(a, 99)"#, "-1");
+display index(a, 99)"#,
+        "-1",
+    );
 }
 
 #[test]
 fn list_slice() {
-    assert_ok_contains("list_slice", r#"
+    assert_ok_contains(
+        "list_slice",
+        r#"
 let a = [10, 20, 30, 40, 50]
 let b = slice(a, 1, 4)
-display len(b)"#, "3");
+display len(b)"#,
+        "3",
+    );
 }
 
 #[test]
 fn list_slice_open() {
-    assert_ok_contains("list_slice_open", r#"
+    assert_ok_contains(
+        "list_slice_open",
+        r#"
 let a = [10, 20, 30, 40]
 let b = slice(a, 2)
-display len(b)"#, "2");
+display len(b)"#,
+        "2",
+    );
 }
 
 #[test]
 fn list_join() {
-    assert_ok_contains("list_join", r#"
+    assert_ok_contains(
+        "list_join",
+        r#"
 let a = ["a", "b", "c"]
-display join(a, "-")"#, "a-b-c");
+display join(a, "-")"#,
+        "a-b-c",
+    );
 }
 
 #[test]
 fn list_join_default() {
-    assert_ok_contains("list_join_default", r#"
+    assert_ok_contains(
+        "list_join_default",
+        r#"
 let a = [1, 2, 3]
-display join(a)"#, "1, 2, 3");
+display join(a)"#,
+        "1, 2, 3",
+    );
 }
 
 #[test]
 fn list_unique() {
-    assert_ok_contains("list_unique", r#"
+    assert_ok_contains(
+        "list_unique",
+        r#"
 let a = [1, 2, 2, 3, 1]
 let b = unique(a)
-display len(b)"#, "3");
+display len(b)"#,
+        "3",
+    );
 }
 
 #[test]
 fn list_flatten() {
-    assert_ok_contains("list_flatten", r#"
+    assert_ok_contains(
+        "list_flatten",
+        r#"
 let a = [[1, 2], [3, 4], 5]
 let b = flatten(a)
-display len(b)"#, "5");
+display len(b)"#,
+        "5",
+    );
 }
 
 #[test]
 fn list_map() {
-    assert_ok_contains("list_map", r#"
+    assert_ok_contains(
+        "list_map",
+        r#"
 fn double(x) { return x * 2 }
 let a = [1, 2, 3]
 let b = map(a, double)
-display b[2]"#, "6");
+display b[2]"#,
+        "6",
+    );
 }
 
 #[test]
 fn list_immutability() {
-    assert_ok_contains("list_immut", r#"
+    assert_ok_contains(
+        "list_immut",
+        r#"
 let a = [1, 2, 3]
 let b = push(a, 4)
-display len(a)"#, "3");
+display len(a)"#,
+        "3",
+    );
 }
 
 #[test]
 fn list_chained() {
-    assert_ok_contains("list_chained", r#"
+    assert_ok_contains(
+        "list_chained",
+        r#"
 let a = [3, 1, 2]
 let b = sort(push(a, 0))
-display b[0]"#, "0");
+display b[0]"#,
+        "0",
+    );
 }
 
 #[test]
@@ -4382,7 +5556,10 @@ fn list_pop_empty_error() {
 fn list_remove_out_of_bounds() {
     let (ok, out) = run_inline("let a = [1, 2]\nlet b = remove(a, 5)");
     assert!(!ok, "remove OOB should fail:\n{out}");
-    assert!(out.contains("out of range"), "expected 'out of range':\n{out}");
+    assert!(
+        out.contains("out of range"),
+        "expected 'out of range':\n{out}"
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -4391,109 +5568,165 @@ fn list_remove_out_of_bounds() {
 
 #[test]
 fn dict_literal() {
-    assert_ok_contains("dict_lit", r#"
+    assert_ok_contains(
+        "dict_lit",
+        r#"
 let d = {"name": "Alice", "age": 30}
-display d["name"]"#, "Alice");
+display d["name"]"#,
+        "Alice",
+    );
 }
 
 #[test]
 fn dict_index_int_value() {
-    assert_ok_contains("dict_int_val", r#"
+    assert_ok_contains(
+        "dict_int_val",
+        r#"
 let d = {"x": 42}
-display d["x"]"#, "42");
+display d["x"]"#,
+        "42",
+    );
 }
 
 #[test]
 fn dict_len() {
-    assert_ok_contains("dict_len", r#"
+    assert_ok_contains(
+        "dict_len",
+        r#"
 let d = {"a": 1, "b": 2, "c": 3}
-display len(d)"#, "3");
+display len(d)"#,
+        "3",
+    );
 }
 
 #[test]
 fn dict_keys() {
-    assert_ok_contains("dict_keys", r#"
+    assert_ok_contains(
+        "dict_keys",
+        r#"
 let d = {"b": 2, "a": 1}
 let k = keys(d)
-display k[0]"#, "a");
+display k[0]"#,
+        "a",
+    );
 }
 
 #[test]
 fn dict_values() {
-    assert_ok_contains("dict_values", r#"
+    assert_ok_contains(
+        "dict_values",
+        r#"
 let d = {"a": 10, "b": 20}
 let v = values(d)
-display len(v)"#, "2");
+display len(v)"#,
+        "2",
+    );
 }
 
 #[test]
 fn dict_has_key_true() {
-    assert_ok_contains("dict_has_key_t", r#"
+    assert_ok_contains(
+        "dict_has_key_t",
+        r#"
 let d = {"x": 1}
-display has_key(d, "x")"#, "true");
+display has_key(d, "x")"#,
+        "true",
+    );
 }
 
 #[test]
 fn dict_has_key_false() {
-    assert_ok_contains("dict_has_key_f", r#"
+    assert_ok_contains(
+        "dict_has_key_f",
+        r#"
 let d = {"x": 1}
-display has_key(d, "z")"#, "false");
+display has_key(d, "z")"#,
+        "false",
+    );
 }
 
 #[test]
 fn dict_set() {
-    assert_ok_contains("dict_set", r#"
+    assert_ok_contains(
+        "dict_set",
+        r#"
 let d = {"a": 1}
 let d2 = dict_set(d, "b", 2)
-display len(d2)"#, "2");
+display len(d2)"#,
+        "2",
+    );
 }
 
 #[test]
 fn dict_set_overwrite() {
-    assert_ok_contains("dict_set_ow", r#"
+    assert_ok_contains(
+        "dict_set_ow",
+        r#"
 let d = {"a": 1}
 let d2 = dict_set(d, "a", 99)
-display d2["a"]"#, "99");
+display d2["a"]"#,
+        "99",
+    );
 }
 
 #[test]
 fn dict_remove() {
-    assert_ok_contains("dict_remove", r#"
+    assert_ok_contains(
+        "dict_remove",
+        r#"
 let d = {"a": 1, "b": 2}
 let d2 = dict_remove(d, "a")
-display len(d2)"#, "1");
+display len(d2)"#,
+        "1",
+    );
 }
 
 #[test]
 fn dict_merge() {
-    assert_ok_contains("dict_merge", r#"
+    assert_ok_contains(
+        "dict_merge",
+        r#"
 let d1 = {"a": 1, "b": 2}
 let d2 = {"b": 99, "c": 3}
 let d3 = dict_merge(d1, d2)
-display d3["b"]"#, "99");
+display d3["b"]"#,
+        "99",
+    );
 }
 
 #[test]
 fn dict_immutability() {
-    assert_ok_contains("dict_immut", r#"
+    assert_ok_contains(
+        "dict_immut",
+        r#"
 let d = {"a": 1}
 let d2 = dict_set(d, "b", 2)
-display len(d)"#, "1");
+display len(d)"#,
+        "1",
+    );
 }
 
 #[test]
 fn dict_nested() {
-    assert_ok_contains("dict_nested", r#"
+    assert_ok_contains(
+        "dict_nested",
+        r#"
 let inner = {"x": 42}
 let outer = {"data": inner}
-display outer["data"]"#, "\"x\": 42");
+display outer["data"]"#,
+        "\"x\": 42",
+    );
 }
 
 #[test]
 fn dict_empty() {
-    assert_ok_contains("dict_empty", r#"
+    assert_ok_contains(
+        "dict_empty",
+        r#"
 let d = {}
-display len(d)"#, "0");
+display len(d)"#,
+        "0",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -4502,61 +5735,89 @@ display len(d)"#, "0");
 
 #[test]
 fn const_declare() {
-    assert_ok_contains("const_decl", r#"
+    assert_ok_contains(
+        "const_decl",
+        r#"
 const PI = 3.14159
-display PI"#, "3.14159");
+display PI"#,
+        "3.14159",
+    );
 }
 
 #[test]
 fn const_reassign_error() {
     let (ok, out) = run_inline("const X = 10\nX = 20");
     assert!(!ok, "reassign const should fail:\n{out}");
-    assert!(out.contains("cannot reassign const"), "expected const error:\n{out}");
+    assert!(
+        out.contains("cannot reassign const"),
+        "expected const error:\n{out}"
+    );
 }
 
 #[test]
 fn const_let_redeclare_error() {
     let (ok, out) = run_inline("const X = 10\nlet X = 20");
     assert!(!ok, "let over const should fail:\n{out}");
-    assert!(out.contains("cannot redeclare const"), "expected const error:\n{out}");
+    assert!(
+        out.contains("cannot redeclare const"),
+        "expected const error:\n{out}"
+    );
 }
 
 #[test]
 fn const_in_expression() {
-    assert_ok_contains("const_expr", r#"
+    assert_ok_contains(
+        "const_expr",
+        r#"
 const TAX = 0.1
 let price = 100
-display price * (1 + TAX)"#, "110");
+display price * (1 + TAX)"#,
+        "110",
+    );
 }
 
 #[test]
 fn const_let_same_name_different_scope() {
-    assert_ok_contains("const_scope", r#"
+    assert_ok_contains(
+        "const_scope",
+        r#"
 const G = 10
 if true {
     let x = G * 2
     display x
-}"#, "20");
+}"#,
+        "20",
+    );
 }
 
 #[test]
 fn dict_missing_key_error() {
-    let (ok, out) = run_inline(r#"let d = {"a": 1}
-display d["z"]"#);
+    let (ok, out) = run_inline(
+        r#"let d = {"a": 1}
+display d["z"]"#,
+    );
     assert!(!ok, "missing key should fail:\n{out}");
     assert!(out.contains("not found"), "expected 'not found':\n{out}");
 }
 
 #[test]
 fn dict_display() {
-    assert_ok_contains("dict_display", r#"
+    assert_ok_contains(
+        "dict_display",
+        r#"
 let d = {"name": "Bob", "age": 25}
-display d"#, "\"age\": 25");
+display d"#,
+        "\"age\": 25",
+    );
 }
 
 #[test]
 fn dict_in_list() {
-    assert_ok_contains("dict_in_list", r#"
+    assert_ok_contains(
+        "dict_in_list",
+        r#"
 let items = [{"name": "A", "val": 1}, {"name": "B", "val": 2}]
-display items[1]["name"]"#, "B");
+display items[1]["name"]"#,
+        "B",
+    );
 }

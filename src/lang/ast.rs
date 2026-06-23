@@ -3,7 +3,7 @@
 pub struct Formula {
     pub lhs: String,
     pub rhs: Vec<RhsTerm>,
-    pub fe: Vec<String>,   // após |
+    pub fe: Vec<String>, // após |
 }
 
 #[derive(Debug, Clone)]
@@ -24,20 +24,35 @@ pub struct Opt {
 /// Operadores binários para expressões aritméticas/comparação/lógica
 #[derive(Debug, Clone)]
 pub enum BinOp {
-    Add, Sub, Mul, Div, Pow,
-    Gt, Lt, GtEq, LtEq, Eq, Ne,
-    And, Or, In,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Pow,
+    Gt,
+    Lt,
+    GtEq,
+    LtEq,
+    Eq,
+    Ne,
+    And,
+    Or,
+    In,
 }
 
 /// Operador de série temporal
 #[derive(Debug, Clone)]
-pub enum TsOpKind { Lag, Lead, Diff }
+pub enum TsOpKind {
+    Lag,
+    Lead,
+    Diff,
+}
 
 /// Iterador de loop for
 #[derive(Debug, Clone)]
 pub enum ForIter {
-    Range(Expr, Expr),  // start..end  (exclusivo no topo, tipo Rust/Python)
-    Items(Expr),         // lista ou variável
+    Range(Expr, Expr), // start..end  (exclusivo no topo, tipo Rust/Python)
+    Items(Expr),       // lista ou variável
 }
 
 /// Expressões da linguagem
@@ -52,7 +67,11 @@ pub enum Expr {
     Formula(Formula),
 
     // aritmética / comparação / lógica: price * 1.5, mpg > 20, a && b
-    BinOp { op: BinOp, lhs: Box<Expr>, rhs: Box<Expr> },
+    BinOp {
+        op: BinOp,
+        lhs: Box<Expr>,
+        rhs: Box<Expr>,
+    },
 
     // negação unária: -price
     Neg(Box<Expr>),
@@ -67,7 +86,10 @@ pub enum Expr {
     Dict(Vec<(Expr, Expr)>),
 
     // indexação: lista[0] ou dict["key"]
-    Index { obj: Box<Expr>, idx: Box<Expr> },
+    Index {
+        obj: Box<Expr>,
+        idx: Box<Expr>,
+    },
 
     // chamada de função/estimador: ols(fórmula, df, cov=HC3)
     Call {
@@ -85,16 +107,30 @@ pub enum Expr {
     },
 
     // closure: |x, y| x + y
-    Closure { params: Vec<String>, body: Box<Expr> },
+    Closure {
+        params: Vec<String>,
+        body: Box<Expr>,
+    },
 
     // match expr { pattern => result, ... }
-    Match { expr: Box<Expr>, arms: Vec<(Expr, Expr)> },
+    Match {
+        expr: Box<Expr>,
+        arms: Vec<(Expr, Expr)>,
+    },
 
     // if cond { expr } else { expr }  (expression, returns value)
-    IfExpr { cond: Box<Expr>, then_expr: Box<Expr>, else_expr: Box<Expr> },
+    IfExpr {
+        cond: Box<Expr>,
+        then_expr: Box<Expr>,
+        else_expr: Box<Expr>,
+    },
 
     // operadores de série temporal: L.price, L2.price, F.gdp, D.wage
-    TsOp { op: TsOpKind, var: String, n: usize },
+    TsOp {
+        op: TsOpKind,
+        var: String,
+        n: usize,
+    },
 }
 
 pub type Spanned = (Stmt, usize);
@@ -103,38 +139,75 @@ pub type Spanned = (Stmt, usize);
 #[derive(Debug, Clone)]
 pub enum Stmt {
     // let nome = expr (declara no escopo atual)
-    Let { name: String, value: Expr },
+    Let {
+        name: String,
+        value: Expr,
+    },
 
     // const nome = expr (declara imutável no escopo atual)
-    Const { name: String, value: Expr },
+    Const {
+        name: String,
+        value: Expr,
+    },
 
     // nome = expr (modifica variável existente no escopo mais próximo)
-    Assign { name: String, value: Expr },
+    Assign {
+        name: String,
+        value: Expr,
+    },
 
     // load "arquivo.csv" as nome [, sheet=Plan1, table=t, query="..."]
-    Load { path: Expr, alias: String, opts: Vec<Opt> },
+    Load {
+        path: Expr,
+        alias: String,
+        opts: Vec<Opt>,
+    },
 
     // generate df newvar = expr
-    Generate { df: String, varname: String, expr: Expr },
+    Generate {
+        df: String,
+        varname: String,
+        expr: Expr,
+    },
 
     // predict df newvar = model [, "kind"]
     // kind: "xb" (default) | "residuals" | "pr"
-    Predict { df: String, varname: String, model: Expr, kind: Expr },
+    Predict {
+        df: String,
+        varname: String,
+        model: Expr,
+        kind: Expr,
+    },
 
     // print(expr)
     Print(Expr),
 
     // export(expr, formato, "arquivo")
-    Export { value: Expr, fmt: Expr, path: Expr },
+    Export {
+        value: Expr,
+        fmt: Expr,
+        path: Expr,
+    },
 
     // replace df varname = expr [if cond]
-    Replace { df: String, varname: String, expr: Expr, cond: Option<Expr> },
+    Replace {
+        df: String,
+        varname: String,
+        expr: Expr,
+        cond: Option<Expr>,
+    },
 
     // count df [if cond]
-    Count { df: String, cond: Option<Expr> },
+    Count {
+        df: String,
+        cond: Option<Expr>,
+    },
 
     // tsset df timevar
-    Tsset { df: String, t_var: String },
+    Tsset {
+        df: String,
+        t_var: String,
+    },
 
     // if cond { ... } [else if cond { ... }]* [else { ... }]
     If {

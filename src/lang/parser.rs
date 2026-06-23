@@ -10,7 +10,11 @@ pub struct Parser {
 
 impl Parser {
     pub fn new(tokens: Vec<(Token, usize)>) -> Self {
-        Self { tokens, pos: 0, paren_depth: 0 }
+        Self {
+            tokens,
+            pos: 0,
+            paren_depth: 0,
+        }
     }
 
     fn peek(&mut self) -> &Token {
@@ -19,7 +23,10 @@ impl Parser {
                 self.pos += 1;
             }
         }
-        self.tokens.get(self.pos).map(|(t, _)| t).unwrap_or(&Token::Eof)
+        self.tokens
+            .get(self.pos)
+            .map(|(t, _)| t)
+            .unwrap_or(&Token::Eof)
     }
 
     fn line(&self) -> usize {
@@ -32,9 +39,17 @@ impl Parser {
                 self.pos += 1;
             }
         }
-        let t = self.tokens.get(self.pos).map(|(t, _)| t).unwrap_or(&Token::Eof);
-        if t == &Token::LParen { self.paren_depth += 1; }
-        if t == &Token::RParen && self.paren_depth > 0 { self.paren_depth -= 1; }
+        let t = self
+            .tokens
+            .get(self.pos)
+            .map(|(t, _)| t)
+            .unwrap_or(&Token::Eof);
+        if t == &Token::LParen {
+            self.paren_depth += 1;
+        }
+        if t == &Token::RParen && self.paren_depth > 0 {
+            self.paren_depth -= 1;
+        }
         self.pos += 1;
         t
     }
@@ -43,7 +58,10 @@ impl Parser {
         let line = self.line();
         match self.advance().clone() {
             Token::Ident(s) => Ok(s),
-            t => Err(HayashiError::Parse { line, msg: format!("expected identifier, got {t:?}") }),
+            t => Err(HayashiError::Parse {
+                line,
+                msg: format!("expected identifier, got {t:?}"),
+            }),
         }
     }
 
@@ -53,7 +71,10 @@ impl Parser {
         if &got == expected {
             Ok(())
         } else {
-            Err(HayashiError::Parse { line, msg: format!("expected {expected:?}, got {got:?}") })
+            Err(HayashiError::Parse {
+                line,
+                msg: format!("expected {expected:?}, got {got:?}"),
+            })
         }
     }
 
@@ -75,8 +96,13 @@ impl Parser {
         loop {
             match self.peek().clone() {
                 Token::Newline | Token::Eof | Token::RParen | Token::Comma => break,
-                Token::Pipe => { self.advance(); in_fe = true; }
-                Token::Plus | Token::Minus => { self.advance(); }
+                Token::Pipe => {
+                    self.advance();
+                    in_fe = true;
+                }
+                Token::Plus | Token::Minus => {
+                    self.advance();
+                }
                 Token::Ident(name) => {
                     self.advance();
                     if self.peek() == &Token::LParen {
@@ -89,7 +115,7 @@ impl Parser {
                         } else {
                             let term = match name.as_str() {
                                 "C" => RhsTerm::Categorical(inner),
-                                f   => RhsTerm::Transform(f.to_string(), inner),
+                                f => RhsTerm::Transform(f.to_string(), inner),
                             };
                             rhs.push(term);
                         }
@@ -111,7 +137,9 @@ impl Parser {
                         rhs.push(RhsTerm::Var(name));
                     }
                 }
-                _ => { self.advance(); }
+                _ => {
+                    self.advance();
+                }
             }
         }
         Ok(Formula { lhs, rhs, fe })
@@ -135,17 +163,25 @@ impl Parser {
             self.advance();
             let rhs = self.parse_or()?;
             lhs = match rhs {
-                Expr::Call { func, mut args, opts } => {
+                Expr::Call {
+                    func,
+                    mut args,
+                    opts,
+                } => {
                     args.insert(0, lhs);
                     Expr::Call { func, args, opts }
                 }
-                Expr::Var(name) => {
-                    Expr::Call { func: name, args: vec![lhs], opts: vec![] }
+                Expr::Var(name) => Expr::Call {
+                    func: name,
+                    args: vec![lhs],
+                    opts: vec![],
+                },
+                _ => {
+                    return Err(HayashiError::Parse {
+                        line: self.line(),
+                        msg: "|> right side must be a function call".into(),
+                    })
                 }
-                _ => return Err(HayashiError::Parse {
-                    line: self.line(),
-                    msg: "|> right side must be a function call".into(),
-                }),
             };
         }
         Ok(lhs)
@@ -156,7 +192,11 @@ impl Parser {
         while self.peek() == &Token::Or {
             self.advance();
             let rhs = self.parse_and()?;
-            lhs = Expr::BinOp { op: BinOp::Or, lhs: Box::new(lhs), rhs: Box::new(rhs) };
+            lhs = Expr::BinOp {
+                op: BinOp::Or,
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
+            };
         }
         Ok(lhs)
     }
@@ -166,7 +206,11 @@ impl Parser {
         while self.peek() == &Token::And {
             self.advance();
             let rhs = self.parse_comparison()?;
-            lhs = Expr::BinOp { op: BinOp::And, lhs: Box::new(lhs), rhs: Box::new(rhs) };
+            lhs = Expr::BinOp {
+                op: BinOp::And,
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
+            };
         }
         Ok(lhs)
     }
@@ -175,18 +219,22 @@ impl Parser {
         let mut lhs = self.parse_additive()?;
         loop {
             let op = match self.peek() {
-                Token::Gt    => BinOp::Gt,
-                Token::Lt    => BinOp::Lt,
-                Token::GtEq  => BinOp::GtEq,
-                Token::LtEq  => BinOp::LtEq,
-                Token::EqEq  => BinOp::Eq,
+                Token::Gt => BinOp::Gt,
+                Token::Lt => BinOp::Lt,
+                Token::GtEq => BinOp::GtEq,
+                Token::LtEq => BinOp::LtEq,
+                Token::EqEq => BinOp::Eq,
                 Token::BangEq => BinOp::Ne,
-                Token::In    => BinOp::In,
+                Token::In => BinOp::In,
                 _ => break,
             };
             self.advance();
             let rhs = self.parse_additive()?;
-            lhs = Expr::BinOp { op, lhs: Box::new(lhs), rhs: Box::new(rhs) };
+            lhs = Expr::BinOp {
+                op,
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
+            };
         }
         Ok(lhs)
     }
@@ -195,13 +243,17 @@ impl Parser {
         let mut lhs = self.parse_multiplicative()?;
         loop {
             let op = match self.peek() {
-                Token::Plus  => BinOp::Add,
+                Token::Plus => BinOp::Add,
                 Token::Minus => BinOp::Sub,
                 _ => break,
             };
             self.advance();
             let rhs = self.parse_multiplicative()?;
-            lhs = Expr::BinOp { op, lhs: Box::new(lhs), rhs: Box::new(rhs) };
+            lhs = Expr::BinOp {
+                op,
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
+            };
         }
         Ok(lhs)
     }
@@ -210,13 +262,17 @@ impl Parser {
         let mut lhs = self.parse_power()?;
         loop {
             let op = match self.peek() {
-                Token::Star  => BinOp::Mul,
+                Token::Star => BinOp::Mul,
                 Token::Slash => BinOp::Div,
                 _ => break,
             };
             self.advance();
             let rhs = self.parse_power()?;
-            lhs = Expr::BinOp { op, lhs: Box::new(lhs), rhs: Box::new(rhs) };
+            lhs = Expr::BinOp {
+                op,
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
+            };
         }
         Ok(lhs)
     }
@@ -226,7 +282,11 @@ impl Parser {
         if self.peek() == &Token::Caret {
             self.advance();
             let exp = self.parse_unary()?; // right-associative
-            Ok(Expr::BinOp { op: BinOp::Pow, lhs: Box::new(base), rhs: Box::new(exp) })
+            Ok(Expr::BinOp {
+                op: BinOp::Pow,
+                lhs: Box::new(base),
+                rhs: Box::new(exp),
+            })
         } else {
             Ok(base)
         }
@@ -256,7 +316,10 @@ impl Parser {
                 self.advance();
                 let idx = self.parse_expr()?;
                 self.expect(&Token::RBracket)?;
-                expr = Expr::Index { obj: Box::new(expr), idx: Box::new(idx) };
+                expr = Expr::Index {
+                    obj: Box::new(expr),
+                    idx: Box::new(idx),
+                };
             } else {
                 break;
             }
@@ -267,10 +330,22 @@ impl Parser {
     fn parse_primary(&mut self) -> Result<Expr> {
         let line = self.line();
         match self.peek().clone() {
-            Token::Float(f) => { self.advance(); Ok(Expr::Float(f)) }
-            Token::Int(i)   => { self.advance(); Ok(Expr::Int(i)) }
-            Token::Bool(b)  => { self.advance(); Ok(Expr::Bool(b)) }
-            Token::StringLit(s) => { self.advance(); Ok(Expr::Str(s)) }
+            Token::Float(f) => {
+                self.advance();
+                Ok(Expr::Float(f))
+            }
+            Token::Int(i) => {
+                self.advance();
+                Ok(Expr::Int(i))
+            }
+            Token::Bool(b) => {
+                self.advance();
+                Ok(Expr::Bool(b))
+            }
+            Token::StringLit(s) => {
+                self.advance();
+                Ok(Expr::Str(s))
+            }
 
             // if cond { then_expr } else { else_expr }  (expression)
             Token::If => {
@@ -280,7 +355,10 @@ impl Parser {
                 let then_expr = self.parse_expr()?;
                 self.expect(&Token::RBrace)?;
                 if self.peek() != &Token::Else {
-                    return Err(HayashiError::Parse { line, msg: "if-expression requires else branch".into() });
+                    return Err(HayashiError::Parse {
+                        line,
+                        msg: "if-expression requires else branch".into(),
+                    });
                 }
                 self.advance();
                 self.expect(&Token::LBrace)?;
@@ -292,7 +370,10 @@ impl Parser {
                     else_expr: Box::new(else_expr),
                 })
             }
-            Token::FStringLit(s) => { self.advance(); Ok(Expr::FString(s)) }
+            Token::FStringLit(s) => {
+                self.advance();
+                Ok(Expr::FString(s))
+            }
 
             // Agrupamento: (expr)
             Token::LParen => {
@@ -308,7 +389,9 @@ impl Parser {
                 let mut items = Vec::new();
                 while !matches!(self.peek(), Token::RBracket | Token::Eof | Token::Newline) {
                     items.push(self.parse_expr()?);
-                    if self.peek() == &Token::Comma { self.advance(); }
+                    if self.peek() == &Token::Comma {
+                        self.advance();
+                    }
                 }
                 self.expect(&Token::RBracket)?;
                 Ok(Expr::List(items))
@@ -323,7 +406,9 @@ impl Parser {
                     self.expect(&Token::Colon)?;
                     let val = self.parse_expr()?;
                     pairs.push((key, val));
-                    if self.peek() == &Token::Comma { self.advance(); }
+                    if self.peek() == &Token::Comma {
+                        self.advance();
+                    }
                 }
                 self.expect(&Token::RBrace)?;
                 Ok(Expr::Dict(pairs))
@@ -347,11 +432,16 @@ impl Parser {
                     self.expect(&Token::FatArrow)?;
                     let result = self.parse_expr()?;
                     arms.push((pattern, result));
-                    if self.peek() == &Token::Comma { self.advance(); }
+                    if self.peek() == &Token::Comma {
+                        self.advance();
+                    }
                     self.skip_newlines();
                 }
                 self.expect(&Token::RBrace)?;
-                Ok(Expr::Match { expr: Box::new(scrutinee), arms })
+                Ok(Expr::Match {
+                    expr: Box::new(scrutinee),
+                    arms,
+                })
             }
 
             Token::Ident(name) => {
@@ -366,7 +456,11 @@ impl Parser {
                     self.advance();
                     let (args, opts) = self.parse_call_args()?;
                     self.expect(&Token::RParen)?;
-                    let mut expr = Expr::Call { func: name, args, opts };
+                    let mut expr = Expr::Call {
+                        func: name,
+                        args,
+                        opts,
+                    };
 
                     while self.peek() == &Token::Dot {
                         self.advance();
@@ -379,7 +473,12 @@ impl Parser {
                         } else {
                             (vec![], vec![])
                         };
-                        expr = Expr::Field { obj: Box::new(expr), field, args: fargs, opts: fopts };
+                        expr = Expr::Field {
+                            obj: Box::new(expr),
+                            field,
+                            args: fargs,
+                            opts: fopts,
+                        };
                     }
                     return Ok(expr);
                 }
@@ -391,17 +490,29 @@ impl Parser {
             Token::TsLag(n) => {
                 self.advance();
                 let var = self.expect_ident()?;
-                Ok(Expr::TsOp { op: TsOpKind::Lag, var, n })
+                Ok(Expr::TsOp {
+                    op: TsOpKind::Lag,
+                    var,
+                    n,
+                })
             }
             Token::TsLead(n) => {
                 self.advance();
                 let var = self.expect_ident()?;
-                Ok(Expr::TsOp { op: TsOpKind::Lead, var, n })
+                Ok(Expr::TsOp {
+                    op: TsOpKind::Lead,
+                    var,
+                    n,
+                })
             }
             Token::TsDiff(n) => {
                 self.advance();
                 let var = self.expect_ident()?;
-                Ok(Expr::TsOp { op: TsOpKind::Diff, var, n })
+                Ok(Expr::TsOp {
+                    op: TsOpKind::Diff,
+                    var,
+                    n,
+                })
             }
 
             // Closure: |x, y| expr
@@ -410,30 +521,53 @@ impl Parser {
                 let mut params = Vec::new();
                 while !matches!(self.peek(), Token::Pipe | Token::Eof) {
                     params.push(self.expect_ident()?);
-                    if self.peek() == &Token::Comma { self.advance(); }
+                    if self.peek() == &Token::Comma {
+                        self.advance();
+                    }
                 }
                 self.expect(&Token::Pipe)?;
                 let body = self.parse_expr()?;
-                Ok(Expr::Closure { params, body: Box::new(body) })
+                Ok(Expr::Closure {
+                    params,
+                    body: Box::new(body),
+                })
             }
 
             // Keywords usadas como identificadores em contexto de expressão
-            Token::Count | Token::Replace | Token::Load | Token::Export
-            | Token::Print | Token::Predict | Token::Generate | Token::Return
-            | Token::Break | Token::Continue | Token::In => {
+            Token::Count
+            | Token::Replace
+            | Token::Load
+            | Token::Export
+            | Token::Print
+            | Token::Predict
+            | Token::Generate
+            | Token::Return
+            | Token::Break
+            | Token::Continue
+            | Token::In => {
                 let name = match self.peek() {
-                    Token::Count => "count", Token::Replace => "replace",
-                    Token::Load => "load", Token::Export => "export",
-                    Token::Print => "print", Token::Predict => "predict",
-                    Token::Generate => "generate", Token::Return => "return",
-                    Token::Break => "break", Token::Continue => "continue",
-                    Token::In => "in", _ => "?",
-                }.to_string();
+                    Token::Count => "count",
+                    Token::Replace => "replace",
+                    Token::Load => "load",
+                    Token::Export => "export",
+                    Token::Print => "print",
+                    Token::Predict => "predict",
+                    Token::Generate => "generate",
+                    Token::Return => "return",
+                    Token::Break => "break",
+                    Token::Continue => "continue",
+                    Token::In => "in",
+                    _ => "?",
+                }
+                .to_string();
                 self.advance();
                 Ok(Expr::Var(name))
             }
 
-            _ => Err(HayashiError::Parse { line, msg: format!("unexpected token {:?}", self.peek()) }),
+            _ => Err(HayashiError::Parse {
+                line,
+                msg: format!("unexpected token {:?}", self.peek()),
+            }),
         }
     }
 
@@ -444,17 +578,46 @@ impl Parser {
         while !matches!(self.peek(), Token::RParen | Token::Eof | Token::Newline) {
             // opt=value  ou  expr normal
             // Caso especial: keyword `if` usada como chave de opção (ex: mean(df, y, if=x==1))
-            let is_kw_opt = matches!(self.peek(), Token::If | Token::Else | Token::Generate | Token::For | Token::In | Token::Return | Token::Break | Token::Continue | Token::Count | Token::Replace | Token::Load | Token::Export | Token::Print | Token::Predict)
-                && self.tokens.get(self.pos + 1).map(|(t, _)| t == &Token::Eq).unwrap_or(false);
+            let is_kw_opt = matches!(
+                self.peek(),
+                Token::If
+                    | Token::Else
+                    | Token::Generate
+                    | Token::For
+                    | Token::In
+                    | Token::Return
+                    | Token::Break
+                    | Token::Continue
+                    | Token::Count
+                    | Token::Replace
+                    | Token::Load
+                    | Token::Export
+                    | Token::Print
+                    | Token::Predict
+            ) && self
+                .tokens
+                .get(self.pos + 1)
+                .map(|(t, _)| t == &Token::Eq)
+                .unwrap_or(false);
             if is_kw_opt {
                 let kw_name = match self.peek() {
-                    Token::If => "if", Token::Else => "else", Token::Generate => "gen",
-                    Token::For => "for", Token::In => "in", Token::Return => "return",
-                    Token::Break => "break", Token::Continue => "continue", Token::Count => "count",
-                    Token::Replace => "replace", Token::Load => "load", Token::Export => "export",
-                    Token::Print => "print", Token::Predict => "predict",
+                    Token::If => "if",
+                    Token::Else => "else",
+                    Token::Generate => "gen",
+                    Token::For => "for",
+                    Token::In => "in",
+                    Token::Return => "return",
+                    Token::Break => "break",
+                    Token::Continue => "continue",
+                    Token::Count => "count",
+                    Token::Replace => "replace",
+                    Token::Load => "load",
+                    Token::Export => "export",
+                    Token::Print => "print",
+                    Token::Predict => "predict",
                     _ => "?",
-                }.to_string();
+                }
+                .to_string();
                 self.advance(); // keyword
                 self.advance(); // =
                 let val = if kw_name == "if" || kw_name == "else" {
@@ -465,13 +628,21 @@ impl Parser {
                 } else {
                     self.parse_expr()?
                 };
-                opts.push(Opt { name: kw_name, value: val });
+                opts.push(Opt {
+                    name: kw_name,
+                    value: val,
+                });
             } else if let Token::Ident(name) = self.peek().clone() {
                 // lookahead: é opt=val?
-                if self.tokens.get(self.pos + 1).map(|(t, _)| t == &Token::Eq).unwrap_or(false) {
+                if self
+                    .tokens
+                    .get(self.pos + 1)
+                    .map(|(t, _)| t == &Token::Eq)
+                    .unwrap_or(false)
+                {
                     self.advance(); // nome
                     self.advance(); // =
-                    // Identificador bare em posição de opção é átomo de string (ex: cov=HC3)
+                                    // Identificador bare em posição de opção é átomo de string (ex: cov=HC3)
                     let val = if let Token::Ident(kw) = self.peek().clone() {
                         self.advance();
                         Expr::Str(kw)
@@ -486,7 +657,9 @@ impl Parser {
                 args.push(self.parse_expr()?);
             }
 
-            if self.peek() == &Token::Comma { self.advance(); }
+            if self.peek() == &Token::Comma {
+                self.advance();
+            }
         }
         Ok((args, opts))
     }
@@ -578,7 +751,10 @@ impl Parser {
                         }
                         _ => self.parse_expr()?,
                     };
-                    opts.push(Opt { name: key, value: val });
+                    opts.push(Opt {
+                        name: key,
+                        value: val,
+                    });
                 }
                 Ok(Some(Stmt::Load { path, alias, opts }))
             }
@@ -605,7 +781,7 @@ impl Parser {
 
             Token::Generate => {
                 self.advance();
-                let df      = self.expect_ident()?;
+                let df = self.expect_ident()?;
                 let varname = self.expect_ident()?;
                 self.expect(&Token::Eq)?;
                 let expr = self.parse_expr()?;
@@ -614,7 +790,7 @@ impl Parser {
 
             Token::Predict => {
                 self.advance();
-                let df      = self.expect_ident()?;
+                let df = self.expect_ident()?;
                 let varname = self.expect_ident()?;
                 self.expect(&Token::Eq)?;
                 let model = self.parse_primary()?;
@@ -624,7 +800,12 @@ impl Parser {
                 } else {
                     Expr::Str("xb".to_string())
                 };
-                Ok(Some(Stmt::Predict { df, varname, model, kind }))
+                Ok(Some(Stmt::Predict {
+                    df,
+                    varname,
+                    model,
+                    kind,
+                }))
             }
 
             Token::Count => {
@@ -641,7 +822,7 @@ impl Parser {
 
             Token::Replace => {
                 self.advance();
-                let df      = self.expect_ident()?;
+                let df = self.expect_ident()?;
                 let varname = self.expect_ident()?;
                 self.expect(&Token::Eq)?;
                 let expr = self.parse_expr()?;
@@ -652,12 +833,17 @@ impl Parser {
                 } else {
                     None
                 };
-                Ok(Some(Stmt::Replace { df, varname, expr, cond }))
+                Ok(Some(Stmt::Replace {
+                    df,
+                    varname,
+                    expr,
+                    cond,
+                }))
             }
 
             Token::Tsset => {
                 self.advance();
-                let df    = self.expect_ident()?;
+                let df = self.expect_ident()?;
                 let t_var = self.expect_ident()?;
                 Ok(Some(Stmt::Tsset { df, t_var }))
             }
@@ -673,7 +859,8 @@ impl Parser {
                     if self.peek() == &Token::If {
                         let inner_line = self.line();
                         let inner = self.parse_stmt()?.ok_or_else(|| HayashiError::Parse {
-                            line, msg: "expected statement after 'else if'".into()
+                            line,
+                            msg: "expected statement after 'else if'".into(),
                         })?;
                         Some(vec![(inner, inner_line)])
                     } else {
@@ -682,7 +869,11 @@ impl Parser {
                 } else {
                     None
                 };
-                Ok(Some(Stmt::If { cond, then_body, else_body }))
+                Ok(Some(Stmt::If {
+                    cond,
+                    then_body,
+                    else_body,
+                }))
             }
 
             // ── for var in iter { ... } ───────────────────────────────────────
@@ -692,9 +883,12 @@ impl Parser {
                 // espera "in"
                 match self.advance().clone() {
                     Token::In => {}
-                    t => return Err(HayashiError::Parse {
-                        line, msg: format!("expected 'in' after variável do for, got {t:?}")
-                    }),
+                    t => {
+                        return Err(HayashiError::Parse {
+                            line,
+                            msg: format!("expected 'in' after variável do for, got {t:?}"),
+                        })
+                    }
                 }
                 let iter = self.parse_for_iter()?;
                 let body = self.parse_block()?;
@@ -709,7 +903,9 @@ impl Parser {
                 let mut params = Vec::new();
                 while !matches!(self.peek(), Token::RParen | Token::Eof) {
                     params.push(self.expect_ident()?);
-                    if self.peek() == &Token::Comma { self.advance(); }
+                    if self.peek() == &Token::Comma {
+                        self.advance();
+                    }
                 }
                 self.expect(&Token::RParen)?;
                 let body = self.parse_block()?;
@@ -727,8 +923,14 @@ impl Parser {
                 Ok(Some(Stmt::Return(expr)))
             }
 
-            Token::Break    => { self.advance(); Ok(Some(Stmt::Break)) }
-            Token::Continue => { self.advance(); Ok(Some(Stmt::Continue)) }
+            Token::Break => {
+                self.advance();
+                Ok(Some(Stmt::Break))
+            }
+            Token::Continue => {
+                self.advance();
+                Ok(Some(Stmt::Continue))
+            }
 
             // ── while cond { ... } ────────────────────────────────────────────
             Token::While => {
@@ -749,7 +951,11 @@ impl Parser {
                 loop {
                     match self.peek().clone() {
                         Token::Newline | Token::Eof => break,
-                        Token::Ident(h) => { let h = h.clone(); self.advance(); headers.push(h); }
+                        Token::Ident(h) => {
+                            let h = h.clone();
+                            self.advance();
+                            headers.push(h);
+                        }
                         _ => break,
                     }
                 }
@@ -761,36 +967,71 @@ impl Parser {
                     self.skip_newlines();
                     // Detectar "end"
                     if let Token::Ident(ref s) = self.peek().clone() {
-                        if s == "end" { self.advance(); break 'outer; }
+                        if s == "end" {
+                            self.advance();
+                            break 'outer;
+                        }
                     }
-                    if self.peek() == &Token::Eof { break; }
+                    if self.peek() == &Token::Eof {
+                        break;
+                    }
 
                     let mut row: Vec<f64> = Vec::new();
                     loop {
                         match self.peek().clone() {
                             Token::Newline | Token::Eof => break,
-                            Token::Float(v) => { let v = v; self.advance(); row.push(v); }
-                            Token::Int(v)   => { let v = v as f64; self.advance(); row.push(v); }
+                            Token::Float(v) => {
+                                let v = v;
+                                self.advance();
+                                row.push(v);
+                            }
+                            Token::Int(v) => {
+                                let v = v as f64;
+                                self.advance();
+                                row.push(v);
+                            }
                             Token::Minus => {
                                 self.advance();
                                 let v = match self.peek().clone() {
-                                    Token::Float(v) => { self.advance(); -v }
-                                    Token::Int(v)   => { self.advance(); -(v as f64) }
-                                    _ => return Err(HayashiError::Parse { line, msg: "esperado número após '-'".into() }),
+                                    Token::Float(v) => {
+                                        self.advance();
+                                        -v
+                                    }
+                                    Token::Int(v) => {
+                                        self.advance();
+                                        -(v as f64)
+                                    }
+                                    _ => {
+                                        return Err(HayashiError::Parse {
+                                            line,
+                                            msg: "esperado número após '-'".into(),
+                                        })
+                                    }
                                 };
                                 row.push(v);
                             }
-                            Token::Dot => { self.advance(); row.push(f64::NAN); } // . = missing
+                            Token::Dot => {
+                                self.advance();
+                                row.push(f64::NAN);
+                            } // . = missing
                             _ => {
                                 // pular tokens desconhecidos até fim da linha
-                                while !matches!(self.peek(), Token::Newline | Token::Eof) { self.advance(); }
+                                while !matches!(self.peek(), Token::Newline | Token::Eof) {
+                                    self.advance();
+                                }
                                 break;
                             }
                         }
                     }
-                    if !row.is_empty() { rows.push(row); }
+                    if !row.is_empty() {
+                        rows.push(row);
+                    }
                 }
-                Ok(Some(Stmt::Input { alias, headers, rows }))
+                Ok(Some(Stmt::Input {
+                    alias,
+                    headers,
+                    rows,
+                }))
             }
 
             // ── try { ... } catch e { ... } ──────────────────────────────────
@@ -798,15 +1039,25 @@ impl Parser {
                 self.advance();
                 let try_body = self.parse_block()?;
                 let catch_kw = match self.peek().clone() {
-                    Token::Ident(s) if s == "catch" => { self.advance(); true }
+                    Token::Ident(s) if s == "catch" => {
+                        self.advance();
+                        true
+                    }
                     _ => false,
                 };
                 if !catch_kw {
-                    return Err(HayashiError::Parse { line, msg: "expected 'catch' after try block".into() });
+                    return Err(HayashiError::Parse {
+                        line,
+                        msg: "expected 'catch' after try block".into(),
+                    });
                 }
                 let error_var = self.expect_ident()?;
                 let catch_body = self.parse_block()?;
-                Ok(Some(Stmt::TryCatch { try_body, error_var, catch_body }))
+                Ok(Some(Stmt::TryCatch {
+                    try_body,
+                    error_var,
+                    catch_body,
+                }))
             }
 
             // ── display expr  (sem parênteses) ───────────────────────────────
@@ -826,7 +1077,13 @@ impl Parser {
             }
 
             // nome = expr (assignment sem let — modifica variável existente)
-            Token::Ident(ref name) if self.tokens.get(self.pos + 1).map(|(t, _)| t == &Token::Eq).unwrap_or(false) => {
+            Token::Ident(ref name)
+                if self
+                    .tokens
+                    .get(self.pos + 1)
+                    .map(|(t, _)| t == &Token::Eq)
+                    .unwrap_or(false) =>
+            {
                 let name = name.clone();
                 self.advance(); // ident
                 self.advance(); // =
@@ -839,15 +1096,25 @@ impl Parser {
                 Ok(Some(Stmt::Expr(expr)))
             }
 
-            Token::Int(_) | Token::Float(_) | Token::Bool(_)
-            | Token::StringLit(_) | Token::FStringLit(_)
-            | Token::LBracket | Token::LBrace | Token::LParen
-            | Token::Minus | Token::Bang | Token::Pipe => {
+            Token::Int(_)
+            | Token::Float(_)
+            | Token::Bool(_)
+            | Token::StringLit(_)
+            | Token::FStringLit(_)
+            | Token::LBracket
+            | Token::LBrace
+            | Token::LParen
+            | Token::Minus
+            | Token::Bang
+            | Token::Pipe => {
                 let expr = self.parse_expr()?;
                 Ok(Some(Stmt::Expr(expr)))
             }
 
-            t => Err(HayashiError::Parse { line, msg: format!("unexpected token at statement level: {t:?}") }),
+            t => Err(HayashiError::Parse {
+                line,
+                msg: format!("unexpected token at statement level: {t:?}"),
+            }),
         }
     }
 

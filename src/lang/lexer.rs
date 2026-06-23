@@ -36,29 +36,29 @@ pub enum Token {
     TsDiff(usize),
 
     // Operadores
-    Eq,       // =
-    EqEq,     // ==
-    BangEq,   // !=
-    Tilde,    // ~
-    Plus,     // +
-    Minus,    // -
-    Star,     // *
-    Slash,    // /
-    Caret,    // ^
-    Pipe,     // |
-    Colon,    // :
-    Comma,    // ,
-    Dot,      // .
-    DotDot,   // ..
-    Bang,     // !
-    Lt,       // <
-    LtEq,     // <=
-    Gt,       // >
-    GtEq,     // >=
-    And,      // &&
-    Or,       // ||
-    FatArrow, // =>
-    PipeRight,// |>
+    Eq,        // =
+    EqEq,      // ==
+    BangEq,    // !=
+    Tilde,     // ~
+    Plus,      // +
+    Minus,     // -
+    Star,      // *
+    Slash,     // /
+    Caret,     // ^
+    Pipe,      // |
+    Colon,     // :
+    Comma,     // ,
+    Dot,       // .
+    DotDot,    // ..
+    Bang,      // !
+    Lt,        // <
+    LtEq,      // <=
+    Gt,        // >
+    GtEq,      // >=
+    And,       // &&
+    Or,        // ||
+    FatArrow,  // =>
+    PipeRight, // |>
 
     // Delimitadores
     LParen,
@@ -81,7 +81,11 @@ pub struct Lexer {
 
 impl Lexer {
     pub fn new(src: &str) -> Self {
-        Self { src: src.chars().collect(), pos: 0, line: 1 }
+        Self {
+            src: src.chars().collect(),
+            pos: 0,
+            line: 1,
+        }
     }
 
     fn peek(&self) -> Option<char> {
@@ -94,7 +98,9 @@ impl Lexer {
 
     fn advance(&mut self) -> Option<char> {
         let c = self.src.get(self.pos).copied();
-        if c == Some('\n') { self.line += 1; }
+        if c == Some('\n') {
+            self.line += 1;
+        }
         self.pos += 1;
         c
     }
@@ -119,7 +125,12 @@ impl Lexer {
                     _ => s.push('\\'),
                 },
                 Some(c) => s.push(c),
-                None => return Err(HayashiError::Lex { line, msg: "unterminated string".into() }),
+                None => {
+                    return Err(HayashiError::Lex {
+                        line,
+                        msg: "unterminated string".into(),
+                    })
+                }
             }
         }
     }
@@ -158,28 +169,28 @@ impl Lexer {
             }
         }
         match s.as_str() {
-            "let"      => Token::Let,
-            "load"     => Token::Load,
-            "print"    => Token::Print,
-            "export"   => Token::Export,
+            "let" => Token::Let,
+            "load" => Token::Load,
+            "print" => Token::Print,
+            "export" => Token::Export,
             "generate" => Token::Generate,
-            "gen"      => Token::Generate,
-            "predict"  => Token::Predict,
-            "replace"  => Token::Replace,
-            "if"       => Token::If,
-            "else"     => Token::Else,
-            "for"      => Token::For,
-            "in"       => Token::In,
-            "count"    => Token::Count,
-            "tsset"    => Token::Tsset,
-            "while"    => Token::While,
-            "fn"       => Token::Fn,
-            "return"   => Token::Return,
-            "break"    => Token::Break,
+            "gen" => Token::Generate,
+            "predict" => Token::Predict,
+            "replace" => Token::Replace,
+            "if" => Token::If,
+            "else" => Token::Else,
+            "for" => Token::For,
+            "in" => Token::In,
+            "count" => Token::Count,
+            "tsset" => Token::Tsset,
+            "while" => Token::While,
+            "fn" => Token::Fn,
+            "return" => Token::Return,
+            "break" => Token::Break,
             "continue" => Token::Continue,
-            "true"     => Token::Bool(true),
-            "false"    => Token::Bool(false),
-            _          => Token::Ident(s),
+            "true" => Token::Bool(true),
+            "false" => Token::Bool(false),
+            _ => Token::Ident(s),
         }
     }
 
@@ -205,12 +216,16 @@ impl Lexer {
             return tok;
         }
         self.advance(); // consome '.'
-        let n: usize = if rest.is_empty() { 1 } else { rest.parse().unwrap_or(1) };
+        let n: usize = if rest.is_empty() {
+            1
+        } else {
+            rest.parse().unwrap_or(1)
+        };
         match first {
             'L' => Token::TsLag(n),
             'F' => Token::TsLead(n),
             'D' => Token::TsDiff(n),
-            _   => unreachable!(),
+            _ => unreachable!(),
         }
     }
 
@@ -220,8 +235,15 @@ impl Lexer {
             self.skip_whitespace_inline();
             let line = self.line;
             match self.advance() {
-                None => { tokens.push((Token::Eof, line)); break; }
-                Some('#') => { while !matches!(self.peek(), Some('\n') | None) { self.advance(); } }
+                None => {
+                    tokens.push((Token::Eof, line));
+                    break;
+                }
+                Some('#') => {
+                    while !matches!(self.peek(), Some('\n') | None) {
+                        self.advance();
+                    }
+                }
                 Some('\n') => tokens.push((Token::Newline, line)),
                 Some('"') => tokens.push((self.read_string()?, line)),
                 Some(c) if c.is_ascii_digit() => tokens.push((self.read_number(c), line)),
@@ -238,34 +260,64 @@ impl Lexer {
                     tokens.push((tok, line));
                 }
                 Some('=') => {
-                    if self.peek() == Some('=') { self.advance(); tokens.push((Token::EqEq, line)); }
-                    else if self.peek() == Some('>') { self.advance(); tokens.push((Token::FatArrow, line)); }
-                    else { tokens.push((Token::Eq, line)); }
+                    if self.peek() == Some('=') {
+                        self.advance();
+                        tokens.push((Token::EqEq, line));
+                    } else if self.peek() == Some('>') {
+                        self.advance();
+                        tokens.push((Token::FatArrow, line));
+                    } else {
+                        tokens.push((Token::Eq, line));
+                    }
                 }
                 Some('!') => {
-                    if self.peek() == Some('=') { self.advance(); tokens.push((Token::BangEq, line)); }
-                    else { tokens.push((Token::Bang, line)); }
+                    if self.peek() == Some('=') {
+                        self.advance();
+                        tokens.push((Token::BangEq, line));
+                    } else {
+                        tokens.push((Token::Bang, line));
+                    }
                 }
                 Some('<') => {
-                    if self.peek() == Some('=') { self.advance(); tokens.push((Token::LtEq, line)); }
-                    else { tokens.push((Token::Lt, line)); }
+                    if self.peek() == Some('=') {
+                        self.advance();
+                        tokens.push((Token::LtEq, line));
+                    } else {
+                        tokens.push((Token::Lt, line));
+                    }
                 }
                 Some('>') => {
-                    if self.peek() == Some('=') { self.advance(); tokens.push((Token::GtEq, line)); }
-                    else { tokens.push((Token::Gt, line)); }
+                    if self.peek() == Some('=') {
+                        self.advance();
+                        tokens.push((Token::GtEq, line));
+                    } else {
+                        tokens.push((Token::Gt, line));
+                    }
                 }
                 Some('&') => {
-                    if self.peek() == Some('&') { self.advance(); }
+                    if self.peek() == Some('&') {
+                        self.advance();
+                    }
                     tokens.push((Token::And, line));
                 }
                 Some('|') => {
-                    if self.peek() == Some('|') { self.advance(); tokens.push((Token::Or, line)); }
-                    else if self.peek() == Some('>') { self.advance(); tokens.push((Token::PipeRight, line)); }
-                    else { tokens.push((Token::Pipe, line)); }
+                    if self.peek() == Some('|') {
+                        self.advance();
+                        tokens.push((Token::Or, line));
+                    } else if self.peek() == Some('>') {
+                        self.advance();
+                        tokens.push((Token::PipeRight, line));
+                    } else {
+                        tokens.push((Token::Pipe, line));
+                    }
                 }
                 Some('.') => {
-                    if self.peek() == Some('.') { self.advance(); tokens.push((Token::DotDot, line)); }
-                    else { tokens.push((Token::Dot, line)); }
+                    if self.peek() == Some('.') {
+                        self.advance();
+                        tokens.push((Token::DotDot, line));
+                    } else {
+                        tokens.push((Token::Dot, line));
+                    }
                 }
                 Some('~') => tokens.push((Token::Tilde, line)),
                 Some('+') => tokens.push((Token::Plus, line)),
@@ -290,7 +342,12 @@ impl Lexer {
                 Some(']') => tokens.push((Token::RBracket, line)),
                 Some('{') => tokens.push((Token::LBrace, line)),
                 Some('}') => tokens.push((Token::RBrace, line)),
-                Some(c) => return Err(HayashiError::Lex { line, msg: format!("unexpected character '{c}'") }),
+                Some(c) => {
+                    return Err(HayashiError::Lex {
+                        line,
+                        msg: format!("unexpected character '{c}'"),
+                    })
+                }
             }
         }
         Ok(tokens)
