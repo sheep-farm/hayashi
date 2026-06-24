@@ -6,7 +6,7 @@ use rustyline::error::ReadlineError;
 use rustyline::DefaultEditor;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const HISTORY_FILE: &str = ".hayashi_history";
+const HISTORY_FILE: &str = ".hay_history";
 
 fn main() {
     const STACK_SIZE: usize = 32 * 1024 * 1024;
@@ -36,7 +36,7 @@ fn run() {
 
     match args_clean.get(1).copied() {
         Some("--version") | Some("-V") => {
-            println!("hayashi {VERSION}");
+            println!("hay {VERSION}");
             return;
         }
         Some("--help") | Some("-h") => {
@@ -59,7 +59,7 @@ fn run() {
         }
         Some("install") => {
             let pkg = args_clean.get(2).unwrap_or_else(|| {
-                eprintln!("Usage: hayashi install user/repo");
+                eprintln!("Usage: hay install user/repo");
                 std::process::exit(1);
             });
             pkg_install(pkg);
@@ -67,7 +67,7 @@ fn run() {
         }
         Some("remove") | Some("uninstall") => {
             let pkg = args_clean.get(2).unwrap_or_else(|| {
-                eprintln!("Usage: hayashi remove package_name");
+                eprintln!("Usage: hay remove package_name");
                 std::process::exit(1);
             });
             pkg_remove(pkg);
@@ -82,8 +82,8 @@ fn run() {
             return;
         }
         Some(unknown) => {
-            eprintln!("hayashi: unknown argument '{unknown}'");
-            eprintln!("Usage: hayashi [script.hy | - | install | remove | list]");
+            eprintln!("hay: unknown argument '{unknown}'");
+            eprintln!("Usage: hay [script.hay | - | install | remove | list]");
             std::process::exit(1);
         }
         None => {}
@@ -96,7 +96,7 @@ fn run_script(path: &str, verbose: bool) {
     let src = match std::fs::read_to_string(path) {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("hayashi: cannot read '{path}': {e}");
+            eprintln!("hay: cannot read '{path}': {e}");
             std::process::exit(1);
         }
     };
@@ -141,7 +141,7 @@ fn run_repl() {
     let mut depth: i32 = 0;
 
     loop {
-        let prompt = if depth > 0 { "      > " } else { "hayashi> " };
+        let prompt = if depth > 0 { "      > " } else { "hay> " };
         match rl.readline(prompt) {
             Ok(line) => {
                 let trimmed = line.trim();
@@ -218,9 +218,9 @@ fn print_help() {
     println!("Hayashi {VERSION}  — Applied Econometrics Language");
     println!();
     println!("USAGE:");
-    println!("    hayashi              Start interactive REPL (multi-line)");
-    println!("    hayashi script.hy    Run a script file");
-    println!("    hayashi --version    Print version");
+    println!("    hay              Start interactive REPL (multi-line)");
+    println!("    hay script.hay    Run a script file");
+    println!("    hay --version    Print version");
     println!();
     println!("ESTIMATORS:");
     println!("    ols/reg  logit  probit  iv  poisson  nbreg  tobit  qreg");
@@ -236,32 +236,30 @@ fn print_help() {
     println!("    summarize  tabulate  ttest  correlate  list  describe");
     println!();
     println!("PACKAGES:");
-    println!("    hayashi install user/repo    Install from GitHub");
-    println!("    hayashi remove  name         Uninstall a package");
-    println!("    hayashi list                 List installed packages");
+    println!("    hay install user/repo    Install from GitHub");
+    println!("    hay remove  name         Uninstall a package");
+    println!("    hay list                 List installed packages");
     println!();
     println!("In REPL, type help() for full command list or help(cmd) for details.");
 }
 
 fn packages_dir() -> std::path::PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
-    std::path::Path::new(&home)
-        .join(".hayashi")
-        .join("packages")
+    std::path::Path::new(&home).join(".hay").join("packages")
 }
 
 fn pkg_install(spec: &str) {
     let (user, repo) = if let Some(pos) = spec.find('/') {
         (&spec[..pos], &spec[pos + 1..])
     } else {
-        eprintln!("hayashi install: expected 'user/repo', got '{spec}'");
+        eprintln!("hay install: expected 'user/repo', got '{spec}'");
         std::process::exit(1);
     };
 
     let dest = packages_dir().join(user).join(repo);
     if dest.exists() {
         println!("{user}/{repo}: already installed at {}", dest.display());
-        println!("  use 'hayashi remove {user}/{repo}' first to reinstall");
+        println!("  use 'hay remove {user}/{repo}' first to reinstall");
         return;
     }
 
@@ -269,13 +267,13 @@ fn pkg_install(spec: &str) {
     println!("Fetching {user}/{repo}...");
 
     let resp = match ureq::get(&api_url)
-        .set("User-Agent", "hayashi")
+        .set("User-Agent", "hay")
         .set("Accept", "application/vnd.github.v3+json")
         .call()
     {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("hayashi install: cannot reach GitHub API: {e}");
+            eprintln!("hay install: cannot reach GitHub API: {e}");
             std::process::exit(1);
         }
     };
@@ -284,14 +282,14 @@ fn pkg_install(spec: &str) {
     let entries: Vec<GhEntry> = match serde_json::from_str(&body) {
         Ok(v) => v,
         Err(e) => {
-            eprintln!("hayashi install: cannot parse GitHub response: {e}");
+            eprintln!("hay install: cannot parse GitHub response: {e}");
             std::process::exit(1);
         }
     };
 
     let dominated = |name: &str| -> bool {
         let lower = name.to_lowercase();
-        lower.ends_with(".hy")
+        lower.ends_with(".hay")
             || lower == "readme.md"
             || lower == "readme"
             || lower == "readme.txt"
@@ -307,14 +305,14 @@ fn pkg_install(spec: &str) {
         .filter(|e| e.r#type == "file" && e.download_url.is_some() && dominated(&e.name))
         .collect();
 
-    let n_hy = files.iter().filter(|e| e.name.ends_with(".hy")).count();
+    let n_hy = files.iter().filter(|e| e.name.ends_with(".hay")).count();
     if n_hy == 0 {
-        eprintln!("hayashi install: no .hy files found in {user}/{repo}");
+        eprintln!("hay install: no .hay files found in {user}/{repo}");
         std::process::exit(1);
     }
 
     std::fs::create_dir_all(&dest).unwrap_or_else(|e| {
-        eprintln!("hayashi install: cannot create {}: {e}", dest.display());
+        eprintln!("hay install: cannot create {}: {e}", dest.display());
         std::process::exit(1);
     });
 
@@ -351,11 +349,11 @@ fn pkg_remove(spec: &str) {
         packages_dir().join(spec)
     };
     if !dest.exists() {
-        eprintln!("hayashi remove: package '{spec}' not installed");
+        eprintln!("hay remove: package '{spec}' not installed");
         std::process::exit(1);
     }
     std::fs::remove_dir_all(&dest).unwrap_or_else(|e| {
-        eprintln!("hayashi remove: cannot remove {}: {e}", dest.display());
+        eprintln!("hay remove: cannot remove {}: {e}", dest.display());
         std::process::exit(1);
     });
     // remove empty user dir
@@ -394,7 +392,7 @@ fn pkg_list() {
 
         for repo_entry in &repos {
             if !found {
-                println!("Installed packages (~/.hayashi/packages/):\n");
+                println!("Installed packages (~/.hay/packages/):\n");
                 found = true;
             }
             let repo = repo_entry.file_name();
