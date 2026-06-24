@@ -10,16 +10,20 @@
 | Interface | Terminal (REPL + script) + VS Code | GUI + terminal |
 | I/O | CSV, TSV, JSON, DTA, Excel, Parquet, SQLite, ODBC | DTA, CSV, Excel, ODBC |
 | Graphics | SVG + ASCII | PNG/SVG/PDF native |
-| Tests | 382 automated + 59 examples | Internal proprietary suite |
+| Tests | 389 automated + 60 examples | Internal proprietary suite |
 | Scoping | Block-scoped, const, no GC | Global |
 | DataFrames | Multiple simultaneous, Rc COW | Single active dataset (frames since v16) |
 | Types | int, float, bool, str, list, dict, closures | Numeric + string |
+| Collinearity | Auto-detect, Stata-style (omitted) | Manual or addon |
+| REPL | Tab completion, syntax highlighting, hints | Basic |
+| Namespaces | Module-based (import as/only) | — |
+| Date/time | date(), year(), month(), dow() | Built-in |
 | License | GPL-3.0 | Proprietary |
 
 ## Syntax side by side
 
 ```
-// Stata                              // Hayashi
+// Stata                              // Hay
 reg Y X1 X2                           reg(Y ~ X1 + X2, df)
 reg Y X1 X2, vce(robust)              reg(Y ~ X1 + X2, df, cov=robust)
 reg Y X1 X2, vce(cluster firm)        reg(Y ~ X1 + X2, df, cluster=firm)
@@ -63,6 +67,11 @@ assert price > 0                       assert(X > 0, "msg")
 .                                      match x { 1 => "one", _ => "other" }
 .                                      try { ... } catch e { display e }
 .                                      f"mean = {mu:.2f}"
+.                                      import("finance")  // finance::func()
+.                                      import("mod", as=m)  // m::func()
+.                                      date("2024-01-15")
+.                                      generate df Y = year(date_col)
+gen X2 = exper * exper                 generate df X2 = exper |> |x| x * x
 
 foreach v in X1 X2 X3 {               for v in ["X1", "X2", "X3"] {
     reg Y `v'                              eststo(ols("Y ~ " + v, df))
@@ -102,6 +111,8 @@ esttab m_*
 | Beta regression | — | `betareg` | Hayashi only |
 | Fama-MacBeth | `xtfmb` (paid addon) | `fmb` (builtin + NW) | Hayashi superior |
 | Portfolio sorts | manual coding | `portsort`/`doublesort` | Hayashi superior |
+| Collinearity detection | manual `_rmcoll` | auto in all estimators | Hayashi superior |
+| Date/time in generate | `year()` etc. | `year()` `month()` etc. | Parity |
 | Mixed/HLM | `mixed` | `mixed` | Partial |
 | Survey | `svy:` | — | Missing |
 | SEM | `sem`/`gsem` | — | Missing |
@@ -171,14 +182,21 @@ Stata is a command-oriented language with global state. Hayashi is a block-scope
 ### Collections Stata lacks
 
 ```
-// List — 16 operations, immutable (returns new list)
+// List — 16 operations, push/pop mutate in-place (like Python/JS/Rust)
 let nums = [3, 1, 2] |> sort |> map(|x| x * 10)   // [10, 20, 30]
 push  pop  insert  remove  clear  reverse  index  slice
 join  map  filter  unique  flatten  sort  range  len
 
-// Dict — 7 operations, immutable
+// Dict — 7 operations
 let config = {"alpha": 0.05, "n_boot": 1000}
 keys  values  has_key  dict_set  dict_remove  dict_merge  len
+
+// esttab accepts lists: build models with push in loop
+let models = []
+for v in ["X1", "X2", "X3"] {
+    push(models, ols("Y ~ " + v, df))
+}
+esttab(models)
 
 // Pipe chaining (no Stata equivalent)
 raw_data
@@ -203,7 +221,7 @@ raw_data
 Stata supports only one active dataset (frames added in v16, verbose syntax). Hayashi treats DataFrames as regular variables:
 
 ```
-// Hayashi — natural
+// Hay — natural
 load "sales.csv" as sales
 load "clients.parquet" as clients
 load "stock.db" as stock, table=products
@@ -222,7 +240,7 @@ frlink 1:1 id, frame(clients)
 **Cost and deployment:**
 - Free and open source (GPL-3.0) vs US$ 595+/year
 - Single 20 MB binary, no system dependencies
-- `cargo install hayashi` — done
+- `cargo install hay` — done
 
 **I/O:**
 - 8 input formats: CSV, TSV, JSON, DTA, Excel, Parquet, SQLite, ODBC
@@ -245,6 +263,10 @@ frlink 1:1 id, frame(clients)
 - Function parameters are const by default (immutable input)
 - No variable shadowing — prevents subtle bugs
 - Type conversions: `int()`, `float()`, `str()`, `bool()`, `type()`
+- Module namespaces: `import("mod")` -> `mod::func()`
+- Pipe with inline closures: `exper |> |x| x * x`
+- `push`/`pop` mutate in-place (standard behavior)
+- Date/time extraction: `year()`, `month()`, `day()`, `dow()` in generate
 
 **Econometrics-specific:**
 - Fama-MacBeth with Newey-West built-in (Stata requires paid addon)
@@ -253,13 +275,16 @@ frlink 1:1 id, frame(clients)
 - Dynamic formulas: `ols("Y ~ " + v, df)` native
 - Row-wise regex in formulas: `ols(Y ~ X, df, if = regexm(name, "Dr"))`
 - Copy-on-write DataFrames: zero-copy in functions
+- Auto collinearity detection across all estimators (Stata-style (omitted) display)
 
 **Developer experience:**
-- 382 automated tests, 59 examples, `cargo test` in <1s
+- 389 automated tests, 60 examples, `cargo test` in <1s
 - `help()` with ~110 topics, signature + example for every command
 - VS Code extension (syntax highlighting, run/debug)
+- Tab completion + syntax highlighting in REPL
 - Error messages with line numbers
 - Multi-line expressions inside parentheses
+- Domain: haylang.dev
 
 ## Where Stata wins
 
@@ -275,6 +300,6 @@ frlink 1:1 id, frame(clients)
 
 ## Conclusion
 
-Hayashi covers ~97% of the applied econometrics workflow at the graduate level with full functional parity in estimation, post-estimation, data manipulation, and publishable output. The remaining gaps are specialized niches (survey, SEM, Bayesian, spatial) that few researchers use simultaneously.
+Hayashi covers ~97% of the applied econometrics workflow at the graduate level with 46 estimators, 389 automated tests, and full functional parity in estimation, post-estimation, data manipulation, and publishable output. The remaining gaps are specialized niches (survey, SEM, Bayesian, spatial) that few researchers use simultaneously.
 
-The language goes beyond Stata with modern features (closures, pattern matching, pipe, f-strings, dict, const, try/catch) that make scripts more expressive and robust. Multiple simultaneous DataFrames, block scoping, and immutable function parameters are architectural improvements over Stata's global-state model.
+The language goes beyond Stata with modern features (closures, pattern matching, pipe, f-strings, dict, const, try/catch, namespaces) that make scripts more expressive and robust. Multiple simultaneous DataFrames, block scoping, immutable function parameters, and auto collinearity detection are architectural improvements over Stata's global-state model. Scripts use the `.hay` extension and documentation is available at haylang.dev.
