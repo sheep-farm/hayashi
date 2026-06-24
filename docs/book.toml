@@ -1,0 +1,15 @@
+[book]
+title = "Hayashi — Applied Econometrics Language"
+authors = ["Flávio de Vasconcellos Corrêa"]
+language = "en"
+src = "src"
+
+[build]
+build-dir = "book"
+
+[output.html]
+default-theme = "light"
+preferred-dark-theme = "ayu"
+git-repository-url = "https://github.com/sheep-farm/hayashi"
+edit-url-template = "https://github.com/sheep-farm/hayashi/edit/dev/docs/{path}"
+site-url = "/hayashi/"
