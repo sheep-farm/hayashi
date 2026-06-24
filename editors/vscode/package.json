@@ -1,8 +1,8 @@
 {
   "name": "hayashi-lang",
   "displayName": "Hayashi",
-  "description": "Language support for Hayashi (.hy) — applied econometrics DSL",
-  "version": "0.1.0",
+  "description": "Language support for Hayashi (.hay) — applied econometrics DSL",
+  "version": "0.2.0",
   "publisher": "sheep-farm",
   "license": "MIT",
   "repository": {
@@ -17,8 +17,8 @@
     "languages": [
       {
         "id": "hayashi",
-        "aliases": ["Hayashi", "hayashi"],
-        "extensions": [".hy"],
+        "aliases": ["Hayashi", "hay"],
+        "extensions": [".hay"],
         "configuration": "./language-configuration.json"
       }
     ],
@@ -42,7 +42,7 @@
         "properties": {
           "script": {
             "type": "string",
-            "description": "The .hy file to run"
+            "description": "The .hay file to run"
           }
         }
       }
