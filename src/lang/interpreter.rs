@@ -605,7 +605,7 @@ impl Interpreter {
 
         for entry in entries {
             let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) == Some("hy") {
+            if path.extension().and_then(|e| e.to_str()) == Some("hay") {
                 let name = path
                     .file_stem()
                     .unwrap_or_default()
@@ -670,7 +670,7 @@ impl Interpreter {
 
         Err(HayashiError::Runtime(format!(
             "import: module '{}' not found (searched: ./, ~/.hayashi/plugins/, plugin_path, $HAYASHI_PATH)",
-            name.trim_end_matches(".hy")
+            name.trim_end_matches(".hay")
         )))
     }
 
@@ -7133,10 +7133,10 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
-            // ── source/do: executa script .hy no ambiente atual ─────────────
+            // ── source/do: executa script .hay no ambiente atual ─────────────
             "source" | "do" | "run" | "include" => {
                 if args.is_empty() {
-                    return Err(self.rt_err("source(\"script.hy\")"));
+                    return Err(self.rt_err("source(\"script.hay\")"));
                 }
                 let path = match self.eval_expr(&args[0])? {
                     Value::Str(s) => s,
@@ -7171,10 +7171,10 @@ impl Interpreter {
                         self.rt_err(format!("import: cannot read downloaded module: {e}"))
                     })?
                 } else {
-                    let name = if module.ends_with(".hy") {
+                    let name = if module.ends_with(".hay") {
                         module.clone()
                     } else {
-                        format!("{module}.hy")
+                        format!("{module}.hay")
                     };
                     let resolved = self.resolve_import(&name)?;
                     std::fs::read_to_string(&resolved).map_err(|e| {

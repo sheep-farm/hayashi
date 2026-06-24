@@ -38,16 +38,16 @@ jobs:
 
       - name: Package (Unix)
         if: runner.os != 'Windows'
-        run: tar czf hayashi-${{ github.ref_name }}-${{ matrix.target }}.tar.gz -C target/release hayashi
+        run: tar czf hay-${{ github.ref_name }}-${{ matrix.target }}.tar.gz -C target/release hay
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
-        run: Compress-Archive -Path target/release/hayashi.exe -DestinationPath hayashi-${{ github.ref_name }}-${{ matrix.target }}.zip
+        run: Compress-Archive -Path target/release/hay.exe -DestinationPath hay-${{ github.ref_name }}-${{ matrix.target }}.zip
 
       - uses: actions/upload-artifact@v4
         with:
-          name: hayashi-${{ matrix.target }}
-          path: hayashi-${{ github.ref_name }}-*
+          name: hay-${{ matrix.target }}
+          path: hay-${{ github.ref_name }}-*
 
   publish:
     needs: build
@@ -59,5 +59,5 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
-          files: hayashi-*
+          files: hay-*
           generate_release_notes: true

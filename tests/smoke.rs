@@ -7,17 +7,17 @@ fn tmp(name: &str) -> String {
 }
 
 fn run_hy(script: &str) -> (bool, String) {
-    let output = Command::new(env!("CARGO_BIN_EXE_hayashi"))
+    let output = Command::new(env!("CARGO_BIN_EXE_hay"))
         .arg(script)
         .output()
-        .expect("failed to execute hayashi");
+        .expect("failed to execute hay");
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
     (output.status.success(), format!("{stdout}{stderr}"))
 }
 
 fn run_inline(src: &str) -> (bool, String) {
-    let output = Command::new(env!("CARGO_BIN_EXE_hayashi"))
+    let output = Command::new(env!("CARGO_BIN_EXE_hay"))
         .arg("-")
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
@@ -28,7 +28,7 @@ fn run_inline(src: &str) -> (bool, String) {
             child.stdin.take().unwrap().write_all(src.as_bytes())?;
             child.wait_with_output()
         })
-        .expect("failed to execute hayashi");
+        .expect("failed to execute hay");
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
     (output.status.success(), format!("{stdout}{stderr}"))
@@ -49,7 +49,7 @@ fn assert_ok_contains(name: &str, src: &str, needle: &str) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// SMOKE TESTS — exemplos .hy offline (17 que passam sem rede)
+// SMOKE TESTS — exemplos .hay offline (17 que passam sem rede)
 // ══════════════════════════════════════════════════════════════════════════════
 
 macro_rules! smoke {
@@ -71,49 +71,49 @@ macro_rules! smoke {
 
 smoke!(
     smoke_input_display,
-    "exemplos/input_display.hy",
+    "exemplos/input_display.hay",
     "OLS Regression"
 );
-smoke!(smoke_eststo_loop, "exemplos/eststo_loop.hy", "estclear");
+smoke!(smoke_eststo_loop, "exemplos/eststo_loop.hay", "estclear");
 smoke!(
     smoke_foreach_regression,
-    "exemplos/foreach_regression.hy",
+    "exemplos/foreach_regression.hay",
     "●"
 );
-smoke!(smoke_portfolio_sort, "exemplos/portfolio_sort.hy", "H-L");
+smoke!(smoke_portfolio_sort, "exemplos/portfolio_sort.hay", "H-L");
 smoke!(
     smoke_fama_macbeth,
-    "exemplos/fama_macbeth.hy",
+    "exemplos/fama_macbeth.hay",
     "Fama-MacBeth"
 );
-smoke!(smoke_double_sort, "exemplos/double_sort.hy", "Double Sort");
-smoke!(smoke_pwcorr, "exemplos/pwcorr.hy", "***");
+smoke!(smoke_double_sort, "exemplos/double_sort.hay", "Double Sort");
+smoke!(smoke_pwcorr, "exemplos/pwcorr.hay", "***");
 smoke!(
     smoke_missing_values,
-    "exemplos/missing_values.hy",
+    "exemplos/missing_values.hay",
     "Missing"
 );
 smoke!(
     smoke_preserve_restore,
-    "exemplos/preserve_restore.hy",
+    "exemplos/preserve_restore.hay",
     "restore"
 );
 smoke!(
     smoke_test_cov_display,
-    "exemplos/test_cov_display.hy",
+    "exemplos/test_cov_display.hay",
     "OLS (cluster)"
 );
 smoke!(
     smoke_tres_workflows,
-    "exemplos/tres_workflows.hy",
+    "exemplos/tres_workflows.hay",
     "Hausman"
 );
 smoke!(
     smoke_modelos_contagem,
-    "exemplos/modelos_contagem.hy",
+    "exemplos/modelos_contagem.hay",
     "Poisson"
 );
-smoke!(smoke_painel, "exemplos/painel.hy", "FE");
+smoke!(smoke_painel, "exemplos/painel.hay", "FE");
 
 // ══════════════════════════════════════════════════════════════════════════════
 // SCOPING — block scoping com destruição determinística
@@ -3802,8 +3802,8 @@ gscatter(df, X, Y, path="{}")
 
 #[test]
 fn smoke_graficos_svg() {
-    let (ok, out) = run_hy("exemplos/graficos_svg.hy");
-    assert!(ok, "graficos_svg.hy failed:\n{out}");
+    let (ok, out) = run_hy("exemplos/graficos_svg.hay");
+    assert!(ok, "graficos_svg.hay failed:\n{out}");
     assert!(out.contains("graph saved: scatter.svg"));
     assert!(out.contains("graph saved: coefplot.svg"));
     // cleanup
@@ -4115,8 +4115,8 @@ summarize(df, X, detail=true)
 
 #[test]
 fn smoke_funcoes_matematicas() {
-    let (ok, out) = run_hy("exemplos/funcoes_matematicas.hy");
-    assert!(ok, "funcoes_matematicas.hy failed:\n{out}");
+    let (ok, out) = run_hy("exemplos/funcoes_matematicas.hay");
+    assert!(ok, "funcoes_matematicas.hay failed:\n{out}");
     assert!(out.contains("Skewness"));
 }
 
@@ -4637,8 +4637,8 @@ fn regex_email_pattern() {
 
 #[test]
 fn smoke_regex() {
-    let (ok, out) = run_hy("exemplos/regex.hy");
-    assert!(ok, "regex.hy failed:\n{out}");
+    let (ok, out) = run_hy("exemplos/regex.hay");
+    assert!(ok, "regex.hay failed:\n{out}");
     assert!(out.contains("42.50"));
 }
 
@@ -5184,7 +5184,7 @@ fn import_not_found() {
 fn import_with_extension() {
     assert_ok_contains(
         "import_ext",
-        r#"import("exemplos/data/test_module.hy")
+        r#"import("exemplos/data/test_module.hay")
 display double(3)"#,
         "6",
     );

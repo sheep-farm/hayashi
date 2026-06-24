@@ -10,7 +10,7 @@ keywords = ["econometrics", "statistics", "stata", "repl", "language"]
 categories = ["science", "command-line-utilities"]
 
 [[bin]]
-name = "hayashi"
+name = "hay"
 path = "src/main.rs"
 
 [dependencies]
