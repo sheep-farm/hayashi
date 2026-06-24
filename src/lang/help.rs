@@ -1,3 +1,23 @@
+pub fn help_about() -> String {
+    format!(
+        "Hayashi — Applied Econometrics Language\n\
+         Version: {}\n\
+         License: {}\n\n\
+         An interpreted language for applied econometrics.\n\
+         Named after Fumio Hayashi, author of \"Econometrics\" (Princeton, 2000).\n\n\
+         Built in Rust on top of Greeners (econometrics engine).\n\
+         100% Rust — no C, no Fortran, no system BLAS/LAPACK.\n\n\
+         Author: {}\n\
+         Repository: {}\n\
+         Website: https://haylang.dev\n\
+         Crate: https://crates.io/crates/hayashi-lang\n",
+        env!("CARGO_PKG_VERSION"),
+        env!("CARGO_PKG_LICENSE"),
+        env!("CARGO_PKG_AUTHORS"),
+        env!("CARGO_PKG_REPOSITORY"),
+    )
+}
+
 pub fn help_text(topic: &str) -> Option<&'static str> {
     let h = match topic {
         "" => concat!(
@@ -452,19 +472,6 @@ pub fn help_text(topic: &str) -> Option<&'static str> {
         "factor" => "factor(df, var1, var2 [, ...] [, nfactors=2])\n  Factor analysis.\n\n  factor(df, q1, q2, q3, q4, nfactors=2)\n",
         "manova" => "manova(df, var1, var2 [, ...], by=\"group\")\n  Multivariate ANOVA.\n\n  manova(df, price, mpg, weight, by=\"foreign\")\n",
         "anova" => "anova(df, var, by=\"group\")\n  One-way ANOVA.\n\n  anova(df, price, by=\"foreign\")\n",
-        "about" => concat!(
-            "Hayashi — Applied Econometrics Language\n",
-            "Version: 0.2.2-dev\n",
-            "License: GPL-3.0-only\n\n",
-            "An interpreted language for applied econometrics.\n",
-            "Named after Fumio Hayashi, author of \"Econometrics\" (Princeton, 2000).\n\n",
-            "Built in Rust on top of Greeners (econometrics engine).\n",
-            "100% Rust — no C, no Fortran, no system BLAS/LAPACK.\n\n",
-            "Author: Flávio de Vasconcellos Corrêa <flavio.vcorrea@ufpel.edu.br>\n",
-            "Repository: https://github.com/sheep-farm/hayashi\n",
-            "Website: https://haylang.dev\n",
-            "Crate: https://crates.io/crates/hayashi-lang\n",
-        ),
         _ => return None,
     };
     Some(h)
