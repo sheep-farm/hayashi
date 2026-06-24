@@ -491,6 +491,33 @@ pub fn help_text(topic: &str) -> Option<&'static str> {
         "factor" => "factor(df, var1, var2 [, ...] [, nfactors=2])\n  Factor analysis.\n\n  factor(df, q1, q2, q3, q4, nfactors=2)\n",
         "manova" => "manova(df, var1, var2 [, ...], by=\"group\")\n  Multivariate ANOVA.\n\n  manova(df, price, mpg, weight, by=\"foreign\")\n",
         "anova" => "anova(df, var, by=\"group\")\n  One-way ANOVA.\n\n  anova(df, price, by=\"foreign\")\n",
+        "clogit" | "xtlogit_fe" => concat!(
+            "clogit(formula, df, group=\"id_col\")\n",
+            "  Alias: xtlogit_fe\n\n",
+            "  Conditional (fixed-effects) logit for panel binary outcomes.\n",
+            "  Groups without variation in y are dropped.\n\n",
+            "  Example:\n",
+            "    let m = clogit(y ~ x1 + x2, df, group=\"id\")\n",
+        ),
+        "cpoisson" | "xtpoisson_fe" | "ppml" => concat!(
+            "cpoisson(formula, df, group=\"id_col\")\n",
+            "  Aliases: xtpoisson_fe, ppml\n\n",
+            "  Conditional (fixed-effects) Poisson. Consistent under\n",
+            "  unobserved heterogeneity (PPML estimator).\n\n",
+            "  Example:\n",
+            "    let m = cpoisson(exports ~ gdp + dist, df, group=\"pair\")\n",
+        ),
+        "cmnlogit" | "cmlogit" | "conditional_mlogit" => concat!(
+            "cmnlogit(formula, df, group=\"id_col\", alts=N)\n",
+            "  Aliases: cmlogit, conditional_mlogit\n\n",
+            "  Conditional multinomial logit (McFadden's choice model).\n",
+            "  Data must be stacked: N_occasions * N_alternatives rows.\n\n",
+            "  Options:\n",
+            "    group=\"col\"   Choice-set/individual identifier\n",
+            "    alts=N        Number of alternatives per choice set\n\n",
+            "  Example:\n",
+            "    let m = cmnlogit(choice ~ price + quality, df, group=\"id\", alts=3)\n",
+        ),
         _ => return None,
     };
     Some(h)
