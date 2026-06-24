@@ -5360,6 +5360,31 @@ fn typeof_dict() {
     assert_ok_contains("typeof_dict", r#"display type({"a": 1})"#, "dict");
 }
 
+#[test]
+fn scalar_math_sqrt() {
+    assert_ok_contains("scalar_sqrt", "display sqrt(16)", "4");
+}
+
+#[test]
+fn scalar_math_abs() {
+    assert_ok_contains("scalar_abs", "display abs(-7)", "7");
+}
+
+#[test]
+fn scalar_math_ln() {
+    assert_ok_contains("scalar_ln", "display ln(1)", "0");
+}
+
+#[test]
+fn scalar_math_exp() {
+    assert_ok_contains("scalar_exp", "let x = exp(0)\ndisplay x", "1");
+}
+
+#[test]
+fn scalar_math_pow() {
+    assert_ok_contains("scalar_pow", "display pow(2, 10)", "1024");
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // PARQUET — load/export
 // ══════════════════════════════════════════════════════════════════════════════
