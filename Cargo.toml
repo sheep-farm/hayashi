@@ -16,6 +16,7 @@ path = "src/main.rs"
 [dependencies]
 greeners = { path = "../Greeners" }
 ndarray = "0.17"
+chrono = "0.4"
 thiserror = "2"
 rustyline = "14"
 anyhow = "1"

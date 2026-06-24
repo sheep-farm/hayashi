@@ -1273,6 +1273,37 @@ impl Interpreter {
                 ))
             }
 
+            // ── Date/time ─────────────────────────────────────────────────────
+            "date" => {
+                if args.len() != 1 {
+                    return Err(HayashiError::Runtime("date(\"YYYY-MM-DD\")".into()));
+                }
+                let s = match self.eval_expr(&args[0])? {
+                    Value::Str(s) => s,
+                    _ => return Err(HayashiError::Type("date() requires a string".into())),
+                };
+                let nd = chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d")
+                    .map_err(|e| HayashiError::Runtime(format!("date parse error: {e}")))?;
+                let dt = nd.and_hms_opt(0, 0, 0).unwrap();
+                Ok(Value::Float(dt.and_utc().timestamp() as f64))
+            }
+
+            "datetime" => {
+                if args.len() != 1 {
+                    return Err(HayashiError::Runtime(
+                        "datetime(\"YYYY-MM-DD HH:MM:SS\")".into(),
+                    ));
+                }
+                let s = match self.eval_expr(&args[0])? {
+                    Value::Str(s) => s,
+                    _ => return Err(HayashiError::Type("datetime() requires a string".into())),
+                };
+                let dt = chrono::NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M:%S")
+                    .or_else(|_| chrono::NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%S"))
+                    .map_err(|e| HayashiError::Runtime(format!("datetime parse error: {e}")))?;
+                Ok(Value::Float(dt.and_utc().timestamp() as f64))
+            }
+
             // ── Builtins de lista ─────────────────────────────────────────────
             "len" => {
                 if args.len() != 1 {
@@ -18536,12 +18567,18 @@ impl Interpreter {
                     return Ok(vec![df.n_rows() as f64; df.n_rows()]);
                 }
                 use greeners::Column;
-                let col = df.get_column(name)
-                    .map_err(|_| HayashiError::Runtime(format!("column '{name}' not found")))?;
-                match col {
-                    Column::Float(arr) => Ok(arr.to_vec()),
-                    Column::Int(arr)   => Ok(arr.iter().map(|&x| x as f64).collect()),
-                    _ => Err(HayashiError::Type(format!("column '{name}' is not numeric"))),
+                match df.get_column(name) {
+                    Ok(Column::Float(arr)) => Ok(arr.to_vec()),
+                    Ok(Column::Int(arr)) => Ok(arr.iter().map(|&x| x as f64).collect()),
+                    Ok(_) => Err(HayashiError::Type(format!("column '{name}' is not numeric"))),
+                    Err(_) => match self.env.get(name) {
+                        Some(Value::Float(f)) => Ok(vec![*f; df.n_rows()]),
+                        Some(Value::Int(i)) => Ok(vec![*i as f64; df.n_rows()]),
+                        Some(Value::Bool(b)) => Ok(vec![if *b { 1.0 } else { 0.0 }; df.n_rows()]),
+                        _ => Err(HayashiError::Runtime(format!(
+                            "'{name}' not found as column or scalar variable"
+                        ))),
+                    },
                 }
             }
             Expr::Neg(inner) => {
@@ -18679,6 +18716,53 @@ impl Interpreter {
                             };
                             let strs = Self::col_to_strings(df, &col_name)?;
                             return Ok(greeners::Transforms::group(&strs));
+                        }
+                        "year" | "month" | "day" | "hour" | "minute" | "second" | "dow" => {
+                            let col_name = match &args[0] {
+                                Expr::Var(name) => name.clone(),
+                                _ => return Err(HayashiError::Runtime(
+                                    format!("{func}() requires a column name"),
+                                )),
+                            };
+                            if let Ok(arr) = df.get_datetime(&col_name) {
+                                use chrono::{Datelike, Timelike};
+                                let extract = |dt: &chrono::NaiveDateTime| -> f64 {
+                                    match func.as_str() {
+                                        "year" => dt.year() as f64,
+                                        "month" => dt.month() as f64,
+                                        "day" => dt.day() as f64,
+                                        "hour" => dt.hour() as f64,
+                                        "minute" => dt.minute() as f64,
+                                        "second" => dt.second() as f64,
+                                        "dow" => dt.weekday().num_days_from_monday() as f64,
+                                        _ => f64::NAN,
+                                    }
+                                };
+                                return Ok(arr.iter().map(extract).collect());
+                            }
+                            let vals = self.eval_col_expr(&args[0], df)?;
+                            use chrono::DateTime as ChronoDateTime;
+                            let result: Vec<f64> = vals.iter().map(|&ts| {
+                                let dt = ChronoDateTime::from_timestamp(ts as i64, 0)
+                                    .map(|d| d.naive_utc());
+                                match dt {
+                                    Some(d) => {
+                                        use chrono::{Datelike, Timelike};
+                                        match func.as_str() {
+                                            "year" => d.year() as f64,
+                                            "month" => d.month() as f64,
+                                            "day" => d.day() as f64,
+                                            "hour" => d.hour() as f64,
+                                            "minute" => d.minute() as f64,
+                                            "second" => d.second() as f64,
+                                            "dow" => d.weekday().num_days_from_monday() as f64,
+                                            _ => f64::NAN,
+                                        }
+                                    }
+                                    None => f64::NAN,
+                                }
+                            }).collect();
+                            return Ok(result);
                         }
                         _ => {}
                     }
