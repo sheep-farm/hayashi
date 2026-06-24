@@ -17314,6 +17314,40 @@ impl Interpreter {
 
             // ── Função definida pelo usuário ──────────────────────────────────
             other => {
+                // scalar math: sqrt(4), ln(2.7), abs(-3), etc.
+                if args.len() == 1 {
+                    if let Ok(v) = self.eval_expr(&args[0]) {
+                        let x = match &v {
+                            Value::Float(f) => Some(*f),
+                            Value::Int(i) => Some(*i as f64),
+                            _ => None,
+                        };
+                        if let Some(x) = x {
+                            if let Ok(res) = greeners::Transforms::apply(&[x], other) {
+                                return Ok(Value::Float(res[0]));
+                            }
+                        }
+                    }
+                } else if args.len() == 2 {
+                    if let (Ok(va), Ok(vb)) = (self.eval_expr(&args[0]), self.eval_expr(&args[1])) {
+                        let xa = match &va {
+                            Value::Float(f) => Some(*f),
+                            Value::Int(i) => Some(*i as f64),
+                            _ => None,
+                        };
+                        let xb = match &vb {
+                            Value::Float(f) => Some(*f),
+                            Value::Int(i) => Some(*i as f64),
+                            _ => None,
+                        };
+                        if let (Some(a), Some(b)) = (xa, xb) {
+                            if let Ok(res) = greeners::Transforms::apply2(&[a], &[b], other) {
+                                return Ok(Value::Float(res[0]));
+                            }
+                        }
+                    }
+                }
+
                 // Recupera a função do env (se existir)
                 let user_fn = match self.env.get(other).cloned() {
                     Some(Value::UserFn(f)) => f,

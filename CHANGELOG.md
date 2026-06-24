@@ -3,6 +3,12 @@
 All notable changes to Hayashi are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.1] — 2026-06-24
+
+### Fixed
+
+- **Scalar math functions**: `sqrt()`, `abs()`, `ln()`, `exp()`, `pow()`, `log2()`, `log10()`, `sin()`, `cos()`, `tan()`, `ceil()`, `floor()`, `round()`, `sign()`, `factorial()`, `normalden()`, `invnormal()`, `mod()`, `atan2()`, `max()`, `min()`, `comb()` now work as standalone expressions (previously only worked inside `generate`)
+
 ## [0.2.0] — 2026-06-24
 
 ### Breaking Changes
