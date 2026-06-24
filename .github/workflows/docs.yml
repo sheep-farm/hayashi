@@ -28,7 +28,9 @@ jobs:
           mv mdbook /usr/local/bin/
 
       - name: Build book
-        run: cd docs && mdbook build
+        run: |
+          cd docs && mdbook build
+          cp CNAME book/ 2>/dev/null || true
 
       - uses: actions/upload-pages-artifact@v3
         with:
