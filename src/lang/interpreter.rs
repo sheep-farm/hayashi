@@ -2091,14 +2091,7 @@ impl Interpreter {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime("fmb(formula, df, time=col)".into()));
                 }
-                let formula_ast = match &args[0] {
-                    Expr::Formula(f) => f.clone(),
-                    _ => {
-                        return Err(HayashiError::Type(
-                            "first argument must be a formula".into(),
-                        ))
-                    }
-                };
+                let formula_ast = self.resolve_formula(&args[0])?;
                 let df_name = match &args[1] {
                     Expr::Var(n) => n.clone(),
                     _ => {
@@ -2463,22 +2456,8 @@ impl Interpreter {
                         "iv() requires (endog_formula, instrument_formula, dataframe)".into(),
                     ));
                 }
-                let endog_ast = match &args[0] {
-                    Expr::Formula(f) => f.clone(),
-                    _ => {
-                        return Err(HayashiError::Type(
-                            "first argument must be a formula".into(),
-                        ))
-                    }
-                };
-                let instr_ast = match &args[1] {
-                    Expr::Formula(f) => f.clone(),
-                    _ => {
-                        return Err(HayashiError::Type(
-                            "second argument must be a formula".into(),
-                        ))
-                    }
-                };
+                let endog_ast = self.resolve_formula(&args[0])?;
+                let instr_ast = self.resolve_formula(&args[1])?;
                 let df_name = match &args[2] {
                     Expr::Var(name) => name.clone(),
                     _ => {
@@ -2537,22 +2516,8 @@ impl Interpreter {
                         "weak_iv() requer (formula_estrutural, formula_instrumentos, df)".into(),
                     ));
                 }
-                let endog_ast = match &args[0] {
-                    Expr::Formula(f) => f.clone(),
-                    _ => {
-                        return Err(HayashiError::Type(
-                            "weak_iv(): first argument must be a formula".into(),
-                        ))
-                    }
-                };
-                let instr_ast = match &args[1] {
-                    Expr::Formula(f) => f.clone(),
-                    _ => {
-                        return Err(HayashiError::Type(
-                            "weak_iv(): second argument must be fórmula de instrumentos".into(),
-                        ))
-                    }
-                };
+                let endog_ast = self.resolve_formula(&args[0])?;
+                let instr_ast = self.resolve_formula(&args[1])?;
                 let df_name = match &args[2] {
                     Expr::Var(n) => n.clone(),
                     _ => {
@@ -2854,22 +2819,8 @@ impl Interpreter {
                         "heckman() requer (formula_resultado, formula_seleção, df)".into(),
                     ));
                 }
-                let out_ast = match &args[0] {
-                    Expr::Formula(f) => f.clone(),
-                    _ => return Err(HayashiError::Type(
-                        "heckman(): primeiro argumento deve ser fórmula de resultado (y ~ x1+x2)"
-                            .into(),
-                    )),
-                };
-                let sel_ast = match &args[1] {
-                    Expr::Formula(f) => f.clone(),
-                    _ => {
-                        return Err(HayashiError::Type(
-                            "heckman(): second argument must be fórmula de seleção (z ~ w1+w2)"
-                                .into(),
-                        ))
-                    }
-                };
+                let out_ast = self.resolve_formula(&args[0])?;
+                let sel_ast = self.resolve_formula(&args[1])?;
                 let df_name = match &args[2] {
                     Expr::Var(name) => name.clone(),
                     _ => {
@@ -2959,14 +2910,7 @@ impl Interpreter {
                         "rd() requer (formula, cutoff, df [, bw=..., poly=..., kernel=...])".into(),
                     ));
                 }
-                let formula_ast = match &args[0] {
-                    Expr::Formula(f) => f.clone(),
-                    _ => {
-                        return Err(HayashiError::Type(
-                            "rd(): first argument must be a formula".into(),
-                        ))
-                    }
-                };
+                let formula_ast = self.resolve_formula(&args[0])?;
                 let cutoff = match self.eval_expr(&args[1])? {
                     Value::Float(v) => v,
                     Value::Int(v) => v as f64,
@@ -3038,14 +2982,7 @@ impl Interpreter {
                         "fuzzy_rd() requer (formula, \"treatment\", cutoff, df [, bw=..., poly=...])".into()
                     ));
                 }
-                let formula_ast = match &args[0] {
-                    Expr::Formula(f) => f.clone(),
-                    _ => {
-                        return Err(HayashiError::Type(
-                            "fuzzy_rd(): first argument must be a formula".into(),
-                        ))
-                    }
-                };
+                let formula_ast = self.resolve_formula(&args[0])?;
                 let treatment_name = match self.eval_expr(&args[1])? {
                     Value::Str(s) => s,
                     _ => return Err(HayashiError::Type(
@@ -3133,14 +3070,7 @@ impl Interpreter {
                             .into(),
                     ));
                 }
-                let formula_ast = match &args[0] {
-                    Expr::Formula(f) => f.clone(),
-                    _ => {
-                        return Err(HayashiError::Type(
-                            "psm(): first argument must be a formula".into(),
-                        ))
-                    }
-                };
+                let formula_ast = self.resolve_formula(&args[0])?;
                 let df = match self.eval_expr(&args[1])? {
                     Value::DataFrame(df) => df,
                     _ => {
@@ -3411,14 +3341,7 @@ impl Interpreter {
                         "did(outcome ~ tratado + pos, df) requer fórmula e DataFrame".into(),
                     ));
                 }
-                let formula_ast = match &args[0] {
-                    Expr::Formula(f) => f.clone(),
-                    _ => {
-                        return Err(HayashiError::Type(
-                            "did(): first argument must be a formula".into(),
-                        ))
-                    }
-                };
+                let formula_ast = self.resolve_formula(&args[0])?;
                 let df = match self.eval_expr(&args[1])? {
                     Value::DataFrame(d) => d,
                     _ => {
@@ -3538,14 +3461,7 @@ impl Interpreter {
                         "cox(time ~ x1 + x2, df, event=col) requer fórmula e DataFrame".into(),
                     ));
                 }
-                let formula_ast = match &args[0] {
-                    Expr::Formula(f) => f.clone(),
-                    _ => {
-                        return Err(HayashiError::Type(
-                            "cox(): first argument must be a formula".into(),
-                        ))
-                    }
-                };
+                let formula_ast = self.resolve_formula(&args[0])?;
                 let df = match self.eval_expr(&args[1])? {
                     Value::DataFrame(d) => d,
                     _ => {
@@ -5044,10 +4960,7 @@ impl Interpreter {
                     Some(Value::DataFrame(d)) => d.clone(),
                     _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
-                let formula_ast = match &args[1] {
-                    Expr::Formula(f) => f.clone(),
-                    _ => return Err(HayashiError::Type("second argument must be fórmula".into())),
-                };
+                let formula_ast = self.resolve_formula(&args[1])?;
                 let id_col = match opt_map.get("id") {
                     Some(Value::Str(s)) => s.clone(),
                     _ => self
@@ -5128,10 +5041,7 @@ impl Interpreter {
                     Some(Value::DataFrame(d)) => d.clone(),
                     _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
-                let formula_ast = match &args[1] {
-                    Expr::Formula(f) => f.clone(),
-                    _ => return Err(HayashiError::Type("second argument must be fórmula".into())),
-                };
+                let formula_ast = self.resolve_formula(&args[1])?;
                 let id_col = match opt_map.get("id") {
                     Some(Value::Str(s)) => s.clone(),
                     _ => self
@@ -5220,10 +5130,7 @@ impl Interpreter {
                     Some(Value::DataFrame(d)) => d.clone(),
                     _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
-                let formula_ast = match &args[1] {
-                    Expr::Formula(f) => f.clone(),
-                    _ => return Err(HayashiError::Type("second argument must be fórmula".into())),
-                };
+                let formula_ast = self.resolve_formula(&args[1])?;
                 let id_col = match opt_map.get("id") {
                     Some(Value::Str(s)) => s.clone(),
                     _ => self
@@ -5305,10 +5212,7 @@ impl Interpreter {
                     Some(Value::DataFrame(d)) => d.clone(),
                     _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
-                let formula_ast = match &args[1] {
-                    Expr::Formula(f) => f.clone(),
-                    _ => return Err(HayashiError::Type("second argument must be fórmula".into())),
-                };
+                let formula_ast = self.resolve_formula(&args[1])?;
                 let id_col = match opt_map.get("id") {
                     Some(Value::Str(s)) => s.clone(),
                     _ => self
@@ -5398,10 +5302,7 @@ impl Interpreter {
                     Some(Value::DataFrame(d)) => d.clone(),
                     _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
-                let formula_ast = match &args[1] {
-                    Expr::Formula(f) => f.clone(),
-                    _ => return Err(HayashiError::Type("second argument must be fórmula".into())),
-                };
+                let formula_ast = self.resolve_formula(&args[1])?;
                 let id_col = match opt_map.get("id") {
                     Some(Value::Str(s)) => s.clone(),
                     _ => self
@@ -5498,14 +5399,7 @@ impl Interpreter {
                 let mut eq_var_names: Vec<Vec<String>> = Vec::new();
 
                 for arg in &args[1..] {
-                    let formula_ast = match arg {
-                        Expr::Formula(f) => f.clone(),
-                        _ => {
-                            return Err(HayashiError::Type(
-                                "sur: cada equação deve ser uma fórmula (y ~ x1 + x2)".into(),
-                            ))
-                        }
-                    };
+                    let formula_ast = self.resolve_formula(arg)?;
                     let formula_str = Self::formula_to_string(&formula_ast);
                     let g_formula = GFormula::parse(&formula_str)
                         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -6297,14 +6191,8 @@ impl Interpreter {
                         "gmm(endog_formula, instrument_formula, dataframe)".into(),
                     ));
                 }
-                let endog_ast = match &args[0] {
-                    Expr::Formula(f) => f.clone(),
-                    _ => return Err(HayashiError::Type("first argument must be a formula".into())),
-                };
-                let instr_ast = match &args[1] {
-                    Expr::Formula(f) => f.clone(),
-                    _ => return Err(HayashiError::Type("second argument must be a formula".into())),
-                };
+                let endog_ast = self.resolve_formula(&args[0])?;
+                let instr_ast = self.resolve_formula(&args[1])?;
                 let df_name = match &args[2] {
                     Expr::Var(name) => name.clone(),
                     _ => return Err(HayashiError::Type("third argument must be a DataFrame variable".into())),
@@ -6459,20 +6347,8 @@ impl Interpreter {
                 }
 
                 let endog_ast =
-                    match &args[0] {
-                        Expr::Formula(f) => f.clone(),
-                        _ => return Err(HayashiError::Type(
-                            "feiv(): primeiro argumento deve ser fórmula estrutural (y ~ x1 + x2)"
-                                .into(),
-                        )),
-                    };
-                let instr_ast = match &args[1] {
-                    Expr::Formula(f) => f.clone(),
-                    _ => return Err(HayashiError::Type(
-                        "feiv(): second argument must be fórmula dos instrumentos (~ x1 + z1 + z2)"
-                            .into(),
-                    )),
-                };
+                    self.resolve_formula(&args[0])?;
+                let instr_ast = self.resolve_formula(&args[1])?;
                 let df_name = match &args[2] {
                     Expr::Var(name) => name.clone(),
                     _ => {
@@ -14208,14 +14084,7 @@ impl Interpreter {
                 let mut equations: Vec<greeners::Equation> = Vec::new();
                 let mut eq_var_names: Vec<Vec<String>> = Vec::new();
                 for arg in &args[1..] {
-                    let formula_ast = match arg {
-                        Expr::Formula(f) => f.clone(),
-                        _ => {
-                            return Err(HayashiError::Type(
-                                "threesl: cada equação deve ser uma fórmula (y ~ x1 + z1)".into(),
-                            ))
-                        }
-                    };
+                    let formula_ast = self.resolve_formula(arg)?;
                     let formula_str = Self::formula_to_string(&formula_ast);
                     let g_formula = GFormula::parse(&formula_str)
                         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -14577,14 +14446,7 @@ impl Interpreter {
                         "pthresh(y ~ x1 + x2, df, q=threshold_var, id=entity_id)".into(),
                     ));
                 }
-                let formula = match &args[0] {
-                    Expr::Formula(f) => f.clone(),
-                    _ => {
-                        return Err(HayashiError::Type(
-                            "first argument must be a formula y ~ x1 + x2".into(),
-                        ))
-                    }
-                };
+                let formula = self.resolve_formula(&args[0])?;
                 let df_name = match &args[1] {
                     Expr::Var(n) => n.clone(),
                     _ => {
@@ -15780,14 +15642,7 @@ impl Interpreter {
                         "ridge(formula, df, alpha=1.0)".into(),
                     ));
                 }
-                let formula = match &args[0] {
-                    Expr::Formula(f) => f.clone(),
-                    _ => {
-                        return Err(HayashiError::Type(
-                            "ridge: first argument must be a formula".into(),
-                        ))
-                    }
-                };
+                let formula = self.resolve_formula(&args[0])?;
                 let df_name = match &args[1] {
                     Expr::Var(n) => n.clone(),
                     _ => {
@@ -15858,14 +15713,7 @@ impl Interpreter {
                         "lasso(formula, df, alpha=1.0, tol=1e-6, max_iter=10000)".into(),
                     ));
                 }
-                let formula = match &args[0] {
-                    Expr::Formula(f) => f.clone(),
-                    _ => {
-                        return Err(HayashiError::Type(
-                            "lasso: first argument must be a formula".into(),
-                        ))
-                    }
-                };
+                let formula = self.resolve_formula(&args[0])?;
                 let df_name = match &args[1] {
                     Expr::Var(n) => n.clone(),
                     _ => {
@@ -16020,14 +15868,7 @@ impl Interpreter {
                         "elasticnet(formula, df, alpha=1.0, l1_ratio=0.5)".into(),
                     ));
                 }
-                let formula = match &args[0] {
-                    Expr::Formula(f) => f.clone(),
-                    _ => {
-                        return Err(HayashiError::Type(
-                            "elasticnet: first argument must be a formula".into(),
-                        ))
-                    }
-                };
+                let formula = self.resolve_formula(&args[0])?;
                 let df_name = match &args[1] {
                     Expr::Var(n) => n.clone(),
                     _ => {
@@ -17708,14 +17549,7 @@ impl Interpreter {
                 "panel estimator requires (formula, dataframe [, id=col])".into(),
             ));
         }
-        let formula_ast = match &args[0] {
-            Expr::Formula(f) => f.clone(),
-            _ => {
-                return Err(HayashiError::Type(
-                    "first argument must be a formula".into(),
-                ))
-            }
-        };
+        let formula_ast = self.resolve_formula(&args[0])?;
         let df_name = match &args[1] {
             Expr::Var(name) => name.clone(),
             _ => {
