@@ -7320,12 +7320,16 @@ impl Interpreter {
                         _ => String::new(),
                     }
                 };
-                match crate::lang::help::help_text(&topic) {
-                    Some(h) => println!("{h}"),
-                    None => println!(
-                        "help: '{}' not documented. Type help() for full list.",
-                        topic
-                    ),
+                if topic == "about" {
+                    println!("{}", crate::lang::help::help_about());
+                } else {
+                    match crate::lang::help::help_text(&topic) {
+                        Some(h) => println!("{h}"),
+                        None => println!(
+                            "help: '{}' not documented. Type help() for full list.",
+                            topic
+                        ),
+                    }
                 }
                 Ok(Value::Nil)
             }
