@@ -10,7 +10,7 @@ Stata-like syntax, modern language features, zero cost. Built in Rust on top of 
 git clone https://github.com/sheep-farm/hayashi.git
 cd hayashi
 cargo build --release
-# Binary at target/release/hayashi
+# Binary at target/release/hay
 
 # Optional: ODBC support (requires unixodbc)
 cargo build --release --features odbc
@@ -19,12 +19,13 @@ cargo build --release --features odbc
 ## Usage
 
 ```bash
-hayashi                  # interactive REPL (multi-line)
-hayashi script.hy        # run a script
-hayashi -                # read from stdin
-hayashi --verbose        # trace each statement
-hayashi --help           # list commands
+hay                  # interactive REPL (tab completion, syntax highlighting)
+hay script.hay       # run a script
+hay -                # read from stdin
+hay --help           # list commands
 ```
+
+REPL features: tab completion for keywords + variables, syntax highlighting (keywords blue, strings green, numbers yellow), history hints (fish-style).
 
 ## Quick start
 
@@ -55,7 +56,7 @@ Hayashi is a dynamically-typed, block-scoped interpreted language. It combines S
 | `float` | `3.14` | 64-bit IEEE 754 |
 | `bool` | `true` / `false` | |
 | `string` | `"hello"` | UTF-8, immutable |
-| `list` | `[1, 2, 3]` | Heterogeneous, immutable (COW) |
+| `list` | `[1, 2, 3]` | Heterogeneous; `push`/`pop` mutate, rest COW |
 | `dict` | `{"key": value}` | String keys, any values, immutable (COW) |
 | `nil` | | Absence of value |
 | `dataframe` | via `load` / `input` | Tabular data, copy-on-write (`Rc`) |
@@ -138,7 +139,7 @@ F-strings support any expression inside `{}` and format specifiers: `.Nf` (decim
 
 ### Collections
 
-All collection operations are **immutable** — they return a new collection, leaving the original unchanged.
+`push(list, item)` and `pop(list)` mutate in-place (like Python/JS). Other list operations return new lists, leaving the original unchanged.
 
 **List operations:** `push` `pop` `insert` `remove` `clear` `reverse` `index` `slice` `join` `map` `filter` `unique` `flatten` `sort` `range` `len`
 
@@ -151,6 +152,9 @@ All collection operations are **immutable** — they return a new collection, le
     |> sort
     |> map(|x| x * 10)
     |> reverse
+
+value |> |x| x * 3           // pipe with inline closure
+exper |> dobro                // pipe with user function
 ```
 
 ## Data I/O
@@ -199,7 +203,7 @@ export(m, "html", "table.html")
 | Finance | `fmb` `portsort` `doublesort` |
 | Robust | `rlm` `gee` `glm` `betareg` `mixed` |
 
-All estimators support `if=` for subsamples and `cov=`/`cluster=`/`nw=` for robust SEs.
+All estimators support `if=` for subsamples and `cov=`/`cluster=`/`nw=` for robust SEs. All estimators auto-detect and drop perfectly collinear variables (Stata-style `(omitted)` display).
 
 ## Post-estimation
 
@@ -247,6 +251,25 @@ dropna(df, price, mpg)
 rename(df, old, new)
 label(df, Y, "GDP per capita")
 preserve(df) / restore(df)
+```
+
+## Date/time
+
+```
+// Parsing
+let t = date("2024-06-15")              // -> Unix timestamp
+let dt = datetime("2024-06-15 14:30:00")
+
+// Extraction in generate
+generate df Y = year(date_col)
+generate df M = month(date_col)
+generate df D = day(date_col)
+generate df H = hour(date_col)
+generate df W = dow(date_col)           // 0=Monday
+
+// Filtering with scalar variables
+let cutoff = date("2020-01-01")
+let sub = filter(df, ts >= cutoff)
 ```
 
 ## Descriptive statistics
@@ -298,7 +321,7 @@ let ok = true           // bool
 const N = 1000
 const TAX = 0.15
 
-// Lists (immutable — operations return new list)
+// Lists (push/pop mutate in-place, other ops return new list)
 let nums = [1, 2, 3]
 let doubled = nums |> map(|x| x * 2)    // [2, 4, 6]
 push(nums, 4)  pop(nums)  insert(nums, 0, 99)  remove(nums, 1)
@@ -364,6 +387,18 @@ fn add(a, b) {
 let doubled = map([1, 2, 3], |x| x * 2)
 let big = filter(nums, |x| x > 10)
 let add = |a, b| a + b
+```
+
+## Namespaces
+
+```
+// Module-based namespacing
+import("finance")                    // finance::sharpe(), finance::sortino()
+import("finance", as=fin)           // fin::sharpe()
+import("finance", only=["sharpe"])  // sharpe() directly
+
+// Qualified calls
+let ratio = finance::sharpe(ret, rf)
 ```
 
 ## F-strings and operators
@@ -433,18 +468,18 @@ capture(ols(Y ~ X, df))       // ignore errors
 assert(n > 0, "empty data")
 timer(ols(Y ~ X, df))         // time execution
 set_seed(42)                   // reproducibility
-source("other_script.hy")     // run another script
-help(ols)                      // ~110 topics with examples
+source("other_script.hay")     // run another script
+help(ols)                      // help() has ~110 topics with examples
 ```
 
 ## Build & test
 
 ```bash
-cargo build --release      # optimized binary
-cargo test                 # 382 tests, <1s
+cargo build --release      # optimized binary -> target/release/hay
+cargo test                 # 389 tests, <2s
 ```
 
-59 example scripts in `exemplos/`, all passing.
+60 example scripts in `exemplos/`, all passing.
 
 ## License
 
