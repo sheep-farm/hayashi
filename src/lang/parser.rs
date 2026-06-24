@@ -451,6 +451,23 @@ impl Parser {
             Token::Ident(name) => {
                 self.advance();
 
+                if self.peek() == &Token::ColonColon {
+                    self.advance();
+                    let member = self.expect_ident()?;
+                    let qualified = format!("{name}::{member}");
+                    if self.peek() == &Token::LParen {
+                        self.advance();
+                        let (args, opts) = self.parse_call_args()?;
+                        self.expect(&Token::RParen)?;
+                        return Ok(Expr::Call {
+                            func: qualified,
+                            args,
+                            opts,
+                        });
+                    }
+                    return Ok(Expr::Var(qualified));
+                }
+
                 if self.peek() == &Token::Tilde {
                     let formula = self.parse_formula(name)?;
                     return Ok(Expr::Formula(formula));

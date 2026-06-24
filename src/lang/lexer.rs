@@ -36,29 +36,30 @@ pub enum Token {
     TsDiff(usize),
 
     // Operadores
-    Eq,        // =
-    EqEq,      // ==
-    BangEq,    // !=
-    Tilde,     // ~
-    Plus,      // +
-    Minus,     // -
-    Star,      // *
-    Slash,     // /
-    Caret,     // ^
-    Pipe,      // |
-    Colon,     // :
-    Comma,     // ,
-    Dot,       // .
-    DotDot,    // ..
-    Bang,      // !
-    Lt,        // <
-    LtEq,      // <=
-    Gt,        // >
-    GtEq,      // >=
-    And,       // &&
-    Or,        // ||
-    FatArrow,  // =>
-    PipeRight, // |>
+    Eq,         // =
+    EqEq,       // ==
+    BangEq,     // !=
+    Tilde,      // ~
+    Plus,       // +
+    Minus,      // -
+    Star,       // *
+    Slash,      // /
+    Caret,      // ^
+    Pipe,       // |
+    Colon,      // :
+    ColonColon, // ::
+    Comma,      // ,
+    Dot,        // .
+    DotDot,     // ..
+    Bang,       // !
+    Lt,         // <
+    LtEq,       // <=
+    Gt,         // >
+    GtEq,       // >=
+    And,        // &&
+    Or,         // ||
+    FatArrow,   // =>
+    PipeRight,  // |>
 
     // Delimitadores
     LParen,
@@ -334,7 +335,14 @@ impl Lexer {
                     }
                 }
                 Some('^') => tokens.push((Token::Caret, line)),
-                Some(':') => tokens.push((Token::Colon, line)),
+                Some(':') => {
+                    if self.peek() == Some(':') {
+                        self.advance();
+                        tokens.push((Token::ColonColon, line));
+                    } else {
+                        tokens.push((Token::Colon, line));
+                    }
+                }
                 Some(',') => tokens.push((Token::Comma, line)),
                 Some('(') => tokens.push((Token::LParen, line)),
                 Some(')') => tokens.push((Token::RParen, line)),
