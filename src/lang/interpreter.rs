@@ -266,6 +266,7 @@ pub enum Value {
     GarchResult(Rc<greeners::GarchResult>),
     DiagResult(Rc<DiagResult>),
     AbResult(Rc<greeners::ArellanoBondResult>),
+    GmmResult(Rc<greeners::GmmResult>),
     SysGmmResult(Rc<greeners::SystemGmmResult>),
     FE2SLSResult(Rc<greeners::PanelIvResult>),
     PcseResult(Rc<greeners::PcseResult>),
@@ -335,6 +336,7 @@ impl std::fmt::Display for Value {
             Value::GarchResult(r) => write!(f, "{r}"),
             Value::DiagResult(r) => write!(f, "{r}"),
             Value::AbResult(r) => write!(f, "{r}"),
+            Value::GmmResult(r) => write!(f, "{r}"),
             Value::SysGmmResult(r) => write!(f, "{r}"),
             Value::FE2SLSResult(r) => write!(f, "{r}"),
             Value::PcseResult(r) => write!(f, "{r}"),
@@ -6287,6 +6289,87 @@ impl Interpreter {
                 Ok(Value::AbResult(Rc::new(result)))
             }
 
+            // ── GMM genérico (Two-Step Efficient) ────────────────────────────
+            // gmm(endog_formula, instrument_formula, df)
+            "gmm" => {
+                if args.len() < 3 {
+                    return Err(HayashiError::Runtime(
+                        "gmm(endog_formula, instrument_formula, dataframe)".into(),
+                    ));
+                }
+                let endog_ast = match &args[0] {
+                    Expr::Formula(f) => f.clone(),
+                    _ => return Err(HayashiError::Type("first argument must be a formula".into())),
+                };
+                let instr_ast = match &args[1] {
+                    Expr::Formula(f) => f.clone(),
+                    _ => return Err(HayashiError::Type("second argument must be a formula".into())),
+                };
+                let df_name = match &args[2] {
+                    Expr::Var(name) => name.clone(),
+                    _ => return Err(HayashiError::Type("third argument must be a DataFrame variable".into())),
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(df)) => df.clone(),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
+                };
+
+                let endog_str = Self::formula_to_string(&endog_ast);
+                let instr_str = Self::formula_to_string(&instr_ast);
+
+                let g_endog = GFormula::parse(&endog_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                let g_instr = if instr_ast.lhs.is_empty() {
+                    let independents: Vec<String> = instr_ast
+                        .rhs
+                        .iter()
+                        .map(|t| match t {
+                            RhsTerm::Var(v) => v.clone(),
+                            RhsTerm::Categorical(v) => format!("C({v})"),
+                            RhsTerm::Transform(fn_, v) => format!("{fn_}({v})"),
+                            RhsTerm::Interaction(a, b) => format!("{a}:{b}"),
+                        })
+                        .collect();
+                    GFormula {
+                        dependent: String::new(),
+                        independents,
+                        intercept: true,
+                    }
+                } else {
+                    GFormula::parse(&instr_str).map_err(|e| HayashiError::Runtime(e.to_string()))?
+                };
+
+                let (y, x) = df
+                    .to_design_matrix(&g_endog)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                let z = {
+                    let n_rows = df.n_rows();
+                    let n_cols = g_instr.independents.len() + if g_instr.intercept { 1 } else { 0 };
+                    let mut z_mat = ndarray::Array2::<f64>::zeros((n_rows, n_cols));
+                    let mut col_idx = 0;
+                    if g_instr.intercept {
+                        for i in 0..n_rows {
+                            z_mat[[i, 0]] = 1.0;
+                        }
+                        col_idx = 1;
+                    }
+                    for (j, var_name) in g_instr.independents.iter().enumerate() {
+                        let col_data = df.get(var_name)
+                            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                        for i in 0..n_rows {
+                            z_mat[[i, col_idx + j]] = col_data[i];
+                        }
+                    }
+                    z_mat
+                };
+
+                let result = greeners::GMM::fit(&y, &x, &z)
+                    .map_err(|e| self.rt_err(format!("gmm: {e}")))?;
+                Ok(Value::GmmResult(Rc::new(result)))
+            }
+
             // ── System GMM (Blundell-Bond 1998) ──────────────────────────────
             // sysgmm(formula, df, id=col, time=col [, lags=2 [, step=1]])
             // Empilha eq. em 1ª diferença (instrumentadas com níveis defasados)
@@ -8164,6 +8247,17 @@ impl Interpreter {
                             models.push(extract_std(
                                 "AB-GMM",
                                 &r.variable_names,
+                                &r.params,
+                                &r.std_errors,
+                                &r.p_values,
+                                r.n_obs,
+                            ));
+                        }
+                        Value::GmmResult(r) => {
+                            let names: Option<Vec<String>> = Some((0..r.params.len()).map(|i| format!("x{i}")).collect());
+                            models.push(extract_std(
+                                "GMM",
+                                &names,
                                 &r.params,
                                 &r.std_errors,
                                 &r.p_values,

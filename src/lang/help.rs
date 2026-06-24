@@ -491,6 +491,16 @@ pub fn help_text(topic: &str) -> Option<&'static str> {
         "factor" => "factor(df, var1, var2 [, ...] [, nfactors=2])\n  Factor analysis.\n\n  factor(df, q1, q2, q3, q4, nfactors=2)\n",
         "manova" => "manova(df, var1, var2 [, ...], by=\"group\")\n  Multivariate ANOVA.\n\n  manova(df, price, mpg, weight, by=\"foreign\")\n",
         "anova" => "anova(df, var, by=\"group\")\n  One-way ANOVA.\n\n  anova(df, price, by=\"foreign\")\n",
+        "gmm" => concat!(
+            "gmm(endog_formula, instrument_formula, df)\n\n",
+            "  Linear GMM (Two-Step Efficient). Robust to heteroskedasticity.\n",
+            "  Reports Hansen's J-statistic for overidentification test.\n\n",
+            "  Same formula syntax as iv():\n",
+            "    1st formula: y ~ all regressors (exog + endog)\n",
+            "    2nd formula: ~ exog + excluded instruments\n\n",
+            "  Example:\n",
+            "    let m = gmm(y ~ x1 + x2, ~ x1 + z1 + z2 + z3, df)\n",
+        ),
         "clogit" | "xtlogit_fe" => concat!(
             "clogit(formula, df, group=\"id_col\")\n",
             "  Alias: xtlogit_fe\n\n",
