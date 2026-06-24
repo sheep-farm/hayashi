@@ -5385,6 +5385,46 @@ fn scalar_math_pow() {
     assert_ok_contains("scalar_pow", "display pow(2, 10)", "1024");
 }
 
+#[test]
+fn modulo_operator() {
+    assert_ok_contains("mod_op", "display 10 % 3", "1");
+}
+
+#[test]
+fn modulo_float() {
+    assert_ok_contains("mod_float", "display 10.5 % 3.0", "1.5");
+}
+
+#[test]
+fn starstar_power() {
+    assert_ok_contains("starstar", "display 2 ** 10", "1024");
+}
+
+#[test]
+fn compound_plus_eq() {
+    assert_ok_contains("plus_eq", "let x = 5\nx += 3\ndisplay x", "8");
+}
+
+#[test]
+fn compound_minus_eq() {
+    assert_ok_contains("minus_eq", "let x = 10\nx -= 4\ndisplay x", "6");
+}
+
+#[test]
+fn compound_star_eq() {
+    assert_ok_contains("star_eq", "let x = 3\nx *= 4\ndisplay x", "12");
+}
+
+#[test]
+fn compound_slash_eq() {
+    assert_ok_contains("slash_eq", "let x = 20\nx /= 4\ndisplay x", "5");
+}
+
+#[test]
+fn compound_percent_eq() {
+    assert_ok_contains("pct_eq", "let x = 10\nx %= 3\ndisplay x", "1");
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // PARQUET — load/export
 // ══════════════════════════════════════════════════════════════════════════════

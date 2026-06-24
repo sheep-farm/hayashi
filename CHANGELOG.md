@@ -3,6 +3,23 @@
 All notable changes to Hayashi are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.2] — 2026-06-24
+
+### Added
+
+- **`%` (modulo operator)**: `10 % 3` → `1`, works on int and float, including inside `generate`
+- **`**` (power alias)**: alternative to `^` for users coming from Python/JS (`2 ** 10` → `1024`)
+- **Compound assignment**: `+=`, `-=`, `*=`, `/=`, `%=` desugar to `x = x op expr`
+- **`gmm()`**: generic two-step efficient GMM with Hansen J-test for overidentification
+- **`cmnlogit()`**: conditional multinomial logit (McFadden's choice model)
+- **`help(about)`**: project info derived from Cargo.toml (version, license, author, repo)
+- **`help(license)`**: GPL-3.0 notice derived from Cargo.toml metadata
+- **README badges**: license, Rust edition, version, crates.io, CI status
+
+### Fixed
+
+- **Formula parsing unified**: all 53 estimators now accept both bare formulas (`y ~ x1 + x2`) and string formulas (`"y ~ x1 + x2"`), enabling dynamic formula composition
+
 ## [0.2.1] — 2026-06-24
 
 ### Fixed

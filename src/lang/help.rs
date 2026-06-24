@@ -1,3 +1,42 @@
+pub fn help_license() -> String {
+    format!(
+        "Hayashi — {}\n\n\
+         Copyright (C) 2025-2026 {}\n\n\
+         This program is free software: you can redistribute it and/or modify\n\
+         it under the terms of the GNU General Public License as published by\n\
+         the Free Software Foundation, either version 3 of the License, or\n\
+         (at your option) any later version.\n\n\
+         This program is distributed in the hope that it will be useful,\n\
+         but WITHOUT ANY WARRANTY; without even the implied warranty of\n\
+         MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the\n\
+         GNU General Public License for more details.\n\n\
+         You should have received a copy of the GNU General Public License\n\
+         along with this program. If not, see <https://www.gnu.org/licenses/>.\n",
+        env!("CARGO_PKG_LICENSE"),
+        env!("CARGO_PKG_AUTHORS"),
+    )
+}
+
+pub fn help_about() -> String {
+    format!(
+        "Hayashi — Applied Econometrics Language\n\
+         Version: {}\n\
+         License: {}\n\n\
+         An interpreted language for applied econometrics.\n\
+         Named after Fumio Hayashi, author of \"Econometrics\" (Princeton, 2000).\n\n\
+         Built in Rust on top of Greeners (econometrics engine).\n\
+         100% Rust — no C, no Fortran, no system BLAS/LAPACK.\n\n\
+         Author: {}\n\
+         Repository: {}\n\
+         Website: https://haylang.dev\n\
+         Crate: https://crates.io/crates/hayashi-lang\n",
+        env!("CARGO_PKG_VERSION"),
+        env!("CARGO_PKG_LICENSE"),
+        env!("CARGO_PKG_AUTHORS"),
+        env!("CARGO_PKG_REPOSITORY"),
+    )
+}
+
 pub fn help_text(topic: &str) -> Option<&'static str> {
     let h = match topic {
         "" => concat!(
@@ -36,6 +75,7 @@ pub fn help_text(topic: &str) -> Option<&'static str> {
             "  upper lower trim substr split str_replace contains\n",
             "  regexm regexr regexra regexs\n\n",
             "Type help(command) for details. Ex: help(ols)\n",
+            "Type help(about) for project info.\n",
         ),
         "ols" | "reg" | "regress" => concat!(
             "ols(formula, df [, options])\n",
@@ -451,6 +491,43 @@ pub fn help_text(topic: &str) -> Option<&'static str> {
         "factor" => "factor(df, var1, var2 [, ...] [, nfactors=2])\n  Factor analysis.\n\n  factor(df, q1, q2, q3, q4, nfactors=2)\n",
         "manova" => "manova(df, var1, var2 [, ...], by=\"group\")\n  Multivariate ANOVA.\n\n  manova(df, price, mpg, weight, by=\"foreign\")\n",
         "anova" => "anova(df, var, by=\"group\")\n  One-way ANOVA.\n\n  anova(df, price, by=\"foreign\")\n",
+        "gmm" => concat!(
+            "gmm(endog_formula, instrument_formula, df)\n\n",
+            "  Linear GMM (Two-Step Efficient). Robust to heteroskedasticity.\n",
+            "  Reports Hansen's J-statistic for overidentification test.\n\n",
+            "  Same formula syntax as iv():\n",
+            "    1st formula: y ~ all regressors (exog + endog)\n",
+            "    2nd formula: ~ exog + excluded instruments\n\n",
+            "  Example:\n",
+            "    let m = gmm(y ~ x1 + x2, ~ x1 + z1 + z2 + z3, df)\n",
+        ),
+        "clogit" | "xtlogit_fe" => concat!(
+            "clogit(formula, df, group=\"id_col\")\n",
+            "  Alias: xtlogit_fe\n\n",
+            "  Conditional (fixed-effects) logit for panel binary outcomes.\n",
+            "  Groups without variation in y are dropped.\n\n",
+            "  Example:\n",
+            "    let m = clogit(y ~ x1 + x2, df, group=\"id\")\n",
+        ),
+        "cpoisson" | "xtpoisson_fe" | "ppml" => concat!(
+            "cpoisson(formula, df, group=\"id_col\")\n",
+            "  Aliases: xtpoisson_fe, ppml\n\n",
+            "  Conditional (fixed-effects) Poisson. Consistent under\n",
+            "  unobserved heterogeneity (PPML estimator).\n\n",
+            "  Example:\n",
+            "    let m = cpoisson(exports ~ gdp + dist, df, group=\"pair\")\n",
+        ),
+        "cmnlogit" | "cmlogit" | "conditional_mlogit" => concat!(
+            "cmnlogit(formula, df, group=\"id_col\", alts=N)\n",
+            "  Aliases: cmlogit, conditional_mlogit\n\n",
+            "  Conditional multinomial logit (McFadden's choice model).\n",
+            "  Data must be stacked: N_occasions * N_alternatives rows.\n\n",
+            "  Options:\n",
+            "    group=\"col\"   Choice-set/individual identifier\n",
+            "    alts=N        Number of alternatives per choice set\n\n",
+            "  Example:\n",
+            "    let m = cmnlogit(choice ~ price + quality, df, group=\"id\", alts=3)\n",
+        ),
         _ => return None,
     };
     Some(h)
