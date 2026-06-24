@@ -481,6 +481,10 @@ cargo test                 # 389 tests, <2s
 
 60 example scripts in `examples/`, all passing.
 
+## Author
+
+Flávio de Vasconcellos Corrêa — [@sheep-farm](https://github.com/sheep-farm) — flavio.vcorrea@ufpel.edu.br
+
 ## License
 
 GPL-3.0 — see [LICENSE](LICENSE).
