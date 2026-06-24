@@ -268,6 +268,25 @@ pub fn help_text(topic: &str) -> Option<&'static str> {
             "    duplicates(df, id)\n",
             "    duplicates(df, id, action=drop)\n",
         ),
+        "date" => concat!(
+            "date(\"YYYY-MM-DD\")\n",
+            "  Parse date string to Unix timestamp (float).\n\n",
+            "  let t = date(\"2024-06-15\")\n",
+            "  let sub = filter(df, ts >= date(\"2020-01-01\"))\n",
+        ),
+        "datetime" => concat!(
+            "datetime(\"YYYY-MM-DD HH:MM:SS\")\n",
+            "  Parse datetime string to Unix timestamp (float).\n\n",
+            "  let t = datetime(\"2024-06-15 14:30:00\")\n",
+        ),
+        "year" | "month" | "day" | "hour" | "minute" | "second" | "dow" => concat!(
+            "year(col), month(col), day(col), hour(col), minute(col), second(col), dow(col)\n",
+            "  Extract date/time component from a DateTime column or timestamp.\n",
+            "  dow = day of week (0=Monday, 6=Sunday).\n\n",
+            "  generate df Y = year(date_col)\n",
+            "  generate df M = month(date_col)\n",
+            "  generate df W = dow(date_col)\n",
+        ),
         "format" | "fmt" => concat!(
             "format(value, fmt_str)\n",
             "  Format numeric value as string.\n\n",
