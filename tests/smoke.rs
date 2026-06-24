@@ -1,5 +1,11 @@
 use std::process::Command;
 
+fn tmp(name: &str) -> String {
+    let mut p = std::env::temp_dir();
+    p.push(name);
+    p.to_string_lossy().replace('\\', "/")
+}
+
 fn run_hy(script: &str) -> (bool, String) {
     let output = Command::new(env!("CARGO_BIN_EXE_hayashi"))
         .arg(script)
@@ -3592,7 +3598,7 @@ display len(s)
 
 #[test]
 fn graph_scatter_svg() {
-    let (ok, out) = run_inline(
+    let script = format!(
         r#"
 input df
 Y X
@@ -3603,17 +3609,19 @@ Y X
 11 2
 14 4
 end
-graph_scatter(df, X, Y, path="/tmp/test_scatter.svg")
+graph_scatter(df, X, Y, path="{}")
 "#,
+        tmp("test_scatter.svg")
     );
+    let (ok, out) = run_inline(&script);
     assert!(ok, "graph_scatter failed:\n{out}");
     assert!(out.contains("graph saved"));
-    assert!(std::path::Path::new("/tmp/test_scatter.svg").exists());
+    assert!(std::path::Path::new(&tmp("test_scatter.svg")).exists());
 }
 
 #[test]
 fn graph_line_svg() {
-    let (ok, out) = run_inline(
+    let script = format!(
         r#"
 input df
 Y X
@@ -3623,17 +3631,19 @@ Y X
 16 4
 25 5
 end
-graph_line(df, X, Y, path="/tmp/test_line.svg")
+graph_line(df, X, Y, path="{}")
 "#,
+        tmp("test_line.svg")
     );
+    let (ok, out) = run_inline(&script);
     assert!(ok, "graph_line failed:\n{out}");
     assert!(out.contains("graph saved"));
-    assert!(std::path::Path::new("/tmp/test_line.svg").exists());
+    assert!(std::path::Path::new(&tmp("test_line.svg")).exists());
 }
 
 #[test]
 fn graph_hist_svg() {
-    let (ok, out) = run_inline(
+    let script = format!(
         r#"
 input df
 Y
@@ -3646,17 +3656,19 @@ Y
 7
 8
 end
-graph_hist(df, Y, path="/tmp/test_hist.svg", bins=4)
+graph_hist(df, Y, path="{}", bins=4)
 "#,
+        tmp("test_hist.svg")
     );
+    let (ok, out) = run_inline(&script);
     assert!(ok, "graph_hist failed:\n{out}");
     assert!(out.contains("graph saved"));
-    assert!(std::path::Path::new("/tmp/test_hist.svg").exists());
+    assert!(std::path::Path::new(&tmp("test_hist.svg")).exists());
 }
 
 #[test]
 fn graph_coef_svg() {
-    let (ok, out) = run_inline(
+    let script = format!(
         r#"
 input df
 Y X1 X2
@@ -3668,17 +3680,19 @@ Y X1 X2
 14 4 4
 end
 let m = ols(Y ~ X1 + X2, df)
-graph_coef(m, path="/tmp/test_coef.svg")
+graph_coef(m, path="{}")
 "#,
+        tmp("test_coef.svg")
     );
+    let (ok, out) = run_inline(&script);
     assert!(ok, "graph_coef failed:\n{out}");
     assert!(out.contains("graph saved"));
-    assert!(std::path::Path::new("/tmp/test_coef.svg").exists());
+    assert!(std::path::Path::new(&tmp("test_coef.svg")).exists());
 }
 
 #[test]
 fn graph_scatter_custom_title() {
-    let (ok, out) = run_inline(
+    let script = format!(
         r#"
 input df
 Y X
@@ -3687,17 +3701,19 @@ Y X
 8 1
 15 5
 end
-graph_scatter(df, X, Y, path="/tmp/test_scatter_title.svg", title="Custom Title")
+graph_scatter(df, X, Y, path="{}", title="Custom Title")
 "#,
+        tmp("test_scatter_title.svg")
     );
+    let (ok, out) = run_inline(&script);
     assert!(ok, "graph_scatter title failed:\n{out}");
-    let svg = std::fs::read_to_string("/tmp/test_scatter_title.svg").unwrap();
+    let svg = std::fs::read_to_string(tmp("test_scatter_title.svg")).unwrap();
     assert!(svg.contains("Custom Title"));
 }
 
 #[test]
 fn graph_hist_custom_bins() {
-    let (ok, out) = run_inline(
+    let script = format!(
         r#"
 input df
 Y
@@ -3712,16 +3728,18 @@ Y
 9
 10
 end
-graph_hist(df, Y, path="/tmp/test_hist_bins.svg", bins=2)
+graph_hist(df, Y, path="{}", bins=2)
 "#,
+        tmp("test_hist_bins.svg")
     );
+    let (ok, out) = run_inline(&script);
     assert!(ok, "graph_hist bins failed:\n{out}");
-    assert!(std::path::Path::new("/tmp/test_hist_bins.svg").exists());
+    assert!(std::path::Path::new(&tmp("test_hist_bins.svg")).exists());
 }
 
 #[test]
 fn graph_coef_svg_valid() {
-    let (ok, _) = run_inline(
+    let script = format!(
         r#"
 input df
 Y X1 X2 X3
@@ -3733,11 +3751,13 @@ Y X1 X2 X3
 14 4 4 6
 end
 let m = ols(Y ~ X1 + X2 + X3, df)
-graph_coef(m, path="/tmp/test_coef_valid.svg", title="3 Variables")
+graph_coef(m, path="{}", title="3 Variables")
 "#,
+        tmp("test_coef_valid.svg")
     );
+    let (ok, _) = run_inline(&script);
     assert!(ok);
-    let svg = std::fs::read_to_string("/tmp/test_coef_valid.svg").unwrap();
+    let svg = std::fs::read_to_string(tmp("test_coef_valid.svg")).unwrap();
     assert!(svg.contains("<svg"));
     assert!(svg.contains("3 Variables"));
     assert!(svg.contains("Coefficient"));
@@ -3763,7 +3783,7 @@ graph_line(df, X, Y)
 
 #[test]
 fn graph_scatter_gscatter_alias() {
-    let (ok, out) = run_inline(
+    let script = format!(
         r#"
 input df
 Y X
@@ -3771,9 +3791,11 @@ Y X
 12 3
 8 1
 end
-gscatter(df, X, Y, path="/tmp/test_gscatter.svg")
+gscatter(df, X, Y, path="{}")
 "#,
+        tmp("test_gscatter.svg")
     );
+    let (ok, out) = run_inline(&script);
     assert!(ok, "gscatter alias failed:\n{out}");
     assert!(out.contains("graph saved"));
 }
@@ -4738,90 +4760,106 @@ fn load_odbc_without_feature_gives_clear_error() {
 
 #[test]
 fn export_csv() {
-    let (ok, out) = run_inline(
+    let script = format!(
         r#"load "exemplos/data/sample.db" as df
-export(df, "csv", "/tmp/hayashi_test_export.csv")"#,
+export(df, "csv", "{}")"#,
+        tmp("hayashi_test_export.csv")
     );
+    let (ok, out) = run_inline(&script);
     assert!(ok, "export csv failed:\n{out}");
     assert!(out.contains("Exported"), "expected 'Exported':\n{out}");
-    let content = std::fs::read_to_string("/tmp/hayashi_test_export.csv").unwrap();
+    let content = std::fs::read_to_string(tmp("hayashi_test_export.csv")).unwrap();
     assert!(content.contains("Soja"), "csv missing data:\n{content}");
 }
 
 #[test]
 fn export_json() {
-    let (ok, out) = run_inline(
+    let script = format!(
         r#"load "exemplos/data/sample.db" as df
-export(df, "json", "/tmp/hayashi_test_export.json")"#,
+export(df, "json", "{}")"#,
+        tmp("hayashi_test_export.json")
     );
+    let (ok, out) = run_inline(&script);
     assert!(ok, "export json failed:\n{out}");
-    let content = std::fs::read_to_string("/tmp/hayashi_test_export.json").unwrap();
+    let content = std::fs::read_to_string(tmp("hayashi_test_export.json")).unwrap();
     assert!(content.contains("Soja"), "json missing data:\n{content}");
 }
 
 #[test]
 fn export_tsv() {
-    let (ok, out) = run_inline(
+    let script = format!(
         r#"load "exemplos/data/sample.db" as df
-export(df, "tsv", "/tmp/hayashi_test_export.tsv")"#,
+export(df, "tsv", "{}")"#,
+        tmp("hayashi_test_export.tsv")
     );
+    let (ok, out) = run_inline(&script);
     assert!(ok, "export tsv failed:\n{out}");
-    let content = std::fs::read_to_string("/tmp/hayashi_test_export.tsv").unwrap();
+    let content = std::fs::read_to_string(tmp("hayashi_test_export.tsv")).unwrap();
     assert!(content.contains('\t'), "tsv missing tabs:\n{content}");
 }
 
 #[test]
 fn export_xlsx() {
-    let (ok, out) = run_inline(
+    let script = format!(
         r#"load "exemplos/data/sample.db" as df
-export(df, "xlsx", "/tmp/hayashi_test_export.xlsx")"#,
+export(df, "xlsx", "{}")"#,
+        tmp("hayashi_test_export.xlsx")
     );
+    let (ok, out) = run_inline(&script);
     assert!(ok, "export xlsx failed:\n{out}");
-    assert!(std::path::Path::new("/tmp/hayashi_test_export.xlsx").exists());
+    assert!(std::path::Path::new(&tmp("hayashi_test_export.xlsx")).exists());
 }
 
 #[test]
 fn export_sqlite() {
-    let (ok, out) = run_inline(
+    let script = format!(
         r#"load "exemplos/data/sample.db" as df
-export(df, "sqlite", "/tmp/hayashi_test_export_out.db")"#,
+export(df, "sqlite", "{}")"#,
+        tmp("hayashi_test_export_out.db")
     );
+    let (ok, out) = run_inline(&script);
     assert!(ok, "export sqlite failed:\n{out}");
-    assert!(std::path::Path::new("/tmp/hayashi_test_export_out.db").exists());
+    assert!(std::path::Path::new(&tmp("hayashi_test_export_out.db")).exists());
 }
 
 #[test]
 fn export_roundtrip_tsv() {
-    let (ok, out) = run_inline(
+    let p = tmp("hayashi_rt.tsv");
+    let script = format!(
         r#"load "exemplos/data/sample.db" as df
-export(df, "tsv", "/tmp/hayashi_rt.tsv")
-load "/tmp/hayashi_rt.tsv" as df2
+export(df, "tsv", "{p}")
+load "{p}" as df2
 display mean(df2, preco)"#,
     );
+    let (ok, out) = run_inline(&script);
     assert!(ok, "roundtrip tsv failed:\n{out}");
     assert!(out.contains("88.4"), "expected mean ~88.4:\n{out}");
 }
 
 #[test]
 fn export_roundtrip_xlsx() {
-    let (ok, out) = run_inline(
+    let p = tmp("hayashi_rt.xlsx");
+    let script = format!(
         r#"load "exemplos/data/sample.db" as df
-export(df, "xlsx", "/tmp/hayashi_rt.xlsx")
-load "/tmp/hayashi_rt.xlsx" as df2
+export(df, "xlsx", "{p}")
+load "{p}" as df2
 display mean(df2, preco)"#,
     );
+    let (ok, out) = run_inline(&script);
     assert!(ok, "roundtrip xlsx failed:\n{out}");
     assert!(out.contains("88.4"), "expected mean ~88.4:\n{out}");
 }
 
 #[test]
 fn export_roundtrip_sqlite() {
-    let (ok, out) = run_inline(
+    let p = tmp("hayashi_rt_out.db");
+    let script = format!(
         r#"load "exemplos/data/sample.db" as df
-export(df, "sqlite", "/tmp/hayashi_rt_out.db")
-load "/tmp/hayashi_rt_out.db" as df2
+export(df, "sqlite", "{p}")
+load "{p}" as df2
 display mean(df2, preco)"#,
     );
+    let (ok, out) = run_inline(&script);
     assert!(ok, "roundtrip sqlite failed:\n{out}");
     assert!(out.contains("88.4"), "expected mean ~88.4:\n{out}");
 }
@@ -5308,34 +5346,40 @@ fn typeof_dict() {
 
 #[test]
 fn export_parquet() {
-    let (ok, out) = run_inline(
+    let script = format!(
         r#"load "exemplos/data/sample.db" as df
-export(df, "parquet", "/tmp/hayashi_test.parquet")"#,
+export(df, "parquet", "{}")"#,
+        tmp("hayashi_test.parquet")
     );
+    let (ok, out) = run_inline(&script);
     assert!(ok, "export parquet failed:\n{out}");
-    assert!(std::path::Path::new("/tmp/hayashi_test.parquet").exists());
+    assert!(std::path::Path::new(&tmp("hayashi_test.parquet")).exists());
 }
 
 #[test]
 fn parquet_roundtrip() {
-    let (ok, out) = run_inline(
+    let p = tmp("hayashi_rt.parquet");
+    let script = format!(
         r#"load "exemplos/data/sample.db" as df
-export(df, "parquet", "/tmp/hayashi_rt.parquet")
-load "/tmp/hayashi_rt.parquet" as df2
+export(df, "parquet", "{p}")
+load "{p}" as df2
 display mean(df2, preco)"#,
     );
+    let (ok, out) = run_inline(&script);
     assert!(ok, "parquet roundtrip failed:\n{out}");
     assert!(out.contains("88.4"), "expected mean ~88.4:\n{out}");
 }
 
 #[test]
 fn load_parquet() {
-    let (ok, out) = run_inline(
+    let p = tmp("hayashi_load.parquet");
+    let script = format!(
         r#"load "exemplos/data/sample.db" as df
-export(df, "parquet", "/tmp/hayashi_load.parquet")
-load "/tmp/hayashi_load.parquet" as df2
+export(df, "parquet", "{p}")
+load "{p}" as df2
 print(df2)"#,
     );
+    let (ok, out) = run_inline(&script);
     assert!(ok, "load parquet failed:\n{out}");
     assert!(out.contains("8 rows"), "expected 8 rows:\n{out}");
 }
