@@ -4848,6 +4848,64 @@ impl Interpreter {
                 Ok(Value::ConditionalResult(Rc::new(result)))
             }
 
+            // cmnlogit — Conditional Multinomial Logit
+            // cmnlogit(y ~ x1 + x2, df, group="id_col", alts=3)
+            "cmnlogit" | "cmlogit" | "conditional_mlogit" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let group_col = match opt_map.get("group") {
+                    Some(Value::Str(s)) => s.clone(),
+                    None => {
+                        return Err(HayashiError::Runtime(
+                            "cmnlogit requires group=\"id_col\"".into(),
+                        ))
+                    }
+                    _ => return Err(HayashiError::Type("cmnlogit: group= must be string".into())),
+                };
+                let n_alts = match opt_map.get("alts") {
+                    Some(Value::Int(n)) => *n as usize,
+                    Some(Value::Float(f)) => *f as usize,
+                    None => {
+                        return Err(HayashiError::Runtime(
+                            "cmnlogit requires alts=N (number of alternatives)".into(),
+                        ))
+                    }
+                    _ => return Err(HayashiError::Type("cmnlogit: alts= must be integer".into())),
+                };
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (y_vec, x_mat) = df
+                    .to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = df
+                    .formula_var_names(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let group_vals = Self::get_col_f64(&df, &group_col)?;
+                let mut gmap: std::collections::HashMap<i64, usize> =
+                    std::collections::HashMap::new();
+                let mut gnext = 0usize;
+                let groups: Vec<usize> = group_vals
+                    .iter()
+                    .map(|&v| {
+                        let key = v as i64;
+                        *gmap.entry(key).or_insert_with(|| {
+                            let g = gnext;
+                            gnext += 1;
+                            g
+                        })
+                    })
+                    .collect();
+                let result = greeners::ConditionalMNLogit::fit_with_names(
+                    &y_vec,
+                    &x_mat,
+                    &groups,
+                    n_alts,
+                    Some(var_names),
+                )
+                .map_err(|e| self.rt_err(format!("cmnlogit: {e}")))?;
+                Ok(Value::ConditionalResult(Rc::new(result)))
+            }
+
             // gqtest — Goldfeld-Quandt test (heteroskedasticidade)
             // gqtest(model, split=0.2)
             // H0: homocedasticidade
