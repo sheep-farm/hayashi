@@ -45,6 +45,8 @@ pub enum Token {
     Star,       // *
     Slash,      // /
     Caret,      // ^
+    Percent,    // %
+    StarStar,   // **
     Pipe,       // |
     Colon,      // :
     ColonColon, // ::
@@ -60,6 +62,11 @@ pub enum Token {
     Or,         // ||
     FatArrow,   // =>
     PipeRight,  // |>
+    PlusEq,     // +=
+    MinusEq,    // -=
+    StarEq,     // *=
+    SlashEq,    // /=
+    PercentEq,  // %=
 
     // Delimitadores
     LParen,
@@ -321,17 +328,51 @@ impl Lexer {
                     }
                 }
                 Some('~') => tokens.push((Token::Tilde, line)),
-                Some('+') => tokens.push((Token::Plus, line)),
-                Some('-') => tokens.push((Token::Minus, line)),
-                Some('*') => tokens.push((Token::Star, line)),
+                Some('+') => {
+                    if self.peek() == Some('=') {
+                        self.advance();
+                        tokens.push((Token::PlusEq, line));
+                    } else {
+                        tokens.push((Token::Plus, line));
+                    }
+                }
+                Some('-') => {
+                    if self.peek() == Some('=') {
+                        self.advance();
+                        tokens.push((Token::MinusEq, line));
+                    } else {
+                        tokens.push((Token::Minus, line));
+                    }
+                }
+                Some('*') => {
+                    if self.peek() == Some('*') {
+                        self.advance();
+                        tokens.push((Token::StarStar, line));
+                    } else if self.peek() == Some('=') {
+                        self.advance();
+                        tokens.push((Token::StarEq, line));
+                    } else {
+                        tokens.push((Token::Star, line));
+                    }
+                }
                 Some('/') => {
                     if self.peek() == Some('/') {
-                        // comentário de linha: consome até \n
                         while !matches!(self.peek(), Some('\n') | None) {
                             self.advance();
                         }
+                    } else if self.peek() == Some('=') {
+                        self.advance();
+                        tokens.push((Token::SlashEq, line));
                     } else {
                         tokens.push((Token::Slash, line));
+                    }
+                }
+                Some('%') => {
+                    if self.peek() == Some('=') {
+                        self.advance();
+                        tokens.push((Token::PercentEq, line));
+                    } else {
+                        tokens.push((Token::Percent, line));
                     }
                 }
                 Some('^') => tokens.push((Token::Caret, line)),

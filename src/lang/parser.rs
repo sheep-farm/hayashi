@@ -268,6 +268,7 @@ impl Parser {
             let op = match self.peek() {
                 Token::Star => BinOp::Mul,
                 Token::Slash => BinOp::Div,
+                Token::Percent => BinOp::Mod,
                 _ => break,
             };
             self.advance();
@@ -283,7 +284,7 @@ impl Parser {
 
     fn parse_power(&mut self) -> Result<Expr> {
         let base = self.parse_unary()?;
-        if self.peek() == &Token::Caret {
+        if matches!(self.peek(), Token::Caret | Token::StarStar) {
             self.advance();
             let exp = self.parse_unary()?; // right-associative
             Ok(Expr::BinOp {
@@ -1096,6 +1097,34 @@ impl Parser {
                 self.advance(); // ident
                 self.advance(); // =
                 let value = self.parse_expr()?;
+                Ok(Some(Stmt::Assign { name, value }))
+            }
+
+            // compound assignment: +=  -=  *=  /=  %=
+            Token::Ident(ref name)
+                if self
+                    .tokens
+                    .get(self.pos + 1)
+                    .map(|(t, _)| matches!(t, Token::PlusEq | Token::MinusEq | Token::StarEq | Token::SlashEq | Token::PercentEq))
+                    .unwrap_or(false) =>
+            {
+                let name = name.clone();
+                self.advance(); // ident
+                let op = match self.peek() {
+                    Token::PlusEq => BinOp::Add,
+                    Token::MinusEq => BinOp::Sub,
+                    Token::StarEq => BinOp::Mul,
+                    Token::SlashEq => BinOp::Div,
+                    Token::PercentEq => BinOp::Mod,
+                    _ => unreachable!(),
+                };
+                self.advance(); // op=
+                let rhs = self.parse_expr()?;
+                let value = Expr::BinOp {
+                    op,
+                    lhs: Box::new(Expr::Var(name.clone())),
+                    rhs: Box::new(rhs),
+                };
                 Ok(Some(Stmt::Assign { name, value }))
             }
 
