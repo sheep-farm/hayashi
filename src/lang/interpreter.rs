@@ -7322,6 +7322,8 @@ impl Interpreter {
                 };
                 if topic == "about" {
                     println!("{}", crate::lang::help::help_about());
+                } else if topic == "license" {
+                    println!("{}", crate::lang::help::help_license());
                 } else {
                     match crate::lang::help::help_text(&topic) {
                         Some(h) => println!("{h}"),
