@@ -4,6 +4,7 @@
   "scopeName": "source.hayashi",
   "patterns": [
     { "include": "#comments" },
+    { "include": "#fstrings" },
     { "include": "#strings" },
     { "include": "#numbers" },
     { "include": "#keywords" },
@@ -23,6 +24,30 @@
         {
           "name": "comment.line.hash.hayashi",
           "match": "#.*$"
+        }
+      ]
+    },
+    "fstrings": {
+      "patterns": [
+        {
+          "name": "string.interpolated.hayashi",
+          "begin": "f\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.hayashi",
+              "match": "\\\\."
+            },
+            {
+              "name": "meta.interpolation.hayashi",
+              "begin": "\\{",
+              "end": "\\}",
+              "patterns": [
+                { "include": "#numbers" },
+                { "include": "#variables" }
+              ]
+            }
+          ]
         }
       ]
     },
@@ -57,19 +82,19 @@
       "patterns": [
         {
           "name": "keyword.control.hayashi",
-          "match": "\\b(if|else|for|in|while|break|continue|return|fn)\\b"
+          "match": "\\b(if|else|for|in|while|break|continue|return|fn|match|try|catch)\\b"
         },
         {
           "name": "keyword.declaration.hayashi",
-          "match": "\\b(let|scalar|load|as|generate|gen|predict|replace|input|end|display|print|export)\\b"
+          "match": "\\b(let|const|scalar|load|as|generate|gen|predict|replace|input|end|display|print|export|import|source)\\b"
         },
         {
           "name": "constant.language.hayashi",
-          "match": "\\b(true|false)\\b"
+          "match": "\\b(true|false|nil)\\b"
         },
         {
           "name": "keyword.other.hayashi",
-          "match": "\\b(xtset|tsset|source|do|help|set_seed|timer|preserve|restore|quietly|capture|assert)\\b"
+          "match": "\\b(xtset|tsset|help|set_seed|timer|preserve|restore|quietly|capture|assert)\\b"
         }
       ]
     },
@@ -77,7 +102,7 @@
       "patterns": [
         {
           "name": "entity.name.function.estimator.hayashi",
-          "match": "\\b(ols|reg|regress|iv|logit|probit|poisson|nbreg|tobit|heckman|truncreg|qreg|fe|re|ab|sysgmm|pcse|xtgls|cox|km|arima|sarima|garch|egarch|gjrgarch|var|vecm|svar|lasso|ridge|elasticnet|did|rd|synth|psmatch|fmb|rlm|gee|glm|betareg|ologit|oprobit|clogit|cloglog|zip|zinb|mlogit|mixed|bootstrap|boot)\\b"
+          "match": "\\b(ols|reg|regress|iv|logit|probit|poisson|nbreg|tobit|heckman|truncreg|qreg|fe|re|ab|sysgmm|pcse|xtgls|cox|km|arima|sarima|garch|egarch|gjrgarch|var|vecm|varma|svar|lasso|ridge|elasticnet|did|rd|synth|psmatch|psm|fmb|rlm|gee|glm|betareg|ologit|oprobit|clogit|cloglog|zip|zinb|mlogit|mnlogit|mixed|bootstrap|boot|gmm|sur|pca|ucm|ets|dfm)\\b"
         }
       ]
     },
@@ -89,11 +114,11 @@
         },
         {
           "name": "support.function.postestimation.hayashi",
-          "match": "\\b(test|nlcom|margins|coefplot|esttab|eststo|estclear|estat|hausman|predict|lincom|vif|durbinwatson|diagnostics)\\b"
+          "match": "\\b(test|nlcom|margins|coefplot|esttab|eststo|estclear|estat|hausman|predict|lincom|vif|condnum|reset|jb|influence|drop_collinear)\\b"
         },
         {
           "name": "support.function.data.hayashi",
-          "match": "\\b(drop|keep|dropna|rename|sort|merge|append|collapse|reshape|encode|decode|winsor|winsorize|tabgen|recode|duplicates|label|ci|centile|format|portsort|doublesort)\\b"
+          "match": "\\b(drop|keep|dropna|rename|sort|filter|merge|append|collapse|reshape|encode|decode|winsor|winsorize|tabgen|recode|duplicates|label|ci|centile|format|portsort|doublesort|push|pop|insert|remove|clear|reverse|index|slice|join|map|select|unique|flatten|range|len|keys|values|has_key|dict_set|dict_remove|dict_merge|typeof|type)\\b"
         },
         {
           "name": "support.function.graph.hayashi",
@@ -101,11 +126,15 @@
         },
         {
           "name": "support.function.math.hayashi",
-          "match": "\\b(log|ln|exp|sqrt|abs|floor|ceil|round|sin|cos|tan|asin|acos|atan|sign|factorial|comb|cond|normal|invnormal|uniform|rnormal|mod|pow)\\b"
+          "match": "\\b(log|ln|exp|sqrt|abs|floor|ceil|round|sin|cos|tan|asin|acos|atan|atan2|sign|factorial|comb|cond|normal|invnormal|uniform|rnormal|mod|pow|chi2tail|ttail|invttail)\\b"
         },
         {
           "name": "support.function.string.hayashi",
-          "match": "\\b(upper|lower|trim|contains|starts_with|ends_with|len|substr|split|str_replace|str|int|float|regexm|regexr|regexra|regexs)\\b"
+          "match": "\\b(upper|lower|trim|contains|starts_with|ends_with|substr|split|str_replace|str|int|float|bool|regexm|regexr|regexra|regexs)\\b"
+        },
+        {
+          "name": "support.function.datetime.hayashi",
+          "match": "\\b(date|datetime|year|month|day|hour|minute|second|dow)\\b"
         }
       ]
     },
@@ -122,6 +151,14 @@
         {
           "name": "keyword.operator.arithmetic.hayashi",
           "match": "\\+|-|\\*|/|\\^"
+        },
+        {
+          "name": "keyword.operator.pipe.hayashi",
+          "match": "\\|>"
+        },
+        {
+          "name": "keyword.operator.namespace.hayashi",
+          "match": "::"
         },
         {
           "name": "keyword.operator.assignment.hayashi",
