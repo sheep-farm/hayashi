@@ -505,6 +505,18 @@ impl Env {
             }
         }
     }
+
+    pub fn var_names(&self) -> Vec<String> {
+        let mut names = Vec::new();
+        for scope in self.scopes.iter().rev() {
+            for key in scope.vars.keys() {
+                if !names.contains(key) {
+                    names.push(key.clone());
+                }
+            }
+        }
+        names
+    }
 }
 
 // ── Interpetador ──────────────────────────────────────────────────────────────
@@ -7183,7 +7195,60 @@ impl Interpreter {
                 };
 
                 self.imported.insert(module.clone());
+
+                let alias = match opt_map.get("as") {
+                    Some(Value::Str(s)) => Some(s.clone()),
+                    _ => None,
+                };
+                let only: Option<Vec<String>> = match opt_map.get("only") {
+                    Some(Value::List(lst)) => Some(
+                        lst.iter()
+                            .filter_map(|v| match v {
+                                Value::Str(s) => Some(s.clone()),
+                                _ => None,
+                            })
+                            .collect(),
+                    ),
+                    _ => None,
+                };
+
+                let before: std::collections::HashSet<String> =
+                    self.env.var_names().into_iter().collect();
+
                 crate::lang::run_source(&src, self)?;
+
+                let ns = alias.unwrap_or_else(|| {
+                    module
+                        .trim_end_matches(".hay")
+                        .rsplit('/')
+                        .next()
+                        .unwrap_or(&module)
+                        .to_string()
+                });
+
+                let new_names: Vec<String> = self
+                    .env
+                    .var_names()
+                    .into_iter()
+                    .filter(|n| !before.contains(n))
+                    .collect();
+
+                if let Some(ref allowed) = only {
+                    for name in &new_names {
+                        if !allowed.contains(name) {
+                            self.env.remove(name);
+                        }
+                    }
+                } else {
+                    for name in &new_names {
+                        if let Some(val) = self.env.get(name).cloned() {
+                            let qualified = format!("{ns}::{name}");
+                            self.env.declare(&qualified, val).ok();
+                            self.env.remove(name);
+                        }
+                    }
+                }
+
                 Ok(Value::Nil)
             }
 

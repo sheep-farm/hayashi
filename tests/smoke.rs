@@ -5147,7 +5147,7 @@ fn import_basic() {
     assert_ok_contains(
         "import_basic",
         r#"import("exemplos/data/test_module")
-display double(21)"#,
+display test_module::double(21)"#,
         "42",
     );
 }
@@ -5157,7 +5157,7 @@ fn import_const_available() {
     assert_ok_contains(
         "import_const",
         r#"import("exemplos/data/test_module")
-display MODULE_LOADED"#,
+display test_module::MODULE_LOADED"#,
         "true",
     );
 }
@@ -5168,7 +5168,7 @@ fn import_dedup() {
         "import_dedup",
         r#"import("exemplos/data/test_module")
 import("exemplos/data/test_module")
-display double(5)"#,
+display test_module::double(5)"#,
         "10",
     );
 }
@@ -5185,8 +5185,28 @@ fn import_with_extension() {
     assert_ok_contains(
         "import_ext",
         r#"import("exemplos/data/test_module.hay")
-display double(3)"#,
+display test_module::double(3)"#,
         "6",
+    );
+}
+
+#[test]
+fn import_alias() {
+    assert_ok_contains(
+        "import_alias",
+        r#"import("exemplos/data/test_module", as=tm)
+display tm::double(7)"#,
+        "14",
+    );
+}
+
+#[test]
+fn import_only() {
+    assert_ok_contains(
+        "import_only",
+        r#"import("exemplos/data/test_module", only=["double"])
+display double(4)"#,
+        "8",
     );
 }
 

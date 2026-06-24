@@ -2,8 +2,272 @@ mod io;
 mod lang;
 
 use lang::interpreter::Interpreter;
+use rustyline::completion::Completer;
 use rustyline::error::ReadlineError;
-use rustyline::DefaultEditor;
+use rustyline::highlight::Highlighter;
+use rustyline::hint::{Hinter, HistoryHinter};
+use rustyline::validate::Validator;
+use rustyline::{Context, Editor, Helper};
+use std::borrow::Cow;
+use std::cell::RefCell;
+use std::rc::Rc;
+
+// ── REPL Helper (tab completion, syntax highlighting, history hints) ─────────
+
+const KEYWORDS: &[&str] = &[
+    "let",
+    "const",
+    "fn",
+    "if",
+    "else",
+    "for",
+    "in",
+    "while",
+    "return",
+    "break",
+    "continue",
+    "match",
+    "try",
+    "catch",
+    "import",
+    "source",
+    "display",
+    "input",
+    "end",
+    "generate",
+    "replace",
+    "load",
+    "export",
+    "predict",
+    "xtset",
+    "tsset",
+    "ols",
+    "reg",
+    "fe",
+    "re",
+    "iv",
+    "logit",
+    "probit",
+    "poisson",
+    "nbreg",
+    "tobit",
+    "qreg",
+    "rlm",
+    "lasso",
+    "ridge",
+    "elasticnet",
+    "garch",
+    "arima",
+    "var",
+    "vecm",
+    "hausman",
+    "fmb",
+    "portsort",
+    "doublesort",
+    "esttab",
+    "eststo",
+    "estclear",
+    "test",
+    "nlcom",
+    "lincom",
+    "margins",
+    "bootstrap",
+    "estat",
+    "vif",
+    "reset",
+    "jb",
+    "condnum",
+    "coefplot",
+    "summarize",
+    "describe",
+    "tabulate",
+    "correlate",
+    "pwcorr",
+    "ttest",
+    "ci",
+    "list",
+    "count",
+    "sort",
+    "filter",
+    "drop",
+    "keep",
+    "rename",
+    "collapse",
+    "append",
+    "merge",
+    "reshape",
+    "winsor",
+    "tabgen",
+    "encode",
+    "recode",
+    "duplicates",
+    "label",
+    "preserve",
+    "restore",
+    "quietly",
+    "capture",
+    "assert",
+    "push",
+    "pop",
+    "len",
+    "keys",
+    "values",
+    "map",
+    "select",
+    "unique",
+    "flatten",
+    "mean",
+    "sum",
+    "min",
+    "max",
+    "std",
+    "abs",
+    "sqrt",
+    "log",
+    "exp",
+    "help",
+    "timer",
+    "set_seed",
+    "format",
+    "typeof",
+    "drop_collinear",
+    "true",
+    "false",
+    "nil",
+];
+
+struct HayHelper {
+    vars: Rc<RefCell<Vec<String>>>,
+    hinter: HistoryHinter,
+}
+
+impl HayHelper {
+    fn new(vars: Rc<RefCell<Vec<String>>>) -> Self {
+        Self {
+            vars,
+            hinter: HistoryHinter {},
+        }
+    }
+
+    fn completions_for(&self, word: &str) -> Vec<String> {
+        let mut matches: Vec<String> = KEYWORDS
+            .iter()
+            .filter(|k| k.starts_with(word))
+            .map(|k| k.to_string())
+            .collect();
+        for v in self.vars.borrow().iter() {
+            if v.starts_with(word) && !matches.contains(v) {
+                matches.push(v.clone());
+            }
+        }
+        matches.sort();
+        matches
+    }
+}
+
+impl Completer for HayHelper {
+    type Candidate = String;
+
+    fn complete(
+        &self,
+        line: &str,
+        pos: usize,
+        _ctx: &Context<'_>,
+    ) -> rustyline::Result<(usize, Vec<String>)> {
+        let start = line[..pos]
+            .rfind(|c: char| !c.is_alphanumeric() && c != '_')
+            .map(|i| i + 1)
+            .unwrap_or(0);
+        let word = &line[start..pos];
+        if word.is_empty() {
+            return Ok((pos, vec![]));
+        }
+        Ok((start, self.completions_for(word)))
+    }
+}
+
+impl Highlighter for HayHelper {
+    fn highlight<'l>(&self, line: &'l str, _pos: usize) -> Cow<'l, str> {
+        let mut out = String::with_capacity(line.len() * 2);
+        let mut chars = line.chars().peekable();
+        let mut word = String::new();
+
+        let flush_word = |word: &mut String, out: &mut String| {
+            if word.is_empty() {
+                return;
+            }
+            let w = word.as_str();
+            if KEYWORDS.contains(&w) {
+                out.push_str("\x1b[1;34m");
+                out.push_str(w);
+                out.push_str("\x1b[0m");
+            } else if w.parse::<f64>().is_ok() {
+                out.push_str("\x1b[33m");
+                out.push_str(w);
+                out.push_str("\x1b[0m");
+            } else {
+                out.push_str(w);
+            }
+            word.clear();
+        };
+
+        while let Some(c) = chars.next() {
+            if c == '"' {
+                flush_word(&mut word, &mut out);
+                out.push_str("\x1b[32m\"");
+                for c2 in chars.by_ref() {
+                    out.push(c2);
+                    if c2 == '"' {
+                        break;
+                    }
+                }
+                out.push_str("\x1b[0m");
+            } else if (c == '/' && chars.peek() == Some(&'/')) || (c == '#' && word.is_empty()) {
+                flush_word(&mut word, &mut out);
+                out.push_str("\x1b[90m");
+                out.push(c);
+                for c2 in chars.by_ref() {
+                    out.push(c2);
+                }
+                out.push_str("\x1b[0m");
+            } else if c.is_alphanumeric() || c == '_' || c == '.' {
+                word.push(c);
+            } else {
+                flush_word(&mut word, &mut out);
+                out.push(c);
+            }
+        }
+        flush_word(&mut word, &mut out);
+        Cow::Owned(out)
+    }
+
+    fn highlight_prompt<'b, 's: 'b, 'p: 'b>(
+        &'s self,
+        prompt: &'p str,
+        _default: bool,
+    ) -> Cow<'b, str> {
+        Cow::Owned(format!("\x1b[1;32m{}\x1b[0m", prompt))
+    }
+
+    fn highlight_hint<'h>(&self, hint: &'h str) -> Cow<'h, str> {
+        Cow::Owned(format!("\x1b[90m{}\x1b[0m", hint))
+    }
+
+    fn highlight_char(&self, _line: &str, _pos: usize, _forced: bool) -> bool {
+        true
+    }
+}
+
+impl Hinter for HayHelper {
+    type Hint = String;
+
+    fn hint(&self, line: &str, pos: usize, ctx: &Context<'_>) -> Option<String> {
+        self.hinter.hint(line, pos, ctx)
+    }
+}
+
+impl Validator for HayHelper {}
+impl Helper for HayHelper {}
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const HISTORY_FILE: &str = ".hay_history";
@@ -134,13 +398,18 @@ fn run_repl() {
 
     let mut interp = Interpreter::new();
     interp.load_plugins();
-    let mut rl = DefaultEditor::new().expect("failed to init readline");
+
+    let vars: Rc<RefCell<Vec<String>>> = Rc::new(RefCell::new(Vec::new()));
+    let helper = HayHelper::new(vars.clone());
+    let mut rl = Editor::new().expect("failed to init readline");
+    rl.set_helper(Some(helper));
     let _ = rl.load_history(HISTORY_FILE);
 
     let mut buf = String::new();
     let mut depth: i32 = 0;
 
     loop {
+        *vars.borrow_mut() = interp.env.var_names();
         let prompt = if depth > 0 { "      > " } else { "hay> " };
         match rl.readline(prompt) {
             Ok(line) => {
