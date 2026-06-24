@@ -479,7 +479,7 @@ cargo build --release      # optimized binary -> target/release/hay
 cargo test                 # 389 tests, <2s
 ```
 
-60 example scripts in `exemplos/`, all passing.
+60 example scripts in `examples/`, all passing.
 
 ## License
 

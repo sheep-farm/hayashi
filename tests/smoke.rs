@@ -71,49 +71,49 @@ macro_rules! smoke {
 
 smoke!(
     smoke_input_display,
-    "exemplos/input_display.hay",
+    "examples/input_display.hay",
     "OLS Regression"
 );
-smoke!(smoke_eststo_loop, "exemplos/eststo_loop.hay", "estclear");
+smoke!(smoke_eststo_loop, "examples/eststo_loop.hay", "estclear");
 smoke!(
     smoke_foreach_regression,
-    "exemplos/foreach_regression.hay",
+    "examples/foreach_regression.hay",
     "●"
 );
-smoke!(smoke_portfolio_sort, "exemplos/portfolio_sort.hay", "H-L");
+smoke!(smoke_portfolio_sort, "examples/portfolio_sort.hay", "H-L");
 smoke!(
     smoke_fama_macbeth,
-    "exemplos/fama_macbeth.hay",
+    "examples/fama_macbeth.hay",
     "Fama-MacBeth"
 );
-smoke!(smoke_double_sort, "exemplos/double_sort.hay", "Double Sort");
-smoke!(smoke_pwcorr, "exemplos/pwcorr.hay", "***");
+smoke!(smoke_double_sort, "examples/double_sort.hay", "Double Sort");
+smoke!(smoke_pwcorr, "examples/pwcorr.hay", "***");
 smoke!(
     smoke_missing_values,
-    "exemplos/missing_values.hay",
+    "examples/missing_values.hay",
     "Missing"
 );
 smoke!(
     smoke_preserve_restore,
-    "exemplos/preserve_restore.hay",
+    "examples/preserve_restore.hay",
     "restore"
 );
 smoke!(
     smoke_test_cov_display,
-    "exemplos/test_cov_display.hay",
+    "examples/test_cov_display.hay",
     "OLS (cluster)"
 );
 smoke!(
-    smoke_tres_workflows,
-    "exemplos/tres_workflows.hay",
+    smoke_three_workflows,
+    "examples/three_workflows.hay",
     "Hausman"
 );
 smoke!(
-    smoke_modelos_contagem,
-    "exemplos/modelos_contagem.hay",
+    smoke_count_models,
+    "examples/count_models.hay",
     "Poisson"
 );
-smoke!(smoke_painel, "exemplos/painel.hay", "FE");
+smoke!(smoke_panel, "examples/panel.hay", "FE");
 
 // ══════════════════════════════════════════════════════════════════════════════
 // SCOPING — block scoping com destruição determinística
@@ -3801,9 +3801,9 @@ gscatter(df, X, Y, path="{}")
 }
 
 #[test]
-fn smoke_graficos_svg() {
-    let (ok, out) = run_hy("exemplos/graficos_svg.hay");
-    assert!(ok, "graficos_svg.hay failed:\n{out}");
+fn smoke_graphs_svg() {
+    let (ok, out) = run_hy("examples/graphs_svg.hay");
+    assert!(ok, "graphs_svg.hay failed:\n{out}");
     assert!(out.contains("graph saved: scatter.svg"));
     assert!(out.contains("graph saved: coefplot.svg"));
     // cleanup
@@ -4114,9 +4114,9 @@ summarize(df, X, detail=true)
 }
 
 #[test]
-fn smoke_funcoes_matematicas() {
-    let (ok, out) = run_hy("exemplos/funcoes_matematicas.hay");
-    assert!(ok, "funcoes_matematicas.hay failed:\n{out}");
+fn smoke_math_functions() {
+    let (ok, out) = run_hy("examples/math_functions.hay");
+    assert!(ok, "math_functions.hay failed:\n{out}");
     assert!(out.contains("Skewness"));
 }
 
@@ -4637,7 +4637,7 @@ fn regex_email_pattern() {
 
 #[test]
 fn smoke_regex() {
-    let (ok, out) = run_hy("exemplos/regex.hay");
+    let (ok, out) = run_hy("examples/regex.hay");
     assert!(ok, "regex.hay failed:\n{out}");
     assert!(out.contains("42.50"));
 }
@@ -4649,7 +4649,7 @@ fn smoke_regex() {
 #[test]
 fn load_json() {
     let (ok, out) = run_inline(
-        r#"load "exemplos/data/sample.json" as df
+        r#"load "examples/data/sample.json" as df
 print(df)"#,
     );
     assert!(ok, "load json failed:\n{out}");
@@ -4659,7 +4659,7 @@ print(df)"#,
 #[test]
 fn load_tsv() {
     let (ok, out) = run_inline(
-        r#"load "exemplos/data/sample.tsv" as df
+        r#"load "examples/data/sample.tsv" as df
 print(df)"#,
     );
     assert!(ok, "load tsv failed:\n{out}");
@@ -4669,7 +4669,7 @@ print(df)"#,
 #[test]
 fn load_sqlite_default_table() {
     let (ok, out) = run_inline(
-        r#"load "exemplos/data/sample.db" as df
+        r#"load "examples/data/sample.db" as df
 print(df)"#,
     );
     assert!(ok, "load sqlite failed:\n{out}");
@@ -4679,7 +4679,7 @@ print(df)"#,
 #[test]
 fn load_sqlite_table_option() {
     let (ok, out) = run_inline(
-        r#"load "exemplos/data/sample.db" as df, table=precos
+        r#"load "examples/data/sample.db" as df, table=precos
 print(df)"#,
     );
     assert!(ok, "load sqlite table= failed:\n{out}");
@@ -4689,7 +4689,7 @@ print(df)"#,
 #[test]
 fn load_sqlite_query() {
     let (ok, out) = run_inline(
-        r#"load "exemplos/data/sample.db" as df, query="SELECT * FROM precos WHERE produto = 'Soja'"
+        r#"load "examples/data/sample.db" as df, query="SELECT * FROM precos WHERE produto = 'Soja'"
 print(df)"#,
     );
     assert!(ok, "load sqlite query= failed:\n{out}");
@@ -4699,7 +4699,7 @@ print(df)"#,
 #[test]
 fn load_csv_semicolon_sep() {
     let (ok, out) = run_inline(
-        r#"load "exemplos/data/sample_semicolon.csv" as df, sep=";"
+        r#"load "examples/data/sample_semicolon.csv" as df, sep=";"
 print(df)"#,
     );
     assert!(ok, "load csv sep=; failed:\n{out}");
@@ -4708,7 +4708,7 @@ print(df)"#,
 
 #[test]
 fn load_unknown_option_error() {
-    let (ok, out) = run_inline(r#"load "exemplos/data/sample.json" as df, bogus=1"#);
+    let (ok, out) = run_inline(r#"load "examples/data/sample.json" as df, bogus=1"#);
     assert!(!ok, "should fail with unknown option:\n{out}");
     assert!(
         out.contains("unknown option"),
@@ -4719,7 +4719,7 @@ fn load_unknown_option_error() {
 #[test]
 fn load_json_then_summarize() {
     let (ok, out) = run_inline(
-        r#"load "exemplos/data/sample.json" as df
+        r#"load "examples/data/sample.json" as df
 summarize(df, pop)"#,
     );
     assert!(ok, "load json + summarize failed:\n{out}");
@@ -4729,7 +4729,7 @@ summarize(df, pop)"#,
 #[test]
 fn load_sqlite_then_generate() {
     let (ok, out) = run_inline(
-        r#"load "exemplos/data/sample.db" as df
+        r#"load "examples/data/sample.db" as df
 generate df preco2 = preco * 2
 display mean(df, preco2)"#,
     );
@@ -4761,7 +4761,7 @@ fn load_odbc_without_feature_gives_clear_error() {
 #[test]
 fn export_csv() {
     let script = format!(
-        r#"load "exemplos/data/sample.db" as df
+        r#"load "examples/data/sample.db" as df
 export(df, "csv", "{}")"#,
         tmp("hayashi_test_export.csv")
     );
@@ -4775,7 +4775,7 @@ export(df, "csv", "{}")"#,
 #[test]
 fn export_json() {
     let script = format!(
-        r#"load "exemplos/data/sample.db" as df
+        r#"load "examples/data/sample.db" as df
 export(df, "json", "{}")"#,
         tmp("hayashi_test_export.json")
     );
@@ -4788,7 +4788,7 @@ export(df, "json", "{}")"#,
 #[test]
 fn export_tsv() {
     let script = format!(
-        r#"load "exemplos/data/sample.db" as df
+        r#"load "examples/data/sample.db" as df
 export(df, "tsv", "{}")"#,
         tmp("hayashi_test_export.tsv")
     );
@@ -4801,7 +4801,7 @@ export(df, "tsv", "{}")"#,
 #[test]
 fn export_xlsx() {
     let script = format!(
-        r#"load "exemplos/data/sample.db" as df
+        r#"load "examples/data/sample.db" as df
 export(df, "xlsx", "{}")"#,
         tmp("hayashi_test_export.xlsx")
     );
@@ -4813,7 +4813,7 @@ export(df, "xlsx", "{}")"#,
 #[test]
 fn export_sqlite() {
     let script = format!(
-        r#"load "exemplos/data/sample.db" as df
+        r#"load "examples/data/sample.db" as df
 export(df, "sqlite", "{}")"#,
         tmp("hayashi_test_export_out.db")
     );
@@ -4826,7 +4826,7 @@ export(df, "sqlite", "{}")"#,
 fn export_roundtrip_tsv() {
     let p = tmp("hayashi_rt.tsv");
     let script = format!(
-        r#"load "exemplos/data/sample.db" as df
+        r#"load "examples/data/sample.db" as df
 export(df, "tsv", "{p}")
 load "{p}" as df2
 display mean(df2, preco)"#,
@@ -4840,7 +4840,7 @@ display mean(df2, preco)"#,
 fn export_roundtrip_xlsx() {
     let p = tmp("hayashi_rt.xlsx");
     let script = format!(
-        r#"load "exemplos/data/sample.db" as df
+        r#"load "examples/data/sample.db" as df
 export(df, "xlsx", "{p}")
 load "{p}" as df2
 display mean(df2, preco)"#,
@@ -4854,7 +4854,7 @@ display mean(df2, preco)"#,
 fn export_roundtrip_sqlite() {
     let p = tmp("hayashi_rt_out.db");
     let script = format!(
-        r#"load "exemplos/data/sample.db" as df
+        r#"load "examples/data/sample.db" as df
 export(df, "sqlite", "{p}")
 load "{p}" as df2
 display mean(df2, preco)"#,
@@ -4867,7 +4867,7 @@ display mean(df2, preco)"#,
 #[test]
 fn load_tsv_then_regression() {
     let (ok, out) = run_inline(
-        r#"load "exemplos/data/sample.tsv" as df
+        r#"load "examples/data/sample.tsv" as df
 let m = ols(score ~ id, df)
 print(m)"#,
     );
@@ -5146,7 +5146,7 @@ display r[0]"#,
 fn import_basic() {
     assert_ok_contains(
         "import_basic",
-        r#"import("exemplos/data/test_module")
+        r#"import("examples/data/test_module")
 display test_module::double(21)"#,
         "42",
     );
@@ -5156,7 +5156,7 @@ display test_module::double(21)"#,
 fn import_const_available() {
     assert_ok_contains(
         "import_const",
-        r#"import("exemplos/data/test_module")
+        r#"import("examples/data/test_module")
 display test_module::MODULE_LOADED"#,
         "true",
     );
@@ -5166,8 +5166,8 @@ display test_module::MODULE_LOADED"#,
 fn import_dedup() {
     assert_ok_contains(
         "import_dedup",
-        r#"import("exemplos/data/test_module")
-import("exemplos/data/test_module")
+        r#"import("examples/data/test_module")
+import("examples/data/test_module")
 display test_module::double(5)"#,
         "10",
     );
@@ -5184,7 +5184,7 @@ fn import_not_found() {
 fn import_with_extension() {
     assert_ok_contains(
         "import_ext",
-        r#"import("exemplos/data/test_module.hay")
+        r#"import("examples/data/test_module.hay")
 display test_module::double(3)"#,
         "6",
     );
@@ -5194,7 +5194,7 @@ display test_module::double(3)"#,
 fn import_alias() {
     assert_ok_contains(
         "import_alias",
-        r#"import("exemplos/data/test_module", as=tm)
+        r#"import("examples/data/test_module", as=tm)
 display tm::double(7)"#,
         "14",
     );
@@ -5204,7 +5204,7 @@ display tm::double(7)"#,
 fn import_only() {
     assert_ok_contains(
         "import_only",
-        r#"import("exemplos/data/test_module", only=["double"])
+        r#"import("examples/data/test_module", only=["double"])
 display double(4)"#,
         "8",
     );
@@ -5367,7 +5367,7 @@ fn typeof_dict() {
 #[test]
 fn export_parquet() {
     let script = format!(
-        r#"load "exemplos/data/sample.db" as df
+        r#"load "examples/data/sample.db" as df
 export(df, "parquet", "{}")"#,
         tmp("hayashi_test.parquet")
     );
@@ -5380,7 +5380,7 @@ export(df, "parquet", "{}")"#,
 fn parquet_roundtrip() {
     let p = tmp("hayashi_rt.parquet");
     let script = format!(
-        r#"load "exemplos/data/sample.db" as df
+        r#"load "examples/data/sample.db" as df
 export(df, "parquet", "{p}")
 load "{p}" as df2
 display mean(df2, preco)"#,
@@ -5394,7 +5394,7 @@ display mean(df2, preco)"#,
 fn load_parquet() {
     let p = tmp("hayashi_load.parquet");
     let script = format!(
-        r#"load "exemplos/data/sample.db" as df
+        r#"load "examples/data/sample.db" as df
 export(df, "parquet", "{p}")
 load "{p}" as df2
 print(df2)"#,
