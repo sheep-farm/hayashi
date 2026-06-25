@@ -10,7 +10,7 @@
 | Interface | Terminal (REPL + script) + VS Code | GUI + terminal |
 | I/O | CSV, TSV, JSON, DTA, Excel, Parquet, SQLite, ODBC | DTA, CSV, Excel, ODBC |
 | Graphics | SVG + ASCII | PNG/SVG/PDF native |
-| Tests | 389 automated + 60 examples | Internal proprietary suite |
+| Tests | 428 automated + 60 examples | Internal proprietary suite |
 | Scoping | Block-scoped, const, no GC | Global |
 | DataFrames | Multiple simultaneous, Rc COW | Single active dataset (frames since v16) |
 | Types | int, float, bool, str, list, dict, closures | Numeric + string |
@@ -72,6 +72,14 @@ assert price > 0                       assert(X > 0, "msg")
 .                                      date("2024-01-15")
 .                                      generate df Y = year(date_col)
 gen X2 = exper * exper                 generate df X2 = exper |> |x| x * x
+.                                      mutate(df, X2 = exper^2, X3 = ln(Y))
+.                                      df |> mutate(z = x^2) |> filter(z > 5)
+.                                      group_by(df, setor, mean, ret, vol)
+.                                      pivot_longer(df, stubs=["gdp"], i=id, j=year)
+.                                      codebook(df)
+.                                      swilk(df, Y)  // Shapiro-Wilk
+.                                      sktest(df, Y) // JB + D'Agostino
+.                                      print("x =", x, sep=", ")
 
 foreach v in X1 X2 X3 {               for v in ["X1", "X2", "X3"] {
     reg Y `v'                              eststo(ols("Y ~ " + v, df))
@@ -98,6 +106,8 @@ esttab m_*
 | ZIP/ZINB | `zip` | `zip`/`zinb` | Parity |
 | Ordered logit/probit | `ologit`/`oprobit` | `ologit`/`oprobit` | Parity |
 | Multinomial logit | `mlogit` | `mlogit` | Parity |
+| Conditional MNLogit | `asclogit` | `cmnlogit` | Parity |
+| GMM | `gmm` | `gmm` | Parity |
 | Tobit/Heckman | `tobit`/`heckman` | `tobit`/`heckman` | Parity |
 | Quantile | `qreg` | `qreg` | Parity |
 | ARIMA/GARCH | `arima`/`arch` | `arima`/`garch`/`egarch` | Parity |
@@ -214,7 +224,7 @@ raw_data
 | Ignore errors | `capture` (no error info) | `capture(expr)` — returns Nil on error |
 | Structured handling | — | `try { } catch e { display f"Error: {e}" }` |
 | Assertions | `assert` | `assert(cond, "message")` |
-| Error messages | generic | line numbers: `"line 15: undefined variable 'x'"` |
+| Error messages | generic | source preview, "did you mean?", stack traces, type mismatch |
 
 ### Multiple DataFrames
 
@@ -278,11 +288,11 @@ frlink 1:1 id, frame(clients)
 - Auto collinearity detection across all estimators (Stata-style (omitted) display)
 
 **Developer experience:**
-- 389 automated tests, 60 examples, `cargo test` in <1s
-- `help()` with ~110 topics, signature + example for every command
+- 428 automated tests, 60 examples, `cargo test` in <1s
+- `help()` with ~115 topics, signature + example for every command
 - VS Code extension (syntax highlighting, run/debug)
 - Tab completion + syntax highlighting in REPL
-- Error messages with line numbers
+- Error messages with source preview, "did you mean?", stack traces, type mismatch
 - Multi-line expressions inside parentheses
 - Domain: haylang.dev
 
@@ -300,6 +310,6 @@ frlink 1:1 id, frame(clients)
 
 ## Conclusion
 
-Hayashi covers ~97% of the applied econometrics workflow at the graduate level with 46 estimators, 389 automated tests, and full functional parity in estimation, post-estimation, data manipulation, and publishable output. The remaining gaps are specialized niches (survey, SEM, Bayesian, spatial) that few researchers use simultaneously.
+Hayashi covers ~97% of the applied econometrics workflow at the graduate level with 53 estimators, 428 automated tests, and full functional parity in estimation, post-estimation, data manipulation, and publishable output. The remaining gaps are specialized niches (survey, SEM, Bayesian, spatial) that few researchers use simultaneously.
 
-The language goes beyond Stata with modern features (closures, pattern matching, pipe, f-strings, dict, const, try/catch, namespaces) that make scripts more expressive and robust. Multiple simultaneous DataFrames, block scoping, immutable function parameters, and auto collinearity detection are architectural improvements over Stata's global-state model. Scripts use the `.hay` extension and documentation is available at haylang.dev.
+The language goes beyond Stata with modern features (closures, pattern matching, pipe, f-strings, dict, const, try/catch, namespaces, mutate, group_by, pivot) that make scripts more expressive and robust. Pipe assign-back semantics (`df |> f()` modifies source), rich error messages with "did you mean?", stack traces, and source preview make debugging intuitive. Multiple simultaneous DataFrames, block scoping, immutable function parameters, and auto collinearity detection are architectural improvements over Stata's global-state model. Scripts use the `.hay` extension and documentation is available at haylang.dev.
