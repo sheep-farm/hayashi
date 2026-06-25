@@ -3,6 +3,33 @@
 All notable changes to Hayashi are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.3] — 2026-06-25
+
+### Added
+
+- **`codebook(df)`**: detailed variable description — type, unique values, missing, range, percentiles
+- **`swilk(df, var)`**: Shapiro-Wilk normality test (Royston 1995, 3 ≤ n ≤ 5000)
+- **`sfrancia(df, var)`**: Shapiro-Francia normality test (Royston 1993, 5 ≤ n ≤ 5000)
+- **`sktest(df, var)`**: Skewness/Kurtosis tests (Jarque-Bera + D'Agostino)
+- **`mutate(df, col1=expr1, col2=expr2)`**: generate multiple columns at once, pipe-friendly
+- **`group_by(df, by, stat, vars...)`**: pipe-friendly aggregation by group
+- **`pivot_longer(df, stubs=[], i=, j=)`**: expressive wide-to-long reshape
+- **`pivot_wider(df, i=, j=, values=)`**: expressive long-to-wide reshape
+- **`select()`**: alias for `keep`, natural in pipe chains
+- **`generate()` as function call**: `generate(df, col=expr)` works in pipes, modifies in-place
+- **`print()` multi-arg**: `print(a, b, c, sep=", ", end="")` with separator and line ending
+- **`summarize()` returns dict**: silent when captured (`let s = summarize(df, x)`), prints when standalone
+- **`resolve_var_list()`**: 16 commands now accept bare, string, variable, and list-of-strings for column names
+- **Pipe assigns back**: standalone `df |> f()` modifies `df`; `let r = df |> f()` preserves `df`
+- **Error messages**: source line preview with `^`, Levenshtein "did you mean?", stack traces for nested functions, `expected X, got Y` type mismatch
+- **`Expr::Pipe`**: AST node preserves pipe source for assign-back semantics
+
+### Fixed
+
+- Keywords followed by `(` now parse as function calls (e.g. `generate(df, col=expr)`)
+- Parser line numbers: correctly track lines after newlines
+- `MomentHelpers` now exported from Greeners (was missing from lib.rs)
+
 ## [0.2.2] — 2026-06-24
 
 ### Added
