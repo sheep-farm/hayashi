@@ -127,7 +127,8 @@ let big = filter(list, |x| x > 10)
 
 | Category | Operators |
 |---|---|
-| Arithmetic | `+` `-` `*` `/` `^` |
+| Arithmetic | `+` `-` `*` `/` `^` `**` `%` |
+| Assignment | `=` `+=` `-=` `*=` `/=` `%=` |
 | Comparison | `==` `!=` `>` `<` `>=` `<=` |
 | Logical | `&&` (or `&`) `\|\|` `!` |
 | Membership | `in` — works with list, dict (key), string (substring) |
@@ -198,7 +199,8 @@ export(m, "html", "table.html")
 | Panel | `fe` `re` `ab` `sysgmm` `pcse` `xtgls` |
 | Binary | `logit` `probit` `cloglog` `clogit` |
 | Count | `poisson` `nbreg` `zip` `zinb` |
-| Ordinal | `ologit` `oprobit` `mlogit` |
+| Ordinal | `ologit` `oprobit` `mlogit` `cmnlogit` |
+| GMM | `gmm` |
 | Censored | `tobit` `heckman` `truncreg` |
 | Survival | `cox` `km` |
 | Quantile | `qreg` |
@@ -234,28 +236,42 @@ vif(m)                       // variance inflation factors
 ## Data manipulation
 
 ```
+// Generate (statement — modifies in-place)
 generate df lnY = log(Y)
 generate df D = (X == 1)
-generate df dr = regexm(name, "^Dr")
-generate df Z = std(Y)
 generate df row = _n
-replace df Y = 0 if X > 10
+
+// Mutate (function — multi-column, pipe-friendly)
+let df2 = mutate(df, z = x^2, w = ln(y), ratio = x / y)
+let df2 = df |> mutate(z = x * 2) |> filter(z > 5) |> sort(z)
+
+// Pipe semantics: standalone modifies source, captured preserves it
+df |> mutate(z = x^2)               // modifies df
+let result = df |> mutate(z = x^2)  // df unchanged, result has z
+
+// Selection and filtering
+select(df, col1, col2)              // alias for keep
 drop(df, col)
-keep(df, col1, col2)
 filter(df, mpg > 25 & foreign == 1)
 sort(df, price)
+
+// Aggregation
+group_by(df, setor, mean, ret, vol)  // pipe-friendly
+collapse(df, mean, price, mpg, by=foreign)
+
+// Reshape
+pivot_longer(df, stubs=["gdp"], i=country, j=year)
+pivot_wider(df, i=id, j=year, values=gdp)
+
+// Other
+replace df Y = 0 if X > 10
 merge(df1, df2, key=id, type=left)
 append(df1, df2)
-collapse(df, mean, price, mpg, by=foreign)
-reshape(df, id=country, stubs=[gdp, pop])
 winsor(df, Y, p=0.01)
-encode(df, str_col)
-tabgen(df, group)
-recode(df, X, from=[1,2], to=[10,20])
-duplicates(df, id, action=drop)
 dropna(df, price, mpg)
 rename(df, old, new)
 label(df, Y, "GDP per capita")
+duplicates(df, id, action=drop)
 preserve(df) / restore(df)
 ```
 
@@ -281,7 +297,16 @@ let sub = filter(df, ts >= cutoff)
 ## Descriptive statistics
 
 ```
-summarize(df, detail=true)
+// summarize returns dict when captured, prints when standalone
+let s = summarize(df, price, detail=true)
+display s["mean"]
+
+// All accept bare, string, variable, or list for column names
+let cols = ["price", "mpg"]
+summarize(df, cols)
+
+// Descriptive commands
+codebook(df)                         // detailed variable description
 tabulate(df, group)
 tabulate(df, row, col, chi2=true)
 correlate(df, X1, X2, X3)
@@ -289,9 +314,12 @@ pwcorr(df, X1, X2, X3)
 ttest(df, Y, by=group)
 ci(df, Y, level=0.99)
 centile(df, Y, percentiles=[10, 50, 90])
-count df if price > 5000
-list(df, vars=[X1, X2], n=10)
 describe(df)
+
+// Normality tests
+swilk(df, Y)                         // Shapiro-Wilk
+sfrancia(df, Y)                      // Shapiro-Francia
+sktest(df, Y)                        // Skewness/Kurtosis (JB + D'Agostino)
 ```
 
 ## Graphs
@@ -475,17 +503,43 @@ assert(n > 0, "empty data")
 timer(ols(Y ~ X, df))         // time execution
 set_seed(42)                   // reproducibility
 source("other_script.hay")     // run another script
-help(ols)                      // help() has ~110 topics with examples
+help(ols)                      // help() has ~115 topics with examples
+help(about)                    // project info (version, license, author)
+print("x =", x, "y =", y)    // multi-arg with sep= and end=
+print("a", "b", sep=", ")     // a, b
 ```
 
 ## Build & test
 
 ```bash
 cargo build --release      # optimized binary -> target/release/hay
-cargo test                 # 389 tests, <2s
+cargo test                 # 428 tests, <1s
 ```
 
 60 example scripts in `examples/`, all passing.
+
+## Error messages
+
+Hayashi provides rich error diagnostics:
+
+```
+error: line 3: undefined variable 'preco_total'
+  3 │ display preco_total
+    │ ^^^^^^^^^^^^^^^^^^^
+
+error: line 6: undefined function 'sumarize' — did you mean 'summarize'?
+  6 │ sumarize(df)
+    │ ^^^^^^^^^^^^
+
+error: line 2: undefined variable 'factor'
+Stack trace:
+  in calculate() at line 2
+  in process() at line 5
+
+error: line 1: expected DataFrame, got Int
+  1 │ summarize(42)
+    │ ^^^^^^^^^^^^^
+```
 
 ## Author
 
