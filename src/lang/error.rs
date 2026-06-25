@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum HayashiError {
     #[error("Lexer error at line {line}: {msg}")]
     Lex { line: usize, msg: String },
@@ -14,8 +14,11 @@ pub enum HayashiError {
     #[error("Runtime error: {0}")]
     Runtime(String),
 
+    #[error("{0}")]
+    Annotated(String),
+
     #[error("I/O error: {0}")]
-    Io(#[from] std::io::Error),
+    Io(String),
 
     // Sentinelas de controle de fluxo — capturadas internamente, nunca expostas ao usuário
     #[error("return")]

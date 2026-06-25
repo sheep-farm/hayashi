@@ -5,7 +5,7 @@ pub mod interpreter;
 pub mod lexer;
 pub mod parser;
 
-use error::Result;
+use error::{HayashiError, Result};
 use interpreter::Interpreter;
 use lexer::Lexer;
 use parser::Parser;
@@ -16,12 +16,12 @@ pub fn run_source(src: &str, interp: &mut Interpreter) -> Result<()> {
 
 pub fn run_source_verbose(src: &str, interp: &mut Interpreter, verbose: bool) -> Result<()> {
     let mut lexer = Lexer::new(src);
-    let tokens = lexer.tokenize()?;
+    let tokens = lexer.tokenize().map_err(|e| annotate_error(src, &e))?;
     if verbose {
         eprintln!("[hayashi] {} tokens parsed", tokens.len());
     }
     let mut parser = Parser::new(tokens);
-    let stmts = parser.parse_program()?;
+    let stmts = parser.parse_program().map_err(|e| annotate_error(src, &e))?;
     if verbose {
         eprintln!("[hayashi] {} statements", stmts.len());
     }
@@ -34,9 +34,75 @@ pub fn run_source_verbose(src: &str, interp: &mut Interpreter, verbose: bool) ->
                 stmt_label(&spanned.0)
             );
         }
-        interp.exec(spanned)?;
+        interp.exec(spanned).map_err(|e| annotate_error(src, &e))?;
     }
     Ok(())
+}
+
+fn strip_runtime_prefixes(msg: &str) -> &str {
+    let mut s = msg;
+    loop {
+        if let Some(rest) = s.strip_prefix("Runtime error: ") {
+            s = rest;
+        } else if let Some(rest) = s.strip_prefix("Type error: ") {
+            s = rest;
+        } else {
+            break;
+        }
+    }
+    s
+}
+
+fn extract_line_number(e: &HayashiError) -> Option<usize> {
+    match e {
+        HayashiError::Lex { line, .. } | HayashiError::Parse { line, .. } => Some(*line),
+        HayashiError::Runtime(msg) | HayashiError::Type(msg) => {
+            let clean = strip_runtime_prefixes(msg);
+            if let Some(rest) = clean.strip_prefix("line ") {
+                rest.split(':').next().and_then(|n| n.trim().parse().ok())
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+fn error_message(e: &HayashiError) -> String {
+    match e {
+        HayashiError::Lex { line, msg } => format!("Lexer error at line {line}: {msg}"),
+        HayashiError::Parse { line, msg } => format!("Parse error at line {line}: {msg}"),
+        HayashiError::Runtime(msg) | HayashiError::Type(msg) => {
+            let clean = strip_runtime_prefixes(msg);
+            if let Some(rest) = clean.strip_prefix("line ") {
+                if let Some(pos) = rest.find(':') {
+                    let core = rest[pos + 1..].trim();
+                    return core.to_string();
+                }
+            }
+            clean.to_string()
+        }
+        _ => format!("{e}"),
+    }
+}
+
+fn annotate_error(src: &str, e: &HayashiError) -> HayashiError {
+    let line_num = match extract_line_number(e) {
+        Some(n) => n,
+        None => return e.clone(),
+    };
+    let lines: Vec<&str> = src.lines().collect();
+    if line_num == 0 || line_num > lines.len() {
+        return e.clone();
+    }
+    let line_src = lines[line_num - 1];
+    let msg = error_message(e);
+    let pad = " ".repeat(line_num.to_string().len());
+    let preview = format!(
+        "line {line_num}: {msg}\n  {line_num} │ {line_src}\n  {pad} │ {}",
+        "^".repeat(line_src.trim().len())
+    );
+    HayashiError::Annotated(preview)
 }
 
 fn stmt_label(s: &ast::Stmt) -> &'static str {
