@@ -434,6 +434,7 @@ pub fn help_text(topic: &str) -> Option<&'static str> {
         "doublesort" | "double_sort" => "doublesort(df, ret, var1, var2, n1=5, n2=5 [, time=var])\n  Double portfolio sort.\n\n  doublesort(df, ret, size, bm, n1=5, n2=5)\n",
         "let" => "let name = expr\n  Declare a mutable variable in the current scope.\n\n  let x = 10\n  let m = ols(Y ~ X, df)\n",
         "const" => "const name = expr\n  Declare an immutable variable. Cannot be reassigned or redeclared.\n\n  const PI = 3.14159\n  const N = 1000\n",
+        "print" => "print(expr1 [, expr2, ...] [, sep=\" \"] [, end=\"\\n\"])\n  Print values with separator and line ending.\n\n  print(\"x =\", x, \"y =\", y)          // x = 3.14 y = 42\n  print(\"a\", \"b\", \"c\", sep=\", \")     // a, b, c\n  print(\"no newline\", end=\"\")         // no trailing newline\n  print()                             // empty line\n",
         "display" | "di" => "display expr\n  Print a scalar value (no parentheses, Stata-style).\n\n  display mean(df, price)\n  display x + y\n",
         "scalar" => "scalar name = expr\n  Alias for 'let'.\n\n  scalar mu = mean(df, Y)\n",
         "input" => "input alias\ncol1 col2 col3\n1.0 2.0 3.0\nend\n  Create DataFrame from inline numeric data.\n\n  input df\n  Y X\n  4.0 1.0\n  5.0 2.0\n  end\n",

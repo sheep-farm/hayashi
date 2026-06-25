@@ -47,7 +47,7 @@ fn stmt_label(s: &ast::Stmt) -> &'static str {
         ast::Stmt::Load { .. } => "load",
         ast::Stmt::Generate { .. } => "generate",
         ast::Stmt::Predict { .. } => "predict",
-        ast::Stmt::Print(_) => "print",
+        ast::Stmt::Print(..) => "print",
         ast::Stmt::Export { .. } => "export",
         ast::Stmt::Replace { .. } => "replace",
         ast::Stmt::Count { .. } => "count",
