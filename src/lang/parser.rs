@@ -1076,6 +1076,17 @@ impl Parser {
                                 self.advance();
                                 row.push(f64::NAN);
                             } // . = missing
+                            Token::Ident(ref s) | Token::StringLit(ref s) => {
+                                let s = s.clone();
+                                return Err(HayashiError::Parse {
+                                    line,
+                                    msg: format!(
+                                        "input block só aceita valores numéricos — \
+                                         '{s}' não é um número. \
+                                         Use '.' para missing, ou load para arquivos com colunas de texto."
+                                    ),
+                                });
+                            }
                             _ => {
                                 // pular tokens desconhecidos até fim da linha
                                 while !matches!(self.peek(), Token::Newline | Token::Eof) {
