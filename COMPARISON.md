@@ -308,6 +308,20 @@ frlink 1:1 id, frame(clients)
 - **Academic acceptance**: de facto standard in journals
 - **Support**: StataCorp + paid support
 
+## Hayashi vs R / Python / Julia
+
+| | Hayashi | R | Python | Julia |
+|---|---|---|---|---|
+| Econometrics packages | 53 built-in | ~15-20 core (plm, fixest, ivreg, sandwich, vars, ...) | ~10 core (statsmodels, linearmodels) | ~5 core (FixedEffectModels.jl, ...) |
+| Setup | `cargo install hayashi-lang` | install.packages × N | pip install × N | Pkg.add × N |
+| Imports needed | 0 | 3-8 per script | 5-10 per script | 3-6 per script |
+| Syntax consistency | one syntax for all | each package has its own API | statsmodels vs linearmodels vs arch | each package differs |
+| System deps | none (pure Rust) | R runtime + BLAS | Python + NumPy + SciPy + BLAS | Julia runtime + BLAS |
+| Binary size | ~20 MB | ~200 MB runtime | ~500 MB environment | ~700 MB runtime |
+| REPL | tab completion, highlighting, hints | basic | IPython (separate install) | good |
+
+**Note on R's "20,000 packages":** CRAN has ~20,000 packages total, but the vast majority cover bioinformatics, genomics, ecology, psychometrics — not econometrics. The applied econometrics core in R is ~15-20 packages, comparable in scope to Hayashi's 53 built-in estimators. The difference: Hayashi is cohesive (one syntax, zero imports), while R requires assembling packages with inconsistent APIs.
+
 ## Conclusion
 
 Hayashi covers ~97% of the applied econometrics workflow at the graduate level with 53 estimators, 428 automated tests, and full functional parity in estimation, post-estimation, data manipulation, and publishable output. The remaining gaps are specialized niches (survey, SEM, Bayesian, spatial) that few researchers use simultaneously.
