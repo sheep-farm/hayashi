@@ -509,6 +509,22 @@ print("x =", x, "y =", y)    // multi-arg with sep= and end=
 print("a", "b", sep=", ")     // a, b
 ```
 
+## Extensibility
+
+```
+// Script plugins — auto-loaded from ~/.hayashi/plugins/
+import("finance")                    // finance::sharpe(), finance::sortino()
+import("finance", as=fin)            // fin::sharpe()
+
+// Install from GitHub
+// $ hay install user/repo
+
+// Plugin search paths
+plugin_path("/shared/plugins", "/team/lib")
+```
+
+Native Rust plugins (`.so`/`.dll`) are planned, enabling third parties to ship optimized estimators and data connectors via Hayashi's namespace system — the same extensibility model as R and Python, with Rust performance.
+
 ## Build & test
 
 ```bash
