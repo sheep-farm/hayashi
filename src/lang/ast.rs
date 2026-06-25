@@ -52,8 +52,9 @@ pub enum TsOpKind {
 /// Iterador de loop for
 #[derive(Debug, Clone)]
 pub enum ForIter {
-    Range(Expr, Expr), // start..end  (exclusivo no topo, tipo Rust/Python)
-    Items(Expr),       // lista ou variável
+    Range(Expr, Expr),          // start..end   (exclusivo, como Rust)
+    RangeInclusive(Expr, Expr), // start..=end  (inclusivo, como Rust)
+    Items(Expr),                // lista ou variável
 }
 
 /// Expressões da linguagem
