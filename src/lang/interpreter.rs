@@ -545,7 +545,7 @@ const BUILTIN_NAMES: &[&str] = &[
     "glm", "gee", "mixed", "mlogit", "ologit", "oprobit", "clogit", "cpoisson",
     "gmm", "sur", "three_sls", "fmb", "did", "rd", "psm", "synth",
     "summarize", "tabulate", "tabstat", "correlate", "corr", "pwcorr",
-    "describe", "codebook", "ttest", "ci", "centile", "count",
+    "describe", "codebook", "ttest", "ci", "centile", "count", "nrow",
     "filter", "sort", "drop", "keep", "select", "dropna", "rename",
     "merge", "append", "collapse", "group_by", "reshape",
     "mutate", "generate", "pivot_longer", "pivot_wider",
@@ -9824,6 +9824,25 @@ impl Interpreter {
             }
 
             // ── ttest ────────────────────────────────────────────────────────
+            // ── count(df) / nrow(df) — contagem de linhas como valor ─────────
+            "count" | "nrow" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "count(df) ou count(df, condição)".into(),
+                    ));
+                }
+                let df = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(d) => d,
+                    other => return Err(self.type_mismatch("DataFrame", &other)),
+                };
+                if args.len() >= 2 {
+                    let mask = self.eval_col_expr(&args[1], &df)?;
+                    let n = mask.iter().filter(|&&v| v != 0.0 && !v.is_nan()).count();
+                    return Ok(Value::Int(n as i64));
+                }
+                Ok(Value::Int(df.n_rows() as i64))
+            }
+
             "ttest" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime("ttest() requires a DataFrame".into()));

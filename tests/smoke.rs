@@ -6418,8 +6418,7 @@ input df
   4
 end
 df |> filter(x > 2)
-let s = summarize(df, x)
-display s["N"]
+display count(df)
 "#,
         "2",
     );
@@ -6771,7 +6770,6 @@ display s["min"]
 
 #[test]
 fn dropna_string_literal_arg() {
-    // dropna com string literal — após drop, N de x deve ser 2
     assert_ok_contains(
         "dropna_string_literal",
         r#"
@@ -6782,8 +6780,7 @@ input df
   3.0 30.0
 end
 let df2 = dropna(df, "x")
-let s = summarize(df2, x)
-display s["N"]
+display count(df2)
 "#,
         "2",
     );
@@ -7713,7 +7710,7 @@ display d
 
 #[test]
 fn pivot_longer_row_count() {
-    // 2 id * 3 anos = 6 rows; N do summarize deve ser 6
+    // 2 id * 3 anos = 6 rows
     assert_ok_contains(
         "pivot_longer_rows",
         r#"
@@ -7723,8 +7720,7 @@ input df
   2  150     250     350
 end
 let long = pivot_longer(df, stubs=["gdp"], i=id, j=year)
-let s = summarize(long, gdp)
-display s["N"]
+display count(long)
 "#,
         "6",
     );
@@ -7997,5 +7993,173 @@ let lst = build(5)
 display len(lst)
 "#,
         "5",
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// COUNT(df) / NROW(df) — contagem de linhas como valor
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn count_fn_total_rows() {
+    assert_ok_contains(
+        "count_fn_total",
+        r#"
+input df
+  x
+  10
+  20
+  30
+  40
+  50
+end
+display count(df)
+"#,
+        "5",
+    );
+}
+
+#[test]
+fn nrow_alias() {
+    assert_ok_contains(
+        "nrow_alias",
+        r#"
+input df
+  x
+  1
+  2
+  3
+end
+display nrow(df)
+"#,
+        "3",
+    );
+}
+
+#[test]
+fn count_fn_with_condition() {
+    assert_ok_contains(
+        "count_fn_cond",
+        r#"
+input df
+  x
+  1
+  2
+  3
+  4
+  5
+end
+display count(df, x > 3)
+"#,
+        "2",
+    );
+}
+
+#[test]
+fn count_fn_after_filter() {
+    assert_ok_contains(
+        "count_after_filter",
+        r#"
+input df
+  x
+  1
+  2
+  3
+  4
+end
+let df2 = filter(df, x >= 3)
+display count(df2)
+"#,
+        "2",
+    );
+}
+
+#[test]
+fn count_fn_returns_int() {
+    assert_ok_contains(
+        "count_fn_int",
+        r#"
+input df
+  x
+  10
+  20
+end
+let n = count(df)
+display n + 1
+"#,
+        "3",
+    );
+}
+
+#[test]
+fn count_fn_empty_after_filter() {
+    assert_ok_contains(
+        "count_fn_zero",
+        r#"
+input df
+  x
+  1
+  2
+  3
+end
+let df2 = filter(df, x > 100)
+display count(df2)
+"#,
+        "0",
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// INPUT BLOCK — erro claro ao receber dados não-numéricos
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn input_rejects_string_data() {
+    let (ok, out) = run_inline(r#"
+input df
+  name age
+  Alice 25
+  Bob   30
+end
+"#);
+    assert!(!ok, "input with string data should fail");
+    assert!(
+        out.contains("Alice") || out.contains("não é um número") || out.contains("numérico"),
+        "error should mention the non-numeric token:\n{out}"
+    );
+}
+
+#[test]
+fn input_rejects_quoted_string() {
+    let (ok, out) = run_inline(r#"
+input df
+  x
+  "hello"
+  2
+end
+"#);
+    assert!(!ok, "input with quoted string should fail");
+    assert!(
+        out.contains("hello") || out.contains("não é um número") || out.contains("numérico"),
+        "error should mention the invalid token:\n{out}"
+    );
+}
+
+#[test]
+fn input_accepts_dot_as_missing() {
+    // '.' é missing válido; não deve ser confundido com string
+    assert_ok_contains(
+        "input_dot_missing",
+        r#"
+input df
+  x y
+  1.0 10.0
+  .   20.0
+  3.0 30.0
+end
+let s = summarize(df, x)
+display s["missing"]
+"#,
+        "1",
     );
 }
