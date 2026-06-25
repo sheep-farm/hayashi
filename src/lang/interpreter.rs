@@ -499,6 +499,17 @@ impl Env {
         None
     }
 
+    pub fn all_names(&self) -> Vec<String> {
+        let mut names: Vec<String> = self
+            .scopes
+            .iter()
+            .flat_map(|s| s.vars.keys().cloned())
+            .collect();
+        names.sort();
+        names.dedup();
+        names
+    }
+
     pub fn remove(&mut self, name: &str) {
         for scope in self.scopes.iter_mut().rev() {
             if scope.vars.remove(name).is_some() {
@@ -523,6 +534,33 @@ impl Env {
 
 // ── Interpetador ──────────────────────────────────────────────────────────────
 
+const BUILTIN_NAMES: &[&str] = &[
+    "mean", "sd", "min", "max", "sum", "total", "abs", "sqrt", "ln", "log", "exp",
+    "sin", "cos", "tan", "asin", "acos", "atan", "atan2", "ceil", "floor", "round",
+    "sign", "factorial", "comb", "int", "float", "str", "bool", "len", "typeof",
+    "ols", "iv", "logit", "probit", "poisson", "nbreg", "tobit", "heckman",
+    "fe", "re", "be", "fe2sls", "ab", "sysgmm", "pcse", "xtgls",
+    "qreg", "rlm", "lasso", "ridge", "elasticnet", "cox",
+    "arima", "var", "vecm", "varma", "svar", "garch",
+    "glm", "gee", "mixed", "mlogit", "ologit", "oprobit", "clogit", "cpoisson",
+    "gmm", "sur", "three_sls", "fmb", "did", "rd", "psm", "synth",
+    "summarize", "tabulate", "tabstat", "correlate", "corr", "pwcorr",
+    "describe", "codebook", "ttest", "ci", "centile", "count",
+    "filter", "sort", "drop", "keep", "select", "dropna", "rename",
+    "merge", "append", "collapse", "group_by", "reshape",
+    "mutate", "generate", "pivot_longer", "pivot_wider",
+    "anova", "pca", "factor", "manova", "cancorr", "kde", "lowess",
+    "swilk", "sfrancia", "sktest", "omnibus", "dagostino",
+    "vif", "predict", "esttab", "eststo", "margins", "test", "lincom", "nlcom",
+    "bootstrap", "bootse", "histogram", "boxplot", "kdensity", "qqplot",
+    "scatter", "recode", "destring", "winsor", "label", "format",
+    "print", "display", "source", "import", "assert", "timer",
+    "push", "pop", "reverse", "unique", "flatten", "join", "split",
+    "contains", "starts_with", "ends_with", "lower", "upper", "trim",
+    "substr", "replace", "regexm", "regexr", "regexs",
+    "input", "load", "export",
+];
+
 pub struct Interpreter {
     pub env: Env,
     ts_info: HashMap<String, String>,
@@ -536,6 +574,7 @@ pub struct Interpreter {
     imported: HashSet<String>,
     plugin_paths: Vec<String>,
     capturing: bool,
+    call_stack: Vec<(String, usize)>,
 }
 
 impl Interpreter {
@@ -553,7 +592,48 @@ impl Interpreter {
             imported: HashSet::new(),
             plugin_paths: Vec::new(),
             capturing: false,
+            call_stack: Vec::new(),
         }
+    }
+
+    fn levenshtein(a: &str, b: &str) -> usize {
+        let (m, n) = (a.len(), b.len());
+        let mut prev: Vec<usize> = (0..=n).collect();
+        let mut curr = vec![0; n + 1];
+        for (i, ca) in a.chars().enumerate() {
+            curr[0] = i + 1;
+            for (j, cb) in b.chars().enumerate() {
+                let cost = if ca == cb { 0 } else { 1 };
+                curr[j + 1] = (prev[j + 1] + 1).min(curr[j] + 1).min(prev[j] + cost);
+            }
+            std::mem::swap(&mut prev, &mut curr);
+        }
+        prev[n]
+    }
+
+    fn suggest(name: &str, candidates: &[String]) -> Option<String> {
+        let max_dist = match name.len() {
+            0..=2 => 1,
+            3..=5 => 2,
+            _ => 3,
+        };
+        candidates
+            .iter()
+            .filter_map(|c| {
+                let d = Self::levenshtein(name, c);
+                if d > 0 && d <= max_dist { Some((d, c.clone())) } else { None }
+            })
+            .min_by_key(|(d, _)| *d)
+            .map(|(_, c)| c)
+    }
+
+    fn format_stack_trace(&self, innermost: &str, line: usize) -> String {
+        let mut frames = Vec::new();
+        for (name, ln) in self.call_stack.iter().rev() {
+            frames.push(format!("  in {name}() at line {ln}"));
+        }
+        frames.push(format!("  in {innermost}() at line {line}"));
+        format!("Stack trace:\n{}", frames.join("\n"))
     }
 
     fn rt_err(&self, msg: impl Into<String>) -> HayashiError {
@@ -563,6 +643,30 @@ impl Interpreter {
         } else {
             HayashiError::Runtime(m)
         }
+    }
+
+    fn type_name(v: &Value) -> &'static str {
+        match v {
+            Value::Float(_) => "Float",
+            Value::Int(_) => "Int",
+            Value::Bool(_) => "Bool",
+            Value::Str(_) => "String",
+            Value::Nil => "Nil",
+            Value::List(_) => "List",
+            Value::Dict(_) => "Dict",
+            Value::DataFrame(_) => "DataFrame",
+            Value::UserFn(_) => "Function",
+            Value::OlsResult(_) => "OlsResult",
+            Value::IvResult(_) => "IvResult",
+            _ => "Object",
+        }
+    }
+
+    fn type_mismatch(&self, expected: &str, got: &Value) -> HayashiError {
+        self.type_err(format!(
+            "expected {expected}, got {}",
+            Self::type_name(got)
+        ))
     }
 
     fn resolve_var_list(
@@ -824,7 +928,13 @@ impl Interpreter {
                 .env
                 .get(name)
                 .cloned()
-                .ok_or_else(|| self.rt_err(format!("undefined variable '{name}'"))),
+                .ok_or_else(|| {
+                    let known = self.env.all_names();
+                    let hint = Self::suggest(name, &known)
+                        .map(|s| format!(" — did you mean '{s}'?"))
+                        .unwrap_or_default();
+                    self.rt_err(format!("undefined variable '{name}'{hint}"))
+                }),
 
             Expr::Formula(_f) => Err(HayashiError::Runtime(
                 "formula must be used inside an estimator call".into(),
@@ -7411,11 +7521,7 @@ impl Interpreter {
                 }
                 let df = match self.eval_expr(&args[0])? {
                     Value::DataFrame(df) => df,
-                    _ => {
-                        return Err(HayashiError::Type(
-                            "codebook() requires a DataFrame".into(),
-                        ))
-                    }
+                    other => return Err(self.type_mismatch("DataFrame", &other)),
                 };
 
                 let requested: Vec<String> = if args.len() > 1 {
@@ -7740,11 +7846,7 @@ impl Interpreter {
                 }
                 let df = match self.eval_expr(&args[0])? {
                     Value::DataFrame(df) => df,
-                    _ => {
-                        return Err(HayashiError::Type(
-                            "first argument must be a DataFrame".into(),
-                        ))
-                    }
+                    other => return Err(self.type_mismatch("DataFrame", &other)),
                 };
 
                 // variáveis pedidas ou todas as numéricas
@@ -7859,11 +7961,7 @@ impl Interpreter {
                 }
                 let df = match self.eval_expr(&args[0])? {
                     Value::DataFrame(df) => df,
-                    _ => {
-                        return Err(HayashiError::Type(
-                            "first argument must be a DataFrame".into(),
-                        ))
-                    }
+                    other => return Err(self.type_mismatch("DataFrame", &other)),
                 };
 
                 let requested: Vec<String> = if args.len() > 1 {
@@ -8831,7 +8929,7 @@ impl Interpreter {
                 }
 
                 if let Some(path) = out_path {
-                    std::fs::write(&path, &buf).map_err(|e| HayashiError::Io(e))?;
+                    std::fs::write(&path, &buf).map_err(|e| HayashiError::Io(e.to_string()))?;
                     println!("Exported table → '{path}'");
                 } else {
                     print!("\n{buf}");
@@ -12076,11 +12174,7 @@ impl Interpreter {
                 };
                 let mut df_val = match self.eval_expr(&args[0])? {
                     Value::DataFrame(d) => d,
-                    _ => {
-                        return Err(HayashiError::Type(
-                            "mutate: first argument must be a DataFrame".into(),
-                        ))
-                    }
+                    other => return Err(self.type_mismatch("DataFrame", &other)),
                 };
                 if opts.is_empty() {
                     return Err(HayashiError::Runtime(
@@ -18011,10 +18105,18 @@ impl Interpreter {
                     }
                 }
 
-                // Recupera a função do env (se existir)
                 let user_fn = match self.env.get(other).cloned() {
                     Some(Value::UserFn(f)) => f,
-                    _ => return Err(HayashiError::Runtime(format!("função '{other}' not found"))),
+                    _ => {
+                        let mut known = self.env.all_names();
+                        known.extend(BUILTIN_NAMES.iter().map(|s| s.to_string()));
+                        let hint = Self::suggest(other, &known)
+                            .map(|s| format!(" — did you mean '{s}'?"))
+                            .unwrap_or_default();
+                        return Err(self.rt_err(format!(
+                            "undefined function '{other}'{hint}"
+                        )));
+                    }
                 };
 
                 if args.len() != user_fn.params.len() {
@@ -18031,6 +18133,7 @@ impl Interpreter {
                     .map(|e| self.eval_expr(e))
                     .collect::<Result<_>>()?;
 
+                self.call_stack.push((other.to_string(), self.current_line));
                 self.env.push_scope();
                 for (param, val) in user_fn.params.iter().zip(arg_vals) {
                     self.env.declare_const(param, val);
@@ -18056,9 +18159,17 @@ impl Interpreter {
                 }
 
                 self.env.pop_scope();
+                self.call_stack.pop();
 
                 if let Some(e) = exec_err {
-                    return Err(e);
+                    let frame = format!("  in {other}() at line {}", self.current_line);
+                    let msg = format!("{e}");
+                    let annotated = if msg.contains("Stack trace:") {
+                        format!("{msg}\n{frame}")
+                    } else {
+                        format!("{msg}\nStack trace:\n{frame}")
+                    };
+                    return Err(HayashiError::Runtime(annotated));
                 }
 
                 Ok(self.return_value.take().unwrap_or(Value::Nil))
@@ -20474,39 +20585,39 @@ impl Interpreter {
                     // ── OLS → CSV / LaTeX / HTML ──────────────────────────────
                     (Value::OlsResult(m), "csv") => {
                         let content = m.result.to_csv();
-                        std::fs::write(&path_str, &content).map_err(|e| HayashiError::Io(e))?;
+                        std::fs::write(&path_str, &content).map_err(|e| HayashiError::Io(e.to_string()))?;
                         println!("Exported OLS → '{path_str}'");
                     }
                     (Value::OlsResult(m), "latex" | "tex") => {
                         let content = m.result.to_latex();
-                        std::fs::write(&path_str, &content).map_err(|e| HayashiError::Io(e))?;
+                        std::fs::write(&path_str, &content).map_err(|e| HayashiError::Io(e.to_string()))?;
                         println!("Exported OLS → '{path_str}'");
                     }
                     (Value::OlsResult(m), "html" | "htm") => {
                         let content = m.result.to_html();
-                        std::fs::write(&path_str, &content).map_err(|e| HayashiError::Io(e))?;
+                        std::fs::write(&path_str, &content).map_err(|e| HayashiError::Io(e.to_string()))?;
                         println!("Exported OLS → '{path_str}'");
                     }
 
                     // ── Qualquer modelo → txt ─────────────────────────────────
                     (Value::IvResult(r), "txt" | "text") => {
                         std::fs::write(&path_str, format!("{r}"))
-                            .map_err(|e| HayashiError::Io(e))?;
+                            .map_err(|e| HayashiError::Io(e.to_string()))?;
                         println!("Exported IV results → '{path_str}'");
                     }
                     (Value::BinaryResult(m), "txt" | "text") => {
                         std::fs::write(&path_str, format!("{m}"))
-                            .map_err(|e| HayashiError::Io(e))?;
+                            .map_err(|e| HayashiError::Io(e.to_string()))?;
                         println!("Exported logit/probit results → '{path_str}'");
                     }
                     (Value::PanelResult(r), "txt" | "text") => {
                         std::fs::write(&path_str, format!("{r}"))
-                            .map_err(|e| HayashiError::Io(e))?;
+                            .map_err(|e| HayashiError::Io(e.to_string()))?;
                         println!("Exported FE results → '{path_str}'");
                     }
                     (Value::ReResult(r), "txt" | "text") => {
                         std::fs::write(&path_str, format!("{r}"))
-                            .map_err(|e| HayashiError::Io(e))?;
+                            .map_err(|e| HayashiError::Io(e.to_string()))?;
                         println!("Exported RE results → '{path_str}'");
                     }
                     (
@@ -20519,7 +20630,7 @@ impl Interpreter {
                         "txt" | "text",
                     ) => {
                         std::fs::write(&path_str, format!("{val}"))
-                            .map_err(|e| HayashiError::Io(e))?;
+                            .map_err(|e| HayashiError::Io(e.to_string()))?;
                         println!("Exported results → '{path_str}'");
                     }
 

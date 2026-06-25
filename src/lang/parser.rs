@@ -1211,6 +1211,7 @@ impl Parser {
     pub fn parse_program(&mut self) -> Result<Vec<Spanned>> {
         let mut stmts = Vec::new();
         loop {
+            self.skip_newlines();
             let line = self.line();
             match self.parse_stmt()? {
                 None => break,

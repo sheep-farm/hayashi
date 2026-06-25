@@ -6246,6 +6246,42 @@ print()
 }
 
 #[test]
+fn error_did_you_mean_variable() {
+    let (ok, out) = run_inline("let price = 10\ndisplay pric");
+    assert!(!ok);
+    assert!(out.contains("did you mean 'price'"), "missing hint:\n{out}");
+}
+
+#[test]
+fn error_did_you_mean_function() {
+    let (ok, out) = run_inline("input df\nx\n1\nend\nsumarize(df)");
+    assert!(!ok);
+    assert!(out.contains("did you mean 'summarize'"), "missing hint:\n{out}");
+}
+
+#[test]
+fn error_stack_trace() {
+    let (ok, out) = run_inline("fn inner() {\n  let z = nope\n}\nfn outer() {\n  inner()\n}\nouter()");
+    assert!(!ok);
+    assert!(out.contains("in inner()"), "missing inner frame:\n{out}");
+    assert!(out.contains("in outer()"), "missing outer frame:\n{out}");
+}
+
+#[test]
+fn error_type_mismatch() {
+    let (ok, out) = run_inline("summarize(42)");
+    assert!(!ok);
+    assert!(out.contains("expected DataFrame, got Int"), "missing type info:\n{out}");
+}
+
+#[test]
+fn error_shows_source_line() {
+    let (ok, out) = run_inline("let x = 1\nlet y = 2\ndisplay z");
+    assert!(!ok);
+    assert!(out.contains("│ display z"), "missing source line:\n{out}");
+}
+
+#[test]
 fn codebook_basic() {
     assert_ok_contains(
         "codebook_basic",
