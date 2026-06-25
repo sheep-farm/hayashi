@@ -5953,3 +5953,431 @@ display items[1]["name"]"#,
         "B",
     );
 }
+
+#[test]
+fn summarize_returns_dict() {
+    assert_ok_contains(
+        "summarize_returns_dict",
+        r#"
+input df
+  x y
+  1 10
+  2 20
+  3 30
+end
+let s = summarize(df, x)
+display s["mean"]
+"#,
+        "2",
+    );
+}
+
+#[test]
+fn summarize_string_arg() {
+    assert_ok_contains(
+        "summarize_string_arg",
+        r#"
+input df
+  x y
+  1 10
+  2 20
+  3 30
+end
+let s = summarize(df, "x")
+display s["mean"]
+"#,
+        "2",
+    );
+}
+
+#[test]
+fn summarize_var_indirect() {
+    assert_ok_contains(
+        "summarize_var_indirect",
+        r#"
+input df
+  x y
+  1 10
+  2 20
+  3 30
+end
+let col = "x"
+let s = summarize(df, col)
+display s["mean"]
+"#,
+        "2",
+    );
+}
+
+#[test]
+fn summarize_list_arg() {
+    assert_ok_contains(
+        "summarize_list_arg",
+        r#"
+input df
+  x y
+  1 10
+  2 20
+  3 30
+end
+let s = summarize(df, ["x", "y"])
+display s["y"]["mean"]
+"#,
+        "20",
+    );
+}
+
+#[test]
+fn summarize_list_var_arg() {
+    assert_ok_contains(
+        "summarize_list_var_arg",
+        r#"
+input df
+  x y
+  1 10
+  2 20
+  3 30
+end
+let vars = ["x", "y"]
+let s = summarize(df, vars)
+display s["x"]["mean"]
+"#,
+        "2",
+    );
+}
+
+#[test]
+fn summarize_multi_returns_nested_dict() {
+    assert_ok_contains(
+        "summarize_multi_returns_nested_dict",
+        r#"
+input df
+  x y
+  1 10
+  2 20
+  3 30
+end
+let s = summarize(df, x, y)
+display s["y"]["mean"]
+"#,
+        "20",
+    );
+}
+
+#[test]
+fn mutate_basic() {
+    assert_ok_contains(
+        "mutate_basic",
+        r#"
+input df
+  x y
+  1 10
+  2 20
+  3 30
+end
+let df2 = mutate(df, z = x^2, w = y + x)
+summarize(df2, z, w)
+"#,
+        "z",
+    );
+}
+
+#[test]
+fn mutate_pipe() {
+    assert_ok_contains(
+        "mutate_pipe",
+        r#"
+input df
+  x y
+  1 10
+  2 20
+  3 30
+end
+let df2 = df |> mutate(z = x * 2) |> filter(z > 2)
+summarize(df2, z)
+"#,
+        "z",
+    );
+}
+
+#[test]
+fn mutate_chain() {
+    assert_ok_contains(
+        "mutate_chain",
+        r#"
+input df
+  x
+  1
+  4
+  9
+end
+let df2 = df |> mutate(y = sqrt(x), z = x^2)
+let s = summarize(df2, y)
+display s["mean"]
+"#,
+        "2",
+    );
+}
+
+#[test]
+fn group_by_basic() {
+    assert_ok_contains(
+        "group_by_basic",
+        r#"
+input df
+  g x
+  1 10
+  1 20
+  2 30
+  2 40
+end
+let agg = group_by(df, g, mean, x)
+summarize(agg)
+"#,
+        "x",
+    );
+}
+
+#[test]
+fn group_by_pipe() {
+    assert_ok_contains(
+        "group_by_pipe",
+        r#"
+input df
+  g x
+  1 10
+  1 20
+  2 30
+  2 40
+end
+let agg = df |> group_by(g, mean, x)
+let s = summarize(agg, x)
+display s["mean"]
+"#,
+        "25",
+    );
+}
+
+#[test]
+fn pivot_longer_basic() {
+    assert_ok_contains(
+        "pivot_longer_basic",
+        r#"
+input df
+  id gdp1990 gdp2000
+  1  100     200
+  2  150     300
+end
+let long = pivot_longer(df, stubs=["gdp"], i=id, j=year)
+summarize(long)
+"#,
+        "gdp",
+    );
+}
+
+#[test]
+fn pivot_wider_basic() {
+    assert_ok_contains(
+        "pivot_wider_basic",
+        r#"
+input df
+  id year val
+  1  1990 100
+  1  2000 200
+  2  1990 150
+  2  2000 300
+end
+let wide = pivot_wider(df, i=id, j=year, values=val)
+describe(wide)
+"#,
+        "val1990",
+    );
+}
+
+#[test]
+fn select_alias() {
+    assert_ok_contains(
+        "select_alias",
+        r#"
+input df
+  x y z
+  1 10 100
+  2 20 200
+end
+let df2 = select(df, x, z)
+describe(df2)
+"#,
+        "x",
+    );
+}
+
+#[test]
+fn print_multi_args() {
+    assert_ok_contains(
+        "print_multi_args",
+        r#"
+let x = 3.14
+let y = 42
+print("x =", x, "y =", y)
+"#,
+        "x = 3.14 y = 42",
+    );
+}
+
+#[test]
+fn print_custom_sep() {
+    assert_ok_contains(
+        "print_custom_sep",
+        r#"
+print("a", "b", "c", sep=", ")
+"#,
+        "a, b, c",
+    );
+}
+
+#[test]
+fn print_empty_call() {
+    assert_ok(
+        "print_empty_call",
+        r#"
+print()
+"#,
+    );
+}
+
+#[test]
+fn error_did_you_mean_variable() {
+    let (ok, out) = run_inline("let price = 10\ndisplay pric");
+    assert!(!ok);
+    assert!(out.contains("did you mean 'price'"), "missing hint:\n{out}");
+}
+
+#[test]
+fn error_did_you_mean_function() {
+    let (ok, out) = run_inline("input df\nx\n1\nend\nsumarize(df)");
+    assert!(!ok);
+    assert!(out.contains("did you mean 'summarize'"), "missing hint:\n{out}");
+}
+
+#[test]
+fn error_stack_trace() {
+    let (ok, out) = run_inline("fn inner() {\n  let z = nope\n}\nfn outer() {\n  inner()\n}\nouter()");
+    assert!(!ok);
+    assert!(out.contains("in inner()"), "missing inner frame:\n{out}");
+    assert!(out.contains("in outer()"), "missing outer frame:\n{out}");
+}
+
+#[test]
+fn error_type_mismatch() {
+    let (ok, out) = run_inline("summarize(42)");
+    assert!(!ok);
+    assert!(out.contains("expected DataFrame, got Int"), "missing type info:\n{out}");
+}
+
+#[test]
+fn error_shows_source_line() {
+    let (ok, out) = run_inline("let x = 1\nlet y = 2\ndisplay z");
+    assert!(!ok);
+    assert!(out.contains("│ display z"), "missing source line:\n{out}");
+}
+
+#[test]
+fn codebook_basic() {
+    assert_ok_contains(
+        "codebook_basic",
+        r#"
+input df
+  x y
+  1 10
+  2 20
+  3 30
+  4 40
+  5 50
+end
+codebook(df)
+"#,
+        "unique:",
+    );
+}
+
+#[test]
+fn swilk_basic() {
+    assert_ok_contains(
+        "swilk_basic",
+        r#"
+input df
+  x
+  1.2
+  2.3
+  3.1
+  4.0
+  5.5
+  6.1
+  7.2
+  8.3
+  9.0
+  10.1
+end
+swilk(df, x)
+"#,
+        "Shapiro-Wilk",
+    );
+}
+
+#[test]
+fn sfrancia_basic() {
+    assert_ok_contains(
+        "sfrancia_basic",
+        r#"
+input df
+  x
+  1.2
+  2.3
+  3.1
+  4.0
+  5.5
+  6.1
+  7.2
+  8.3
+  9.0
+  10.1
+end
+sfrancia(df, x)
+"#,
+        "Shapiro-Francia",
+    );
+}
+
+#[test]
+fn sktest_basic() {
+    assert_ok_contains(
+        "sktest_basic",
+        r#"
+input df
+  x
+  1.2
+  2.3
+  3.1
+  4.0
+  5.5
+  6.1
+  7.2
+  8.3
+  9.0
+  10.1
+  11.0
+  12.5
+  13.3
+  14.1
+  15.0
+  16.2
+  17.8
+  18.1
+  19.5
+  20.0
+end
+sktest(df, x)
+"#,
+        "Skewness/Kurtosis",
+    );
+}

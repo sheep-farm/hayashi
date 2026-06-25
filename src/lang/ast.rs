@@ -119,6 +119,13 @@ pub enum Expr {
         args: Vec<Expr>,
     },
 
+    // pipe chain: source |> f(x) |> g(y)
+    // source = original LHS, expr = desugared call chain
+    Pipe {
+        source: Box<Expr>,
+        expr: Box<Expr>,
+    },
+
     // match expr { pattern => result, ... }
     Match {
         expr: Box<Expr>,
@@ -186,8 +193,8 @@ pub enum Stmt {
         kind: Expr,
     },
 
-    // print(expr)
-    Print(Expr),
+    // print(expr, expr, ..., sep=" ", end="\n")
+    Print(Vec<Expr>, Vec<Opt>),
 
     // export(expr, formato, "arquivo")
     Export {
