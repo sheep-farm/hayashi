@@ -555,7 +555,7 @@ const BUILTIN_NAMES: &[&str] = &[
     "bootstrap", "bootse", "histogram", "boxplot", "kdensity", "qqplot",
     "scatter", "recode", "destring", "winsor", "label", "format",
     "print", "display", "source", "import", "assert", "timer",
-    "push", "pop", "reverse", "unique", "flatten", "join", "split",
+    "push", "pop", "reverse", "unique", "flatten", "chain", "join", "split",
     "contains", "starts_with", "ends_with", "lower", "upper", "trim",
     "substr", "replace", "regexm", "regexr", "regexs",
     "input", "load", "export",
@@ -667,6 +667,14 @@ impl Interpreter {
             "expected {expected}, got {}",
             Self::type_name(got)
         ))
+    }
+
+    fn eval_as_int(&mut self, expr: &Expr, ctx: &str) -> Result<i64> {
+        match self.eval_expr(expr)? {
+            Value::Int(i)   => Ok(i),
+            Value::Float(f) => Ok(f as i64),
+            v => Err(self.type_err(format!("{ctx} must be integer, got {}", Self::type_name(&v)))),
+        }
     }
 
     fn resolve_var_list(
@@ -1145,6 +1153,32 @@ impl Interpreter {
             Expr::TsOp { .. } => Err(HayashiError::Runtime(
                 "operadores L./F./D. só são válidos dentro de generate".into(),
             )),
+
+            Expr::Range(start_expr, end_expr) => {
+                let start = self.eval_as_int(start_expr, "range start")?;
+                let end   = self.eval_as_int(end_expr,   "range end")?;
+                let step: i64 = if start <= end { 1 } else { -1 };
+                let mut v = Vec::new();
+                let mut cur = start;
+                while if step > 0 { cur < end } else { cur > end } {
+                    v.push(Value::Int(cur));
+                    cur += step;
+                }
+                Ok(Value::List(Rc::new(v)))
+            }
+
+            Expr::RangeInclusive(start_expr, end_expr) => {
+                let start = self.eval_as_int(start_expr, "range start")?;
+                let end   = self.eval_as_int(end_expr,   "range end")?;
+                let step: i64 = if start <= end { 1 } else { -1 };
+                let mut v = Vec::new();
+                let mut cur = start;
+                while if step > 0 { cur <= end } else { cur >= end } {
+                    v.push(Value::Int(cur));
+                    cur += step;
+                }
+                Ok(Value::List(Rc::new(v)))
+            }
         }
     }
 
@@ -2189,6 +2223,20 @@ impl Interpreter {
                     }
                     _ => Err(HayashiError::Type("flatten() requires list".into())),
                 }
+            }
+
+            "chain" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime("chain(seq1, seq2, ...)".into()));
+                }
+                let mut result = Vec::new();
+                for arg in args {
+                    match self.eval_expr(arg)? {
+                        Value::List(v) => result.extend(v.iter().cloned()),
+                        other => return Err(self.type_mismatch("List", &other)),
+                    }
+                }
+                Ok(Value::List(Rc::new(result)))
             }
 
             "range" => {

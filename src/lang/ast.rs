@@ -146,6 +146,10 @@ pub enum Expr {
         var: String,
         n: usize,
     },
+
+    // ranges como expressões: 1..5 → [1,2,3,4]  |  1..=5 → [1,2,3,4,5]
+    Range(Box<Expr>, Box<Expr>),
+    RangeInclusive(Box<Expr>, Box<Expr>),
 }
 
 pub type Spanned = (Stmt, usize);
