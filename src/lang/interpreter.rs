@@ -555,7 +555,7 @@ const BUILTIN_NAMES: &[&str] = &[
     "bootstrap", "bootse", "histogram", "boxplot", "kdensity", "qqplot",
     "scatter", "recode", "destring", "winsor", "label", "format",
     "print", "display", "source", "import", "assert", "timer",
-    "push", "pop", "reverse", "unique", "flatten", "join", "split",
+    "push", "pop", "reverse", "unique", "flatten", "chain", "join", "split",
     "contains", "starts_with", "ends_with", "lower", "upper", "trim",
     "substr", "replace", "regexm", "regexr", "regexs",
     "input", "load", "export",
@@ -2172,9 +2172,9 @@ impl Interpreter {
                 }
             }
 
-            "flatten" => {
+            "flatten" | "chain" => {
                 if args.len() != 1 {
-                    return Err(HayashiError::Runtime("flatten(lista)".into()));
+                    return Err(HayashiError::Runtime(format!("{func}(lista_de_listas)").into()));
                 }
                 match self.eval_expr(&args[0])? {
                     Value::List(v) => {
@@ -2187,7 +2187,7 @@ impl Interpreter {
                         }
                         Ok(Value::List(Rc::new(result)))
                     }
-                    _ => Err(HayashiError::Type("flatten() requires list".into())),
+                    _ => Err(HayashiError::Type(format!("{func}() requires list").into())),
                 }
             }
 
@@ -20766,28 +20766,45 @@ impl Interpreter {
                         let start = match self.eval_expr(start_expr)? {
                             Value::Int(i) => i,
                             Value::Float(f) => f as i64,
-                            v => {
-                                return Err(HayashiError::Type(format!(
-                                    "for: início do range must be integer, não {v}"
-                                )))
-                            }
+                            v => return Err(HayashiError::Type(format!(
+                                "for: início do range must be integer, não {v}"
+                            ))),
                         };
                         let end = match self.eval_expr(end_expr)? {
                             Value::Int(i) => i,
                             Value::Float(f) => f as i64,
-                            v => {
-                                return Err(HayashiError::Type(format!(
-                                    "for: fim do range must be integer, não {v}"
-                                )))
-                            }
+                            v => return Err(HayashiError::Type(format!(
+                                "for: fim do range must be integer, não {v}"
+                            ))),
                         };
                         let step: i64 = if start <= end { 1 } else { -1 };
                         let mut cur = start;
                         while if step > 0 { cur < end } else { cur > end } {
                             self.env.set(var, Value::Int(cur))?;
-                            if run_body!() {
-                                break;
-                            }
+                            if run_body!() { break; }
+                            cur += step;
+                        }
+                    }
+                    ForIter::RangeInclusive(start_expr, end_expr) => {
+                        let start = match self.eval_expr(start_expr)? {
+                            Value::Int(i) => i,
+                            Value::Float(f) => f as i64,
+                            v => return Err(HayashiError::Type(format!(
+                                "for: início do range must be integer, não {v}"
+                            ))),
+                        };
+                        let end = match self.eval_expr(end_expr)? {
+                            Value::Int(i) => i,
+                            Value::Float(f) => f as i64,
+                            v => return Err(HayashiError::Type(format!(
+                                "for: fim do range must be integer, não {v}"
+                            ))),
+                        };
+                        let step: i64 = if start <= end { 1 } else { -1 };
+                        let mut cur = start;
+                        while if step > 0 { cur <= end } else { cur >= end } {
+                            self.env.set(var, Value::Int(cur))?;
+                            if run_body!() { break; }
                             cur += step;
                         }
                     }

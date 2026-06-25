@@ -717,7 +717,11 @@ impl Parser {
 
     fn parse_for_iter(&mut self) -> Result<ForIter> {
         let start = self.parse_expr()?;
-        if self.peek() == &Token::DotDot {
+        if self.peek() == &Token::DotDotEq {
+            self.advance();
+            let end = self.parse_expr()?;
+            Ok(ForIter::RangeInclusive(start, end))
+        } else if self.peek() == &Token::DotDot {
             self.advance();
             let end = self.parse_expr()?;
             Ok(ForIter::Range(start, end))
