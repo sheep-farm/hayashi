@@ -555,7 +555,7 @@ const BUILTIN_NAMES: &[&str] = &[
     "bootstrap", "bootse", "histogram", "boxplot", "kdensity", "qqplot",
     "scatter", "recode", "destring", "winsor", "label", "format",
     "print", "display", "source", "import", "assert", "timer",
-    "push", "pop", "reverse", "unique", "flatten", "chain", "join", "split",
+    "push", "pop", "reverse", "unique", "flatten", "join", "split",
     "contains", "starts_with", "ends_with", "lower", "upper", "trim",
     "substr", "replace", "regexm", "regexr", "regexs",
     "input", "load", "export",
@@ -2172,9 +2172,9 @@ impl Interpreter {
                 }
             }
 
-            "flatten" | "chain" => {
+            "flatten" => {
                 if args.len() != 1 {
-                    return Err(HayashiError::Runtime(format!("{func}(lista_de_listas)").into()));
+                    return Err(HayashiError::Runtime("flatten(lista)".into()));
                 }
                 match self.eval_expr(&args[0])? {
                     Value::List(v) => {
@@ -2187,7 +2187,7 @@ impl Interpreter {
                         }
                         Ok(Value::List(Rc::new(result)))
                     }
-                    _ => Err(HayashiError::Type(format!("{func}() requires list").into())),
+                    _ => Err(HayashiError::Type("flatten() requires list".into())),
                 }
             }
 
