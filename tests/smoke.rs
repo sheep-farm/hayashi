@@ -6065,6 +6065,153 @@ display s["y"]["mean"]
 }
 
 #[test]
+fn mutate_basic() {
+    assert_ok_contains(
+        "mutate_basic",
+        r#"
+input df
+  x y
+  1 10
+  2 20
+  3 30
+end
+let df2 = mutate(df, z = x^2, w = y + x)
+summarize(df2, z, w)
+"#,
+        "z",
+    );
+}
+
+#[test]
+fn mutate_pipe() {
+    assert_ok_contains(
+        "mutate_pipe",
+        r#"
+input df
+  x y
+  1 10
+  2 20
+  3 30
+end
+let df2 = df |> mutate(z = x * 2) |> filter(z > 2)
+summarize(df2, z)
+"#,
+        "z",
+    );
+}
+
+#[test]
+fn mutate_chain() {
+    assert_ok_contains(
+        "mutate_chain",
+        r#"
+input df
+  x
+  1
+  4
+  9
+end
+let df2 = df |> mutate(y = sqrt(x), z = x^2)
+let s = summarize(df2, y)
+display s["mean"]
+"#,
+        "2",
+    );
+}
+
+#[test]
+fn group_by_basic() {
+    assert_ok_contains(
+        "group_by_basic",
+        r#"
+input df
+  g x
+  1 10
+  1 20
+  2 30
+  2 40
+end
+let agg = group_by(df, g, mean, x)
+summarize(agg)
+"#,
+        "x",
+    );
+}
+
+#[test]
+fn group_by_pipe() {
+    assert_ok_contains(
+        "group_by_pipe",
+        r#"
+input df
+  g x
+  1 10
+  1 20
+  2 30
+  2 40
+end
+let agg = df |> group_by(g, mean, x)
+let s = summarize(agg, x)
+display s["mean"]
+"#,
+        "25",
+    );
+}
+
+#[test]
+fn pivot_longer_basic() {
+    assert_ok_contains(
+        "pivot_longer_basic",
+        r#"
+input df
+  id gdp1990 gdp2000
+  1  100     200
+  2  150     300
+end
+let long = pivot_longer(df, stubs=["gdp"], i=id, j=year)
+summarize(long)
+"#,
+        "gdp",
+    );
+}
+
+#[test]
+fn pivot_wider_basic() {
+    assert_ok_contains(
+        "pivot_wider_basic",
+        r#"
+input df
+  id year val
+  1  1990 100
+  1  2000 200
+  2  1990 150
+  2  2000 300
+end
+let wide = pivot_wider(df, i=id, j=year, values=val)
+describe(wide)
+"#,
+        "val1990",
+    );
+}
+
+#[test]
+fn select_alias() {
+    assert_ok_contains(
+        "select_alias",
+        r#"
+input df
+  x y z
+  1 10 100
+  2 20 200
+end
+let df2 = select(df, x, z)
+describe(df2)
+"#,
+        "x",
+    );
+}
+
+#[test]
 fn print_multi_args() {
     assert_ok_contains(
         "print_multi_args",
