@@ -6065,6 +6065,40 @@ display s["y"]["mean"]
 }
 
 #[test]
+fn print_multi_args() {
+    assert_ok_contains(
+        "print_multi_args",
+        r#"
+let x = 3.14
+let y = 42
+print("x =", x, "y =", y)
+"#,
+        "x = 3.14 y = 42",
+    );
+}
+
+#[test]
+fn print_custom_sep() {
+    assert_ok_contains(
+        "print_custom_sep",
+        r#"
+print("a", "b", "c", sep=", ")
+"#,
+        "a, b, c",
+    );
+}
+
+#[test]
+fn print_empty_call() {
+    assert_ok(
+        "print_empty_call",
+        r#"
+print()
+"#,
+    );
+}
+
+#[test]
 fn codebook_basic() {
     assert_ok_contains(
         "codebook_basic",

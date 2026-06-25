@@ -20037,9 +20037,27 @@ impl Interpreter {
                 self.env.set(df, Value::DataFrame(df_val))?;
             }
 
-            Stmt::Print(expr) => {
-                let val = self.eval_expr(expr)?;
-                println!("{val}");
+            Stmt::Print(exprs, opts) => {
+                let opt_map: HashMap<String, Value> = opts
+                    .iter()
+                    .map(|o| Ok((o.name.clone(), self.eval_expr(&o.value)?)))
+                    .collect::<Result<_>>()?;
+                let sep = match opt_map.get("sep") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => " ".to_string(),
+                };
+                let end = match opt_map.get("end") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => "\n".to_string(),
+                };
+                for (i, expr) in exprs.iter().enumerate() {
+                    if i > 0 {
+                        print!("{sep}");
+                    }
+                    let val = self.eval_expr(expr)?;
+                    print!("{val}");
+                }
+                print!("{end}");
             }
 
             Stmt::Export { value, fmt, path } => {

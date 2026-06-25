@@ -29,6 +29,10 @@ impl Parser {
             .unwrap_or(&Token::Eof)
     }
 
+    fn peek_raw_at(&self, offset: usize) -> Option<&Token> {
+        self.tokens.get(self.pos + offset).map(|(t, _)| t)
+    }
+
     fn line(&self) -> usize {
         self.tokens.get(self.pos).map(|(_, l)| *l).unwrap_or(0)
     }
@@ -771,9 +775,33 @@ impl Parser {
             Token::Print => {
                 self.advance();
                 self.expect(&Token::LParen)?;
-                let expr = self.parse_expr()?;
+                let mut exprs = Vec::new();
+                let mut opts = Vec::new();
+                if self.peek() != &Token::RParen {
+                    loop {
+                        if let Some(Token::Ident(name)) = self.peek_raw_at(0).cloned() {
+                            if self.peek_raw_at(1) == Some(&Token::Eq) {
+                                self.advance();
+                                self.advance();
+                                let val = self.parse_expr()?;
+                                opts.push(Opt { name, value: val });
+                                if self.peek() == &Token::Comma {
+                                    self.advance();
+                                    continue;
+                                }
+                                break;
+                            }
+                        }
+                        exprs.push(self.parse_expr()?);
+                        if self.peek() == &Token::Comma {
+                            self.advance();
+                        } else {
+                            break;
+                        }
+                    }
+                }
                 self.expect(&Token::RParen)?;
-                Ok(Some(Stmt::Print(expr)))
+                Ok(Some(Stmt::Print(exprs, opts)))
             }
 
             Token::Export => {

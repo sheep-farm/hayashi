@@ -186,8 +186,8 @@ pub enum Stmt {
         kind: Expr,
     },
 
-    // print(expr)
-    Print(Expr),
+    // print(expr, expr, ..., sep=" ", end="\n")
+    Print(Vec<Expr>, Vec<Opt>),
 
     // export(expr, formato, "arquivo")
     Export {
