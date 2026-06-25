@@ -6491,7 +6491,6 @@ display s["mean"]
 
 #[test]
 fn generate_fn_call_result_has_new_col() {
-    // generate() como chamada de função retorna df modificado E modifica o original (por design)
     assert_ok_contains(
         "generate_fn_result",
         r#"
@@ -6507,6 +6506,45 @@ display s["mean"]
 "#,
         // mean([1,4,9]) ≈ 4.67
         "4",
+    );
+}
+
+#[test]
+fn generate_fn_call_does_not_modify_original() {
+    // generate() como função é puro: df original NÃO deve ter a coluna z
+    let (ok, out) = run_inline(r#"
+input df
+  x
+  1
+  2
+  3
+end
+let df2 = generate(df, z = x^2)
+describe(df)
+"#);
+    assert!(ok, "generate_fn_not_modify failed:\n{out}");
+    assert!(!out.contains("| z") && !out.contains("  z "),
+        "original df should not have column z after generate():\n{out}");
+}
+
+#[test]
+fn generate_fn_baseline_preserved() {
+    // cenário real: baseline e derivado coexistem independentes
+    assert_ok_contains(
+        "generate_fn_baseline",
+        r#"
+input df
+  x
+  1
+  4
+  9
+end
+let baseline = df
+let transformed = df |> generate(sq = x^2)
+let s = summarize(baseline, x)
+display s["N"]
+"#,
+        "3",
     );
 }
 
