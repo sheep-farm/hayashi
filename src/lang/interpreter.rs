@@ -4309,15 +4309,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let var_names: Vec<String> = args[1..]
-                    .iter()
-                    .map(|a| match a {
-                        Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
-                        _ => Err(HayashiError::Type(
-                            "pca: variáveis devem ser identificadores".into(),
-                        )),
-                    })
-                    .collect::<Result<_>>()?;
+                let var_names = self.resolve_var_list(&args[1..], &df)?;
                 let n = df.n_rows();
                 let k = var_names.len();
                 let n_components = match opt_map.get("n") {
@@ -4359,15 +4351,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let var_names: Vec<String> = args[1..]
-                    .iter()
-                    .map(|a| match a {
-                        Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
-                        _ => Err(HayashiError::Type(
-                            "factor: variáveis devem ser identificadores".into(),
-                        )),
-                    })
-                    .collect::<Result<_>>()?;
+                let var_names = self.resolve_var_list(&args[1..], &df)?;
                 let n = df.n_rows();
                 let k = var_names.len();
                 let n_factors = match opt_map.get("n") {
@@ -4429,15 +4413,7 @@ impl Interpreter {
                     }
                     _ => return Err(HayashiError::Type("manova: by= must be string".into())),
                 };
-                let outcome_names: Vec<String> = args[1..]
-                    .iter()
-                    .map(|a| match a {
-                        Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
-                        _ => Err(HayashiError::Type(
-                            "manova: variáveis outcomes devem ser identificadores".into(),
-                        )),
-                    })
-                    .collect::<Result<_>>()?;
+                let outcome_names = self.resolve_var_list(&args[1..], &df)?;
                 let n = df.n_rows();
                 let q = outcome_names.len();
                 let mut y_mat = ndarray::Array2::<f64>::zeros((n, q));
@@ -7441,16 +7417,7 @@ impl Interpreter {
                 };
 
                 let requested: Vec<String> = if args.len() > 1 {
-                    args[1..]
-                        .iter()
-                        .map(|a| match a {
-                            Expr::Var(name) => Ok(name.clone()),
-                            Expr::Str(s) => Ok(s.clone()),
-                            _ => Err(HayashiError::Type(
-                                "codebook() variable list must be identifiers".into(),
-                            )),
-                        })
-                        .collect::<Result<_>>()?
+                    self.resolve_var_list(&args[1..], &df)?
                 } else {
                     let mut names = df.column_names();
                     names.sort();
@@ -7780,15 +7747,7 @@ impl Interpreter {
 
                 // variáveis pedidas ou todas as numéricas
                 let names: Vec<String> = if args.len() > 1 {
-                    args[1..]
-                        .iter()
-                        .map(|a| match a {
-                            Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
-                            _ => Err(HayashiError::Type(
-                                "variable list must be identifiers".into(),
-                            )),
-                        })
-                        .collect::<Result<_>>()?
+                    self.resolve_var_list(&args[1..], &df)?
                 } else {
                     use greeners::Column;
                     let mut ns: Vec<String> = df
@@ -9219,15 +9178,7 @@ impl Interpreter {
                     }
                 };
 
-                let var_names: Vec<String> = args[1..]
-                    .iter()
-                    .map(|a| match a {
-                        Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
-                        _ => Err(HayashiError::Type(
-                            "variáveis do VECM devem ser identificadores".into(),
-                        )),
-                    })
-                    .collect::<Result<_>>()?;
+                let var_names = self.resolve_var_list(&args[1..], &df)?;
 
                 let lags = match opt_map.get("lags") {
                     Some(Value::Int(v)) => *v as usize,
@@ -9275,16 +9226,7 @@ impl Interpreter {
                     }
                 };
 
-                // args[1..]: nomes das variáveis
-                let var_names: Vec<String> = args[1..]
-                    .iter()
-                    .map(|a| match a {
-                        Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
-                        _ => Err(HayashiError::Type(
-                            "variáveis do VAR devem ser identificadores".into(),
-                        )),
-                    })
-                    .collect::<Result<_>>()?;
+                let var_names = self.resolve_var_list(&args[1..], &df)?;
 
                 let lags = match opt_map.get("lags") {
                     Some(Value::Int(v)) => *v as usize,
@@ -10034,15 +9976,7 @@ impl Interpreter {
 
                 // variáveis a agregar: args[2..] ou todas as numéricas exceto by
                 let agg_vars: Vec<String> = if args.len() > 2 {
-                    args[2..]
-                        .iter()
-                        .map(|a| match a {
-                            Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
-                            _ => Err(HayashiError::Type(
-                                "variable names must be identifiers".into(),
-                            )),
-                        })
-                        .collect::<Result<_>>()?
+                    self.resolve_var_list(&args[2..], &df)?
                 } else {
                     use greeners::Column;
                     df.column_names()
@@ -10880,13 +10814,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let sort_vars: Vec<String> = args[1..]
-                    .iter()
-                    .map(|a| match a {
-                        Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
-                        _ => Err(HayashiError::Type("sort keys must be identifiers".into())),
-                    })
-                    .collect::<Result<_>>()?;
+                let sort_vars = self.resolve_var_list(&args[1..], &df)?;
                 let desc = matches!(opt_map.get("desc"), Some(Value::Bool(true)));
 
                 // extrai chaves de ordenação
@@ -11378,17 +11306,8 @@ impl Interpreter {
                     }
                 };
 
-                // colunas a verificar: as listadas ou todas as float
                 let check: Vec<String> = if args.len() > 1 {
-                    args[1..]
-                        .iter()
-                        .map(|a| match a {
-                            Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
-                            _ => Err(HayashiError::Type(
-                                "variable names must be identifiers".into(),
-                            )),
-                        })
-                        .collect::<Result<_>>()?
+                    self.resolve_var_list(&args[1..], &df)?
                 } else {
                     use greeners::Column;
                     df.column_names()
@@ -11722,15 +11641,8 @@ impl Interpreter {
                         ))
                     }
                 };
-                let drop_names: std::collections::HashSet<String> = args[1..]
-                    .iter()
-                    .map(|a| match a {
-                        Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
-                        _ => Err(HayashiError::Type(
-                            "variable names must be identifiers".into(),
-                        )),
-                    })
-                    .collect::<Result<_>>()?;
+                let drop_names: std::collections::HashSet<String> =
+                    self.resolve_var_list(&args[1..], &df)?.into_iter().collect();
 
                 let all = df.column_names();
                 let keep: Vec<&str> = all
@@ -11859,15 +11771,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let keep_names: Vec<String> = args[1..]
-                    .iter()
-                    .map(|a| match a {
-                        Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
-                        _ => Err(HayashiError::Type(
-                            "variable names must be identifiers".into(),
-                        )),
-                    })
-                    .collect::<Result<_>>()?;
+                let keep_names = self.resolve_var_list(&args[1..], &df)?;
 
                 let refs: Vec<&str> = keep_names.iter().map(String::as_str).collect();
                 let n_before = df.column_names().len();
@@ -13338,15 +13242,7 @@ impl Interpreter {
                     Some(Value::DataFrame(d)) => d.clone(),
                     _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
-                let var_names: Vec<String> = args[1..]
-                    .iter()
-                    .map(|a| match a {
-                        Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
-                        _ => Err(HayashiError::Type(
-                            "variáveis de varma() devem ser identificadores".into(),
-                        )),
-                    })
-                    .collect::<Result<_>>()?;
+                let var_names = self.resolve_var_list(&args[1..], &df)?;
                 let p = match opt_map.get("p") {
                     Some(Value::Int(v)) => *v as usize,
                     Some(Value::Float(v)) => *v as usize,
@@ -14030,17 +13926,8 @@ impl Interpreter {
                         .collect::<Result<_>>()?,
                     Some(Value::Str(s)) => vec![s.clone()],
                     None => {
-                        // All positional args after df are var names
                         if args.len() > 1 {
-                            args[1..]
-                                .iter()
-                                .map(|a| match a {
-                                    Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
-                                    _ => Err(HayashiError::Type(
-                                        "variáveis de mice() devem ser identificadores".into(),
-                                    )),
-                                })
-                                .collect::<Result<_>>()?
+                            self.resolve_var_list(&args[1..], &df)?
                         } else {
                             return Err(HayashiError::Runtime(
                                 "mice: especifique vars=[\"x1\",\"x2\",...] ou liste variáveis após df".into()
@@ -14139,15 +14026,7 @@ impl Interpreter {
                     Some(Value::DataFrame(d)) => d.clone(),
                     _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
-                let var_names: Vec<String> = args[1..]
-                    .iter()
-                    .map(|a| match a {
-                        Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
-                        _ => Err(HayashiError::Type(
-                            "variáveis de svar() devem ser identificadores".into(),
-                        )),
-                    })
-                    .collect::<Result<_>>()?;
+                let var_names = self.resolve_var_list(&args[1..], &df)?;
                 let lags = match opt_map.get("lags") {
                     Some(Value::Int(v)) => *v as usize,
                     Some(Value::Float(v)) => *v as usize,
@@ -15147,20 +15026,7 @@ impl Interpreter {
                     Some(Value::DataFrame(d)) => d.clone(),
                     _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
-                let var_names: Vec<String> = {
-                    let mut v = Vec::new();
-                    for a in &args[1..] {
-                        match a {
-                            Expr::Var(n) | Expr::Str(n) => v.push(n.clone()),
-                            _ => {
-                                return Err(HayashiError::Type(
-                                    "args devem ser nomes de variáveis".into(),
-                                ))
-                            }
-                        }
-                    }
-                    v
-                };
+                let var_names = self.resolve_var_list(&args[1..], &df)?;
                 if var_names.is_empty() {
                     return Err(HayashiError::Runtime(
                         "tabstat: provide at least one variable".into(),
