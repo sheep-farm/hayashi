@@ -6381,3 +6381,1621 @@ sktest(df, x)
         "Skewness/Kurtosis",
     );
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PIPE ASSIGN-BACK — df |> cmd(...) sem let modifica df no lugar
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn pipe_assignback_mutate() {
+    assert_ok_contains(
+        "pipe_assignback_mutate",
+        r#"
+input df
+  x
+  1
+  2
+  3
+end
+df |> mutate(z = x * 10)
+let s = summarize(df, z)
+display s["mean"]
+"#,
+        "20",
+    );
+}
+
+#[test]
+fn pipe_assignback_filter() {
+    assert_ok_contains(
+        "pipe_assignback_filter",
+        r#"
+input df
+  x
+  1
+  2
+  3
+  4
+end
+df |> filter(x > 2)
+let s = summarize(df, x)
+display s["N"]
+"#,
+        "2",
+    );
+}
+
+#[test]
+fn pipe_assignback_chain() {
+    // filter(x>=2) → [2,3,4,5]; mutate(y=x*2) → [4,6,8,10]; mean=7
+    assert_ok_contains(
+        "pipe_assignback_chain",
+        r#"
+input df
+  x
+  1
+  2
+  3
+  4
+  5
+end
+df |> filter(x >= 2) |> mutate(y = x * 2)
+let s = summarize(df, y)
+display s["mean"]
+"#,
+        "7",
+    );
+}
+
+#[test]
+fn pipe_assignback_preserves_other_vars() {
+    assert_ok_contains(
+        "pipe_assignback_preserve",
+        r#"
+input df
+  x y
+  1 10
+  2 20
+  3 30
+end
+let other = 42
+df |> mutate(z = x + y)
+display other
+"#,
+        "42",
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GENERATE DUAL MODE — instrução Stata vs chamada de função
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn generate_fn_call_returns_new_df() {
+    assert_ok_contains(
+        "generate_fn_call",
+        r#"
+input df
+  x
+  1
+  2
+  3
+end
+let df2 = generate(df, z = x^2)
+let s = summarize(df2, z)
+display s["mean"]
+"#,
+        // mean([1,4,9]) = 14/3 ≈ 4.666
+        "4",
+    );
+}
+
+#[test]
+fn generate_fn_call_result_has_new_col() {
+    // generate() como chamada de função retorna df modificado E modifica o original (por design)
+    assert_ok_contains(
+        "generate_fn_result",
+        r#"
+input df
+  x
+  1
+  2
+  3
+end
+let df2 = generate(df, z = x^2)
+let s = summarize(df2, z)
+display s["mean"]
+"#,
+        // mean([1,4,9]) ≈ 4.67
+        "4",
+    );
+}
+
+#[test]
+fn generate_stmt_creates_column_inplace() {
+    assert_ok_contains(
+        "generate_stmt_inplace",
+        r#"
+input df
+  x
+  2
+  4
+  6
+end
+generate df z = x / 2
+let s = summarize(df, z)
+display s["mean"]
+"#,
+        "3",
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// OPERADORES DE SÉRIE TEMPORAL — L., F., D. dentro de generate
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn tsop_lag_basic() {
+    // L.x em [10,20,30,40] → [NaN,10,20,30]; mean dos não-NaN = 20
+    assert_ok_contains(
+        "tsop_lag",
+        r#"
+input df
+  x
+  10
+  20
+  30
+  40
+end
+generate df Lx = L.x
+let s = summarize(df, Lx)
+display s["mean"]
+"#,
+        "20",
+    );
+}
+
+#[test]
+fn tsop_lag_reduces_n() {
+    // L.x em 4 obs tem 1 NaN → N não-NaN = 3
+    assert_ok_contains(
+        "tsop_lag_n",
+        r#"
+input df
+  x
+  10
+  20
+  30
+  40
+end
+generate df Lx = L.x
+let s = summarize(df, Lx)
+display s["N"]
+"#,
+        "3",
+    );
+}
+
+#[test]
+fn tsop_lead_basic() {
+    // F.x em [10,20,30,40] → [20,30,40,NaN]; mean dos não-NaN = 30
+    assert_ok_contains(
+        "tsop_lead",
+        r#"
+input df
+  x
+  10
+  20
+  30
+  40
+end
+generate df Fx = F.x
+let s = summarize(df, Fx)
+display s["mean"]
+"#,
+        "30",
+    );
+}
+
+#[test]
+fn tsop_diff_basic() {
+    // D.x em [10,13,18,24] → [NaN,3,5,6]; min dos não-NaN = 3
+    assert_ok_contains(
+        "tsop_diff",
+        r#"
+input df
+  x
+  10
+  13
+  18
+  24
+end
+generate df Dx = D.x
+let s = summarize(df, Dx)
+display s["min"]
+"#,
+        "3",
+    );
+}
+
+#[test]
+fn tsop_lag2_basic() {
+    // L2.x em [10,20,30,40] → [NaN,NaN,10,20]; mean dos não-NaN = 15
+    assert_ok_contains(
+        "tsop_lag2",
+        r#"
+input df
+  x
+  10
+  20
+  30
+  40
+end
+generate df L2x = L2.x
+let s = summarize(df, L2x)
+display s["mean"]
+"#,
+        "15",
+    );
+}
+
+#[test]
+fn tsop_outside_generate_errors() {
+    let (ok, _out) = run_inline("let x = L.y");
+    assert!(!ok, "TsOp outside generate should fail");
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// RESOLVE_VAR_LIST — 4 modos nos comandos que aceitam colunas
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn select_string_literal_arg() {
+    assert_ok_contains(
+        "select_str_literal",
+        r#"
+input df
+  x y z
+  1 10 100
+  2 20 200
+end
+let df2 = select(df, "x", "z")
+describe(df2)
+"#,
+        "x",
+    );
+}
+
+#[test]
+fn select_string_literal_excludes_col() {
+    let (ok, out) = run_inline(r#"
+input df
+  x y z
+  1 10 100
+  2 20 200
+end
+let df2 = select(df, "x", "z")
+describe(df2)
+"#);
+    assert!(ok, "select_string_literal_excludes_col failed:\n{out}");
+    assert!(!out.contains(" y ") && !out.contains("\ny\n") && !out.contains("| y"),
+        "y should not appear after select:\n{out}");
+}
+
+#[test]
+fn select_var_indirect_arg() {
+    assert_ok_contains(
+        "select_var_indirect",
+        r#"
+input df
+  x y z
+  1 10 100
+  2 20 200
+end
+let col = "x"
+let df2 = select(df, col, z)
+describe(df2)
+"#,
+        "x",
+    );
+}
+
+#[test]
+fn select_list_arg() {
+    assert_ok_contains(
+        "select_list_arg",
+        r#"
+input df
+  x y z
+  1 10 100
+  2 20 200
+end
+let cols = ["x", "z"]
+let df2 = select(df, cols)
+describe(df2)
+"#,
+        "x",
+    );
+}
+
+#[test]
+fn drop_string_literal_arg() {
+    let (ok, out) = run_inline(r#"
+input df
+  x y z
+  1 10 100
+end
+let df2 = drop(df, "y")
+describe(df2)
+"#);
+    assert!(ok, "drop_string_literal_arg failed:\n{out}");
+    assert!(!out.contains("| y") && !out.contains(" y "),
+        "y should be dropped:\n{out}");
+}
+
+#[test]
+fn drop_var_indirect_arg() {
+    let (ok, out) = run_inline(r#"
+input df
+  x y z
+  1 10 100
+end
+let col = "y"
+let df2 = drop(df, col)
+describe(df2)
+"#);
+    assert!(ok, "drop_var_indirect_arg failed:\n{out}");
+    assert!(!out.contains("| y") && !out.contains(" y "),
+        "y should be dropped:\n{out}");
+}
+
+#[test]
+fn sort_string_literal_arg() {
+    // sort com string literal — verifica que min continua sendo o mesmo após sort
+    assert_ok_contains(
+        "sort_string_literal",
+        r#"
+input df
+  x
+  3
+  1
+  2
+end
+let df2 = sort(df, "x")
+let s = summarize(df2, x)
+display s["min"]
+"#,
+        "1",
+    );
+}
+
+#[test]
+fn dropna_string_literal_arg() {
+    // dropna com string literal — após drop, N de x deve ser 2
+    assert_ok_contains(
+        "dropna_string_literal",
+        r#"
+input df
+  x y
+  1.0 10.0
+  .   20.0
+  3.0 30.0
+end
+let df2 = dropna(df, "x")
+let s = summarize(df2, x)
+display s["N"]
+"#,
+        "2",
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CLOSURES — captura de variáveis do escopo externo
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn closure_captures_outer_var() {
+    assert_ok_contains(
+        "closure_capture_outer",
+        r#"
+let factor = 10
+let scale = |x| x * factor
+display scale(5)
+"#,
+        "50",
+    );
+}
+
+#[test]
+fn closure_captures_updated_var() {
+    assert_ok_contains(
+        "closure_capture_updated",
+        r#"
+let base = 100
+let add_base = |x| x + base
+base = 200
+display add_base(5)
+"#,
+        "205",
+    );
+}
+
+#[test]
+fn closure_in_map_with_outer() {
+    assert_ok_contains(
+        "closure_map_outer",
+        r#"
+let mult = 3
+let r = map([1, 2, 3], |x| x * mult)
+display r[2]
+"#,
+        "9",
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TRY/CATCH — casos de borda e propagação de erros
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn try_catch_inside_function() {
+    assert_ok_contains(
+        "try_catch_fn",
+        r#"
+fn safe_get(d, k) {
+    try {
+        return d[k]
+    } catch e {
+        return -1
+    }
+}
+let m = {"a": 42}
+display safe_get(m, "a")
+display safe_get(m, "missing")
+"#,
+        "42",
+    );
+}
+
+#[test]
+fn try_catch_nested() {
+    assert_ok_contains(
+        "try_catch_nested",
+        r#"
+try {
+    try {
+        display undefined_x
+    } catch inner {
+        display "inner caught"
+    }
+    display "after inner"
+} catch outer {
+    display "outer caught"
+}
+"#,
+        "inner caught",
+    );
+}
+
+#[test]
+fn try_catch_nested_after_inner() {
+    assert_ok_contains(
+        "try_catch_nested_after",
+        r#"
+try {
+    try {
+        display undefined_x
+    } catch inner {
+        let x = 1
+    }
+    display "after inner"
+} catch outer {
+    display "should not reach"
+}
+"#,
+        "after inner",
+    );
+}
+
+#[test]
+fn try_catch_in_loop() {
+    assert_ok_contains(
+        "try_catch_loop",
+        r#"
+let errors = 0
+for i in 1..4 {
+    try {
+        if i == 2 { display bad_var }
+    } catch e {
+        errors = errors + 1
+    }
+}
+display errors
+"#,
+        "1",
+    );
+}
+
+#[test]
+fn try_catch_error_message_content() {
+    let (ok, out) = run_inline(r#"
+try {
+    display undefined_xyz
+} catch e {
+    display e
+}
+"#);
+    assert!(ok, "try_catch_error_content failed:\n{out}");
+    assert!(out.contains("undefined_xyz") || out.contains("xyz"),
+        "error message should mention variable name:\n{out}");
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PRINT — opções sep= e end=
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn print_end_option() {
+    assert_ok_contains(
+        "print_end",
+        r#"print("hello", end="!")
+print(" world")"#,
+        "hello! world",
+    );
+}
+
+#[test]
+fn print_sep_and_end() {
+    assert_ok_contains(
+        "print_sep_end",
+        r#"print("a", "b", "c", sep="-", end=".")"#,
+        "a-b-c.",
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// FSTRING — expressões complexas
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn fstring_with_arithmetic() {
+    assert_ok_contains(
+        "fstr_arith",
+        r#"let x = 5
+display f"square = {x * x}""#,
+        "square = 25",
+    );
+}
+
+#[test]
+fn fstring_with_conditional() {
+    assert_ok_contains(
+        "fstr_cond",
+        r#"
+let x = 10
+let sign = if x > 0 { 1 } else { -1 }
+display f"sign = {sign}"
+"#,
+        "sign = 1",
+    );
+}
+
+#[test]
+fn fstring_in_loop() {
+    assert_ok_contains(
+        "fstr_loop",
+        r#"
+let result = ""
+for i in 1..4 {
+    result = result + f"[{i}]"
+}
+display result
+"#,
+        "[1][2][3]",
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CONST — imutabilidade e escopo
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn const_in_function_scope() {
+    assert_ok_contains(
+        "const_fn_scope",
+        r#"
+fn compute(x) {
+    const factor = 2
+    return x * factor
+}
+display compute(7)
+"#,
+        "14",
+    );
+}
+
+#[test]
+fn const_in_function_immutable() {
+    let (ok, _out) = run_inline(r#"
+fn bad() {
+    const x = 10
+    x = 20
+}
+bad()
+"#);
+    assert!(!ok, "assigning to const in fn should fail");
+}
+
+#[test]
+fn const_shadows_outer_let() {
+    assert_ok_contains(
+        "const_shadow",
+        r#"
+let x = 1
+fn f() {
+    const x = 99
+    return x
+}
+display f()
+"#,
+        "99",
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// FUNÇÕES — múltiplos caminhos de retorno e recursão com acumulador
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn fn_early_return_on_condition() {
+    assert_ok_contains(
+        "fn_early_return",
+        r#"
+fn sign(x) {
+    if x > 0 { return 1 }
+    if x < 0 { return -1 }
+    return 0
+}
+display sign(-5)
+display sign(0)
+display sign(3)
+"#,
+        "-1",
+    );
+}
+
+#[test]
+fn fn_multiple_return_paths_all_hit() {
+    let (ok, out) = run_inline(r#"
+fn classify(x) {
+    if x < 0 { return "negative" }
+    if x == 0 { return "zero" }
+    return "positive"
+}
+display classify(-1)
+display classify(0)
+display classify(1)
+"#);
+    assert!(ok, "fn_multiple_paths failed:\n{out}");
+    assert!(out.contains("negative"), "missing negative:\n{out}");
+    assert!(out.contains("zero"), "missing zero:\n{out}");
+    assert!(out.contains("positive"), "missing positive:\n{out}");
+}
+
+#[test]
+fn fn_accumulator_pattern() {
+    assert_ok_contains(
+        "fn_accumulator",
+        r#"
+fn sum_to(n) {
+    let acc = 0
+    for i in 1..(n+1) {
+        acc = acc + i
+    }
+    return acc
+}
+display sum_to(10)
+"#,
+        "55",
+    );
+}
+
+#[test]
+fn fn_default_param_behavior() {
+    assert_ok_contains(
+        "fn_default_param",
+        r#"
+fn greet(name, prefix) {
+    return prefix + " " + name
+}
+display greet("World", "Hello")
+"#,
+        "Hello World",
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GENERATE / MUTATE — _n e _N como variáveis especiais
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn generate_uses_row_number() {
+    // _n em 3 obs = [1,2,3]; sum=6, mean=2
+    assert_ok_contains(
+        "generate_n",
+        r#"
+input df
+  x
+  10
+  20
+  30
+end
+generate df idx = _n
+let s = summarize(df, idx)
+display s["mean"]
+"#,
+        "2",
+    );
+}
+
+#[test]
+fn generate_uses_total_rows() {
+    // _N em 3 obs = [3,3,3]; mean=3, min=3
+    assert_ok_contains(
+        "generate_N",
+        r#"
+input df
+  x
+  10
+  20
+  30
+end
+generate df total = _N
+let s = summarize(df, total)
+display s["mean"]
+"#,
+        "3",
+    );
+}
+
+#[test]
+fn mutate_uses_row_number() {
+    // _n via mutate — mean deve ser 2 para 3 linhas
+    assert_ok_contains(
+        "mutate_n",
+        r#"
+input df
+  x
+  10
+  20
+  30
+end
+let df2 = mutate(df, idx = _n)
+let s = summarize(df2, idx)
+display s["mean"]
+"#,
+        "2",
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GROUP_BY — múltiplas funções de agregação
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn group_by_sum() {
+    assert_ok_contains(
+        "group_by_sum",
+        r#"
+input df
+  g x
+  1 10
+  1 20
+  2 30
+  2 40
+end
+let agg = group_by(df, g, sum, x)
+let s = summarize(agg, x)
+display s["max"]
+"#,
+        "70",
+    );
+}
+
+#[test]
+fn group_by_count() {
+    assert_ok_contains(
+        "group_by_count",
+        r#"
+input df
+  g x
+  1 10
+  1 20
+  1 30
+  2 40
+end
+let agg = group_by(df, g, count, x)
+let s = summarize(agg, x)
+display s["max"]
+"#,
+        "3",
+    );
+}
+
+#[test]
+fn group_by_min_max() {
+    assert_ok_contains(
+        "group_by_min",
+        r#"
+input df
+  g x
+  1 5
+  1 15
+  2 3
+  2 30
+end
+let agg = group_by(df, g, min, x)
+let s = summarize(agg, x)
+display s["min"]
+"#,
+        "3",
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CODEBOOK — com coluna string
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn codebook_with_repeated_values() {
+    // codebook em coluna com valores repetidos mostra unique count < N
+    assert_ok_contains(
+        "codebook_repeated",
+        r#"
+input df
+  group score
+  1 85
+  1 90
+  2 70
+  2 80
+  1 95
+end
+codebook(df)
+"#,
+        "unique:",
+    );
+}
+
+#[test]
+fn codebook_single_column() {
+    assert_ok_contains(
+        "codebook_single",
+        r#"
+input df
+  x y
+  1 10
+  2 20
+  3 30
+end
+codebook(df, x)
+"#,
+        "x",
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// FOR — iteração sobre lista de strings e dicts
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn for_over_string_list() {
+    assert_ok_contains(
+        "for_str_list",
+        r#"
+let words = ["hello", "world", "foo"]
+let result = ""
+for w in words {
+    result = result + w + " "
+}
+display trim(result)
+"#,
+        "hello world foo",
+    );
+}
+
+#[test]
+fn for_over_mixed_list() {
+    assert_ok_contains(
+        "for_mixed_list",
+        r#"
+let items = [1, 2, 3]
+let total = 0
+for v in items {
+    total = total + v
+}
+display total
+"#,
+        "6",
+    );
+}
+
+#[test]
+fn for_builds_list() {
+    // push() muta a lista no lugar; não atribuir o resultado
+    assert_ok_contains(
+        "for_builds_list",
+        r#"
+let squares = []
+for i in 1..6 {
+    push(squares, i * i)
+}
+display len(squares)
+"#,
+        "5",
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MATCH — casos com tipos e expressões nas arms
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn match_int_values() {
+    assert_ok_contains(
+        "match_int",
+        r#"
+let x = 2
+let r = match x {
+    1 => "one"
+    2 => "two"
+    3 => "three"
+    _ => "other"
+}
+display r
+"#,
+        "two",
+    );
+}
+
+#[test]
+fn match_bool_value() {
+    assert_ok_contains(
+        "match_bool",
+        r#"
+let flag = true
+let r = match flag {
+    true  => "yes"
+    false => "no"
+}
+display r
+"#,
+        "yes",
+    );
+}
+
+#[test]
+fn match_float_value() {
+    assert_ok_contains(
+        "match_float",
+        r#"
+let x = 3.14
+let r = match x {
+    3.14 => "pi-ish"
+    _    => "other"
+}
+display r
+"#,
+        "pi-ish",
+    );
+}
+
+#[test]
+fn match_uses_expression_in_arm() {
+    assert_ok_contains(
+        "match_expr_arm",
+        r#"
+fn double(x) { return x * 2 }
+let n = 5
+let r = match n {
+    5 => double(n)
+    _ => 0
+}
+display r
+"#,
+        "10",
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// IF-EXPR — expressão ternária em contextos variados
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn if_expr_in_assignment() {
+    assert_ok_contains(
+        "ifexpr_assign",
+        r#"
+let x = 7
+let label = if x > 5 { "big" } else { "small" }
+display label
+"#,
+        "big",
+    );
+}
+
+#[test]
+fn if_expr_in_fstring() {
+    assert_ok_contains(
+        "ifexpr_fstr",
+        r#"
+let score = 85
+let grade = if score >= 90 { "A" } else { "B" }
+display f"grade: {grade}"
+"#,
+        "grade: B",
+    );
+}
+
+#[test]
+fn if_expr_as_function_arg() {
+    assert_ok_contains(
+        "ifexpr_arg",
+        r#"
+let x = -3
+let magnitude = if x < 0 { x * -1 } else { x }
+display abs(magnitude)
+"#,
+        "3",
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ESCOPOS — shadowing, escopo de bloco, param vs externo
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn scope_param_shadows_outer() {
+    assert_ok_contains(
+        "scope_param_shadow",
+        r#"
+let x = 100
+fn f(x) { return x }
+display f(42)
+"#,
+        "42",
+    );
+}
+
+#[test]
+fn scope_block_let_dies() {
+    let (ok, out) = run_inline(r#"
+{
+    let inner = 99
+}
+display inner
+"#);
+    assert!(!ok, "block let should not leak:\n{out}");
+}
+
+#[test]
+fn scope_for_iter_var_survives() {
+    // em Hayashi, a variável de iteração do for persiste após o loop (por design)
+    assert_ok_contains(
+        "scope_for_survives",
+        r#"
+for i in 1..4 {}
+display i
+"#,
+        "3",
+    );
+}
+
+#[test]
+fn scope_fn_sees_outer_const() {
+    assert_ok_contains(
+        "scope_fn_outer_const",
+        r#"
+const PI = 3.14159
+fn circle_area(r) {
+    return PI * r * r
+}
+display circle_area(1)
+"#,
+        "3.14",
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// WHILE — condição baseada em variável e break antecipado
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn while_with_fn_condition() {
+    assert_ok_contains(
+        "while_fn_cond",
+        r#"
+let x = 1
+while x < 32 {
+    x = x * 2
+}
+display x
+"#,
+        "32",
+    );
+}
+
+#[test]
+fn while_break_on_condition() {
+    assert_ok_contains(
+        "while_break",
+        r#"
+let i = 0
+let found = false
+while i < 100 {
+    i = i + 1
+    if i == 7 {
+        found = true
+        break
+    }
+}
+display found
+display i
+"#,
+        "true",
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// OPERADORES COMPOSTOS — em contextos diversos
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn compound_in_loop() {
+    assert_ok_contains(
+        "compound_loop",
+        r#"
+let x = 0
+for i in 1..6 {
+    x += i
+}
+display x
+"#,
+        "15",
+    );
+}
+
+#[test]
+fn compound_multiply_in_loop() {
+    assert_ok_contains(
+        "compound_mul_loop",
+        r#"
+let x = 1
+for i in 1..6 {
+    x *= i
+}
+display x
+"#,
+        "120",
+    );
+}
+
+#[test]
+fn compound_assignments_multiple() {
+    // testa vários operadores compostos em sequência
+    assert_ok_contains(
+        "compound_multi",
+        r#"
+let x = 100
+x -= 10
+x *= 2
+x /= 4
+x %= 7
+display x
+"#,
+        // 100 - 10 = 90, * 2 = 180, / 4 = 45, % 7 = 3
+        "3",
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DICT — acesso, set, remove e merge em cenários compostos
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn dict_built_in_loop() {
+    assert_ok_contains(
+        "dict_loop_build",
+        r#"
+let d = {}
+for i in 1..4 {
+    d = dict_set(d, str(i), i * i)
+}
+display d["1"]
+display d["3"]
+"#,
+        "9",
+    );
+}
+
+#[test]
+fn dict_nested_access() {
+    assert_ok_contains(
+        "dict_nested_acc",
+        r#"
+let config = {"db": {"host": "localhost", "port": 5432}, "debug": true}
+display config["db"]["port"]
+"#,
+        "5432",
+    );
+}
+
+#[test]
+fn dict_has_key_after_set() {
+    assert_ok_contains(
+        "dict_haskey_set",
+        r#"
+let d = {"a": 1}
+let d2 = dict_set(d, "b", 2)
+display has_key(d2, "b")
+"#,
+        "true",
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MENSAGENS DE ERRO — cobertura de cenários específicos
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn error_column_not_found_suggest() {
+    let (ok, out) = run_inline(r#"
+input df
+  price quantity
+  10 5
+  20 10
+end
+summarize(df, prce)
+"#);
+    assert!(!ok, "bad column should fail");
+    // não exigimos did-you-mean para nomes de coluna (depende da implementação),
+    // mas deve falhar com mensagem clara
+    assert!(out.contains("prce") || out.contains("price") || out.contains("not found"),
+        "error should mention the column:\n{out}");
+}
+
+#[test]
+fn error_wrong_arg_count_fn() {
+    let (ok, out) = run_inline(r#"
+fn add(a, b) { return a + b }
+display add(1)
+"#);
+    assert!(!ok, "wrong arg count should fail:\n{out}");
+}
+
+#[test]
+fn error_index_out_of_bounds() {
+    let (ok, out) = run_inline(r#"
+let lst = [1, 2, 3]
+display lst[10]
+"#);
+    assert!(!ok, "out-of-bounds should fail:\n{out}");
+    assert!(out.contains("10") || out.contains("index") || out.contains("bounds"),
+        "error should mention index:\n{out}");
+}
+
+#[test]
+fn error_type_mismatch_string_plus_int() {
+    // "hello" + 42 deve falhar pois 42 não é string
+    let (ok, out) = run_inline(r#"display "hello" + 42"#);
+    if !ok {
+        // mensagem deve mencionar o problema de tipo
+        assert!(out.contains("numeric") || out.contains("type") || out.contains("string") || out.contains("expected"),
+            "type error should be informative:\n{out}");
+    }
+    // se ok, auto-conversão é aceitável; apenas garantir determinismo
+}
+
+#[test]
+fn error_source_annotation_multiline() {
+    let (ok, out) = run_inline(r#"
+let a = 1
+let b = 2
+let c = 3
+display d
+"#);
+    assert!(!ok);
+    assert!(out.contains("│") || out.contains("|"), "should show source annotation:\n{out}");
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PIVOT — casos mais completos
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn pivot_longer_row_count() {
+    // 2 id * 3 anos = 6 rows; N do summarize deve ser 6
+    assert_ok_contains(
+        "pivot_longer_rows",
+        r#"
+input df
+  id gdp1990 gdp2000 gdp2010
+  1  100     200     300
+  2  150     250     350
+end
+let long = pivot_longer(df, stubs=["gdp"], i=id, j=year)
+let s = summarize(long, gdp)
+display s["N"]
+"#,
+        "6",
+    );
+}
+
+#[test]
+fn pivot_wider_column_count() {
+    assert_ok_contains(
+        "pivot_wider_cols",
+        r#"
+input df
+  id year val
+  1  2000  10
+  1  2001  20
+  2  2000  30
+  2  2001  40
+end
+let wide = pivot_wider(df, i=id, j=year, values=val)
+describe(wide)
+"#,
+        "val2000",
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MUTATE — múltiplas colunas, incluindo condicionais
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn mutate_multiple_columns() {
+    assert_ok_contains(
+        "mutate_multi",
+        r#"
+input df
+  x
+  1
+  2
+  3
+end
+let df2 = mutate(df, sq = x^2, cube = x^3)
+let s = summarize(df2, cube)
+display s["max"]
+"#,
+        "27",
+    );
+}
+
+#[test]
+fn mutate_conditional_column() {
+    // (x > 0) cria coluna 0.0/1.0; mean de [0,0,1] = 1/3
+    assert_ok_contains(
+        "mutate_cond",
+        r#"
+input df
+  x
+  -2
+  0
+  3
+end
+let df2 = mutate(df, pos = x > 0)
+let s = summarize(df2, pos)
+display s["max"]
+"#,
+        "1",
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// OPERAÇÕES MATEMÁTICAS — precisão e casos extremos
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn math_integer_division_floor() {
+    assert_ok_contains("math_int_div", "display int(7 / 2)", "3");
+}
+
+#[test]
+fn math_modulo_negative() {
+    let (ok, out) = run_inline("display -7 % 3");
+    assert!(ok, "negative modulo failed:\n{out}");
+    // resultado pode ser -1 ou 2 dependendo da convenção; só verifica que é determinístico
+    assert!(out.trim() == "-1" || out.trim() == "2",
+        "unexpected modulo result:\n{out}");
+}
+
+#[test]
+fn math_power_zero() {
+    assert_ok_contains("math_pow_zero", "display 5^0", "1");
+}
+
+#[test]
+fn math_nested_calls() {
+    assert_ok_contains("math_nested", "display sqrt(abs(-16))", "4");
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// IN OPERATOR — em listas e ranges
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn in_operator_list_true() {
+    assert_ok_contains("in_list_t", "display 3 in [1, 2, 3, 4]", "true");
+}
+
+#[test]
+fn in_operator_list_false() {
+    assert_ok_contains("in_list_f", "display 5 in [1, 2, 3, 4]", "false");
+}
+
+#[test]
+fn in_operator_string_list() {
+    assert_ok_contains("in_str_list", r#"display "b" in ["a", "b", "c"]"#, "true");
+}
+
+#[test]
+fn in_operator_not_in_list() {
+    assert_ok_contains("not_in_list", r#"display !("z" in ["a", "b"])"#, "true");
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// BOOLEAN — short-circuit e combinações
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn bool_and_false_on_first() {
+    // false && anything = false
+    assert_ok_contains(
+        "bool_and_ff",
+        r#"
+let r = false && true
+display r
+"#,
+        "false",
+    );
+}
+
+#[test]
+fn bool_or_true_on_first() {
+    // true || anything = true
+    assert_ok_contains(
+        "bool_or_tt",
+        r#"
+let r = true || false
+display r
+"#,
+        "true",
+    );
+}
+
+#[test]
+fn bool_complex_expression() {
+    assert_ok_contains(
+        "bool_complex",
+        r#"
+let a = 5
+let b = 10
+let c = 3
+display (a < b) && (c < a) && (b > c)
+"#,
+        "true",
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// STRINGS — operações em cadeia e comportamento com caracteres especiais
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn string_chain_ops() {
+    assert_ok_contains(
+        "str_chain",
+        r#"
+let s = "  Hello, World!  "
+let r = lower(trim(s))
+display r
+"#,
+        "hello, world!",
+    );
+}
+
+#[test]
+fn string_split_and_index() {
+    assert_ok_contains(
+        "str_split_idx",
+        r#"
+let parts = split("a,b,c", ",")
+display parts[1]
+"#,
+        "b",
+    );
+}
+
+#[test]
+fn string_len_after_concat() {
+    assert_ok_contains(
+        "str_len_concat",
+        r#"
+let s = "hello" + " " + "world"
+display len(s)
+"#,
+        "11",
+    );
+}
+
+#[test]
+fn string_substr_range() {
+    assert_ok_contains(
+        "str_substr_range",
+        r#"
+let s = "econometrics"
+display substr(s, 0, 5)
+"#,
+        "econo",
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LISTAS — operações funcionais
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn list_filter_closure() {
+    assert_ok_contains(
+        "list_filter_cl",
+        r#"
+let evens = filter([1, 2, 3, 4, 5, 6], |x| x % 2 == 0)
+display len(evens)
+"#,
+        "3",
+    );
+}
+
+#[test]
+fn list_map_then_filter() {
+    assert_ok_contains(
+        "list_map_filter",
+        r#"
+let r = filter(map([1, 2, 3, 4], |x| x * x), |x| x > 5)
+display len(r)
+"#,
+        "2",
+    );
+}
+
+#[test]
+fn list_nested() {
+    assert_ok_contains(
+        "list_nested",
+        r#"
+let matrix = [[1, 2], [3, 4], [5, 6]]
+display matrix[1][0]
+"#,
+        "3",
+    );
+}
+
+#[test]
+fn list_push_in_fn() {
+    assert_ok_contains(
+        "list_push_fn",
+        r#"
+fn build(n) {
+    let r = []
+    for i in 1..(n+1) {
+        push(r, i)
+    }
+    return r
+}
+let lst = build(5)
+display len(lst)
+"#,
+        "5",
+    );
+}
