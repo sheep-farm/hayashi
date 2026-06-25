@@ -869,6 +869,8 @@ impl Interpreter {
                 Ok(self.return_value.take().unwrap_or(Value::Nil))
             }
 
+            Expr::Pipe { expr, .. } => self.eval_expr(expr),
+
             Expr::Match { expr, arms } => {
                 let scrutinee = self.eval_expr(expr)?;
                 let scrutinee_str = format!("{scrutinee}");
@@ -1212,10 +1214,10 @@ impl Interpreter {
     // ── Funções built-in ──────────────────────────────────────────────────────
 
     fn eval_call(&mut self, func: &str, args: &[Expr], opts: &[Opt]) -> Result<Value> {
-        // avalia opts primeiro (exceto "if"/"vars" — avaliados lazy pelos builtins)
+        let is_mutate = func == "mutate" || func == "generate";
         let opt_map: HashMap<String, Value> = opts
             .iter()
-            .filter(|o| o.name != "if" && o.name != "vars" && o.name != "dydx")
+            .filter(|o| o.name != "if" && o.name != "vars" && o.name != "dydx" && !is_mutate)
             .map(|o| {
                 let val = self.eval_expr(&o.value).or_else(|e| {
                     if let Expr::Var(name) = &o.value {
@@ -10101,6 +10103,311 @@ impl Interpreter {
                 Ok(Value::DataFrame(Rc::new(new_df)))
             }
 
+            // ── group_by ──────────────────────────────────────────────────────
+            // group_by(df, by_col, stat, var1, var2, ...)
+            // like collapse but by= is positional, pipe-friendly
+            "group_by" | "groupby" => {
+                if args.len() < 3 {
+                    return Err(HayashiError::Runtime(
+                        "group_by(df, by_col, stat, var1, var2, ...)".into(),
+                    ));
+                }
+                let df = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(d) => d,
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "first argument must be a DataFrame".into(),
+                        ))
+                    }
+                };
+                let by_col = match &args[1] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    other => match self.eval_expr(other)? {
+                        Value::Str(s) => s,
+                        _ => return Err(self.type_err("by column must be a name or string")),
+                    },
+                };
+                let func_name = match &args[2] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(self.type_err(
+                        "third argument must be aggregation: mean, sum, min, max, count, sd, median",
+                    )),
+                };
+                match func_name.as_str() {
+                    "mean" | "sum" | "min" | "max" | "count" | "sd" | "median" => {}
+                    other => return Err(HayashiError::Runtime(format!(
+                        "unknown aggregation '{other}' — use: mean, sum, min, max, count, sd, median"
+                    ))),
+                }
+
+                let agg_vars: Vec<String> = if args.len() > 3 {
+                    self.resolve_var_list(&args[3..], &df)?
+                } else {
+                    use greeners::Column;
+                    df.column_names()
+                        .into_iter()
+                        .filter(|n| {
+                            n != &by_col
+                                && matches!(
+                                    df.get_column(n),
+                                    Ok(Column::Float(_)) | Ok(Column::Int(_))
+                                )
+                        })
+                        .collect()
+                };
+
+                let col_data: Vec<Vec<f64>> = agg_vars
+                    .iter()
+                    .map(|col| {
+                        use greeners::Column;
+                        match df.get_column(col) {
+                            Ok(Column::Float(a)) => Ok(a.to_vec()),
+                            Ok(Column::Int(a)) => Ok(a.iter().map(|&x| x as f64).collect()),
+                            _ => Err(self.type_err(format!("'{col}' is not numeric"))),
+                        }
+                    })
+                    .collect::<Result<_>>()?;
+
+                let by_strs = Self::col_to_strings(&df, &by_col)?;
+                let n_obs = df.n_rows();
+                let mut groups: HashMap<String, Vec<usize>> = HashMap::new();
+                for (i, v) in by_strs.iter().enumerate() {
+                    groups.entry(v.clone()).or_default().push(i);
+                }
+                let mut keys: Vec<String> = groups.keys().cloned().collect();
+                let keys_numeric = keys.iter().all(|s| s.parse::<f64>().is_ok());
+                if keys_numeric {
+                    keys.sort_by(|a, b| {
+                        a.parse::<f64>()
+                            .unwrap()
+                            .partial_cmp(&b.parse::<f64>().unwrap())
+                            .unwrap()
+                    });
+                } else {
+                    keys.sort();
+                }
+
+                let agg_fn = |vals: &[f64]| -> f64 {
+                    let n = vals.len();
+                    if n == 0 {
+                        return f64::NAN;
+                    }
+                    match func_name.as_str() {
+                        "count" => n as f64,
+                        "sum" => vals.iter().sum::<f64>(),
+                        "mean" => vals.iter().sum::<f64>() / n as f64,
+                        "min" => vals.iter().cloned().fold(f64::INFINITY, f64::min),
+                        "max" => vals.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+                        "sd" => {
+                            if n < 2 { return f64::NAN; }
+                            let m = vals.iter().sum::<f64>() / n as f64;
+                            (vals.iter().map(|x| (x - m).powi(2)).sum::<f64>() / (n - 1) as f64).sqrt()
+                        }
+                        "median" => {
+                            let mut s = vals.to_vec();
+                            s.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                            if n % 2 == 0 { (s[n / 2 - 1] + s[n / 2]) / 2.0 } else { s[n / 2] }
+                        }
+                        _ => f64::NAN,
+                    }
+                };
+
+                let mut builder = DataFrame::builder();
+                use greeners::Column;
+                if matches!(df.get_column(&by_col), Ok(Column::Float(_)) | Ok(Column::Int(_))) {
+                    let vals: Vec<f64> = keys.iter().map(|k| k.parse::<f64>().unwrap_or(f64::NAN)).collect();
+                    builder = builder.add_column(&by_col, vals);
+                } else {
+                    builder = builder.add_string(&by_col, keys.clone());
+                }
+                for (ci, col_name) in agg_vars.iter().enumerate() {
+                    let vals: Vec<f64> = keys
+                        .iter()
+                        .map(|key| {
+                            let subset: Vec<f64> = groups[key].iter().map(|&i| col_data[ci][i]).collect();
+                            agg_fn(&subset)
+                        })
+                        .collect();
+                    builder = builder.add_column(col_name, vals);
+                }
+                let new_df = builder.build().map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                if !self.capturing {
+                    println!("({} groups from {} observations)", keys.len(), n_obs);
+                }
+                Ok(Value::DataFrame(Rc::new(new_df)))
+            }
+
+            // ── pivot_longer / pivot_wider ───────────────────────────────────
+            "pivot_longer" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "pivot_longer(df, stubs=[...], i=id_col, j=time_col)".into(),
+                    ));
+                }
+                let df = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(d) => d,
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "first argument must be a DataFrame".into(),
+                        ))
+                    }
+                };
+                let i_col = match opt_map.get("i") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => return Err(HayashiError::Runtime("pivot_longer requires i=id_col".into())),
+                };
+                let j_col = match opt_map.get("j") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => return Err(HayashiError::Runtime("pivot_longer requires j=time_col".into())),
+                };
+                let stubs: Vec<String> = match opt_map.get("stubs") {
+                    Some(Value::List(lst)) => lst.iter().map(|v| match v {
+                        Value::Str(s) => Ok(s.clone()),
+                        _ => Err(HayashiError::Type("stubs must be strings".into())),
+                    }).collect::<Result<_>>()?,
+                    _ => {
+                        if args.len() > 1 {
+                            self.resolve_var_list(&args[1..], &df)?
+                        } else {
+                            return Err(HayashiError::Runtime("pivot_longer requires stubs".into()));
+                        }
+                    }
+                };
+
+                let col_names = df.column_names();
+                let mut stub_suffixes: Vec<Vec<String>> = Vec::new();
+                for stub in &stubs {
+                    let mut suffs: Vec<String> = col_names
+                        .iter()
+                        .filter(|c| c.starts_with(stub.as_str()) && *c != stub)
+                        .map(|c| c[stub.len()..].to_string())
+                        .collect();
+                    suffs.sort();
+                    if suffs.is_empty() {
+                        return Err(HayashiError::Runtime(format!(
+                            "pivot_longer: no columns with stub '{stub}' found"
+                        )));
+                    }
+                    stub_suffixes.push(suffs);
+                }
+                let time_vals = &stub_suffixes[0];
+                let n_i = df.n_rows();
+                let n_t = time_vals.len();
+                let n_long = n_i * n_t;
+
+                let mut builder = DataFrame::builder();
+                let id_data = Self::get_col_f64(&df, &i_col)?;
+                let ids: Vec<f64> = (0..n_long).map(|idx| id_data[idx / n_t]).collect();
+                builder = builder.add_column(&i_col, ids);
+
+                let time_numeric = time_vals.iter().all(|s| s.parse::<f64>().is_ok());
+                if time_numeric {
+                    let ts: Vec<f64> = (0..n_long)
+                        .map(|idx| time_vals[idx % n_t].parse::<f64>().unwrap())
+                        .collect();
+                    builder = builder.add_column(&j_col, ts);
+                } else {
+                    let ts: Vec<String> = (0..n_long)
+                        .map(|idx| time_vals[idx % n_t].clone())
+                        .collect();
+                    builder = builder.add_string(&j_col, ts);
+                }
+
+                for (si, stub) in stubs.iter().enumerate() {
+                    let suffs = &stub_suffixes[si];
+                    let mut vals = Vec::with_capacity(n_long);
+                    for i in 0..n_i {
+                        for suf in suffs {
+                            let col_name = format!("{stub}{suf}");
+                            let col = Self::get_col_f64(&df, &col_name)?;
+                            vals.push(col[i]);
+                        }
+                    }
+                    builder = builder.add_column(stub, vals);
+                }
+
+                let new_df = builder.build().map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                if !self.capturing {
+                    println!("pivot_longer: {} → {} observations", n_i, n_long);
+                }
+                Ok(Value::DataFrame(Rc::new(new_df)))
+            }
+
+            "pivot_wider" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "pivot_wider(df, i=id_col, j=time_col, values=var)".into(),
+                    ));
+                }
+                let df = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(d) => d,
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "first argument must be a DataFrame".into(),
+                        ))
+                    }
+                };
+                let i_col = match opt_map.get("i") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => return Err(HayashiError::Runtime("pivot_wider requires i=id_col".into())),
+                };
+                let j_col = match opt_map.get("j") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => return Err(HayashiError::Runtime("pivot_wider requires j=time_col".into())),
+                };
+                let val_vars: Vec<String> = if args.len() > 1 {
+                    self.resolve_var_list(&args[1..], &df)?
+                } else {
+                    match opt_map.get("values") {
+                        Some(Value::Str(s)) => vec![s.clone()],
+                        Some(Value::List(lst)) => lst.iter().map(|v| match v {
+                            Value::Str(s) => Ok(s.clone()),
+                            _ => Err(HayashiError::Type("values must be strings".into())),
+                        }).collect::<Result<_>>()?,
+                        _ => {
+                            df.column_names().into_iter().filter(|n| n != &i_col && n != &j_col).collect()
+                        }
+                    }
+                };
+
+                let id_vals = Self::get_col_f64(&df, &i_col)?;
+                let j_strs = Self::col_to_strings(&df, &j_col)?;
+
+                let mut unique_ids: Vec<f64> = id_vals.to_vec();
+                unique_ids.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                unique_ids.dedup();
+
+                let mut unique_j: Vec<String> = j_strs.clone();
+                unique_j.sort();
+                unique_j.dedup();
+
+                let n_wide = unique_ids.len();
+                let mut builder = DataFrame::builder();
+                builder = builder.add_column(&i_col, unique_ids.clone());
+
+                for var in &val_vars {
+                    let var_data = Self::get_col_f64(&df, var)?;
+                    for jv in &unique_j {
+                        let col_name = format!("{var}{jv}");
+                        let mut vals = vec![f64::NAN; n_wide];
+                        for (row, (id, j)) in id_vals.iter().zip(j_strs.iter()).enumerate() {
+                            if j == jv {
+                                if let Ok(pos) = unique_ids.binary_search_by(|a| a.partial_cmp(id).unwrap()) {
+                                    vals[pos] = var_data[row];
+                                }
+                            }
+                        }
+                        builder = builder.add_column(&col_name, vals);
+                    }
+                }
+
+                let new_df = builder.build().map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                if !self.capturing {
+                    println!("pivot_wider: {} → {} observations", df.n_rows(), n_wide);
+                }
+                Ok(Value::DataFrame(Rc::new(new_df)))
+            }
+
             // ── append ───────────────────────────────────────────────────────
             "append" => {
                 if args.len() != 2 {
@@ -11756,8 +12063,58 @@ impl Interpreter {
                 Ok(Value::DataFrame(Rc::new(new_df)))
             }
 
-            // ── keep ──────────────────────────────────────────────────────────
-            "keep" => {
+            // ── mutate / generate() ──────────────────────────────────────────
+            "mutate" | "generate" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "mutate(df, col1 = expr1, col2 = expr2, ...)".into(),
+                    ));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => Some(n.clone()),
+                    _ => None,
+                };
+                let mut df_val = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(d) => d,
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "mutate: first argument must be a DataFrame".into(),
+                        ))
+                    }
+                };
+                if opts.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "mutate: provide at least one column (e.g. mutate(df, z = x^2))".into(),
+                    ));
+                }
+                let mut generated = Vec::new();
+                for o in opts {
+                    let vals = self.eval_col_expr(&o.value, &df_val)?;
+                    let arr = ndarray::Array1::from(vals);
+                    Rc::make_mut(&mut df_val)
+                        .insert(o.name.clone(), arr)
+                        .map_err(|e: greeners::GreenersError| self.rt_err(e.to_string()))?;
+                    generated.push(o.name.clone());
+                }
+                if !self.capturing {
+                    println!(
+                        "({} obs)  {} column(s) generated: {}",
+                        df_val.n_rows(),
+                        generated.len(),
+                        generated.join(", ")
+                    );
+                }
+                // generate() modifica in-place (como o statement)
+                if func == "generate" {
+                    if let Some(name) = df_name {
+                        self.env.set(&name, Value::DataFrame(df_val.clone()))?;
+                    }
+                }
+                Ok(Value::DataFrame(df_val))
+            }
+
+            // ── keep / select ────────────────────────────────────────────────
+            "keep" | "select" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
                         "keep() requires (dataframe, var1, ...)".into(),
@@ -20382,9 +20739,16 @@ impl Interpreter {
             },
 
             Stmt::Expr(expr) => {
-                let val = self.eval_expr(expr)?;
-                if !matches!(val, Value::Nil) {
-                    println!("{val}");
+                if let Expr::Pipe { source, expr: inner } = expr {
+                    let val = self.eval_expr(inner)?;
+                    if let Expr::Var(name) = source.as_ref() {
+                        self.env.set(name, val)?;
+                    }
+                } else {
+                    let val = self.eval_expr(expr)?;
+                    if !matches!(val, Value::Nil) {
+                        println!("{val}");
+                    }
                 }
             }
         }

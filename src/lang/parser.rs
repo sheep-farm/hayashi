@@ -163,6 +163,10 @@ impl Parser {
 
     pub fn parse_expr(&mut self) -> Result<Expr> {
         let mut lhs = self.parse_or()?;
+        if self.peek() != &Token::PipeRight {
+            return Ok(lhs);
+        }
+        let source = lhs.clone();
         while self.peek() == &Token::PipeRight {
             self.advance();
             let rhs = self.parse_or()?;
@@ -192,7 +196,10 @@ impl Parser {
                 }
             };
         }
-        Ok(lhs)
+        Ok(Expr::Pipe {
+            source: Box::new(source),
+            expr: Box::new(lhs),
+        })
     }
 
     fn parse_or(&mut self) -> Result<Expr> {
@@ -587,7 +594,18 @@ impl Parser {
                 }
                 .to_string();
                 self.advance();
-                Ok(Expr::Var(name))
+                if self.peek() == &Token::LParen {
+                    self.advance();
+                    let (args, opts) = self.parse_call_args()?;
+                    self.expect(&Token::RParen)?;
+                    Ok(Expr::Call {
+                        func: name,
+                        args,
+                        opts,
+                    })
+                } else {
+                    Ok(Expr::Var(name))
+                }
             }
 
             _ => Err(HayashiError::Parse {
@@ -817,12 +835,19 @@ impl Parser {
             }
 
             Token::Generate => {
-                self.advance();
-                let df = self.expect_ident()?;
-                let varname = self.expect_ident()?;
-                self.expect(&Token::Eq)?;
-                let expr = self.parse_expr()?;
-                Ok(Some(Stmt::Generate { df, varname, expr }))
+                if self.peek_raw_at(1) == Some(&Token::LParen) {
+                    // generate(df, col = expr) — function call form
+                    let expr = self.parse_expr()?;
+                    Ok(Some(Stmt::Expr(expr)))
+                } else {
+                    // generate df var = expr — Stata statement form
+                    self.advance();
+                    let df = self.expect_ident()?;
+                    let varname = self.expect_ident()?;
+                    self.expect(&Token::Eq)?;
+                    let expr = self.parse_expr()?;
+                    Ok(Some(Stmt::Generate { df, varname, expr }))
+                }
             }
 
             Token::Predict => {
