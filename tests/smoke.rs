@@ -5953,3 +5953,214 @@ display items[1]["name"]"#,
         "B",
     );
 }
+
+#[test]
+fn summarize_returns_dict() {
+    assert_ok_contains(
+        "summarize_returns_dict",
+        r#"
+input df
+  x y
+  1 10
+  2 20
+  3 30
+end
+let s = summarize(df, x)
+display s["mean"]
+"#,
+        "2",
+    );
+}
+
+#[test]
+fn summarize_string_arg() {
+    assert_ok_contains(
+        "summarize_string_arg",
+        r#"
+input df
+  x y
+  1 10
+  2 20
+  3 30
+end
+let s = summarize(df, "x")
+display s["mean"]
+"#,
+        "2",
+    );
+}
+
+#[test]
+fn summarize_var_indirect() {
+    assert_ok_contains(
+        "summarize_var_indirect",
+        r#"
+input df
+  x y
+  1 10
+  2 20
+  3 30
+end
+let col = "x"
+let s = summarize(df, col)
+display s["mean"]
+"#,
+        "2",
+    );
+}
+
+#[test]
+fn summarize_list_arg() {
+    assert_ok_contains(
+        "summarize_list_arg",
+        r#"
+input df
+  x y
+  1 10
+  2 20
+  3 30
+end
+let s = summarize(df, ["x", "y"])
+display s["y"]["mean"]
+"#,
+        "20",
+    );
+}
+
+#[test]
+fn summarize_list_var_arg() {
+    assert_ok_contains(
+        "summarize_list_var_arg",
+        r#"
+input df
+  x y
+  1 10
+  2 20
+  3 30
+end
+let vars = ["x", "y"]
+let s = summarize(df, vars)
+display s["x"]["mean"]
+"#,
+        "2",
+    );
+}
+
+#[test]
+fn summarize_multi_returns_nested_dict() {
+    assert_ok_contains(
+        "summarize_multi_returns_nested_dict",
+        r#"
+input df
+  x y
+  1 10
+  2 20
+  3 30
+end
+let s = summarize(df, x, y)
+display s["y"]["mean"]
+"#,
+        "20",
+    );
+}
+
+#[test]
+fn codebook_basic() {
+    assert_ok_contains(
+        "codebook_basic",
+        r#"
+input df
+  x y
+  1 10
+  2 20
+  3 30
+  4 40
+  5 50
+end
+codebook(df)
+"#,
+        "unique:",
+    );
+}
+
+#[test]
+fn swilk_basic() {
+    assert_ok_contains(
+        "swilk_basic",
+        r#"
+input df
+  x
+  1.2
+  2.3
+  3.1
+  4.0
+  5.5
+  6.1
+  7.2
+  8.3
+  9.0
+  10.1
+end
+swilk(df, x)
+"#,
+        "Shapiro-Wilk",
+    );
+}
+
+#[test]
+fn sfrancia_basic() {
+    assert_ok_contains(
+        "sfrancia_basic",
+        r#"
+input df
+  x
+  1.2
+  2.3
+  3.1
+  4.0
+  5.5
+  6.1
+  7.2
+  8.3
+  9.0
+  10.1
+end
+sfrancia(df, x)
+"#,
+        "Shapiro-Francia",
+    );
+}
+
+#[test]
+fn sktest_basic() {
+    assert_ok_contains(
+        "sktest_basic",
+        r#"
+input df
+  x
+  1.2
+  2.3
+  3.1
+  4.0
+  5.5
+  6.1
+  7.2
+  8.3
+  9.0
+  10.1
+  11.0
+  12.5
+  13.3
+  14.1
+  15.0
+  16.2
+  17.8
+  18.1
+  19.5
+  20.0
+end
+sktest(df, x)
+"#,
+        "Skewness/Kurtosis",
+    );
+}

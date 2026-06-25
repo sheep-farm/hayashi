@@ -535,6 +535,7 @@ pub struct Interpreter {
     current_line: usize,
     imported: HashSet<String>,
     plugin_paths: Vec<String>,
+    capturing: bool,
 }
 
 impl Interpreter {
@@ -551,6 +552,7 @@ impl Interpreter {
             current_line: 0,
             imported: HashSet::new(),
             plugin_paths: Vec::new(),
+            capturing: false,
         }
     }
 
@@ -561,6 +563,44 @@ impl Interpreter {
         } else {
             HayashiError::Runtime(m)
         }
+    }
+
+    fn resolve_var_list(
+        &mut self,
+        args: &[Expr],
+        df: &greeners::DataFrame,
+    ) -> Result<Vec<String>> {
+        let col_names = df.column_names();
+        let mut names = Vec::new();
+        for a in args {
+            match a {
+                Expr::Str(s) => names.push(s.clone()),
+                Expr::Var(name) if col_names.contains(name) => {
+                    names.push(name.clone());
+                }
+                other => match self.eval_expr(other)? {
+                    Value::Str(s) => names.push(s),
+                    Value::List(lst) => {
+                        for v in lst.iter() {
+                            match v {
+                                Value::Str(s) => names.push(s.clone()),
+                                _ => {
+                                    return Err(self.type_err(
+                                        "variable list items must be strings",
+                                    ))
+                                }
+                            }
+                        }
+                    }
+                    _ => {
+                        return Err(self.type_err(
+                            "expected column name, string, or list of strings",
+                        ))
+                    }
+                },
+            }
+        }
+        Ok(names)
     }
 
     fn type_err(&self, msg: impl Into<String>) -> HayashiError {
@@ -7384,6 +7424,168 @@ impl Interpreter {
                 }
             }
 
+            // ── codebook ─────────────────────────────────────────────────────
+            "codebook" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "codebook(df [, var1, var2, ...])".into(),
+                    ));
+                }
+                let df = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(df) => df,
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "codebook() requires a DataFrame".into(),
+                        ))
+                    }
+                };
+
+                let requested: Vec<String> = if args.len() > 1 {
+                    args[1..]
+                        .iter()
+                        .map(|a| match a {
+                            Expr::Var(name) => Ok(name.clone()),
+                            Expr::Str(s) => Ok(s.clone()),
+                            _ => Err(HayashiError::Type(
+                                "codebook() variable list must be identifiers".into(),
+                            )),
+                        })
+                        .collect::<Result<_>>()?
+                } else {
+                    let mut names = df.column_names();
+                    names.sort();
+                    names
+                };
+
+                let sep = "─".repeat(76);
+                println!("\n{:═^76}", " Codebook ");
+
+                for name in &requested {
+                    use greeners::Column;
+                    let col = df
+                        .get_column(name)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                    println!("\n{sep}");
+                    match col {
+                        Column::Float(arr) => {
+                            let total = arr.len();
+                            let vals: Vec<f64> =
+                                arr.iter().copied().filter(|x| x.is_finite()).collect();
+                            let missing = total - vals.len();
+                            let n = vals.len();
+                            println!(
+                                "  {:<20} type: float    obs: {}    missing: {}",
+                                name, total, missing
+                            );
+                            if n > 0 {
+                                let mean = vals.iter().sum::<f64>() / n as f64;
+                                let var = vals.iter().map(|x| (x - mean).powi(2)).sum::<f64>()
+                                    / (n as f64 - 1.0).max(1.0);
+                                let sd = var.sqrt();
+                                let min = vals.iter().cloned().fold(f64::INFINITY, f64::min);
+                                let max = vals.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+                                let mut sorted = vals.clone();
+                                sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                                let pctile = |p: f64| -> f64 {
+                                    let idx = (p * (n - 1) as f64).round() as usize;
+                                    sorted[idx.min(n - 1)]
+                                };
+                                let mut unique = sorted.clone();
+                                unique.dedup();
+                                println!(
+                                    "  unique: {}    mean: {:.4}    sd: {:.4}",
+                                    unique.len(),
+                                    mean,
+                                    sd
+                                );
+                                println!(
+                                    "  min: {:.4}    p25: {:.4}    p50: {:.4}    p75: {:.4}    max: {:.4}",
+                                    min,
+                                    pctile(0.25),
+                                    pctile(0.50),
+                                    pctile(0.75),
+                                    max
+                                );
+                            }
+                        }
+                        Column::Int(arr) => {
+                            let total = arr.len();
+                            let vals: Vec<f64> = arr.iter().map(|&x| x as f64).collect();
+                            let n = vals.len();
+                            println!(
+                                "  {:<20} type: int      obs: {}    missing: 0",
+                                name, total
+                            );
+                            if n > 0 {
+                                let mean = vals.iter().sum::<f64>() / n as f64;
+                                let var = vals.iter().map(|x| (x - mean).powi(2)).sum::<f64>()
+                                    / (n as f64 - 1.0).max(1.0);
+                                let sd = var.sqrt();
+                                let min = vals.iter().cloned().fold(f64::INFINITY, f64::min);
+                                let max = vals.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+                                let mut sorted = vals.clone();
+                                sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                                let mut unique = sorted.clone();
+                                unique.dedup();
+                                println!(
+                                    "  unique: {}    mean: {:.4}    sd: {:.4}",
+                                    unique.len(),
+                                    mean,
+                                    sd
+                                );
+                                println!(
+                                    "  min: {:.0}    max: {:.0}",
+                                    min, max
+                                );
+                            }
+                        }
+                        Column::String(arr) => {
+                            let total = arr.len();
+                            let non_empty = arr.iter().filter(|s: &&String| !s.is_empty()).count();
+                            let missing = total - non_empty;
+                            let mut unique: Vec<&str> = arr.iter().map(|s: &String| s.as_str()).collect();
+                            unique.sort();
+                            unique.dedup();
+                            println!(
+                                "  {:<20} type: string   obs: {}    missing: {}",
+                                name, total, missing
+                            );
+                            println!("  unique: {}", unique.len());
+                            if unique.len() <= 10 {
+                                let examples: Vec<&str> =
+                                    unique.iter().take(10).copied().collect();
+                                println!("  values: {}", examples.join(", "));
+                            } else {
+                                let first5: Vec<&str> =
+                                    unique.iter().take(5).copied().collect();
+                                println!(
+                                    "  values: {}, ... ({} more)",
+                                    first5.join(", "),
+                                    unique.len() - 5
+                                );
+                            }
+                        }
+                        Column::Bool(arr) => {
+                            let total = arr.len();
+                            let trues = arr.iter().filter(|&&b| b).count();
+                            let falses = total - trues;
+                            println!(
+                                "  {:<20} type: bool     obs: {}    missing: 0",
+                                name, total
+                            );
+                            println!("  true: {}    false: {}", trues, falses);
+                        }
+                        _ => {
+                            println!("  {:<20} type: other", name);
+                        }
+                    }
+                }
+                println!("\n{sep}");
+                println!();
+                Ok(Value::Nil)
+            }
+
             // ── format: formata valor numérico ──────────────────────────────
             "format" | "fmt" => {
                 if args.len() < 2 {
@@ -7703,30 +7905,27 @@ impl Interpreter {
                     }
                 };
 
-                // variáveis pedidas (args[1..]) ou todas as colunas numéricas
                 let requested: Vec<String> = if args.len() > 1 {
-                    args[1..]
-                        .iter()
-                        .map(|a| match a {
-                            Expr::Var(name) => Ok(name.clone()),
-                            Expr::Str(s) => Ok(s.clone()),
-                            _ => Err(HayashiError::Type(
-                                "summarize() variable list must be identifiers".into(),
-                            )),
-                        })
-                        .collect::<Result<_>>()?
+                    self.resolve_var_list(&args[1..], &df)?
                 } else {
                     let mut names = df.column_names();
                     names.sort();
                     names
                 };
 
-                // cabeçalho
-                println!(
-                    "\n{:<16} {:>9}  {:>7}  {:>12} {:>12} {:>12} {:>12}",
-                    "Variable", "Obs", "Missing", "Mean", "Std. Dev.", "Min", "Max"
-                );
-                println!("{}", "-".repeat(91));
+                let detail = matches!(opt_map.get("detail"), Some(Value::Bool(true)))
+                    || matches!(opt_map.get("d"), Some(Value::Bool(true)));
+                let quiet = self.capturing;
+
+                if !quiet {
+                    println!(
+                        "\n{:<16} {:>9}  {:>7}  {:>12} {:>12} {:>12} {:>12}",
+                        "Variable", "Obs", "Missing", "Mean", "Std. Dev.", "Min", "Max"
+                    );
+                    println!("{}", "-".repeat(91));
+                }
+
+                let mut result_dicts: Vec<(String, HashMap<String, Value>)> = Vec::new();
 
                 for name in &requested {
                     use greeners::Column;
@@ -7747,14 +7946,18 @@ impl Interpreter {
                             (vals.len(), 0, vals)
                         }
                         _ => {
-                            println!("{:<16} {:>9}  {:>7}", name, "(non-numeric)", "");
+                            if !quiet {
+                                println!("{:<16} {:>9}  {:>7}", name, "(non-numeric)", "");
+                            }
                             continue;
                         }
                     };
 
                     let n = vals.len();
                     if n == 0 {
-                        println!("{:<16} {:>9}  {:>7}  (all missing)", name, 0, n_total);
+                        if !quiet {
+                            println!("{:<16} {:>9}  {:>7}  (all missing)", name, 0, n_total);
+                        }
                         continue;
                     }
 
@@ -7765,20 +7968,28 @@ impl Interpreter {
                     let min = vals.iter().cloned().fold(f64::INFINITY, f64::min);
                     let max = vals.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
 
-                    let miss_str = if n_missing > 0 {
-                        format!("{}", n_missing)
-                    } else {
-                        String::new()
-                    };
-                    println!(
-                        "{:<16} {:>9}  {:>7}  {:>12.4} {:>12.4} {:>12.4} {:>12.4}",
-                        name, n, miss_str, mean, sd, min, max
-                    );
+                    if !quiet {
+                        let miss_str = if n_missing > 0 {
+                            format!("{}", n_missing)
+                        } else {
+                            String::new()
+                        };
+                        println!(
+                            "{:<16} {:>9}  {:>7}  {:>12.4} {:>12.4} {:>12.4} {:>12.4}",
+                            name, n, miss_str, mean, sd, min, max
+                        );
+                    }
 
-                    // detail: percentis, skewness, kurtosis
-                    if matches!(opt_map.get("detail"), Some(Value::Bool(true)))
-                        || matches!(opt_map.get("d"), Some(Value::Bool(true)))
-                    {
+                    let mut d = HashMap::new();
+                    d.insert("N".into(), Value::Int(n as i64));
+                    d.insert("missing".into(), Value::Int(n_missing as i64));
+                    d.insert("mean".into(), Value::Float(mean));
+                    d.insert("sd".into(), Value::Float(sd));
+                    d.insert("min".into(), Value::Float(min));
+                    d.insert("max".into(), Value::Float(max));
+                    d.insert("variance".into(), Value::Float(variance));
+
+                    if detail {
                         let mut sorted = vals.clone();
                         sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
                         let pctile = |p: f64| -> f64 {
@@ -7807,23 +8018,53 @@ impl Interpreter {
                         } else {
                             f64::NAN
                         };
-                        println!("         Percentiles:");
-                        println!("          1%  {:>10.4}       Skewness  {:>10.4}", p1, skew);
-                        println!("          5%  {:>10.4}       Kurtosis  {:>10.4}", p5, kurt);
-                        println!("         10%  {:>10.4}", p10);
-                        println!(
-                            "         25%  {:>10.4}       Variance  {:>10.4}",
-                            p25, variance
-                        );
-                        println!("         50%  {:>10.4}", p50);
-                        println!("         75%  {:>10.4}", p75);
-                        println!("         90%  {:>10.4}", p90);
-                        println!("         95%  {:>10.4}", p95);
-                        println!("         99%  {:>10.4}", p99);
+                        if !quiet {
+                            println!("         Percentiles:");
+                            println!("          1%  {:>10.4}       Skewness  {:>10.4}", p1, skew);
+                            println!("          5%  {:>10.4}       Kurtosis  {:>10.4}", p5, kurt);
+                            println!("         10%  {:>10.4}", p10);
+                            println!(
+                                "         25%  {:>10.4}       Variance  {:>10.4}",
+                                p25, variance
+                            );
+                            println!("         50%  {:>10.4}", p50);
+                            println!("         75%  {:>10.4}", p75);
+                            println!("         90%  {:>10.4}", p90);
+                            println!("         95%  {:>10.4}", p95);
+                            println!("         99%  {:>10.4}", p99);
+                        }
+                        d.insert("p1".into(), Value::Float(p1));
+                        d.insert("p5".into(), Value::Float(p5));
+                        d.insert("p10".into(), Value::Float(p10));
+                        d.insert("p25".into(), Value::Float(p25));
+                        d.insert("p50".into(), Value::Float(p50));
+                        d.insert("p75".into(), Value::Float(p75));
+                        d.insert("p90".into(), Value::Float(p90));
+                        d.insert("p95".into(), Value::Float(p95));
+                        d.insert("p99".into(), Value::Float(p99));
+                        d.insert("skewness".into(), Value::Float(skew));
+                        d.insert("kurtosis".into(), Value::Float(kurt));
                     }
+                    result_dicts.push((name.clone(), d));
                 }
-                println!();
-                Ok(Value::Nil)
+                if !quiet {
+                    println!();
+                }
+
+                if quiet {
+                    if result_dicts.len() == 1 {
+                        let (_, d) = result_dicts.into_iter().next().unwrap();
+                        Ok(Value::Dict(Rc::new(d)))
+                    } else {
+                        let mut outer = HashMap::new();
+                        for (name, d) in result_dicts {
+                            outer.insert(name, Value::Dict(Rc::new(d)));
+                        }
+                        Ok(Value::Dict(Rc::new(outer)))
+                    }
+                } else {
+                    Ok(Value::Nil)
+                }
             }
 
             // ── esttab ───────────────────────────────────────────────────────
@@ -14312,6 +14553,206 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // swilk(df, var) — Shapiro-Wilk test for normality
+            "swilk" | "shapiro_wilk" | "shapiro" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("swilk(df, var)".into()));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "first argument must be a DataFrame".into(),
+                        ))
+                    }
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
+                };
+                let var_name = match &args[1] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "second argument must be a variable name".into(),
+                        ))
+                    }
+                };
+                let data = Self::get_col_f64(&df, &var_name)?;
+                let res = greeners::Diagnostics::shapiro_wilk(&ndarray::Array1::from(data))
+                    .map_err(|e| self.rt_err(format!("swilk: {e}")))?;
+                let sig = if res.p_value < 0.01 {
+                    "***"
+                } else if res.p_value < 0.05 {
+                    "**"
+                } else if res.p_value < 0.10 {
+                    "*"
+                } else {
+                    ""
+                };
+                let sep = "─".repeat(56);
+                println!("\nShapiro-Wilk Test for Normality");
+                println!("{sep}");
+                println!("  H₀: {var_name} is normally distributed");
+                println!("  n = {}", res.n_obs);
+                println!("{sep}");
+                println!(
+                    "{:<26} {:>10} {:>10} {:>4}",
+                    "Test", "W", "p-value", ""
+                );
+                println!("{sep}");
+                println!(
+                    "{:<26} {:>10.6} {:>10.4} {:>4}",
+                    "Shapiro-Wilk", res.w, res.p_value, sig
+                );
+                println!("{sep}");
+                println!("(*** p<0.01  ** p<0.05  * p<0.10)");
+                println!();
+                Ok(Value::Nil)
+            }
+
+            // sfrancia(df, var) — Shapiro-Francia test for normality
+            "sfrancia" | "shapiro_francia" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("sfrancia(df, var)".into()));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "first argument must be a DataFrame".into(),
+                        ))
+                    }
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
+                };
+                let var_name = match &args[1] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "second argument must be a variable name".into(),
+                        ))
+                    }
+                };
+                let data = Self::get_col_f64(&df, &var_name)?;
+                let res = greeners::Diagnostics::shapiro_francia(&ndarray::Array1::from(data))
+                    .map_err(|e| self.rt_err(format!("sfrancia: {e}")))?;
+                let sig = if res.p_value < 0.01 {
+                    "***"
+                } else if res.p_value < 0.05 {
+                    "**"
+                } else if res.p_value < 0.10 {
+                    "*"
+                } else {
+                    ""
+                };
+                let sep = "─".repeat(56);
+                println!("\nShapiro-Francia Test for Normality");
+                println!("{sep}");
+                println!("  H₀: {var_name} is normally distributed");
+                println!("  n = {}", res.n_obs);
+                println!("{sep}");
+                println!(
+                    "{:<26} {:>10} {:>10} {:>4}",
+                    "Test", "W'", "p-value", ""
+                );
+                println!("{sep}");
+                println!(
+                    "{:<26} {:>10.6} {:>10.4} {:>4}",
+                    "Shapiro-Francia", res.w_prime, res.p_value, sig
+                );
+                println!("{sep}");
+                println!("(*** p<0.01  ** p<0.05  * p<0.10)");
+                println!();
+                Ok(Value::Nil)
+            }
+
+            // sktest(df, var) — Skewness/Kurtosis test for normality
+            "sktest" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("sktest(df, var)".into()));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "first argument must be a DataFrame".into(),
+                        ))
+                    }
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
+                };
+                let var_name = match &args[1] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "second argument must be a variable name".into(),
+                        ))
+                    }
+                };
+                let data = Self::get_col_f64(&df, &var_name)?;
+                let slice = data.as_slice().unwrap();
+                let skew = greeners::MomentHelpers::skewness(slice);
+                let kurt = greeners::MomentHelpers::kurtosis(slice);
+                let (jb, jb_p) = greeners::MomentHelpers::jarque_bera(slice);
+                let (k2, k2_p) = greeners::MomentHelpers::dagostino(slice);
+                let n = data.len();
+                let sep = "─".repeat(66);
+                println!("\nSkewness/Kurtosis Tests for Normality");
+                println!("{sep}");
+                println!("  Variable: {var_name}    n = {n}");
+                println!("{sep}");
+                println!(
+                    "{:<16} {:>10} {:>10} {:>12} {:>8}",
+                    "", "Statistic", "Value", "chi2(2)", "p-value"
+                );
+                println!("{sep}");
+                println!(
+                    "{:<16} {:>10} {:>10.4}",
+                    "Skewness", "", skew
+                );
+                println!(
+                    "{:<16} {:>10} {:>10.4}",
+                    "Kurtosis", "", kurt + 3.0
+                );
+                let jb_sig = if jb_p < 0.01 {
+                    "***"
+                } else if jb_p < 0.05 {
+                    "**"
+                } else if jb_p < 0.10 {
+                    "*"
+                } else {
+                    ""
+                };
+                let k2_sig = if k2_p < 0.01 {
+                    "***"
+                } else if k2_p < 0.05 {
+                    "**"
+                } else if k2_p < 0.10 {
+                    "*"
+                } else {
+                    ""
+                };
+                println!("{sep}");
+                println!(
+                    "{:<16} {:>10} {:>10} {:>12.4} {:>8.4} {jb_sig}",
+                    "Jarque-Bera", "JB", "", jb, jb_p
+                );
+                println!(
+                    "{:<16} {:>10} {:>10} {:>12.4} {:>8.4} {k2_sig}",
+                    "D'Agostino", "K²", "", k2, k2_p
+                );
+                println!("{sep}");
+                println!("(*** p<0.01  ** p<0.05  * p<0.10)");
+                println!("(Kurtosis shown as excess+3, i.e. Normal=3)");
+                println!();
+                Ok(Value::Nil)
+            }
+
             // harveycollier(model) — teste de linearidade via resíduos recursivos
             "harveycollier" | "harvey_collier" | "hctest" => {
                 if args.is_empty() {
@@ -18937,17 +19378,23 @@ impl Interpreter {
         self.current_line = *line;
         match stmt {
             Stmt::Let { name, value } => {
+                self.capturing = true;
                 let val = self.eval_expr(value)?;
+                self.capturing = false;
                 self.env.declare(name, val)?;
             }
 
             Stmt::Const { name, value } => {
+                self.capturing = true;
                 let val = self.eval_expr(value)?;
+                self.capturing = false;
                 self.env.declare_const(name, val);
             }
 
             Stmt::Assign { name, value } => {
+                self.capturing = true;
                 let val = self.eval_expr(value)?;
+                self.capturing = false;
                 self.env.set(name, val)?;
             }
 
