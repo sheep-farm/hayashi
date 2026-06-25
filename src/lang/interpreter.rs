@@ -12187,10 +12187,6 @@ impl Interpreter {
                         "mutate(df, col1 = expr1, col2 = expr2, ...)".into(),
                     ));
                 }
-                let df_name = match &args[0] {
-                    Expr::Var(n) => Some(n.clone()),
-                    _ => None,
-                };
                 let mut df_val = match self.eval_expr(&args[0])? {
                     Value::DataFrame(d) => d,
                     other => return Err(self.type_mismatch("DataFrame", &other)),
@@ -12216,12 +12212,6 @@ impl Interpreter {
                         generated.len(),
                         generated.join(", ")
                     );
-                }
-                // generate() modifica in-place (como o statement)
-                if func == "generate" {
-                    if let Some(name) = df_name {
-                        self.env.set(&name, Value::DataFrame(df_val.clone()))?;
-                    }
                 }
                 Ok(Value::DataFrame(df_val))
             }
