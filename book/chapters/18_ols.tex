@@ -149,6 +149,52 @@ exato até a precisão de ponto flutuante.
   valores finitos e interpretáveis.
 \end{nota}
 
+\subsection*{Efeito de má-especificação}
+
+O mesmo DGP permite verificar o que acontece ao omitir $x_2$.
+Estimam-se dois modelos e comparam-se com \lstinline{esttab}:
+
+\begin{lstlisting}[caption={Modelo correto vs.\ $x_2$ omitido}]
+// mesma semente e mesmo DGP do bloco anterior
+let m1 = ols(y ~ x1 + x2, df)   // especificação correta
+let m2 = ols(y ~ x1, df)         // x2 omitido
+esttab(m1, m2)
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+                            (1)              (2)
+                            OLS              OLS
+────────────────────────────────────────────────
+x1                    1.8000***        1.7745***
+                       (0.0000)         (0.0215)
+x2                   -0.7000***
+                       (0.0000)
+Constant              2.5000***        2.1515***
+                       (0.0000)         (0.0125)
+────────────────────────────────────────────────
+N                          1000             1000
+R²                       1.0000           0.8726
+Adj. R²                  1.0000           0.8725
+────────────────────────────────────────────────
+* p<0.10  ** p<0.05  *** p<0.01
+\end{lstlisting}
+
+\noindent O coeficiente de $x_1$ mal se altera (1.8000 $\to$ 1.7745) porque
+$x_1$ e $x_2$ são gerados independentemente — a correlação amostral é
+próxima de zero. Já a constante distorce de 2.5000 para 2.1515 porque
+absorve $\hat\beta_2\,\bar{x}_2$, e a média amostral de $x_2$ não é
+exatamente zero mesmo com $n=1000$.
+
+\begin{nota}
+  Viés de variável omitida (OVB) \emph{requer correlação} entre o regressor
+  incluído e o omitido. Sem correlação, a omissão apenas infla os erros
+  padrão e reduz o $R^2$ (perda de eficiência, não de consistência). Para o
+  tratamento formal de endogeneidade e instrumentos, veja o
+  Capítulo~\ref{cap:iv}.
+\end{nota}
+
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Erros padrão}
 
