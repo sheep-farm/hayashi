@@ -161,28 +161,12 @@ todos os argumentos simetricamente.
 
 \subsection{Nota sobre desempenho}
 
-\hayashi{} materializa ranges em listas antes da iteração — não há avaliação
-\textit{lazy}. Python, Rust, Haskell e Julia processam elemento a elemento, sem
-alocar a sequência completa.
+\lstinline{chain} materializa os ranges em uma lista antes de iterar.
+\lstinline{for i in 1..N}, por outro lado, itera diretamente sem alocar nada.
 
-Na prática, essa diferença é irrelevante para econometria aplicada. Os ranges típicos
-— lags (\lstinline{1..=20}), anos (\lstinline{1950..=2030}), iterações de bootstrap
-(\lstinline{1..=5000}) — ficam bem abaixo do limiar onde a alocação importa.
-
-\begin{center}
-\begin{tabular}{rrl}
-\toprule
-\textbf{Elementos} & \textbf{Memória} & \textbf{Relevância} \\
-\midrule
-1.000     & $\sim$24 KB  & Desprezível \\
-100.000   & $\sim$2,4 MB & Desprezível \\
-1.000.000 & $\sim$24 MB  & Começa a importar \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-Para sequências dessa magnitude em \hayashi{}, prefira \lstinline{for i in 1..N}
-diretamente — o laço itera sem materializar a lista.
+\lstinline{chain} é para sequências não-contíguas pequenas — lags, anos, grupos de
+variáveis. Esse é o seu único caso de uso legítimo. Qualquer sequência contígua é
+simplesmente \lstinline{1..N} ou \lstinline{1..=N}.
 
 \section{Dicionários}
 
