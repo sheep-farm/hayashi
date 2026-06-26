@@ -1,0 +1,117 @@
+\chapter{Variáveis Instrumentais}
+\label{cap:iv}
+
+\section{O problema de endogeneidade}
+
+OLS produz estimativas viesadas quando o regressor de interesse é correlacionado com
+o termo de erro — situação chamada de endogeneidade. As causas mais comuns são:
+
+\begin{itemize}
+  \item Variável omitida correlacionada com o regressor
+  \item Causalidade reversa (simultaneidade)
+  \item Erro de medida no regressor
+\end{itemize}
+
+A solução de Variáveis Instrumentais (IV) usa um instrumento $z$ que satisfaz duas
+condições: \textbf{relevância} ($z$ correlacionado com o regressor endógeno) e
+\textbf{exogeneidade} ($z$ não correlacionado com o erro).
+
+\section{Sintaxe}
+
+\begin{lstlisting}
+iv(fórmula_estrutural, fórmula_instrumentos, df)
+iv(fórmula_estrutural, fórmula_instrumentos, df, cov=tipo)
+\end{lstlisting}
+
+A \textit{fórmula estrutural} especifica a equação de interesse. A
+\textit{fórmula dos instrumentos} lista os instrumentos excluídos após \texttt{\textasciitilde}:
+
+\begin{lstlisting}[caption={IV básico — um instrumento}]
+// equação estrutural: y ~ x  (x é endógeno)
+// instrumento excluído: z
+iv(y ~ x, ~ z, df)
+\end{lstlisting}
+
+Para múltiplos regressores e instrumentos:
+
+\begin{lstlisting}
+iv(y ~ x1 + x2, ~ z1 + z2, df)
+\end{lstlisting}
+
+\begin{nota}
+  O modelo é identificado quando o número de instrumentos excluídos for maior ou
+  igual ao número de regressores endógenos. Com exatamente um instrumento para um
+  regressor endógeno, o estimador IV é equivalente ao 2SLS.
+\end{nota}
+
+\section{Erros padrão}
+
+As mesmas opções de \lstinline{cov=} disponíveis no OLS aplicam-se ao IV:
+
+\begin{lstlisting}
+iv(y ~ x, ~ z, df)                           // clássico
+iv(y ~ x, ~ z, df, cov=robust)              // HC1
+iv(y ~ x, ~ z, df, cov=HC3)                 // HC3
+iv(y ~ x, ~ z, df, cov=cluster, cluster=id) // clusterizado
+\end{lstlisting}
+
+\section{Capturando o resultado}
+
+\begin{lstlisting}
+let m_iv = iv(y ~ x, ~ z, df)
+\end{lstlisting}
+
+O resultado armazenado pode ser usado em \lstinline{esttab} ao lado de modelos OLS:
+
+\begin{lstlisting}[caption={OLS versus IV na mesma tabela}]
+let m_ols = ols(y ~ x, df)
+let m_iv  = iv(y ~ x, ~ z, df, cov=robust)
+
+esttab(m_ols, m_iv)
+\end{lstlisting}
+
+\section{Diagnóstico de instrumentos fracos}
+
+O teste de instrumentos fracos avalia a relevância dos instrumentos na primeira etapa.
+Instrumentos fracos inflam o viés IV e invalidam a inferência.
+
+\begin{lstlisting}[caption={Teste de instrumentos fracos}]
+weak_iv(y ~ x, ~ z, df)
+\end{lstlisting}
+
+A função reporta:
+\begin{itemize}
+  \item Estatística F da primeira etapa (por variável endógena)
+  \item Estatística de Cragg-Donald
+  \item Valores críticos de Stock \& Yogo (2005) para $L = 1\ldots10$ instrumentos
+  \item Regra de bolso de Staiger \& Stock (1997): $F > 10$
+\end{itemize}
+
+\begin{nota}
+  A mesma sintaxe de fórmulas de \lstinline{iv()} é usada em \lstinline{weak\_iv()}.
+\end{nota}
+
+\section{Valores ajustados}
+
+\begin{lstlisting}
+let m_iv = iv(y ~ x, ~ z, df)
+let yhat = predict(m_iv, "xb")    // valores ajustados da equação estrutural
+\end{lstlisting}
+
+\section{Tabela comparativa}
+
+O fluxo típico de uma análise IV compara OLS e IV para quantificar o viés de
+endogeneidade:
+
+\begin{lstlisting}[caption={Fluxo completo de análise IV}]
+load "dados.csv" as df
+
+let m_ols = ols(salario ~ educ, df)
+let m_iv  = iv(salario ~ educ, ~ distancia, df, cov=robust)
+
+// diagnóstico da primeira etapa
+weak_iv(salario ~ educ, ~ distancia, df)
+
+// tabela comparativa
+esttab(m_ols, m_iv)
+\end{lstlisting}
