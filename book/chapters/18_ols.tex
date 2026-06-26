@@ -1,6 +1,135 @@
 \chapter{Mínimos Quadrados Ordinários}
 \label{cap:ols}
 
+% ─────────────────────────────────────────────────────────────────────────────
+\section{O modelo}
+
+Considere o modelo de regressão linear:
+
+\[
+  y = X\beta + \varepsilon
+\]
+
+onde $y$ é um vetor $n \times 1$ de observações da variável dependente,
+$X$ é uma matriz $n \times k$ de regressores (a primeira coluna é
+identicamente 1, correspondendo ao intercepto), $\beta$ é um vetor
+$k \times 1$ de parâmetros desconhecidos, e $\varepsilon$ é um vetor
+$n \times 1$ de erros.
+
+\subsection*{Hipóteses de Gauss-Markov}
+
+\begin{enumerate}
+  \item \textbf{Linearidade:} $y = X\beta + \varepsilon$.
+  \item \textbf{Posto completo:} $\mathrm{rank}(X) = k$ (sem multicolinearidade perfeita).
+  \item \textbf{Exogeneidade estrita:} $E[\varepsilon \mid X] = 0$.
+  \item \textbf{Homocedasticidade:} $\mathrm{Var}[\varepsilon \mid X] = \sigma^2 I_n$.
+  \item \textbf{Não-autocorrelação:} $\mathrm{Cov}[\varepsilon_i, \varepsilon_j \mid X] = 0$ para $i \neq j$.
+\end{enumerate}
+
+Sob H1–H3 o OLS é não-viesado. Sob H1–H5 é BLUE (Teorema de Gauss-Markov).
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{O estimador}
+
+O estimador OLS minimiza a soma dos quadrados dos resíduos:
+
+\[
+  \hat{\beta} = \arg\min_{\beta}\, (y - X\beta)'(y - X\beta)
+\]
+
+A condição de primeira ordem $X'(y - X\beta) = 0$ — as \emph{equações normais} —
+tem solução analítica:
+
+\[
+  \boxed{\hat{\beta} = (X'X)^{-1}X'y}
+\]
+
+Os resíduos são $\hat{e} = y - X\hat{\beta} = M_X y$, onde
+$M_X = I - X(X'X)^{-1}X'$ é a matriz de resíduos (simétrica e idempotente).
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Propriedades}
+
+Sob H1–H3:
+\[
+  E[\hat{\beta}] = \beta
+\]
+
+Sob H1–H5, a variância condicional do estimador é:
+\[
+  \mathrm{Var}[\hat{\beta} \mid X] = \sigma^2 (X'X)^{-1}
+\]
+
+O estimador não-viesado da variância do erro é:
+\[
+  s^2 = \frac{\hat{e}'\hat{e}}{n - k}
+\]
+
+e portanto $\widehat{\mathrm{Var}}[\hat{\beta}] = s^2 (X'X)^{-1}$.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Erros padrão}
+
+\subsection*{Clássico}
+
+Assume homocedasticidade. A matriz de covariância estimada é
+$s^2(X'X)^{-1}$ e o erro padrão do coeficiente $j$ é
+$\mathrm{se}_j = s\,\sqrt{[(X'X)^{-1}]_{jj}}$.
+
+\subsection*{Robusto à heterocedasticidade}
+
+Quando $\mathrm{Var}[\varepsilon_i \mid x_i] = \sigma_i^2$ (heterocedasticidade),
+o estimador sanduíche fornece inferência válida.
+
+\textbf{HC1} (White com correção de graus de liberdade):
+\[
+  \hat{V}_{\mathrm{HC1}} = \frac{n}{n-k}\,(X'X)^{-1}
+    \!\left(\sum_{i=1}^{n} \hat{e}_i^2\, x_i x_i'\right)\!(X'X)^{-1}
+\]
+
+\textbf{HC3} (mais conservador, recomendado em amostras pequenas):
+\[
+  \hat{V}_{\mathrm{HC3}} = (X'X)^{-1}
+    \!\left(\sum_{i=1}^{n} \frac{\hat{e}_i^2}{(1 - h_{ii})^2}\, x_i x_i'\right)\!(X'X)^{-1}
+\]
+
+onde $h_{ii} = x_i'(X'X)^{-1}x_i$ é o \emph{leverage} da observação $i$.
+
+\subsection*{Clusterizado}
+
+Quando os erros são correlacionados dentro de grupos $g = 1,\ldots,G$:
+\[
+  \hat{V}_{\mathrm{cl}} = \frac{G(n-1)}{(G-1)(n-k)}\,
+    (X'X)^{-1}\!\left(\sum_{g=1}^{G} X_g'\hat{e}_g\hat{e}_g'X_g\right)\!(X'X)^{-1}
+\]
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Inferência}
+
+\subsection*{Teste $t$ sobre um coeficiente}
+
+Sob H0: $\beta_j = \beta_j^0$:
+\[
+  t_j = \frac{\hat{\beta}_j - \beta_j^0}{\mathrm{se}(\hat{\beta}_j)}
+  \;\xrightarrow{d}\; t_{n-k}
+\]
+
+\subsection*{Teste $F$ sobre restrições lineares}
+
+Para $R\beta = r$ com $q$ restrições:
+\[
+  F = \frac{(R\hat{\beta} - r)'
+       \bigl[R\,(X'X)^{-1}R'\bigr]^{-1}
+       (R\hat{\beta} - r)}{q\,s^2}
+  \;\xrightarrow{d}\; F_{q,\,n-k}
+\]
+
+\begin{nota}
+  Com erros robustos ou clusterizados, $\hat{V}$ substitui $s^2(X'X)^{-1}$
+  no cálculo do teste $F$.
+\end{nota}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Sintaxe}
 
 \begin{lstlisting}
@@ -43,20 +172,18 @@ let formula = "Y ~ X1 + X2"
 ols(formula, df)
 \end{lstlisting}
 
-\section{Erros padrão}
-
-O tipo de erro padrão é controlado pela opção \lstinline{cov=}:
+\section{Opções de erro padrão}
 
 \begin{center}
 \begin{tabular}{ll}
 \toprule
-\textbf{Opção} & \textbf{Erro padrão} \\
+\textbf{Opção} & \textbf{Fórmula} \\
 \midrule
-(padrão)              & OLS clássico (homocedasticidade) \\
-\texttt{cov=robust}   & Robusto à heterocedasticidade (HC1) \\
-\texttt{cov=HC1}      & Idem — alias explícito \\
-\texttt{cov=HC3}      & HC3 (mais conservador em amostras pequenas) \\
-\texttt{cov=cluster, cluster=col}  & Clusterizado por \texttt{col} \\
+(padrão)                            & $s^2(X'X)^{-1}$ \\
+\texttt{cov=robust}                 & HC1 (sanduíche White) \\
+\texttt{cov=HC1}                    & idem \\
+\texttt{cov=HC3}                    & HC3 (leverage-ajustado) \\
+\texttt{cov=cluster, cluster=col}   & clusterizado por \texttt{col} \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -78,40 +205,31 @@ ols(Y ~ X, df, if = grupo == 1)
 
 \section{Capturando o resultado}
 
-O resultado de \lstinline{ols()} é um objeto que pode ser atribuído a uma variável
-e usado em pós-estimação:
-
-\begin{lstlisting}
-let m = ols(Y ~ X, df)
-\end{lstlisting}
-
-Quando atribuído, \lstinline{ols()} não imprime a tabela — apenas armazena o modelo.
-Para exibir o resultado explicitamente:
-
 \begin{lstlisting}
 let m = ols(Y ~ X, df)
 display m
 \end{lstlisting}
 
+Quando atribuído, \lstinline{ols()} não imprime a tabela — apenas armazena o modelo.
+
 \section{Pós-estimação}
 
 \subsection{\texttt{predict}}
 
-Extrai valores ajustados ou resíduos do modelo:
-
 \begin{lstlisting}
 let m = ols(Y ~ X, df)
 
-let yhat = predict(m, "xb")        // valores ajustados
-let ehat = predict(m, "residuals") // resíduos
+let yhat = predict(m, "xb")        // $\hat{y} = X\hat{\beta}$
+let ehat = predict(m, "residuals") // $\hat{e} = y - X\hat{\beta}$
 \end{lstlisting}
 
-Aliases aceitos: \texttt{"fitted"} para valores ajustados; \texttt{"resid"} ou
-\texttt{"e"} para resíduos.
+Aliases aceitos: \texttt{"fitted"} para valores ajustados; \texttt{"resid"} ou \texttt{"e"} para resíduos.
 
 \subsection{\texttt{vif}}
 
-Fator de inflação da variância — diagnóstico de multicolinearidade:
+O VIF do regressor $j$ é $\mathrm{VIF}_j = 1/(1 - R_j^2)$, onde $R_j^2$ é o
+$R^2$ da regressão de $x_j$ sobre os demais regressores. Valores acima de 10
+indicam multicolinearidade severa.
 
 \begin{lstlisting}
 let m = ols(Y ~ X1 + X2 + X3, df)
@@ -120,7 +238,7 @@ vif(m)
 
 \subsection{\texttt{test}}
 
-Teste de hipótese linear sobre os coeficientes (teste F):
+Teste $F$ de restrições lineares $H_0: R\beta = r$:
 
 \begin{lstlisting}
 let m = ols(Y ~ X1 + X2 + X3, df)
@@ -129,7 +247,7 @@ test(m, X2 = 0, X3 = 0)    // H0: X2 = X3 = 0
 
 \subsection{\texttt{lincom}}
 
-Combinação linear de coeficientes com erro padrão:
+Combinação linear $c'\hat{\beta}$ com erro padrão $\sqrt{c'\hat{V}c}$:
 
 \begin{lstlisting}
 let m = ols(Y ~ X1 + X2, df)
@@ -138,7 +256,8 @@ lincom(m, X1 + X2)
 
 \subsection{\texttt{margins}}
 
-Efeitos marginais médios (para modelos não-lineares; no OLS equivale aos coeficientes):
+Efeitos marginais médios. No OLS linear $\partial E[y]/\partial x_j = \beta_j$,
+equivalente aos coeficientes.
 
 \begin{lstlisting}
 let m = ols(Y ~ X, df)
@@ -146,8 +265,6 @@ margins(m)
 \end{lstlisting}
 
 \section{Tabela de resultados com \texttt{esttab}}
-
-\lstinline{esttab} exibe múltiplos modelos em uma tabela comparativa:
 
 \begin{lstlisting}[caption={Comparação de especificações}]
 let m1 = ols(Y ~ X, df)
@@ -157,8 +274,6 @@ let m3 = ols(Y ~ X1 + X2, df)
 esttab(m1, m2, m3)
 \end{lstlisting}
 
-Alternativamente, use \lstinline{eststo} para acumular modelos e depois exibir:
-
 \begin{lstlisting}
 eststo(ols(Y ~ X, df))
 eststo(ols(Y ~ X1 + X2, df))
@@ -167,7 +282,7 @@ esttab()
 
 \section{Bootstrap}
 
-Erros padrão por bootstrap:
+Erros padrão por bootstrap — alternativa não-paramétrica:
 
 \begin{lstlisting}
 bootstrap(ols, Y ~ X, df, n=1000)

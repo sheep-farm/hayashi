@@ -1,21 +1,132 @@
 \chapter{Variáveis Instrumentais}
 \label{cap:iv}
 
+% ─────────────────────────────────────────────────────────────────────────────
 \section{O problema de endogeneidade}
 
-OLS produz estimativas viesadas quando o regressor de interesse é correlacionado com
-o termo de erro — situação chamada de endogeneidade. As causas mais comuns são:
+Considere o modelo estrutural:
+\[
+  y = X_1\beta_1 + X_2\beta_2 + \varepsilon
+\]
+
+onde $X_1$ são regressores exógenos ($n \times k_1$) e $X_2$ são regressores
+potencialmente endógenos ($n \times k_2$). O OLS é viesado e inconsistente
+quando:
+\[
+  E[\varepsilon \mid X_2] \neq 0
+  \quad\Longleftrightarrow\quad
+  \mathrm{plim}\,\hat{\beta}_{\mathrm{OLS}} \neq \beta
+\]
+
+As causas mais comuns são:
 
 \begin{itemize}
-  \item Variável omitida correlacionada com o regressor
-  \item Causalidade reversa (simultaneidade)
-  \item Erro de medida no regressor
+  \item \textbf{Variável omitida} correlacionada com $X_2$: se $y = X\beta + W\gamma + u$
+        e $W$ é omitida, então $\varepsilon = W\gamma + u$ e $\mathrm{Cov}(X_2, \varepsilon) \neq 0$.
+  \item \textbf{Simultaneidade}: $y$ e $X_2$ são determinados conjuntamente.
+  \item \textbf{Erro de medida clássico}: $X_2 = X_2^* + \nu$, com $X_2^*$
+        verdadeiro; o atenuante é $\mathrm{plim}\,\hat{\beta} = \beta \cdot \sigma_{X^*}^2/\sigma_X^2 < \beta$.
 \end{itemize}
 
-A solução de Variáveis Instrumentais (IV) usa um instrumento $z$ que satisfaz duas
-condições: \textbf{relevância} ($z$ correlacionado com o regressor endógeno) e
-\textbf{exogeneidade} ($z$ não correlacionado com o erro).
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Condições de identificação}
 
+Seja $Z$ a matriz $n \times L$ de instrumentos (incluindo $X_1$ como
+instrumentos incluídos). Um instrumento válido satisfaz duas condições:
+
+\begin{enumerate}
+  \item \textbf{Relevância:}
+        $\mathrm{rank}\bigl(E[z_i x_i']\bigr) = k$, onde $k = k_1 + k_2$.
+        Na prática: $X_2$ é correlacionado com $Z$ na primeira etapa.
+
+  \item \textbf{Exogeneidade (restrição de exclusão):}
+        $E[z_i \varepsilon_i] = 0$.
+        Os instrumentos excluídos afetam $y$ \emph{somente} através de $X_2$.
+\end{enumerate}
+
+O modelo é identificado quando $L \geq k$ (condição de ordem). Para
+$L = k$ (identificação exata) o estimador IV é único; para $L > k$
+(sobreidentificação) o 2SLS é eficiente na classe dos estimadores IV.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{O estimador 2SLS}
+
+Defina a matriz de projeção sobre o espaço coluna de $Z$:
+\[
+  P_Z = Z(Z'Z)^{-1}Z'
+\]
+
+O estimador de Mínimos Quadrados em Dois Estágios (2SLS) é:
+\[
+  \boxed{\hat{\beta}_{\mathrm{2SLS}} = (X'P_Z X)^{-1} X'P_Z y}
+\]
+
+\subsection*{Interpretação em dois estágios}
+
+\textbf{Primeiro estágio} — projeta cada coluna de $X_2$ sobre $Z$:
+\[
+  X_2 = Z\hat{\Pi} + \hat{V}, \qquad \hat{\Pi} = (Z'Z)^{-1}Z'X_2
+\]
+
+\textbf{Segundo estágio} — regride $y$ sobre $\hat{X} = P_Z X = [X_1,\, \hat{X}_2]$:
+\[
+  \hat{\beta}_{\mathrm{2SLS}} = (\hat{X}'X)^{-1}\hat{X}'y
+\]
+
+\begin{aviso}
+  Nunca execute os dois estágios manualmente como OLS sequencial. Os erros
+  padrão do segundo estágio estarão errados porque $\hat{X}_2$ é estimado.
+  Use sempre \lstinline{iv()}, que corrige a variância automaticamente.
+\end{aviso}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Variância assintótica}
+
+Sob exogeneidade e relevância, $\hat{\beta}_{\mathrm{2SLS}}$ é consistente e
+assintoticamente normal:
+\[
+  \sqrt{n}\,(\hat{\beta}_{\mathrm{2SLS}} - \beta)
+  \;\xrightarrow{d}\;
+  \mathcal{N}\!\bigl(0,\; \sigma^2 \,Q_{XZ}^{-1} Q_{ZZ} Q_{XZ}^{-1\prime}\bigr)
+\]
+
+onde $Q_{XZ} = E[x_i z_i']$ e $Q_{ZZ} = E[z_i z_i']$.
+
+O estimador da variância é:
+\[
+  \widehat{\mathrm{Var}}[\hat{\beta}_{\mathrm{2SLS}}]
+  = s^2_{\mathrm{IV}}\,(X'P_Z X)^{-1},
+  \qquad
+  s^2_{\mathrm{IV}} = \frac{\hat{e}'_{\mathrm{2SLS}}\,\hat{e}_{\mathrm{2SLS}}}{n - k}
+\]
+
+As mesmas correções sanduíche do OLS (HC1, HC3, clustered) aplicam-se
+substituindo $X$ por $\hat{X} = P_Z X$.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Instrumentos fracos}
+
+Um instrumento é fraco quando a correlação com $X_2$ é baixa. O viés do
+2SLS em relação ao OLS é aproximadamente:
+\[
+  \frac{\mathrm{Viés}_{\mathrm{2SLS}}}{\mathrm{Viés}_{\mathrm{OLS}}}
+  \approx \frac{1}{F + 1}
+\]
+
+onde $F$ é a estatística $F$ da primeira etapa. Para $F < 10$ (regra de
+Staiger \& Stock, 1997) o instrumento é considerado fraco.
+
+A \textbf{estatística de Cragg-Donald} generaliza para múltiplos
+regressores endógenos:
+\[
+  CD = \frac{n - L}{L - k_1} \cdot \lambda_{\min}
+\]
+
+onde $\lambda_{\min}$ é o menor autovalor da matriz de concentração.
+Stock \& Yogo (2005) tabelam valores críticos para viés máximo relativo
+de 5\%, 10\%, 20\% e 30\% em relação ao OLS.
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Sintaxe}
 
 \begin{lstlisting}
@@ -24,7 +135,7 @@ iv(fórmula_estrutural, fórmula_instrumentos, df, cov=tipo)
 \end{lstlisting}
 
 A \textit{fórmula estrutural} especifica a equação de interesse. A
-\textit{fórmula dos instrumentos} lista os instrumentos excluídos após \texttt{\textasciitilde}:
+\textit{fórmula dos instrumentos} lista os instrumentos excluídos após \lstinline{~}:
 
 \begin{lstlisting}[caption={IV básico — um instrumento}]
 // equação estrutural: y ~ x  (x é endógeno)
@@ -32,19 +143,19 @@ A \textit{fórmula estrutural} especifica a equação de interesse. A
 iv(y ~ x, ~ z, df)
 \end{lstlisting}
 
-Para múltiplos regressores e instrumentos:
+Para múltiplos regressores endógenos e instrumentos:
 
 \begin{lstlisting}
 iv(y ~ x1 + x2, ~ z1 + z2, df)
 \end{lstlisting}
 
 \begin{nota}
-  O modelo é identificado quando o número de instrumentos excluídos for maior ou
-  igual ao número de regressores endógenos. Com exatamente um instrumento para um
-  regressor endógeno, o estimador IV é equivalente ao 2SLS.
+  Os regressores exógenos incluídos ($X_1$) não precisam ser listados na
+  fórmula dos instrumentos — são adicionados automaticamente como seus
+  próprios instrumentos.
 \end{nota}
 
-\section{Erros padrão}
+\section{Opções de erro padrão}
 
 As mesmas opções de \lstinline{cov=} disponíveis no OLS aplicam-se ao IV:
 
@@ -59,21 +170,10 @@ iv(y ~ x, ~ z, df, cov=cluster, cluster=id) // clusterizado
 
 \begin{lstlisting}
 let m_iv = iv(y ~ x, ~ z, df)
-\end{lstlisting}
-
-O resultado armazenado pode ser usado em \lstinline{esttab} ao lado de modelos OLS:
-
-\begin{lstlisting}[caption={OLS versus IV na mesma tabela}]
-let m_ols = ols(y ~ x, df)
-let m_iv  = iv(y ~ x, ~ z, df, cov=robust)
-
-esttab(m_ols, m_iv)
+display m_iv
 \end{lstlisting}
 
 \section{Diagnóstico de instrumentos fracos}
-
-O teste de instrumentos fracos avalia a relevância dos instrumentos na primeira etapa.
-Instrumentos fracos inflam o viés IV e invalidam a inferência.
 
 \begin{lstlisting}[caption={Teste de instrumentos fracos}]
 weak_iv(y ~ x, ~ z, df)
@@ -81,27 +181,22 @@ weak_iv(y ~ x, ~ z, df)
 
 A função reporta:
 \begin{itemize}
-  \item Estatística F da primeira etapa (por variável endógena)
-  \item Estatística de Cragg-Donald
-  \item Valores críticos de Stock \& Yogo (2005) para $L = 1\ldots10$ instrumentos
-  \item Regra de bolso de Staiger \& Stock (1997): $F > 10$
+  \item Estatística $F$ da primeira etapa (por variável endógena)
+  \item Estatística de Cragg-Donald $CD$
+  \item Valores críticos de Stock \& Yogo (2005) para viés relativo de 5\%–30\%
+  \item Referência: $F > 10$ (Staiger \& Stock, 1997)
 \end{itemize}
-
-\begin{nota}
-  A mesma sintaxe de fórmulas de \lstinline{iv()} é usada em \lstinline{weak\_iv()}.
-\end{nota}
 
 \section{Valores ajustados}
 
 \begin{lstlisting}
 let m_iv = iv(y ~ x, ~ z, df)
-let yhat = predict(m_iv, "xb")    // valores ajustados da equação estrutural
+let yhat = predict(m_iv, "xb")    // $\hat{y} = X\hat{\beta}_{\mathrm{2SLS}}$
 \end{lstlisting}
 
 \section{Tabela comparativa}
 
-O fluxo típico de uma análise IV compara OLS e IV para quantificar o viés de
-endogeneidade:
+O fluxo típico quantifica o viés de endogeneidade comparando OLS e IV:
 
 \begin{lstlisting}[caption={Fluxo completo de análise IV}]
 load "dados.csv" as df
@@ -115,3 +210,7 @@ weak_iv(salario ~ educ, ~ distancia, df)
 // tabela comparativa
 esttab(m_ols, m_iv)
 \end{lstlisting}
+
+Se $\hat{\beta}^{\mathrm{IV}} > \hat{\beta}^{\mathrm{OLS}}$, o viés do OLS
+é negativo — o que é consistente com erro de medida atenuante ou com
+variável omitida que deprime tanto $X_2$ quanto $y$.
