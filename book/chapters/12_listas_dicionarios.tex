@@ -126,10 +126,63 @@ A sintaxe \lstinline{|x| expr} define uma closure sem a cerimônia de \lstinline
 let r = map(chain(1..=10, 5..9, 56..70), |n| n * 3)
 \end{lstlisting}
 
-Esta combinação — ranges como listas de primeira classe, \lstinline{chain} variádico
-e closure leve — não existe com esta sintaxe em nenhuma outra linguagem. Rust exige
-encadeamento de métodos; Haskell separa \texttt{map} e concatenação; Julia e Python
-chegam perto, mas com mais ruído sintático.
+O pipe também funciona no cabeçalho do \lstinline{for}, compondo transformações
+antes de entrar no corpo do laço:
+
+\begin{lstlisting}[caption={Pipeline no cabeçalho do for}]
+for i in chain(1..=10, 5..9, 56..70) |> filter(|n| (n % 2) == 0) {
+    display i
+}
+\end{lstlisting}
+
+\subsection{Comparação com outras linguagens}
+
+A tabela abaixo mostra como as principais linguagens expressariam o mesmo pipeline:
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Linguagem} & \textbf{Forma} \\
+\midrule
+Python  & \texttt{filter(lambda n: n\%2==0, chain(range(1,11), range(5,9), range(56,70)))} \\
+Rust    & \texttt{(1..=10).chain(5..9).chain(56..70).filter(|n| n\%2==0)} \\
+Haskell & \texttt{filter even \$ [1..10] ++ [5..8] ++ [56..69]} \\
+Julia   & \texttt{Iterators.filter(n->n\%2==0, Iterators.flatten([1:10,5:8,56:69]))} \\
+R       & \texttt{Filter(function(n) n\%\%2==0, c(1:10, 5:8, 56:69))} \\
+\midrule
+Hayashi & \texttt{chain(1..=10,5..9,56..70) |> filter(|n| (n\%2)==0)} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\hayashi{} é a única linguagem em que o pipeline é estritamente da esquerda para a
+direita, sem imports, sem namespaces e com \lstinline{chain} variádico que trata
+todos os argumentos simetricamente.
+
+\subsection{Nota sobre desempenho}
+
+\hayashi{} materializa ranges em listas antes da iteração — não há avaliação
+\textit{lazy}. Python, Rust, Haskell e Julia processam elemento a elemento, sem
+alocar a sequência completa.
+
+Na prática, essa diferença é irrelevante para econometria aplicada. Os ranges típicos
+— lags (\lstinline{1..=20}), anos (\lstinline{1950..=2030}), iterações de bootstrap
+(\lstinline{1..=5000}) — ficam bem abaixo do limiar onde a alocação importa.
+
+\begin{center}
+\begin{tabular}{rrl}
+\toprule
+\textbf{Elementos} & \textbf{Memória} & \textbf{Relevância} \\
+\midrule
+1.000     & $\sim$24 KB  & Desprezível \\
+100.000   & $\sim$2,4 MB & Desprezível \\
+1.000.000 & $\sim$24 MB  & Começa a importar \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Para sequências dessa magnitude em \hayashi{}, prefira \lstinline{for i in 1..N}
+diretamente — o laço itera sem materializar a lista.
 
 \section{Dicionários}
 
