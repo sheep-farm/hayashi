@@ -64,6 +64,54 @@ let  const  fn  return  if  else  for  in  while  break  continue
 match  try  catch  and  or  not  true  false  nil
 \end{lstlisting}
 
+\section{Estatística descritiva e momentos}
+
+Todas as funções abaixo aceitam lista pura ou coluna de DataFrame.
+As formas sobre DataFrame aceitam \lstinline{if = cond}.
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Notação} & \textbf{Função} & \textbf{Formas} \\
+\midrule
+$E(X)$
+  & \texttt{mean(df, x)}
+  & lista / df / \texttt{if =} \\
+$\mathrm{Var}(X)$
+  & \texttt{variance(df, x)}
+  & lista / df / \texttt{if =} \\
+$\mathrm{DP}(X)$
+  & \texttt{sd(df, x)}
+  & lista / df / \texttt{if =} \\
+$\mathrm{Cov}(X,Y)$
+  & \texttt{cov(df, x, y)}
+  & df / \texttt{if =} \\
+$\rho(X,Y)$
+  & \texttt{corr\_pair(df, x, y)}
+  & df / \texttt{if =} \\
+$\mathrm{Med}(X)$
+  & \texttt{median(df, x)}
+  & lista / df / \texttt{if =} \\
+$Q_p(X)$
+  & \texttt{quantile(df, x, p)}
+  & lista / df / \texttt{if =} \\
+\midrule
+\multicolumn{2}{l}{\texttt{correlate(df, x, y, ...)}}
+  & matriz de correlação (display) \\
+\multicolumn{2}{l}{\texttt{summarize(df, x)}}
+  & dict: mean, sd, variance, min, max, N \\
+\multicolumn{2}{l}{\texttt{summarize(df, x, detail=true)}}
+  & + p1..p99, skew, kurt \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{lstlisting}[style=inline]
+mean(df, renda, if = sexo == 1)         // E(renda | homens)
+cov(df, educ, salario, if = formal==1)  // Cov condicional
+quantile(df, renda, 0.9)               // percentil 90
+\end{lstlisting}
+
 \section{Funções de dados}
 
 \begin{center}
