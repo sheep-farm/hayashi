@@ -1,0 +1,114 @@
+\chapter{O Operador Pipe}
+\label{cap:pipes}
+
+\section{Sintaxe básica}
+
+O operador \lstinline{|>} passa o valor à sua esquerda como primeiro argumento da
+função à sua direita:
+
+\begin{lstlisting}
+expr |> f(args...)
+// equivale a: f(expr, args...)
+\end{lstlisting}
+
+Sem pipe:
+\begin{lstlisting}
+display sort(filter(df, renda > 0), renda desc)
+\end{lstlisting}
+
+Com pipe:
+\begin{lstlisting}
+df
+  |> filter(renda > 0)
+|> sort(renda desc)
+|> display
+\end{lstlisting}
+
+O pipe permite ler transformações na ordem em que ocorrem, da esquerda para a
+direita (ou de cima para baixo), sem aninhamento de parênteses.
+
+\section{Semântica com DataFrames}
+
+O comportamento do pipe com DataFrames segue uma regra única:
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Forma} & \textbf{Efeito} \\
+\midrule
+\texttt{df |> f(...)}          & Assign-back: df recebe o resultado \\
+\texttt{let df2 = df |> f(...)} & Funcional: df inalterado, df2 é novo \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection*{Assign-back}
+
+Quando o pipe começa com uma variável (\lstinline{df |> ...}) e não há \lstinline{let},
+o resultado é atribuído de volta à variável de origem:
+
+\begin{lstlisting}[caption={Assign-back: df é modificado}]
+load "dados.csv" as df
+
+df |> filter(ano >= 2010)
+   |> dropna
+   |> sort(renda desc)
+
+// df agora é o resultado de todas as transformações
+\end{lstlisting}
+
+\subsection*{Forma funcional com \texttt{let}}
+
+\begin{lstlisting}[caption={let preserva o original}]
+load "dados.csv" as df
+
+let df_limpo = df
+  |> filter(ano >= 2010)
+  |> dropna
+
+// df está intacto; df_limpo é a versão filtrada
+\end{lstlisting}
+
+\section{COW e pipes}
+
+A semântica COW garante que o assign-back é eficiente: enquanto \lstinline{df} e
+\lstinline{df_limpo} compartilham os mesmos dados (antes de qualquer mutação), nenhuma
+cópia de memória ocorre. A cópia real acontece apenas quando os dados divergem.
+
+\begin{lstlisting}[caption={Preservando baseline com let}]
+load "painel.csv" as df
+let baseline = df      // alias barato
+
+df |> filter(tratamento == 1)   // modifica df, não baseline
+
+display count(baseline)    // todas as obs originais
+display count(df)          // só o grupo de tratamento
+\end{lstlisting}
+
+\section{Encadeamento longo}
+
+O pipe é especialmente útil em pipelines de limpeza e transformação:
+
+\begin{lstlisting}[caption={Pipeline completo de preparação}]
+load "pnad.csv" as pnad
+
+let amostra = pnad
+  |> filter(idade >= 18 and idade <= 65)
+  |> filter(horas_trab > 0)
+  |> dropna
+  |> generate(lrenda = log(renda + 1))
+  |> generate(exp = idade - anos_estudo - 6)
+  |> generate(exp2 = exp^2)
+  |> sort(uf ano)
+
+display count(amostra)
+\end{lstlisting}
+
+\section{Pipe com closures}
+
+O operador \lstinline{|>} também funciona com closures:
+
+\begin{lstlisting}
+let resultado = 5 |> fn(x) { x^2 + 1 }
+display resultado    // 26
+\end{lstlisting}

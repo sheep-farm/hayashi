@@ -1,0 +1,126 @@
+\chapter{Referência Rápida}
+\label{apendice:referencia}
+
+\section{Tipos}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Tipo} & \textbf{Exemplo} & \textbf{Notas} \\
+\midrule
+\texttt{Int}       & \texttt{42}, \texttt{-7}      & 64 bits, com sinal \\
+\texttt{Float}     & \texttt{3.14}, \texttt{1e-5}  & IEEE 754 \\
+\texttt{Bool}      & \texttt{true}, \texttt{false} & \\
+\texttt{Nil}       & \texttt{nil}                  & Ausência de valor \\
+\texttt{String}    & \texttt{"texto"}              & UTF-8 \\
+\texttt{FString}   & \texttt{f"val: \{x\}"}        & Interpolação \\
+\texttt{List}      & \texttt{[1, 2, 3]}            & Índice base 0 \\
+\texttt{Dict}      & \texttt{\{"a": 1\}}           & Chave string ou int \\
+\texttt{DataFrame} & \texttt{load "f.csv" as df}   & COW, colunas Float \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Operadores}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Aritmético}    & \texttt{+  -  *  /  \^{}  \%} \\
+\textbf{Comparação}    & \texttt{== != > < >= <=} \\
+\textbf{Lógico}        & \texttt{and  or  not} \\
+\textbf{Pertencimento} & \texttt{in} \\
+\textbf{Pipe}          & \texttt{|>} \\
+\textbf{Atribuição}    & \texttt{=  +=  -=  *=  /=} \\
+\textbf{Range}         & \texttt{a..b} (exclusivo) \quad \texttt{a..=b} (inclusivo) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Ranges}
+
+Ranges são expressões que produzem listas de inteiros:
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\texttt{1..5}          & \texttt{[1, 2, 3, 4]} \\
+\texttt{1..=5}         & \texttt{[1, 2, 3, 4, 5]} \\
+\texttt{5..1}          & \texttt{[5, 4, 3, 2]} (decrescente) \\
+\texttt{chain(s1, s2)} & Concatena listas/ranges \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{lstlisting}[style=inline]
+chain(1..3, 9..=11)           // [1, 2, 9, 10, 11]
+map(1..=5, fn(x) { x^2 })    // [1, 4, 9, 16, 25]
+\end{lstlisting}
+
+\section{Palavras-chave}
+
+\begin{lstlisting}[style=inline]
+let  const  fn  return  if  else  for  in  while  break  continue
+match  try  catch  and  or  not  true  false  nil
+\end{lstlisting}
+
+\section{Funções de dados}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Função} & \textbf{Descrição} \\
+\midrule
+\texttt{load "f" as df}           & Carrega arquivo \\
+\texttt{save df "f"}              & Salva arquivo \\
+\texttt{describe df}              & Estrutura do DataFrame \\
+\texttt{count(df)}                & Número de linhas \\
+\texttt{count(df, cond)}          & Linhas onde cond é verdade \\
+\texttt{nrow(df)}                 & Alias de count(df) \\
+\texttt{filter(df, cond)}         & Filtra linhas \\
+\texttt{select(df, cols...)}      & Seleciona colunas \\
+\texttt{drop(df, cols...)}        & Remove colunas \\
+\texttt{mutate(df, col=expr)}     & Adiciona/modifica coluna \\
+\texttt{generate(df, col=expr)}   & Alias de mutate \\
+\texttt{sort(df, col [desc])}     & Ordena \\
+\texttt{dropna(df [, cols...])}   & Remove NaN \\
+\texttt{append(df1, df2)}         & Empilha verticalmente \\
+\texttt{group\_by(df, col, ...)}  & Agrega por grupo \\
+\texttt{pivot\_longer(...)}       & Largo → longo \\
+\texttt{pivot\_wider(...)}        & Longo → largo \\
+\texttt{summarize(df, col)}       & Estatísticas descritivas \\
+\texttt{codebook df}              & Sumário completo \\
+\texttt{tabulate df col}          & Frequências \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Operadores de séries temporais}
+
+Disponíveis dentro de \lstinline{generate df col = expr}:
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\texttt{L.x}   & Lag de ordem 1 \\
+\texttt{L2.x}  & Lag de ordem 2 \\
+\texttt{F.x}   & Lead de ordem 1 \\
+\texttt{D.x}   & Diferença primeira \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Atalhos do REPL}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Atalho}  & \textbf{Ação} \\
+\midrule
+\texttt{exit}    & Sair do REPL \\
+\texttt{Ctrl-D}  & Sair do REPL (EOF) \\
+\texttt{Ctrl-C}  & Cancelar linha atual \\
+\texttt{Ctrl-R}  & Buscar no histórico \\
+\bottomrule
+\end{tabular}
+\end{center}
