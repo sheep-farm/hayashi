@@ -2,11 +2,4 @@
 ROADMAP_INTERNAL.md
 .hay_history
 docs/book
-book/**/*.pdf
-book/**/*.aux
-book/**/*.log
-book/**/*.toc
-book/**/*.out
-book/**/*.synctex.gz
-book/**/*.fls
-book/**/*.fdb_latexmk
+book/
