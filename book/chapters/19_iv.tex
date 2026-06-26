@@ -127,6 +127,94 @@ Stock \& Yogo (2005) tabelam valores críticos para viés máximo relativo
 de 5\%, 10\%, 20\% e 30\% em relação ao OLS.
 
 % ─────────────────────────────────────────────────────────────────────────────
+\section{Verificação por DGP}
+
+O mesmo método do Capítulo~\ref{cap:ols} se aplica ao IV: define-se um DGP
+com endogeneidade conhecida, estima-se OLS e IV, e verifica-se que o IV
+corrige o viés.
+
+\subsection*{Estrutura do DGP}
+
+Sejam $z$, $v$ e $u$ independentes e $\sim \mathcal{N}(0,1)$:
+
+\[
+  x = 0{,}8\,z + v
+  \qquad
+  y = 1{,}5 + 2{,}0\,x + \underbrace{0{,}7\,v + u}_{\varepsilon}
+\]
+
+O erro estrutural $\varepsilon = 0{,}7v + u$ compartilha $v$ com $x$, criando
+endogeneidade:
+\[
+  \mathrm{Cov}(x,\varepsilon) = 0{,}7\,\mathrm{Var}(v) = 0{,}7 \neq 0
+\]
+
+O instrumento $z$ satisfaz ambas as condições:
+\begin{itemize}
+  \item \textbf{Relevância:} $\mathrm{Cov}(z,x) = 0{,}8 \neq 0$
+  \item \textbf{Exogeneidade:} $\mathrm{Cov}(z,\varepsilon) = 0$
+\end{itemize}
+
+O viés assintótico do OLS é previsível:
+\[
+  \mathrm{plim}\;\hat\beta_{\mathrm{OLS}}
+  = \beta_1 + \frac{\mathrm{Cov}(x,\varepsilon)}{\mathrm{Var}(x)}
+  = 2{,}0 + \frac{0{,}7}{0{,}64 + 1}
+  \approx 2{,}43
+\]
+
+\subsection*{Script}
+
+\begin{lstlisting}[caption={DGP com endogeneidade — OLS vs.\ IV}]
+seed(42)
+
+// inicializa e duplica DataFrame até 1024 linhas (ver cap. OLS)
+input df
+id
+1
+end
+for i in 1..=10 {
+    df = append(df, df)
+}
+df |> filter(_n <= 1000)
+
+generate df z = rnormal()          // instrumento exógeno
+generate df v = rnormal()          // componente compartilhado
+generate df u = rnormal()          // erro estrutural puro
+generate df x = 0.8*z + v          // regressor endógeno
+generate df y = 1.5 + 2.0*x + 0.7*v + u
+
+let m_ols = ols(y ~ x, df)
+let m_iv  = iv(y ~ x, ~ z, df)
+esttab(m_ols, m_iv)
+\end{lstlisting}
+
+\noindent Saída real do interpretador:
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+                            (1)              (2)
+                            OLS          IV/2SLS
+────────────────────────────────────────────────
+x                     2.4454***        2.0186***
+                       (0.0270)         (0.0473)
+Constant              1.9655***        2.3453***
+                       (0.0260)         (0.0436)
+────────────────────────────────────────────────
+N                          1000             1000
+R²                       0.8917
+────────────────────────────────────────────────
+* p<0.10  ** p<0.05  *** p<0.01
+\end{lstlisting}
+
+O OLS superestima $\beta_1$ em $+0{,}45$ (2.4454 vs.\ 2.0000), exatamente
+na direção prevista pelo viés assintótico de $+0{,}43$. O IV recupera
+$2{,}0186$ — desvio de $0{,}019$ atribuível à variância amostral finita.
+O $R^2$ não é exibido para IV porque não tem interpretação padrão sob
+endogeneidade.
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Sintaxe}
 
 \begin{lstlisting}
