@@ -68,6 +68,76 @@ O estimador não-viesado da variância do erro é:
 e portanto $\widehat{\mathrm{Var}}[\hat{\beta}] = s^2 (X'X)^{-1}$.
 
 % ─────────────────────────────────────────────────────────────────────────────
+\section{Verificação por DGP}
+
+A prova mais direta de que o estimador está correto é definir um DGP
+(\emph{data-generating process}) com parâmetros conhecidos, gerar dados
+a partir dele e verificar que o OLS os recupera.
+
+Escolha os parâmetros verdadeiros:
+\[
+  \beta_0 = 2{,}5 \qquad \beta_1 = 1{,}8 \qquad \beta_2 = -0{,}7
+\]
+
+e gere $n = 1000$ observações \emph{sem} termo de erro ($\varepsilon = 0$):
+\[
+  y_i = 2{,}5 + 1{,}8\,x_{1i} - 0{,}7\,x_{2i}
+\]
+
+Com $\varepsilon = 0$ as hipóteses de Gauss-Markov são satisfeitas de forma
+exata, e o OLS deve recuperar $(\beta_0, \beta_1, \beta_2)$ com precisão
+de máquina.
+
+\begin{lstlisting}[caption={DGP sem ruído — verificação numérica}]
+seed(42)
+
+// inicializa DataFrame e duplica até 1024 linhas
+input df
+id
+1
+end
+for i in 1..=10 {
+    df = append(df, df)
+}
+df |> filter(_n <= 1000)   // 1000 observações
+
+// gera regressores aleatórios
+generate df x1 = rnormal()
+generate df x2 = rnormal()
+
+// DGP: parâmetros verdadeiros conhecidos
+// y = 2.5 + 1.8*x1 + (-0.7)*x2  (sem erro)
+generate df y = 2.5 + 1.8*x1 + (-0.7)*x2
+
+// estima
+ols(y ~ x1 + x2, df)
+\end{lstlisting}
+
+\noindent Resultado obtido:
+
+\begin{lstlisting}[style=inline]
+Variable  |    coef   |  std err  |
+----------+-----------+-----------+
+const     |    2.5000 |    0.0000 |
+x1        |    1.8000 |    0.0000 |
+x2        |   -0.7000 |    0.0000 |
+
+R-squared: 1.0000     Adj. R-squared: 1.0000
+\end{lstlisting}
+
+O OLS recupera exatamente $(\hat\beta_0, \hat\beta_1, \hat\beta_2) = (2{,}5;\; 1{,}8;\; -0{,}7)$.
+O erro padrão zero e o $R^2 = 1$ são esperados: sem ruído, os dados estão
+exatamente sobre o hiperplano definido por $\beta$, e o estimador é numericamente
+exato até a precisão de ponto flutuante.
+
+\begin{nota}
+  A estatística $F$ aparece como \texttt{0.0} e o p-valor como \texttt{1.0}
+  neste caso — artefato numérico de $0/0$ quando $\mathrm{SQR} = 0$.
+  Em presença de ruído ($\varepsilon \neq 0$) ambas as estatísticas assumem
+  valores finitos e interpretáveis.
+\end{nota}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Erros padrão}
 
 \subsection*{Clássico}
