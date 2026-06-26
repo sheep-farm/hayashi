@@ -18,10 +18,7 @@ display sort(filter(df, renda > 0), renda desc)
 
 Com pipe:
 \begin{lstlisting}
-df
-  |> filter(renda > 0)
-|> sort(renda desc)
-|> display
+df |> filter(renda > 0) |> sort(renda desc) |> display
 \end{lstlisting}
 
 O pipe permite ler transformações na ordem em que ocorrem, da esquerda para a
