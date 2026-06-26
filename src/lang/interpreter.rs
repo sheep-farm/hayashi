@@ -535,7 +535,8 @@ impl Env {
 // ── Interpetador ──────────────────────────────────────────────────────────────
 
 const BUILTIN_NAMES: &[&str] = &[
-    "mean", "sd", "min", "max", "sum", "total", "abs", "sqrt", "ln", "log", "exp",
+    "mean", "sd", "min", "max", "sum", "total", "median", "variance", "quantile",
+    "cov", "corr_pair", "abs", "sqrt", "ln", "log", "exp",
     "sin", "cos", "tan", "asin", "acos", "atan", "atan2", "ceil", "floor", "round",
     "sign", "factorial", "comb", "int", "float", "str", "bool", "len", "typeof",
     "ols", "iv", "logit", "probit", "poisson", "nbreg", "tobit", "heckman",
@@ -1886,8 +1887,8 @@ impl Interpreter {
             // ── Agregações sobre List ─────────────────────────────────────────
             // "sum" fica para summarize(df) — Stata-style
             // "total" é a soma de uma lista numérica
-            "sum" | "mean" | "std" | "min" | "max" | "total" => {
-                // Forma 1: mean(list)
+            "sum" | "mean" | "sd" | "std" | "min" | "max" | "total" => {
+                // Forma 1: mean(list)  /  sd(list)  /  std(list)  etc.
                 // Forma 2: mean(df, var)  ou  mean(df, var, if=cond)
                 let nums: Vec<f64> = if args.len() >= 2 {
                     // forma DataFrame
@@ -1946,7 +1947,7 @@ impl Interpreter {
                     "mean" => nums.iter().sum::<f64>() / nums.len() as f64,
                     "min" => nums.iter().cloned().fold(f64::INFINITY, f64::min),
                     "max" => nums.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
-                    "std" => {
+                    "sd" | "std" => {
                         let n = nums.len() as f64;
                         let m = nums.iter().sum::<f64>() / n;
                         (nums.iter().map(|x| (x - m).powi(2)).sum::<f64>() / (n - 1.0)).sqrt()
@@ -1954,6 +1955,212 @@ impl Interpreter {
                     _ => unreachable!(),
                 };
                 Ok(Value::Float(result))
+            }
+
+            // ── Novas agregações escalares ────────────────────────────────────
+            "median" => {
+                // median(lista) ou median(df, var)
+                let nums: Vec<f64> = if args.len() >= 2 {
+                    let df_name = match &args[0] {
+                        Expr::Var(n) => n.clone(),
+                        _ => return Err(self.rt_err("median: primeiro argumento deve ser DataFrame")),
+                    };
+                    let df = match self.env.get(&df_name) {
+                        Some(Value::DataFrame(d)) => d.clone(),
+                        _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
+                    };
+                    let var_name = match &args[1] {
+                        Expr::Var(n) | Expr::Str(n) => n.clone(),
+                        _ => return Err(self.rt_err("median: segundo argumento deve ser nome de variável")),
+                    };
+                    Self::get_col_f64(&df, &var_name)?.to_vec()
+                } else if args.len() == 1 {
+                    match self.eval_expr(&args[0])? {
+                        Value::List(lst) => lst.iter().map(Self::value_as_f64).collect::<Result<_>>()?,
+                        other => return Err(self.type_err(format!("median() requires numeric list, got {other}"))),
+                    }
+                } else {
+                    return Err(self.rt_err("median() requires at least 1 argument"));
+                };
+                if nums.is_empty() {
+                    return Err(self.rt_err("median(): lista vazia"));
+                }
+                let mut sorted = nums.clone();
+                sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                let n = sorted.len();
+                let result = if n % 2 == 0 {
+                    (sorted[n / 2 - 1] + sorted[n / 2]) / 2.0
+                } else {
+                    sorted[n / 2]
+                };
+                Ok(Value::Float(result))
+            }
+
+            "variance" => {
+                // variance(lista) ou variance(df, var) — variância amostral (/ n-1)
+                let nums: Vec<f64> = if args.len() >= 2 {
+                    let df_name = match &args[0] {
+                        Expr::Var(n) => n.clone(),
+                        _ => return Err(self.rt_err("variance: primeiro argumento deve ser DataFrame")),
+                    };
+                    let df = match self.env.get(&df_name) {
+                        Some(Value::DataFrame(d)) => d.clone(),
+                        _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
+                    };
+                    let var_name = match &args[1] {
+                        Expr::Var(n) | Expr::Str(n) => n.clone(),
+                        _ => return Err(self.rt_err("variance: segundo argumento deve ser nome de variável")),
+                    };
+                    Self::get_col_f64(&df, &var_name)?.to_vec()
+                } else if args.len() == 1 {
+                    match self.eval_expr(&args[0])? {
+                        Value::List(lst) => lst.iter().map(Self::value_as_f64).collect::<Result<_>>()?,
+                        other => return Err(self.type_err(format!("variance() requires numeric list, got {other}"))),
+                    }
+                } else {
+                    return Err(self.rt_err("variance() requires at least 1 argument"));
+                };
+                let n = nums.len();
+                if n < 2 {
+                    return Err(self.rt_err("variance(): requer pelo menos 2 observações"));
+                }
+                let mean = nums.iter().sum::<f64>() / n as f64;
+                let v = nums.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n - 1) as f64;
+                Ok(Value::Float(v))
+            }
+
+            "quantile" => {
+                // quantile(df, x, p) ou quantile(lista, p)  — p em [0, 1]
+                let (nums, p) = if args.len() >= 3 {
+                    let df_name = match &args[0] {
+                        Expr::Var(n) => n.clone(),
+                        _ => return Err(self.rt_err("quantile: primeiro argumento deve ser DataFrame")),
+                    };
+                    let df = match self.env.get(&df_name) {
+                        Some(Value::DataFrame(d)) => d.clone(),
+                        _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
+                    };
+                    let var_name = match &args[1] {
+                        Expr::Var(n) | Expr::Str(n) => n.clone(),
+                        _ => return Err(self.rt_err("quantile: segundo argumento deve ser nome de variável")),
+                    };
+                    let col = Self::get_col_f64(&df, &var_name)?.to_vec();
+                    let p = match self.eval_expr(&args[2])? {
+                        Value::Float(f) => f,
+                        Value::Int(i) => i as f64,
+                        other => return Err(self.type_mismatch("Float", &other)),
+                    };
+                    (col, p)
+                } else if args.len() == 2 {
+                    let v = self.eval_expr(&args[0])?;
+                    let nums = match v {
+                        Value::List(lst) => lst.iter().map(Self::value_as_f64).collect::<Result<_>>()?,
+                        other => return Err(self.type_err(format!("quantile() requires numeric list, got {other}"))),
+                    };
+                    let p = match self.eval_expr(&args[1])? {
+                        Value::Float(f) => f,
+                        Value::Int(i) => i as f64,
+                        other => return Err(self.type_mismatch("Float", &other)),
+                    };
+                    (nums, p)
+                } else {
+                    return Err(self.rt_err("quantile(df, x, p) ou quantile(lista, p)"));
+                };
+                if !(0.0..=1.0).contains(&p) {
+                    return Err(self.rt_err("quantile(): p deve estar em [0, 1]"));
+                }
+                let mut sorted: Vec<f64> = nums.into_iter().filter(|x| x.is_finite()).collect();
+                if sorted.is_empty() {
+                    return Err(self.rt_err("quantile(): nenhum valor finito"));
+                }
+                sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                let idx = p * (sorted.len() - 1) as f64;
+                let lo = idx.floor() as usize;
+                let hi = idx.ceil() as usize;
+                let result = if lo == hi {
+                    sorted[lo]
+                } else {
+                    let w = idx - lo as f64;
+                    sorted[lo] * (1.0 - w) + sorted[hi] * w
+                };
+                Ok(Value::Float(result))
+            }
+
+            "cov" => {
+                // cov(df, x, y) — covariância amostral entre duas colunas (/ n-1)
+                if args.len() < 3 {
+                    return Err(HayashiError::Runtime("cov(df, x, y)".into()));
+                }
+                let df = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(df) => df,
+                    other => return Err(self.type_mismatch("DataFrame", &other)),
+                };
+                let x_name = match &args[1] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => return Err(self.rt_err("cov(): segundo argumento deve ser nome de variável")),
+                };
+                let y_name = match &args[2] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => return Err(self.rt_err("cov(): terceiro argumento deve ser nome de variável")),
+                };
+                let x_col = Self::get_col_f64(&df, &x_name)?;
+                let y_col = Self::get_col_f64(&df, &y_name)?;
+                let n = x_col.len();
+                if n != y_col.len() {
+                    return Err(self.rt_err("cov(): colunas com comprimentos diferentes"));
+                }
+                if n < 2 {
+                    return Err(self.rt_err("cov(): requer pelo menos 2 observações"));
+                }
+                let mx = x_col.iter().sum::<f64>() / n as f64;
+                let my = y_col.iter().sum::<f64>() / n as f64;
+                let c = x_col.iter().zip(y_col.iter())
+                    .map(|(&xi, &yi)| (xi - mx) * (yi - my))
+                    .sum::<f64>() / (n - 1) as f64;
+                Ok(Value::Float(c))
+            }
+
+            "corr_pair" => {
+                // corr_pair(df, x, y) — correlação de Pearson escalar entre duas colunas
+                if args.len() < 3 {
+                    return Err(HayashiError::Runtime("corr_pair(df, x, y)".into()));
+                }
+                let df = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(df) => df,
+                    other => return Err(self.type_mismatch("DataFrame", &other)),
+                };
+                let x_name = match &args[1] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => return Err(self.rt_err("corr_pair(): segundo argumento deve ser nome de variável")),
+                };
+                let y_name = match &args[2] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => return Err(self.rt_err("corr_pair(): terceiro argumento deve ser nome de variável")),
+                };
+                let x_col = Self::get_col_f64(&df, &x_name)?;
+                let y_col = Self::get_col_f64(&df, &y_name)?;
+                let n = x_col.len();
+                if n != y_col.len() || n < 2 {
+                    return Err(self.rt_err("corr_pair(): colunas incompatíveis"));
+                }
+                let mx = x_col.iter().sum::<f64>() / n as f64;
+                let my = y_col.iter().sum::<f64>() / n as f64;
+                let mut num = 0.0f64;
+                let mut dx2 = 0.0f64;
+                let mut dy2 = 0.0f64;
+                for (&xi, &yi) in x_col.iter().zip(y_col.iter()) {
+                    let dx = xi - mx;
+                    let dy = yi - my;
+                    num += dx * dy;
+                    dx2 += dx * dx;
+                    dy2 += dy * dy;
+                }
+                let r = if dx2 > 0.0 && dy2 > 0.0 {
+                    num / (dx2.sqrt() * dy2.sqrt())
+                } else {
+                    0.0
+                };
+                Ok(Value::Float(r))
             }
 
             "push" => {
