@@ -1957,9 +1957,9 @@ impl Interpreter {
                 Ok(Value::Float(result))
             }
 
-            // ── Novas agregações escalares ────────────────────────────────────
+            // ── Novas agregações escalares (todas suportam if = cond) ────────
             "median" => {
-                // median(lista) ou median(df, var)
+                // median(lista) | median(df, x) | median(df, x, if = cond)
                 let nums: Vec<f64> = if args.len() >= 2 {
                     let df_name = match &args[0] {
                         Expr::Var(n) => n.clone(),
@@ -1973,7 +1973,13 @@ impl Interpreter {
                         Expr::Var(n) | Expr::Str(n) => n.clone(),
                         _ => return Err(self.rt_err("median: segundo argumento deve ser nome de variável")),
                     };
-                    Self::get_col_f64(&df, &var_name)?.to_vec()
+                    let col = Self::get_col_f64(&df, &var_name)?;
+                    if let Some(cond_opt) = opts.iter().find(|o| o.name == "if") {
+                        let mask = self.eval_col_expr(&cond_opt.value, &df)?;
+                        col.iter().zip(mask.iter()).filter(|(_, &m)| m != 0.0).map(|(&v, _)| v).collect()
+                    } else {
+                        col.to_vec()
+                    }
                 } else if args.len() == 1 {
                     match self.eval_expr(&args[0])? {
                         Value::List(lst) => lst.iter().map(Self::value_as_f64).collect::<Result<_>>()?,
@@ -1997,7 +2003,7 @@ impl Interpreter {
             }
 
             "variance" => {
-                // variance(lista) ou variance(df, var) — variância amostral (/ n-1)
+                // variance(lista) | variance(df, x) | variance(df, x, if = cond) — amostral (/ n-1)
                 let nums: Vec<f64> = if args.len() >= 2 {
                     let df_name = match &args[0] {
                         Expr::Var(n) => n.clone(),
@@ -2011,7 +2017,13 @@ impl Interpreter {
                         Expr::Var(n) | Expr::Str(n) => n.clone(),
                         _ => return Err(self.rt_err("variance: segundo argumento deve ser nome de variável")),
                     };
-                    Self::get_col_f64(&df, &var_name)?.to_vec()
+                    let col = Self::get_col_f64(&df, &var_name)?;
+                    if let Some(cond_opt) = opts.iter().find(|o| o.name == "if") {
+                        let mask = self.eval_col_expr(&cond_opt.value, &df)?;
+                        col.iter().zip(mask.iter()).filter(|(_, &m)| m != 0.0).map(|(&v, _)| v).collect()
+                    } else {
+                        col.to_vec()
+                    }
                 } else if args.len() == 1 {
                     match self.eval_expr(&args[0])? {
                         Value::List(lst) => lst.iter().map(Self::value_as_f64).collect::<Result<_>>()?,
@@ -2030,7 +2042,7 @@ impl Interpreter {
             }
 
             "quantile" => {
-                // quantile(df, x, p) ou quantile(lista, p)  — p em [0, 1]
+                // quantile(df, x, p) | quantile(lista, p) | quantile(df, x, p, if = cond) — p ∈ [0,1]
                 let (nums, p) = if args.len() >= 3 {
                     let df_name = match &args[0] {
                         Expr::Var(n) => n.clone(),
@@ -2044,13 +2056,19 @@ impl Interpreter {
                         Expr::Var(n) | Expr::Str(n) => n.clone(),
                         _ => return Err(self.rt_err("quantile: segundo argumento deve ser nome de variável")),
                     };
-                    let col = Self::get_col_f64(&df, &var_name)?.to_vec();
+                    let col = Self::get_col_f64(&df, &var_name)?;
+                    let nums = if let Some(cond_opt) = opts.iter().find(|o| o.name == "if") {
+                        let mask = self.eval_col_expr(&cond_opt.value, &df)?;
+                        col.iter().zip(mask.iter()).filter(|(_, &m)| m != 0.0).map(|(&v, _)| v).collect()
+                    } else {
+                        col.to_vec()
+                    };
                     let p = match self.eval_expr(&args[2])? {
                         Value::Float(f) => f,
                         Value::Int(i) => i as f64,
                         other => return Err(self.type_mismatch("Float", &other)),
                     };
-                    (col, p)
+                    (nums, p)
                 } else if args.len() == 2 {
                     let v = self.eval_expr(&args[0])?;
                     let nums = match v {
@@ -2087,7 +2105,7 @@ impl Interpreter {
             }
 
             "cov" => {
-                // cov(df, x, y) — covariância amostral entre duas colunas (/ n-1)
+                // cov(df, x, y) | cov(df, x, y, if = cond) — covariância amostral (/ n-1)
                 if args.len() < 3 {
                     return Err(HayashiError::Runtime("cov(df, x, y)".into()));
                 }
@@ -2105,23 +2123,30 @@ impl Interpreter {
                 };
                 let x_col = Self::get_col_f64(&df, &x_name)?;
                 let y_col = Self::get_col_f64(&df, &y_name)?;
-                let n = x_col.len();
-                if n != y_col.len() {
-                    return Err(self.rt_err("cov(): colunas com comprimentos diferentes"));
-                }
+                let (x_vals, y_vals): (Vec<f64>, Vec<f64>) =
+                    if let Some(cond_opt) = opts.iter().find(|o| o.name == "if") {
+                        let mask = self.eval_col_expr(&cond_opt.value, &df)?;
+                        x_col.iter().zip(y_col.iter()).zip(mask.iter())
+                            .filter(|(_, &m)| m != 0.0)
+                            .map(|((&xi, &yi), _)| (xi, yi))
+                            .unzip()
+                    } else {
+                        (x_col.to_vec(), y_col.to_vec())
+                    };
+                let n = x_vals.len();
                 if n < 2 {
                     return Err(self.rt_err("cov(): requer pelo menos 2 observações"));
                 }
-                let mx = x_col.iter().sum::<f64>() / n as f64;
-                let my = y_col.iter().sum::<f64>() / n as f64;
-                let c = x_col.iter().zip(y_col.iter())
+                let mx = x_vals.iter().sum::<f64>() / n as f64;
+                let my = y_vals.iter().sum::<f64>() / n as f64;
+                let c = x_vals.iter().zip(y_vals.iter())
                     .map(|(&xi, &yi)| (xi - mx) * (yi - my))
                     .sum::<f64>() / (n - 1) as f64;
                 Ok(Value::Float(c))
             }
 
             "corr_pair" => {
-                // corr_pair(df, x, y) — correlação de Pearson escalar entre duas colunas
+                // corr_pair(df, x, y) | corr_pair(df, x, y, if = cond) — Pearson escalar
                 if args.len() < 3 {
                     return Err(HayashiError::Runtime("corr_pair(df, x, y)".into()));
                 }
@@ -2139,16 +2164,26 @@ impl Interpreter {
                 };
                 let x_col = Self::get_col_f64(&df, &x_name)?;
                 let y_col = Self::get_col_f64(&df, &y_name)?;
-                let n = x_col.len();
-                if n != y_col.len() || n < 2 {
-                    return Err(self.rt_err("corr_pair(): colunas incompatíveis"));
+                let (x_vals, y_vals): (Vec<f64>, Vec<f64>) =
+                    if let Some(cond_opt) = opts.iter().find(|o| o.name == "if") {
+                        let mask = self.eval_col_expr(&cond_opt.value, &df)?;
+                        x_col.iter().zip(y_col.iter()).zip(mask.iter())
+                            .filter(|(_, &m)| m != 0.0)
+                            .map(|((&xi, &yi), _)| (xi, yi))
+                            .unzip()
+                    } else {
+                        (x_col.to_vec(), y_col.to_vec())
+                    };
+                let n = x_vals.len();
+                if n < 2 {
+                    return Err(self.rt_err("corr_pair(): requer pelo menos 2 observações"));
                 }
-                let mx = x_col.iter().sum::<f64>() / n as f64;
-                let my = y_col.iter().sum::<f64>() / n as f64;
+                let mx = x_vals.iter().sum::<f64>() / n as f64;
+                let my = y_vals.iter().sum::<f64>() / n as f64;
                 let mut num = 0.0f64;
                 let mut dx2 = 0.0f64;
                 let mut dy2 = 0.0f64;
-                for (&xi, &yi) in x_col.iter().zip(y_col.iter()) {
+                for (&xi, &yi) in x_vals.iter().zip(y_vals.iter()) {
                     let dx = xi - mx;
                     let dy = yi - my;
                     num += dx * dy;
