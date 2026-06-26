@@ -1,0 +1,175 @@
+\chapter{Mínimos Quadrados Ordinários}
+\label{cap:ols}
+
+\section{Sintaxe}
+
+\begin{lstlisting}
+ols(fórmula, df)
+ols(fórmula, df, cov=tipo)
+ols(fórmula, df, cov=cluster, cluster=coluna)
+ols(fórmula, df, if = condição)
+\end{lstlisting}
+
+Alias: \lstinline{reg()} é equivalente a \lstinline{ols()}.
+
+\section{Fórmula}
+
+A fórmula segue a notação padrão \texttt{y \textasciitilde{} x1 + x2 + ...}:
+
+\begin{lstlisting}[caption={OLS básico}]
+input df
+Y X
+10 2
+12 3
+8  1
+15 5
+11 2
+14 4
+end
+
+ols(Y ~ X, df)
+\end{lstlisting}
+
+A constante é incluída automaticamente. Para múltiplas variáveis:
+
+\begin{lstlisting}
+ols(Y ~ X1 + X2 + X3, df)
+\end{lstlisting}
+
+A fórmula pode ser passada como string:
+
+\begin{lstlisting}
+let formula = "Y ~ X1 + X2"
+ols(formula, df)
+\end{lstlisting}
+
+\section{Erros padrão}
+
+O tipo de erro padrão é controlado pela opção \lstinline{cov=}:
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Opção} & \textbf{Erro padrão} \\
+\midrule
+(padrão)              & OLS clássico (homocedasticidade) \\
+\texttt{cov=robust}   & Robusto à heterocedasticidade (HC1) \\
+\texttt{cov=HC1}      & Idem — alias explícito \\
+\texttt{cov=HC3}      & HC3 (mais conservador em amostras pequenas) \\
+\texttt{cov=cluster, cluster=col}  & Clusterizado por \texttt{col} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{lstlisting}[caption={Variantes de erro padrão}]
+ols(Y ~ X, df)                           // clássico
+ols(Y ~ X, df, cov=robust)              // HC1
+ols(Y ~ X, df, cov=HC3)                 // HC3
+ols(Y ~ X, df, cov=cluster, cluster=id) // clusterizado
+\end{lstlisting}
+
+\section{Amostra condicional}
+
+A opção \lstinline{if =} restringe a estimação a um subconjunto sem modificar o DataFrame:
+
+\begin{lstlisting}
+ols(Y ~ X, df, if = grupo == 1)
+\end{lstlisting}
+
+\section{Capturando o resultado}
+
+O resultado de \lstinline{ols()} é um objeto que pode ser atribuído a uma variável
+e usado em pós-estimação:
+
+\begin{lstlisting}
+let m = ols(Y ~ X, df)
+\end{lstlisting}
+
+Quando atribuído, \lstinline{ols()} não imprime a tabela — apenas armazena o modelo.
+Para exibir o resultado explicitamente:
+
+\begin{lstlisting}
+let m = ols(Y ~ X, df)
+display m
+\end{lstlisting}
+
+\section{Pós-estimação}
+
+\subsection{\texttt{predict}}
+
+Extrai valores ajustados ou resíduos do modelo:
+
+\begin{lstlisting}
+let m = ols(Y ~ X, df)
+
+let yhat = predict(m, "xb")        // valores ajustados
+let ehat = predict(m, "residuals") // resíduos
+\end{lstlisting}
+
+Aliases aceitos: \texttt{"fitted"} para valores ajustados; \texttt{"resid"} ou
+\texttt{"e"} para resíduos.
+
+\subsection{\texttt{vif}}
+
+Fator de inflação da variância — diagnóstico de multicolinearidade:
+
+\begin{lstlisting}
+let m = ols(Y ~ X1 + X2 + X3, df)
+vif(m)
+\end{lstlisting}
+
+\subsection{\texttt{test}}
+
+Teste de hipótese linear sobre os coeficientes (teste F):
+
+\begin{lstlisting}
+let m = ols(Y ~ X1 + X2 + X3, df)
+test(m, X2 = 0, X3 = 0)    // H0: X2 = X3 = 0
+\end{lstlisting}
+
+\subsection{\texttt{lincom}}
+
+Combinação linear de coeficientes com erro padrão:
+
+\begin{lstlisting}
+let m = ols(Y ~ X1 + X2, df)
+lincom(m, X1 + X2)
+\end{lstlisting}
+
+\subsection{\texttt{margins}}
+
+Efeitos marginais médios (para modelos não-lineares; no OLS equivale aos coeficientes):
+
+\begin{lstlisting}
+let m = ols(Y ~ X, df)
+margins(m)
+\end{lstlisting}
+
+\section{Tabela de resultados com \texttt{esttab}}
+
+\lstinline{esttab} exibe múltiplos modelos em uma tabela comparativa:
+
+\begin{lstlisting}[caption={Comparação de especificações}]
+let m1 = ols(Y ~ X, df)
+let m2 = ols(Y ~ X, df, cov=robust)
+let m3 = ols(Y ~ X1 + X2, df)
+
+esttab(m1, m2, m3)
+\end{lstlisting}
+
+Alternativamente, use \lstinline{eststo} para acumular modelos e depois exibir:
+
+\begin{lstlisting}
+eststo(ols(Y ~ X, df))
+eststo(ols(Y ~ X1 + X2, df))
+esttab()
+\end{lstlisting}
+
+\section{Bootstrap}
+
+Erros padrão por bootstrap:
+
+\begin{lstlisting}
+bootstrap(ols, Y ~ X, df, n=1000)
+bootse(m, n=500)
+\end{lstlisting}
