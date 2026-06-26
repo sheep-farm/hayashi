@@ -113,16 +113,24 @@ generate df y = 2.5 + 1.8*x1 + (-0.7)*x2
 ols(y ~ x1 + x2, df)
 \end{lstlisting}
 
-\noindent Resultado obtido:
+\noindent Saída real do interpretador:
 
-\begin{lstlisting}[style=inline]
-Variable  |    coef   |  std err  |
-----------+-----------+-----------+
-const     |    2.5000 |    0.0000 |
-x1        |    1.8000 |    0.0000 |
-x2        |   -0.7000 |    0.0000 |
+\begin{lstlisting}[style=inline, basicstyle=\ttfamily\footnotesize]
+=========================== OLS Regression Results ===========================
+Dep. Variable:                     y || R-squared:                    1.0000
+Model:                           OLS || Adj. R-squared:               1.0000
+Covariance Type:          Non-Robust || F-statistic:                  0.0000
+No. Observations:               1000 || Prob (F-statistic):         1.0000e0
+Df Residuals:                    997 || Log-Likelihood:           31513.9419
+AIC:                     -63021.8837 || BIC:                     -63007.1605
 
-R-squared: 1.0000     Adj. R-squared: 1.0000
+------------------------------------------------------------------------------
+Variable   |       coef |    std err |        t |    P>|t| | [0.025  0.975]
+------------------------------------------------------------------------------
+const      |     2.5000 |     0.0000 | 6.17e+15 |    0.000 |  2.5000  2.5000
+x1         |     1.8000 |     0.0000 | 3.36e+15 |    0.000 |  1.8000  1.8000
+x2         |    -0.7000 |     0.0000 |-1.28e+15 |    0.000 | -0.7000 -0.7000
+==============================================================================
 \end{lstlisting}
 
 O OLS recupera exatamente $(\hat\beta_0, \hat\beta_1, \hat\beta_2) = (2{,}5;\; 1{,}8;\; -0{,}7)$.
@@ -133,7 +141,9 @@ exato até a precisão de ponto flutuante.
 \begin{nota}
   A estatística $F$ aparece como \texttt{0.0} e o p-valor como \texttt{1.0}
   neste caso — artefato numérico de $0/0$ quando $\mathrm{SQR} = 0$.
-  Em presença de ruído ($\varepsilon \neq 0$) ambas as estatísticas assumem
+  As estatísticas $t$ são da ordem de $10^{15}$ pelo mesmo motivo: numerador
+  finito dividido por denominador de precisão de máquina.
+  Em presença de ruído ($\varepsilon \neq 0$) todas as estatísticas assumem
   valores finitos e interpretáveis.
 \end{nota}
 
