@@ -135,31 +135,35 @@ corrige o viés.
 
 \subsection*{Estrutura do DGP}
 
-Sejam $z$, $v$ e $u$ independentes e $\sim \mathcal{N}(0,1)$:
-
+Sejam $z$ e $v$ variáveis aleatórias independentes $\sim \mathcal{N}(0,1)$.
+Defina $\varepsilon$ como o \emph{resíduo} da projeção de $v$ sobre $[1,\;z]$:
 \[
-  x = 0{,}8\,z + v
+  \varepsilon = v - \delta_0 - \delta_1 z,
   \qquad
-  y = 1{,}5 + 2{,}0\,x + \underbrace{0{,}7\,v + u}_{\varepsilon}
+  \delta_1 = \frac{\mathrm{Cov}_n(z,v)}{\mathrm{Var}_n(z)},
+  \quad
+  \delta_0 = \bar v - \delta_1\bar z
 \]
 
-O erro estrutural $\varepsilon = 0{,}7v + u$ compartilha $v$ com $x$, criando
-endogeneidade:
+Por construção $\sum \varepsilon_i = 0$ e $\sum z_i\varepsilon_i = 0$, ou seja,
+$Z'\varepsilon = 0$ \emph{exatamente} na amostra. Então:
+
 \[
-  \mathrm{Cov}(x,\varepsilon) = 0{,}7\,\mathrm{Var}(v) = 0{,}7 \neq 0
+  x = 0{,}8\,z + \varepsilon
+  \qquad
+  y = 1{,}5 + 2{,}0\,x + 0{,}7\,\varepsilon
 \]
 
-O instrumento $z$ satisfaz ambas as condições:
-\begin{itemize}
-  \item \textbf{Relevância:} $\mathrm{Cov}(z,x) = 0{,}8 \neq 0$
-  \item \textbf{Exogeneidade:} $\mathrm{Cov}(z,\varepsilon) = 0$
-\end{itemize}
+O erro estrutural $0{,}7\varepsilon$ cria endogeneidade ($\mathrm{Cov}(x,0{,}7\varepsilon) \neq 0$),
+mas como $Z'\varepsilon = 0$ exatamente, as condições de momento do IV são
+satisfeitas sem ruído amostral. Resultado: IV recupera $(\beta_0, \beta_1)$
+com precisão de máquina — o mesmo que OLS fez sem ruído no Capítulo~\ref{cap:ols}.
 
-O viés assintótico do OLS é previsível:
+O viés do OLS é previsível:
 \[
   \mathrm{plim}\;\hat\beta_{\mathrm{OLS}}
   = \beta_1 + \frac{\mathrm{Cov}(x,\varepsilon)}{\mathrm{Var}(x)}
-  = 2{,}0 + \frac{0{,}7}{0{,}64 + 1}
+  \approx 2{,}0 + \frac{0{,}7}{0{,}64 + 1}
   \approx 2{,}43
 \]
 
@@ -178,11 +182,16 @@ for i in 1..=10 {
 }
 df |> filter(_n <= 1000)
 
-generate df z = rnormal()          // instrumento exógeno
-generate df v = rnormal()          // componente compartilhado
-generate df u = rnormal()          // erro estrutural puro
-generate df x = 0.8*z + v          // regressor endógeno
-generate df y = 1.5 + 2.0*x + 0.7*v + u
+generate df z = rnormal()
+generate df v = rnormal()
+
+// eps = resíduo de v sobre [1, z]: garante Z'eps = 0 exatamente
+let d1 = cov(df, z, v) / variance(df, z)
+let d0 = mean(df, v) - d1 * mean(df, z)
+generate df eps = v - d0 - d1*z
+
+generate df x = 0.8*z + eps        // regressor endógeno
+generate df y = 1.5 + 2.0*x + 0.7*eps
 
 let m_ols = ols(y ~ x, df)
 let m_iv  = iv(y ~ x, ~ z, df)
@@ -197,22 +206,21 @@ esttab(m_ols, m_iv)
                             (1)              (2)
                             OLS          IV/2SLS
 ────────────────────────────────────────────────
-x                     2.4454***        2.0186***
-                       (0.0270)         (0.0473)
-Constant              1.9655***        2.3453***
-                       (0.0260)         (0.0436)
+x                     2.4233***        2.0000***
+                       (0.0108)         (0.0274)
+Constant              1.3299***        1.5000***
+                       (0.0059)         (0.0127)
 ────────────────────────────────────────────────
 N                          1000             1000
-R²                       0.8917
+R²                       0.9804
 ────────────────────────────────────────────────
 * p<0.10  ** p<0.05  *** p<0.01
 \end{lstlisting}
 
-O OLS superestima $\beta_1$ em $+0{,}45$ (2.4454 vs.\ 2.0000), exatamente
-na direção prevista pelo viés assintótico de $+0{,}43$. O IV recupera
-$2{,}0186$ — desvio de $0{,}019$ atribuível à variância amostral finita.
-O $R^2$ não é exibido para IV porque não tem interpretação padrão sob
-endogeneidade.
+O IV recupera $(\hat\beta_0, \hat\beta_1) = (1{,}5000,\; 2{,}0000)$ com precisão
+de máquina. O OLS superestima $\beta_1$ em $+0{,}42$ (2.4233 vs.\ 2.0000),
+consistente com o viés assintótico previsto de $+0{,}43$.
+O $R^2$ não é reportado para IV pois não tem interpretação padrão sob endogeneidade.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Sintaxe}
