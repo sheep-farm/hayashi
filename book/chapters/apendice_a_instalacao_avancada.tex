@@ -1,0 +1,42 @@
+\chapter{Instalação Avançada}
+\label{apendice:instalacao}
+
+\section{Compilação com suporte a ODBC}
+
+Para conectar \hayashi{} a bancos de dados via ODBC (SQL Server, Oracle, etc.):
+
+\begin{lstlisting}[style=inline, language=sh]
+cargo install hayashi-lang --features odbc
+\end{lstlisting}
+
+Requer driver ODBC instalado no sistema (\texttt{unixODBC} no Linux).
+
+\section{Variáveis de ambiente}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Variável} & \textbf{Efeito} \\
+\midrule
+\texttt{HAY\_HISTORY}  & Caminho do arquivo de histórico do REPL \\
+\texttt{HAY\_NOCOLOR}  & Desabilita cores nas mensagens de erro \\
+\texttt{HAY\_TRACE}    & Habilita trace de execução (depuração) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Integração com editores}
+
+\subsection*{Neovim}
+
+Adicione ao \texttt{init.lua} para reconhecimento de sintaxe básico:
+
+\begin{lstlisting}[style=inline, language=Hayashi]
+vim.filetype.add({ extension = { hay = "hayashi" } })
+\end{lstlisting}
+
+Highlighting completo via Tree-sitter está no roadmap.
+
+\subsection*{VS Code}
+
+Extensão disponível na marketplace como \texttt{hayashi-lang}.

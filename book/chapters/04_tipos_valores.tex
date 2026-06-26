@@ -1,0 +1,147 @@
+\chapter{Tipos e Valores}
+
+\hayashi{} é dinamicamente tipado: variáveis não têm tipo declarado, mas cada valor
+carrega seu tipo em tempo de execução. O sistema de tipos é coerente — operações entre
+tipos incompatíveis produzem erros claros em vez de coerções silenciosas.
+
+\section{Tipos primitivos}
+
+\subsection{Int}
+
+Inteiro de 64 bits com sinal. Literais inteiros são escritos sem ponto decimal:
+
+\begin{lstlisting}
+let n = 42
+let negativo = -7
+let grande = 1_000_000    // _ como separador visual
+\end{lstlisting}
+
+\subsection{Float}
+
+Ponto flutuante de 64 bits (IEEE 754). Requer ponto decimal ou notação científica:
+
+\begin{lstlisting}
+let pi = 3.14159
+let e  = 2.71828
+let pequeno = 1.5e-10
+\end{lstlisting}
+
+Operações aritméticas entre \texttt{Int} e \texttt{Float} promovem para \texttt{Float}:
+
+\begin{lstlisting}
+let x = 3 / 2      // 1  (divisão inteira)
+let y = 3 / 2.0    // 1.5
+let z = 3.0 / 2    // 1.5
+\end{lstlisting}
+
+Divisão de \texttt{Float} por zero retorna \texttt{inf} ou \texttt{-inf}, nunca
+um erro — seguindo IEEE 754:
+
+\begin{lstlisting}
+display 1.0 / 0.0    // inf
+display -1.0 / 0.0   // -inf
+display 0.0 / 0.0    // nan
+\end{lstlisting}
+
+\begin{nota}
+  Divisão de \texttt{Int} por zero produz erro de runtime. Divisão de \texttt{Float}
+  por zero segue IEEE 754 e retorna \texttt{inf}.
+\end{nota}
+
+\subsection{Bool}
+
+Verdadeiro ou falso. Literais: \lstinline{true} e \lstinline{false}.
+
+\begin{lstlisting}
+let ativo = true
+let encerrado = false
+\end{lstlisting}
+
+Operadores lógicos: \lstinline{and}, \lstinline{or}, \lstinline{not}.
+
+\subsection{Nil}
+
+Ausência de valor. Algumas funções retornam \lstinline{nil} quando não há resultado
+relevante (por exemplo, \lstinline{push} que muta uma lista no lugar).
+
+\begin{lstlisting}
+let nada = nil
+display nada    // nil
+\end{lstlisting}
+
+\section{Strings}
+
+Strings são sequências de caracteres Unicode delimitadas por aspas duplas:
+
+\begin{lstlisting}
+let nome = "Hayashi"
+let caminho = "/home/usuario/dados.csv"
+\end{lstlisting}
+
+Sequências de escape: \texttt{\textbackslash n} (nova linha), \texttt{\textbackslash t}
+(tab), \texttt{\textbackslash"} (aspas), \texttt{\textbackslash\textbackslash} (barra).
+
+F-strings permitem interpolação de expressões:
+
+\begin{lstlisting}
+let ano = 2026
+display f"Publicado em {ano}"   // Publicado em 2026
+\end{lstlisting}
+
+\section{Listas}
+
+Coleções ordenadas de valores de qualquer tipo, delimitadas por colchetes:
+
+\begin{lstlisting}
+let numeros = [1, 2, 3, 4, 5]
+let misto   = [1, "dois", true, nil]
+let vazia   = []
+\end{lstlisting}
+
+\section{Dicionários}
+
+Mapeamentos chave-valor. Chaves e valores podem ser de qualquer tipo:
+
+\begin{lstlisting}
+let config = {"host": "localhost", "porta": 5432}
+let vazio  = {}
+\end{lstlisting}
+
+Acesso por chave:
+
+\begin{lstlisting}
+config["host"]      // "localhost"
+\end{lstlisting}
+
+\section{DataFrame}
+
+O tipo central de \hayashi{}. Um DataFrame é uma tabela bidimensional com colunas
+nomeadas. Cada coluna é um vetor de \texttt{Float} (valores ausentes representados
+por \texttt{NaN}).
+
+\begin{lstlisting}[caption={Criando um DataFrame inline}]
+input x y
+  1  2
+  3  4
+  5  6
+end
+\end{lstlisting}
+
+DataFrames são discutidos em profundidade no Capítulo~\ref{cap:dataframes}.
+
+\section{Conversões}
+
+\hayashi{} não faz coerção implícita entre tipos. Conversões devem ser explícitas:
+
+\begin{lstlisting}
+let s = str(42)        // "42"
+let n = int("7")       // 7
+let f = float("3.14")  // 3.14
+\end{lstlisting}
+
+Tentar somar um \texttt{Int} com uma \texttt{String} produz erro de tipo:
+
+\begin{lstlisting}
+42 + "3"
+// error: type mismatch — expected Int or Float, got String
+\end{lstlisting}
