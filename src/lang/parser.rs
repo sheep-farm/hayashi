@@ -163,6 +163,19 @@ impl Parser {
 
     pub fn parse_expr(&mut self) -> Result<Expr> {
         let mut lhs = self.parse_or()?;
+
+        // Range operators: a..b (exclusivo) ou a..=b (inclusivo)
+        if self.peek() == &Token::DotDotEq {
+            self.advance();
+            let rhs = self.parse_or()?;
+            return Ok(Expr::RangeInclusive(Box::new(lhs), Box::new(rhs)));
+        }
+        if self.peek() == &Token::DotDot {
+            self.advance();
+            let rhs = self.parse_or()?;
+            return Ok(Expr::Range(Box::new(lhs), Box::new(rhs)));
+        }
+
         if self.peek() != &Token::PipeRight {
             return Ok(lhs);
         }
@@ -716,13 +729,10 @@ impl Parser {
     // Aceita:  start..end   (Range)   ou   expr   (Items — lista/var)
 
     fn parse_for_iter(&mut self) -> Result<ForIter> {
-        let start = self.parse_expr()?;
-        if self.peek() == &Token::DotDot {
-            self.advance();
-            let end = self.parse_expr()?;
-            Ok(ForIter::Range(start, end))
-        } else {
-            Ok(ForIter::Items(start))
+        match self.parse_expr()? {
+            Expr::Range(start, end)          => Ok(ForIter::Range(*start, *end)),
+            Expr::RangeInclusive(start, end) => Ok(ForIter::RangeInclusive(*start, *end)),
+            other                            => Ok(ForIter::Items(other)),
         }
     }
 
