@@ -1395,6 +1395,7 @@ dependencies = [
  "parquet",
  "plotters",
  "rand",
+ "rand_distr",
  "rusqlite",
  "rust_xlsxwriter",
  "rustyline",
