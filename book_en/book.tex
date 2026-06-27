@@ -1,0 +1,275 @@
+% ============================================================
+%  Hayashi — A Language for Applied Econometrics
+%  Main file (English edition)
+% ============================================================
+\documentclass[12pt, a4paper, twoside, openright]{book}
+
+% ── Encoding & language ─────────────────────────────────────
+\usepackage{fontspec}
+\usepackage[english]{babel}
+
+% ── Typography ───────────────────────────────────────────────
+\usepackage{microtype}
+\usepackage{lmodern}
+\usepackage{setspace}
+\onehalfspacing
+
+% ── Geometry ─────────────────────────────────────────────────
+\usepackage[
+  top=3cm, bottom=3cm,
+  inner=3.5cm, outer=2.5cm,
+  headheight=14pt
+]{geometry}
+
+% ── Colors ───────────────────────────────────────────────────
+\usepackage{xcolor}
+\definecolor{hayblue}{RGB}{0, 90, 160}
+\definecolor{haygreen}{RGB}{0, 120, 80}
+\definecolor{hayred}{RGB}{160, 30, 30}
+\definecolor{codbg}{RGB}{245, 245, 245}
+\definecolor{codframe}{RGB}{200, 200, 200}
+\definecolor{comment}{RGB}{100, 120, 100}
+\definecolor{keyword}{RGB}{0, 80, 160}
+\definecolor{string}{RGB}{140, 40, 40}
+\definecolor{number}{RGB}{60, 100, 60}
+
+% ── Code listings ────────────────────────────────────────────
+\usepackage{listings}
+
+\lstdefinelanguage{Hayashi}{
+  morekeywords={
+    let, const, fn, return, if, else, for, in, while, break, continue,
+    match, try, catch, and, or, not, true, false, nil,
+    load, save, source, display, input, generate, mutate, filter,
+    select, drop, rename, sort, dropna, append, collapse,
+    group_by, pivot_longer, pivot_wider, summarize, codebook,
+    tabulate, replace, keep, count, nrow, swilk, sfrancia, sktest
+  },
+  sensitive=true,
+  morecomment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  morestring=[b]",
+  morestring=[b]',
+  morestring=[s]{f"}{"},
+}
+
+\lstset{
+  language=Hayashi,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{keyword}\bfseries,
+  stringstyle=\color{string},
+  commentstyle=\color{comment}\itshape,
+  numberstyle=\tiny\color{gray},
+  numbers=left,
+  numbersep=8pt,
+  backgroundcolor=\color{codbg},
+  frame=single,
+  framerule=0.4pt,
+  rulecolor=\color{codframe},
+  breaklines=true,
+  breakatwhitespace=false,
+  showstringspaces=false,
+  tabsize=4,
+  captionpos=b,
+  xleftmargin=1.5em,
+  xrightmargin=0.5em,
+}
+
+% estilo sem numeração para trechos inline curtos
+\lstdefinestyle{inline}{
+  numbers=none,
+  frame=none,
+  backgroundcolor=\color{codbg},
+  basicstyle=\ttfamily\small,
+}
+
+% ── Math ─────────────────────────────────────────────────────
+\usepackage{amsmath,amssymb}
+
+% ── Tables ───────────────────────────────────────────────────
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{imakeidx}
+\makeindex[title=Index, intoc=true, columns=2]
+
+% ── Graphics ─────────────────────────────────────────────────
+\usepackage{graphicx}
+
+% ── Environments ─────────────────────────────────────────────
+\usepackage{tcolorbox}
+\tcbuselibrary{most}
+
+\newtcolorbox{nota}{
+  colback=hayblue!6,
+  colframe=hayblue!60,
+  fonttitle=\bfseries,
+  title=Note,
+  left=6pt, right=6pt, top=4pt, bottom=4pt,
+}
+
+\newtcolorbox{aviso}{
+  colback=hayred!6,
+  colframe=hayred!60,
+  fonttitle=\bfseries,
+  title=Warning,
+  left=6pt, right=6pt, top=4pt, bottom=4pt,
+}
+
+\newtcolorbox{dica}{
+  colback=haygreen!6,
+  colframe=haygreen!60,
+  fonttitle=\bfseries,
+  title=Tip,
+  left=6pt, right=6pt, top=4pt, bottom=4pt,
+}
+
+% ── Headers & footers ────────────────────────────────────────
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE]{\small\textit{\leftmark}}
+\fancyhead[RO]{\small\textit{\rightmark}}
+\fancyfoot[C]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ── Hyperlinks ───────────────────────────────────────────────
+\usepackage[
+  colorlinks=true,
+  linkcolor=hayblue,
+  urlcolor=hayblue,
+  citecolor=hayblue,
+  pdftitle={Hayashi — A Language for Applied Econometrics},
+  pdfauthor={Flávio de Vasconcellos Corrêa},
+  pdfsubject={Econometrics, Programming Language},
+]{hyperref}
+
+% ── Custom commands ──────────────────────────────────────────
+\newcommand{\hay}{\texttt{hay}}
+\newcommand{\hayashi}{\textsc{Hayashi}}
+\newcommand{\version}{0.2.4}
+
+% ============================================================
+\begin{document}
+
+% ── Cover ───────────────────────────────────────────────────
+\begin{titlepage}
+  \centering
+  \vspace*{3cm}
+  {\Huge\bfseries\color{hayblue} Hayashi \par}
+  \vspace{0.5cm}
+  {\large\itshape A Language for Applied Econometrics \par}
+  \vspace{2cm}
+  \renewcommand{\thefootnote}{\fnsymbol{footnote}}%
+  {\large Flávio de Vasconcellos Corrêa\footnote{Master in Applied Economics,
+    Graduate Program in Organizations and Markets (PPGOM),
+    Federal University of Pelotas (UFPel).} \par}%
+  \renewcommand{\thefootnote}{\arabic{footnote}}
+  \vspace{1cm}
+  {\normalsize Version \version{} \par}
+  \vfill
+  {\small \today \par}
+\end{titlepage}
+
+% ── Blank page ──────────────────────────────────────────────
+\cleardoublepage
+
+% ── Frontmatter ─────────────────────────────────────────────
+\frontmatter
+\include{chapters/00_preface}
+
+\tableofcontents
+\cleardoublepage
+
+% ── Part I: The Language ─────────────────────────────────────
+\mainmatter
+
+\part{The Language}
+
+\include{chapters/01_introduction}
+\include{chapters/02_installation}
+\include{chapters/03_repl}
+\include{chapters/04_types_values}
+\include{chapters/05_variables_scope}
+\include{chapters/06_operators}
+\include{chapters/07_control_flow}
+\include{chapters/08_loops}
+\include{chapters/09_functions}
+\include{chapters/10_errors}
+\include{chapters/11_strings}
+\include{chapters/12_lists_dicts}
+\include{chapters/13_dataframes}
+\include{chapters/14_manipulation}
+\include{chapters/15_pipes}
+\include{chapters/16_modules}
+
+% ── Part II: Applied Econometrics ────────────────────────────
+\part{Applied Econometrics}
+
+\include{chapters/17_probability}
+\include{chapters/18_ols}
+\include{chapters/19_iv}
+\include{chapters/20_panel}
+\include{chapters/21_did}
+\include{chapters/22_logit_probit}
+\include{chapters/23_qreg}
+\include{chapters/24_rdd}
+\include{chapters/25_gmm}
+
+% ── Part III: Time Series ────────────────────────────────────
+\part{Time Series}
+
+\include{chapters/26_arma}
+\include{chapters/27_arima}
+\include{chapters/28_var}
+\include{chapters/29_coint}
+\include{chapters/30_garch}
+
+% ── Part IV: Causal Inference ────────────────────────────────
+\part{Causal Inference}
+
+\include{chapters/31_psm}
+\include{chapters/32_synth}
+
+% ── Part V: Qualitative, Count and Limited Response ──────────
+\part{Qualitative Response and Limited Dependence}
+
+\include{chapters/33_count}
+\include{chapters/34_limited}
+\include{chapters/35_multinomial}
+\include{chapters/36_survival}
+
+% ── Part VI: Advanced Methods ────────────────────────────────
+\part{Advanced Methods}
+
+\include{chapters/37_panel_advanced}
+\include{chapters/38_sur}
+\include{chapters/39_regularization}
+\include{chapters/40_bootstrap}
+\include{chapters/41_multivariate}
+\include{chapters/42_glm}
+\include{chapters/43_regime}
+\include{chapters/44_filters}
+\include{chapters/45_svar}
+
+% ── Part VII: Complementary Methods ─────────────────────────
+\part{Complementary Methods}
+
+\include{chapters/46_inference}
+\include{chapters/47_panel2}
+\include{chapters/48_unit_roots2}
+\include{chapters/49_filters2}
+\include{chapters/50_svar2}
+\include{chapters/51_local}
+\include{chapters/52_ardl}
+\include{chapters/53_kalman}
+
+% ── Backmatter ───────────────────────────────────────────────
+\backmatter
+\include{chapters/appendix_a_advanced_install}
+\include{chapters/appendix_b_quick_reference}
+\include{chapters/appendix_c_equivalences}
+
+\printindex
+
+\end{document}

@@ -1,0 +1,163 @@
+\chapter{Quantile Regression}
+\label{cap:qreg}
+% ── index ───────────────────────────────────────────────────────
+\index{quantile regression|textbf}
+\index{qreg@\texttt{qreg()}|textbf}
+\index{median}
+\index{quantile}
+\index{heteroscedasticity}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{The model}
+
+OLS estimates $E[y \mid x]$ --- the conditional mean. Quantile Regression
+(QR) estimates $Q_\tau[y \mid x]$ --- the $\tau$-th conditional quantile for
+any $\tau \in (0,1)$:
+
+\[
+  Q_\tau(y \mid x) = x'\beta(\tau)
+\]
+
+The vector $\beta(\tau)$ varies with $\tau$: each quantile has its own set
+of coefficients. A single model can describe the entire conditional
+distribution of $y$.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{The estimator}
+
+The estimator minimizes the \textbf{asymmetric loss function} (check function):
+
+\[
+  \hat\beta(\tau) = \arg\min_\beta \sum_{i=1}^{n} \rho_\tau(y_i - x_i'\beta)
+\]
+
+where
+\[
+  \rho_\tau(u) =
+  \begin{cases}
+    \tau\, u       & \text{if } u \geq 0 \\
+    (\tau - 1)\,u  & \text{if } u < 0
+  \end{cases}
+\]
+
+For $\tau = 0{,}5$: $\rho_{0,5}(u) = |u|/2$ --- minimization of the sum of
+absolute deviations (LAD/median). For $\tau \neq 0{,}5$, positive and
+negative residuals receive asymmetric weights, shifting the estimate toward the
+$\tau$-th quantile.
+
+\begin{nota}
+  Unlike OLS, QR has no closed-form solution --- the problem
+  is a linear program solved by the simplex method or interior-point methods.
+  Therefore, standard inference uses bootstrap (\lstinline{boot=}).
+\end{nota}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Advantages over OLS}
+
+\begin{itemize}
+  \item \textbf{Heteroscedasticity:} when $\mathrm{Var}[y \mid x]$ varies
+        with $x$, the slopes $\beta_j(\tau)$ differ across quantiles. OLS
+        captures only the implicit weighted average.
+
+  \item \textbf{Robustness:} the check function is linear in the residuals, not
+        quadratic. Outliers in $y$ influence $\hat\beta(\tau)$
+        less than $\hat\beta_{\mathrm{OLS}}$.
+
+  \item \textbf{Skewed distribution:} wages, income and asset prices
+        have heavy right tails. QR describes effects in the tails without
+        assumptions about the shape of the distribution.
+\end{itemize}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{DGP Verification}
+
+The DGP below introduces multiplicative heteroscedasticity: the dispersion
+of $y$ grows with $x$, so that the effect of $x$ is larger in upper quantiles
+than in lower ones.
+
+\[
+  y_i = 2{,}0 + 1{,}5\,x_i + (1{,}0 + 0{,}8\,x_i)\,\varepsilon_i,
+  \quad \varepsilon_i \sim \mathcal{N}(0,1)
+\]
+
+The conditional quantile $Q_\tau(y \mid x)$ is increasing in $x$, and the
+slope $\partial Q_\tau / \partial x$ increases with $\tau$: individuals
+in upper quantiles are more sensitive to $x$ than those in the lower quantile.
+
+\begin{lstlisting}[caption={Heteroscedastic DGP --- OLS vs.\ four quantiles}]
+seed(42)
+input df
+id
+1
+end
+for i in 1..=10 { df = append(df, df) }
+df |> filter(_n <= 1000)
+generate df x = rnormal()
+generate df e = rnormal()
+generate df y = 2.0 + 1.5*x + (1.0 + 0.8*x)*e
+let m_ols = ols(y ~ x, df)
+let m_q25 = qreg(y ~ x, df, tau=0.25)
+let m_q50 = qreg(y ~ x, df, tau=0.50)
+let m_q75 = qreg(y ~ x, df, tau=0.75)
+esttab(m_ols, m_q25, m_q50, m_q75)
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+                            (1)              (2)              (3)              (4)
+                            OLS     QReg(τ=0.25)     QReg(τ=0.50)     QReg(τ=0.75)
+──────────────────────────────────────────────────────────────────────────────────
+x                     1.9947***        1.8739***        2.0149***        2.2462***
+                       (0.0454)         (0.0687)         (0.0833)         (0.0579)
+const                                  2.1659***        2.4525***        2.6637***
+                                        (0.0302)         (0.0433)         (0.0369)
+Constant              2.4538***
+                       (0.0261)
+──────────────────────────────────────────────────────────────────────────────────
+N                          1000                0                0                0
+R²                       0.6594
+Adj. R²                  0.6591
+──────────────────────────────────────────────────────────────────────────────────
+* p<0.10  ** p<0.05  *** p<0.01
+\end{lstlisting}
+
+The slope of $x$ grows monotonically: $1{,}87$ at Q25, $2{,}01$ at Q50
+and $2{,}25$ at Q75. OLS ($1{,}99$) is an implicit weighted average of these
+heterogeneous effects --- it summarizes in a single number what QR decomposes
+across the entire conditional distribution.
+
+The intercept also increases with $\tau$ ($2{,}17 \to 2{,}45 \to 2{,}66$),
+reflecting that upper quantiles of $y$ are above the mean for
+any value of $x$.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Syntax}
+
+\begin{lstlisting}
+qreg(y ~ x1 + x2, df, tau=0.5)
+qreg(y ~ x1 + x2, df, tau=0.5, boot=500)
+\end{lstlisting}
+
+The \lstinline{tau} parameter defines the desired quantile ($\tau \in (0,1)$,
+default $0{,}5$). The \lstinline{boot} parameter activates bootstrap for
+standard errors (default 200 replications).
+
+\begin{lstlisting}[caption={Typical workflow --- wages at multiple quantiles}]
+load "pnad.csv" as df
+
+let q10 = qreg(wage ~ educ + exp, df, tau=0.10, boot=500)
+let q50 = qreg(wage ~ educ + exp, df, tau=0.50, boot=500)
+let q90 = qreg(wage ~ educ + exp, df, tau=0.90, boot=500)
+let ols = ols(wage ~ educ + exp, df)
+
+esttab(ols, q10, q50, q90)
+\end{lstlisting}
+
+\section{Capturing the result}
+
+\begin{lstlisting}
+let m = qreg(y ~ x, df, tau=0.75)
+display m
+let yhat = predict(m, "xb")
+\end{lstlisting}

@@ -1,0 +1,24 @@
+// Cap 18 — Mínimos Quadrados Ordinários
+// DGP: y = 2.5 + 1.8*x1 - 0.7*x2 (sem ruído)
+// Parâmetros verdadeiros: b0=2.5, b1=1.8, b2=-0.7
+
+seed(42)
+input df
+id
+1
+end
+for i in 1..=10 { df = append(df, df) }
+df |> filter(_n <= 1000)
+generate df x1 = rnormal()
+generate df x2 = rnormal()
+generate df y  = 2.5 + 1.8*x1 - 0.7*x2
+
+// modelo correto vs. x2 omitido (viés de variável omitida)
+let m1 = ols(y ~ x1 + x2, df)
+let m2 = ols(y ~ x1, df)
+
+m1
+
+m2
+
+esttab(m1, m2)

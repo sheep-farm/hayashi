@@ -1,0 +1,38 @@
+// Cap 41 — Análise Multivariada (PCA, Análise Fatorial, Correlação Canônica)
+// DGP: 5 variáveis com 2 fatores latentes comuns
+
+seed(42)
+input df
+id
+1
+end
+for i in 1..=9 { df = append(df, df) }
+df |> filter(_n <= 300)
+
+// 2 fatores latentes f1, f2
+generate df f1 = rnormal()
+generate df f2 = rnormal()
+generate df e1 = (rnormal() - 0.5) * 0.5
+generate df e2 = (rnormal() - 0.5) * 0.5
+generate df e3 = (rnormal() - 0.5) * 0.5
+generate df e4 = (rnormal() - 0.5) * 0.5
+generate df e5 = (rnormal() - 0.5) * 0.5
+
+// Cargas fatoriais
+generate df v1 = 0.9 * f1 + 0.1 * f2 + e1
+generate df v2 = 0.8 * f1 + 0.2 * f2 + e2
+generate df v3 = 0.1 * f1 + 0.9 * f2 + e3
+generate df v4 = 0.2 * f1 + 0.8 * f2 + e4
+generate df v5 = 0.5 * f1 + 0.5 * f2 + e5
+
+// PCA: componentes principais
+let m_pca = pca(df, v1, v2, v3, v4, v5, n=2)
+display m_pca
+
+// Análise Fatorial: fatores rotacionados (varimax)
+let m_fac = factor(df, v1, v2, v3, v4, v5, n=2, rotation=varimax)
+display m_fac
+
+// Correlação canônica: conjunto X = {v1, v2}, conjunto Y = {v3, v4, v5}
+let m_can = cancorr(df, xvars=["v1","v2"], yvars=["v3","v4","v5"])
+display m_can

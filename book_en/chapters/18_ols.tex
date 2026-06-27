@@ -1,0 +1,417 @@
+\chapter{Ordinary Least Squares}
+\label{cap:ols}
+% ── index ───────────────────────────────────────────────────────
+\index{ordinary least squares|textbf}
+\index{OLS|see{ordinary least squares}}
+\index{ols@\texttt{ols()}|textbf}
+\index{omitted variable bias|textbf}
+\index{BLUE|textbf}
+\index{consistency}
+\index{heteroscedasticity}
+\index{robust standard errors}
+\index{esttab@\texttt{esttab()}|textbf}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{The model}
+
+Consider the linear regression model:
+
+\[
+  y = X\beta + \varepsilon
+\]
+
+where $y$ is an $n \times 1$ vector of observations of the dependent variable,
+$X$ is an $n \times k$ matrix of regressors (the first column is
+identically 1, corresponding to the intercept), $\beta$ is a
+$k \times 1$ vector of unknown parameters, and $\varepsilon$ is an
+$n \times 1$ vector of errors.
+
+\subsection*{Gauss-Markov Assumptions}
+
+\begin{enumerate}
+  \item \textbf{Linearity:} $y = X\beta + \varepsilon$.
+  \item \textbf{Full rank:} $\mathrm{rank}(X) = k$ (no perfect multicollinearity).
+  \item \textbf{Strict exogeneity:} $E[\varepsilon \mid X] = 0$.
+  \item \textbf{Homoscedasticity:} $\mathrm{Var}[\varepsilon \mid X] = \sigma^2 I_n$.
+  \item \textbf{No autocorrelation:} $\mathrm{Cov}[\varepsilon_i, \varepsilon_j \mid X] = 0$ for $i \neq j$.
+\end{enumerate}
+
+Under A1--A3 OLS is unbiased. Under A1--A5 it is BLUE (Gauss-Markov Theorem).
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{The estimator}
+
+The OLS estimator minimizes the sum of squared residuals:
+
+\[
+  \hat{\beta} = \arg\min_{\beta}\, (y - X\beta)'(y - X\beta)
+\]
+
+The first-order condition $X'(y - X\beta) = 0$ --- the \emph{normal equations} ---
+has an analytical solution:
+
+\[
+  \boxed{\hat{\beta} = (X'X)^{-1}X'y}
+\]
+
+The residuals are $\hat{e} = y - X\hat{\beta} = M_X y$, where
+$M_X = I - X(X'X)^{-1}X'$ is the residual maker matrix (symmetric and idempotent).
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Properties}
+
+Under A1--A3:
+\[
+  E[\hat{\beta}] = \beta
+\]
+
+Under A1--A5, the conditional variance of the estimator is:
+\[
+  \mathrm{Var}[\hat{\beta} \mid X] = \sigma^2 (X'X)^{-1}
+\]
+
+The unbiased estimator of the error variance is:
+\[
+  s^2 = \frac{\hat{e}'\hat{e}}{n - k}
+\]
+
+and therefore $\widehat{\mathrm{Var}}[\hat{\beta}] = s^2 (X'X)^{-1}$.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{DGP Verification}
+
+The most direct proof that the estimator is correct is to define a DGP
+(\emph{data-generating process}) with known parameters, generate data
+from it and verify that OLS recovers them.
+
+Choose the true parameters:
+\[
+  \beta_0 = 2{,}5 \qquad \beta_1 = 1{,}8 \qquad \beta_2 = -0{,}7
+\]
+
+and generate $n = 1000$ observations \emph{without} an error term ($\varepsilon = 0$):
+\[
+  y_i = 2{,}5 + 1{,}8\,x_{1i} - 0{,}7\,x_{2i}
+\]
+
+With $\varepsilon = 0$ the Gauss-Markov assumptions are satisfied exactly,
+and OLS must recover $(\beta_0, \beta_1, \beta_2)$ to machine precision.
+
+\begin{lstlisting}[caption={Noise-free DGP --- numerical verification}]
+seed(42)
+input df
+id
+1
+end
+for i in 1..=10 { df = append(df, df) }
+df |> filter(_n <= 1000)
+generate df x1 = rnormal()
+generate df x2 = rnormal()
+generate df y  = 2.5 + 1.8*x1 - 0.7*x2
+ols(y ~ x1 + x2, df)
+\end{lstlisting}
+
+\noindent Actual interpreter output:
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\scriptsize,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+=========================== OLS Regression Results ===========================
+Dep. Variable:                     y || R-squared:                    1.0000
+Model:                           OLS || Adj. R-squared:               1.0000
+Covariance Type:          Non-Robust || F-statistic:                  0.0000
+No. Observations:               1000 || Prob (F-statistic):         1.0000e0
+Df Residuals:                    997 || Log-Likelihood:           31513.9419
+AIC:                     -63021.8837 || BIC:                     -63007.1605
+
+------------------------------------------------------------------------------
+Variable   |       coef |    std err |        t |    P>|t| | [0.025  0.975]
+------------------------------------------------------------------------------
+const      |     2.5000 |     0.0000 | 6.17e+15 |    0.000 |  2.5000  2.5000
+x1         |     1.8000 |     0.0000 | 3.36e+15 |    0.000 |  1.8000  1.8000
+x2         |    -0.7000 |     0.0000 |-1.28e+15 |    0.000 | -0.7000 -0.7000
+==============================================================================
+\end{lstlisting}
+
+OLS recovers exactly $(\hat\beta_0, \hat\beta_1, \hat\beta_2) = (2{,}5;\; 1{,}8;\; -0{,}7)$.
+The zero standard error and $R^2 = 1$ are expected: without noise, the data lie
+exactly on the hyperplane defined by $\beta$, and the estimator is numerically
+exact to floating-point precision.
+
+\begin{nota}
+  The $F$-statistic appears as \texttt{0.0} and the p-value as \texttt{1.0}
+  in this case --- a numerical artifact of $0/0$ when $\mathrm{SSR} = 0$.
+  The $t$-statistics are on the order of $10^{15}$ for the same reason: finite
+  numerator divided by a machine-precision denominator.
+  In the presence of noise ($\varepsilon \neq 0$) all statistics take
+  finite and interpretable values.
+\end{nota}
+
+\subsection*{Misspecification effect}
+
+The same DGP allows us to verify what happens when $x_2$ is omitted.
+Two models are estimated and compared with \lstinline{esttab}:
+
+\begin{lstlisting}[caption={Correct model vs.\ omitted $x_2$}]
+let m1 = ols(y ~ x1 + x2, df)
+let m2 = ols(y ~ x1, df)
+esttab(m1, m2)
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+                            (1)              (2)
+                            OLS              OLS
+────────────────────────────────────────────────
+x1                    1.8000***        1.7422***
+                       (0.0000)         (0.0224)
+x2                   -0.7000***
+                       (0.0000)
+Constant              2.5000***        2.1810***
+                       (0.0000)         (0.0129)
+────────────────────────────────────────────────
+N                          1000             1000
+R²                       1.0000           0.8585
+Adj. R²                  1.0000           0.8583
+────────────────────────────────────────────────
+* p<0.10  ** p<0.05  *** p<0.01
+\end{lstlisting}
+
+\noindent The coefficient on $x_1$ barely changes (1.8000 $\to$ 1.7422) because
+$x_1$ and $x_2$ are generated independently --- the sample correlation is
+close to zero. The constant, however, is distorted from 2.5000 to 2.1810 because
+it absorbs $\hat\beta_2\,\bar{x}_2$, and the sample mean of $x_2$ is not
+exactly zero even with $n=1000$.
+
+\begin{nota}
+  Omitted variable bias (OVB) \emph{requires correlation} between the included
+  and the omitted regressor. Without correlation, omission only inflates standard
+  errors and reduces $R^2$ (loss of efficiency, not of consistency). For the
+  formal treatment of endogeneity and instruments, see
+  Chapter~\ref{cap:iv}.
+\end{nota}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Standard errors}
+
+\subsection*{Classical}
+
+Assumes homoscedasticity. The estimated covariance matrix is
+$s^2(X'X)^{-1}$ and the standard error of coefficient $j$ is
+$\mathrm{se}_j = s\,\sqrt{[(X'X)^{-1}]_{jj}}$.
+
+\subsection*{Heteroscedasticity-robust}
+
+When $\mathrm{Var}[\varepsilon_i \mid x_i] = \sigma_i^2$ (heteroscedasticity),
+the sandwich estimator provides valid inference.
+
+\textbf{HC1} (White with degrees-of-freedom correction):
+\[
+  \hat{V}_{\mathrm{HC1}} = \frac{n}{n-k}\,(X'X)^{-1}
+    \!\left(\sum_{i=1}^{n} \hat{e}_i^2\, x_i x_i'\right)\!(X'X)^{-1}
+\]
+
+\textbf{HC3} (more conservative, recommended in small samples):
+\[
+  \hat{V}_{\mathrm{HC3}} = (X'X)^{-1}
+    \!\left(\sum_{i=1}^{n} \frac{\hat{e}_i^2}{(1 - h_{ii})^2}\, x_i x_i'\right)\!(X'X)^{-1}
+\]
+
+where $h_{ii} = x_i'(X'X)^{-1}x_i$ is the \emph{leverage} of observation $i$.
+
+\subsection*{Clustered}
+
+When errors are correlated within groups $g = 1,\ldots,G$:
+\[
+  \hat{V}_{\mathrm{cl}} = \frac{G(n-1)}{(G-1)(n-k)}\,
+    (X'X)^{-1}\!\left(\sum_{g=1}^{G} X_g'\hat{e}_g\hat{e}_g'X_g\right)\!(X'X)^{-1}
+\]
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Inference}
+
+\subsection*{$t$-test on a single coefficient}
+
+Under H0: $\beta_j = \beta_j^0$:
+\[
+  t_j = \frac{\hat{\beta}_j - \beta_j^0}{\mathrm{se}(\hat{\beta}_j)}
+  \;\xrightarrow{d}\; t_{n-k}
+\]
+
+\subsection*{$F$-test on linear restrictions}
+
+For $R\beta = r$ with $q$ restrictions:
+\[
+  F = \frac{(R\hat{\beta} - r)'
+       \bigl[R\,(X'X)^{-1}R'\bigr]^{-1}
+       (R\hat{\beta} - r)}{q\,s^2}
+  \;\xrightarrow{d}\; F_{q,\,n-k}
+\]
+
+\begin{nota}
+  With robust or clustered errors, $\hat{V}$ replaces $s^2(X'X)^{-1}$
+  in the computation of the $F$-test.
+\end{nota}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Syntax}
+
+\begin{lstlisting}
+ols(formula, df)
+ols(formula, df, cov=type)
+ols(formula, df, cov=cluster, cluster=column)
+ols(formula, df, if = condition)
+\end{lstlisting}
+
+Alias: \lstinline{reg()} is equivalent to \lstinline{ols()}.
+
+\section{Formula}
+
+The formula follows the standard notation \texttt{y \textasciitilde{} x1 + x2 + ...}:
+
+\begin{lstlisting}[caption={Basic OLS}]
+input df
+Y X
+10 2
+12 3
+8  1
+15 5
+11 2
+14 4
+end
+
+ols(Y ~ X, df)
+\end{lstlisting}
+
+The intercept is included automatically. For multiple variables:
+
+\begin{lstlisting}
+ols(Y ~ X1 + X2 + X3, df)
+\end{lstlisting}
+
+The formula can be passed as a string:
+
+\begin{lstlisting}
+let formula = "Y ~ X1 + X2"
+ols(formula, df)
+\end{lstlisting}
+
+\section{Standard error options}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Option} & \textbf{Formula} \\
+\midrule
+(default)                           & $s^2(X'X)^{-1}$ \\
+\texttt{cov=robust}                 & HC1 (White sandwich) \\
+\texttt{cov=HC1}                    & same \\
+\texttt{cov=HC3}                    & HC3 (leverage-adjusted) \\
+\texttt{cov=cluster, cluster=col}   & clustered by \texttt{col} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{lstlisting}[caption={Standard error variants}]
+ols(Y ~ X, df)                           // classical
+ols(Y ~ X, df, cov=robust)              // HC1
+ols(Y ~ X, df, cov=HC3)                 // HC3
+ols(Y ~ X, df, cov=cluster, cluster=id) // clustered
+\end{lstlisting}
+
+\section{Conditional sample}
+
+The \lstinline{if =} option restricts estimation to a subset without modifying the DataFrame:
+
+\begin{lstlisting}
+ols(Y ~ X, df, if = group == 1)
+\end{lstlisting}
+
+\section{Capturing the result}
+
+\begin{lstlisting}
+let m = ols(Y ~ X, df)
+display m
+\end{lstlisting}
+
+When assigned, \lstinline{ols()} does not print the table --- it only stores the model.
+
+\section{Post-estimation}
+
+\subsection{\texttt{predict}}
+
+\begin{lstlisting}
+let m = ols(Y ~ X, df)
+
+// $\hat{y} = X\hat{\beta}$
+let yhat = predict(m, "xb")
+// $\hat{e} = y - X\hat{\beta}$
+let ehat = predict(m, "residuals")
+\end{lstlisting}
+
+Accepted aliases: \texttt{"fitted"} for fitted values; \texttt{"resid"} or \texttt{"e"} for residuals.
+
+\subsection{\texttt{vif}}
+
+The VIF of regressor $j$ is $\mathrm{VIF}_j = 1/(1 - R_j^2)$, where $R_j^2$ is the
+$R^2$ of the regression of $x_j$ on the remaining regressors. Values above 10
+indicate severe multicollinearity.
+
+\begin{lstlisting}
+let m = ols(Y ~ X1 + X2 + X3, df)
+vif(m)
+\end{lstlisting}
+
+\subsection{\texttt{test}}
+
+$F$-test of linear restrictions $H_0: R\beta = r$:
+
+\begin{lstlisting}
+let m = ols(Y ~ X1 + X2 + X3, df)
+test(m, X2 = 0, X3 = 0)    // H0: X2 = X3 = 0
+\end{lstlisting}
+
+\subsection{\texttt{lincom}}
+
+Linear combination $c'\hat{\beta}$ with standard error $\sqrt{c'\hat{V}c}$:
+
+\begin{lstlisting}
+let m = ols(Y ~ X1 + X2, df)
+lincom(m, X1 + X2)
+\end{lstlisting}
+
+\subsection{\texttt{margins}}
+
+Average marginal effects. In linear OLS $\partial E[y]/\partial x_j = \beta_j$,
+equivalent to the coefficients.
+
+\begin{lstlisting}
+let m = ols(Y ~ X, df)
+margins(m)
+\end{lstlisting}
+
+\section{Results table with \texttt{esttab}}
+
+\begin{lstlisting}[caption={Comparing specifications}]
+let m1 = ols(Y ~ X, df)
+let m2 = ols(Y ~ X, df, cov=robust)
+let m3 = ols(Y ~ X1 + X2, df)
+
+esttab(m1, m2, m3)
+\end{lstlisting}
+
+\begin{lstlisting}
+eststo(ols(Y ~ X, df))
+eststo(ols(Y ~ X1 + X2, df))
+esttab()
+\end{lstlisting}
+
+\section{Bootstrap}
+
+Bootstrap standard errors --- a nonparametric alternative:
+
+\begin{lstlisting}
+bootstrap(ols, Y ~ X, df, n=1000)
+bootse(m, n=500)
+\end{lstlisting}

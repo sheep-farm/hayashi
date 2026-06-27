@@ -1,0 +1,106 @@
+\chapter{Error Handling}
+
+\section{Error model}
+
+\hayashi{} distinguishes two types of error:
+
+\begin{description}
+  \item[Parse errors] Detected before execution, while analysing the code.
+        Include line number and code snippet.
+  \item[Runtime errors] Occur during execution — undefined variable, wrong
+        type, division by zero, missing key.
+\end{description}
+
+Both types display the code snippet and line number, making the source easy
+to locate:
+
+\begin{lstlisting}[style=inline]
+error: line 5: undefined variable 'income' — did you mean 'gross_income'?
+   5 | display income * 12
+     | ^^^^^^^^^^^^^^^^^^^
+\end{lstlisting}
+
+\section{\texttt{try} / \texttt{catch}}
+
+Runtime errors can be caught with \lstinline{try}/\lstinline{catch}:
+
+\begin{lstlisting}[caption={Basic try/catch}]
+try {
+  let result = 10 / 0
+  display result
+} catch e {
+  display f"Caught error: {e}"
+}
+\end{lstlisting}
+
+The variable \lstinline{e} inside \lstinline{catch} contains the error
+message as a string.
+
+\subsection*{Catching file errors}
+
+\begin{lstlisting}
+try {
+  load "missing_file.csv" as df
+} catch e {
+  display f"File not found: {e}"
+}
+\end{lstlisting}
+
+\subsection*{\texttt{try} as an expression}
+
+\lstinline{try}/\lstinline{catch} can return a value:
+
+\begin{lstlisting}
+let value = try {
+  int("not a number")
+} catch _ {
+  -1
+}
+display value    // -1
+\end{lstlisting}
+
+\section{Common errors and their messages}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Situation} & \textbf{Typical message} \\
+\midrule
+Undeclared variable   & \texttt{undefined variable 'x' — did you mean 'y'?} \\
+Unknown function      & \texttt{undefined function 'foo' — did you mean 'for'?} \\
+Wrong type            & \texttt{type mismatch — expected Int, got String} \\
+Index out of bounds   & \texttt{index 5 out of bounds (len=3)} \\
+Missing dict key      & \texttt{key 'name' not found in dict} \\
+Integer division by zero & \texttt{division by zero} \\
+File not found        & \texttt{file not found: 'path.csv'} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Automatic suggestions}
+
+When the name of a variable or function resembles something that exists,
+\hayashi{} suggests a correction:
+
+\begin{lstlisting}[style=inline]
+error: undefined function 'regres' — did you mean 'regress'?
+\end{lstlisting}
+
+Suggestions use edit distance (Levenshtein) over all names defined in scope
+and in built-in functions.
+
+\section{Re-throwing errors}
+
+To propagate a caught error:
+
+\begin{lstlisting}
+try {
+  risky_operation()
+} catch e {
+  display f"log: {e}"
+  error(e)    // re-throws the error
+}
+\end{lstlisting}
+
+The function \lstinline{error(msg)} throws a runtime error with the given
+message.

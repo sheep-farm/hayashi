@@ -1,0 +1,128 @@
+\chapter{Survival Analysis}
+\label{cap:sobrevivencia}
+% ── index ──────────────────────────────────────────────────────
+\index{survival analysis|textbf}
+\index{Kaplan-Meier, estimator|textbf}
+\index{km@\texttt{km()}|textbf}
+\index{Cox, model|textbf}
+\index{cox@\texttt{cox()}|textbf}
+\index{hazard function|textbf}
+\index{hazard ratio|textbf}
+\index{censoring}
+\index{proportional hazards, assumption of}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Failure Times and Censoring}
+
+Survival analysis models the \emph{time to an event} $T$ —
+firm bankruptcy, death, school dropout. The central challenge is
+\textbf{right censoring}: when the observation ends before the event,
+we only know $T > c$ (observation time $c$), not the exact time.
+
+Two fundamental concepts:
+
+\[
+  S(t) = P(T > t)
+  \quad\text{(survival function)}
+  \qquad
+  h(t) = \lim_{\delta\to 0} \frac{P(t \leq T < t+\delta \mid T \geq t)}{\delta}
+  \quad\text{(hazard function)}
+\]
+
+$S(t)$ decreases from 1 to 0; $h(t)$ measures the instantaneous failure rate
+given that the individual survived to $t$.
+
+\subsection*{Kaplan-Meier}
+
+The Kaplan-Meier (1958) non-parametric estimator estimates $S(t)$ without
+distributional assumptions:
+
+\[
+  \hat{S}(t) = \prod_{t_j \leq t} \left(1 - \frac{d_j}{n_j}\right)
+\]
+
+where $d_j$ is the number of events at time $t_j$ and $n_j$ the number at risk
+immediately before.
+
+\subsection*{Cox — Proportional Hazard}
+
+The Cox (1972) model specifies:
+
+\[
+  h(t \mid x_i) = h_0(t)\,\exp(\beta'\,x_i)
+\]
+
+The baseline hazard function $h_0(t)$ is left non-parametric. The
+coefficients $\beta$ are estimated by partial likelihood, without
+specifying $h_0$. The exponential $e^{\beta_j}$ is the \emph{hazard ratio}:
+a unit increase in $x_j$ multiplies the hazard by $e^{\beta_j}$.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{DGP Verification}
+
+The DGP uses Weibull failure times with shape parameter 1{,}5 and
+proportional hazard in $x \in \{0,1\}$. The true log-hazard ratio is $\beta_x = 0{,}8$.
+
+\begin{lstlisting}[caption={Survival DGP — Weibull with proportional hazard}]
+seed(42)
+generate df x      = rbernoulli(0.5)
+generate df u      = rnormal()
+generate df t_true = exp(-ln(u) / exp(0.8 * x))   // Weibull, beta=0.8
+generate df c      = 3.0
+generate df time   = t_true * (t_true <= c) + c * (t_true > c)
+generate df event  = (t_true <= c)
+
+let m_km  = km(time, event, df)
+display m_km
+
+let m_cox = cox(time ~ x, df, event=event)
+display m_cox
+\end{lstlisting}
+
+\subsection*{Kaplan-Meier}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+============== Kaplan-Meier Survival Estimate ==============
+Observations:               300
+Events:                     246
+Median survival:         1.6319
+\end{lstlisting}
+
+The median survival is 1{,}63: half of the individuals experience the
+event before this time.
+
+\subsection*{Cox}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+======================= Cox Proportional Hazards Model =======================
+Observations: 300   Events: 246   Log-Likelihood: -1235.9213
+Concordance:  0.6725
+------------------------------------------------------------------------------
+Variable  |    coef |  std err |       z |  P>|z| | exp(coef)
+x         |  0.7018 |   0.1306 |   5.372 |  0.000 |    2.0174
+\end{lstlisting}
+
+$\hat\beta_x = 0{,}702$ (true: 0{,}8) — within the confidence interval.
+The estimated hazard ratio $e^{0{,}702} = 2{,}02$: individuals with $x=1$ have
+an instantaneous hazard twice as large as $x=0$. The concordance index
+$C = 0{,}67$ indicates moderate discrimination (0{,}5 = random, 1{,}0 = perfect).
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Syntax}
+
+\begin{lstlisting}
+km(time, event, df)                          // Kaplan-Meier
+cox(time ~ x1 + x2, df, event=event_col)    // Cox PH
+\end{lstlisting}
+
+The \lstinline{event} column must be $1$ for event and $0$ for censoring.
+
+\begin{nota}
+  The Cox model assumes \emph{proportional hazards}: $h(t \mid x=1)/h(t \mid x=0)$
+  is constant over time. Violations can be detected via Schoenfeld residuals
+  or interactions with $\ln(t)$.
+\end{nota}

@@ -1,0 +1,247 @@
+\chapter{AR, MA and ARMA}
+\label{cap:arma}
+% ── index ───────────────────────────────────────────────────────
+\index{ARMA|textbf}
+\index{autoregressive|textbf}
+\index{moving average|textbf}
+\index{arima@\texttt{arima()}|textbf}
+\index{autocorrelation|textbf}
+\index{AIC|textbf}
+\index{BIC|textbf}
+\index{Box-Jenkins methodology|textbf}
+\index{stationarity|textbf}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Stochastic processes and stationarity}
+
+A \textbf{stochastic process} $\{y_t\}$ is (covariance) stationary when:
+\[
+  E[y_t] = \mu, \qquad
+  \mathrm{Var}[y_t] = \sigma^2, \qquad
+  \mathrm{Cov}(y_t, y_{t-k}) = \gamma_k
+\]
+for all $t$ --- mean, variance and autocovariances depend only on the
+lag $k$, not on time $t$.
+
+The simplest case is \textbf{white noise} $\varepsilon_t \sim
+\mathrm{WN}(0, \sigma^2)$: $E[\varepsilon_t] = 0$, $\mathrm{Var}[\varepsilon_t]
+= \sigma^2$ and $\mathrm{Cov}(\varepsilon_t, \varepsilon_s) = 0$ for $t \neq
+s$. White noise is the building block of all models in this section.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{AR(\textit{p}) process}
+
+The autoregressive model of order $p$ (\textbf{AR($p$)}) expresses $y_t$
+as a linear combination of its own past values plus a shock:
+
+\[
+  y_t = c + \phi_1 y_{t-1} + \phi_2 y_{t-2} + \cdots + \phi_p y_{t-p}
+        + \varepsilon_t
+\]
+
+For the AR(1), the stationarity condition is $|\phi_1| < 1$. When
+satisfied, the unconditional mean is $\mu = c / (1 - \phi_1)$ and the
+autocorrelation decays geometrically:
+\[
+  \rho_k = \phi_1^k, \qquad k = 0, 1, 2, \ldots
+\]
+
+The \textbf{Partial Autocorrelation Function} (PACF) cuts off to zero after
+lag $p$ --- a diagnostic signature of AR.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{MA(\textit{q}) process}
+
+The moving average model of order $q$ (\textbf{MA($q$)}) expresses $y_t$
+as a linear combination of current and past shocks:
+
+\[
+  y_t = \mu + \varepsilon_t + \theta_1 \varepsilon_{t-1}
+        + \cdots + \theta_q \varepsilon_{t-q}
+\]
+
+The MA($q$) is always stationary. The \textbf{Autocorrelation Function} (ACF)
+cuts off to zero after lag $q$ --- in contrast with AR, whose ACF decays
+geometrically. The \textbf{invertibility} condition ($|\theta_1| < 1$
+for MA(1)) guarantees a unique AR($\infty$) representation.
+
+\begin{nota}
+  Standard diagnostic: ACF decays slowly and PACF cuts off $\to$ AR($p$);
+  ACF cuts off and PACF decays slowly $\to$ MA($q$); both decay $\to$ ARMA.
+\end{nota}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{ARMA(\textit{p},\,\textit{q}) process}
+
+The ARMA($p$,$q$) combines both mechanisms:
+\[
+  y_t = c + \sum_{i=1}^p \phi_i y_{t-i}
+        + \varepsilon_t + \sum_{j=1}^q \theta_j \varepsilon_{t-j}
+\]
+
+It is stationary when the roots of the AR polynomial lie outside the unit
+circle and invertible when the roots of the MA polynomial do as well.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{DGP Verification}
+
+Since there is no lag generator in \lstinline{generate}, the processes
+are constructed with a \lstinline{while} loop that fills $y_t$ row by
+row, using \lstinline{mean(..., if = t == k)} as an accessor for row $k$.
+
+\subsection*{AR(1) with $\phi = 0{,}7$}
+
+\begin{lstlisting}[caption={AR(1) DGP and estimation}]
+seed(42)
+input df
+id
+1
+end
+for i in 1..=9 { df = append(df, df) }
+df |> filter(_n <= 500)
+generate df e = rnormal()
+generate df y = 0.0
+generate df t = _n
+let n = nrow(df)
+let i = 2
+while i <= n {
+    let lag_y = mean(df, y, if = t == i - 1)
+    let et    = mean(df, e, if = t == i)
+    replace df y = 0.7 * lag_y + et if t == i
+    i = i + 1
+}
+let m = arima(df, y, p=1, d=0, q=0)
+display m
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+================== ARIMA(1,0,0) via Hannan-Rissanen ==================
+Observations:               494
+AIC:                   157.7072   BIC:                   166.1123
+Parameters:
+  intercept   0.5454   std=0.0557   z=9.786   p=0.000   [0.4362, 0.6547]
+  ar.L1       0.6638   std=0.0335   z=19.814  p=0.000   [0.5981, 0.7295]
+======================================================================
+\end{lstlisting}
+
+$\hat\phi_1 = 0{,}6638$ with true $\phi_1 = 0{,}7$; the 95\% CI $[0{,}60;\;
+0{,}73]$ covers the true value.
+
+\subsection*{MA(1) with $\theta = 0{,}5$}
+
+\begin{lstlisting}[caption={MA(1) DGP and estimation}]
+generate df y = e
+let i = 2
+while i <= n {
+    let lag_e = mean(df, e, if = t == i - 1)
+    replace df y = y + 0.5 * lag_e if t == i
+    i = i + 1
+}
+let m = arima(df, y, p=0, d=0, q=1)
+display m
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+================== ARIMA(0,0,1) via Hannan-Rissanen ==================
+Observations:               493
+AIC:                   162.5430   BIC:                   170.9441
+Parameters:
+  intercept   0.7297   std=0.0128   z=57.014  p=0.000   [0.7046, 0.7548]
+  ma.L1       0.5087   std=0.0456   z=11.163  p=0.000   [0.4194, 0.5980]
+======================================================================
+\end{lstlisting}
+
+$\hat\theta_1 = 0{,}5087 \approx 0{,}5$; 95\% CI $[0{,}42;\; 0{,}60]$
+covers $\theta_1 = 0{,}5$.
+
+\subsection*{ARMA(1,1) with $\phi=0{,}6$ and $\theta=0{,}4$}
+
+\begin{lstlisting}[caption={ARMA(1{,}1) DGP and estimation}]
+generate df y = e
+let i = 2
+while i <= n {
+    let lag_y = mean(df, y, if = t == i - 1)
+    let lag_e = mean(df, e, if = t == i - 1)
+    let et    = mean(df, e, if = t == i)
+    replace df y = 0.6*lag_y + et + 0.4*lag_e if t == i
+    i = i + 1
+}
+let m = arima(df, y, p=1, d=0, q=1)
+display m
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+================== ARIMA(1,0,1) via Hannan-Rissanen ==================
+Observations:               493
+AIC:                   159.4217   BIC:                   172.0233
+Parameters:
+  intercept   0.8073   std=0.0660   z=12.227  p=0.000   [0.6779, 0.9367]
+  ar.L1       0.5259   std=0.0380   z=13.831  p=0.000   [0.4514, 0.6004]
+  ma.L1       0.4829   std=0.0591   z=8.167   p=0.000   [0.3670, 0.5987]
+======================================================================
+\end{lstlisting}
+
+Both parameters are recovered with good precision: $\hat\phi = 0{,}53$
+(true $0{,}6$) and $\hat\theta = 0{,}48$ (true $0{,}4$).
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Order selection}
+
+\hayashi{} reports AIC and BIC automatically. The practical criterion:
+
+\begin{enumerate}
+  \item Estimate models with orders $(p,q)$ on a small grid (e.g.\ $0
+        \leq p,q \leq 3$).
+  \item Select the model with the lowest AIC (preference for fit) or BIC
+        (preference for parsimony).
+  \item Verify that the residuals are white noise.
+\end{enumerate}
+
+\begin{lstlisting}[caption={Order selection by AIC}]
+let m00 = arima(df, y, p=0, d=0, q=0)
+let m10 = arima(df, y, p=1, d=0, q=0)
+let m01 = arima(df, y, p=0, d=0, q=1)
+let m11 = arima(df, y, p=1, d=0, q=1)
+esttab(m00, m10, m01, m11)
+\end{lstlisting}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Syntax}
+
+\begin{lstlisting}
+arima(df, y, p=1, d=0, q=0)
+arima(df, y, p=0, d=0, q=1)
+arima(df, y, p=1, d=1, q=1)
+\end{lstlisting}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Parameter} & \textbf{Default} & \textbf{Description} \\
+\midrule
+\texttt{p} & \texttt{0} & autoregressive order \\
+\texttt{d} & \texttt{0} & degree of differencing \\
+\texttt{q} & \texttt{0} & moving average order \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{lstlisting}[caption={Typical workflow with real data}]
+load "cpi.csv" as df
+
+let m = arima(df, inflation, p=1, d=0, q=1)
+display m
+let yhat = predict(m, "xb")
+\end{lstlisting}
+
+\begin{nota}
+  The \lstinline{while} loop in the DGPs above is $O(n^2)$ and is only used to
+  illustrate the structure of the process. In real use, data are loaded
+  from a file with \lstinline{load} and the loop is not needed.
+\end{nota}

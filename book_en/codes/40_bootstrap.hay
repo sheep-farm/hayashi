@@ -1,0 +1,23 @@
+// Cap 40 — Bootstrap
+// DGP: y = 1 + 2*x + e, e ~ heavy-tailed (uniforme não é normal)
+// Objetivo: comparar SE analítico (OLS) vs. SE bootstrap
+// Bootstrap é mais robusto quando distribuição do erro é desconhecida
+
+seed(42)
+input df
+id
+1
+end
+for i in 1..=9 { df = append(df, df) }
+df |> filter(_n <= 200)
+generate df x = rnormal()
+generate df e = (rnormal() - 0.5) * 4.0   // erro com suporte [-2, 2] — não gaussiano
+generate df y = 1.0 + 2.0 * x + e
+
+// OLS padrão (SE analítico)
+let m_ols = ols(y ~ x, df)
+display m_ols
+
+// Bootstrap SE — reamostragem com reposição
+let m_boot = bootstrap("ols", y ~ x, df, reps=500)
+display m_boot

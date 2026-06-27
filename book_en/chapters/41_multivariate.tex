@@ -1,0 +1,152 @@
+\chapter{Multivariate Analysis}
+\label{cap:multivariada}
+% ── index ───────────────────────────────────────────────────────
+\index{principal component analysis|textbf}
+\index{PCA|see{principal component analysis}}
+\index{pca@\texttt{pca()}|textbf}
+\index{factor analysis|textbf}
+\index{factor@\texttt{factor()}|textbf}
+\index{canonical correlation|textbf}
+\index{cancorr@\texttt{cancorr()}|textbf}
+\index{varimax, rotation}
+\index{MANOVA|textbf}
+\index{factor loadings}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Dimensionality reduction and latent structure}
+
+When observing a vector of variables $\mathbf{v} = (v_1,\ldots,v_p)'$
+that share common variation, it is useful to summarize that variation in a few
+dimensions. Two approaches complement each other:
+
+\begin{itemize}
+  \item \textbf{PCA}: maximizes variance explained by orthogonal components
+  (algebraic solution — spectral decomposition of the covariance matrix).
+  \item \textbf{Factor Analysis}: models variables as a linear combination of
+  unobserved latent factors + uniqueness (idiosyncratic part).
+\end{itemize}
+
+\subsection*{Principal Component Analysis (PCA)}
+
+\[
+  \mathbf{v} = W\,\mathbf{f} + \mathbf{e}
+  \qquad W = \text{eigenvectors of } \Sigma_v
+\]
+
+The $j$-th principal component $\text{PC}_j = w_j'\mathbf{v}$ captures the
+$j$-th largest fraction of total variance. Eigenvalues measure the variance
+of each PC; the sum of all eigenvalues is $\mathrm{tr}(\Sigma_v) = \sum \mathrm{Var}(v_j)$.
+
+\subsection*{Factor Analysis}
+
+\[
+  \mathbf{v} = \Lambda\,\mathbf{f} + \boldsymbol{\delta}
+  \qquad \mathbf{f} \perp \boldsymbol{\delta}
+\]
+
+$\Lambda$ are the \emph{factor loadings}: $\lambda_{ij}$ measures how much
+factor $j$ contributes to $v_i$. The \emph{communality} $h_i^2 = \sum_j \lambda_{ij}^2$
+is the fraction of variance of $v_i$ explained by the common factors.
+
+\subsection*{Canonical Correlation}
+
+Given two sets of variables $X = (x_1,\ldots,x_p)$ and $Y = (y_1,\ldots,y_q)$,
+canonical analysis finds vectors $a$ and $b$ such that $\mathrm{Corr}(a'X, b'Y)$
+is maximized. It provides $\min(p,q)$ canonical pairs.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{DGP Verification}
+
+DGP with 2 latent factors and 5 observed variables.
+
+\begin{lstlisting}[caption={Factorial DGP and multivariate analysis}]
+seed(42)
+generate df f1 = rnormal()
+generate df f2 = rnormal()
+// v1, v2: high loadings on f1; v3, v4: high loadings on f2; v5: both
+generate df v1 = 0.9*f1 + 0.1*f2 + e1
+generate df v2 = 0.8*f1 + 0.2*f2 + e2
+generate df v3 = 0.1*f1 + 0.9*f2 + e3
+generate df v4 = 0.2*f1 + 0.8*f2 + e4
+generate df v5 = 0.5*f1 + 0.5*f2 + e5
+
+let m_pca = pca(df, v1, v2, v3, v4, v5, n=2)
+display m_pca
+
+let m_fac = factor(df, v1, v2, v3, v4, v5, n=2, rotation=varimax)
+display m_fac
+
+let m_can = cancorr(df, xvars=["v1","v2"], yvars=["v3","v4","v5"])
+display m_can
+\end{lstlisting}
+
+\subsection*{PCA}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+════════════════════════════════════════════════
+     Principal Component Analysis
+────────────────────────────────────────────────
+ Component    Var Expl.    % Accum.   Eigenvalue
+ PC1              0.5939     0.5939       2.9695
+ PC2              0.2437     0.8377       1.2187
+────────────────────────────────────────────────
+Loadings:
+          PC1      PC2
+ v1     0.677   -0.641
+ v2     0.808   -0.450
+ v3     0.693    0.623
+ v4     0.790    0.466
+ v5     0.868   -0.002
+════════════════════════════════════════════════
+\end{lstlisting}
+
+PC1 (59{,}4\% of variance) has positive loadings on all variables —
+captures the common component. PC2 (24{,}4\%) contrasts the $f_1$ group (v1, v2)
+with the $f_2$ group (v3, v4). The two PCs account for 83{,}8\% of total variance.
+
+\subsection*{Factor Analysis}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+════════════════════════════════════════════════
+        Factor Analysis — Varimax
+────────────────────────────────────────────────
+Variable        F1       F2  Communal.
+ v1           0.027   -0.932      0.869
+ v2           0.255   -0.889      0.856
+ v3           0.931   -0.048      0.869
+ v4           0.888   -0.228      0.841
+ v5           0.613   -0.614      0.753
+════════════════════════════════════════════════
+\end{lstlisting}
+
+After varimax rotation, F1 loads on v3 and v4 (associated with latent factor
+$f_2$); F2 loads on v1 and v2 (factor $f_1$). Communalities above 0{,}75
+confirm that common factors explain a large part of individual variance.
+
+\subsection*{Canonical Correlation}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+============== Canonical Correlation Analysis ==============
+Observations: 300  Wilks' Lambda: 0.5396  F=35.54  p=0.000
+  CC1: 0.6706    CC2: 0.1396
+X vars: v1, v2  |  Y vars: v3, v4, v5
+============================================================
+\end{lstlisting}
+
+The first canonical correlation $\hat\rho_1 = 0{,}671$ captures the association
+between block \{v1, v2\} and block \{v3, v4, v5\} through the shared latent factor.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Syntax}
+
+\begin{lstlisting}
+pca(df, v1, v2, v3, ..., n=2)                    // n components to retain
+factor(df, v1, v2, v3, ..., n=2, rotation=none)  // rotation: none | varimax
+cancorr(df, xvars=["x1","x2"], yvars=["y1","y2"])
+\end{lstlisting}

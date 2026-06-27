@@ -1,0 +1,50 @@
+// Cap 26 — AR, MA e ARMA
+// DGP via laço while (sem lag() no generate)
+// N=500; padrão: mean(df, col, if = t == k) como acessor de linha k
+
+seed(42)
+input df
+id
+1
+end
+for i in 1..=9 { df = append(df, df) }
+df |> filter(_n <= 500)
+generate df e = rnormal()
+generate df t = _n
+let n = nrow(df)
+
+// ── AR(1): phi=0.7 ───────────────────────────────────────────
+generate df y = 0.0
+let i = 2
+while i <= n {
+    let lag_y = mean(df, y, if = t == i - 1)
+    let et    = mean(df, e, if = t == i)
+    replace df y = 0.7 * lag_y + et if t == i
+    i = i + 1
+}
+let m = arima(df, y, p=1, d=0, q=0)
+display m
+
+// ── MA(1): theta=0.5 ─────────────────────────────────────────
+generate df y = e
+let i = 2
+while i <= n {
+    let lag_e = mean(df, e, if = t == i - 1)
+    replace df y = y + 0.5 * lag_e if t == i
+    i = i + 1
+}
+let m = arima(df, y, p=0, d=0, q=1)
+display m
+
+// ── ARMA(1,1): phi=0.6, theta=0.4 ───────────────────────────
+generate df y = e
+let i = 2
+while i <= n {
+    let lag_y = mean(df, y, if = t == i - 1)
+    let lag_e = mean(df, e, if = t == i - 1)
+    let et    = mean(df, e, if = t == i)
+    replace df y = 0.6*lag_y + et + 0.4*lag_e if t == i
+    i = i + 1
+}
+let m = arima(df, y, p=1, d=0, q=1)
+display m

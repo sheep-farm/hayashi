@@ -1,0 +1,286 @@
+\chapter{Descriptive Statistics and Moments}
+\label{cap:probabilidade}
+
+This chapter presents \hayashi{}'s descriptive statistics tools as
+expressions of probability theory. Each function maps directly to a
+theoretical concept, making the code readable both for those coming from
+mathematics and for those coming from Stata or R.
+
+\section{Expected value}
+
+The expected value $E(X)$ of a discrete random variable is the
+weighted average of its values. For observed data, the natural estimator
+is the sample mean:
+
+\[
+  \hat{E}(X) = \bar{X} = \frac{1}{n}\sum_{i=1}^{n} x_i
+\]
+
+In \hayashi{}, \lstinline{mean} accepts a list or a DataFrame column:
+
+\begin{lstlisting}[caption={E(X) over a list and over a column}]
+// over a list
+let xs = [2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0]
+display mean(xs)    // 5.0
+
+// over a DataFrame column
+load "data.csv" as df
+display mean(df, income)
+\end{lstlisting}
+
+\section{Variance and standard deviation}
+
+The sample variance and sample standard deviation are:
+
+\[
+  \widehat{\mathrm{Var}}(X) = s^2 = \frac{1}{n-1}\sum_{i=1}^{n}(x_i - \bar{X})^2
+  \qquad
+  s = \sqrt{s^2}
+\]
+
+The divisor $n-1$ (Bessel's correction) yields an unbiased estimator of
+$\sigma^2$. All \hayashi{} functions use this convention.
+
+\begin{lstlisting}[caption={Variance and standard deviation}]
+display variance(df, income)   // s²
+display sd(df, income)         // s
+\end{lstlisting}
+
+\begin{nota}
+  \lstinline{sd} and \lstinline{std} are aliases — both compute the sample
+  standard deviation with divisor $n-1$.
+\end{nota}
+
+To obtain all moments at once, \lstinline{summarize} returns a dictionary:
+
+\begin{lstlisting}
+let stats = summarize(df, income)
+
+display stats["mean"]      // mean
+display stats["sd"]        // standard deviation
+display stats["variance"]  // variance
+display stats["min"]       // minimum
+display stats["max"]       // maximum
+display stats["N"]         // number of observations
+\end{lstlisting}
+
+\section{Conditional moments}
+
+The conditional expected value $E(X \mid C)$ restricts the calculation to
+a subset of the sample without creating an auxiliary DataFrame. The
+\lstinline{if =} option is available in all scalar aggregation functions:
+
+\begin{lstlisting}[caption={Conditional moments with if =}]
+// E(income | sector == "public")
+display mean(df, income, if = sector == "public")
+
+// Var(income | sector == "public")
+display variance(df, income, if = sector == "public")
+
+// SD(income | sector == "public")
+display sd(df, income, if = sector == "public")
+\end{lstlisting}
+
+The condition is evaluated row by row on the DataFrame — any Boolean
+expression over columns is valid:
+
+\begin{lstlisting}[caption={Compound conditions}]
+display mean(df, wage,   if = educ >= 12 and sex == 1)
+display sd(df,   income, if = state == "TX" or state == "CA")
+\end{lstlisting}
+
+\begin{dica}
+  \lstinline{if =} does not modify the DataFrame. Use \lstinline{filter}
+  to create a permanent subsample; use \lstinline{if =} for a one-off
+  calculation.
+\end{dica}
+
+\section{Covariance}
+
+The sample covariance between $X$ and $Y$ measures their joint variation:
+
+\[
+  \widehat{\mathrm{Cov}}(X, Y)
+  = \frac{1}{n-1}\sum_{i=1}^{n}(x_i - \bar{X})(y_i - \bar{Y})
+\]
+
+\begin{lstlisting}[caption={Covariance between two columns}]
+display cov(df, educ, wage)
+
+// conditional: formal workers only
+display cov(df, educ, wage, if = formal == 1)
+\end{lstlisting}
+
+\begin{nota}
+  $\mathrm{Cov}(X, X) = \mathrm{Var}(X)$. To verify:
+  \lstinline{cov(df, x, x)} returns the same value as
+  \lstinline{variance(df, x)}.
+\end{nota}
+
+\section{Correlation}
+
+\subsection{Scalar between two variables}
+
+Pearson's correlation coefficient normalises the covariance by the product
+of standard deviations:
+
+\[
+  \rho(X, Y) = \frac{\mathrm{Cov}(X,Y)}{\mathrm{SD}(X)\,\mathrm{SD}(Y)}
+  \in [-1,\, 1]
+\]
+
+\lstinline{corr_pair} returns this scalar directly:
+
+\begin{lstlisting}[caption={Scalar correlation}]
+display corr_pair(df, educ, wage)
+
+// conditional: private sector
+display corr_pair(df, educ, wage, if = sector == "private")
+\end{lstlisting}
+
+\subsection{Correlation matrix}
+
+To explore all relationships among multiple variables, use
+\lstinline{correlate}:
+
+\begin{lstlisting}[caption={Full correlation matrix}]
+// all numeric variables
+correlate(df)
+
+// explicit subset
+correlate(df, educ, exp, wage)
+
+// with p-values (* p<0.1  ** p<0.05  *** p<0.01)
+pwcorr(df, educ, exp, wage)
+\end{lstlisting}
+
+\begin{nota}
+  \lstinline{correlate} prints the matrix but does not return a value —
+  use \lstinline{corr_pair} when you need the scalar in a calculation.
+\end{nota}
+
+\section{Median and quantiles}
+
+The median is the central value of the ordered distribution, less
+sensitive to extreme values than the mean.
+
+\begin{lstlisting}[caption={Median}]
+display median(df, income)
+
+// conditional
+display median(df, income, if = region == "South")
+\end{lstlisting}
+
+Quantiles generalise the median to any point $p \in [0, 1]$ of the
+distribution:
+
+\begin{lstlisting}[caption={Quantiles}]
+display quantile(df, income, 0.25)   // 1st quartile
+display quantile(df, income, 0.50)   // median
+display quantile(df, income, 0.75)   // 3rd quartile
+display quantile(df, income, 0.90)   // 90th percentile
+\end{lstlisting}
+
+\lstinline{quantile} accepts \lstinline{if =}:
+
+\begin{lstlisting}
+// 90th percentile of income among college-educated workers
+display quantile(df, income, 0.90, if = educ >= 16)
+\end{lstlisting}
+
+Both functions accept lists directly:
+
+\begin{lstlisting}
+let xs = [3.0, 1.0, 4.0, 1.0, 5.0, 9.0, 2.0, 6.0]
+display median(xs)           // 3.5
+display quantile(xs, 0.75)   // 5.25
+\end{lstlisting}
+
+\section{Detailed summary}
+
+\lstinline{summarize} with \lstinline{detail=true} expands the return
+dictionary to include skewness, kurtosis, and the full percentile grid:
+
+\begin{lstlisting}[caption={summarize with detail}]
+let s = summarize(df, income, detail=true)
+
+display s["mean"]     // mean
+display s["sd"]       // standard deviation
+display s["p25"]      // 1st quartile
+display s["p50"]      // median
+display s["p75"]      // 3rd quartile
+display s["p90"]      // 90th percentile
+display s["p99"]      // 99th percentile
+display s["skew"]     // skewness
+display s["kurt"]     // kurtosis
+\end{lstlisting}
+
+\section{Quick reference}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Notation} & \textbf{Hayashi} & \textbf{Forms} \\
+\midrule
+$E(X)$
+  & \lstinline{mean(df, x)}
+  & list / df / \lstinline{if =} \\
+$\mathrm{Var}(X)$
+  & \lstinline{variance(df, x)}
+  & list / df / \lstinline{if =} \\
+$\mathrm{SD}(X)$
+  & \lstinline{sd(df, x)}
+  & list / df / \lstinline{if =} \\
+$\mathrm{Cov}(X, Y)$
+  & \lstinline{cov(df, x, y)}
+  & df / \lstinline{if =} \\
+$\rho(X, Y)$
+  & \lstinline{corr_pair(df, x, y)}
+  & df / \lstinline{if =} \\
+$\mathrm{Med}(X)$
+  & \lstinline{median(df, x)}
+  & list / df / \lstinline{if =} \\
+$Q_p(X)$
+  & \lstinline{quantile(df, x, p)}
+  & list / df / \lstinline{if =} \\
+\midrule
+\multicolumn{2}{l}{\lstinline{correlate(df, x, y, ...)}}
+  & correlation matrix (display) \\
+\multicolumn{2}{l}{\lstinline{summarize(df, x)}}
+  & full dictionary of moments \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Complete example}
+
+The snippet below illustrates the joint use of these functions in a typical
+exploratory analysis before estimating a model:
+
+\begin{lstlisting}[caption={Exploratory analysis — income and education}]
+load "survey.csv" as df
+
+// overview
+summarize(df, income)
+summarize(df, educ)
+correlate(df, income, educ, exp)
+
+// moments by group
+display mean(df, income, if = sex == 1)      // men
+display mean(df, income, if = sex == 0)      // women
+
+display sd(df, income, if = sex == 1)
+display sd(df, income, if = sex == 0)
+
+// gap between median and mean: sign of skewness
+display mean(df, income)
+display median(df, income)
+
+// linear association
+display cov(df, educ, income)
+display corr_pair(df, educ, income)
+
+// concentration at the top
+display quantile(df, income, 0.90)
+display quantile(df, income, 0.99)
+\end{lstlisting}

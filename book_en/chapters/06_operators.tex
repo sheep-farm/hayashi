@@ -1,0 +1,127 @@
+\chapter{Operators}
+
+\section{Arithmetic}
+
+\begin{center}
+\begin{tabular}{cll}
+\toprule
+\textbf{Operator} & \textbf{Operation} & \textbf{Example} \\
+\midrule
+\texttt{+}  & Addition       & \texttt{3 + 2} → \texttt{5} \\
+\texttt{-}  & Subtraction    & \texttt{5 - 3} → \texttt{2} \\
+\texttt{*}  & Multiplication & \texttt{4 * 3} → \texttt{12} \\
+\texttt{/}  & Division       & \texttt{7 / 2} → \texttt{3} (integers) \\
+\texttt{\^} & Power          & \texttt{2\^{}10} → \texttt{1024} \\
+\texttt{\%} & Modulo         & \texttt{7 \% 3} → \texttt{1} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Division between two \texttt{Int} values is integer division (truncated
+toward zero). For real division, at least one operand must be
+\texttt{Float}:
+
+\begin{lstlisting}
+7 / 2      // 3
+7 / 2.0    // 3.5
+7.0 / 2    // 3.5
+\end{lstlisting}
+
+\section{Comparison}
+
+\begin{center}
+\begin{tabular}{cll}
+\toprule
+\textbf{Operator} & \textbf{Meaning} & \textbf{Example} \\
+\midrule
+\texttt{==} & Equal to              & \texttt{3 == 3} → \texttt{true} \\
+\texttt{!=} & Not equal to          & \texttt{3 != 4} → \texttt{true} \\
+\texttt{>}  & Greater than          & \texttt{5 > 3}  → \texttt{true} \\
+\texttt{<}  & Less than             & \texttt{3 < 5}  → \texttt{true} \\
+\texttt{>=} & Greater than or equal & \texttt{3 >= 3} → \texttt{true} \\
+\texttt{<=} & Less than or equal    & \texttt{2 <= 3} → \texttt{true} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Logical}
+
+\begin{lstlisting}
+true and false    // false
+true or false     // true
+not true          // false
+\end{lstlisting}
+
+\lstinline{and} and \lstinline{or} use short-circuit evaluation: the
+second operand is not evaluated if the result is already determined by
+the first.
+
+\section{The \texttt{in} operator}
+
+Tests membership in a list:
+
+\begin{lstlisting}
+let regions = ["north", "south", "center"]
+"south" in regions    // true
+"east"  in regions    // false
+\end{lstlisting}
+
+Also works with ranges:
+
+\begin{lstlisting}
+5  in 1..10    // true
+15 in 1..10    // false
+\end{lstlisting}
+
+\section{The pipe operator \texttt{|>}}
+\label{sec:pipe}
+
+The \lstinline{|>} operator passes the value on the left as the first
+argument to the function on the right:
+
+\begin{lstlisting}
+// without pipe
+display filter(df, x > 5)
+
+// with pipe — more readable
+df |> filter(x > 5) |> display
+\end{lstlisting}
+
+The pipe has special semantics with DataFrames: when used without an
+explicit assignment (\lstinline{let}), the result is assigned back to the
+source variable:
+
+\begin{lstlisting}
+let df = load("data.csv")
+
+// updates df in place
+df |> filter(x > 0) |> sort(x)
+
+// creates df2, df remains unchanged
+let df2 = df |> filter(x > 0)
+\end{lstlisting}
+
+This behaviour is discussed in detail in Chapter~\ref{cap:pipes}.
+
+\section{Precedence}
+
+From lowest to highest priority:
+
+\begin{enumerate}
+  \item \texttt{or}
+  \item \texttt{and}
+  \item \texttt{not}
+  \item \texttt{== != > < >= <=}
+  \item \texttt{+ -}
+  \item \texttt{* / \%}
+  \item \texttt{\^} (right-associative)
+  \item Unary \texttt{-}
+  \item Function call, indexing, field access
+\end{enumerate}
+
+Use parentheses for clarity when precedence is not obvious:
+
+\begin{lstlisting}
+2 + 3 * 4       // 14  (multiplication first)
+(2 + 3) * 4     // 20
+\end{lstlisting}

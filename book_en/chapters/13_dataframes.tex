@@ -1,0 +1,154 @@
+\chapter{DataFrames}
+\label{cap:dataframes}
+
+\section{What is a DataFrame}
+
+A DataFrame is a two-dimensional table with named columns. In \hayashi{},
+each column is a 64-bit floating-point vector. Missing values are
+represented by \texttt{NaN} (\textit{Not a Number}).
+
+The DataFrame is the central type of the language — virtually every
+econometric analysis starts with a DataFrame loaded from some source.
+
+\section{Copy semantics (COW)}
+
+DataFrames use copy-on-write (COW) semantics: assigning a DataFrame to
+another variable creates an alias that shares the same internal data. The
+actual copy occurs only when one of them is modified.
+
+\begin{lstlisting}[caption={COW: baseline preserved}]
+load "panel.csv" as df
+
+let baseline = df      // cheap alias, no copy
+
+let df2 = df |> generate(z = x^2)    // df2 has 'z', df does not
+let df3 = df |> filter(year > 2000)  // df3 filtered, df intact
+
+// baseline == original df at any point
+\end{lstlisting}
+
+This semantics allows creating analysis variants with no memory cost until
+an actual modification is needed.
+
+\section{Creating DataFrames}
+
+\subsection*{\texttt{input} block}
+
+For small inline datasets — ideal for examples and tests:
+
+\begin{lstlisting}[caption={input block}]
+input x y z
+  1   2  10
+  3   4  20
+  5   6  30
+end
+\end{lstlisting}
+
+The \lstinline{input} block creates a DataFrame named \lstinline{df} by
+default. The number of columns is defined by the header; each data row
+must have the same number of values.
+
+\begin{nota}
+  \lstinline{input} accepts only numeric values. Use \lstinline{.} to
+  represent missing values. For data with text columns, use
+  \lstinline{load}.
+\end{nota}
+
+\subsection*{\texttt{load} — external files}
+
+\begin{lstlisting}[caption={Loading files}]
+load "data.csv" as sales
+load "panel.dta" as panel        // Stata format
+load "results.parquet" as df
+load "sheet.xlsx" as df          // first sheet
+load "sheet.xlsx" sheet="Data" as df
+\end{lstlisting}
+
+Supported formats: CSV, Parquet, Stata (\texttt{.dta}), Excel
+(\texttt{.xlsx}), SQLite.
+
+\section{Saving DataFrames}
+
+\begin{lstlisting}
+save df "output.csv"
+save df "output.parquet"
+save df "output.dta"
+save df "output.xlsx"
+\end{lstlisting}
+
+\section{Inspecting DataFrames}
+
+\subsection*{\texttt{display}}
+
+Displays the first rows of the DataFrame:
+
+\begin{lstlisting}
+display df
+display df, 20    // display up to 20 rows
+\end{lstlisting}
+
+\subsection*{\texttt{describe}}
+
+Displays the structure: number of observations, variables, and types:
+
+\begin{lstlisting}
+describe df
+\end{lstlisting}
+
+Typical output:
+
+\begin{lstlisting}[style=inline]
+DataFrame: 1250 obs, 8 vars
+  year    Float  (0 missing)
+  state   Float  (0 missing)
+  income  Float  (12 missing)
+  gini    Float  (3 missing)
+\end{lstlisting}
+
+\subsection*{\texttt{count} and \texttt{nrow}}
+
+Returns the number of rows:
+
+\begin{lstlisting}
+let n  = count(df)               // total observations
+let n2 = nrow(df)                // alias for count(df)
+let n3 = count(df, income > 1000) // conditional count
+\end{lstlisting}
+
+\section{Special variables}
+
+Inside row-by-row commands (\lstinline{generate}, \lstinline{mutate},
+\lstinline{filter}), two implicit variables are available:
+
+\begin{description}
+  \item[\lstinline{_n}] Current row number (starts at 1).
+  \item[\lstinline{_N}] Total rows in the DataFrame.
+\end{description}
+
+\begin{lstlisting}
+generate df id     = _n       // 1, 2, 3, ..., N
+generate df weight = 1.0/_N   // uniform weight
+\end{lstlisting}
+
+\section{Time series operators}
+
+Inside \lstinline{generate} expressions (imperative form), special
+time-series operators are available:
+
+\begin{center}
+\begin{tabular}{cll}
+\toprule
+\textbf{Operator} & \textbf{Meaning} & \textbf{Example} \\
+\midrule
+\texttt{L.x}   & Lag (previous value)   & \texttt{L.gdp}  → gdp$_{t-1}$ \\
+\texttt{F.x}   & Lead (next value)      & \texttt{F.rate} → rate$_{t+1}$ \\
+\texttt{D.x}   & First difference       & \texttt{D.gdp}  → gdp$_t$ - gdp$_{t-1}$ \\
+\texttt{L2.x}  & Lag of order 2         & \texttt{L2.gdp} → gdp$_{t-2}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{lstlisting}[caption={Time series operators}]
+generate df dgdp    = D.gdp     // GDP growth
+generate df gdp_lag = L.gdp     // lagged GDP
+\end{lstlisting}

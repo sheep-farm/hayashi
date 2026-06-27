@@ -1,0 +1,103 @@
+\chapter{Introduction}
+
+\section{What is Hayashi}
+
+\hayashi{} is an interpreted programming language designed for applied
+econometric analysis. The name honours Fumio Hayashi, whose book
+\textit{Econometrics} (2000) is a canonical reference in the field.
+
+The language has three central goals:
+
+\begin{enumerate}
+  \item \textbf{Familiar syntax} for Stata users — commands such as
+        \lstinline{generate}, \lstinline{summarize}, and \lstinline{regress}
+        work as expected.
+  \item \textbf{General-purpose programming} — functions, closures, control
+        structures, modules. It is not merely a collection of statistical
+        commands.
+  \item \textbf{Performance without configuration} — the interpreter is
+        written in Rust; no JVM, no GC, no runtime dependencies.
+\end{enumerate}
+
+\section{Design philosophy}
+
+\subsection*{Clear semantics before concise syntax}
+
+When an operation mutates an object, it should look visibly imperative.
+When it returns a new value, it should look functional. \hayashi{}
+distinguishes these two forms consistently:
+
+\begin{lstlisting}[caption={Imperative form vs.\ functional form}]
+// imperative: modifies df in place (Stata-style)
+generate df z = x^2
+
+// functional: returns a new DataFrame, df unchanged
+let df2 = generate(df, z = x^2)
+\end{lstlisting}
+
+\subsection*{Copy-on-Write for DataFrames}
+
+DataFrames use copy-on-write (COW) semantics: assigning a DataFrame to
+another variable creates a cheap alias. The actual copy only happens at
+the moment of mutation. This allows efficient sharing without surprises:
+
+\begin{lstlisting}[caption={COW in action}]
+load "data.csv" as df
+let baseline = df      // alias, no copy
+
+let transformed = df |> generate(z = x^2) |> filter(z > 10)
+// baseline still has no column z
+\end{lstlisting}
+
+\subsection*{Error messages as documentation}
+
+Errors in \hayashi{} include the code snippet that caused them, the line
+number, and, when possible, a suggested fix (\textit{did you mean?}).
+A well-formatted error message is more useful than a manual.
+
+\section{Hayashi and Stata}
+
+\hayashi{} is not a Stata clone. The data command syntax is inspired by
+Stata because that syntax is good — it is close to the language economists
+use naturally. But \hayashi{} is a full language: it has first-class
+functions, closures, recursion, and structured error handling.
+
+The table below summarises the key differences:
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Aspect} & \textbf{Stata} & \textbf{Hayashi} \\
+\midrule
+License         & Proprietary      & GPL-3.0 \\
+Functions       & Limited          & First-class \\
+Closures        & No               & Yes \\
+Types           & Implicit         & Explicit in functions \\
+DataFrames      & One at a time    & Multiple, COW \\
+Modularisation  & \texttt{do}      & \lstinline{source} \\
+Performance     & C                & Rust \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Hayashi and R / Python}
+
+R and Python have vast ecosystems. \hayashi{} does not compete with them
+on the volume of available packages — it competes on the clarity of syntax
+for the specific task of applied econometrics. A panel regression script in
+\hayashi{} has less visual noise than its equivalent in any other language.
+
+\section{Structure of this book}
+
+\begin{description}
+  \item[Chapters 2--3] Installation and use of the REPL.
+  \item[Chapters 4--12] Type system, variables, operators, control flow,
+        functions, errors, strings, lists, and dictionaries.
+  \item[Chapters 13--15] DataFrames, data manipulation, and the pipe
+        operator.
+  \item[Chapter 16] Modularisation with \lstinline{source}.
+\end{description}
+
+Parts II through VII cover descriptive statistics, OLS, IV, panel,
+time series, limited dependent variable models, causal inference, and
+advanced methods.

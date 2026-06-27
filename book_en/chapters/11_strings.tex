@@ -1,0 +1,107 @@
+\chapter{Strings and F-Strings}
+
+\section{String literals}
+
+Strings are delimited by double quotes:
+
+\begin{lstlisting}
+let s    = "Hello, world"
+let path = "/home/user/data.csv"
+let empty = ""
+\end{lstlisting}
+
+\subsection*{Escape sequences}
+
+\begin{center}
+\begin{tabular}{cl}
+\toprule
+\textbf{Sequence} & \textbf{Meaning} \\
+\midrule
+\texttt{\textbackslash n}  & Newline \\
+\texttt{\textbackslash t}  & Tab \\
+\texttt{\textbackslash r}  & Carriage return \\
+\texttt{\textbackslash"}   & Literal double quote \\
+\texttt{\textbackslash\textbackslash} & Literal backslash \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{String operations}
+
+\subsection*{Concatenation}
+
+\begin{lstlisting}
+let name    = "Hayashi"
+let version = "0.2.4"
+let title   = name + " " + version    // "Hayashi 0.2.4"
+\end{lstlisting}
+
+\subsection*{Length}
+
+\begin{lstlisting}
+let s = "econometrics"
+display len(s)    // 12
+\end{lstlisting}
+
+\subsection*{Conversions}
+
+\begin{lstlisting}
+let n = str(42)        // "42"
+let f = str(3.14)      // "3.14"
+let b = str(true)      // "true"
+\end{lstlisting}
+
+\subsection*{Comparison}
+
+Strings are compared lexicographically with \lstinline{==}, \lstinline{!=},
+\lstinline{<}, \lstinline{>}, \lstinline{<=}, \lstinline{>=}.
+
+\section{F-Strings}
+
+F-strings allow arbitrary expressions to be interpolated inside a string.
+The prefix \lstinline{f} indicates interpolation; expressions between
+\lstinline|{ }| are evaluated and converted to string:
+
+\begin{lstlisting}[caption={F-strings}]
+let city = "Austin"
+let pop  = 978_908
+
+display f"{city} has {pop} inhabitants"
+// Austin has 978908 inhabitants
+
+display f"Mean: {(10 + 20 + 30) / 3.0:.2f}"
+// Mean: 20.00
+\end{lstlisting}
+
+\subsection*{Expressions in f-strings}
+
+Any expression can be interpolated — variables, arithmetic, function calls:
+
+\begin{lstlisting}
+let n = 5
+display f"{n}^2 = {n^2}"
+// 5^2 = 25
+
+display f"sqrt({n}) = {sqrt(n):.4f}"
+// sqrt(5) = 2.2361
+\end{lstlisting}
+
+\subsection*{F-strings in \texttt{display}}
+
+\lstinline{display} accepts \lstinline{end=} and \lstinline{sep=} options
+to control the terminator and separator between multiple values:
+
+\begin{lstlisting}
+display "a", "b", "c" sep=", "   // a, b, c
+display "line" end=""             // line (no newline)
+\end{lstlisting}
+
+\section{Multiline strings}
+
+\hayashi{} has no multiline string literal. Use explicit concatenation:
+
+\begin{lstlisting}
+let sql = "SELECT * FROM data " +
+          "WHERE year = 2026 " +
+          "ORDER BY state"
+\end{lstlisting}

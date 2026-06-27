@@ -1,0 +1,23 @@
+// Teste kalman(): local level e local linear trend
+// DGP: sinal com tendência suave + ruído de observação
+
+seed(42)
+input df
+id
+1
+end
+for i in 1..=9 { df = append(df, df) }
+df |> filter(_n <= 200)
+generate df t     = _n
+generate df noise = (rnormal() - 0.5) * 2.0
+generate df y     = 10.0 + 0.05 * t + noise     // tendência + ruído
+
+// Local Level (sigma explícito)
+kalman(df, y, model="ll", sigma_obs=2.0, sigma_state=0.1)
+
+// Local Linear Trend (sigmas automáticos)
+kalman(df, y, model="llt")
+
+// Verificar colunas adicionadas
+summarize(df, y_filtered)
+summarize(df, y_smoothed)

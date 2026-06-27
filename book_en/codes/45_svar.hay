@@ -1,0 +1,42 @@
+// Cap 45 — VAR Estrutural (SVAR)
+// DGP: VAR(1) bivariado com restrições de exclusão (triangular/Cholesky)
+// y1_t = 0.5*y1_{t-1} + 0.3*y2_{t-1} + e1
+// y2_t = 0.2*y1_{t-1} + 0.4*y2_{t-1} + e2
+// choque em y1 afeta y2 contemporaneamente, mas não vice-versa
+
+seed(42)
+input df
+id
+1
+end
+for i in 1..=9 { df = append(df, df) }
+df |> filter(_n <= 300)
+generate df t = _n
+generate df e1 = (rnormal() - 0.5) * 1.7321
+generate df e2 = (rnormal() - 0.5) * 1.7321
+generate df y1 = 0.0
+generate df y2 = 0.0
+
+let i = 2
+while i <= 300 {
+    let it = i
+    let ly1 = mean(df, y1, if = t == it - 1)
+    let ly2 = mean(df, y2, if = t == it - 1)
+    let e1t = mean(df, e1, if = t == it)
+    let e2t = mean(df, e2, if = t == it)
+    replace df y1 = 0.5 * ly1 + 0.3 * ly2 + e1t if t == it
+    replace df y2 = 0.2 * ly1 + 0.4 * ly2 + 0.6 * e1t + e2t if t == it
+    i = i + 1
+}
+
+// VAR reduzido (forma reduzida)
+let m_var = var(df, y1, y2, lags=1)
+display m_var
+
+// SVAR com restrição triangular (Cholesky): y2 responde a y1 contemporaneamente
+let m_svar = svar(df, y1, y2, lags=1, id=cholesky)
+display m_svar
+
+// IRF estrutural (resposta de y2 a choque em y1)
+let m_sirf = sirf(m_svar, steps=10)
+display m_sirf
