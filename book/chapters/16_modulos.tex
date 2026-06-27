@@ -1,0 +1,117 @@
+\chapter{Módulos e \texttt{source}}
+
+\section{O que é um módulo em Hayashi}
+
+Em \hayashi{}, um módulo é simplesmente um arquivo \texttt{.hay}. Não há sistema de
+pacotes nem declarações de exportação — qualquer definição no arquivo fica disponível
+no escopo de quem o carrega.
+
+Este modelo é intencional: a linguagem está em crescimento, e a complexidade de um
+sistema de módulos com namespaces, visibilidade e resolução de dependências é adicionada
+quando há demanda real. Por ora, \lstinline{source} cobre a totalidade dos casos de
+uso práticos.
+
+\section{O comando \texttt{source}}
+
+\lstinline{source} executa um arquivo \texttt{.hay} no contexto atual. Todas as
+definições do arquivo ficam visíveis a partir desse ponto:
+
+\begin{lstlisting}[caption={Carregando um módulo}]
+source "lib/estatistica.hay"
+source "lib/graficos.hay"
+
+// funções de estatistica.hay e graficos.hay estão disponíveis
+let resultado = calcular_gini(df)
+\end{lstlisting}
+
+\section{Organizando um projeto}
+
+A estrutura típica de um projeto \hayashi{}:
+
+\begin{lstlisting}[style=inline]
+projeto/
+  main.hay           -- ponto de entrada
+  lib/
+    dados.hay        -- funções de limpeza e carga
+    estimadores.hay  -- funções econométricas customizadas
+    tabelas.hay      -- formatação de resultados
+  dados/
+    raw.csv
+    painel.dta
+  resultados/
+\end{lstlisting}
+
+\texttt{main.hay}:
+
+\begin{lstlisting}
+source "lib/dados.hay"
+source "lib/estimadores.hay"
+source "lib/tabelas.hay"
+
+load "dados/painel.dta" as df
+
+let df_limpo = preparar(df)
+let modelo   = estimar_fe(df_limpo, renda ~ educ + exp)
+
+tabela_regressao(modelo, "resultados/tabela1.tex")
+\end{lstlisting}
+
+\section{Escopo de \texttt{source}}
+
+O arquivo carregado com \lstinline{source} executa no escopo global do arquivo
+principal. Isso significa:
+
+\begin{itemize}
+  \item Funções definidas no arquivo são globalmente visíveis.
+  \item Variáveis definidas no nível superior do arquivo também ficam no escopo global.
+  \item Não há namespaces: se dois arquivos definem \lstinline{fn calcular(...)}, o
+        segundo sobrescreve o primeiro.
+\end{itemize}
+
+\begin{aviso}
+  Por não haver namespaces, evite nomes genéricos em módulos reutilizáveis.
+  Prefira \texttt{gini\_calcular} a apenas \texttt{calcular}.
+\end{aviso}
+
+\section{Criando uma biblioteca}
+
+Um arquivo de biblioteca é um arquivo \texttt{.hay} com funções e constantes, sem
+código de nível superior que produza efeitos colaterais na carga:
+
+\begin{lstlisting}[caption={lib/utils.hay}]
+const PI = 3.14159265358979
+
+fn arredondar(x, casas) {
+  let fator = 10^casas
+  int(x * fator + 0.5) / float(fator)
+}
+
+fn entre(x, lo, hi) {
+  x >= lo and x <= hi
+}
+
+fn clamp(x, lo, hi) {
+  if x < lo { lo } else if x > hi { hi } else { x }
+}
+\end{lstlisting}
+
+\begin{lstlisting}[caption={main.hay}]
+source "lib/utils.hay"
+
+display arredondar(3.14159, 2)    // 3.14
+display entre(5, 1, 10)          // true
+display clamp(15, 0, 10)         // 10
+\end{lstlisting}
+
+\section{Roadmap}
+
+Em versões futuras, \hayashi{} terá um sistema de módulos com:
+
+\begin{itemize}
+  \item Namespaces explícitos (\texttt{use modulo::funcao})
+  \item Distribuição via registro central
+  \item Declarações de dependência em manifesto
+\end{itemize}
+
+A transição de \lstinline{source} para esse sistema será sem quebra de
+compatibilidade: arquivos \texttt{.hay} continuarão funcionando como módulos.

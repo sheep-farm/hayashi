@@ -1,0 +1,198 @@
+\chapter{Logit e Probit}
+\label{cap:logit}
+% ── índice ──────────────────────────────────────────────────────
+\index{logit|textbf}
+\index{probit|textbf}
+\index{logit@\texttt{logit()}|textbf}
+\index{probit@\texttt{probit()}|textbf}
+\index{máxima verossimilhança|textbf}
+\index{efeitos marginais|textbf}
+\index{margins@\texttt{margins()}|textbf}
+\index{odds ratio}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{O modelo de variável latente}
+
+Quando a variável dependente é binária ($y \in \{0,1\}$), o modelo linear
+produz previsões fora do intervalo $[0,1]$ e erros heterocedásticos por
+construção. A solução é modelar a probabilidade de $y=1$ via uma função
+de distribuição acumulada:
+
+\[
+  P(y_i = 1 \mid x_i) = F(x_i'\beta)
+\]
+
+A motivação vem do modelo de variável latente:
+\[
+  y_i^* = x_i'\beta + \varepsilon_i, \qquad y_i = \mathbf{1}[y_i^* > 0]
+\]
+
+A distribuição de $\varepsilon$ determina o modelo:
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Modelo} & \textbf{Distribuição de $\varepsilon$} & \textbf{$F(\cdot)$} \\
+\midrule
+Logit  & Logística$(0, \pi^2/3)$ & $\Lambda(z) = \dfrac{1}{1 + e^{-z}}$ \\[8pt]
+Probit & Normal$(0, 1)$           & $\Phi(z) = \displaystyle\int_{-\infty}^{z} \phi(t)\,dt$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+A estimação é por Máxima Verossimilhança (MLE). A log-verossimilhança é:
+\[
+  \ell(\beta) = \sum_{i=1}^{n}
+    \left[y_i \ln F(x_i'\beta) + (1-y_i)\ln\bigl(1 - F(x_i'\beta)\bigr)\right]
+\]
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Interpretação dos coeficientes}
+
+Os coeficientes do Logit e Probit \textbf{não são efeitos marginais} — são
+parâmetros da variável latente, sem unidade interpretável diretamente.
+Para $x_j$ contínuo, o efeito marginal sobre a probabilidade é:
+
+\[
+  \frac{\partial P(y=1 \mid x)}{\partial x_j}
+  = f(x'\beta)\,\beta_j
+\]
+
+onde $f = F'$ é a densidade da distribuição escolhida. Como $f(x'\beta)$
+varia entre observações, reporta-se o \textbf{Efeito Marginal Médio} (AME):
+
+\[
+  \mathrm{AME}_j = \frac{1}{n}\sum_{i=1}^{n} f(x_i'\beta)\,\beta_j
+\]
+
+\begin{nota}
+  A relação entre os coeficientes de Logit e Probit é aproximadamente:
+  \[
+    \hat\beta_{\mathrm{Logit}} \approx \frac{\pi}{\sqrt{3}}\,\hat\beta_{\mathrm{Probit}}
+    \approx 1{,}81\,\hat\beta_{\mathrm{Probit}}
+  \]
+  Os AMEs dos dois modelos são tipicamente muito próximos, mesmo com
+  coeficientes em escalas diferentes.
+\end{nota}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Verificação por DGP}
+
+\subsection*{Consistência do MLE}
+
+Ao contrário dos modelos lineares dos capítulos anteriores, Logit e Probit
+\emph{não admitem recuperação exata} dos parâmetros. A variável binária $y$
+é gerada por amostragem de Bernoulli — há aleatoriedade irredutível mesmo
+sem adicionar ruído extra. O que se verifica aqui é \textbf{consistência}:
+com $n=1000$ o MLE deve convergir próximo dos parâmetros verdadeiros.
+
+O DGP usa a parametrização logística com $\beta_0 = -1{,}0$ e $\beta_1 = 2{,}0$:
+\[
+  x_i \sim \mathcal{N}(0,1), \qquad
+  p_i = \Lambda(-1{,}0 + 2{,}0\,x_i), \qquad
+  y_i \sim \mathrm{Bernoulli}(p_i)
+\]
+
+Bernoulli individual é gerado por $y_i = \mathbf{1}[u_i < p_i]$, com
+$u_i \sim \mathrm{Uniforme}(0,1)$:
+
+\begin{lstlisting}[caption={DGP logístico — Logit e Probit simultâneos}]
+seed(42)
+input df
+id
+1
+end
+for i in 1..=10 { df = append(df, df) }
+df |> filter(_n <= 1000)
+generate df x  = rnormal()
+generate df lp = -1.0 + 2.0*x
+generate df p  = 1 / (1 + exp(-lp))
+generate df u  = runiform()
+generate df y  = u < p
+let m_l = logit(y ~ x, df)
+let m_p = probit(y ~ x, df)
+esttab(m_l, m_p)
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+                            (1)              (2)
+                          Logit           Probit
+────────────────────────────────────────────────
+const                -0.6772***       -0.4222***
+                       (0.1326)         (0.0821)
+x                     1.3329***        0.8324***
+                       (0.2308)         (0.1427)
+────────────────────────────────────────────────
+N                          1000             1000
+────────────────────────────────────────────────
+* p<0.10  ** p<0.05  *** p<0.01
+\end{lstlisting}
+
+Os verdadeiros parâmetros são $(\beta_0, \beta_1) = (-1{,}0;\; 2{,}0)$ para
+o Logit. Como \lstinline{rnormal()} gera $U(0,1)$ em vez de $\mathcal{N}(0,1)$
+(ver cap.~\ref{cap:ols}), $x \in [0,1]$ e o preditor linear $lp \in [-1,1]$
+varia pouco — o que reduz a informação de Fisher e atenua as estimativas
+em relação ao DGP verdadeiro. O Probit estima na escala normal; os valores
+$(-0{,}42;\; 0{,}83)$ estão dentro do IC 95\% dos equivalentes probit
+$(-0{,}55;\; 1{,}10)$.
+
+\subsection*{Efeitos marginais médios}
+
+Os coeficientes são apenas parâmetros da variável latente. Para
+interpretação econômica, usa-se \lstinline{margins}:
+
+\begin{lstlisting}[caption={AME do Logit}]
+margins(m_l, df)
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+════════════════════════════════════════════════════════════
+ Average Marginal Effects — LOGIT
+════════════════════════════════════════════════════════════
+Variable                dy/dx   Std.Err.        z    P>|z|
+────────────────────────────────────────────────────────────
+x                    0.321859   0.035576    9.047   0.0000 ***
+────────────────────────────────────────────────────────────
+n = 1000
+════════════════════════════════════════════════════════════
+\end{lstlisting}
+
+Um aumento unitário em $x$ eleva a probabilidade de $y=1$ em
+aproximadamente $0{,}32$ pontos percentuais, em média sobre a amostra.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Sintaxe}
+
+\begin{lstlisting}
+logit(y ~ x1 + x2, df)
+probit(y ~ x1 + x2, df)
+margins(modelo, df)
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Fluxo típico — escolha discreta}]
+load "dados.csv" as df
+
+let m_l = logit(empregado ~ educ + exp + sexo, df)
+let m_p = probit(empregado ~ educ + exp + sexo, df)
+
+esttab(m_l, m_p)
+margins(m_l, df)
+\end{lstlisting}
+
+\section{Previsão de probabilidades}
+
+\begin{lstlisting}
+let m = logit(y ~ x, df)
+let phat = predict(m, "pr")     // P(y=1|x) para cada obs
+let yhat = predict(m, "class")  // classe prevista (0 ou 1)
+\end{lstlisting}
+
+\begin{nota}
+  Use \lstinline{predict(m, "class")} com limiar padrão de 0{,}5.
+  Em dados desbalanceados (prevalência baixa), ajuste o limiar com
+  \lstinline{predict(m, "class", threshold=0.3)}.
+\end{nota}

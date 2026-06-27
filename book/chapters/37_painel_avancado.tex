@@ -1,0 +1,141 @@
+\chapter{Painel Avançado I — GMM, PCSE e GEE}
+\label{cap:painel_avancado}
+% ── índice ──────────────────────────────────────────────────────
+\index{Arellano-Bond|textbf}
+\index{GMM em diferenças|textbf}
+\index{ab@\texttt{ab()}|textbf}
+\index{PCSE|textbf}
+\index{pcse@\texttt{pcse()}|textbf}
+\index{GEE|textbf}
+\index{gee@\texttt{gee()}|textbf}
+\index{viés de Nickell|textbf}
+\index{instrumentos internos}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Limitações dos estimadores estáticos}
+
+O cap.~\ref{cap:painel} apresentou FE e RE para painéis com efeito individual
+constante. Três extensões importantes surgem em aplicações empíricas:
+
+\begin{enumerate}
+  \item \textbf{Dinâmica}: quando $y_{i,t-1}$ é regressor, FE é viesado
+  (\emph{viés de Nickell}): $\hat\rho_{\mathrm{FE}} \xrightarrow{p} \rho - O(1/T)$.
+  O estimador Arellano-Bond usa GMM em primeiras diferenças para contornar.
+  \item \textbf{Dependência cross-seccional}: quando erros de diferentes
+  unidades são correlacionados (dados macroeconômicos de países), os SEs
+  OLS e FE são inválidos. PCSE (Beck e Katz 1995) corrige.
+  \item \textbf{Dados não-gaussianos em painel}: GEE (Liang e Zeger 1986)
+  estende modelos de margem para dados de painel com famílias exponenciais.
+\end{enumerate}
+
+\subsection*{Arellano-Bond (AB)}
+
+O estimador diff-GMM de Arellano e Bond (1991) toma primeiras diferenças
+para eliminar o efeito individual:
+
+\[
+  \Delta y_{it} = \rho\,\Delta y_{i,t-1} + \beta\,\Delta x_{it} + \Delta\varepsilon_{it}
+\]
+
+Instrumentos: $y_{i,t-2}, y_{i,t-3}, \ldots$ são válidos para $\Delta y_{i,t-1}$
+pois são não correlacionados com $\Delta\varepsilon_{it}$, contanto que os
+erros em nível não sejam serialmente correlacionados de ordem 2 (teste $m_2$).
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Verificação por DGP}
+
+\begin{lstlisting}[caption={DGP de painel com endogeneidade via efeito individual}]
+seed(42)
+generate df unit  = (_n - 1) % 50 + 1
+generate df t     = (_n - (_n-1) % 50 - 1) / 50 + 1
+generate df alpha = unit * 0.05        // efeito individual correlacionado com x
+generate df x     = alpha + (rnormal() - 0.5) * 1.7321
+generate df e     = (rnormal() - 0.5) * 1.7321
+generate df y     = 1.0 + 1.0 * x + alpha + e  // verdadeiro: b=1.0
+
+// OLS viesado (mistura alpha_i com x)
+let m_ols  = ols(y ~ x, df)
+
+// FE consistente (elimina alpha_i)
+let m_fe   = fe(y ~ x, df, id=unit)
+
+// AB-GMM (dinâmico com lags como instrumentos)
+let m_ab   = ab(y ~ x, df, id=unit, time=t, lags=2)
+
+// PCSE
+let m_pcse = pcse(y ~ x, df, id=unit, time=t)
+
+// GEE
+let m_gee  = gee(y ~ x, df, id=unit)
+\end{lstlisting}
+
+\subsection*{OLS vs.\ FE}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+OLS:  const=1.330  x=1.736***  (viés: +0.74 por mistura de alpha_i)
+FE:              x=1.089***  (próximo de 1.0 — efeito real)
+\end{lstlisting}
+
+\subsection*{Arellano-Bond}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+===================== Arellano-Bond Diff-GMM (One-Step) ======================
+Observations: 900  Entities: 50  Instruments: 3  Sargan df: 1
+──────────────────────────────────────────────────────────────────────────────
+Variable       |    Coef | Std Err |       z |  P>|z|
+LD.y           | -0.0242 |  0.0472 |  -0.512 |  0.608
+Δx             |  1.0604 |  0.0464 |  22.869 |  0.000  ***
+──────────────────────────────────────────────────────────────────────────────
+Sargan: χ²(1)=0.7549  p=0.3849   (instrumentos válidos)
+AB m1: z=-6.22  p=0.000 ***      (AR(1) esperado em FD)
+AB m2: z=0.001  p=0.999          (sem AR(2) — instrumentos OK)
+\end{lstlisting}
+
+AB estima $\hat\beta_{\Delta x} = 1{,}06 \approx 1{,}0$. O lag $\hat\rho_{\mathrm{LD.y}} \approx 0$ confirma que o DGP não tem dinâmica real. O teste de Sargan não rejeita a validade dos instrumentos; $m_2$ não rejeita a ausência de autocorrelação de ordem 2.
+
+\subsection*{PCSE}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+ PCSE:  const=1.330  SE=0.0637   x=1.736  SE=0.0498
+ (SEs maiores que OLS — corrige correlação cross-seccional)
+\end{lstlisting}
+
+\subsection*{GEE}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+ GEE:  const=1.330 (SE robust=0.0612)  x=1.736 (SE robust=0.0330)
+ Scale: 0.3966   QIC: 399.8152
+\end{lstlisting}
+
+GEE com estrutura de correlação exchangeable fornece estimativas de margem
+(populacionais), com SEs robustos para dependência intra-grupo.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Sintaxe}
+
+\begin{lstlisting}
+ab(y ~ x, df, id=unit, time=t, lags=2)
+pcse(y ~ x, df, id=unit, time=t)
+gee(y ~ x, df, id=unit)
+gee(y ~ x, df, id=unit, family=binomial, corstr=exchangeable)
+\end{lstlisting}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Estimador} & \textbf{Pressuposto} & \textbf{Quando usar} \\
+\midrule
+\texttt{ab}    & erros i.i.d.\ em nível & painel dinâmico com pequeno $T$ \\
+\texttt{pcse}  & corr.\ cross-seccional & macro painel ($N$ pequeno, $T$ médio) \\
+\texttt{gee}   & margem populacional     & painel com outcome não-gaussiano \\
+\bottomrule
+\end{tabular}
+\end{center}

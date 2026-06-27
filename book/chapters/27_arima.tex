@@ -1,0 +1,214 @@
+\chapter{ARIMA e Raiz Unitária}
+\label{cap:arima}
+% ── índice ──────────────────────────────────────────────────────
+\index{ARIMA|textbf}
+\index{raiz unitária|textbf}
+\index{Dickey-Fuller, teste de|textbf}
+\index{ADF|see{Dickey-Fuller, teste de}}
+\index{adf@\texttt{adf()}|textbf}
+\index{integração de ordem}
+\index{KPSS, teste de}
+\index{kpss@\texttt{kpss()}}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Processos integrados}
+
+Um processo $\{y_t\}$ é \textbf{integrado de ordem $d$} — denotado $I(d)$
+— quando precisa ser diferenciado $d$ vezes para se tornar estacionário.
+O caso mais comum em economia é $I(1)$: a primeira diferença é estacionária,
+mas o nível não.
+
+O caso mais simples de processo $I(1)$ é o \textbf{passeio aleatório}
+(\emph{random walk}):
+\[
+  y_t = y_{t-1} + \varepsilon_t, \qquad \varepsilon_t \sim \mathrm{WN}(0, \sigma^2)
+\]
+
+A variância cresce com $t$ ($\mathrm{Var}[y_t] = t\sigma^2$), de modo que
+o processo não é estacionário. A primeira diferença $\Delta y_t = y_t -
+y_{t-1} = \varepsilon_t$ é ruído branco — portanto $I(0)$.
+
+O passeio aleatório \emph{com deriva} adiciona uma constante $\mu$:
+\[
+  y_t = \mu + y_{t-1} + \varepsilon_t
+\]
+com tendência determinística $E[y_t] = y_0 + \mu t$ — modelo básico para
+preços de ativos, câmbio e muitas séries macroeconômicas.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Teste de Dickey-Fuller Aumentado}
+
+O teste ADF (\emph{Augmented Dickey-Fuller}) testa formalmente a presença de
+raiz unitária. O modelo auxiliar estimado é:
+\[
+  \Delta y_t = \alpha + \delta y_{t-1}
+               + \sum_{j=1}^{k} \gamma_j \Delta y_{t-j} + \varepsilon_t
+\]
+
+com hipóteses:
+\[
+  H_0: \delta = 0 \quad \text{(raiz unitária)} \qquad
+  H_1: \delta < 0 \quad \text{(estacionário)}
+\]
+
+A estatística $t$ de $\hat\delta$ não segue a distribuição $t$ padrão sob
+$H_0$ — usa-se a distribuição de Dickey-Fuller com valores críticos
+tabelados.
+
+\begin{aviso}
+  Os valores críticos do ADF são \textbf{negativos}: rejeita-se $H_0$
+  quando a estatística é suficientemente \emph{negativa}. Um valor positivo
+  (ou próximo de zero) não rejeita $H_0$ — evidência de raiz unitária.
+\end{aviso}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{O modelo ARIMA}
+
+O ARIMA($p$,$d$,$q$) generaliza o ARMA para séries não estacionárias,
+aplicando $d$ diferenciações antes da estimação:
+
+\[
+  \underbrace{\phi(L)(1-L)^d y_t}_{\text{AR em diferenças}}
+  = c + \underbrace{\theta(L)\varepsilon_t}_{\text{MA}}
+\]
+
+onde $L$ é o operador de defasagem ($Ly_t = y_{t-1}$) e $(1-L)^d$ é o
+operador de diferença de ordem $d$.
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Modelo} & \textbf{Notação} & \textbf{Processo} \\
+\midrule
+Passeio aleatório & ARIMA(0,1,0) & $\Delta y_t = c + \varepsilon_t$ \\
+AR(1) em diferenças & ARIMA(1,1,0) & $\Delta y_t = c + \phi\,\Delta y_{t-1} + \varepsilon_t$ \\
+MA(1) em diferenças & ARIMA(0,1,1) & $\Delta y_t = c + \varepsilon_t + \theta\,\varepsilon_{t-1}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Verificação por DGP}
+
+\subsection*{Random walk: ADF não rejeita, AR(1): ADF rejeita}
+
+O DGP contrasta os dois casos: passeio aleatório (I(1)) gerado por
+\lstinline{cumsum(e)} versus AR(1) estacionário ($\phi=0{,}7$) gerado por
+laço.
+
+\begin{lstlisting}[caption={ADF em passeio aleatório vs.\ AR(1)}]
+seed(42)
+input df
+id
+1
+end
+for i in 1..=9 { df = append(df, df) }
+df |> filter(_n <= 500)
+generate df e  = rnormal()
+generate df rw = cumsum(e)
+generate df y  = 0.0
+generate df t  = _n
+let n = nrow(df)
+let i = 2
+while i <= n {
+    let ly = mean(df, y, if = t == i - 1)
+    let et = mean(df, e, if = t == i)
+    replace df y = 0.7 * ly + et if t == i
+    i = i + 1
+}
+adf(df, rw)
+adf(df, y)
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+=============== Augmented Dickey-Fuller Test ===============
+  Variable: rw   Lags used: 7
+  H₀: series has a unit root (non-stationary)
+  Test statistic:     -0.0980
+  Critical values:  1%=-3.430  5%=-2.860  10%=-2.570
+  Conclusion: Não rejeita H₀ — raiz unitária presente
+
+=============== Augmented Dickey-Fuller Test ===============
+  Variable: y   Lags used: 7
+  H₀: series has a unit root (non-stationary)
+  Test statistic:     -6.4616
+  Critical values:  1%=-3.430  5%=-2.860  10%=-2.570
+  Conclusion: REJEITA H₀ — estacionária
+\end{lstlisting}
+
+O passeio aleatório tem estatística $-0{,}10$ — acima dos valores críticos
+negativos, não rejeita $H_0$. O AR(1) com $\phi=0{,}7$
+tem estatística $-6{,}46$ — muito abaixo do valor crítico de 1\% ($-3{,}43$),
+rejeita $H_0$ com alta confiança.
+
+\subsection*{Estimação ARIMA(0,1,0) e seleção de ordem}
+
+Com a raiz unitária identificada, estima-se com $d=1$. Três ordens
+concorrentes para o passeio aleatório verdadeiro:
+
+\begin{lstlisting}[caption={Seleção de ordem para série I(1)}]
+let m010 = arima(df, rw, p=0, d=1, q=0)
+let m110 = arima(df, rw, p=1, d=1, q=0)
+let m011 = arima(df, rw, p=0, d=1, q=1)
+display m010
+display m110
+display m011
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+-- ARIMA(0,1,0): AIC=156.77  BIC=160.97
+   intercept  0.4863  std=0.0128  z=38.14  p=0.000
+
+-- ARIMA(1,1,0): AIC=158.70  BIC=167.10
+   intercept  0.4805  std=0.0253  z=18.96  p=0.000
+   ar.L1      0.0120  std=0.0450  z=0.266  p=0.791  [insig.]
+
+-- ARIMA(0,1,1): AIC=157.80  BIC=166.19
+   intercept  0.4855  std=0.0128  z=38.07  p=0.000
+   ma.L1      0.0058  std=0.0453  z=0.128  p=0.898  [insig.]
+\end{lstlisting}
+
+O modelo verdadeiro ARIMA(0,1,0) tem o menor AIC e BIC. Os termos AR e MA
+adicionais são insignificantes ($p > 0{,}7$) — o BIC, que penaliza mais
+fortemente a complexidade, confirma a parcimônia do modelo simples.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Fluxo de trabalho}
+
+O protocolo padrão para séries temporais univariadas:
+
+\begin{enumerate}
+  \item \textbf{Inspecionar} o nível da série — tendência visível sugere
+        não-estacionariedade.
+  \item \textbf{Testar} com ADF — não rejeitar $H_0$ indica $d \geq 1$.
+  \item \textbf{Diferenciar} uma vez e re-testar com ADF na série
+        diferenciada — confirma $d=1$.
+  \item \textbf{Selecionar} $(p,q)$ pela grade AIC/BIC sobre a série
+        diferenciada.
+  \item \textbf{Validar} resíduos: devem ser ruído branco.
+\end{enumerate}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Sintaxe}
+
+\begin{lstlisting}
+adf(df, y)
+adf(df, y, lags=4)
+arima(df, y, p=0, d=1, q=0)
+arima(df, y, p=1, d=1, q=1)
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Fluxo típico com dados reais}]
+load "cambio.csv" as df
+
+adf(df, taxa)
+
+// se não rejeitar H0: estimar com d=1
+let m = arima(df, taxa, p=1, d=1, q=0)
+display m
+let yhat = predict(m, "xb")
+\end{lstlisting}

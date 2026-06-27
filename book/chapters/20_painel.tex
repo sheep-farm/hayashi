@@ -1,0 +1,257 @@
+\chapter{Dados em Painel}
+\label{cap:painel}
+% ── índice ──────────────────────────────────────────────────────
+\index{dados em painel|textbf}
+\index{efeitos fixos|textbf}
+\index{efeitos aleatórios|textbf}
+\index{within estimator|see{efeitos fixos}}
+\index{fe@\texttt{fe()}|textbf}
+\index{re@\texttt{re()}|textbf}
+\index{Hausman, teste de|textbf}
+\index{hausman@\texttt{hausman()}|textbf}
+\index{viés de Nickell}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{O modelo}
+
+Um painel observa $n$ indivíduos ao longo de $T$ períodos. O modelo geral é:
+\[
+  y_{it} = \alpha_i + X_{it}\beta + \varepsilon_{it},
+  \qquad i = 1,\ldots,n;\quad t = 1,\ldots,T
+\]
+
+onde $\alpha_i$ é o \textbf{efeito individual não observado} — características
+fixas no tempo que diferem entre indivíduos (habilidade, cultura, localização).
+O OLS em corte transversal ou empilhado ignora $\alpha_i$, tratando-o como parte
+do erro:
+
+\[
+  \mathrm{plim}\;\hat\beta_{\mathrm{OLS}}
+  = \beta + \frac{\mathrm{Cov}(x_{it},\,\alpha_i)}{\mathrm{Var}(x_{it})}
+\]
+
+O viés só desaparece se $\mathrm{Cov}(x_{it}, \alpha_i) = 0$ — hipótese forte
+na maioria das aplicações.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Efeitos Fixos}
+
+O estimador \textbf{within} elimina $\alpha_i$ subtraindo a média temporal
+de cada indivíduo:
+\[
+  \tilde{y}_{it} = y_{it} - \bar{y}_i, \qquad
+  \tilde{X}_{it} = X_{it} - \bar{X}_i
+\]
+
+O estimador de Efeitos Fixos é então o OLS sobre as variáveis desmediadas:
+\[
+  \boxed{\hat\beta_{\mathrm{FE}} = (\tilde{X}'\tilde{X})^{-1}\tilde{X}'\tilde{y}}
+\]
+
+Como a transformação within anula $\alpha_i$ para qualquer valor de
+$\mathrm{Cov}(x_{it}, \alpha_i)$, o estimador é consistente mesmo sob
+endogeneidade do efeito individual. A variância é:
+\[
+  \widehat{\mathrm{Var}}[\hat\beta_{\mathrm{FE}}] = s^2_{\mathrm{FE}}(\tilde{X}'\tilde{X})^{-1},
+  \qquad
+  s^2_{\mathrm{FE}} = \frac{\hat\varepsilon'\hat\varepsilon}{nT - n - k}
+\]
+
+\begin{aviso}
+  Variáveis que não variam no tempo (sexo, raça, região de nascimento) são
+  eliminadas pela transformação within. FE não pode estimar seu efeito.
+  Use RE ou estimadores híbridos nesses casos.
+\end{aviso}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Efeitos Aleatórios}
+
+Se $\alpha_i \sim \mathrm{IID}(0, \sigma^2_\alpha)$ e
+$\mathrm{Cov}(x_{it}, \alpha_i) = 0$, $\alpha_i$ é parte do erro composto
+$v_{it} = \alpha_i + \varepsilon_{it}$. A estrutura de erros implica GLS com
+quasi-desmediação:
+\[
+  y^*_{it} = y_{it} - \theta\bar{y}_i,
+  \qquad
+  \theta = 1 - \frac{\sigma_\varepsilon}{\sqrt{\sigma^2_\varepsilon + T\sigma^2_\alpha}}
+  \in [0,1)
+\]
+
+O estimador RE é o OLS sobre $y^*_{it}$ e $X^*_{it}$. É mais eficiente que
+FE sob $H_0: \mathrm{Cov}(x_{it},\alpha_i) = 0$, mas \emph{inconsistente}
+quando a hipótese falha.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Teste de Hausman}
+
+O teste de Hausman compara FE (consistente sempre) com RE (consistente sob
+$H_0$, eficiente):
+\[
+  H_0: \mathrm{Cov}(x_{it}, \alpha_i) = 0
+  \quad\Longrightarrow\quad
+  \mathrm{plim}(\hat\beta_{\mathrm{FE}} - \hat\beta_{\mathrm{RE}}) = 0
+\]
+
+A estatística é:
+\[
+  H = (\hat\beta_{\mathrm{FE}} - \hat\beta_{\mathrm{RE}})'
+      \bigl[\widehat{\mathrm{Var}}(\hat\beta_{\mathrm{FE}}) -
+             \widehat{\mathrm{Var}}(\hat\beta_{\mathrm{RE}})\bigr]^{-1}
+      (\hat\beta_{\mathrm{FE}} - \hat\beta_{\mathrm{RE}})
+  \;\xrightarrow{d}\; \chi^2(k)
+\]
+
+Rejeitar $H_0$ indica que RE é inconsistente — use FE.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Verificação por DGP}
+
+\subsection*{Recuperação exata (sem ruído)}
+
+O DGP usa 100 indivíduos × 10 períodos ($n = 1000$). O efeito fixo
+$\alpha_i = 0{,}05\cdot i$ é determinístico e correlacionado com $x$:
+\[
+  x_{it} = \alpha_i + u_{it},\quad u \sim \mathcal{N}(0,1)
+  \qquad
+  y_{it} = 1{,}0 + 2{,}0\,x_{it} + \alpha_i \quad(\varepsilon = 0)
+\]
+
+Sem ruído idiossincrático a transformação within elimina $\alpha_i$
+exatamente, e FE recupera $\beta$ com precisão de máquina:
+
+\begin{lstlisting}[caption={FE com efeito fixo correlacionado — sem ruído}]
+seed(42)
+input df
+id
+1
+end
+for i in 1..=10 { df = append(df, df) }
+df |> filter(_n <= 1000)
+generate df id    = (_n - 1) % 100 + 1
+generate df alpha = id * 0.05
+generate df u     = rnormal()
+generate df x     = alpha + u
+generate df y     = 1.0 + 2.0*x + alpha
+let m_ols = ols(y ~ x, df)
+let m_fe  = fe(y ~ x, df, id=id)
+esttab(m_ols, m_fe)
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+                            (1)              (2)
+                            OLS               FE
+────────────────────────────────────────────────
+x                     2.9663***        2.0000***
+                       (0.0060)         (0.0000)
+Constant              0.6002***
+                       (0.0202)
+────────────────────────────────────────────────
+N                          1000             1000
+R²                       0.9959
+Adj. R²                  0.9959
+────────────────────────────────────────────────
+* p<0.10  ** p<0.05  *** p<0.01
+\end{lstlisting}
+
+O OLS superestima $\beta$ em $+0{,}97$ porque $\mathrm{Cov}(x,\alpha) =
+\mathrm{Var}(\alpha) > 0$. O FE recupera $2{,}0000$ exatamente.
+
+\subsection*{Hausman com ruído}
+
+Com ruído idiossincrático $\varepsilon \sim \mathcal{N}(0,1)$, o FE permanece
+consistente e o RE é inconsistente (pois $\alpha_i$ ainda é correlacionado
+com $x$). O Hausman deve rejeitar $H_0$:
+
+\begin{lstlisting}[caption={Hausman — FE vs RE com efeito correlacionado}]
+// mesmo DGP; adiciona ruído idiossincrático
+generate df e  = rnormal()
+generate df y2 = 1.0 + 2.0*x + alpha + e
+let m_fe2 = fe(y2 ~ x, df, id=id)
+let m_re2 = re(y2 ~ x, df, id=id)
+esttab(m_fe2, m_re2)
+hausman(m_fe2, m_re2)
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+                            (1)              (2)
+                             FE               RE
+────────────────────────────────────────────────
+x                     2.0977***        2.9347***
+                       (0.0338)         (0.0118)
+const                                  1.1930***
+                                        (0.0399)
+────────────────────────────────────────────────
+N                          1000                0
+────────────────────────────────────────────────
+* p<0.10  ** p<0.05  *** p<0.01
+
+══════════════════════════════════════════════════════════════
+ Hausman Test: FE vs RE
+ H₀: efeitos individuais não correlacionados com regressores
+══════════════════════════════════════════════════════════════
+── Coeficientes Comuns
+   Variável         β_FE       β_RE         Δβ
+   x              2.0977     2.9347    -0.8369
+── Estatística
+   χ²(1) = 698.1711   p = 0.0000  ***
+── Conclusão
+   Rejeita H₀ → use EFEITOS FIXOS (RE pode ser inconsistente)
+══════════════════════════════════════════════════════════════
+\end{lstlisting}
+
+O RE absorve o efeito de $\alpha_i$ no coeficiente de $x$ (2.9347), replicando
+o viés do OLS. O Hausman rejeita $H_0$ com $p < 0{,}001$ — a endogeneidade
+do efeito individual é detectada.\footnote{%
+  O FE recupera 2.0977, não 2.0000, porque a transformação within elimina
+  $\alpha_i$ mas não $\varepsilon_{it}$. Com ruído idiossincrático presente,
+  o estimador é consistente mas não exato — o mesmo motivo pelo qual OLS
+  e IV divergem de seus parâmetros verdadeiros quando $\varepsilon \neq 0$.}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Sintaxe}
+
+\begin{lstlisting}
+fe(fórmula, df, id=col)
+re(fórmula, df, id=col)
+hausman(modelo_fe, modelo_re)
+\end{lstlisting}
+
+A coluna \lstinline{id} identifica o indivíduo. O FE remove automaticamente
+o intercepto (absorvido pelos efeitos individuais).
+
+\begin{lstlisting}[caption={Fluxo completo}]
+load "painel.csv" as df
+
+let m_fe = fe(salario ~ educ + exp, df, id=id)
+let m_re = re(salario ~ educ + exp, df, id=id)
+
+esttab(m_fe, m_re)
+hausman(m_fe, m_re)
+\end{lstlisting}
+
+\section{Opções de erro padrão}
+
+\begin{lstlisting}
+fe(y ~ x, df, id=id)                        // clássico
+fe(y ~ x, df, id=id, cov=robust)            // HC1
+// cluster por indivíduo
+fe(y ~ x, df, id=id, cov=cluster, cluster=id)
+\end{lstlisting}
+
+\begin{nota}
+  Em painéis, erros clusterizados por indivíduo (\lstinline{cluster=id})
+  são o padrão recomendado: corrigem heterocedasticidade e correlação serial
+  dentro do indivíduo simultaneamente.
+\end{nota}
+
+\section{Capturando resultados}
+
+\begin{lstlisting}
+let m = fe(y ~ x, df, id=id)
+display m
+let yhat = predict(m, "xb")
+\end{lstlisting}

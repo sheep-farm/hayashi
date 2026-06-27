@@ -1,0 +1,25 @@
+// Cap 22 — Logit e Probit
+// DGP: y ~ Bernoulli(logistic(-1.0 + 2.0*x))
+// Parâmetros verdadeiros logit: b0=-1.0, b1=2.0
+
+seed(42)
+input df
+id
+1
+end
+for i in 1..=10 { df = append(df, df) }
+df |> filter(_n <= 1000)
+generate df x  = rnormal()
+generate df lp = -1.0 + 2.0*x
+generate df p  = 1 / (1 + exp(-lp))
+// Bernoulli via comparação com Uniforme(0,1)
+generate df u  = runiform()
+generate df y  = u < p
+
+// Logit e Probit lado a lado
+let m_l = logit(y ~ x, df)
+let m_p = probit(y ~ x, df)
+esttab(m_l, m_p)
+
+// efeitos marginais médios do logit
+margins(m_l, df)

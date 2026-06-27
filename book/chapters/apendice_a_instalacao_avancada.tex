@@ -1,0 +1,118 @@
+\chapter{Instalação Avançada}
+\label{apendice:instalacao}
+% ── índice ──────────────────────────────────────────────────────
+\index{instalação|textbf}
+\index{REPL|textbf}
+\index{módulos}
+\index{seed@\texttt{seed()}|textbf}
+\index{rnormal@\texttt{rnormal()}|textbf}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Compilação com suporte a ODBC}
+
+Para conectar \hayashi{} a bancos de dados via ODBC (SQL Server, Oracle, etc.):
+
+\begin{lstlisting}[style=inline, language=sh]
+cargo install hayashi-lang --features odbc
+\end{lstlisting}
+
+Requer driver ODBC instalado no sistema (\texttt{unixODBC} no Linux).
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Variáveis de ambiente}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Variável} & \textbf{Efeito} \\
+\midrule
+\texttt{HAY\_HISTORY}  & Caminho do arquivo de histórico do REPL \\
+\texttt{HAY\_NOCOLOR}  & Desabilita cores nas mensagens de erro \\
+\texttt{HAY\_TRACE}    & Habilita trace de execução (depuração) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Módulos e funcionalidades opcionais}
+
+\subsection*{Modelos econométricos avançados}
+
+Os estimadores abaixo requerem a crate \texttt{greeners} como dependência
+do interpretador. Em builds de desenvolvimento (\texttt{cargo build}), ela é
+compilada automaticamente. Nenhuma instalação adicional é necessária.
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Grupo} & \textbf{Estimadores} \\
+\midrule
+Dados em painel    & \texttt{fe}, \texttt{re}, \texttt{ab}, \texttt{pcse}, \texttt{gee},
+                     \texttt{mundlak}, \texttt{xtgls}, \texttt{mixedlm}, \texttt{clogit} \\
+Resposta qualitativa & \texttt{logit}, \texttt{probit}, \texttt{mlogit},
+                       \texttt{ologit}, \texttt{oprobit} \\
+Contagem/limitada  & \texttt{poisson}, \texttt{nbreg}, \texttt{zinb},
+                     \texttt{tobit}, \texttt{heckman} \\
+GLM geral          & \texttt{glm} (5 famílias, múltiplos links) \\
+Regularização      & \texttt{lasso}, \texttt{ridge\_reg}, \texttt{enet} \\
+Sobrevivência      & \texttt{km}, \texttt{cox} \\
+Multivariada       & \texttt{pca}, \texttt{factor}, \texttt{cancorr}, \texttt{manova} \\
+Séries temporais   & \texttt{var}, \texttt{svar}, \texttt{vecm}, \texttt{garch},
+                     \texttt{markov}, \texttt{arima} \\
+Filtros            & \texttt{hprescott}, \texttt{baxter\_king}, \texttt{holtwinters},
+                     \texttt{stl}, \texttt{christiano\_fitzgerald} \\
+Inferência causal  & \texttt{psm}, \texttt{synth}, \texttt{did}, \texttt{rd} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection*{Uso da memória}
+
+Modelos computacionalmente intensivos podem requerer ajuste de stack:
+
+\begin{lstlisting}[style=inline, language=sh]
+RUST_MIN_STACK=8388608 hay script.hay  // 8 MB de stack
+\end{lstlisting}
+
+Relevante para VAR/SVAR com muitas defasagens ou PCA em datasets amplos.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Integração com editores}
+
+\subsection*{Neovim}
+
+Adicione ao \texttt{init.lua} para reconhecimento de sintaxe básico:
+
+\begin{lstlisting}[style=inline, language=Hayashi]
+vim.filetype.add({ extension = { hay = "hayashi" } })
+\end{lstlisting}
+
+Highlighting completo via Tree-sitter está no roadmap.
+
+\subsection*{VS Code}
+
+Extensão disponível na marketplace como \texttt{hayashi-lang}.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Compilação de desenvolvimento}
+
+Para iterar com builds locais (sem \texttt{--release}):
+
+\begin{lstlisting}[style=inline, language=sh]
+git clone https://github.com/sheep-farm/hayashi
+cd hayashi
+cargo build            // debug build (recomendado para dev)
+./target/debug/hay script.hay
+\end{lstlisting}
+
+O build debug tem verificações extras de bounds e mensagens de erro detalhadas.
+Não usar \texttt{--release} em desenvolvimento — o ganho de velocidade não
+compensa a perda de diagnóstico.
+
+\subsection*{Execução de scripts}
+
+\begin{lstlisting}[style=inline, language=sh]
+./target/debug/hay script.hay        // executa script
+./target/debug/hay                   // abre REPL interativo
+./target/debug/hay < script.hay      // lê do stdin
+\end{lstlisting}

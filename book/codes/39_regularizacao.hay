@@ -1,0 +1,40 @@
+// Cap 39 — Regularização: LASSO, Ridge, Elastic Net
+// DGP: y = 1 + 2*x1 + 3*x2 + 0*x3 + ... + 0*x10 + e
+// 10 regressores; apenas x1 e x2 têm efeito não nulo
+// LASSO deve zerar x3..x10; Ridge encolhe todos
+
+seed(42)
+input df
+id
+1
+end
+for i in 1..=9 { df = append(df, df) }
+df |> filter(_n <= 200)   // N pequeno para regularização importar
+generate df x1  = rnormal()
+generate df x2  = rnormal()
+generate df x3  = rnormal()
+generate df x4  = rnormal()
+generate df x5  = rnormal()
+generate df x6  = rnormal()
+generate df x7  = rnormal()
+generate df x8  = rnormal()
+generate df x9  = rnormal()
+generate df x10 = rnormal()
+generate df e   = (rnormal() - 0.5) * 1.7321
+generate df y   = 1.0 + 2.0*x1 + 3.0*x2 + e
+
+// OLS: overfitting com 10 regressores e N=200
+let m_ols   = ols(y ~ x1+x2+x3+x4+x5+x6+x7+x8+x9+x10, df)
+display m_ols
+
+// LASSO: seleciona variáveis — alpha é o lambda de penalização
+let m_lasso = lasso(y ~ x1+x2+x3+x4+x5+x6+x7+x8+x9+x10, df, alpha=0.1)
+display m_lasso
+
+// Ridge: encolhe coeficientes sem zerar
+let m_ridge = ridge_reg(y ~ x1+x2+x3+x4+x5+x6+x7+x8+x9+x10, df, alpha=0.5)
+display m_ridge
+
+// Elastic Net: mistura L1 + L2 (alpha=0.5 → igual peso)
+let m_enet  = enet(y ~ x1+x2+x3+x4+x5+x6+x7+x8+x9+x10, df, alpha=0.5)
+display m_enet

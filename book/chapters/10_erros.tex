@@ -1,0 +1,104 @@
+\chapter{Tratamento de Erros}
+
+\section{Modelo de erros}
+
+\hayashi{} distingue dois tipos de erro:
+
+\begin{description}
+  \item[Erros de parse] Detectados antes da execução, ao analisar o código.
+        Incluem linha e trecho do código.
+  \item[Erros de runtime] Ocorrem durante a execução — variável indefinida,
+        tipo errado, divisão por zero, chave ausente.
+\end{description}
+
+Ambos os tipos exibem o trecho de código e a linha, facilitando a localização:
+
+\begin{lstlisting}[style=inline]
+error: line 5: undefined variable 'rendimento' — did you mean 'rendimento_bruto'?
+   5 │ display rendimento * 12
+     │ ^^^^^^^^^^^^^^^^^^^^^^^^
+\end{lstlisting}
+
+\section{\texttt{try} / \texttt{catch}}
+
+Erros de runtime podem ser capturados com \lstinline{try}/\lstinline{catch}:
+
+\begin{lstlisting}[caption={try/catch básico}]
+try {
+  let resultado = 10 / 0
+  display resultado
+} catch e {
+  display f"Erro capturado: {e}"
+}
+\end{lstlisting}
+
+A variável \lstinline{e} dentro do \lstinline{catch} contém a mensagem de erro
+como string.
+
+\subsection*{Capturando erros de arquivo}
+
+\begin{lstlisting}
+try {
+  load "dados_inexistentes.csv" as df
+} catch e {
+  display f"Arquivo não encontrado: {e}"
+}
+\end{lstlisting}
+
+\subsection*{\texttt{try} como expressão}
+
+\lstinline{try}/\lstinline{catch} pode retornar um valor:
+
+\begin{lstlisting}
+let valor = try {
+  int("não é um número")
+} catch _ {
+  -1
+}
+display valor    // -1
+\end{lstlisting}
+
+\section{Erros comuns e suas mensagens}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Situação} & \textbf{Mensagem típica} \\
+\midrule
+Variável não declarada   & \texttt{undefined variable 'x' — did you mean 'y'?} \\
+Função não existe        & \texttt{undefined function 'foo' — did you mean 'for'?} \\
+Tipo errado              & \texttt{type mismatch — expected Int, got String} \\
+Índice fora de limite    & \texttt{index 5 out of bounds (len=3)} \\
+Chave ausente em dict    & \texttt{key 'nome' not found in dict} \\
+Divisão por zero (Int)   & \texttt{division by zero} \\
+Arquivo não encontrado   & \texttt{file not found: 'caminho.csv'} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Sugestões automáticas}
+
+Quando o nome de uma variável ou função é parecido com algo existente, \hayashi{}
+sugere a correção:
+
+\begin{lstlisting}[style=inline]
+error: undefined function 'regres' — did you mean 'regress'?
+\end{lstlisting}
+
+As sugestões usam distância de edição (\textit{Levenshtein}) sobre uma lista de
+todos os nomes definidos no escopo e nas funções embutidas.
+
+\section{Re-lançamento de erros}
+
+Para propagar um erro capturado:
+
+\begin{lstlisting}
+try {
+  operacao_arriscada()
+} catch e {
+  display f"log: {e}"
+  error(e)    // re-lança o erro
+}
+\end{lstlisting}
+
+A função \lstinline{error(msg)} lança um erro de runtime com a mensagem fornecida.

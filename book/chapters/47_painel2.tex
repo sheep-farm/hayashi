@@ -1,0 +1,112 @@
+\chapter{Painel Avançado II}
+\label{cap:painel2}
+% ── índice ──────────────────────────────────────────────────────
+\index{Mundlak, estimador de|textbf}
+\index{mundlak@\texttt{mundlak()}|textbf}
+\index{efeitos correlacionados aleatórios|see{Mundlak, estimador de}}
+\index{CRE|see{Mundlak, estimador de}}
+\index{xtgls@\texttt{xtgls()}|textbf}
+\index{modelo misto|textbf}
+\index{mixedlm@\texttt{mixedlm()}|textbf}
+\index{logit condicional|textbf}
+\index{clogit@\texttt{clogit()}|textbf}
+\index{REML}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Além do FE e RE básicos}
+
+Os estimadores do cap.~\ref{cap:painel_avancado} (AB-GMM, PCSE, GEE) lidam
+com dinâmica e heterocedasticidade. Aqui cobrimos quatro abordagens complementares:
+
+\begin{itemize}
+  \item \textbf{FE} — referência; efeitos fixos padrão (within estimator)
+  \item \textbf{Mundlak (CRE)} — Correlated Random Effects; testa RE vs FE via $\gamma$
+  \item \textbf{xtgls} — GLS para painel; flexível quanto à estrutura de $\Sigma$
+  \item \textbf{mixedlm} — modelo misto com intercepts aleatórios
+  \item \textbf{clogit} — logit condicional para variáveis binárias em painel
+\end{itemize}
+
+\subsection*{Estimador de Mundlak (CRE)}
+
+Mundlak (1978) mostra que o estimador RE é equivalente ao FE se:
+\[
+  \alpha_i = \gamma'\,\bar{x}_i + u_i \quad u_i \perp x_{it}
+\]
+Regride $y_{it}$ em $x_{it}$ \emph{e} $\bar{x}_i$ (média por entidade).
+Se $\hat{\gamma} \neq 0$, o efeito fixo é necessário.
+
+\subsection*{GLS para painel (xtgls)}
+
+O GLS de painel especifica uma estrutura para a covariância dos erros entre
+entidades. Com \texttt{panels=hetero}, cada painel tem variância própria
+$\sigma_i^2$, permitindo heterocedasticidade entre painéis.
+
+\subsection*{Modelo misto (mixedlm)}
+
+O modelo linear misto especifica:
+\[
+  y_{it} = \beta x_{it} + u_i + \varepsilon_{it} \quad u_i \sim N(0, \sigma_u^2)
+\]
+onde $u_i$ é um efeito aleatório de intercept por entidade. Difere do RE
+padrão por usar REML e integrar sobre $u_i$ via máxima verossimilhança.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Verificação por DGP}
+
+DGP: painel estático endógeno. $y = 1 + 2x + \alpha_i + \varepsilon$;
+$\alpha_i = 0{,}05 \cdot i$ correlacionado com $x$ (via $z$).
+$N = 50$ entidades, $T = 20$ períodos.
+
+\begin{lstlisting}[caption={Painel II: FE, Mundlak, xtgls, mixedlm, clogit}]
+seed(42)
+generate df unit  = (_n - 1) % 50 + 1
+generate df t     = (_n - (_n - 1) % 50 - 1) / 50 + 1
+generate df alpha = unit * 0.05
+generate df z     = (rnormal() - 0.5) * 1.7321
+generate df x     = 0.5 * z + alpha + (rnormal() - 0.5)
+generate df y     = 1.0 + 2.0 * x + alpha + e
+
+let m_fe   = fe(y ~ x, df, id=unit)
+let m_mund = mundlak(df, y ~ x, id="unit")
+let m_gls  = xtgls(y ~ x, df, id=unit, time=t)
+let m_mix  = mixedlm(y ~ x, df, id="unit")
+generate df yb = (y > 2.5)
+let m_cl   = clogit(yb ~ x, df, group="unit")
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small, frame=none,
+  numbers=none, backgroundcolor=\color{codbg}]
+FE (within):        x = 2.041 ***    (verdadeiro: 2.0) ✓
+Mundlak:            x = 2.040,  γ(x̄) = 0.939 ***  → rejeita RE
+xtgls (hetero):     x = 2.768 ***    (tendencioso sem demeaning)
+mixedlm:            x = 2.134 ***    (intercept aleatório: σ²_u = 0.388)
+clogit (yb ~ x):    x = 1.397 ***    (grupos sem variação descartados)
+\end{lstlisting}
+
+\subsection*{Teste de Mundlak}
+
+O teste $H_0: \gamma = 0$ (médias não correlacionadas com $x$) rejeita com
+$F = 419{,}96$, $p < 0{,}001$. Isso confirma que $x$ é endógeno — o estimador
+RE seria inconsistente e deve-se usar FE.
+
+O xtgls sem remoção de FE superestima $\beta$ pois captura parte do efeito
+individual. O mixedlm fica próximo do FE porque trata $\alpha_i$ como efeito
+aleatório normal.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Sintaxe}
+
+\begin{lstlisting}
+fe(y ~ x, df, id=unit)                    // Fixed Effects (within)
+mundlak(df, y ~ x, id="unit")             // CRE: inclui médias de grupo
+xtgls(y ~ x, df, id=unit, time=t)         // GLS para painel
+xtgls(y ~ x, df, id=unit, time=t, panels="corr")  // Σ correlacionada
+mixedlm(y ~ x, df, id="unit")             // modelo misto (REML)
+clogit(yb ~ x, df, group="unit")          // logit condicional
+\end{lstlisting}
+
+\begin{nota}
+  No clogit, grupos onde $y$ não varia (todos 0 ou todos 1) são
+  automaticamente descartados porque não contribuem para a verossimilhança
+  condicional. Isso reduz a amostra efetiva, mas é teoricamente correto.
+\end{nota}

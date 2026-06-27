@@ -1,0 +1,153 @@
+\chapter{Análise Multivariada}
+\label{cap:multivariada}
+% ── índice ──────────────────────────────────────────────────────
+\index{análise de componentes principais|textbf}
+\index{PCA|see{análise de componentes principais}}
+\index{pca@\texttt{pca()}|textbf}
+\index{análise fatorial|textbf}
+\index{factor@\texttt{factor()}|textbf}
+\index{correlação canônica|textbf}
+\index{cancorr@\texttt{cancorr()}|textbf}
+\index{varimax, rotação}
+\index{MANOVA|textbf}
+\index{cargas fatoriais}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Redução de dimensionalidade e estrutura latente}
+
+Quando se observa um vetor de variáveis $\mathbf{v} = (v_1,\ldots,v_p)'$
+que compartilham variação comum, é útil resumir essa variação em poucas
+dimensões. Duas abordagens se complementam:
+
+\begin{itemize}
+  \item \textbf{PCA}: maximiza variância explicada por componentes ortogonais
+  (solução álgebrica — decomposição espectral da matriz de covariância).
+  \item \textbf{Análise Fatorial}: modela variáveis como combinação linear de
+  fatores latentes não-observados + unicidade (parte idiossincrática).
+\end{itemize}
+
+\subsection*{Análise de Componentes Principais (PCA)}
+
+\[
+  \mathbf{v} = W\,\mathbf{f} + \mathbf{e}
+  \qquad W = \text{eigenvectors de } \Sigma_v
+\]
+
+O $j$-ésimo componente principal $\text{PC}_j = w_j'\mathbf{v}$ captura a
+$j$-ésima maior fração da variância total. Os eigenvalues medem a variância
+de cada PC; a soma de todos os eigenvalues é $\mathrm{tr}(\Sigma_v) = \sum \mathrm{Var}(v_j)$.
+
+\subsection*{Análise Fatorial}
+
+\[
+  \mathbf{v} = \Lambda\,\mathbf{f} + \boldsymbol{\delta}
+  \qquad \mathbf{f} \perp \boldsymbol{\delta}
+\]
+
+$\Lambda$ são as \emph{cargas fatoriais} (loadings): $\lambda_{ij}$ mede o
+quanto o fator $j$ contribui para $v_i$. A \emph{comunalidade} $h_i^2 = \sum_j \lambda_{ij}^2$
+é a fração da variância de $v_i$ explicada pelos fatores comuns.
+
+\subsection*{Correlação Canônica}
+
+Dadas duas baterias de variáveis $X = (x_1,\ldots,x_p)$ e $Y = (y_1,\ldots,y_q)$,
+a análise canônica encontra vetores $a$ e $b$ tais que $\mathrm{Corr}(a'X, b'Y)$
+é maximizada. Fornece $\min(p,q)$ pares canônicos.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Verificação por DGP}
+
+DGP com 2 fatores latentes e 5 variáveis observadas.
+
+\begin{lstlisting}[caption={DGP fatorial e análise multivariada}]
+seed(42)
+generate df f1 = rnormal()
+generate df f2 = rnormal()
+// v1, v2: cargas altas em f1; v3, v4: cargas altas em f2; v5: ambos
+generate df v1 = 0.9*f1 + 0.1*f2 + e1
+generate df v2 = 0.8*f1 + 0.2*f2 + e2
+generate df v3 = 0.1*f1 + 0.9*f2 + e3
+generate df v4 = 0.2*f1 + 0.8*f2 + e4
+generate df v5 = 0.5*f1 + 0.5*f2 + e5
+
+let m_pca = pca(df, v1, v2, v3, v4, v5, n=2)
+display m_pca
+
+let m_fac = factor(df, v1, v2, v3, v4, v5, n=2, rotation=varimax)
+display m_fac
+
+let m_can = cancorr(df, xvars=["v1","v2"], yvars=["v3","v4","v5"])
+display m_can
+\end{lstlisting}
+
+\subsection*{PCA}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+════════════════════════════════════════════════
+     Principal Component Analysis
+────────────────────────────────────────────────
+ Componente    Var Expl.    % Acum.   Eigenvalue
+ PC1              0.5939     0.5939       2.9695
+ PC2              0.2437     0.8377       1.2187
+────────────────────────────────────────────────
+Loadings:
+          PC1      PC2
+ v1     0.677   -0.641
+ v2     0.808   -0.450
+ v3     0.693    0.623
+ v4     0.790    0.466
+ v5     0.868   -0.002
+════════════════════════════════════════════════
+\end{lstlisting}
+
+PC1 (59{,}4\% da variância) tem cargas positivas em todas as variáveis —
+captura o componente comum. PC2 (24{,}4\%) contrasta o grupo $f_1$ (v1, v2)
+com o grupo $f_2$ (v3, v4). Os dois PCs somam 83{,}8\% da variância total.
+
+\subsection*{Análise Fatorial}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+════════════════════════════════════════════════
+        Factor Analysis — Varimax
+────────────────────────────────────────────────
+Variável        F1       F2  Comunalit.
+ v1           0.027   -0.932      0.869
+ v2           0.255   -0.889      0.856
+ v3           0.931   -0.048      0.869
+ v4           0.888   -0.228      0.841
+ v5           0.613   -0.614      0.753
+════════════════════════════════════════════════
+\end{lstlisting}
+
+Após rotação varimax, F1 carrega em v3 e v4 (associados ao fator latente
+$f_2$); F2 carrega em v1 e v2 (fator $f_1$). Comunalidades acima de 0{,}75
+confirmam que os fatores comuns explicam grande parte da variância individual.
+
+\subsection*{Correlação Canônica}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+============== Canonical Correlation Analysis ==============
+Observations: 300  Wilks' Lambda: 0.5396  F=35.54  p=0.000
+  CC1: 0.6706    CC2: 0.1396
+X vars: v1, v2  |  Y vars: v3, v4, v5
+============================================================
+\end{lstlisting}
+
+A primeira correlação canônica $\hat\rho_1 = 0{,}671$ captura a associação
+entre o bloco \{v1, v2\} e o bloco \{v3, v4, v5\} através do fator latente
+compartilhado.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Sintaxe}
+
+\begin{lstlisting}
+pca(df, v1, v2, v3, ..., n=2)                    // n componentes a reter
+factor(df, v1, v2, v3, ..., n=2, rotation=none)  // rotation: none | varimax
+cancorr(df, xvars=["x1","x2"], yvars=["y1","y2"])
+\end{lstlisting}

@@ -1,0 +1,103 @@
+\chapter{SVAR com Restrições de Longo Prazo}
+\label{cap:svar2}
+% ── índice ──────────────────────────────────────────────────────
+\index{Blanchard-Quah, decomposição de|textbf}
+\index{choque permanente|textbf}
+\index{choque transitório|textbf}
+\index{restrições de longo prazo|textbf}
+\index{SVEC}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Identificação de Blanchard-Quah}
+
+O cap.~\ref{cap:svar} (SVAR Cholesky) impõe restrições de \emph{curto prazo}:
+a variável na posição 1 não é afetada contemporaneamente pela segunda.
+Blanchard e Quah (1989) propõem uma alternativa via restrições de
+\emph{longo prazo}: choques permanentes e transitórios.
+
+A ideia central: na macroeconomia, um choque de oferta tem efeito permanente
+sobre o produto ($y$), enquanto um choque de demanda tem efeito apenas
+transitório. A restrição:
+\[
+  \sum_{h=0}^\infty \Theta_h^{(1,1)} = \text{livre}, \quad
+  \sum_{h=0}^\infty \Theta_h^{(1,2)} = 0
+\]
+impõe que o choque 2 não afeta $y$ no longo prazo. Essa restrição identifica
+a decomposição $B$ sem nenhuma restrição de impacto contemporâneo.
+
+\subsection*{Decomposição BQ}
+
+Dado o VAR na forma reduzida $y_t = \Phi_1 y_{t-1} + u_t$:
+\begin{enumerate}
+  \item Compute a soma $C = (I - \Phi_1)^{-1}$ — multiplicador de longo prazo
+  \item Fatore $C\,\Sigma_u\,C' = F\,F'$ (Cholesky de $F$)
+  \item Extraia $B = C^{-1} F$ — os choques estruturais de longo prazo
+\end{enumerate}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Verificação por DGP}
+
+DGP: VAR(1) bivariado onde $y_1$ é um passeio aleatório (choque 1 permanente),
+$y_2$ é estacionária e responde transitoriamente ao choque 1.
+
+\begin{lstlisting}[caption={SVAR Blanchard-Quah}]
+seed(42)
+// y1_t = y1_{t-1} + e1_t               (passeio aleatório)
+// y2_t = 0.5*y2_{t-1} + 0.4*e1_t + 0.6*e2_t  (estacionária)
+
+let m_bq = svar(df, y1, y2, lags=1, id=longrun)
+display m_bq
+let m_irf_bq = sirf(m_bq, steps=20)
+display m_irf_bq
+\end{lstlisting}
+
+\subsection*{Matriz B (choques estruturais)}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small, frame=none,
+  numbers=none, backgroundcolor=\color{codbg}]
+SVAR(1) — Long-run restrictions
+B Matrix:
+[ 0.4907   0.0358 ]
+[ 0.1935   0.3031 ]
+\end{lstlisting}
+
+A matriz $B$ não é triangular — ao contrário do Cholesky, as restrições de
+longo prazo não implicam restrições de impacto contemporâneo.
+
+\subsection*{IRF estrutural}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small, frame=none,
+  numbers=none, backgroundcolor=\color{codbg}]
+Impulso: Choque 1 (permanente)
+  h= 0:  y1=+0.491  y2=+0.194
+  h= 1:  y1=+0.464  y2=+0.087
+  h= 5:  y1=+0.405  y2=-0.003   (efeito em y2 decai)
+  h=19:  y1=+0.271  y2=-0.005   (y1 retém efeito permanente)
+
+Impulso: Choque 2 (transitório)
+  h= 0:  y1=+0.036  y2=+0.303
+  h= 1:  y1=+0.016  y2=+0.144
+  h= 5:  y1=-0.001  y2=+0.007   (efeito em y1 decai a ~0)
+  h=19:  y1=-0.001  y2= 0.000   (transitório confirmado) ✓
+\end{lstlisting}
+
+O choque 2 afeta $y_1$ apenas transitoriamente (soma → 0), confirmando a
+restrição de longo prazo. O choque 1 tem efeito acumulado crescente sobre $y_1$
+— coerente com a raiz unitária.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Sintaxe}
+
+\begin{lstlisting}
+svar(df, y1, y2, lags=1, id=longrun)     // BQ: restrições de longo prazo
+svar(df, y1, y2, lags=1, id=cholesky)    // Cholesky: restrições contemporâneas
+sirf(m_svar, steps=20)                   // IRF estrutural
+\end{lstlisting}
+
+\begin{nota}
+  A identificação BQ requer que as variáveis sejam integradas de ordem 1
+  ($I(1)$). Para séries estacionárias, $(I - \hat{\Phi}_1)^{-1}$ é finito e
+  a decomposição permanente/transitória não tem interpretação natural.
+  Verificar raiz unitária (cap.~\ref{cap:arima}, \ref{cap:raiz_unitaria2})
+  antes de aplicar BQ.
+\end{nota}

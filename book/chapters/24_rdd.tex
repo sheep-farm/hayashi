@@ -1,0 +1,212 @@
+\chapter{Regressão com Descontinuidade}
+\label{cap:rdd}
+% ── índice ──────────────────────────────────────────────────────
+\index{regressão por descontinuidade|textbf}
+\index{RDD|see{regressão por descontinuidade}}
+\index{rd@\texttt{rd()}|textbf}
+\index{limiar de corte}
+\index{running variable}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{O modelo}
+
+A Regressão com Descontinuidade (RDD) identifica efeitos causais quando o
+tratamento é atribuído mecanicamente com base em um limiar de uma variável
+contínua observável — a \textbf{variável de corrida} (\emph{running variable})
+$x$:
+
+\[
+  D_i = \mathbf{1}[x_i \geq c]
+\]
+
+O estimador explora o fato de que indivíduos imediatamente abaixo e acima do
+limiar $c$ são comparáveis em tudo, exceto no tratamento recebido. O efeito
+identificado é o \textbf{LATE no limiar} (\emph{Local Average Treatment
+Effect at the cutoff}):
+
+\[
+  \tau_{\mathrm{RDD}}
+  = \lim_{x \downarrow c} E[y \mid x]
+  - \lim_{x \uparrow c} E[y \mid x]
+\]
+
+\begin{nota}
+  O RDD \emph{Sharp} (acima) assume que $D$ muda deterministicamente em $c$.
+  O RDD \emph{Fuzzy} generaliza para quando $D$ aumenta
+  \emph{descontinuamente} em $c$, sem salto de 0 a 1 — requer um primeiro
+  estágio e equivale a um IV local.
+\end{nota}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Identificação}
+
+A hipótese central é a \textbf{continuidade dos resultados potenciais} em
+$c$:
+
+\[
+  E[Y^{(0)} \mid x] \quad \text{e} \quad E[Y^{(1)} \mid x]
+  \quad \text{são contínuas em } x = c
+\]
+
+Isso garante que qualquer descontinuidade em $E[y \mid x]$ no ponto $c$ é
+causada pelo salto em $D$, e não por outro fator que também muda em $c$.
+
+A hipótese é violada se agentes \emph{manipulam} $x$ para ficarem acima ou
+abaixo do limiar — estudantes que revisam respostas para cruzar o corte de
+aprovação, por exemplo. O teste de densidades de McCrary (teste de
+continuidade da densidade de $x$ em $c$) verifica se há aglomeração
+suspeita de observações de um lado do limiar.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{O estimador}
+
+O estimador padrão é a \textbf{regressão local linear} separada em cada
+lado do limiar, dentro de uma janela (\emph{bandwidth}) $h$:
+
+\[
+  \hat\tau = \hat\mu_+ - \hat\mu_-
+\]
+
+onde $\hat\mu_+$ e $\hat\mu_-$ são os interceptos das regressões locais
+lineares no lado direito ($x \in [c, c+h)$) e esquerdo ($x \in (c-h, c)$),
+respectivamente, ponderadas pelo kernel triangular:
+
+\[
+  K\!\left(\frac{x - c}{h}\right) = \left(1 - \frac{|x-c|}{h}\right)
+  \mathbf{1}[|x-c| \leq h]
+\]
+
+O \emph{bandwidth} $h$ controla o viés-variância: janelas largas reduzem
+variância mas aumentam viés (linearidade local pode ser má aproximação);
+janelas estreitas são mais locais mas têm menos observações. O Hayashi
+seleciona $h$ automaticamente pelo critério MSE-ótimo (Imbens-Kalyanaraman)
+quando \lstinline{bw} não é especificado.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Verificação por DGP}
+
+\subsection*{Recuperação exata (sem ruído)}
+
+O DGP usa a variável de corrida $x \sim \mathrm{Uniforme}(-1, 1)$, limiar em
+$c = 0$ e efeito verdadeiro $\tau = 2{,}0$. A função de resultados é linear
+em $x$ dos dois lados do limiar, sem ruído, de modo que a RDD deve recuperar
+$\tau$ exatamente.
+
+\[
+  y_i = 1{,}0 + 0{,}5\,x_i + 2{,}0\,D_i, \qquad D_i = \mathbf{1}[x_i \geq 0]
+\]
+
+\begin{lstlisting}[caption={DGP RDD sem ruído — recuperação exata}]
+seed(42)
+input df
+id
+1
+end
+for i in 1..=10 { df = append(df, df) }
+df |> filter(_n <= 1000)
+generate df x = runiform() * 2 - 1
+generate df d = x >= 0
+generate df y = 1.0 + 0.5*x + 2.0*d
+rd(y ~ x, 0.0, df)
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+══════════════════════════════════════════════════════════════════════
+ Regressão Descontínua  —  Sharp  —  Local Linear (p=1)
+══════════════════════════════════════════════════════════════════════
+ Outcome: y                   Running var: x
+ Cutoff: 0.0000   Bandwidth: 0.0571   Kernel: Triangular
+ Obs total: 72   N esquerda: 37   N direita: 35
+──────────────────────────────────────────────────────────────────────
+ Efeito de Tratamento (τ̂):
+       2.0000   SE     0.0000   z 2.443e15   P>|z|   0.0000  ***
+ IC 95%: [2.0000, 2.0000]
+══════════════════════════════════════════════════════════════════════
+ *** p<0.01  ** p<0.05  * p<0.10
+\end{lstlisting}
+
+O estimador recupera $\hat\tau = 2{,}0000$ exatamente. O bandwidth de
+$0{,}0571$ foi selecionado automaticamente — das 1000 observações, 72 estão
+dentro da janela em torno do cutoff.
+
+\subsection*{Com ruído idiossincrático}
+
+Adicionando $\varepsilon$ idiossincrático, o LATE permanece identificado:
+
+\begin{lstlisting}[caption={DGP RDD com ruído}]
+generate df e = rnormal()
+generate df y = 1.0 + 0.5*x + 2.0*d + e
+rd(y ~ x, 0.0, df)
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+══════════════════════════════════════════════════════════════════════
+ Regressão Descontínua  —  Sharp  —  Local Linear (p=1)
+══════════════════════════════════════════════════════════════════════
+ Outcome: y                   Running var: x
+ Cutoff: 0.0000   Bandwidth: 0.0741   Kernel: Triangular
+ Obs total: 94   N esquerda: 43   N direita: 51
+──────────────────────────────────────────────────────────────────────
+ Efeito de Tratamento (τ̂):
+       2.0116   SE     0.1191   z   16.893   P>|z|   0.0000  ***
+ IC 95%: [1.7782, 2.2449]
+══════════════════════════════════════════════════════════════════════
+ *** p<0.01  ** p<0.05  * p<0.10
+\end{lstlisting}
+
+Com ruído, $\hat\tau = 2{,}0116$ — o desvio de $2{,}0$ é variância amostral.
+O IC de 95\% $[1{,}78;\; 2{,}24]$ cobre o verdadeiro $\tau = 2{,}0$.
+O bandwidth foi $0{,}0741$: com mais variância, o critério MSE-ótimo
+prefere janela mais estreita para controlar o viés.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Sintaxe}
+
+\begin{lstlisting}
+rd(y ~ x, cutoff, df)
+rd(y ~ x, cutoff, df, bw=0.3)
+rd(y ~ x, cutoff, df, bw=0.3, poly=2)
+\end{lstlisting}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Parâmetro} & \textbf{Padrão} & \textbf{Descrição} \\
+\midrule
+\texttt{cutoff}  & obrigatório & valor do limiar em $x$ \\
+\texttt{bw}      & automático (IK) & largura da janela $h$ \\
+\texttt{poly}    & \texttt{1} & grau do polinômio local \\
+\texttt{kernel}  & \texttt{triangular} & \texttt{uniform}, \texttt{epanechnikov} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{lstlisting}[caption={Fluxo típico — nota de corte e bolsa}]
+load "escola.csv" as df
+
+// pontuação centralizada no limiar 60
+generate df xc = nota - 60
+
+let m = rd(aprovado ~ xc, 0.0, df)
+display m
+\end{lstlisting}
+
+\section{Capturando o resultado}
+
+\begin{lstlisting}
+let m = rd(y ~ x, 0.0, df)
+display m
+\end{lstlisting}
+
+\begin{nota}
+  Em aplicações reais, valide o RDD com testes de falsificação:
+  (1)~estime o modelo usando \emph{covariáveis pré-tratamento} como
+  desfecho — não deve haver descontinuidade em $c$;
+  (2)~teste descontinuidades em \emph{limiares placebo} ($c \pm \delta$)
+  — não devem ser significativas; (3)~verifique a densidade de $x$ em
+  $c$ (McCrary) para detectar manipulação da variável de corrida.
+\end{nota}

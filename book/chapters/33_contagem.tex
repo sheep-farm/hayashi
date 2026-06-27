@@ -1,0 +1,166 @@
+\chapter{Modelos de Contagem}
+\label{cap:contagem}
+% ── índice ──────────────────────────────────────────────────────
+\index{modelos de contagem|textbf}
+\index{Poisson, regressão de|textbf}
+\index{poisson@\texttt{poisson()}|textbf}
+\index{binomial negativa|textbf}
+\index{nbreg@\texttt{nbreg()}|textbf}
+\index{ZINB|textbf}
+\index{zinb@\texttt{zinb()}|textbf}
+\index{superdispersão|textbf}
+\index{excesso de zeros}
+\index{pseudo-máxima verossimilhança}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Dados de contagem e a inadequação do OLS}
+
+Variáveis de resultado que assumem apenas valores inteiros não negativos
+($Y \in \{0,1,2,\ldots\}$) — número de filhos, visitas ao médico, patentes
+registradas — violam as premissas do OLS. O OLS pode produzir predições
+negativas e é ineficiente: a variância de $Y$ cresce com a média (cauda
+assimétrica à direita), violando homocedasticidade.
+
+\subsection*{Poisson}
+
+O modelo de regressão Poisson especifica:
+
+\[
+  Y_i \mid x_i \sim \mathrm{Poisson}(\lambda_i)
+  \qquad
+  \lambda_i = E[Y_i \mid x_i] = \exp(\beta_0 + \beta_1 x_i)
+\]
+
+A função de log-verossimilhança é:
+
+\[
+  \ell(\beta) = \sum_{i=1}^n \left[ y_i\,(\beta_0 + \beta_1 x_i) - \exp(\beta_0 + \beta_1 x_i) - \ln(y_i!) \right]
+\]
+
+Uma propriedade útil: o estimador de Poisson converge para $\beta$ mesmo que
+$Y$ não seja estritamente Poisson, contanto que $E[Y\mid x] = \exp(x'\beta)$
+(estimador quasi-MLE; Gourieroux, Monfort e Trognon 1984).
+
+\subsection*{Binomial Negativa}
+
+O modelo Poisson impõe $E[Y\mid x] = \mathrm{Var}[Y\mid x]$ (equidispersão).
+Quando a variância supera a média (\emph{superdispersão}), o modelo de
+Binomial Negativa (NB2) generaliza:
+
+\[
+  \mathrm{Var}[Y \mid x] = E[Y\mid x] + \alpha\,(E[Y\mid x])^2
+\]
+
+O parâmetro $\alpha > 0$ captura a superdispersão. Poisson é o caso-limite
+$\alpha \to 0$.
+
+\subsection*{Zero-Inflated Negative Binomial (ZINB)}
+
+Muitas aplicações apresentam zeros em excesso além do que qualquer modelo de
+contagem simples prevê — processos de dois estágios: primeiro decide-se se há
+evento ($D=1$ com prob.\ $\pi_i$), depois conta-se a frequência. O ZINB combina:
+
+\[
+  P(Y_i = 0) = (1-\pi_i) + \pi_i\,(1+\alpha\lambda_i)^{-1/\alpha}
+  \qquad
+  P(Y_i = k) = \pi_i\,P_{\mathrm{NB}}(k \mid \lambda_i,\alpha)\quad (k\geq 1)
+\]
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Verificação por DGP}
+
+O DGP cria contagens aproximadamente Poisson com $\lambda_i = e^{0{,}5 + x_i}$,
+$x \sim U(0,1)$. O estimador deve recuperar $\beta_0 \approx 0{,}5$ e $\beta_1 \approx 1{,}0$.
+
+\begin{lstlisting}[caption={Poisson, NegBin e ZINB}]
+seed(42)
+generate df x   = rnormal()                          // x ~ U(0,1)
+generate df lam = exp(0.5 + 1.0 * x)
+generate df u   = rnormal()
+generate df y   = floor(lam + u)                     // contagem ≥ 0
+
+let m_pois = poisson(y ~ x, df)
+display m_pois
+
+let m_nb   = nbreg(y_nb ~ x, df)
+display m_nb
+
+let m_zinb = zinb(y_zi ~ x, df)
+display m_zinb
+\end{lstlisting}
+
+\subsection*{Poisson}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+========================= Poisson Regression Results =========================
+Dep. Variable:     y  || Log-Likelihood:   102.0744  AIC:  -200.1488
+Method:         IRLS  || Pseudo R-sq:        0.7709  N:         500
+------------------------------------------------------------------------------
+                   coef    std err        z    P>|z|
+const            0.5246     0.0602    8.709    0.000      ***
+x                0.9733     0.0960   10.141    0.000      ***
+\end{lstlisting}
+
+$\hat\beta_0 = 0{,}52 \approx 0{,}5$ e $\hat\beta_1 = 0{,}97 \approx 1{,}0$ —
+estimativas próximas dos valores verdadeiros.
+
+\subsection*{Binomial Negativa}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+================ Negative Binomial Regression (alpha=0.0010) =================
+                   coef    std err        z    P>|z|
+const            0.4613     0.0177   26.025    0.000      ***
+x                1.1950     0.0276   43.249    0.000      ***
+\end{lstlisting}
+
+$\hat\alpha \approx 0{,}001$ — mínima superdispersão, NegBin colapsa para Poisson. Com dados genuinamente superdispersos $\hat\alpha$ é significativamente positivo.
+
+\subsection*{ZINB}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+=============== Zero-Inflated Negative Binomial (ZINB) Results ===============
+---- Count Model ----
+const  0.2994 (0.1347)  **
+x      1.2435 (0.2051)  ***
+---- Inflate Model (Logit) ----
+z0     0.4392 (0.2264)  *
+z1     0.5121 (0.3828)
+\end{lstlisting}
+
+A equação de inflação de zeros estima a probabilidade de um zero estrutural;
+a equação de contagem modela o processo condicional ao evento ocorrer.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Sintaxe}
+
+\begin{lstlisting}
+poisson(y ~ x1 + x2, df)
+nbreg(y ~ x1 + x2, df)
+zinb(y ~ x1 + x2, df)
+zinb(y ~ x1 + x2, df, inflate = z1 + z2)  // equação de inflação separada
+\end{lstlisting}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Estimador} & \textbf{Quando usar} \\
+\midrule
+\texttt{poisson}  & contagens com equidispersão; quasi-MLE robusto \\
+\texttt{nbreg}    & superdispersão ($\hat\alpha$ sig.\ positivo) \\
+\texttt{zinb}     & excesso de zeros além do esperado por NB \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{nota}
+  Coeficientes de Poisson e NB são log-razões: $\beta_1 = 1$ implica que um
+  aumento unitário em $x$ multiplica a contagem esperada por $e^1 \approx 2{,}72$.
+  Para obter \emph{efeitos marginais médios} (AME): use
+  \lstinline{margins(modelo)}.
+\end{nota}

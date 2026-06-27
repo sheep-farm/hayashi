@@ -1,0 +1,33 @@
+// Cap 25 — Método Generalizado dos Momentos (GMM)
+// DGP: x endógeno; z1 exógeno (ortogonalizado); z2 exógeno independente
+// Parâmetros verdadeiros: b0=1.5, b1=2.0
+
+seed(42)
+input df
+id
+1
+end
+for i in 1..=10 { df = append(df, df) }
+df |> filter(_n <= 1000)
+generate df z1  = rnormal()
+generate df z2  = rnormal()
+generate df v   = rnormal()
+// ortogonaliza eps contra z1 in-sample
+let d1          = cov(df, z1, v) / variance(df, z1)
+let d0          = mean(df, v) - d1 * mean(df, z1)
+generate df eps = v - d0 - d1*z1
+generate df x   = 0.8*z1 + 0.4*z2 + eps
+generate df y   = 1.5 + 2.0*x + 0.7*eps
+
+// OLS viesado | IV exato (z1) | GMM eficiente (z1+z2)
+let m_ols = ols(y ~ x, df)
+let m_iv  = iv(y ~ x, ~ z1, df)
+let m_gmm = gmm(y ~ x, ~ z1 + z2, df)
+display m_ols
+display m_iv
+display m_gmm
+
+// z2 contaminado: J-test rejeita
+generate df z2b = z2 + 0.5*eps
+let m_bad = gmm(y ~ x, ~ z1 + z2b, df)
+display m_bad

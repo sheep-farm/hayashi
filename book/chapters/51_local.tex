@@ -1,0 +1,108 @@
+\chapter{Estimação Local e Ponderada}
+\label{cap:local}
+% ── índice ──────────────────────────────────────────────────────
+\index{mínimos quadrados ponderados|textbf}
+\index{WLS|see{mínimos quadrados ponderados}}
+\index{wls@\texttt{wls()}|textbf}
+\index{rolling OLS|textbf}
+\index{rols@\texttt{rols()}|textbf}
+\index{LOWESS|textbf}
+\index{lowess@\texttt{lowess()}|textbf}
+\index{estimação local|textbf}
+\index{suavização não-paramétrica}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Pesos, janelas e suavização}
+
+A estimação clássica (OLS, MLE) trata cada observação simetricamente.
+Três alternativas permitem que o modelo se adapte localmente:
+
+\begin{description}
+  \item[WLS] Mínimos quadrados ponderados: observações com menor variância
+    (ou maior relevância) recebem maior peso.
+
+  \item[Rolling OLS] Estima o modelo em janelas temporais deslizantes,
+    revelando como os coeficientes evoluem ao longo do tempo.
+
+  \item[LOWESS] Suavização não-paramétrica: para cada ponto $x_0$, ajusta
+    uma regressão ponderada localmente usando vizinhos próximos.
+\end{description}
+
+\subsection*{WLS (Weighted Least Squares)}
+
+O estimador WLS minimiza:
+\[
+  \hat{\beta}_{WLS} = \arg\min_\beta \sum_{i=1}^n w_i (y_i - x_i'\beta)^2
+  = (X'WX)^{-1} X'Wy
+\]
+onde $W = \text{diag}(w_1, \ldots, w_n)$. Se os pesos são proporcionais a
+$1/\sigma_i^2$ (variâncias dos erros), o WLS é o estimador eficiente sob
+heterocedasticidade (= GLS para erros independentes).
+
+\subsection*{Rolling OLS}
+
+Para séries temporais não-estacionárias nos parâmetros (coeficientes variantes
+no tempo), o rolling OLS com janela $h$ estima:
+\[
+  \hat{\beta}_t = (X_{t-h:t}' X_{t-h:t})^{-1} X_{t-h:t}' Y_{t-h:t}
+\]
+
+\subsection*{LOWESS}
+
+O LOWESS (Cleveland 1979) estima $m(x_0) = E[y | x = x_0]$ localmente:
+\begin{enumerate}
+  \item Seleciona os $f \cdot n$ vizinhos mais próximos de $x_0$
+  \item Aplica pesos tricúbicos: $w_i = (1 - |d_i|^3)^3$
+  \item Ajusta uma regressão ponderada (linear ou constante)
+  \item Itera com re-ponderação robusta (opcional)
+\end{enumerate}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Verificação por DGP}
+
+DGP: erro heterocedástico $\varepsilon_i \propto (1 + x_i)$; coeficiente de
+$t$ pequeno (0{,}01). $N = 300$ observações.
+
+\begin{lstlisting}[caption={WLS, Rolling OLS, LOWESS}]
+seed(42)
+generate df w = exp(-0.002 * t)        // peso: observações recentes mais relevantes
+generate df e = (rnormal()-0.5)*2*(1+x)  // heterocedasticidade em x
+generate df y = 1.0 + 2.0*x + 0.01*t + e
+
+let m_ols = ols(y ~ x, df)
+let m_wls = wls(y ~ x, df, weights="w")
+let m_rol = rols(y ~ x + t, df, window=50)
+lowess(df, y, x, frac=0.3)
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small, frame=none,
+  numbers=none, backgroundcolor=\color{codbg}]
+OLS:  const=2.362, x=2.263***  (ignora heterocedasticidade)
+WLS:  const=2.212, x=2.257***  (pesos corrigem variância crescente)
+Rolling OLS (última janela t=251..300):
+  const=1.898, x=2.411, t=0.006
+LOWESS: frac=0.30, 300 obs  →  y_hat_lowess adicionado a df
+\end{lstlisting}
+
+O WLS altera pouco os coeficientes aqui — os pesos temporais compensam o
+crescimento do erro em $x$ de forma parcial. O rolling OLS revela que o
+coeficiente de $x$ na última janela (2{,}41) é ligeiramente maior, sugerindo
+não-estacionariedade leve.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Sintaxe}
+
+\begin{lstlisting}
+wls(y ~ x, df, weights="coluna_pesos")       // WLS
+rols(y ~ x + t, df, window=50)               // Rolling OLS
+rolling(y ~ x + t, df, window=50)            // alias
+lowess(df, y_var, x_var, frac=0.67, it=3)   // LOWESS
+\end{lstlisting}
+
+\begin{nota}
+  O LOWESS recebe como argumento a variável dependente \textbf{antes} da
+  independente: \texttt{lowess(df, y, x)}. Isso difere de regressões
+  convencionais. O parâmetro \texttt{frac} (fração de vizinhos usados em
+  cada ponto) controla a suavização: valores menores → curva mais nervosa;
+  maiores → mais suave.
+\end{nota}

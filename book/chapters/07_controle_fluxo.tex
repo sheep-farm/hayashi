@@ -1,0 +1,91 @@
+\chapter{Controle de Fluxo}
+
+\section{\texttt{if} / \texttt{else}}
+
+\begin{lstlisting}[caption={Estrutura básica de if/else}]
+let nota = 7.5
+
+if nota >= 7 {
+  display "aprovado"
+} else if nota >= 5 {
+  display "recuperação"
+} else {
+  display "reprovado"
+}
+\end{lstlisting}
+
+\subsection*{\texttt{if} como expressão}
+
+\lstinline{if} pode ser usado como expressão — retorna o valor do bloco escolhido:
+
+\begin{lstlisting}
+let status = if nota >= 7 { "aprovado" } else { "reprovado" }
+display status
+\end{lstlisting}
+
+Quando usado como expressão, os dois ramos devem ter o mesmo tipo (ou ambos \texttt{nil}).
+
+\section{\texttt{match}}
+
+\lstinline{match} compara um valor contra múltiplos padrões. O primeiro padrão que
+casa é executado:
+
+\begin{lstlisting}[caption={match com literais}]
+let codigo = 2
+
+match codigo {
+  1 => display "iniciante"
+  2 => display "intermediário"
+  3 => display "avançado"
+  _ => display "desconhecido"
+}
+\end{lstlisting}
+
+O padrão \lstinline{_} é o caso padrão (\textit{wildcard}) — casa com qualquer valor.
+
+\subsection*{\texttt{match} com strings}
+
+\begin{lstlisting}
+let uf = "RS"
+
+match uf {
+  "RS" => display "Rio Grande do Sul"
+  "SP" => display "São Paulo"
+  "RJ" => display "Rio de Janeiro"
+  _    => display f"UF desconhecida: {uf}"
+}
+\end{lstlisting}
+
+\subsection*{\texttt{match} como expressão}
+
+\begin{lstlisting}
+let descricao = match codigo {
+  1 => "iniciante"
+  2 => "intermediário"
+  _ => "avançado"
+}
+\end{lstlisting}
+
+\subsection*{Múltiplos valores por braço}
+
+\begin{lstlisting}
+match codigo {
+  1 | 2    => display "básico"
+  3 | 4    => display "avançado"
+  _        => display "outro"
+}
+\end{lstlisting}
+
+\section{Bloco de expressão}
+
+Um bloco \lstinline|\{ \}| é uma expressão que avalia para o último valor produzido
+dentro dele:
+
+\begin{lstlisting}
+let resultado = {
+  let a = 10
+  let b = 20
+  a + b      // este é o valor do bloco
+}
+display resultado    // 30
+\end{lstlisting}

@@ -1,0 +1,151 @@
+\chapter{Modelos de Resposta Limitada}
+\label{cap:limitada}
+% ── índice ──────────────────────────────────────────────────────
+\index{variável dependente limitada|textbf}
+\index{Tobit|textbf}
+\index{tobit@\texttt{tobit()}|textbf}
+\index{Heckman, modelo de|textbf}
+\index{heckman@\texttt{heckman()}|textbf}
+\index{seleção amostral|textbf}
+\index{razão inversa de Mills|textbf}
+\index{viés de censura}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Censura e truncagem}
+
+Em muitas aplicações o resultado só é observado para parte da amostra:
+salários de mulheres que trabalham (seleção), horas de lazer truncadas em
+zero (censura), gastos com bens de luxo (muitos zeros, mas não zeros
+estruturais). O OLS aplicado à variável censurada é viesado mesmo com erros
+gaussianos.
+
+\subsection*{Tobit — censura em zero}
+
+O modelo Tobit (Tobin 1958) especifica uma variável latente:
+
+\[
+  y_i^* = x_i'\beta + \varepsilon_i, \quad \varepsilon_i \sim N(0,\sigma^2)
+  \qquad
+  y_i = \max(0,\; y_i^*)
+\]
+
+O OLS sobre $y_i$ (ignorando a censura) subestima $\beta$ porque os zeros
+"achatam" a distribuição condicional. O estimador de máxima verossimilhança
+(MLE) usa a função de verossimilhança completa:
+
+\[
+  \ell(\beta,\sigma) = \sum_{y_i=0} \ln\Phi\!\left(-\frac{x_i'\beta}{\sigma}\right)
+  + \sum_{y_i>0} \ln\phi\!\left(\frac{y_i - x_i'\beta}{\sigma}\right) - \ln\sigma
+\]
+
+\subsection*{Heckman — seleção amostral}
+
+O modelo de seleção amostral de Heckman (1979) separa:
+\begin{enumerate}
+  \item \textbf{Equação de seleção}: $s_i = \mathbf{1}[\gamma_0 + \gamma_1 z_i + v_i > 0]$
+  \item \textbf{Equação de resultado}: $y_i = \beta_0 + \beta_1 x_i + \varepsilon_i$,
+  observada apenas quando $s_i = 1$.
+\end{enumerate}
+
+Se $\mathrm{Cov}(\varepsilon_i, v_i) \neq 0$, o OLS sobre a sub-amostra
+selecionada é viesado. A correção de Heckman (dois passos) adiciona a
+\emph{Razão Inversa de Mills} (IMR) $\lambda_i = \phi(\hat\gamma'z_i)/\Phi(\hat\gamma'z_i)$
+como regressor para controlar o viés de seleção.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Verificação por DGP}
+
+\begin{lstlisting}[caption={DGP Tobit e Heckman}]
+seed(42)
+generate df x     = rnormal()
+generate df z     = rnormal()
+generate df e     = (rnormal() - 0.5) * 1.7321   // ~ N(0,1)
+generate df v     = (rnormal() - 0.5) * 1.7321
+
+// Tobit: y* = 1 + 2*x + e; y = max(0, y*)
+generate df ystar   = 1.0 + 2.0 * x + e
+generate df y_tobit = ystar * (ystar > 0)
+
+// Heckman: selecionado se 0.5 + 1.5*z + v > 0
+generate df s     = (0.5 + 1.5 * z + v) > 0
+generate df y_out = (1.0 + 2.0 * x + e) * s
+\end{lstlisting}
+
+\subsection*{Tobit}
+
+\begin{lstlisting}
+let m_tobit = tobit(y_tobit ~ x, df)
+display m_tobit
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+══════════════════════════════════════════════════════════════════════
+ Tobit  —  MLE  (censura inferior em 0)
+══════════════════════════════════════════════════════════════════════
+ Obs: 500  Censuradas: 0  Não-cens.: 500  Log-L: -359.2116  σ: 0.4963
+──────────────────────────────────────────────────────────────────────
+ Variável          coef         SE          z     P>|z|
+ const           0.9050     0.0442     20.470    0.0000  ***
+ x               2.1956     0.0787     27.913    0.0000  ***
+ sigma           0.4963
+══════════════════════════════════════════════════════════════════════
+\end{lstlisting}
+
+O Tobit recupera $\hat\beta_0 = 0{,}905 \approx 1{,}0$ e $\hat\beta_1 = 2{,}196 \approx 2{,}0$, parâmetros da variável latente $y^*$. Com zero censura neste DGP (todos $y^* > 0$), equivale ao OLS — o teste do modelo é verificado pela capacidade do MLE de convergir e recuperar $\sigma \approx 0{,}5$.
+
+\subsection*{Heckman}
+
+\begin{lstlisting}
+let m_heck = heckman(y_out ~ x, s ~ z, df)
+display m_heck
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+══════════════════════════════════════════════════════════════════════
+ Heckman Two-Step  —  Heckman (1979)
+══════════════════════════════════════════════════════════════════════
+ Obs (total): 500   Selecionadas: 484
+ ρ̂: 0.3608   σ̂_ε: 0.4971   δ̂ = ρ̂σ̂_ε: 0.1793
+──────────────────────────────────────────────────────────────────────
+ Equação de resultado  (y | z=1)
+ Variável          coef         SE          z     P>|z|
+ const           0.9092     0.0455     20.001    0.0000  ***
+ x               2.1821     0.0804     27.142    0.0000  ***
+ lambda (IMR)    0.1793     0.1917      0.935    0.3495
+──────────────────────────────────────────────────────────────────────
+ Equação de seleção:  const  0.1752  z  8.6806**
+══════════════════════════════════════════════════════════════════════
+\end{lstlisting}
+
+O coeficiente da IMR não é significativo ($p = 0{,}35$) — esperado, pois no DGP $\mathrm{Cov}(\varepsilon, v)$ é fraco ($\rho = 0{,}36$). Com $N = 500$, a potência para detectar correlação moderada é limitada. A equação de resultado recupera corretamente $\hat\beta_1 \approx 2{,}18$.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Sintaxe}
+
+\begin{lstlisting}
+tobit(y ~ x1 + x2, df)                           // censura em 0 (padrão)
+tobit(y ~ x1 + x2, df, ll=0, ul=10)              // censura dupla [0, 10]
+heckman(y ~ x1 + x2, s ~ z1 + z2, df)            // dois passos
+\end{lstlisting}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Opção} & \textbf{Descrição} \\
+\midrule
+\texttt{ll} & limite inferior de censura (padrão: 0) \\
+\texttt{ul} & limite superior de censura (padrão: nenhum) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{aviso}
+  Para que o Heckman identifique o modelo, a equação de seleção deve conter
+  pelo menos uma variável \textbf{exclusa} do resultado ($z$ mas não $x$).
+  Sem exclusão, o modelo é identificado só por não-linearidade funcional —
+  estimativas instáveis.
+\end{aviso}

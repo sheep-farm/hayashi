@@ -1,0 +1,28 @@
+// Cap 38 — SUR (Seemingly Unrelated Regressions)
+// DGP: 2 equações com erros correlacionados (rho=0.7)
+// eq1: y1 = 1 + 2*x1 + e1
+// eq2: y2 = 0.5 + 1.5*x2 + e2
+// corr(e1, e2) = 0.7  → OLS é ineficiente; SUR ganha eficiência
+
+seed(42)
+input df
+id
+1
+end
+for i in 1..=9 { df = append(df, df) }
+df |> filter(_n <= 500)
+generate df x1 = rnormal()
+generate df x2 = rnormal()
+generate df e1 = (rnormal() - 0.5) * 1.7321
+generate df e2 = 0.7 * e1 + 0.7141 * (rnormal() - 0.5) * 1.7321  // corr(e1,e2)=0.7
+generate df y1 = 1.0 + 2.0 * x1 + e1
+generate df y2 = 0.5 + 1.5 * x2 + e2
+
+// OLS equação a equação (ineficiente sob erros correlacionados)
+let m_ols1 = ols(y1 ~ x1, df)
+let m_ols2 = ols(y2 ~ x2, df)
+esttab(m_ols1, m_ols2)
+
+// SUR: Zellner (1962) — GLS conjunto
+let m_sur = sur(df, y1 ~ x1, y2 ~ x2)
+display m_sur

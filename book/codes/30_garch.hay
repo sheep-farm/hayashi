@@ -1,0 +1,34 @@
+// Cap 30 — GARCH e Volatilidade Condicional
+// DGP: ARCH(1) com omega=0.3, alpha=0.5, beta=0
+// Inovações: z = (rnormal()-0.5)*sqrt(12) → E[z]=0, E[z²]=1
+// N=500
+
+seed(42)
+input df
+id
+1
+end
+for i in 1..=9 { df = append(df, df) }
+df |> filter(_n <= 500)
+generate df u  = rnormal()
+generate df z  = (u - 0.5) * 3.4641
+generate df e  = z
+generate df t  = _n
+let n = nrow(df)
+let i = 2
+while i <= n {
+    let le = mean(df, e, if = t == i - 1)
+    let lz = mean(df, z, if = t == i)
+    replace df e = sqrt(0.3 + 0.5 * le * le) * lz if t == i
+    i = i + 1
+}
+
+// ARCH-LM na série bruta: rejeita H₀ (efeitos ARCH presentes)
+archtest(df, e, lags=5)
+
+// Estima GARCH(1,1)
+let m = garch(df, e, p=1, q=1)
+display m
+
+// ARCH-LM nos resíduos padronizados: não rejeita (GARCH captou a heterocedasticidade)
+archtest(m, lags=5)

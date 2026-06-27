@@ -1,0 +1,80 @@
+\chapter*{Prefácio}
+\addcontentsline{toc}{chapter}{Prefácio}
+
+\hayashi{} nasceu de uma insatisfação concreta: as ferramentas existentes para econometria
+aplicada exigem que o pesquisador escolha entre expressividade e desempenho, entre uma
+sintaxe próxima da notação estatística e a capacidade de automatizar análises complexas.
+
+Stata tem a sintaxe certa, mas é proprietário, fechado e não é uma linguagem de propósito
+geral. R tem o ecossistema certo, mas a sintaxe é inconsistente e o modelo de dados é
+surpreendente para quem vem de Stata. Python tem a flexibilidade certa, mas os pacotes
+estatísticos tratam econometria como subcaso da aprendizagem de máquina.
+
+\hayashi{} é uma linguagem interpretada, de propósito geral, construída especificamente
+para análise econométrica. A sintaxe homenageia Stata nos lugares certos e adota idiomas
+modernos onde Stata mostra sua idade. O motor é escrito em Rust — sem máquina virtual,
+sem \textit{garbage collector}, sem tempo de inicialização perceptível.
+
+\bigskip
+
+Este livro documenta tanto a linguagem quanto o núcleo econométrico: da estrutura de
+tipos e controle de fluxo aos estimadores de séries temporais, inferência causal e
+métodos avançados. É um retrato do estado atual do projeto — um documento vivo, que
+evolui com o software.
+
+\bigskip
+\noindent\rule{\textwidth}{0.4pt}
+\bigskip
+
+\section*{Um projeto de um desenvolvedor — e de toda a comunidade}
+
+\hayashi{} é, até o momento, obra de um único desenvolvedor. Isso tem consequências
+práticas que o leitor deve conhecer.
+
+Do lado positivo, há coerência de design: cada decisão de sintaxe, cada interface de
+estimador, cada mensagem de erro foi tomada com o mesmo conjunto de valores em mente.
+Não há comitês, não há \textit{bikeshedding}, não há camadas de compatibilidade
+acumuladas por décadas. O código é enxuto porque ninguém adicionou nada ``só para não
+perder''.
+
+Do lado da limitação, um par de olhos — por mais criterioso que seja — não vê tudo.
+O projeto conta com três camadas de verificação: testes unitários cobrindo os
+primitivos da linguagem; scripts de integração que exercitam a \textsc{Hayashi} como
+caixa preta; e scripts \textit{DGP} (processo gerador de dados) para cada estimador,
+onde o parâmetro verdadeiro é conhecido e a recuperação pode ser verificada
+numericamente. Ainda assim, casos de borda existem, e alguns certamente escaparam.
+
+\bigskip
+
+\noindent\textbf{Licença.} \hayashi{} é software livre, distribuído sob os termos da
+\textbf{GNU General Public License versão~3} (GPL~v3). Isso significa que você pode
+usar, estudar, modificar e redistribuir o programa — inclusive para fins comerciais —
+desde que qualquer trabalho derivado seja igualmente livre. O código-fonte é público
+e pertence, no sentido mais literal, a quem o usa.
+
+A escolha da GPL~v3 não é acidental. Ferramentas econométricas proprietárias criam
+dependência institucional: universidades e laboratórios ficam reféns de licenças, de
+políticas de preço e de decisões corporativas sobre o que o software pode ou não fazer.
+Software livre quebra esse ciclo. \hayashi{} deve ser acessível ao pesquisador em
+qualquer lugar do mundo, independentemente de financiamento.
+
+\bigskip
+
+\noindent\textbf{Colaboradores e testadores são bem-vindos.} Se você encontrou um
+resultado inesperado, um estimador que não converge quando deveria, uma mensagem de
+erro obscura ou simplesmente uma sintaxe que poderia ser mais clara — isso é
+informação valiosa. Abra uma \textit{issue} no repositório. Se quiser ir além, uma
+correção bem testada ou um novo capítulo de documentação é contribuição tão legítima
+quanto qualquer linha de código Rust.
+
+O projeto precisa especialmente de pessoas dispostas a testar \hayashi{} em dados
+reais: séries de tempo com sazonalidade, painéis desbalanceados, modelos com
+multicolinearidade, dados com missings. Esses são os casos que os scripts DGP não
+cobrem, porque dados sintéticos são, por construção, bem-comportados.
+
+\hayashi{} só se torna robusto com uso. E uso honesto — que inclui reportar o que
+quebra — é a forma mais direta de colaborar.
+
+\bigskip
+
+\noindent\textit{Junho de 2026.}

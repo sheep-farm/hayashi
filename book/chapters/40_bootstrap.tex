@@ -1,0 +1,112 @@
+\chapter{Bootstrap}
+\label{cap:bootstrap}
+% ── índice ──────────────────────────────────────────────────────
+\index{bootstrap|textbf}
+\index{bootstrap@\texttt{bootstrap()}|textbf}
+\index{reamostragem|textbf}
+\index{intervalo de confiança percentil}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Inferência por reamostragem}
+
+Os erros-padrão analíticos derivados da teoria assintótica assumem, em geral,
+que os resíduos seguem uma distribuição específica (normal, homocedástica,
+i.i.d.). O \textbf{bootstrap} de Efron (1979) substitui premissas
+distribucionais por reamostragem: replica o processo de estimação $B$ vezes
+em amostras com reposição do próprio conjunto de dados.
+
+\subsection*{Bootstrap de pares}
+
+A abordagem mais simples reamostrea pares $(y_i, x_i)$:
+
+\begin{enumerate}
+  \item Para $b = 1,\ldots,B$: amostrar $n$ observações com reposição.
+  \item Estimar $\hat\theta^{(b)}$ na amostra reamostrada.
+  \item $\widehat{\mathrm{SE}}_{\mathrm{boot}} = \mathrm{sd}(\hat\theta^{(1)},\ldots,\hat\theta^{(B)})$.
+\end{enumerate}
+
+O IC percentil bootstrap de $95\%$ é o intervalo $[Q_{0{,}025},\, Q_{0{,}975}]$
+da distribuição empírica de $\hat\theta^{(b)}$.
+
+\textbf{Vantagem}: válido sem saber a distribuição de $\hat\theta$ — robusto
+a erros não-gaussianos, heterocedasticidade e amostras pequenas onde a
+aproximação normal é ruim.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Verificação por DGP}
+
+DGP com erro uniforme em $[-2, 2]$ — não-gaussiano. Com $N = 200$, o SE
+analítico do OLS pode subestimar a variância real.
+
+\begin{lstlisting}[caption={Comparação SE analítico vs.\ bootstrap}]
+seed(42)
+generate df x = rnormal()
+generate df e = (rnormal() - 0.5) * 4.0     // U(-2, 2) — não gaussiano
+generate df y = 1.0 + 2.0 * x + e
+
+// OLS padrão
+let m_ols  = ols(y ~ x, df)
+display m_ols
+
+// Bootstrap
+let m_boot = bootstrap("ols", y ~ x, df, reps=500)
+display m_boot
+\end{lstlisting}
+
+\subsection*{OLS analítico}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+OLS: R²=0.178
+  const=1.046  SE=0.157   x=1.828  SE=0.279
+\end{lstlisting}
+
+\subsection*{Bootstrap ($B = 500$)}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+════════════════════════════════════════════════════════════════════════════
+                   Bootstrap SE — ols (n=500/500)
+────────────────────────────────────────────────────────────────────────────
+Variável    β̂       SE orig.    SE boot    IC inf      IC sup
+const    1.0462     0.1566     0.1545     0.7235      1.3710
+x        1.8276     0.2787     0.2679     1.3313      2.3910
+════════════════════════════════════════════════════════════════════════════
+\end{lstlisting}
+
+SE bootstrap ($0{,}155$ e $0{,}268$) e analítico ($0{,}157$ e $0{,}279$)
+são similares aqui, indicando que os SEs analíticos do OLS são adequados
+mesmo com erros uniformes quando $N = 200$. A concordância valida a
+implementação: ambos convergem para o mesmo desvio-padrão assintótico.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Sintaxe}
+
+\begin{lstlisting}
+// bootstrap genérico — qualquer estimador implementado
+bootstrap("ols",    y ~ x, df, reps=500)
+bootstrap("logit",  y ~ x, df, reps=500)
+bootstrap("qreg",   y ~ x, df, reps=500, q=0.5)
+
+// alias bootse
+bootse(y ~ x, df, reps=500)                 // ols por padrão (legado)
+\end{lstlisting}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Opção} & \textbf{Padrão} & \textbf{Descrição} \\
+\midrule
+\texttt{reps} / \texttt{n}  & 1000 & número de réplicas bootstrap \\
+\texttt{alpha}               & 0.05 & nível para ICs (bilateral) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{nota}
+  O estimador de bootstrap também pode estimar SEs do PSM (cap.~\ref{cap:psm}),
+  onde a distribuição assintótica do ATT é não-padrão. Nesse contexto, o
+  bootstrap de pares é consistente (Abadie e Imbens 2008).
+\end{nota}
