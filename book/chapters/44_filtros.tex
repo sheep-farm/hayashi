@@ -1,0 +1,144 @@
+\chapter{Filtros e Decomposição de Séries Temporais}
+\label{cap:filtros}
+% ── índice ──────────────────────────────────────────────────────
+\index{filtros de decomposição|textbf}
+\index{Hodrick-Prescott, filtro de|textbf}
+\index{hprescott@\texttt{hprescott()}|textbf}
+\index{Baxter-King, filtro de|textbf}
+\index{baxter_king@\texttt{baxter\_king()}|textbf}
+\index{Holt-Winters|textbf}
+\index{holtwinters@\texttt{holtwinters()}|textbf}
+\index{ETS (Error-Trend-Seasonal)|textbf}
+\index{tendência}
+\index{ciclo}
+\index{sazonalidade}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Separação de componentes}
+
+Uma série temporal pode ser decomposta em:
+\[
+  y_t = \tau_t + c_t + s_t + \varepsilon_t
+\]
+onde $\tau_t$ é a tendência, $c_t$ o componente cíclico, $s_t$ a
+sazonalidade e $\varepsilon_t$ o ruído idiossincrático. Filtros lineares
+extraem um ou mais desses componentes a partir da série observada.
+
+\subsection*{Filtro Hodrick-Prescott (HP)}
+
+O filtro HP (Hodrick e Prescott 1997) separa tendência de ciclo minimizando:
+
+\[
+  \min_{\{\tau_t\}} \left\{ \sum_{t=1}^T (y_t - \tau_t)^2
+  + \lambda \sum_{t=2}^{T-1} [(\tau_{t+1} - \tau_t) - (\tau_t - \tau_{t-1})]^2 \right\}
+\]
+
+O parâmetro $\lambda$ penaliza variações na segunda diferença da tendência.
+Valores canônicos: $\lambda = 1600$ (trimestral), $100$ (anual), $14400$ (mensal).
+
+\subsection*{Filtro Baxter-King (BK)}
+
+O filtro BK (Baxter e King 1999) extrai um componente de \emph{banda de
+frequência}: retém variações periódicas entre $[p_L, p_H]$ períodos e
+elimina tendência e frequências altas. Para ciclos de negócios:
+$p_L = 6$, $p_H = 32$ trimestres ($1{,}5$ a $8$ anos).
+
+\subsection*{Suavização Exponencial Holt-Winters (ETS)}
+
+O modelo ETS (\emph{Error-Trend-Seasonal}) de Holt e Winters combina:
+equações de nível, tendência e sazonalidade atualizadas recursivamente com
+pesos exponencialmente decrescentes. Parâmetros $(\alpha, \beta, \gamma)$
+controlam a velocidade de adaptação de cada componente.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Verificação por DGP}
+
+DGP com tendência linear, ciclo anual e sazonalidade semestral, $T = 120$ meses.
+
+\begin{lstlisting}[caption={Séries com tendência, ciclo e sazonalidade}]
+seed(42)
+generate df t       = _n
+generate df trend   = 0.05 * t
+generate df cycle   = 0.5 * sin(t * 3.14159 / 12)
+generate df season  = 0.3 * sin(t * 3.14159 / 6)
+generate df noise   = (rnormal() - 0.5) * 0.3
+generate df y       = 10.0 + trend + cycle + season + noise
+
+hprescott(df, y, lambda=1600)
+display df
+
+baxter_king(df, y, low=6, high=32, k=12)
+display df
+
+let m_hw = holtwinters(df, y, trend=add, seasonal=add, period=12)
+display m_hw
+\end{lstlisting}
+
+\subsection*{Hodrick-Prescott}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+hpfilter: λ=1600  →  y_trend e y_cycle adicionadas a df
+  t=1:  y=10.34  y_trend=10.56  y_cycle=-0.22
+  t=2:  y=10.62  y_trend=10.56  y_cycle= 0.06
+  ...
+\end{lstlisting}
+
+O HP adiciona colunas \texttt{y\_trend} (tendência suavizada) e \texttt{y\_cycle}
+(ciclo = resíduo).
+
+\subsection*{Baxter-King}
+
+O BK adiciona \texttt{y\_cycle} com o componente de banda de frequência.
+Os primeiros e últimos $k = 12$ períodos ficam como \texttt{NaN} — custo
+dos filtros de duas pontas.
+
+\subsection*{Holt-Winters ETS}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+======================== ETS(A,A,A) ========================
+Observations:    120
+Alpha:        0.8000     (nível)
+Beta:         0.0500     (tendência)
+Gamma:        0.6000     (sazonalidade)
+SSE:            5.3570
+AIC:          -339.09
+BIC:          -291.70
+============================================================
+\end{lstlisting}
+
+O modelo ETS(A,A,A) — erros aditivos, tendência aditiva, sazonalidade
+aditiva — ajusta os parâmetros de suavização $(\alpha, \beta, \gamma)$
+minimizando SSE. $\alpha$ alto (0{,}80) indica resposta rápida do nível.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Sintaxe}
+
+\begin{lstlisting}
+hprescott(df, var, lambda=1600)              // adiciona var_trend e var_cycle
+baxter_king(df, var, low=6, high=32, k=12)  // adiciona var_cycle
+holtwinters(df, var, trend=add, seasonal=add, period=12)
+ets(df, var, trend=add, seasonal=add, period=12)  // alias
+\end{lstlisting}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Filtro} & \textbf{Output} & \textbf{Uso típico} \\
+\midrule
+HP              & tendência + ciclo    & macro trimestral \\
+BK              & ciclo de banda       & análise de negócios \\
+Holt-Winters    & modelo ETS + previsão & previsão de curto prazo \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{nota}
+  O filtro HP em dados de ponta (\emph{end-of-sample}) sofre do
+  \emph{end-point problem}: tendência e ciclo são revisados conforme novos
+  dados chegam. O BK evita esse problema ao usar uma janela simétrica
+  (custo: perde $k$ observações em cada extremo).
+\end{nota}

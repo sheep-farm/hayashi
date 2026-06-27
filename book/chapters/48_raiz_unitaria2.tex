@@ -1,0 +1,106 @@
+\chapter{Raízes Unitárias II}
+\label{cap:raiz_unitaria2}
+% ── índice ──────────────────────────────────────────────────────
+\index{Phillips-Perron, teste de|textbf}
+\index{phillips_perron@\texttt{phillips\_perron()}|textbf}
+\index{Zivot-Andrews, teste de|textbf}
+\index{zivot@\texttt{zivot()}|textbf}
+\index{quebra estrutural|textbf}
+\index{Newey-West, variância de|textbf}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Além do ADF: PP e Zivot-Andrews}
+
+O capítulo anterior (cap.~\ref{cap:arima}) cobriu o teste ADF, que corrige
+para autocorrelação residual por meio de defasagens. Dois problemas permanecem:
+
+\begin{enumerate}
+  \item O ADF é sensível à heterocedasticidade condicional dos erros (GARCH etc.)
+  \item O ADF tem baixo poder na presença de \emph{quebra estrutural}: uma série
+        estacionária com quebra de nível se parece com um passeio aleatório.
+\end{enumerate}
+
+\subsection*{Teste Phillips-Perron (PP)}
+
+Phillips e Perron (1988) adotam uma abordagem não-paramétrica: corrigem a
+estatística ADF para heterocedasticidade e autocorrelação de \emph{qualquer
+forma} via estimador de Newey-West:
+
+\[
+  Z_\alpha = T(\hat{\rho} - 1) - \frac{T^2 \hat{\sigma}^2}{2\hat{s}_T^2}(\hat{\lambda}^2 - \hat{\gamma}_0)
+\]
+
+onde $\hat{s}_T^2$ é a variância de longo prazo estimada com kernel de Bartlett.
+A distribuição assintótica é idêntica à do ADF (Dickey-Fuller).
+
+\subsection*{Teste Zivot-Andrews (ZA)}
+
+Zivot e Andrews (1992) relaxam a hipótese de ausência de quebra estrutural.
+O teste estima a data de quebra \emph{endogenamente} como o valor que minimiza
+a estatística $t$:
+
+\[
+  \hat{t}_B = \arg\min_\lambda \; t_\alpha(\lambda), \quad \lambda = t_B/T \in (0.15, 0.85)
+\]
+
+A equação testada inclui um nível de degrau ou mudança de tendência:
+\[
+  \Delta y_t = c + \beta t + \gamma D U_t(\lambda) + \alpha y_{t-1} + \sum_{j=1}^k d_j \Delta y_{t-j} + \varepsilon_t
+\]
+
+$H_0$: raiz unitária sem quebra estrutural.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Verificação por DGP}
+
+\begin{lstlisting}[caption={PP e Zivot-Andrews}]
+seed(42)
+// Passeio aleatório: rw_t = rw_{t-1} + e_t
+// Série estacionária com tendência: stat_t = 0.5*t + e
+// Série com quebra em t=150: AR(1) + degrau de 3.0
+
+phillips_perron(df, rw)
+phillips_perron(df, stat)
+zivot(df, break_t)
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small, frame=none,
+  numbers=none, backgroundcolor=\color{codbg}]
+PP — rw:      Zt = 77.365   VC 5%=-2.860   NÃO rejeita H₀  (raiz unitária) ✓
+PP — stat:    Zt = 2058     VC 5%=-2.860   NÃO rejeita H₀  (trend-stationary)
+ZA — break_t: t  = -11.597  VC 5%=-4.800   REJEITA H₀, quebra em obs=147 ✓
+\end{lstlisting}
+
+O PP para \texttt{stat} (tendência linear + ruído) não rejeita $H_0$ porque o
+teste padrão (sem tendência determinística na equação auxiliar) não distingue
+tendência estocástica de determinística. O ZA identifica corretamente a quebra
+estrutural em $t=147$ (próximo ao verdadeiro $t=150$) e rejeita $H_0$.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Sintaxe}
+
+\begin{lstlisting}
+phillips_perron(df, var)         // PP sem tendência
+phillips_perron(df, var, trend=true)  // PP com tendência determinística
+zivot(df, var)                   // Zivot-Andrews (quebra endógena de nível)
+zivot(df, var, type="trend")     // quebra na tendência
+\end{lstlisting}
+
+\begin{center}
+\begin{tabular}{llll}
+\toprule
+\textbf{Teste} & \textbf{Correção} & \textbf{Quebra?} & \textbf{VC 5\%} \\
+\midrule
+ADF      & Defasagens paramétricas & Não & $-2{,}86$ \\
+PP       & Newey-West não-param.   & Não & $-2{,}86$ \\
+ZA       & PP + quebra endógena    & Sim & $-4{,}80$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{nota}
+  Séries trend-stationary e séries com quebra estrutural são dois casos onde
+  o ADF/PP pode levar a conclusões erradas. O ZA resolve o segundo; para o
+  primeiro, incluir uma tendência determinística na equação auxiliar
+  (\texttt{trend=true}) é suficiente.
+\end{nota}

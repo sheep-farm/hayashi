@@ -1,0 +1,108 @@
+\chapter{Strings e F-Strings}
+
+\section{Literais de string}
+
+Strings são delimitadas por aspas duplas:
+
+\begin{lstlisting}
+let s = "Olá, mundo"
+let caminho = "/home/usuario/dados.csv"
+let vazia = ""
+\end{lstlisting}
+
+\subsection*{Sequências de escape}
+
+\begin{center}
+\begin{tabular}{cl}
+\toprule
+\textbf{Sequência} & \textbf{Significado} \\
+\midrule
+\texttt{\textbackslash n}  & Nova linha \\
+\texttt{\textbackslash t}  & Tabulação \\
+\texttt{\textbackslash r}  & Retorno de carro \\
+\texttt{\textbackslash"}   & Aspas duplas literais \\
+\texttt{\textbackslash\textbackslash} & Barra invertida literal \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Operações com strings}
+
+\subsection*{Concatenação}
+
+\begin{lstlisting}
+let nome = "Hayashi"
+let versao = "0.2"
+let titulo = nome + " " + versao    // "Hayashi 0.2"
+\end{lstlisting}
+
+\subsection*{Comprimento}
+
+\begin{lstlisting}
+let s = "econometria"
+display len(s)    // 11
+\end{lstlisting}
+
+\subsection*{Conversões}
+
+\begin{lstlisting}
+let n = str(42)        // "42"
+let f = str(3.14)      // "3.14"
+let b = str(true)      // "true"
+\end{lstlisting}
+
+\subsection*{Comparação}
+
+Strings são comparadas lexicograficamente com \lstinline{==}, \lstinline{!=},
+\lstinline{<}, \lstinline{>}, \lstinline{<=}, \lstinline{>=}.
+
+\section{F-Strings}
+
+F-strings permitem interpolar expressões arbitrárias dentro de uma string. O
+prefixo \lstinline{f} indica interpolação; expressões entre \lstinline|{ }| são
+avaliadas e convertidas para string:
+
+\begin{lstlisting}[caption={F-strings}]
+let municipio = "Pelotas"
+let pop = 328_000
+
+display f"{municipio} tem {pop} habitantes"
+// Pelotas tem 328000 habitantes
+
+display f"Média: {(10 + 20 + 30) / 3.0:.2f}"
+// Média: 20.00
+\end{lstlisting}
+
+\subsection*{Expressões em f-strings}
+
+Qualquer expressão pode ser interpolada — variáveis, operações aritméticas,
+chamadas de função:
+
+\begin{lstlisting}
+let n = 5
+display f"{n}^2 = {n^2}"
+// 5^2 = 25
+
+display f"raiz de {n} = {sqrt(n):.4f}"
+// raiz de 5 = 2.2361
+\end{lstlisting}
+
+\subsection*{F-strings em \texttt{display}}
+
+\lstinline{display} aceita opções \lstinline{end=} e \lstinline{sep=} para controlar
+o terminador e o separador entre múltiplos valores:
+
+\begin{lstlisting}
+display "a", "b", "c" sep=", "   // a, b, c
+display "linha" end=""            // linha (sem quebra)
+\end{lstlisting}
+
+\section{Multiline strings}
+
+\hayashi{} não tem literal de string multiline. Use concatenação explícita:
+
+\begin{lstlisting}
+let sql = "SELECT * FROM dados " +
+          "WHERE ano = 2026 " +
+          "ORDER BY uf"
+\end{lstlisting}

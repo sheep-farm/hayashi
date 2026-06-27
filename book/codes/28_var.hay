@@ -1,0 +1,38 @@
+// Cap 28 — VAR e Causalidade de Granger
+// DGP: VAR(1) bivariado com causalidade assimétrica
+// phi12=0.2 (y2->y1 forte), phi21=0.1 (y1->y2 fraco)
+// N=300
+
+seed(42)
+input df
+id
+1
+end
+for i in 1..=9 { df = append(df, df) }
+df |> filter(_n <= 300)
+generate df e1 = rnormal()
+generate df e2 = rnormal()
+generate df y1 = 0.0
+generate df y2 = 0.0
+generate df t  = _n
+let n = nrow(df)
+let i = 2
+while i <= n {
+    let l1 = mean(df, y1, if = t == i - 1)
+    let l2 = mean(df, y2, if = t == i - 1)
+    let a  = mean(df, e1, if = t == i)
+    let b  = mean(df, e2, if = t == i)
+    replace df y1 = 0.5*l1 + 0.2*l2 + a if t == i
+    replace df y2 = 0.1*l1 + 0.6*l2 + b if t == i
+    i = i + 1
+}
+
+let m = var(df, y1, y2, lags=1)
+display m
+
+// Granger: y2->y1 forte (F grande); y1->y2 fraco (F pequeno)
+granger(df, y1, y2, lags=1)
+granger(df, y2, y1, lags=1)
+
+// função de resposta ao impulso (6 passos)
+irf(m, steps=6)

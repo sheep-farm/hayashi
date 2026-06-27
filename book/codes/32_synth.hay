@@ -1,0 +1,32 @@
+// Cap 32 — Controle Sintético
+// DGP: 10 unidades × 20 períodos
+// Tratamento: unidade 1, a partir do ano 11
+// ATT verdadeiro = 3.0
+// Unidade 5 (donor) tem mesmo intercepto que unit 1 → SC usa W_5 ≈ 1
+
+seed(42)
+input df
+id
+1
+end
+for i in 1..=8 { df = append(df, df) }
+df |> filter(_n <= 200)
+
+generate df unit = (_n - 1) % 10 + 1
+generate df year = (_n - (_n - 1) % 10 - 1) / 10 + 1
+
+// interceptos específicos por unidade
+generate df alpha = 0.0
+let j = 2
+while j <= 10 {
+    replace df alpha = j * 1.0 if unit == j
+    j = j + 1
+}
+replace df alpha = 5.0 if unit == 1
+
+generate df d = (unit == 1) * (year >= 11)
+generate df e = rnormal()
+generate df y = alpha + 0.3 * year + 3.0 * d + e
+
+let m = synth("y", 1, 11, df, id="unit", time="year")
+display m

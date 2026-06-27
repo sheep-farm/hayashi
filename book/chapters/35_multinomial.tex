@@ -1,0 +1,146 @@
+\chapter{Modelos de Escolha Múltipla}
+\label{cap:multinomial}
+% ── índice ──────────────────────────────────────────────────────
+\index{logit multinomial|textbf}
+\index{mlogit@\texttt{mlogit()}|textbf}
+\index{logit ordenado|textbf}
+\index{ologit@\texttt{ologit()}|textbf}
+\index{probit ordenado|textbf}
+\index{oprobit@\texttt{oprobit()}|textbf}
+\index{IIA, axioma de|textbf}
+\index{independência de alternativas irrelevantes|see{IIA, axioma de}}
+\index{categoria de referência}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Resposta ordinal e nominal}
+
+Quando o resultado assume mais de duas categorias, duas estruturas são
+possíveis:
+
+\begin{itemize}
+  \item \textbf{Resposta ordinal}: categorias com ordem natural (muito insatisfeito,
+  neutro, muito satisfeito; nível educacional). Modelos ordenados (logit/probit)
+  preservam essa estrutura.
+  \item \textbf{Resposta nominal}: categorias sem ordem (escolha de modal de
+  transporte; tipo de emprego). Logit multinomial sem restrição de ordem.
+\end{itemize}
+
+\subsection*{Logit e Probit Ordenados}
+
+O modelo supõe uma variável latente $y^* = x'\beta + \varepsilon$ e cortes
+$c_1 < c_2 < \cdots < c_{J-1}$:
+
+\[
+  y = j \quad\Longleftrightarrow\quad c_{j-1} < y^* \leq c_j
+\]
+
+O logit ordenado usa $\varepsilon \sim \mathrm{Logistic}(0,1)$; o probit
+ordena usa $\varepsilon \sim N(0,1)$. Ambos estimam $\beta$ e os cortes por MLE.
+
+\subsection*{Logit Multinomial}
+
+Para $J$ alternativas, com alternativa $j=J$ como base:
+
+\[
+  P(y_i = j \mid x_i) = \frac{\exp(\alpha_j + \beta_j'\,x_i)}{1 + \sum_{k=1}^{J-1} \exp(\alpha_k + \beta_k'\,x_i)}
+  \quad j = 1,\ldots,J-1
+\]
+
+Os coeficientes $(\alpha_j, \beta_j)$ medem o efeito de $x$ sobre as chances
+relativas de $j$ versus a alternativa base.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Verificação por DGP}
+
+\begin{lstlisting}[caption={DGP para modelos ordenados e multinomial}]
+seed(42)
+generate df x     = rnormal()
+generate df e     = (rnormal() - 0.5) * 1.7321
+generate df ystar = 1.5 * x + e
+// Categorias 1, 2, 3 com cortes em 0.0 e 1.0
+generate df y_ord = 1 + (ystar >= 0.0) + (ystar >= 1.0)
+
+// Multinomial via inverse-CDF
+generate df denom  = 1.0 + exp(-1.0 + 2.0*x) + exp(0.5)
+generate df p1     = 1.0 / denom
+generate df p12    = (1.0 + exp(-1.0 + 2.0*x)) / denom
+generate df um     = rnormal()
+generate df y_mlog = 1 + (um >= p1) + (um >= p12)
+\end{lstlisting}
+
+\subsection*{Ordered Logit}
+
+\begin{lstlisting}
+let m_olog = ologit(y_ord ~ x, df)
+display m_olog
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+=========================== Ordered Logit Results ============================
+N=500  Log-L=-396.4473  Pseudo R²=0.1878
+-------------------------------- Coefficients --------------------------------
+x        4.8137  (0.4633)  z=10.39  ***
+Thresholds:  cut1=-0.1472  cut2=3.2191
+\end{lstlisting}
+
+\subsection*{Ordered Probit}
+
+\begin{lstlisting}
+let m_opro = oprobit(y_ord ~ x, df)
+display m_opro
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+=========================== Ordered Probit Results ===========================
+N=500  Log-L=-392.8369  Pseudo R²=0.1952
+-------------------------------- Coefficients --------------------------------
+x        2.8683  (0.2603)  z=11.02  ***
+Thresholds:  cut1=-0.0768  cut2=1.9076
+\end{lstlisting}
+
+A razão entre coeficientes logit e probit é $4{,}81/2{,}87 \approx 1{,}68$,
+próximo de $\pi/\sqrt{3} \approx 1{,}81$ — a relação teórica entre as duas
+escalas.
+
+\subsection*{Logit Multinomial}
+
+\begin{lstlisting}
+let m_mlog = mlogit(y_mlog ~ x, df)
+display m_mlog
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+==================== Multinomial Logit Regression Results ====================
+N=500  Log-L=-513.7171  Pseudo R²=0.0448  AIC=1035.43
+------------------------------ y=1 vs base y=3 -------------------------------
+const   -0.0809  (0.2024)
+x       -0.9006  (0.4069)  *
+------------------------------ y=2 vs base y=3 -------------------------------
+const   -1.5279  (0.2542)  ***
+x        2.0825  (0.4119)  ***
+\end{lstlisting}
+
+Para $y=2$ versus base $y=3$: $\hat\beta_x = 2{,}08$ (DGP verdadeiro: $\beta_{x,2} - \beta_{x,3} = 2{,}0$). O sinal negativo de $x$ em $y=1$ vs $y=3$ reflete que $x$ alto aumenta as chances de $y=2$ (que tem $e^{0{,}5}$ de probabilidade base) relativo a $y=1$.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Sintaxe}
+
+\begin{lstlisting}
+ologit(y ~ x1 + x2, df)
+oprobit(y ~ x1 + x2, df)
+mlogit(y ~ x1 + x2, df)
+mlogit(y ~ x1 + x2, df, base=1)    // alternativa base explícita
+\end{lstlisting}
+
+\begin{nota}
+  O logit multinomial impõe a propriedade de \textbf{independência de
+  alternativas irrelevantes} (IIA): a razão de probabilidades entre duas
+  alternativas não depende das demais. Para dados de painel de escolha com
+  alternativas correlacionadas, use \lstinline{clogit} (cap.~\ref{cap:painel2}).
+\end{nota}

@@ -1,0 +1,242 @@
+\chapter{Controle Sintético}
+\label{cap:synth}
+% ── índice ──────────────────────────────────────────────────────
+\index{controle sintético|textbf}
+\index{synth@\texttt{synth()}|textbf}
+\index{RMSPE|textbf}
+\index{doadores, pool de}
+\index{placebo, testes de}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{O problema do caso único}
+
+O DiD (cap.~\ref{cap:did}) e o PSM (cap.~\ref{cap:psm}) dependem de múltiplas
+unidades tratadas e controles comparáveis. Em muitas aplicações de política,
+porém, apenas uma unidade recebe o tratamento — um país que adota um programa
+econômico, um estado que muda sua legislação — e as unidades potencialmente
+comparáveis são poucas e heterogêneas.
+
+O \textbf{Controle Sintético} (Abadie, Diamond e Hainmueller, ADH 2010)
+constrói um grupo de controle artificial — o \emph{controle sintético} — como
+uma combinação convexa de unidades doadoras que replica a trajetória da unidade
+tratada \emph{antes} do tratamento. A ideia central:
+
+\[
+  \hat{Y}_{1t}^{(0)} = \sum_{j=2}^{J+1} w_j^*\, Y_{jt}
+  \qquad
+  w_j^* \geq 0,\quad \sum_{j=2}^{J+1} w_j^* = 1
+\]
+
+Os pesos $W^* = (w_2^*,\ldots,w_{J+1}^*)$ minimizam o erro quadrático médio
+de predição (\emph{RMSPE}) no período pré-tratamento:
+
+\[
+  W^* = \arg\min_{W \in \Delta^J}
+  \sum_{t=1}^{T_0-1} \left( Y_{1t} - \sum_{j\geq 2} w_j Y_{jt} \right)^2
+\]
+
+onde $\Delta^J$ é o simplexo unitário ($w_j \geq 0$, $\sum w_j = 1$). O efeito
+do tratamento no período $t \geq T_0$ é:
+
+\[
+  \hat\tau_t = Y_{1t} - \hat{Y}_{1t}^{(0)}
+\]
+
+A validade do método repousa sobre a qualidade do ajuste pré-tratamento:
+se o controle sintético acompanha a unidade tratada no período pré-tratamento,
+a hipótese de que teria continuado a fazê-lo na ausência do tratamento é
+plausível — uma forma não paramétrica da hipótese de tendências paralelas.
+
+\begin{nota}
+  A restrição de convexidade ($w_j \geq 0$, $\sum w_j = 1$) evita
+  extrapolação — o controle sintético fica dentro do suporte dos doadores.
+  Isso o distingue do DiD com pesos, que pode atribuir pesos negativos para
+  alcançar o balanço.
+\end{nota}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Verificação por DGP}
+
+O DGP usa painel de 10 unidades $\times$ 20 períodos. A unidade 1 é tratada
+a partir do ano 11; as unidades 2--10 são doadoras. O efeito verdadeiro é
+$\tau = 3{,}0$ (permanente, a partir de $T_0 = 11$).
+
+\[
+  y_{it} = \alpha_i + 0{,}3\,t + 3{,}0\cdot\mathbf{1}[i=1, t\geq 11]
+           + \varepsilon_{it}
+  \qquad
+  \alpha_i \in \{2,3,\ldots,10\},\quad \alpha_1 = 5
+\]
+
+O intercepto da unidade tratada ($\alpha_1 = 5$) coincide com o da unidade 5
+(doadora), garantindo suporte comum. As inovações $\varepsilon_{it} \sim U(0,1)$
+introduzem ruído que impede o SC de usar apenas a unidade 5 como doadora
+perfeita.
+
+\begin{lstlisting}[caption={DGP: painel 10 × 20, tratamento na unidade 1 a partir de t=11}]
+seed(42)
+input df
+id
+1
+end
+for i in 1..=8 { df = append(df, df) }
+df |> filter(_n <= 200)
+
+generate df unit = (_n - 1) % 10 + 1
+generate df year = (_n - (_n - 1) % 10 - 1) / 10 + 1
+
+// interceptos por unidade: doadores recebem alpha = unit; tratado alpha = 5
+generate df alpha = 0.0
+let j = 2
+while j <= 10 {
+    replace df alpha = j * 1.0 if unit == j
+    j = j + 1
+}
+replace df alpha = 5.0 if unit == 1
+
+generate df d = (unit == 1) * (year >= 11)
+generate df e = rnormal()
+generate df y = alpha + 0.3 * year + 3.0 * d + e
+
+let m = synth("y", 1, 11, df, id="unit", time="year")
+display m
+\end{lstlisting}
+
+\subsection*{Construção do painel em Hayashi}
+
+A função \lstinline{generate} opera sobre o vetor \lstinline{_n} (linha
+corrente, 1-indexado). Para um painel $N \times T$ em formato longo
+(empilhado por unidade), as fórmulas são:
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Variável} & \textbf{Expressão} \\
+\midrule
+Unidade ($1,\ldots,N$)    & \lstinline{(_n - 1) % N + 1} \\
+Período ($1,\ldots,T$)    & \lstinline{(_n - (_n-1)%N - 1) / N + 1} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection*{Resultado}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+════════════════════════════════════════════════════════════════════
+ Controle Sintético  —  Abadie, Diamond, Hainmueller (2010)
+════════════════════════════════════════════════════════════════════
+ Unidade tratada : 1   Outcome: y
+ T₀ (1ª pós-trat): 11   Doadores: 9   T pré: 10   T pós: 10
+ RMSPE pré  : 0.3347
+ RMSPE pós  : 2.7056   razão pós/pré: 8.083
+────────────────────────────────────────────────────────────────────
+ Pesos dos doadores (w > 0.001):
+   6                         0.4420
+   3                         0.2153
+   8                         0.1747
+   2                         0.1406
+   7                         0.0274
+────────────────────────────────────────────────────────────────────
+  Período          Real     Sintético        Efeito
+ ──────────────────────────────────────────────────
+         1        5.8266        6.0335
+         2        6.5321        6.1112
+         3        6.7458        6.5023
+         4        6.6240        6.8732
+         5        7.4867        7.2037
+         6        7.5689        7.4293
+         7        8.0670        7.6433
+         8        7.8780        8.0722
+         9        8.0202        8.3241
+        10        8.0878        8.6960
+ *      11       11.4437        8.8167        2.6270
+ *      12       12.1888        9.4361        2.7527
+ *      13       12.0728        9.8984        2.1745
+ *      14       12.9748        9.5753        3.3995
+ *      15       12.7653       10.2134        2.5519
+ *      16       13.2120       10.2424        2.9696
+ *      17       13.3167       10.6701        2.6465
+ *      18       13.7205       11.0759        2.6446
+ *      19       14.3320       11.5282        2.8039
+ *      20       14.0020       11.7106        2.2913
+════════════════════════════════════════════════════════════════════
+ * pós-tratamento
+\end{lstlisting}
+
+\subsection*{Leitura dos resultados}
+
+\paragraph{Ajuste pré-tratamento.}
+O RMSPE pré-tratamento é $0{,}33$ em uma série cujo desvio padrão é da
+ordem de 2.5 — um ajuste razoável dado o ruído do DGP ($N=200$, apenas
+10 doadores). A razão pós/pré = 8.1 sinaliza que a divergência
+pós-tratamento é \emph{oito vezes} maior do que o erro de ajuste
+pré-tratamento, rejeitando a hipótese de efeito nulo.
+
+\paragraph{Pesos.}
+O algoritmo distribui os pesos principalmente entre as unidades 6, 3, 8 e
+2, em vez de concentrar todo o peso na unidade 5 (que tem $\alpha_5 = 5 =
+\alpha_1$). Isso ocorre porque o ruído amostral $\varepsilon_{it}$ torna a
+trajetória realizada da unidade 5 uma combinação linear imprecisa da
+unidade 1 no período pré-tratamento. O SC usa múltiplos doadores para
+cancelar o ruído.
+
+\paragraph{Efeitos estimados.}
+A média dos efeitos pós-tratamento é:
+
+\[
+  \bar{\hat\tau} = \frac{1}{10}\sum_{t=11}^{20}\hat\tau_t = 2{,}69
+\]
+
+O valor verdadeiro é $\tau = 3{,}0$; a subestimação de ${\sim}10\%$ reflete
+a imprecisão do ajuste pré-tratamento com apenas 10 doadores e 10 períodos
+pré.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Sintaxe}
+
+\begin{lstlisting}
+synth("outcome", treated_id, t0, df, id="col_unidade", time="col_tempo")
+synth("outcome", treated_id, t0, df, id="col", time="col", covs=["x1","x2"])
+\end{lstlisting}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Argumento} & \textbf{Tipo} & \textbf{Descrição} \\
+\midrule
+\texttt{outcome}    & string & nome da variável de resultado \\
+\texttt{treated\_id}& num/str& identificador da unidade tratada \\
+\texttt{t0}         & número & primeiro período pós-tratamento \\
+\texttt{df}         & DataFrame & painel em formato longo \\
+\texttt{id=}        & opção  & coluna de identificação de unidade \\
+\texttt{time=}      & opção  & coluna de período \\
+\texttt{covs=}      & lista  & covariáveis adicionais para o ajuste \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+O argumento \texttt{covs} permite incluir médias de covariáveis pré-tratamento
+no critério de minimização, além dos valores da variável de resultado. Útil
+quando os doadores têm trajetórias similares mas características estruturais
+distintas.
+
+\begin{lstlisting}[caption={Fluxo típico — avaliação de política estadual}]
+load "estados.csv" as df   // id, ano, pib, pop, educ
+
+let m = synth("pib", "SP", 2008, df,
+              id="id", time="ano",
+              covs=["pop", "educ"])
+display m
+\end{lstlisting}
+
+\begin{nota}
+  O CS não fornece inferência assintótica padrão (sem erros-padrão, sem
+  $p$-values). A inferência é feita via \emph{testes de placebo}: aplica-se
+  o SC a cada unidade doadora "como se" fosse tratada e compara a razão
+  pós/pré. Se a razão para a unidade verdadeiramente tratada for excepcional
+  no conjunto de placebos, o efeito é estatisticamente incomum.
+  O \hayashi{} exibe a razão pós/pré como heurística descritiva; testes de
+  placebo são implementados manualmente via loop sobre as unidades.
+\end{nota}

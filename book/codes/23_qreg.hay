@@ -1,0 +1,22 @@
+// Cap 23 — Regressão Quantílica
+// DGP: heterocedástico — dispersão cresce com x
+// y = 2.0 + 1.5*x + (1.0 + 0.8*x)*e
+// Slope verdadeiro aumenta com o quantil
+
+seed(42)
+input df
+id
+1
+end
+for i in 1..=10 { df = append(df, df) }
+df |> filter(_n <= 1000)
+generate df x = rnormal()
+generate df e = rnormal()
+generate df y = 2.0 + 1.5*x + (1.0 + 0.8*x)*e
+
+// OLS vs quantis 0.25, 0.50, 0.75
+let m_ols = ols(y ~ x, df)
+let m_q25 = qreg(y ~ x, df, tau=0.25)
+let m_q50 = qreg(y ~ x, df, tau=0.50)
+let m_q75 = qreg(y ~ x, df, tau=0.75)
+esttab(m_ols, m_q25, m_q50, m_q75)

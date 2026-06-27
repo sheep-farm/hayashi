@@ -1,0 +1,207 @@
+\chapter{Filtro de Kalman}
+\label{cap:kalman}
+% ── índice ──────────────────────────────────────────────────────
+\index{filtro de Kalman|textbf}
+\index{kalman@\texttt{kalman()}|textbf}
+\index{suavizador de Rauch-Tung-Striebel|textbf}
+\index{RTS|see{suavizador de Rauch-Tung-Striebel}}
+\index{modelo de espaço de estados|textbf}
+\index{local level, modelo}
+\index{local linear trend, modelo}
+\index{estado não-observável}
+\index{log-verossimilhança de predição}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Estado oculto e observação ruidosa}
+
+O filtro de Kalman resolve um problema diferente de todos os modelos anteriores:
+estimar uma variável \emph{latente} (o ``estado'') que não é diretamente
+observada, com base em medições ruidosas ao longo do tempo.
+
+O modelo de espaço de estados em forma geral é:
+\begin{align}
+  y_t   &= H\, s_t + \varepsilon_t, \quad \varepsilon_t \sim N(0, R) \label{eq:obs}\\
+  s_t   &= F\, s_{t-1} + R_s\, \eta_t, \quad \eta_t \sim N(0, Q) \label{eq:trans}
+\end{align}
+A equação \eqref{eq:obs} é a \textbf{equação de observação}: $y_t$ é o que se
+mede, $s_t$ é o estado latente e $\varepsilon_t$ é o ruído de medição. A
+equação \eqref{eq:trans} é a \textbf{equação de transição}: o estado evolui
+de acordo com uma dinâmica linear perturbada por $\eta_t$.
+
+\subsection*{Modelos pré-definidos}
+
+O Hayashi oferece dois modelos prontos para séries escalares:
+
+\medskip
+\textbf{Local Level (LL):}
+\[
+  y_t = \mu_t + \varepsilon_t, \quad
+  \mu_t = \mu_{t-1} + \eta_t
+\]
+O estado $\mu_t$ é um passeio aleatório — o nível deriva ao longo do tempo.
+$\sigma_\varepsilon$ controla o ruído de observação; $\sigma_\eta$ controla
+a velocidade com que o nível muda.
+
+\medskip
+\textbf{Local Linear Trend (LLT):}
+\[
+  y_t = \mu_t + \varepsilon_t, \quad
+  \mu_t = \mu_{t-1} + \nu_{t-1} + \eta_t, \quad
+  \nu_t = \nu_{t-1} + \zeta_t
+\]
+O estado é bidimensional: nível $\mu_t$ e inclinação $\nu_t$.
+A inclinação varia suavemente ao longo do tempo.
+
+\subsection*{Filtro de Kalman (passo forward)}
+
+O filtro processa as observações recursivamente:
+
+\begin{enumerate}
+  \item \textbf{Predição}: $\hat{s}_{t|t-1} = F\,\hat{s}_{t-1|t-1}$,\quad
+    $P_{t|t-1} = F P_{t-1|t-1} F' + R_s Q R_s'$
+
+  \item \textbf{Inovação}: $v_t = y_t - H\,\hat{s}_{t|t-1}$,\quad
+    $S_t = H P_{t|t-1} H' + R$
+
+  \item \textbf{Ganho de Kalman}: $K_t = P_{t|t-1} H' S_t^{-1}$
+
+  \item \textbf{Atualização}: $\hat{s}_{t|t} = \hat{s}_{t|t-1} + K_t v_t$,\quad
+    $P_{t|t} = (I - K_t H) P_{t|t-1}$
+\end{enumerate}
+
+O resultado $\hat{s}_{t|t}$ é o \emph{estado filtrado}: estimativa ótima do
+estado usando $y_1, \ldots, y_t$ (informação até $t$).
+
+\subsection*{Suavizador de Rauch-Tung-Striebel (passo backward)}
+
+Após o filtro, o RTS percorre a série ao contrário e incorpora informação
+futura:
+\[
+  L_t = P_{t|t}\, F'\, P_{t+1|t}^{-1}, \quad
+  \hat{s}_{t|T} = \hat{s}_{t|t} + L_t\bigl(\hat{s}_{t+1|T} - \hat{s}_{t+1|t}\bigr)
+\]
+O resultado $\hat{s}_{t|T}$ é o \emph{estado suavizado}: usa \emph{toda} a
+amostra $y_1, \ldots, y_T$. A variância do suavizado é sempre menor ou igual
+à do filtrado — a informação futura reduz incerteza.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Verificação por DGP}
+
+DGP: nível verdadeiro $\mu_t = 10 + 0{,}1\,t$ (tendência linear) observado
+com ruído $\varepsilon_t \sim N(0, 1)$. $T = 150$.
+
+\begin{lstlisting}[caption={Filtro de Kalman: LL e LLT}]
+seed(42)
+generate df mu = 10.0 + 0.1 * t
+generate df y  = mu + noise       // noise ~ N(0,1)
+
+// Local Level (sigma especificado)
+kalman(df, y, model="ll", sigma_obs=1.0, sigma_state=0.1)
+
+// Local Linear Trend (sigmas automáticos)
+kalman(df, y, model="llt")
+\end{lstlisting}
+
+\subsection*{Saída — Local Level}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small, frame=none,
+  numbers=none, backgroundcolor=\color{codbg}]
+Kalman (ll):  T=150  loglik=-278.1966  σ_obs=1.0000  σ_state=0.1000
+  → y_filtered, y_smoothed adicionadas a df
+\end{lstlisting}
+
+\subsection*{Saída — Local Linear Trend}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small, frame=none,
+  numbers=none, backgroundcolor=\color{codbg}]
+Kalman (llt):  T=150  loglik=-219.2354  σ_obs=0.9663  σ_state=0.0966  σ_slope=0.0097
+  → y_filtered, y_smoothed, y_slope_filtered, y_slope_smoothed adicionadas a df
+\end{lstlisting}
+
+O loglik do LLT ($-219{,}2$) é substancialmente maior do que o do LL
+($-278{,}2$) porque o DGP tem tendência linear — o modelo com inclinação
+livre captura melhor a estrutura dos dados.
+
+\subsection*{Comparação com o estado verdadeiro}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small, frame=none,
+  numbers=none, backgroundcolor=\color{codbg}]
+Primeiras 8 observações (LLT):
+
+  t    mu     y       y_smoothed   y_slope_smoothed
+  1   10.10  10.19      9.74           0.13
+  2   10.20  10.35      9.87           0.13
+  3   10.30  10.77      9.99           0.13
+  4   10.40  10.07     10.10           0.13
+  5   10.50   8.89     10.21           0.13
+  6   10.60  10.31     10.33           0.12
+  7   10.70  11.52     10.46           0.12
+  8   10.80  12.01     10.56           0.12
+
+summarize y_smoothed:  mean=17.49  sd=4.35
+summarize mu:          mean=17.55  sd=4.34
+\end{lstlisting}
+
+O suavizado recupera o nível verdadeiro com precisão notável: média 17{,}49
+vs 17{,}55. A inclinação suavizada (\texttt{y\_slope\_smoothed} $\approx
+0{,}13$) é próxima ao valor verdadeiro de $0{,}1$. A série bruta $y$ oscila
+em $\pm 2$ ao redor de $\mu$; o suavizado elimina esse ruído.
+
+\begin{nota}
+  \textbf{Filtrado vs suavizado}: \texttt{y\_filtered} usa apenas
+  $y_1, \ldots, y_t$ — é causal e útil para previsão em tempo real.
+  \texttt{y\_smoothed} usa $y_1, \ldots, y_T$ inteiro — é retrospectivo,
+  mas ótimo para análise histórica. Nos pontos interiores, o suavizado
+  é sempre mais preciso; no último ponto $t=T$, os dois coincidem.
+\end{nota}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Sintaxe}
+
+\begin{lstlisting}
+// Local Level
+kalman(df, y, model="ll")
+kalman(df, y, model="ll", sigma_obs=1.0, sigma_state=0.1)
+
+// Local Linear Trend
+kalman(df, y, model="llt")
+kalman(df, y, model="llt", sigma_obs=0.5, sigma_state=0.05, sigma_slope=0.005)
+\end{lstlisting}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Parâmetro} & \textbf{Padrão} & \textbf{Descrição} \\
+\midrule
+\texttt{model}       & \texttt{"ll"}         & \texttt{"ll"} ou \texttt{"llt"} \\
+\texttt{sigma\_obs}  & \texttt{sd(diff(y))/\(\sqrt{2}\)} & Desvio-padrão do ruído de observação \\
+\texttt{sigma\_state}& \texttt{sigma\_obs × 0.1}         & Desvio-padrão do ruído de nível \\
+\texttt{sigma\_slope}& \texttt{sigma\_state × 0.1}       & Desvio-padrão do ruído de inclinação (LLT) \\
+\midrule
+\multicolumn{3}{l}{\textit{Colunas adicionadas ao DataFrame:}} \\
+\texttt{\{var\}\_filtered}        & — & Nível filtrado (forward pass) \\
+\texttt{\{var\}\_smoothed}        & — & Nível suavizado (RTS) \\
+\texttt{\{var\}\_slope\_filtered} & — & Inclinação filtrada (só LLT) \\
+\texttt{\{var\}\_slope\_smoothed} & — & Inclinação suavizada (só LLT) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Modelo} & \textbf{Usar quando} & \textbf{Relação} \\
+\midrule
+LL  & Nível drift sem tendência clara   & UCM nível local (cap.~\ref{cap:filtros}) \\
+LLT & Tendência variante no tempo       & HP filter generalizado estocástico \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{nota}
+  O Hayashi usa o suavizador RTS com matrizes fixas especificadas pelo
+  usuário. Para estimação conjunta dos parâmetros de variância
+  ($\sigma_\varepsilon$, $\sigma_\eta$) via máxima verossimilhança,
+  use o comando \texttt{ucm()} (cap.~\ref{cap:filtros}), que executa
+  o algoritmo EM sobre a representação de espaço de estados.
+\end{nota}

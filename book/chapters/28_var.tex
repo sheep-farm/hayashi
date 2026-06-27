@@ -1,0 +1,228 @@
+\chapter{VAR e Causalidade de Granger}
+\label{cap:var}
+% ── índice ──────────────────────────────────────────────────────
+\index{VAR|textbf}
+\index{vetor autoregressivo|see{VAR}}
+\index{var@\texttt{var()}|textbf}
+\index{causalidade de Granger|textbf}
+\index{granger@\texttt{granger()}|textbf}
+\index{função impulso-resposta|textbf}
+\index{irf@\texttt{irf()}|textbf}
+\index{decomposição da variância}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{O modelo VAR}
+
+O modelo Autorregressivo Vetorial (\textbf{VAR($p$)}) generaliza o AR para
+sistemas multivariados. Com $K$ variáveis e $p$ defasagens:
+
+\[
+  \mathbf{y}_t = \mathbf{c} + \mathbf{A}_1 \mathbf{y}_{t-1}
+                 + \cdots + \mathbf{A}_p \mathbf{y}_{t-p}
+                 + \boldsymbol{\varepsilon}_t
+\]
+
+onde $\mathbf{y}_t = (y_{1t}, \ldots, y_{Kt})'$ é o vetor de variáveis,
+$\mathbf{A}_j$ são matrizes $K \times K$ de coeficientes e
+$\boldsymbol{\varepsilon}_t \sim (0, \Sigma_u)$ é o vetor de choques não
+correlacionados no tempo mas potencialmente correlacionados entre si.
+
+O VAR é estimado equação por equação via OLS — cada equação é um AR($p$)
+nos $K$ defasados. A condição de estacionariedade exige que todas as raízes
+características de $\mathbf{A}_1 + \cdots + \mathbf{A}_p$ estejam dentro do
+círculo unitário.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Causalidade de Granger}
+
+$x$ \textbf{causa Granger} $y$ se as defasagens de $x$ têm poder preditivo
+para $y$ além do que as defasagens de $y$ sozinhas fornecem. Formalmente,
+testa-se a hipótese:
+\[
+  H_0: A_{12}(1) = A_{12}(2) = \cdots = A_{12}(p) = 0
+\]
+na equação de $y_1$, onde $A_{12}(j)$ é o coeficiente de $y_{2,t-j}$.
+
+O teste é um teste F padrão na equação auxiliar:
+\[
+  F = \frac{(RSS_r - RSS_u)/p}{RSS_u / (T - 2p - 1)} \sim F(p,\; T-2p-1)
+\]
+
+\begin{nota}
+  Causalidade de Granger é \emph{previsibilidade}, não causalidade
+  estrutural. $x$ que antecede $y$ e correlaciona com ela passa no teste,
+  mesmo sem relação causal direta.
+\end{nota}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Função de Resposta ao Impulso}
+
+A \textbf{IRF} (\emph{Impulse Response Function}) rastreia o efeito de um
+choque unitário em $y_k$ sobre todas as variáveis ao longo do tempo.
+
+A representação MA($\infty$) do VAR é $\mathbf{y}_t = \sum_{h=0}^\infty
+\mathbf{\Phi}_h \boldsymbol{\varepsilon}_{t-h}$, com $\mathbf{\Phi}_0 = I$
+e $\mathbf{\Phi}_h = \mathbf{A}_1 \mathbf{\Phi}_{h-1} + \cdots +
+\mathbf{A}_p \mathbf{\Phi}_{h-p}$. A IRF ortogonalizada usa a decomposição
+de Cholesky de $\Sigma_u$ para isolar choques não correlacionados — a
+\textbf{ordenação de Cholesky} (ordem das variáveis) importa.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Verificação por DGP}
+
+O DGP usa um VAR(1) bivariado com estrutura de causalidade assimétrica:
+$y_2$ causa $y_1$ (coeficiente $0{,}2$), mas $y_1$ causa $y_2$
+fracamente (coeficiente $0{,}1$):
+
+\[
+  \begin{pmatrix} y_{1t} \\ y_{2t} \end{pmatrix}
+  = \begin{pmatrix} 0{,}5 & 0{,}2 \\ 0{,}1 & 0{,}6 \end{pmatrix}
+    \begin{pmatrix} y_{1,t-1} \\ y_{2,t-1} \end{pmatrix}
+  + \begin{pmatrix} \varepsilon_{1t} \\ \varepsilon_{2t} \end{pmatrix}
+\]
+
+\begin{lstlisting}[caption={DGP VAR(1) — Granger e IRF}]
+seed(42)
+input df
+id
+1
+end
+for i in 1..=9 { df = append(df, df) }
+df |> filter(_n <= 300)
+generate df e1 = rnormal()
+generate df e2 = rnormal()
+generate df y1 = 0.0
+generate df y2 = 0.0
+generate df t  = _n
+let n = nrow(df)
+let i = 2
+while i <= n {
+    let l1 = mean(df, y1, if = t == i - 1)
+    let l2 = mean(df, y2, if = t == i - 1)
+    let a  = mean(df, e1, if = t == i)
+    let b  = mean(df, e2, if = t == i)
+    replace df y1 = 0.5*l1 + 0.2*l2 + a if t == i
+    replace df y2 = 0.1*l1 + 0.6*l2 + b if t == i
+    i = i + 1
+}
+let m = var(df, y1, y2, lags=1)
+display m
+granger(df, y1, y2, lags=1)
+granger(df, y2, y1, lags=1)
+irf(m, steps=6)
+\end{lstlisting}
+
+\subsection*{Ajuste do modelo}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+VAR(1)  N=299  AIC=-5.0269  BIC=-4.9526
+
+Sigma_u:
+  [ 0.0819  0.0046 ]
+  [ 0.0046  0.0772 ]
+\end{lstlisting}
+
+A matriz de covariância residual $\hat\Sigma_u$ é quase diagonal — os
+choques $\varepsilon_1$ e $\varepsilon_2$ são praticamente ortogonais,
+como especificado no DGP.
+
+\subsection*{Causalidade de Granger}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+================== Granger Causality Test ==================
+  H₀: y2 não causa Granger y1   (lags=1)
+  F(1, 296) = 9.4437   p = 0.0023
+  Conclusion: REJEITA H₀ — y2 causa Granger y1
+
+================== Granger Causality Test ==================
+  H₀: y1 não causa Granger y2   (lags=1)
+  F(1, 296) = 4.5768   p = 0.0332
+  Conclusion: REJEITA H₀ — y1 causa Granger y2
+\end{lstlisting}
+
+Ambas as direções rejeitam $H_0$: $y_2 \to y_1$ com $p = 0{,}002$ e
+$y_1 \to y_2$ com $p = 0{,}033$. O DGP impõe $\phi_{12} = 0{,}2$ e
+$\phi_{21} = 0{,}1$ — a causalidade bidirecional é detectada, embora
+$y_2 \to y_1$ seja mais forte.
+
+\subsection*{Resposta ao impulso}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+IRF — VAR(1) — 6 passos
+
+  Impulso: y1
+  ──────────────────────────────────────
+       h          y1          y2
+  ──────────────────────────────────────
+       1      0.2862      0.0161
+       2      0.1430      0.0382
+       3      0.0758      0.0364
+       4      0.0426      0.0286
+       5      0.0251      0.0207
+       6      0.0154      0.0145
+  ──────────────────────────────────────
+
+  Impulso: y2
+  ──────────────────────────────────────
+       h          y1          y2
+  ──────────────────────────────────────
+       1      0.0000      0.2774
+       2      0.0405      0.1595
+       3      0.0432      0.0958
+       4      0.0352      0.0595
+       5      0.0260      0.0378
+       6      0.0183      0.0243
+  ──────────────────────────────────────
+\end{lstlisting}
+
+Um choque em $y_1$ tem efeito rápido sobre $y_1$ (decai de $0{,}29$ para
+$0{,}015$ em 6 períodos) e efeito pequeno sobre $y_2$. Um choque em $y_2$
+transmite-se progressivamente a $y_1$ — atinge $0{,}043$ no período 3,
+depois decai — capturando o canal $\phi_{12} = 0{,}2$ do DGP.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Seleção de defasagens}
+
+\begin{lstlisting}[caption={Comparação por número de defasagens}]
+let m1 = var(df, y1, y2, lags=1)
+let m2 = var(df, y1, y2, lags=2)
+let m3 = var(df, y1, y2, lags=3)
+esttab(m1, m2, m3)
+\end{lstlisting}
+
+Seleciona-se a defasagem com menor BIC (parcimônia) ou AIC (ajuste).
+Com o DGP VAR(1), espera-se que $p=1$ minimize ambos.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Sintaxe}
+
+\begin{lstlisting}
+var(df, y1, y2, lags=1)
+var(df, y1, y2, y3, lags=2)
+granger(df, y, x, lags=1)
+irf(m, steps=10)
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Fluxo típico — PIB e inflação}]
+load "macro.csv" as df
+
+adf(df, pib)
+adf(df, ipca)
+
+let m = var(df, pib, ipca, lags=2)
+granger(df, pib, ipca, lags=2)
+granger(df, ipca, pib, lags=2)
+irf(m, steps=12)
+\end{lstlisting}
+
+\begin{nota}
+  O VAR exige séries \emph{estacionárias}. Se as variáveis forem I(1) e
+  cointegradas, o modelo adequado é o VECM (cap.~\ref{cap:coint}). Se
+  forem I(1) mas não cointegradas, diferencie antes de estimar.
+\end{nota}

@@ -1,0 +1,164 @@
+\chapter{Regressão Quantílica}
+\label{cap:qreg}
+% ── índice ──────────────────────────────────────────────────────
+\index{regressão quantílica|textbf}
+\index{qreg@\texttt{qreg()}|textbf}
+\index{mediana}
+\index{quantil}
+\index{heterocedasticidade}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{O modelo}
+
+O OLS estima $E[y \mid x]$ — a média condicional. A Regressão Quantílica
+(QR) estima $Q_\tau[y \mid x]$ — o $\tau$-ésimo quantil condicional para
+qualquer $\tau \in (0,1)$:
+
+\[
+  Q_\tau(y \mid x) = x'\beta(\tau)
+\]
+
+O vetor $\beta(\tau)$ varia com $\tau$: cada quantil tem seu próprio conjunto
+de coeficientes. Com um único modelo é possível descrever a distribuição
+condicional inteira de $y$.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{O estimador}
+
+O estimador minimiza a \textbf{função de perda assimétrica} (check function):
+
+\[
+  \hat\beta(\tau) = \arg\min_\beta \sum_{i=1}^{n} \rho_\tau(y_i - x_i'\beta)
+\]
+
+onde
+\[
+  \rho_\tau(u) =
+  \begin{cases}
+    \tau\, u       & \text{se } u \geq 0 \\
+    (\tau - 1)\,u  & \text{se } u < 0
+  \end{cases}
+\]
+
+Para $\tau = 0{,}5$: $\rho_{0,5}(u) = |u|/2$ — minimização da soma dos
+desvios absolutos (LAD/mediana). Para $\tau \neq 0{,}5$, resíduos positivos
+e negativos recebem pesos assimétricos, deslocando a estimativa para o
+$\tau$-ésimo quantil.
+
+\begin{nota}
+  Ao contrário do OLS, a QR não tem solução de forma fechada — o problema
+  é um programa linear resolvido por simplex ou métodos de ponto interior.
+  Por isso a inferência padrão usa bootstrap (\lstinline{boot=}).
+\end{nota}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Vantagens sobre o OLS}
+
+\begin{itemize}
+  \item \textbf{Heterocedasticidade:} quando $\mathrm{Var}[y \mid x]$ varia
+        com $x$, os slopes $\beta_j(\tau)$ diferem entre quantis. O OLS
+        captura apenas a média ponderada implícita.
+
+  \item \textbf{Robustez:} a função check é linear nos resíduos, não
+        quadrática. Outliers em $y$ influenciam menos $\hat\beta(\tau)$
+        do que $\hat\beta_{\mathrm{OLS}}$.
+
+  \item \textbf{Distribuição assimétrica:} salários, renda e preços de
+        ativos têm caudas pesadas à direita. A QR descreve efeitos nas
+        caudas sem suposições sobre a forma da distribuição.
+\end{itemize}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Verificação por DGP}
+
+O DGP abaixo introduz heterocedasticidade multiplicativa: a dispersão
+de $y$ cresce com $x$, de modo que o efeito de $x$ é maior nos quantis
+superiores do que nos inferiores.
+
+\[
+  y_i = 2{,}0 + 1{,}5\,x_i + (1{,}0 + 0{,}8\,x_i)\,\varepsilon_i,
+  \quad \varepsilon_i \sim \mathcal{N}(0,1)
+\]
+
+O quantil condicional $Q_\tau(y \mid x)$ é crescente em $x$, e a
+inclinação $\partial Q_\tau / \partial x$ aumenta com $\tau$: indivíduos
+nos quantis superiores são mais sensíveis a $x$ do que os do quantil
+inferior.
+
+\begin{lstlisting}[caption={DGP heterocedástico — OLS vs.\ quatro quantis}]
+seed(42)
+input df
+id
+1
+end
+for i in 1..=10 { df = append(df, df) }
+df |> filter(_n <= 1000)
+generate df x = rnormal()
+generate df e = rnormal()
+generate df y = 2.0 + 1.5*x + (1.0 + 0.8*x)*e
+let m_ols = ols(y ~ x, df)
+let m_q25 = qreg(y ~ x, df, tau=0.25)
+let m_q50 = qreg(y ~ x, df, tau=0.50)
+let m_q75 = qreg(y ~ x, df, tau=0.75)
+esttab(m_ols, m_q25, m_q50, m_q75)
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+                            (1)              (2)              (3)              (4)
+                            OLS     QReg(τ=0.25)     QReg(τ=0.50)     QReg(τ=0.75)
+──────────────────────────────────────────────────────────────────────────────────
+x                     1.9947***        1.8739***        2.0149***        2.2462***
+                       (0.0454)         (0.0687)         (0.0833)         (0.0579)
+const                                  2.1659***        2.4525***        2.6637***
+                                        (0.0302)         (0.0433)         (0.0369)
+Constant              2.4538***
+                       (0.0261)
+──────────────────────────────────────────────────────────────────────────────────
+N                          1000                0                0                0
+R²                       0.6594
+Adj. R²                  0.6591
+──────────────────────────────────────────────────────────────────────────────────
+* p<0.10  ** p<0.05  *** p<0.01
+\end{lstlisting}
+
+O slope de $x$ cresce monotonicamente: $1{,}87$ no Q25, $2{,}01$ no Q50
+e $2{,}25$ no Q75. O OLS ($1{,}99$) é uma média ponderada implícita desses
+efeitos heterogêneos — resume em um único número o que a QR decompõe em
+toda a distribuição condicional.
+
+A constante também aumenta com $\tau$ ($2{,}17 \to 2{,}45 \to 2{,}66$),
+refletindo que os quantis superiores de $y$ estão acima da média para
+qualquer valor de $x$.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Sintaxe}
+
+\begin{lstlisting}
+qreg(y ~ x1 + x2, df, tau=0.5)
+qreg(y ~ x1 + x2, df, tau=0.5, boot=500)
+\end{lstlisting}
+
+O parâmetro \lstinline{tau} define o quantil desejado ($\tau \in (0,1)$,
+padrão $0{,}5$). O parâmetro \lstinline{boot} ativa bootstrap para os
+erros padrão (padrão 200 réplicas).
+
+\begin{lstlisting}[caption={Fluxo típico — salários em múltiplos quantis}]
+load "pnad.csv" as df
+
+let q10 = qreg(sal ~ edu + exp, df, tau=0.10, boot=500)
+let q50 = qreg(sal ~ edu + exp, df, tau=0.50, boot=500)
+let q90 = qreg(sal ~ edu + exp, df, tau=0.90, boot=500)
+let ols = ols(sal ~ edu + exp, df)
+
+esttab(ols, q10, q50, q90)
+\end{lstlisting}
+
+\section{Capturando o resultado}
+
+\begin{lstlisting}
+let m = qreg(y ~ x, df, tau=0.75)
+display m
+let yhat = predict(m, "xb")
+\end{lstlisting}

@@ -1,0 +1,139 @@
+\chapter{Inferência Clássica}
+\label{cap:inferencia}
+% ── índice ──────────────────────────────────────────────────────
+\index{teste t|textbf}
+\index{ttest@\texttt{ttest()}|textbf}
+\index{ANOVA|textbf}
+\index{anova@\texttt{anova()}|textbf}
+\index{Kruskal-Wallis, teste de|textbf}
+\index{kruskal_wallis@\texttt{kruskal\_wallis()}|textbf}
+\index{Welch, teste de|textbf}
+\index{não-paramétrico, teste}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Testes de hipóteses paramétricos e não-paramétricos}
+
+Os testes apresentados neste capítulo respondem à pergunta: \emph{os dados
+são consistentes com uma hipótese sobre a distribuição populacional?}
+
+\subsection*{Teste t de Student}
+
+Para uma amostra de tamanho $n$ com variância desconhecida, a estatística:
+\[
+  t = \frac{\bar{x} - \mu_0}{s / \sqrt{n}} \sim t_{n-1}
+\]
+testa $H_0: \mu = \mu_0$. Para duas amostras independentes, o teste de Welch
+usa graus de liberdade aproximados pelo método de Satterthwaite, sem assumir
+homoscedasticidade.
+
+\subsection*{ANOVA de um fator}
+
+Generaliza o $t$-test para $K > 2$ grupos. Decompõe a variação total:
+\[
+  \text{SS}_{\text{total}} = \text{SS}_{\text{entre}} + \text{SS}_{\text{dentro}}
+\]
+\[
+  F = \frac{\text{SS}_{\text{entre}} / (K-1)}{\text{SS}_{\text{dentro}} / (N-K)}
+  \sim F_{K-1,\, N-K}
+\]
+$H_0$: todas as médias grupais são iguais.
+
+\subsection*{Kruskal-Wallis}
+
+Alternativa não-paramétrica à ANOVA de um fator. Substitui observações por
+\emph{ranks} e compara as somas de ranks entre grupos. Estatística:
+\[
+  H = \frac{12}{N(N+1)} \sum_{k=1}^K \frac{R_k^2}{n_k} - 3(N+1) \sim \chi^2_{K-1}
+\]
+válida mesmo sem normalidade, desde que as distribuições tenham forma similar.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Verificação por DGP}
+
+DGP com 3 grupos de tamanhos distintos; o valor esperado cresce linearmente
+com o grupo. $N=300$, $\sigma = 1$.
+
+\begin{lstlisting}[caption={Testes de hipóteses}]
+seed(42)
+...
+generate df g   = (_n <= 150) * 1 + (_n > 150) * 2
+generate df yg  = 2.0 + e + (g - 1) * 0.5  // g=1: mu=2.0, g=2: mu=2.5
+
+// Teste t de uma amostra: H0: mu = 2.0
+ttest(df, y, mu=2.0)
+
+// Teste t de dois grupos (Welch): H0: mu(g1) = mu(g2)
+ttest(df, yg, by=g)
+
+// Pareado: antes vs depois
+ttest(df, y_antes, y_depois, paired=true)
+
+// ANOVA: H0: mu1 = mu2 = mu3
+anova(df, y3, by=k)
+
+// Kruskal-Wallis (não-paramétrico)
+kruskal_wallis(df, y3, by=k)
+\end{lstlisting}
+
+\subsection*{Teste t — uma amostra}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small, frame=none,
+  numbers=none, backgroundcolor=\color{codbg}]
+One-sample t-test: y   H0: mean = 2.0
+t = -0.6946   df = 299   p = 0.4879
+\end{lstlisting}
+
+Não rejeita $H_0$ — média amostral 1{,}98 é compatível com 2{,}0.
+
+\subsection*{Teste t — dois grupos (Welch)}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small, frame=none,
+  numbers=none, backgroundcolor=\color{codbg}]
+Two-sample t-test (Welch): yg by g
+  grupo 1: n=150  mean=1.971  SE=0.040
+  grupo 2: n=150  mean=2.489  SE=0.041
+Welch's t = -9.0552   df = 297.38   p = 0.0000
+\end{lstlisting}
+
+Rejeita $H_0$: diferença de 0{,}52 ≈ diferença verdadeira de 0{,}50.
+
+\subsection*{ANOVA}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small, frame=none,
+  numbers=none, backgroundcolor=\color{codbg}]
+=========================== One-Way ANOVA ============================
+Source           SS     df      MS         F       P>F
+----------------------------------------------------------------------
+Between       51.195     2   25.597   104.037   0.0000
+Within        73.074   297    0.246
+Total        124.269   299
+\end{lstlisting}
+
+$F = 104{,}0$, $p < 0{,}001$: rejeita $H_0$ com segurança.
+
+\subsection*{Kruskal-Wallis}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small, frame=none,
+  numbers=none, backgroundcolor=\color{codbg}]
+H = 120.38   df = 2   p = 0.0000
+\end{lstlisting}
+
+Confirma a ANOVA sem assumir normalidade.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Sintaxe}
+
+\begin{lstlisting}
+ttest(df, var, mu=0.0)                  // uma amostra
+ttest(df, var, by=grupo)               // dois grupos (Welch)
+ttest(df, var1, var2, paired=true)     // pareado
+anova(df, var, by=grupo)               // ANOVA de um fator
+kruskal_wallis(df, var, by=grupo)      // Kruskal-Wallis
+\end{lstlisting}
+
+\begin{nota}
+  O teste de Welch não assume homocedasticidade e é preferível ao $t$-test
+  clássico de Student em quase todos os casos práticos. A perda de potência
+  é negligenciável quando as variâncias são iguais; o ganho quando diferem
+  é substancial.
+\end{nota}

@@ -1,0 +1,39 @@
+// Cap 37 — Painel Avançado (Arellano-Bond, PCSE, GEE)
+// DGP: painel N=50 × T=20 com efeito individual correlacionado com x
+// y_it = 0.8*y_{i,t-1} + 1.0*x_it + alpha_i + e_it
+// OLS viesado por Nickell bias; AB-GMM é consistente
+
+seed(42)
+input df
+id
+1
+end
+for i in 1..=10 { df = append(df, df) }
+df |> filter(_n <= 1000)
+
+generate df unit = (_n - 1) % 50 + 1
+generate df t    = (_n - (_n - 1) % 50 - 1) / 50 + 1
+generate df alpha = unit * 0.05
+generate df x     = alpha + (rnormal() - 0.5) * 1.7321
+generate df e     = (rnormal() - 0.5) * 1.7321
+generate df y     = 1.0 + 1.0 * x + alpha + e
+
+// OLS ignora efeitos individuais — viesado
+let m_ols = ols(y ~ x, df)
+display m_ols
+
+// FE elimina alpha_i — consistente (sem lag y)
+let m_fe = fe(y ~ x, df, id=unit)
+display m_fe
+
+// Arellano-Bond GMM: usa diferenças + instrumentos para estimar rho
+let m_ab = ab(y ~ x, df, id=unit, time=t, lags=2)
+display m_ab
+
+// PCSE: Beck & Katz (1995) — SEs corrigidos p/ heteroscedasticidade e autocorr
+let m_pcse = pcse(y ~ x, df, id=unit, time=t)
+display m_pcse
+
+// GEE: função de estimação generalizada (família gaussiana)
+let m_gee = gee(y ~ x, df, id=unit)
+display m_gee

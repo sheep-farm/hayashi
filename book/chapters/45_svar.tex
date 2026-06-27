@@ -1,0 +1,137 @@
+\chapter{VAR Estrutural}
+\label{cap:svar}
+% ── índice ──────────────────────────────────────────────────────
+\index{VAR estrutural|textbf}
+\index{SVAR|see{VAR estrutural}}
+\index{svar@\texttt{svar()}|textbf}
+\index{sirf@\texttt{sirf()}|textbf}
+\index{Cholesky, decomposição de|textbf}
+\index{identificação estrutural|textbf}
+\index{função impulso-resposta estrutural|textbf}
+\index{ordenação causal}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Da forma reduzida à estrutura}
+
+O VAR da forma reduzida (cap.~\ref{cap:var}) fornece $K^2 \cdot p + K$ parâmetros
+livres. A impulso-resposta reduzida mede o efeito de \emph{inovações} $u_t$
+sem conteúdo econômico. O SVAR recupera \emph{choques estruturais}
+$\varepsilon_t$ (oferta, demanda, política monetária) impondo restrições
+que refletem teoria econômica:
+
+\[
+  A\,y_t = A_1^*\,y_{t-1} + \cdots + B\,\varepsilon_t
+  \qquad
+  \varepsilon_t \sim (0, I_K)
+\]
+
+\subsection*{Identificação de Cholesky}
+
+A decomposição triangular inferior de $\Sigma_u = P\,P'$ impõe uma
+ordenação causal recursiva: a variável na posição 1 é exógena
+contemporaneamente; a na posição 2 responde contemporaneamente apenas
+à primeira; etc.
+
+\[
+  B = P \quad\text{(triangular inferior)} \implies y_{1,t} \perp \varepsilon_{2,t} \text{ no mesmo período}
+\]
+
+O IRF estrutural $\Theta_h = \Phi_h B$ mede a resposta de $y_{k,t+h}$
+a um choque unitário em $\varepsilon_{j,t}$.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Verificação por DGP}
+
+DGP: VAR(1) bivariado com restrição Cholesky verdadeira (y2 responde
+contemporaneamente a y1, mas não vice-versa).
+
+\begin{lstlisting}[caption={DGP estrutural e SVAR Cholesky}]
+seed(42)
+generate df t  = _n
+// VAR(1): y1 e y2 com coeficientes cruzados
+...
+replace df y1 = 0.5*ly1 + 0.3*ly2 + e1t          if t == it
+replace df y2 = 0.2*ly1 + 0.4*ly2 + 0.6*e1t + e2t if t == it
+
+let m_var  = var(df, y1, y2, lags=1)
+display m_var
+
+let m_svar = svar(df, y1, y2, lags=1, id=cholesky)
+display m_svar
+
+let m_sirf = sirf(m_svar, steps=10)
+display m_sirf
+\end{lstlisting}
+
+\subsection*{VAR reduzido}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+Vector Autoregression (VAR(1)):  Observations=299  AIC=-2.83  BIC=-2.76
+Residual Covariance (Σ_u):
+[ 0.2452   0.1617 ]
+[ 0.1617   0.3375 ]
+\end{lstlisting}
+
+\subsection*{SVAR — Matriz B}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+============================= SVAR(1) — Cholesky =============================
+B Matrix (impacto estrutural):
+[ 0.4952   0.0000 ]     <- choque 1 afeta y1, não afeta y2 contemporaneamente
+[ 0.3265   0.4805 ]     <- choque 2 afeta y2; y2 responde ao choque 1
+\end{lstlisting}
+
+A coluna nula em $B_{12}$ reflete a ordenação Cholesky: o choque 2 não afeta
+$y_1$ contemporaneamente. $B_{21} = 0{,}33$ estima o efeito contemporâneo do
+choque 1 sobre $y_2$ (DGP verdadeiro: 0{,}6 $\times$ $\sigma_{\varepsilon_1}$).
+
+\subsection*{IRF estrutural}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+Impulso: Choque 1 (Var0)
+  h=0:  y1=+0.495  y2=+0.327   (impacto contemporâneo)
+  h=1:  y1=+0.324  y2=+0.224
+  h=5:  y1=+0.063  y2=+0.044   (amortecimento progressivo)
+  h=9:  y1=+0.012  y2=+0.009
+
+Impulso: Choque 2 (Var1)
+  h=0:  y1= 0.000  y2=+0.481   (restrição Cholesky: y1 não responde)
+  h=1:  y1=+0.115  y2=+0.170
+\end{lstlisting}
+
+A resposta de $y_1$ ao choque 2 em $h=0$ é exatamente zero — restrição de
+identificação Cholesky aplicada. No horizonte $h=1$, $y_1$ começa a responder
+via o canal VAR defasado.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Sintaxe}
+
+\begin{lstlisting}
+svar(df, y1, y2, lags=1, id=cholesky)     // SVAR com identificação Cholesky
+svar(df, y1, y2, lags=1, id=longrun)      // BQ: restrições de longo prazo
+sirf(m_svar, steps=10)                    // IRF estrutural
+\end{lstlisting}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Identificação} & \textbf{Restrições} \\
+\midrule
+\texttt{cholesky} & triangular inferior — restrições de curto prazo recursivas \\
+\texttt{longrun}  & Blanchard-Quah — restrições de longo prazo \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{nota}
+  A ordenação das variáveis no SVAR Cholesky é crucial: a variável listada
+  primeiro é tratada como contemporaneamente exógena a todas as demais.
+  A escolha da ordenação deve ser guiada por teoria econômica ou por
+  resultados robustos a permutações da ordem.
+\end{nota}

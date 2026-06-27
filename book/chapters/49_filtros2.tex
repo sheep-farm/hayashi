@@ -1,0 +1,121 @@
+\chapter{Decomposição de Séries II}
+\label{cap:filtros2}
+% ── índice ──────────────────────────────────────────────────────
+\index{STL|textbf}
+\index{stl@\texttt{stl()}|textbf}
+\index{Christiano-Fitzgerald, filtro de|textbf}
+\index{christiano_fitzgerald@\texttt{christiano\_fitzgerald()}|textbf}
+\index{loess}
+\index{filtro passa-banda}
+\index{decomposição sazonal}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{STL e Christiano-Fitzgerald}
+
+O cap.~\ref{cap:filtros} apresentou HP, BK e Holt-Winters. Este capítulo
+cobre dois métodos adicionais:
+
+\begin{description}
+  \item[STL] \emph{Seasonal-Trend decomposition via Loess} (Cleveland et al.~1990):
+    decompõe $y_t = T_t + S_t + R_t$ iterativamente via regressão local (loess).
+    Robusto a outliers; permite sazonalidade variante no tempo.
+
+  \item[Christiano-Fitzgerald (CF)] Filtro passa-banda assimétrico (2003):
+    extrai frequências em $[p_L, p_H]$ usando pesos de uma janela
+    não-simétrica que se adapta à posição na série. Ao contrário do BK, não
+    perde pontos de borda — o preço é que os pesos mudam a cada observação.
+\end{description}
+
+\subsection*{STL: decomposição iterativa}
+
+O algoritmo STL alterna entre:
+\begin{enumerate}
+  \item \emph{Seasonal loop}: suaviza cada posição sazonal com loess
+  \item \emph{Trend loop}: suaviza a série dessazonalizada com loess
+\end{enumerate}
+A convergência produz $T_t$ (tendência), $S_t$ (sazonalidade) e $R_t$ (resíduo)
+com propriedades de robustez a outliers quando \texttt{robust=true}.
+
+\subsection*{Filtro Christiano-Fitzgerald}
+
+O CF aplica pesos $a_j$ que satisfazem $\sum_j a_j e^{i\omega j} \approx 1$
+para $\omega \in [\omega_L, \omega_H]$ e $\approx 0$ fora da banda.
+Para $t$ nas bordas, os pesos se ajustam para não usar observações futuras.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Verificação por DGP}
+
+DGP: série mensal com tendência linear, ciclo anual e sazonalidade semestral.
+$T = 120$ meses.
+
+\begin{lstlisting}[caption={STL e Christiano-Fitzgerald}]
+seed(42)
+generate df trend  = 0.05 * t
+generate df cycle  = 0.5 * sin(t * 3.14159 / 12)
+generate df season = 0.3 * sin(t * 3.14159 / 6)
+generate df y      = 10.0 + trend + cycle + season + noise
+
+stl(df, y, period=12)
+display df
+
+christiano_fitzgerald(df, y, low=6, high=32)
+display df
+\end{lstlisting}
+
+\subsection*{STL}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small, frame=none,
+  numbers=none, backgroundcolor=\color{codbg}]
+Seasonal Decomposition (STL)
+  Observations: 120
+  Trend mean:   13.0243
+  Seasonal std:  0.1943
+  Residual std:  0.1868
+\end{lstlisting}
+
+O STL adiciona colunas \texttt{y\_trend}, \texttt{y\_seasonal} e \texttt{y\_resid}
+ao DataFrame. Residual std $< 0{,}2$ — o ruído verdadeiro ($\sigma = 0{,}3$) é
+bem separado dos demais componentes.
+
+\subsection*{Christiano-Fitzgerald}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small, frame=none,
+  numbers=none, backgroundcolor=\color{codbg}]
+cffilter: períodos [6,32]  →  y_cycle adicionada a df
+  t=1:  y_cycle = 1.04
+  t=6:  y_cycle = 1.19    (ciclo anual dominante)
+  t=12: y_cycle = 0.87
+\end{lstlisting}
+
+O CF retém variações periódicas entre 6 e 32 meses (1{,}5 a 8 anos — ciclos
+de negócios). A vantagem sobre o BK é que todas as 120 observações são mantidas
+(sem trimagem de pontas).
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Sintaxe}
+
+\begin{lstlisting}
+stl(df, var, period=12)                        // adiciona trend, seasonal, resid
+christiano_fitzgerald(df, var, low=6, high=32) // adiciona var_cycle
+\end{lstlisting}
+
+\begin{center}
+\begin{tabular}{llll}
+\toprule
+\textbf{Filtro} & \textbf{Tipo} & \textbf{Perda de borda} & \textbf{Sazonalidade} \\
+\midrule
+HP              & passa-baixo    & Sim (ponta)         & Não \\
+BK              & passa-banda    & Sim ($k$ cada lado) & Não \\
+CF              & passa-banda    & Não                 & Não \\
+STL             & decomposição   & Não                 & Sim \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{nota}
+  A função \texttt{hamilton} no Hayashi refere-se ao modelo de Markov
+  Switching de Hamilton (1989), \emph{não} ao filtro de Hamilton (2018)
+  (cap.~\ref{cap:regime}). O filtro Hamilton 2018 — que propõe substituir
+  o HP por uma regressão OLS com 4 defasagens e horizonte $h = 8$ —
+  não está implementado separadamente.
+\end{nota}

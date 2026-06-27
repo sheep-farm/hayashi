@@ -1,0 +1,763 @@
+\chapter{Código Equivalente por Plataforma}
+\label{apendice:equivalencias}
+% ── índice ──────────────────────────────────────────────────────
+\index{equivalências Stata/R/Python|textbf}
+
+Este apêndice reproduz DGPs representativos em Stata, R e Python, lado a
+lado com o código \hayashi{}. O objetivo é duplo: permitir validação cruzada
+de resultados e evidenciar diferenças de sintaxe.
+
+\begin{nota}
+  Os geradores de números aleatórios diferem entre plataformas — os
+  valores numéricos serão distintos, mas as propriedades estatísticas
+  (recuperação de parâmetros, direção do viés, decisão do Hausman)
+  são idênticas para qualquer semente.
+\end{nota}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{OLS — DGP sem ruído e comparação com variável omitida}
+
+\subsection*{Hayashi}
+
+\begin{lstlisting}
+seed(42)
+input df
+id
+1
+end
+for i in 1..=10 { df = append(df, df) }
+df |> filter(_n <= 1000)
+generate df x1 = rnormal()
+generate df x2 = rnormal()
+generate df y  = 2.5 + 1.8*x1 - 0.7*x2
+let m1 = ols(y ~ x1 + x2, df)
+let m2 = ols(y ~ x1, df)
+esttab(m1, m2)
+\end{lstlisting}
+
+\subsection*{Stata}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg}]
+clear
+set obs 1000
+set seed 42
+gen x1 = rnormal()
+gen x2 = rnormal()
+gen y  = 2.5 + 1.8*x1 - 0.7*x2
+reg y x1 x2
+estimates store m1
+reg y x1
+estimates store m2
+esttab m1 m2          // ssc install estout
+\end{lstlisting}
+
+\subsection*{R}
+
+\begin{lstlisting}[language=R, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg},
+  keywordstyle=\color{keyword}\bfseries,
+  stringstyle=\color{string},
+  commentstyle=\color{comment}\itshape]
+set.seed(42)
+n  <- 1000
+x1 <- rnorm(n);  x2 <- rnorm(n)
+y  <- 2.5 + 1.8*x1 - 0.7*x2
+m1 <- lm(y ~ x1 + x2)
+m2 <- lm(y ~ x1)
+library(stargazer)
+stargazer(m1, m2, type = "text")
+\end{lstlisting}
+
+\subsection*{Python}
+
+\begin{lstlisting}[language=Python, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg},
+  keywordstyle=\color{keyword}\bfseries,
+  stringstyle=\color{string},
+  commentstyle=\color{comment}\itshape]
+import numpy as np, pandas as pd
+import statsmodels.formula.api as smf
+from statsmodels.iolib.summary2 import summary_col
+np.random.seed(42)
+n = 1000
+x1 = np.random.randn(n);  x2 = np.random.randn(n)
+y  = 2.5 + 1.8*x1 - 0.7*x2
+df = pd.DataFrame({'y': y, 'x1': x1, 'x2': x2})
+m1 = smf.ols('y ~ x1 + x2', data=df).fit()
+m2 = smf.ols('y ~ x1',      data=df).fit()
+print(summary_col([m1, m2], stars=True))
+\end{lstlisting}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{IV — Endogeneidade com instrumento válido}
+
+\subsection*{Hayashi}
+
+\begin{lstlisting}
+seed(42)
+...
+generate df z   = rnormal()
+generate df v   = rnormal()
+let d1          = cov(df, z, v) / variance(df, z)
+let d0          = mean(df, v) - d1 * mean(df, z)
+generate df eps = v - d0 - d1*z
+generate df x   = 0.8*z + eps
+generate df y   = 1.5 + 2.0*x + 0.7*eps
+let m_ols = ols(y ~ x, df)
+let m_iv  = iv(y ~ x, ~ z, df)
+esttab(m_ols, m_iv)
+\end{lstlisting}
+
+\subsection*{Stata}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg}]
+gen z = rnormal()
+gen v = rnormal()
+reg v z
+predict eps, residuals
+gen x = 0.8*z + eps
+gen y = 1.5 + 2.0*x + 0.7*eps
+reg y x
+ivregress 2sls y (x = z)
+\end{lstlisting}
+
+\subsection*{R}
+
+\begin{lstlisting}[language=R, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg},
+  keywordstyle=\color{keyword}\bfseries,
+  stringstyle=\color{string},
+  commentstyle=\color{comment}\itshape]
+eps <- resid(lm(v ~ z))
+x   <- 0.8*z + eps
+y   <- 1.5 + 2.0*x + 0.7*eps
+library(ivreg)
+ivreg(y ~ x | z, data = data.frame(y,x,z))
+\end{lstlisting}
+
+\subsection*{Python}
+
+\begin{lstlisting}[language=Python, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg},
+  keywordstyle=\color{keyword}\bfseries,
+  stringstyle=\color{string},
+  commentstyle=\color{comment}\itshape]
+from linearmodels.iv import IV2SLS
+import statsmodels.api as sm
+IV2SLS(y, sm.add_constant(x),
+       None, sm.add_constant(z)).fit()
+\end{lstlisting}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Painel — FE, RE e Hausman}
+
+\subsection*{Hayashi}
+
+\begin{lstlisting}
+seed(42) / ... / df |> filter(_n <= 1000)
+generate df id    = (_n - 1) % 100 + 1
+generate df alpha = id * 0.05
+generate df x     = alpha + rnormal()
+generate df y     = 1.0 + 2.0*x + alpha + rnormal()
+let m_fe  = fe(y ~ x, df, id=id)
+let m_re  = re(y ~ x, df, id=id)
+hausman(m_fe, m_re)
+\end{lstlisting}
+
+\subsection*{Stata}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg}]
+xtset id
+xtreg y x, fe
+estimates store m_fe
+xtreg y x, re
+estimates store m_re
+hausman m_fe m_re
+\end{lstlisting}
+
+\subsection*{R}
+
+\begin{lstlisting}[language=R, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg},
+  keywordstyle=\color{keyword}\bfseries,
+  stringstyle=\color{string},
+  commentstyle=\color{comment}\itshape]
+library(plm)
+pd   <- pdata.frame(df, index = "id")
+m_fe <- plm(y ~ x, data = pd, model = "within")
+m_re <- plm(y ~ x, data = pd, model = "random")
+phtest(m_fe, m_re)
+\end{lstlisting}
+
+\subsection*{Python}
+
+\begin{lstlisting}[language=Python, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg},
+  keywordstyle=\color{keyword}\bfseries,
+  stringstyle=\color{string},
+  commentstyle=\color{comment}\itshape]
+from linearmodels import PanelOLS, RandomEffects
+m_fe = PanelOLS(df['y'], df[['x']], entity_effects=True).fit()
+m_re = RandomEffects(df['y'], df[['x']]).fit()
+\end{lstlisting}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Logit e Probit}
+
+\subsection*{Hayashi}
+
+\begin{lstlisting}
+generate df p = 1 / (1 + exp(-(-1.0 + 2.0*x)))
+generate df y = rnormal() < p
+let m_l = logit(y ~ x, df)
+let m_p = probit(y ~ x, df)
+margins(m_l, df)
+\end{lstlisting}
+
+\subsection*{Stata}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg}]
+logit  y x
+probit y x
+margins, dydx(x)
+\end{lstlisting}
+
+\subsection*{R}
+
+\begin{lstlisting}[language=R, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg},
+  keywordstyle=\color{keyword}\bfseries,
+  stringstyle=\color{string},
+  commentstyle=\color{comment}\itshape]
+m_l <- glm(y ~ x, family = binomial("logit"))
+m_p <- glm(y ~ x, family = binomial("probit"))
+library(margins)
+summary(margins(m_l))
+\end{lstlisting}
+
+\subsection*{Python}
+
+\begin{lstlisting}[language=Python, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg},
+  keywordstyle=\color{keyword}\bfseries,
+  stringstyle=\color{string},
+  commentstyle=\color{comment}\itshape]
+import statsmodels.formula.api as smf
+m_l = smf.logit('y ~ x', data=df).fit()
+print(m_l.get_margeff().summary())
+\end{lstlisting}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Modelos de contagem}
+
+\subsection*{Hayashi}
+
+\begin{lstlisting}
+generate df lam = exp(0.5 + 1.0*x)
+generate df y   = floor(lam + rnormal())
+let m_p  = poisson(y ~ x, df)
+let m_nb = nbreg(y ~ x, df)
+\end{lstlisting}
+
+\subsection*{Stata}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg}]
+poisson y x
+nbreg   y x
+\end{lstlisting}
+
+\subsection*{R}
+
+\begin{lstlisting}[language=R, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg},
+  keywordstyle=\color{keyword}\bfseries,
+  stringstyle=\color{string},
+  commentstyle=\color{comment}\itshape]
+glm(y ~ x, family = poisson("log"))
+library(MASS)
+glm.nb(y ~ x)
+\end{lstlisting}
+
+\subsection*{Python}
+
+\begin{lstlisting}[language=Python, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg},
+  keywordstyle=\color{keyword}\bfseries,
+  stringstyle=\color{string},
+  commentstyle=\color{comment}\itshape]
+smf.poisson('y ~ x', data=df).fit()
+smf.negativebinomial('y ~ x', data=df).fit()
+\end{lstlisting}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Tobit e Heckman}
+
+\subsection*{Hayashi}
+
+\begin{lstlisting}
+let m_t = tobit(y_tobit ~ x, df)
+let m_h = heckman(y_out ~ x, s ~ z, df)
+\end{lstlisting}
+
+\subsection*{Stata}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg}]
+tobit y_tobit x, ll(0)
+heckman y_out x, select(s = x z)
+\end{lstlisting}
+
+\subsection*{R}
+
+\begin{lstlisting}[language=R, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg},
+  keywordstyle=\color{keyword}\bfseries,
+  stringstyle=\color{string},
+  commentstyle=\color{comment}\itshape]
+library(AER)
+tobit(y_tobit ~ x, left = 0)
+library(sampleSelection)
+heckit(s ~ x + z, y_out ~ x)
+\end{lstlisting}
+
+\subsection*{Python}
+
+\begin{lstlisting}[language=Python, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg},
+  keywordstyle=\color{keyword}\bfseries,
+  stringstyle=\color{string},
+  commentstyle=\color{comment}\itshape]
+# Tobit: sem implementação nativa no statsmodels
+# Heckman: via heckit do pyheckit ou statsmodels
+from statsmodels.regression.linear_model import OLS
+# implementação manual via two-step
+\end{lstlisting}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Modelos multinomiais ordenados}
+
+\subsection*{Hayashi}
+
+\begin{lstlisting}
+let m_ol = ologit(y ~ x, df)
+let m_op = oprobit(y ~ x, df)
+let m_ml = mlogit(y ~ x, df)
+\end{lstlisting}
+
+\subsection*{Stata}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg}]
+ologit  y x
+oprobit y x
+mlogit  y x
+\end{lstlisting}
+
+\subsection*{R}
+
+\begin{lstlisting}[language=R, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg},
+  keywordstyle=\color{keyword}\bfseries,
+  stringstyle=\color{string},
+  commentstyle=\color{comment}\itshape]
+library(MASS)
+polr(factor(y) ~ x, method = "logistic")  # ologit
+polr(factor(y) ~ x, method = "probit")    # oprobit
+library(nnet)
+multinom(y ~ x)                           # mlogit
+\end{lstlisting}
+
+\subsection*{Python}
+
+\begin{lstlisting}[language=Python, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg},
+  keywordstyle=\color{keyword}\bfseries,
+  stringstyle=\color{string},
+  commentstyle=\color{comment}\itshape]
+from statsmodels.miscmodels.ordinal_model import OrderedModel
+OrderedModel(y, X, distr='logit').fit()
+OrderedModel(y, X, distr='probit').fit()
+smf.mnlogit('y ~ x', data=df).fit()
+\end{lstlisting}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Regularização (LASSO, Ridge, Elastic Net)}
+
+\subsection*{Hayashi}
+
+\begin{lstlisting}
+let m_las = lasso(y ~ x1+x2+...+x10, df, alpha=0.1)
+let m_rid = ridge_reg(y ~ x1+...+x10, df, alpha=0.5)
+let m_ent = enet(y ~ x1+...+x10, df, alpha=0.5)
+display m_las
+\end{lstlisting}
+
+\subsection*{Stata}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg}]
+// requer Stata 16+
+lasso linear y x1-x10
+cvlasso y x1-x10
+\end{lstlisting}
+
+\subsection*{R}
+
+\begin{lstlisting}[language=R, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg},
+  keywordstyle=\color{keyword}\bfseries,
+  stringstyle=\color{string},
+  commentstyle=\color{comment}\itshape]
+library(glmnet)
+X <- model.matrix(y ~ ., df)[,-1]
+# LASSO (alpha=1), Ridge (alpha=0), Enet (alpha=0.5)
+cv.glmnet(X, df$y, alpha = 1)   # LASSO com CV
+cv.glmnet(X, df$y, alpha = 0)   # Ridge com CV
+cv.glmnet(X, df$y, alpha = 0.5) # Enet com CV
+\end{lstlisting}
+
+\subsection*{Python}
+
+\begin{lstlisting}[language=Python, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg},
+  keywordstyle=\color{keyword}\bfseries,
+  stringstyle=\color{string},
+  commentstyle=\color{comment}\itshape]
+from sklearn.linear_model import Lasso, Ridge, ElasticNet
+Lasso(alpha=0.1).fit(X, y)
+Ridge(alpha=0.5).fit(X, y)
+ElasticNet(alpha=0.1, l1_ratio=0.5).fit(X, y)
+\end{lstlisting}
+
+{\footnotesize \textbf{Nota de escala:} \texttt{alpha} em Hayashi e statsmodels é $\lambda$
+(força de penalização). Em glmnet (R), os dados são padronizados automaticamente
+e \texttt{lambda} é escolhido por validação cruzada. Em scikit-learn, \texttt{alpha}
+é análogo a $\lambda$.}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Análise de sobrevivência}
+
+\subsection*{Hayashi}
+
+\begin{lstlisting}
+let m_km  = km(time, event, df)
+let m_cox = cox(time ~ x, df, event=event)
+display m_cox
+\end{lstlisting}
+
+\subsection*{Stata}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg}]
+stset time, failure(event)
+sts graph              // Kaplan-Meier
+stcox x                // Cox PH
+stcox x, nohr          // coeficientes log-hazard
+\end{lstlisting}
+
+\subsection*{R}
+
+\begin{lstlisting}[language=R, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg},
+  keywordstyle=\color{keyword}\bfseries,
+  stringstyle=\color{string},
+  commentstyle=\color{comment}\itshape]
+library(survival)
+km_fit  <- survfit(Surv(time, event) ~ 1)
+cox_fit <- coxph(Surv(time, event) ~ x)
+summary(cox_fit)
+\end{lstlisting}
+
+\subsection*{Python}
+
+\begin{lstlisting}[language=Python, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg},
+  keywordstyle=\color{keyword}\bfseries,
+  stringstyle=\color{string},
+  commentstyle=\color{comment}\itshape]
+from lifelines import KaplanMeierFitter, CoxPHFitter
+kmf = KaplanMeierFitter().fit(df['time'], df['event'])
+cph = CoxPHFitter().fit(df, 'time', 'event')
+\end{lstlisting}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{SVAR — Cholesky e Blanchard-Quah}
+
+\subsection*{Hayashi}
+
+\begin{lstlisting}
+let m_ch = svar(df, y1, y2, lags=1, id=cholesky)
+let m_bq = svar(df, y1, y2, lags=1, id=longrun)
+let m_ir = sirf(m_ch, steps=12)
+display m_ir
+\end{lstlisting}
+
+\subsection*{Stata}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg}]
+var y1 y2, lags(1)
+// Cholesky (padrao do IRF pos-VAR):
+irf create myirf, step(12) replace
+irf table sirf
+// Blanchard-Quah requer restrições manuais via svar
+matrix A = (1, 0 \ ., 1)
+matrix B = (., 0 \ ., .)
+svar y1 y2, lags(1) aeq(A) beq(B)
+\end{lstlisting}
+
+\subsection*{R}
+
+\begin{lstlisting}[language=R, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg},
+  keywordstyle=\color{keyword}\bfseries,
+  stringstyle=\color{string},
+  commentstyle=\color{comment}\itshape]
+library(vars)
+m <- VAR(cbind(y1, y2), p = 1)
+# Cholesky:
+irf(m, n.ahead = 12, ortho = TRUE)
+# Blanchard-Quah:
+BQ(m)
+\end{lstlisting}
+
+\subsection*{Python}
+
+\begin{lstlisting}[language=Python, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg},
+  keywordstyle=\color{keyword}\bfseries,
+  stringstyle=\color{string},
+  commentstyle=\color{comment}\itshape]
+from statsmodels.tsa.api import VAR
+m  = VAR(df[['y1', 'y2']]).fit(1)
+# Cholesky:
+m.irf(12).orth_ma            # orthogonalized IRF
+# BQ: requer implementação manual em Python
+\end{lstlisting}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Filtros de decomposição}
+
+\subsection*{Hayashi}
+
+\begin{lstlisting}
+hprescott(df, y, lambda=1600)
+baxter_king(df, y, low=6, high=32, k=12)
+stl(df, y, period=12)
+christiano_fitzgerald(df, y, low=6, high=32)
+\end{lstlisting}
+
+\subsection*{Stata}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg}]
+// ssc install hprescott
+hprescott y, smooth(1600)      // HP
+// ssc install bking
+bking y, minperiod(6) maxperiod(32) stub(bk)
+// ssc install cfitzroy
+// stl: via Python/R (nao disponivel nativamente no Stata)
+\end{lstlisting}
+
+\subsection*{R}
+
+\begin{lstlisting}[language=R, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg},
+  keywordstyle=\color{keyword}\bfseries,
+  stringstyle=\color{string},
+  commentstyle=\color{comment}\itshape]
+library(mFilter)
+hp <- hpfilter(y, freq = 1600)
+bk <- bkfilter(y, pl = 6, pu = 32, nfix = 12)
+cf <- cffilter(y, pl = 6, pu = 32)
+library(stats)
+stl(ts(y, frequency=12), s.window="periodic")
+\end{lstlisting}
+
+\subsection*{Python}
+
+\begin{lstlisting}[language=Python, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg},
+  keywordstyle=\color{keyword}\bfseries,
+  stringstyle=\color{string},
+  commentstyle=\color{comment}\itshape]
+from statsmodels.tsa.filters.hp_filter import hpfilter
+from statsmodels.tsa.filters.bk_filter import bkfilter
+from statsmodels.tsa.seasonal import STL
+_, trend = hpfilter(y, lamb=1600)
+cycle_bk = bkfilter(y, low=6, high=32, K=12)
+stl = STL(y, period=12).fit()
+\end{lstlisting}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{PSM e Controle Sintético}
+
+\subsection*{Hayashi}
+
+\begin{lstlisting}
+let m_psm = psm(y ~ d + x1, df, k=1, caliper=0.05, boot=200)
+display m_psm
+
+// Controle Sintético (painel)
+let m_sc = synth("y", 1, 11, df, id="unit", time="year")
+display m_sc
+\end{lstlisting}
+
+\subsection*{Stata}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg}]
+// ssc install psmatch2
+psmatch2 d x1, outcome(y) neighbor(1) caliper(0.05)
+// ssc install synth
+synth y x1, trunit(1) trperiod(11) xperiod(1/10)
+\end{lstlisting}
+
+\subsection*{R}
+
+\begin{lstlisting}[language=R, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg},
+  keywordstyle=\color{keyword}\bfseries,
+  stringstyle=\color{string},
+  commentstyle=\color{comment}\itshape]
+library(MatchIt)
+m <- matchit(d ~ x1, data=df, method="nearest",
+             caliper=0.05)
+library(Synth)
+dataprep.out <- dataprep(...)    # setup
+synth(dataprep.out)
+\end{lstlisting}
+
+\subsection*{Python}
+
+\begin{lstlisting}[language=Python, basicstyle=\ttfamily\small,
+  frame=single, numbers=none, backgroundcolor=\color{codbg},
+  keywordstyle=\color{keyword}\bfseries,
+  stringstyle=\color{string},
+  commentstyle=\color{comment}\itshape]
+# PSM:
+from sklearn.linear_model import LogisticRegression
+# calcular propensity scores e fazer matching manual
+# Controle Sintético:
+# pip install pysynth
+from pysynth import Synth
+\end{lstlisting}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Resumo comparativo}
+
+{\footnotesize\setlength{\tabcolsep}{3pt}%
+\begin{longtable}{lllll}
+\toprule
+\textbf{Tarefa} & \textbf{Hayashi} & \textbf{Stata} & \textbf{R} & \textbf{Python} \\
+\midrule
+\endfirsthead
+\multicolumn{5}{l}{\footnotesize\itshape (continuação)} \\[2pt]
+\toprule
+\textbf{Tarefa} & \textbf{Hayashi} & \textbf{Stata} & \textbf{R} & \textbf{Python} \\
+\midrule
+\endhead
+\midrule
+\multicolumn{5}{r}{\footnotesize\itshape (continua na próxima página)} \\
+\endfoot
+\bottomrule
+\endlastfoot
+%
+\multicolumn{5}{l}{\textit{Regressão}} \\
+OLS             & \texttt{ols()}        & \texttt{reg}          & \texttt{lm()}          & \texttt{smf.ols()} \\
+IV/2SLS         & \texttt{iv()}         & \texttt{ivregress}    & \texttt{ivreg()}       & \texttt{IV2SLS()} \\
+GMM             & \texttt{gmm()}        & \texttt{gmm}          & \texttt{gmm()}         & \texttt{LinearIVGMM()} \\
+WLS             & \texttt{wls()}        & \texttt{vwls}         & \texttt{lm(weights=)}  & \texttt{WLS()} \\
+Rolling OLS     & \texttt{rols()}       & \texttt{rolling()}    & \texttt{rollregres()}  & \texttt{RollingOLS()} \\
+LASSO           & \texttt{lasso()}      & \texttt{lasso linear} & \texttt{glmnet(a=1)}   & \texttt{Lasso()} \\
+Ridge           & \texttt{ridge\_reg()} & —                     & \texttt{glmnet(a=0)}   & \texttt{Ridge()} \\
+Elastic Net     & \texttt{enet()}       & —                     & \texttt{glmnet(a=.5)}  & \texttt{ElasticNet()} \\
+Bootstrap       & \texttt{bootstrap()}  & \texttt{bootstrap:}   & \texttt{boot()}        & \texttt{resample()} \\
+LOWESS          & \texttt{lowess()}     & \texttt{lowess}       & \texttt{lowess()}      & \texttt{lowess()} \\
+Quant. reg.     & \texttt{qreg()}       & \texttt{qreg}         & \texttt{rq()}          & \texttt{QuantReg()} \\
+SUR             & \texttt{sur()}        & \texttt{sureg}        & \texttt{systemfit()}   & \texttt{SUR()} \\
+\midrule
+\multicolumn{5}{l}{\textit{Dados em painel}} \\
+FE (within)     & \texttt{fe()}         & \texttt{xtreg, fe}    & \texttt{plm(within)}   & \texttt{PanelOLS()} \\
+RE (GLS)        & \texttt{re()}         & \texttt{xtreg, re}    & \texttt{plm(random)}   & \texttt{RandomEffects()} \\
+Hausman         & \texttt{hausman()}    & \texttt{hausman}      & \texttt{phtest()}      & manual \\
+AB-GMM          & \texttt{ab()}         & \texttt{xtabond2}     & \texttt{pgmm()}        & \texttt{FirstDifferenceGMM()} \\
+PCSE            & \texttt{pcse()}       & \texttt{xtpcse}       & \texttt{pcse()}        & — \\
+GEE             & \texttt{gee()}        & \texttt{xtgee}        & \texttt{geeglm()}      & \texttt{GEE()} \\
+Mundlak (CRE)   & \texttt{mundlak()}    & manual                & \texttt{mundlak()}     & manual \\
+xtgls           & \texttt{xtgls()}      & \texttt{xtgls}        & \texttt{pggls()}       & — \\
+Modelo misto    & \texttt{mixedlm()}    & \texttt{mixed}        & \texttt{lme4::lmer()}  & \texttt{MixedLM()} \\
+Logit FE        & \texttt{clogit()}     & \texttt{clogit}       & \texttt{clogit()}      & \texttt{ConditionalLogit()} \\
+\midrule
+\multicolumn{5}{l}{\textit{Variáveis dependentes especiais}} \\
+Logit           & \texttt{logit()}      & \texttt{logit}        & \texttt{glm(logit)}    & \texttt{smf.logit()} \\
+Probit          & \texttt{probit()}     & \texttt{probit}       & \texttt{glm(probit)}   & \texttt{smf.probit()} \\
+Logit ordenado  & \texttt{ologit()}     & \texttt{ologit}       & \texttt{polr()}        & \texttt{OrderedModel} \\
+Probit ordenado & \texttt{oprobit()}    & \texttt{oprobit}      & \texttt{polr()}        & \texttt{OrderedModel} \\
+Logit multinom. & \texttt{mlogit()}     & \texttt{mlogit}       & \texttt{multinom()}    & \texttt{MNLogit()} \\
+Poisson         & \texttt{poisson()}    & \texttt{poisson}      & \texttt{glm(poisson)}  & \texttt{smf.poisson()} \\
+Neg. Binomial   & \texttt{nbreg()}      & \texttt{nbreg}        & \texttt{glm.nb()}      & \texttt{smf.negativebinomial()} \\
+Zero-inflated   & \texttt{zinb()}       & \texttt{zinb}         & \texttt{zeroinfl()}    & \texttt{ZeroInflatedNB} \\
+Tobit           & \texttt{tobit()}      & \texttt{tobit}        & \texttt{AER::tobit()}  & manual \\
+Heckman         & \texttt{heckman()}    & \texttt{heckman}      & \texttt{heckit()}      & manual \\
+GLM geral       & \texttt{glm()}        & \texttt{glm}          & \texttt{glm()}         & \texttt{GLM()} \\
+Ef. marginais   & \texttt{margins()}    & \texttt{margins}      & \texttt{margins()}     & \texttt{get\_margeff()} \\
+\midrule
+\multicolumn{5}{l}{\textit{Inferência causal}} \\
+DiD             & \texttt{did()}        & \texttt{diff}         & \texttt{lm()}          & \texttt{smf.ols()} \\
+RDD             & \texttt{rd()}         & \texttt{rdrobust}     & \texttt{rdrobust()}    & \texttt{rdd()} \\
+PSM             & \texttt{psm()}        & \texttt{psmatch2}     & \texttt{matchit()}     & manual \\
+Controle sint.  & \texttt{synth()}      & \texttt{synth}        & \texttt{Synth}         & \texttt{pysynth} \\
+\midrule
+\multicolumn{5}{l}{\textit{Sobrevivência}} \\
+Kaplan-Meier    & \texttt{km()}         & \texttt{sts}          & \texttt{survfit()}     & \texttt{KaplanMeierFitter} \\
+Cox PH          & \texttt{cox()}        & \texttt{stcox}        & \texttt{coxph()}       & \texttt{CoxPHFitter} \\
+\midrule
+\multicolumn{5}{l}{\textit{Séries temporais}} \\
+AR/MA/ARMA      & \texttt{arima()}      & \texttt{arima}        & \texttt{arima()}       & \texttt{ARIMA()} \\
+AR($p$) OLS     & \texttt{autoreg()}    & \texttt{arima}        & \texttt{arima()}       & \texttt{AutoReg()} \\
+ARDL($p$,$q$)   & \texttt{ardl()}       & \texttt{ardl}         & \texttt{dynlm()}       & \texttt{ardl()} \\
+GARCH           & \texttt{garch()}      & \texttt{arch}         & \texttt{garch()}       & \texttt{arch()} \\
+Raiz unit. (ADF) & \texttt{adf()}       & \texttt{dfuller}      & \texttt{adf.test()}    & \texttt{adfuller()} \\
+Phillips-Perron & \texttt{phillips\_perron()} & \texttt{pperron} & \texttt{PP.test()}   & \texttt{PhillipsPerron()} \\
+Zivot-Andrews   & \texttt{zivot()}      & \texttt{zandrews}     & \texttt{ur.za()}       & \texttt{ZivotAndrews()} \\
+Cointegração    & \texttt{johansen()}   & \texttt{vecrank}      & \texttt{ca.jo()}       & \texttt{coint\_johansen} \\
+VAR             & \texttt{var()}        & \texttt{var}          & \texttt{VAR()}         & \texttt{VAR()} \\
+IRF (reduzida)  & \texttt{irf()}        & \texttt{irf create}   & \texttt{irf()}         & \texttt{irf().plot()} \\
+SVAR Cholesky   & \texttt{svar(chol.)}  & \texttt{svar}         & \texttt{id.chol()}     & manual \\
+SVAR BQ         & \texttt{svar(long.)}  & \texttt{svar}         & \texttt{BQ()}          & manual \\
+IRF estrutural  & \texttt{sirf()}       & \texttt{irf create}   & \texttt{irf()}         & manual \\
+Markov Switch.  & \texttt{markov()}     & \texttt{mswitch}      & \texttt{msmFit()}      & \texttt{MarkovRegression} \\
+\midrule
+\multicolumn{5}{l}{\textit{Filtros e decomposição}} \\
+HP              & \texttt{hprescott()}  & \texttt{hprescott}$^*$ & \texttt{hpfilter()}  & \texttt{hpfilter()} \\
+Baxter-King     & \texttt{baxter\_king()} & \texttt{bking}$^*$  & \texttt{bkfilter()}   & \texttt{bkfilter()} \\
+Holt-Winters    & \texttt{holtwinters()} & \texttt{tssmooth}   & \texttt{HoltWinters()} & \texttt{ExponentialSmoothing()} \\
+STL             & \texttt{stl()}        & —                     & \texttt{stl()}         & \texttt{STL()} \\
+CF filter       & \texttt{christiano\_fitzgerald()} & \texttt{cfitzroy} & \texttt{cffilter()} & — \\
+\midrule
+\multicolumn{5}{l}{\textit{Análise multivariada}} \\
+PCA             & \texttt{pca()}        & \texttt{pca}          & \texttt{prcomp()}      & \texttt{PCA()} \\
+Análise fatorial & \texttt{factor()}    & \texttt{factor}       & \texttt{factanal()}    & \texttt{FactorAnalysis()} \\
+Cor. canônica   & \texttt{cancorr()}    & \texttt{canon}        & \texttt{cancor()}      & \texttt{CCA()} \\
+MANOVA          & \texttt{manova()}     & \texttt{manova}       & \texttt{manova()}      & \texttt{MANOVA()} \\
+\midrule
+\multicolumn{5}{l}{\textit{Inferência e testes}} \\
+Teste $t$       & \texttt{ttest()}      & \texttt{ttest}        & \texttt{t.test()}      & \texttt{ttest\_ind()} \\
+ANOVA           & \texttt{anova()}      & \texttt{anova}        & \texttt{aov()}         & \texttt{f\_oneway()} \\
+Kruskal-Wallis  & \texttt{kruskal\_wallis()} & \texttt{kwallis} & \texttt{kruskal.test()} & \texttt{kruskal()} \\
+Normalidade     & \texttt{swilk()}      & \texttt{swilk}        & \texttt{shapiro.test()} & \texttt{shapiro()} \\
+Tabela          & \texttt{esttab()}     & \texttt{esttab}$^\dagger$ & \texttt{stargazer()} & \texttt{summary\_col()} \\
+\end{longtable}}
+
+\noindent
+$^*$ HP e BK no Stata requerem \texttt{ssc install hprescott} e \texttt{ssc install bking}.\\
+$^\dagger$ \texttt{esttab} no Stata requer \texttt{ssc install estout}.\\[4pt]
+\noindent\textbf{Nota sobre \texttt{rnormal()}:} em Hayashi, gera $U(0,1)$, \emph{não} $N(0,1)$.
+Ao replicar DGPs em outras plataformas, substitua por \texttt{runiform()} (Stata),
+\texttt{runif()} (R) ou \texttt{np.random.uniform()} (Python).

@@ -1,0 +1,29 @@
+// Cap 44 — Filtros e Decomposição de Séries Temporais
+// HP filter, Baxter-King, Holt-Winters (ETS)
+// DGP: série com tendência + ciclo + sazonalidade + ruído
+
+seed(42)
+input df
+id
+1
+end
+for i in 1..=9 { df = append(df, df) }
+df |> filter(_n <= 120)  // 10 anos de dados mensais
+generate df t = _n
+generate df trend = 0.05 * t           // tendência linear
+generate df cycle = 0.5 * sin(t * 3.14159 / 12)  // ciclo anual
+generate df season = 0.3 * sin(t * 3.14159 / 6)  // sazonalidade semestral
+generate df noise = (rnormal() - 0.5) * 0.3
+generate df y = 10.0 + trend + cycle + season + noise
+
+// Hodrick-Prescott: lambda=1600 (trimestral) — separa tendência do ciclo
+hprescott(df, y, lambda=1600)
+display df
+
+// Baxter-King: passa-banda para ciclos de 6-32 períodos (business cycle)
+baxter_king(df, y, low=6, high=32, k=12)
+display df
+
+// Holt-Winters: suavização exponencial com tendência e sazonalidade
+let m_hw = holtwinters(df, y, trend=add, seasonal=add, period=12)
+display m_hw
