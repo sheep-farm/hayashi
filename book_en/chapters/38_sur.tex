@@ -1,0 +1,115 @@
+\chapter{Seemingly Unrelated Regressions}
+\label{cap:sur}
+% ── index ──────────────────────────────────────────────────────
+\index{SUR|textbf}
+\index{seemingly unrelated regressions|see{SUR}}
+\index{Zellner, estimator|textbf}
+\index{sur@\texttt{sur()}|textbf}
+\index{efficiency, gain of}
+\index{contemporaneous correlation}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{The Zellner Estimator}
+
+When estimating a system of $M$ equations with the same (or different)
+regressors and errors are correlated across equations, equation-by-equation
+OLS is inefficient. Zellner's (1962) \textbf{SUR} (\emph{Seemingly Unrelated
+Regressions}) estimator exploits this correlation via joint GLS.
+
+System of $M$ equations:
+\[
+  y_m = X_m\,\beta_m + \varepsilon_m, \quad m = 1,\ldots,M
+\]
+
+Stacking: $Y = X\beta + \varepsilon$, with $E[\varepsilon\varepsilon'] = \Sigma \otimes I_n$,
+where $\Sigma$ is the cross-equation covariance matrix ($M \times M$).
+
+The joint GLS estimator:
+\[
+  \hat\beta_{\mathrm{SUR}} = (X'(\Sigma^{-1}\otimes I)X)^{-1}\,X'(\Sigma^{-1}\otimes I)\,Y
+\]
+
+\textbf{Efficiency gain}: SUR $\geq$ OLS when $\Sigma$ has non-zero off-diagonal
+elements — i.e., when equation errors are correlated. If $\Sigma$ is diagonal
+or if the regressors are identical, SUR $=$ OLS.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{DGP Verification}
+
+DGP with two strongly correlated errors ($\rho = 0{,}7$):
+
+\[
+  y_1 = 1 + 2\,x_1 + \varepsilon_1 \qquad y_2 = 0{,}5 + 1{,}5\,x_2 + \varepsilon_2
+\]
+\[
+  \mathrm{Cov}(\varepsilon_1, \varepsilon_2) = 0{,}7\,\sigma_1\,\sigma_2
+\]
+
+\begin{lstlisting}[caption={SUR DGP and comparison with equation-by-equation OLS}]
+seed(42)
+generate df x1 = rnormal()
+generate df x2 = rnormal()
+generate df e1 = (rnormal() - 0.5) * 1.7321
+generate df e2 = 0.7 * e1 + 0.7141 * (rnormal() - 0.5) * 1.7321
+generate df y1 = 1.0 + 2.0 * x1 + e1
+generate df y2 = 0.5 + 1.5 * x2 + e2
+
+let m_ols1 = ols(y1 ~ x1, df)
+let m_ols2 = ols(y2 ~ x2, df)
+esttab(m_ols1, m_ols2)
+
+let m_sur = sur(df, y1 ~ x1, y2 ~ x2)
+display m_sur
+\end{lstlisting}
+
+\subsection*{Equation-by-Equation OLS}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+                            (1)              (2)
+                            OLS              OLS
+────────────────────────────────────────────────
+x1                    2.1956***
+                       (0.0788)
+x2                                     1.5097***
+                                        (0.0779)
+Constant              0.9050***        0.4879***
+────────────────────────────────────────────────
+N                           500              500
+R²                       0.6091           0.4300
+\end{lstlisting}
+
+\subsection*{SUR}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+══════════════════════════════════════════════════════════════════════════════
+               Seemingly Unrelated Regressions (SUR)
+         Cross-Equation Error Correlation (Σ):
+  [  0.2463   0.1689 ]
+  [  0.1689   0.2419 ]
+────────────────────────────────────────────────
+ Equation: y1  —  const=0.9513  x1=2.1003***   R²=0.6080
+ Equation: y2  —  const=0.4591  x2=1.5653***   R²=0.4294
+══════════════════════════════════════════════════════════════════════════════
+\end{lstlisting}
+
+The estimated correlation between errors is $\hat\Sigma_{12}/\sqrt{\hat\Sigma_{11}\hat\Sigma_{22}} = 0{,}169/\sqrt{0{,}246 \times 0{,}242} \approx 0{,}69$, close to the true $0{,}7$. SUR gains efficiency by reducing SEs: $\hat\sigma_{\mathrm{SUR}}(x_1) < \hat\sigma_{\mathrm{OLS}}(x_1)$.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Syntax}
+
+\begin{lstlisting}
+sur(df, y1 ~ x1 + x2, y2 ~ x3 + x4)
+sur(df, y1 ~ x1, y2 ~ x2, y3 ~ x3)        // 3 equations
+\end{lstlisting}
+
+The first argument is the DataFrame; the remaining arguments are formulas (one per equation).
+
+\begin{nota}
+  If all equations have the same regressors, SUR = OLS and there is no
+  efficiency gain. The gain is maximized when the regressors are orthogonal
+  across equations and the cross-equation error correlation is high.
+\end{nota}

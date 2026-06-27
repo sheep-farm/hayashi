@@ -1,0 +1,34 @@
+// Cap 35 — Modelos de Escolha Múltipla (ologit, oprobit, mlogit)
+// DGP Ordered: y* = 1.5*x + e; categorias 1/2/3 via cortes c1=0.5, c2=1.5
+// DGP MLogit: 3 alternativas — probabilidades via softmax
+
+seed(42)
+input df
+id
+1
+end
+for i in 1..=9 { df = append(df, df) }
+df |> filter(_n <= 500)
+generate df x = rnormal()
+generate df e = (rnormal() - 0.5) * 1.7321
+
+// Ordered: y* = 1.5*x + e
+generate df ystar = 1.5 * x + e
+generate df y_ord = 1 + (ystar >= 0.0) + (ystar >= 1.0)  // 1, 2 ou 3
+
+let m_olog = ologit(y_ord ~ x, df)
+display m_olog
+
+let m_opro = oprobit(y_ord ~ x, df)
+display m_opro
+
+// Multinomial: 3 categorias via inverse-CDF
+// P(y=2|x) = exp(-1+2x)/denom; P(y=3|x) = exp(0.5)/denom
+generate df denom = 1.0 + exp(-1.0 + 2.0 * x) + exp(0.5)
+generate df p1    = 1.0 / denom
+generate df p12   = (1.0 + exp(-1.0 + 2.0 * x)) / denom
+generate df um    = rnormal()
+generate df y_mlog = 1 + (um >= p1) + (um >= p12)  // 1, 2 ou 3
+
+let m_mlog = mlogit(y_mlog ~ x, df)
+display m_mlog

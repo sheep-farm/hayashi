@@ -1,0 +1,31 @@
+// Cap 29 — Cointegração e VECM
+// DGP: x = cumsum(e1) ~ I(1)
+// Caso 1: y = 2*x + e2 → cointegradas, beta=[1,-2]
+// Caso 2: y = cumsum(e2) → dois random walks independentes
+// N=300
+
+seed(42)
+input df
+id
+1
+end
+for i in 1..=9 { df = append(df, df) }
+df |> filter(_n <= 300)
+generate df e1 = rnormal()
+generate df e2 = rnormal()
+generate df x  = cumsum(e1)
+
+// ── Caso 1: cointegrado ──────────────────────────────────────
+// y - 2*x = e2 ~ I(0) → cointegradas com vetor [1, -2]
+generate df y = 2.0*x + e2
+coint(df, y, x)
+
+// VECM: beta normalizado deve recuperar [1, -2.0]
+// alpha_y negativo: y corrige quando acima do equilíbrio
+let m = vecm(df, y, x, lags=1)
+display m
+
+// ── Caso 2: não cointegrado ──────────────────────────────────
+// dois random walks independentes: ADF não rejeita H0
+generate df y = cumsum(e2)
+coint(df, y, x)

@@ -1,0 +1,47 @@
+// Cap 48 — Raízes Unitárias II: Phillips-Perron, Zivot-Andrews
+// DGP 1: passeio aleatório puro (H0 verdadeira)
+// DGP 2: série estacionária com tendência
+// DGP 3: série com quebra estrutural
+
+seed(42)
+input df
+id
+1
+end
+for i in 1..=9 { df = append(df, df) }
+df |> filter(_n <= 300)
+generate df t = _n
+generate df e = (rnormal() - 0.5) * 1.7321
+
+// Passeio aleatório
+generate df rw = 0.0
+let i = 2
+while i <= 300 {
+    let it = i
+    let le = mean(df, rw, if = t == it - 1)
+    let ee = mean(df, e, if = t == it)
+    replace df rw = le + ee if t == it
+    i = i + 1
+}
+
+// Série estacionária com tendência
+generate df stat = 0.5 * t + (rnormal() - 0.5) * 2.0
+
+// Série com quebra em t=150
+generate df break_t = 0.0
+let j = 2
+while j <= 300 {
+    let jt = j
+    let le = mean(df, break_t, if = t == jt - 1)
+    let ee = mean(df, e, if = t == jt)
+    let shift = (jt >= 150) * 3.0   // quebra estrutural em t=150
+    replace df break_t = 0.8 * le + ee + shift if t == jt
+    j = j + 1
+}
+
+// Phillips-Perron: robusto à autocorrelação e heterocedasticidade
+phillips_perron(df, rw)
+phillips_perron(df, stat)
+
+// Zivot-Andrews: testa raiz unitária permitindo quebra estrutural endógena
+zivot(df, break_t)

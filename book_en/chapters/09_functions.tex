@@ -1,0 +1,129 @@
+\chapter{Functions}
+
+\section{Declaration}
+
+Functions are declared with \lstinline{fn}:
+
+\begin{lstlisting}[caption={Basic function}]
+fn square(x) {
+  return x^2
+}
+
+display square(5)    // 25
+\end{lstlisting}
+
+\subsection*{Implicit return}
+
+The last expression in a function is returned automatically:
+
+\begin{lstlisting}
+fn square(x) {
+  x^2    // implicit return
+}
+\end{lstlisting}
+
+\subsection*{Multiple parameters}
+
+\begin{lstlisting}
+fn mean(a, b) {
+  (a + b) / 2.0
+}
+
+display mean(10, 20)    // 15.0
+\end{lstlisting}
+
+\section{Functions as values}
+
+Functions are first-class values — they can be assigned to variables,
+passed as arguments, and returned by other functions:
+
+\begin{lstlisting}[caption={Function as argument}]
+fn apply(f, x) {
+  f(x)
+}
+
+fn double(n) { n * 2 }
+
+display apply(double, 7)    // 14
+\end{lstlisting}
+
+\section{Closures}
+
+Closures are anonymous functions that capture the environment where they
+were defined:
+
+\begin{lstlisting}[caption={Basic closure}]
+let multiplier = fn(factor) {
+  fn(x) { x * factor }    // captures 'factor'
+}
+
+let triple = multiplier(3)
+display triple(10)    // 30
+\end{lstlisting}
+
+\subsection*{Closures as arguments}
+
+\begin{lstlisting}
+fn apply_two(f, a, b) {
+  f(a) + f(b)
+}
+
+let sum_of_squares = apply_two(fn(x) { x^2 }, 3, 4)
+display sum_of_squares    // 9 + 16 = 25
+\end{lstlisting}
+
+\section{Recursion}
+
+Functions can call themselves:
+
+\begin{lstlisting}[caption={Recursive factorial}]
+fn fact(n) {
+  if n <= 1 { return 1 }
+  n * fact(n - 1)
+}
+
+display fact(10)    // 3628800
+\end{lstlisting}
+
+\begin{nota}
+  \hayashi{} does not optimise tail calls. For long sequences, prefer
+  loops.
+\end{nota}
+
+\section{Optional parameters and defaults}
+
+\hayashi{} has no native optional parameters, but the idiomatic pattern is
+to use \lstinline{nil} as a sentinel and check explicitly:
+
+\begin{lstlisting}
+fn format_val(value, digits) {
+  let d = if digits == nil { 2 } else { digits }
+  // ...
+}
+\end{lstlisting}
+
+\section{Function scope}
+
+Functions declared with \lstinline{fn} at module level are available
+throughout the file. Functions declared inside blocks are local to that
+block:
+
+\begin{lstlisting}
+{
+  fn local(x) { x + 1 }
+  display local(5)    // 6
+}
+display local(5)    // error: undefined function 'local'
+\end{lstlisting}
+
+\section{\texttt{const} inside functions}
+
+\lstinline{const} can be used inside functions to fix values that should
+not change during execution:
+
+\begin{lstlisting}
+fn bmi(weight, height) {
+  const FORMULA = "weight / height^2"
+  weight / height^2
+}
+\end{lstlisting}

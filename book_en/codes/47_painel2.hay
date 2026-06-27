@@ -1,0 +1,36 @@
+// Cap 47 — Painel II: feiv, clogit, mundlak, xtgls, mixedlm
+seed(42)
+input df
+id
+1
+end
+for i in 1..=10 { df = append(df, df) }
+df |> filter(_n <= 1000)
+generate df unit  = (_n - 1) % 50 + 1
+generate df t     = (_n - (_n - 1) % 50 - 1) / 50 + 1
+generate df alpha = unit * 0.05
+generate df z     = (rnormal() - 0.5) * 1.7321
+generate df x     = 0.5 * z + alpha + (rnormal() - 0.5)
+generate df e     = (rnormal() - 0.5) * 1.7321
+generate df y     = 1.0 + 2.0 * x + alpha + e
+
+// FE com efeitos fixos padrão (referência para comparação)
+let m_fe = fe(y ~ x, df, id=unit)
+display m_fe
+
+// Mundlak: media de x por grupo → controla efeito individual (CRE)
+let m_mund = mundlak(df, y ~ x, id="unit")
+display m_mund
+
+// xtgls: GLS para painel com heterocedasticidade entre painéis
+let m_gls = xtgls(y ~ x, df, id=unit, time=t)
+display m_gls
+
+// mixedlm: modelo misto (intercept aleatório por unidade)
+let m_mix = mixedlm(y ~ x, df, id="unit")
+display m_mix
+
+// clogit: logit com efeitos fixos (conditional logit)
+generate df yb = (y > 2.5)
+let m_cl = clogit(yb ~ x, df, group="unit")
+display m_cl

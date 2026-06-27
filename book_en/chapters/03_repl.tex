@@ -1,0 +1,88 @@
+\chapter{The REPL}
+
+\section{What is the REPL}
+
+The REPL (\textit{Read-Eval-Print Loop}) is the interactive mode of
+\hayashi{}. Each line typed is evaluated immediately and the result is
+displayed. It is the ideal environment for exploring data, testing
+expressions, and prototyping analyses.
+
+\begin{lstlisting}[style=inline, language=sh]
+hay
+\end{lstlisting}
+
+\begin{lstlisting}[style=inline]
+Hayashi 0.2.4  — Applied Econometrics Language
+In honor of Fumio Hayashi. Type 'exit' or Ctrl-D to quit.
+
+hay>
+\end{lstlisting}
+
+\section{Exiting the REPL}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Command} & \textbf{Effect} \\
+\midrule
+\texttt{exit}   & Exit the REPL \\
+\texttt{Ctrl-D} & Exit the REPL (EOF) \\
+\texttt{Ctrl-C} & Cancel the current line \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Navigation and history}
+
+The REPL uses \texttt{rustyline} and supports:
+
+\begin{itemize}
+  \item Up/down arrow: command history
+  \item \texttt{Ctrl-R}: history search
+  \item \texttt{Ctrl-A} / \texttt{Ctrl-E}: beginning/end of line
+  \item \texttt{Ctrl-C}: cancel the current line
+  \item \texttt{Ctrl-D}: exit the REPL (equivalent to \texttt{exit})
+\end{itemize}
+
+History is persisted across sessions in \texttt{\$HOME/.hay\_history}.
+
+\section{Expressions in the REPL}
+
+Any valid expression can be typed directly:
+
+\begin{lstlisting}[caption={Basic interactive session}]
+hay> 2 + 2
+4
+
+hay> let x = 10
+hay> x * 3
+30
+
+hay> let s = "hello, world"
+hay> s
+"hello, world"
+\end{lstlisting}
+
+\section{Running scripts}
+
+\texttt{.hay} scripts are text files with one statement per line.
+To run one:
+
+\begin{lstlisting}[style=inline, language=sh]
+hay analysis.hay
+\end{lstlisting}
+
+Output goes to \texttt{stdout}. Errors go to \texttt{stderr}.
+
+\section{Error format}
+
+\hayashi{} displays errors with visual context:
+
+\begin{lstlisting}[style=inline]
+error: line 3: undefined variable 'y' — did you mean 'x'?
+   3 | display y + 1
+     | ^^^^^^^^^^^^^
+\end{lstlisting}
+
+The code snippet, line number, and suggestion (when available) make
+correction straightforward without having to count lines manually.

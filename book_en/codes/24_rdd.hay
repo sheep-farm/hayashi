@@ -1,0 +1,22 @@
+// Cap 24 — Regressão com Descontinuidade (RDD Sharp)
+// DGP: x ~ Uniforme(-1,1); cutoff=0; tau verdadeiro=2.0
+// y = 1.0 + 0.5*x + 2.0*D,  D = (x >= 0)
+
+seed(42)
+input df
+id
+1
+end
+for i in 1..=10 { df = append(df, df) }
+df |> filter(_n <= 1000)
+generate df x = runiform() * 2 - 1
+generate df d = x >= 0
+
+// sem ruído: recuperação exata
+generate df y = 1.0 + 0.5*x + 2.0*d
+rd(y ~ x, 0.0, df)
+
+// com ruído: LATE identificado, bandwidth encolhe
+generate df e = rnormal()
+generate df y = 1.0 + 0.5*x + 2.0*d + e
+rd(y ~ x, 0.0, df)

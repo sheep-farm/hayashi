@@ -1,0 +1,71 @@
+\chapter{Installation}
+
+\section{Requirements}
+
+\hayashi{} is distributed as a static binary for Linux, macOS, and
+Windows. There are no runtime dependencies: the \hay{} executable is
+self-contained.
+
+\begin{itemize}
+  \item Linux x86-64 or ARM64
+  \item macOS 12+ (Intel or Apple Silicon)
+  \item Windows 10+ (x86-64)
+\end{itemize}
+
+\section{Via Cargo (recommended)}
+
+If Rust is installed:
+
+\begin{lstlisting}[style=inline, language=sh]
+cargo install hayashi-lang
+\end{lstlisting}
+
+The \texttt{hay} binary will be installed in \texttt{\$HOME/.cargo/bin}.
+Make sure that directory is on your \texttt{PATH}.
+
+\begin{lstlisting}[style=inline, language=sh]
+hay --version
+\end{lstlisting}
+
+\section{Pre-compiled binaries}
+
+Available on the repository releases page:
+\url{https://github.com/sheep-farm/hayashi/releases}
+
+Download the archive for your platform, extract it, and place the
+\texttt{hay} binary in any directory on your \texttt{PATH}.
+
+\section{Building from source}
+
+\begin{lstlisting}[style=inline, language=sh]
+git clone https://github.com/sheep-farm/hayashi
+cd hayashi
+cargo build --release
+# binary at target/release/hay
+\end{lstlisting}
+
+\section{Verifying the installation}
+
+\begin{lstlisting}[style=inline, language=sh]
+hay --version
+hay --help
+\end{lstlisting}
+
+To run a script:
+
+\begin{lstlisting}[style=inline, language=sh]
+hay my_script.hay
+\end{lstlisting}
+
+To enter the interactive REPL:
+
+\begin{lstlisting}[style=inline, language=sh]
+hay
+\end{lstlisting}
+
+\begin{nota}
+  On Arch Linux with Omarchy/Hyprland, \texttt{\$HOME/.cargo/bin} is
+  usually on the \texttt{PATH} if the shell was configured with
+  \texttt{rustup}. Otherwise, add to \texttt{.bashrc} or \texttt{.zshrc}:
+  \texttt{export PATH="\$HOME/.cargo/bin:\$PATH"}
+\end{nota}

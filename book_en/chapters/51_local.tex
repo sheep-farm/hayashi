@@ -1,0 +1,108 @@
+\chapter{Local and Weighted Estimation}
+\label{cap:local}
+% ── index ───────────────────────────────────────────────────────
+\index{weighted least squares|textbf}
+\index{WLS|see{weighted least squares}}
+\index{wls@\texttt{wls()}|textbf}
+\index{rolling OLS|textbf}
+\index{rols@\texttt{rols()}|textbf}
+\index{LOWESS|textbf}
+\index{lowess@\texttt{lowess()}|textbf}
+\index{local estimation|textbf}
+\index{nonparametric smoothing}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Weights, windows and smoothing}
+
+Classical estimation (OLS, MLE) treats each observation symmetrically.
+Three alternatives allow the model to adapt locally:
+
+\begin{description}
+  \item[WLS] Weighted least squares: observations with lower variance
+    (or greater relevance) receive higher weight.
+
+  \item[Rolling OLS] Estimates the model in sliding time windows,
+    revealing how coefficients evolve over time.
+
+  \item[LOWESS] Nonparametric smoothing: for each point $x_0$, fits
+    a locally weighted regression using nearby neighbors.
+\end{description}
+
+\subsection*{WLS (Weighted Least Squares)}
+
+The WLS estimator minimizes:
+\[
+  \hat{\beta}_{WLS} = \arg\min_\beta \sum_{i=1}^n w_i (y_i - x_i'\beta)^2
+  = (X'WX)^{-1} X'Wy
+\]
+where $W = \text{diag}(w_1, \ldots, w_n)$. If the weights are proportional to
+$1/\sigma_i^2$ (error variances), WLS is the efficient estimator under
+heteroscedasticity (= GLS for independent errors).
+
+\subsection*{Rolling OLS}
+
+For time series non-stationary in parameters (time-varying coefficients),
+rolling OLS with window $h$ estimates:
+\[
+  \hat{\beta}_t = (X_{t-h:t}' X_{t-h:t})^{-1} X_{t-h:t}' Y_{t-h:t}
+\]
+
+\subsection*{LOWESS}
+
+LOWESS (Cleveland 1979) estimates $m(x_0) = E[y | x = x_0]$ locally:
+\begin{enumerate}
+  \item Selects the $f \cdot n$ nearest neighbors of $x_0$
+  \item Applies tricubic weights: $w_i = (1 - |d_i|^3)^3$
+  \item Fits a weighted regression (linear or constant)
+  \item Iterates with robust reweighting (optional)
+\end{enumerate}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{DGP Verification}
+
+DGP: heteroscedastic error $\varepsilon_i \propto (1 + x_i)$; small
+coefficient on $t$ (0{,}01). $N = 300$ observations.
+
+\begin{lstlisting}[caption={WLS, Rolling OLS, LOWESS}]
+seed(42)
+generate df w = exp(-0.002 * t)        // weight: more recent observations more relevant
+generate df e = (rnormal()-0.5)*2*(1+x)  // heteroscedasticity in x
+generate df y = 1.0 + 2.0*x + 0.01*t + e
+
+let m_ols = ols(y ~ x, df)
+let m_wls = wls(y ~ x, df, weights="w")
+let m_rol = rols(y ~ x + t, df, window=50)
+lowess(df, y, x, frac=0.3)
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small, frame=none,
+  numbers=none, backgroundcolor=\color{codbg}]
+OLS:  const=2.362, x=2.263***  (ignores heteroscedasticity)
+WLS:  const=2.212, x=2.257***  (weights correct growing variance)
+Rolling OLS (last window t=251..300):
+  const=1.898, x=2.411, t=0.006
+LOWESS: frac=0.30, 300 obs  →  y_hat_lowess added to df
+\end{lstlisting}
+
+WLS changes the coefficients only slightly here — temporal weights compensate for
+the error growth in $x$ only partially. Rolling OLS reveals that the
+coefficient of $x$ in the last window (2{,}41) is slightly higher, suggesting
+mild non-stationarity.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Syntax}
+
+\begin{lstlisting}
+wls(y ~ x, df, weights="weight_column")      // WLS
+rols(y ~ x + t, df, window=50)               // Rolling OLS
+rolling(y ~ x + t, df, window=50)            // alias
+lowess(df, y_var, x_var, frac=0.67, it=3)   // LOWESS
+\end{lstlisting}
+
+\begin{nota}
+  LOWESS receives the dependent variable \textbf{before} the
+  independent one: \texttt{lowess(df, y, x)}. This differs from
+  conventional regressions. The parameter \texttt{frac} (fraction of neighbors used at
+  each point) controls smoothing: smaller values $\to$ noisier curve;
+  larger values $\to$ smoother.
+\end{nota}

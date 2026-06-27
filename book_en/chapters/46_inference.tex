@@ -1,0 +1,139 @@
+\chapter{Classical Inference}
+\label{cap:inferencia}
+% ── index ───────────────────────────────────────────────────────
+\index{t-test|textbf}
+\index{ttest@\texttt{ttest()}|textbf}
+\index{ANOVA|textbf}
+\index{anova@\texttt{anova()}|textbf}
+\index{Kruskal-Wallis, test of|textbf}
+\index{kruskal_wallis@\texttt{kruskal\_wallis()}|textbf}
+\index{Welch, test of|textbf}
+\index{nonparametric, test}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Parametric and non-parametric hypothesis tests}
+
+The tests presented in this chapter answer the question: \emph{are the data
+consistent with a hypothesis about the population distribution?}
+
+\subsection*{Student's t-test}
+
+For a sample of size $n$ with unknown variance, the statistic:
+\[
+  t = \frac{\bar{x} - \mu_0}{s / \sqrt{n}} \sim t_{n-1}
+\]
+tests $H_0: \mu = \mu_0$. For two independent samples, Welch's test
+uses approximate degrees of freedom by the Satterthwaite method, without
+assuming homoscedasticity.
+
+\subsection*{One-way ANOVA}
+
+Generalizes the $t$-test to $K > 2$ groups. Decomposes total variation:
+\[
+  \text{SS}_{\text{total}} = \text{SS}_{\text{between}} + \text{SS}_{\text{within}}
+\]
+\[
+  F = \frac{\text{SS}_{\text{between}} / (K-1)}{\text{SS}_{\text{within}} / (N-K)}
+  \sim F_{K-1,\, N-K}
+\]
+$H_0$: all group means are equal.
+
+\subsection*{Kruskal-Wallis}
+
+Non-parametric alternative to one-way ANOVA. Replaces observations with
+\emph{ranks} and compares rank sums across groups. Statistic:
+\[
+  H = \frac{12}{N(N+1)} \sum_{k=1}^K \frac{R_k^2}{n_k} - 3(N+1) \sim \chi^2_{K-1}
+\]
+valid even without normality, as long as the distributions have a similar shape.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{DGP Verification}
+
+DGP with 3 groups of different sizes; the expected value increases linearly
+with the group. $N=300$, $\sigma = 1$.
+
+\begin{lstlisting}[caption={Hypothesis tests}]
+seed(42)
+...
+generate df g   = (_n <= 150) * 1 + (_n > 150) * 2
+generate df yg  = 2.0 + e + (g - 1) * 0.5  // g=1: mu=2.0, g=2: mu=2.5
+
+// One-sample t-test: H0: mu = 2.0
+ttest(df, y, mu=2.0)
+
+// Two-sample t-test (Welch): H0: mu(g1) = mu(g2)
+ttest(df, yg, by=g)
+
+// Paired: before vs after
+ttest(df, y_antes, y_depois, paired=true)
+
+// ANOVA: H0: mu1 = mu2 = mu3
+anova(df, y3, by=k)
+
+// Kruskal-Wallis (non-parametric)
+kruskal_wallis(df, y3, by=k)
+\end{lstlisting}
+
+\subsection*{t-test — one sample}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small, frame=none,
+  numbers=none, backgroundcolor=\color{codbg}]
+One-sample t-test: y   H0: mean = 2.0
+t = -0.6946   df = 299   p = 0.4879
+\end{lstlisting}
+
+Does not reject $H_0$ — sample mean 1{,}98 is compatible with 2{,}0.
+
+\subsection*{t-test — two groups (Welch)}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small, frame=none,
+  numbers=none, backgroundcolor=\color{codbg}]
+Two-sample t-test (Welch): yg by g
+  group 1: n=150  mean=1.971  SE=0.040
+  group 2: n=150  mean=2.489  SE=0.041
+Welch's t = -9.0552   df = 297.38   p = 0.0000
+\end{lstlisting}
+
+Rejects $H_0$: difference of 0{,}52 $\approx$ true difference of 0{,}50.
+
+\subsection*{ANOVA}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small, frame=none,
+  numbers=none, backgroundcolor=\color{codbg}]
+=========================== One-Way ANOVA ============================
+Source           SS     df      MS         F       P>F
+----------------------------------------------------------------------
+Between       51.195     2   25.597   104.037   0.0000
+Within        73.074   297    0.246
+Total        124.269   299
+\end{lstlisting}
+
+$F = 104{,}0$, $p < 0{,}001$: rejects $H_0$ decisively.
+
+\subsection*{Kruskal-Wallis}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small, frame=none,
+  numbers=none, backgroundcolor=\color{codbg}]
+H = 120.38   df = 2   p = 0.0000
+\end{lstlisting}
+
+Confirms the ANOVA without assuming normality.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Syntax}
+
+\begin{lstlisting}
+ttest(df, var, mu=0.0)                  // one sample
+ttest(df, var, by=group)               // two groups (Welch)
+ttest(df, var1, var2, paired=true)     // paired
+anova(df, var, by=group)               // one-way ANOVA
+kruskal_wallis(df, var, by=group)      // Kruskal-Wallis
+\end{lstlisting}
+
+\begin{nota}
+  Welch's test does not assume homoscedasticity and is preferable to the
+  classical Student's $t$-test in almost all practical cases. The loss of power
+  is negligible when variances are equal; the gain when they differ
+  is substantial.
+\end{nota}

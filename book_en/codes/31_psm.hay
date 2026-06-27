@@ -1,0 +1,33 @@
+// Cap 31 — PSM: Propensity Score Matching
+// DGP: seleção em observáveis via X1
+// P(D=1|X1) = 0.3 + 0.4*X1  ∈ [0.30, 0.70]  — boa sobreposição
+// Y = 1 + 2*D + 3*X1 + e   →  ATT verdadeiro = 2
+
+seed(42)
+input df
+id
+1
+end
+for i in 1..=10 { df = append(df, df) }
+df |> filter(_n <= 1000)
+generate df x1 = rnormal()
+generate df u  = rnormal()
+generate df d  = (0.3 + 0.4*x1) > u
+generate df e  = rnormal()
+generate df y  = 1.0 + 2.0*d + 3.0*x1 + e
+
+// OLS ingênuo: viesado por confusão de x1
+let m_ols = ols(y ~ d, df)
+display m_ols
+
+// OLS controlando x1: não viesado
+let m_adj = ols(y ~ d + x1, df)
+display m_adj
+
+// PSM 1:1 sem reposição, sem caliper
+let m_psm = psm(y ~ d + x1, df, k=1, boot=200)
+display m_psm
+
+// PSM com caliper 0.05
+let m_cal = psm(y ~ d + x1, df, k=1, caliper=0.05, boot=200)
+display m_cal
