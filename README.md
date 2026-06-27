@@ -2,7 +2,7 @@
 
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-2021-orange.svg)](https://www.rust-lang.org)
-[![Version](https://img.shields.io/badge/version-0.2.3-green.svg)](Cargo.toml)
+[![Version](https://img.shields.io/badge/version-0.2.4-green.svg)](Cargo.toml)
 [![crates.io](https://img.shields.io/crates/v/hayashi-lang.svg)](https://crates.io/crates/hayashi-lang)
 [![CI](https://github.com/sheep-farm/hayashi/actions/workflows/ci.yml/badge.svg)](https://github.com/sheep-farm/hayashi/actions/workflows/ci.yml)
 
