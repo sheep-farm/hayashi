@@ -1,0 +1,192 @@
+\chapter{Cointegration and VECM}
+\label{cap:coint}
+% ── index ──────────────────────────────────────────────────────
+\index{cointegration|textbf}
+\index{VECM|textbf}
+\index{error correction model|see{VECM}}
+\index{Johansen, test|textbf}
+\index{johansen@\texttt{johansen()}|textbf}
+\index{vecm@\texttt{vecm()}|textbf}
+\index{long-run relationship}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Long-run Relationship Between I(1) Series}
+
+Two $I(1)$ series are \textbf{cointegrated} if there exists a linear combination
+between them that is $I(0)$. Formally, $y_t$ and $x_t$ are cointegrated if
+there exists $\beta$ such that:
+\[
+  u_t = y_t - \beta x_t \sim I(0)
+\]
+
+The intuition is that of a \emph{leash}: series that individually follow
+random walks may be attracted by a long-run equilibrium force. Asset prices
+in the same market, exchange rates and purchasing power parity, short- and
+long-term interest rates are classic examples.
+
+Non-cointegrated $I(1)$ series diverge indefinitely — level regression produces
+\textbf{spurious regression}: high $R^2$ and significant $t$-statistics with
+no real causal relationship.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Engle-Granger Test}
+
+The Engle-Granger (1987) procedure tests cointegration in two steps:
+
+\begin{enumerate}
+  \item Estimate the \textbf{long-run relationship} by OLS:
+        $\hat u_t = y_t - \hat\beta x_t$
+  \item Apply the \textbf{ADF test} to the residuals $\hat u_t$ — under $H_0$
+        the residuals have a unit root (no cointegration).
+\end{enumerate}
+
+The critical values of the test are more negative than those of the standard ADF,
+since $\hat u_t$ is an estimated residual, not a directly observed series.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Error Correction Model (VECM)}
+
+If $y_t$ and $x_t$ are cointegrated, the VECM (\emph{Vector Error Correction
+Model}) decomposes the dynamics into a short-run component and adjustment to
+the long-run equilibrium:
+
+\[
+  \Delta \mathbf{y}_t
+  = \boldsymbol{\alpha} \underbrace{(\boldsymbol{\beta}' \mathbf{y}_{t-1})}_{\text{deviation from equilibrium}}
+  + \sum_{j=1}^{p-1} \mathbf{\Gamma}_j \Delta \mathbf{y}_{t-j}
+  + \boldsymbol{\varepsilon}_t
+\]
+
+\begin{itemize}
+  \item $\boldsymbol{\beta}$ — \textbf{cointegrating vector}: defines the long-run
+        equilibrium relationship $\boldsymbol{\beta}'\mathbf{y}_t = 0$.
+  \item $\boldsymbol{\alpha}$ — \textbf{adjustment coefficients}: speed at which
+        each variable corrects deviations from equilibrium. A negative sign in
+        $\alpha_y$ means $y$ falls when it is above equilibrium.
+  \item $\mathbf{\Gamma}_j$ — short-run dynamics.
+\end{itemize}
+
+The VECM is estimated by ML via the Johansen procedure, which tests the number
+of cointegrating vectors (\emph{rank}) via the trace statistic or maximum eigenvalue.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{DGP Verification}
+
+\subsection*{Case 1 — cointegrated: $y_t = 2 x_t + \varepsilon_t$}
+
+$x_t$ is a random walk ($I(1)$); $\varepsilon_t \sim I(0)$. Therefore
+$y_t - 2 x_t = \varepsilon_t \sim I(0)$: the series are cointegrated with
+vector $[1,\; -2]$.
+
+\begin{lstlisting}[caption={Cointegrated DGP and Engle-Granger test}]
+seed(42)
+input df
+id
+1
+end
+for i in 1..=9 { df = append(df, df) }
+df |> filter(_n <= 300)
+generate df e1 = rnormal()
+generate df e2 = rnormal()
+generate df x  = cumsum(e1)
+generate df y  = 2.0*x + e2
+coint(df, y, x)
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+============= Engle-Granger Cointegration Test =============
+  Variables: y, x
+  H₀: no cointegration
+  ADF statistic:    -6.4808
+  Critical values:  1%=-3.900  5%=-3.340  10%=-3.040
+  Cointegrating vector: [0.4778, 2.0002]
+  Conclusion: REJECT H₀ — cointegrated series
+\end{lstlisting}
+
+The statistic $-6{,}48$ is well below the 1\% critical value
+($-3{,}90$). The estimated cointegrating vector $[0{,}48;\; 2{,}00]$ recovers
+$\beta = 2{,}0$ with precision.
+
+\subsection*{Case 2 — not cointegrated: two independent random walks}
+
+\begin{lstlisting}[caption={Two random walks — no cointegration}]
+generate df y = cumsum(e2)
+coint(df, y, x)
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+============= Engle-Granger Cointegration Test =============
+  Variables: y, x
+  H₀: no cointegration
+  ADF statistic:    -3.1058
+  Critical values:  1%=-3.900  5%=-3.340  10%=-3.040
+  Conclusion: Fail to reject H₀ — no cointegration
+\end{lstlisting}
+
+\subsection*{VECM — adjustment dynamics}
+
+With cointegration confirmed, we estimate the VECM:
+
+\begin{lstlisting}[caption={VECM with rank 1}]
+generate df y = 2.0*x + e2
+let m = vecm(df, y, x, lags=1)
+display m
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+======================== VECM (Johansen ML) - Rank 1 =========================
+No. Variables:                2
+Observations:               299
+
+------------------------ Cointegration Vectors (Beta) ------------------------
+[ 3.6175, -7.2357 ]  →  normalized: [ 1, -2.000 ]
+
+---------------------- Adjustment Coefficients (Alpha) -----------------------
+  y:  -0.3133   (corrects deviations from equilibrium)
+  x:  -0.0179   (nearly exogenous — minimal adjustment)
+
+----------------------- Johansen Eigenvalues (Lambda) ------------------------
+    λ₁ = 0.5017     λ₂ = 0.0004
+==============================================================================
+\end{lstlisting}
+
+The normalized cointegrating vector $[1,\; -2{,}00]$ recovers the true
+$\beta = 2{,}0$. The adjustment coefficient $\hat\alpha_y = -0{,}313$: when
+$y_{t-1} > 2 x_{t-1}$ (above equilibrium), $\Delta y_t$ is negative —
+$y$ corrects downward. $x$ barely adjusts ($\hat\alpha_x \approx -0{,}02$),
+since it is the exogenous variable that defines the equilibrium.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Syntax}
+
+\begin{lstlisting}
+coint(df, y, x)
+coint(df, y, x, lags=4)
+vecm(df, y, x, lags=1)
+vecm(df, y1, y2, y3, lags=2)
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Typical workflow — exchange rate and parity}]
+load "cambio.csv" as df
+
+adf(df, spot)
+adf(df, forward)
+
+coint(df, spot, forward)
+
+// if cointegrated:
+let m = vecm(df, spot, forward, lags=2)
+display m
+\end{lstlisting}
+
+\begin{nota}
+  VECM assumes all variables are $I(1)$ and cointegrated.
+  Verify with ADF before estimating. If the series are $I(1)$ but not
+  cointegrated, use the VAR in first differences (ch.~\ref{cap:var}).
+\end{nota}

@@ -1,0 +1,118 @@
+\chapter{Advanced Installation}
+\label{apendice:instalacao}
+% ── index ───────────────────────────────────────────────────────
+\index{installation|textbf}
+\index{REPL|textbf}
+\index{modules}
+\index{seed@\texttt{seed()}|textbf}
+\index{rnormal@\texttt{rnormal()}|textbf}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Compilation with ODBC support}
+
+To connect \hayashi{} to databases via ODBC (SQL Server, Oracle, etc.):
+
+\begin{lstlisting}[style=inline, language=sh]
+cargo install hayashi-lang --features odbc
+\end{lstlisting}
+
+Requires an ODBC driver installed on the system (\texttt{unixODBC} on Linux).
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Environment variables}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Variable} & \textbf{Effect} \\
+\midrule
+\texttt{HAY\_HISTORY}  & Path to REPL history file \\
+\texttt{HAY\_NOCOLOR}  & Disables colors in error messages \\
+\texttt{HAY\_TRACE}    & Enables execution trace (debugging) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Modules and optional features}
+
+\subsection*{Advanced econometric models}
+
+The estimators below require the \texttt{greeners} crate as a dependency
+of the interpreter. In development builds (\texttt{cargo build}), it is
+compiled automatically. No additional installation is required.
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Group} & \textbf{Estimators} \\
+\midrule
+Panel data         & \texttt{fe}, \texttt{re}, \texttt{ab}, \texttt{pcse}, \texttt{gee},
+                     \texttt{mundlak}, \texttt{xtgls}, \texttt{mixedlm}, \texttt{clogit} \\
+Qualitative response & \texttt{logit}, \texttt{probit}, \texttt{mlogit},
+                       \texttt{ologit}, \texttt{oprobit} \\
+Count/limited      & \texttt{poisson}, \texttt{nbreg}, \texttt{zinb},
+                     \texttt{tobit}, \texttt{heckman} \\
+General GLM        & \texttt{glm} (5 families, multiple links) \\
+Regularization     & \texttt{lasso}, \texttt{ridge\_reg}, \texttt{enet} \\
+Survival           & \texttt{km}, \texttt{cox} \\
+Multivariate       & \texttt{pca}, \texttt{factor}, \texttt{cancorr}, \texttt{manova} \\
+Time series        & \texttt{var}, \texttt{svar}, \texttt{vecm}, \texttt{garch},
+                     \texttt{markov}, \texttt{arima} \\
+Filters            & \texttt{hprescott}, \texttt{baxter\_king}, \texttt{holtwinters},
+                     \texttt{stl}, \texttt{christiano\_fitzgerald} \\
+Causal inference   & \texttt{psm}, \texttt{synth}, \texttt{did}, \texttt{rd} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection*{Memory usage}
+
+Computationally intensive models may require stack size adjustment:
+
+\begin{lstlisting}[style=inline, language=sh]
+RUST_MIN_STACK=8388608 hay script.hay  // 8 MB of stack
+\end{lstlisting}
+
+Relevant for VAR/SVAR with many lags or PCA on large datasets.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Editor integration}
+
+\subsection*{Neovim}
+
+Add to \texttt{init.lua} for basic syntax recognition:
+
+\begin{lstlisting}[style=inline, language=Hayashi]
+vim.filetype.add({ extension = { hay = "hayashi" } })
+\end{lstlisting}
+
+Full highlighting via Tree-sitter is on the roadmap.
+
+\subsection*{VS Code}
+
+Extension available on the marketplace as \texttt{hayashi-lang}.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Development builds}
+
+To iterate with local builds (without \texttt{--release}):
+
+\begin{lstlisting}[style=inline, language=sh]
+git clone https://github.com/sheep-farm/hayashi
+cd hayashi
+cargo build            // debug build (recommended for dev)
+./target/debug/hay script.hay
+\end{lstlisting}
+
+The debug build has extra bounds checks and detailed error messages.
+Do not use \texttt{--release} in development — the speed gain does not
+compensate for the loss of diagnostic information.
+
+\subsection*{Running scripts}
+
+\begin{lstlisting}[style=inline, language=sh]
+./target/debug/hay script.hay        // run script
+./target/debug/hay                   // open interactive REPL
+./target/debug/hay < script.hay      // read from stdin
+\end{lstlisting}

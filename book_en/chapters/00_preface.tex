@@ -1,0 +1,87 @@
+\chapter*{Preface}
+\addcontentsline{toc}{chapter}{Preface}
+
+\hayashi{} was born out of a concrete frustration: existing tools for applied
+econometrics force the researcher to choose between expressiveness and
+performance, between a syntax close to statistical notation and the ability
+to automate complex analyses.
+
+Stata has the right syntax, but it is proprietary, closed, and not a
+general-purpose language. R has the right ecosystem, but its syntax is
+inconsistent and its data model is surprising for those coming from Stata.
+Python has the right flexibility, but its statistical packages treat
+econometrics as a special case of machine learning.
+
+\hayashi{} is an interpreted, general-purpose language built specifically
+for econometric analysis. The syntax pays homage to Stata where it matters
+and adopts modern idioms where Stata shows its age. The engine is written
+in Rust — no virtual machine, no garbage collector, no perceptible startup
+time.
+
+\bigskip
+
+This book documents both the language and the econometric core: from the
+type structure and control flow to time series estimators, causal inference,
+and advanced methods. It is a snapshot of the current state of the project
+— a living document that evolves with the software.
+
+\bigskip
+\noindent\rule{\textwidth}{0.4pt}
+\bigskip
+
+\section*{A project by one developer — and by the entire community}
+
+\hayashi{} is, to date, the work of a single developer. This has practical
+consequences the reader should know about.
+
+On the positive side, there is design coherence: every syntax decision,
+every estimator interface, every error message was made with the same set
+of values in mind. There are no committees, no bikeshedding, no
+compatibility layers accumulated over decades. The code is lean because
+nobody added anything ``just to keep it''.
+
+On the limitation side, one pair of eyes — however careful — does not see
+everything. The project relies on three layers of verification: unit tests
+covering the language primitives; integration scripts that exercise
+\textsc{Hayashi} as a black box; and DGP (data-generating process) scripts
+for each estimator, where the true parameter is known and recovery can be
+verified numerically. Even so, edge cases exist, and some have certainly
+escaped detection.
+
+\bigskip
+
+\noindent\textbf{License.} \hayashi{} is free software, distributed under
+the terms of the \textbf{GNU General Public License version~3} (GPL~v3).
+This means you may use, study, modify, and redistribute the program —
+including for commercial purposes — provided that any derivative work is
+equally free. The source code is public and belongs, in the most literal
+sense, to whoever uses it.
+
+The choice of GPL~v3 is not accidental. Proprietary econometric tools
+create institutional dependency: universities and research labs become
+hostage to licenses, pricing policies, and corporate decisions about what
+the software can or cannot do. Free software breaks that cycle.
+\hayashi{} should be accessible to any researcher anywhere in the world,
+regardless of funding.
+
+\bigskip
+
+\noindent\textbf{Contributors and testers are welcome.} If you found an
+unexpected result, an estimator that fails to converge when it should, an
+obscure error message, or simply a syntax that could be clearer — that is
+valuable information. Open an issue in the repository. If you want to go
+further, a well-tested fix or a new documentation chapter is as legitimate
+a contribution as any line of Rust code.
+
+The project especially needs people willing to test \hayashi{} on real
+data: time series with seasonality, unbalanced panels, models with
+multicollinearity, data with missing values. Those are the cases that DGP
+scripts do not cover, because synthetic data is, by construction,
+well-behaved.
+
+\hayashi{} only becomes robust through use. And honest use — which includes
+reporting what breaks — is the most direct way to contribute.
+
+\bigskip
+
+\noindent\textit{June 2026.}

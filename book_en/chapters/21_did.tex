@@ -1,0 +1,187 @@
+\chapter{Difference-in-Differences}
+\label{cap:did}
+% ── index ───────────────────────────────────────────────────────
+\index{difference-in-differences|textbf}
+\index{DiD|see{difference-in-differences}}
+\index{did@\texttt{did()}|textbf}
+\index{parallel trends|textbf}
+\index{ATT|see{average treatment effect on the treated}}
+\index{average treatment effect on the treated|textbf}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{The model}
+
+Difference-in-Differences (DiD) estimates the causal effect of a treatment
+by comparing the time variation of the treated group with that of the control group:
+
+\[
+  \hat\delta_{\mathrm{DiD}}
+  = \underbrace{(\bar{Y}_{1,\text{post}} - \bar{Y}_{1,\text{pre}})}_{\text{treated variation}}
+  - \underbrace{(\bar{Y}_{0,\text{post}} - \bar{Y}_{0,\text{pre}})}_{\text{control variation}}
+\]
+
+The $2\times 2$ table summarizes the four groups:
+
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+ & \textbf{Pre} & \textbf{Post} \\
+\midrule
+Control ($D=0$) & $\mu_{00}$ & $\mu_{01}$ \\
+Treated  ($D=1$) & $\mu_{10}$ & $\mu_{11}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\[
+  \hat\delta = (\mu_{11} - \mu_{10}) - (\mu_{01} - \mu_{00})
+\]
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Regression form}
+
+The DiD estimator is equivalent to the coefficient on the interaction term in:
+
+\[
+  y_{it} = \beta_0 + \beta_1\,\text{Post}_t + \beta_2\,\text{Treated}_i
+           + \delta\,(\text{Treated}_i \times \text{Post}_t) + \varepsilon_{it}
+\]
+
+where $\hat\delta = \hat\beta_3$ is the Average Treatment effect on the Treated (ATT).
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Parallel trends assumption}
+
+Identification of the ATT rests on:
+
+\[
+  E\!\left[Y_{it}^{(0)} - Y_{is}^{(0)} \mid D_i = 1\right]
+  = E\!\left[Y_{it}^{(0)} - Y_{is}^{(0)} \mid D_i = 0\right]
+  \qquad \forall\; t \neq s
+\]
+
+In the absence of treatment, treated and control groups would have the \emph{same}
+time trend. The assumption is not testable in the post-treatment period,
+but can be checked in pre-treatment periods when more than one
+period is available.
+
+\begin{aviso}
+  The parallel trends assumption is stronger than it appears. Groups
+  with structurally different growth trends (e.g.\ expanding regions
+  vs.\ stagnant regions) violate the assumption even if their
+  pre-treatment levels are similar.
+\end{aviso}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{DGP Verification}
+
+\subsection*{Exact recovery (no noise)}
+
+The DGP uses 500 individuals $\times$ 2 periods ($n = 1000$). The first 250
+are treated, the rest are control. The true effect is $\delta = 3{,}0$:
+
+\[
+  y_{it} = 1{,}0 + 0{,}5\cdot\text{Post}_t + 3{,}0\cdot(D_i\times\text{Post}_t)
+\]
+
+The four cell means are $\mu_{00}=1{,}0$, $\mu_{01}=1{,}5$,
+$\mu_{10}=1{,}0$ and $\mu_{11}=4{,}5$, so that
+$\hat\delta = (4{,}5 - 1{,}0) - (1{,}5 - 1{,}0) = 3{,}0$ exactly.
+
+\begin{lstlisting}[caption={Noise-free DiD DGP --- exact recovery}]
+seed(42)
+input df
+id
+1
+end
+for i in 1..=10 { df = append(df, df) }
+df |> filter(_n <= 1000)
+generate df id      = (_n - 1) % 500 + 1
+generate df post    = _n > 500
+generate df treated = id <= 250
+generate df att     = treated * post
+generate df y       = 1.0 + 0.5*post + 3.0*att
+did(y ~ treated + post, df)
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+================= Difference-in-Differences (2x2 Canonical) ==================
+ATT (Effect):                 3.0000 || R-squared:                    1.0000
+Std. Error:                   0.0000 || P-value:                      0.0000
+t-statistic:                     inf || Observations:                   1000
+
+-------------------------------- Group Means ---------------------------------
+Control Group (Pre):      1.0000 | Control Group (Post):     1.5000
+Treated Group (Pre):      1.0000 | Treated Group (Post):     4.5000
+Parallel Trend Diff:      0.0000 (If > 0, Control grew more than Treated Pre-trend)
+==============================================================================
+\end{lstlisting}
+
+\subsection*{With idiosyncratic noise}
+
+Adding $\varepsilon \sim \mathcal{N}(0,1)$, DiD remains consistent:
+
+\begin{lstlisting}[caption={DiD DGP with noise}]
+generate df e = rnormal()
+generate df y = 1.0 + 0.5*post + 3.0*att + e
+did(y ~ treated + post, df)
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+================= Difference-in-Differences (2x2 Canonical) ==================
+ATT (Effect):                 3.0114 || R-squared:                    0.9645
+Std. Error:                   0.0358 || P-value:                      0.0000
+t-statistic:                 84.0942 || Observations:                   1000
+
+-------------------------------- Group Means ---------------------------------
+Control Group (Pre):      1.4842 | Control Group (Post):     2.0099
+Treated Group (Pre):      1.4880 | Treated Group (Post):     5.0251
+Parallel Trend Diff:      0.0000 (If > 0, Control grew more than Treated Pre-trend)
+==============================================================================
+\end{lstlisting}
+
+The ATT of $3{,}0114$ is close to the true $3{,}0$; the deviation is sampling
+variance. The \emph{Parallel Trend Diff} near zero confirms that the
+parallel trends assumption is satisfied by construction.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Syntax}
+
+\begin{lstlisting}
+did(outcome ~ treated + post, df)
+did(outcome ~ treated + post, df, cov=robust)
+\end{lstlisting}
+
+The formula requires exactly two variables on the right-hand side: the group
+indicator (\lstinline{treated}) and the period indicator (\lstinline{post}).
+\hayashi{} computes the interaction internally.
+
+\begin{lstlisting}[caption={Typical DiD workflow}]
+load "data.csv" as df
+
+// create indicators
+generate df post    = year >= 2020
+generate df treated = state == "RS"
+
+let m = did(wage ~ treated + post, df, cov=robust)
+display m
+\end{lstlisting}
+
+\section{Capturing the result}
+
+\begin{lstlisting}
+let m = did(y ~ treated + post, df)
+display m
+\end{lstlisting}
+
+\begin{nota}
+  For event studies with multiple pre- and post-treatment periods,
+  the canonical $2\times 2$ DiD may be insufficient. In those cases,
+  estimate the regression model with period-by-period interactions and
+  verify the absence of pre-treatment effects as a test of
+  parallel trends.
+\end{nota}

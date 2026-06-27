@@ -1,0 +1,106 @@
+\chapter{Unit Roots II}
+\label{cap:raiz_unitaria2}
+% ── index ───────────────────────────────────────────────────────
+\index{Phillips-Perron, test of|textbf}
+\index{phillips_perron@\texttt{phillips\_perron()}|textbf}
+\index{Zivot-Andrews, test of|textbf}
+\index{zivot@\texttt{zivot()}|textbf}
+\index{structural break|textbf}
+\index{Newey-West, variance of|textbf}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Beyond the ADF: PP and Zivot-Andrews}
+
+The previous chapter (ch.~\ref{cap:arima}) covered the ADF test, which corrects
+for residual autocorrelation via lags. Two problems remain:
+
+\begin{enumerate}
+  \item The ADF is sensitive to conditional heteroscedasticity of errors (GARCH etc.)
+  \item The ADF has low power in the presence of a \emph{structural break}: a
+        stationary series with a level break looks like a random walk.
+\end{enumerate}
+
+\subsection*{Phillips-Perron Test (PP)}
+
+Phillips and Perron (1988) adopt a non-parametric approach: they correct the
+ADF statistic for heteroscedasticity and autocorrelation of \emph{any
+form} via the Newey-West estimator:
+
+\[
+  Z_\alpha = T(\hat{\rho} - 1) - \frac{T^2 \hat{\sigma}^2}{2\hat{s}_T^2}(\hat{\lambda}^2 - \hat{\gamma}_0)
+\]
+
+where $\hat{s}_T^2$ is the long-run variance estimated with the Bartlett kernel.
+The asymptotic distribution is identical to that of the ADF (Dickey-Fuller).
+
+\subsection*{Zivot-Andrews Test (ZA)}
+
+Zivot and Andrews (1992) relax the assumption of no structural break.
+The test estimates the break date \emph{endogenously} as the value that minimizes
+the $t$ statistic:
+
+\[
+  \hat{t}_B = \arg\min_\lambda \; t_\alpha(\lambda), \quad \lambda = t_B/T \in (0.15, 0.85)
+\]
+
+The tested equation includes a level shift or trend change:
+\[
+  \Delta y_t = c + \beta t + \gamma D U_t(\lambda) + \alpha y_{t-1} + \sum_{j=1}^k d_j \Delta y_{t-j} + \varepsilon_t
+\]
+
+$H_0$: unit root without structural break.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{DGP Verification}
+
+\begin{lstlisting}[caption={PP and Zivot-Andrews}]
+seed(42)
+// Random walk: rw_t = rw_{t-1} + e_t
+// Trend-stationary series: stat_t = 0.5*t + e
+// Series with break at t=150: AR(1) + level shift of 3.0
+
+phillips_perron(df, rw)
+phillips_perron(df, stat)
+zivot(df, break_t)
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small, frame=none,
+  numbers=none, backgroundcolor=\color{codbg}]
+PP — rw:      Zt = 77.365   CV 5%=-2.860   DOES NOT reject H₀  (unit root) ✓
+PP — stat:    Zt = 2058     CV 5%=-2.860   DOES NOT reject H₀  (trend-stationary)
+ZA — break_t: t  = -11.597  CV 5%=-4.800   REJECTS H₀, break at obs=147 ✓
+\end{lstlisting}
+
+The PP for \texttt{stat} (linear trend + noise) does not reject $H_0$ because the
+standard test (without a deterministic trend in the auxiliary equation) cannot distinguish
+stochastic from deterministic trend. The ZA correctly identifies the
+structural break at $t=147$ (close to the true $t=150$) and rejects $H_0$.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Syntax}
+
+\begin{lstlisting}
+phillips_perron(df, var)         // PP without trend
+phillips_perron(df, var, trend=true)  // PP with deterministic trend
+zivot(df, var)                   // Zivot-Andrews (endogenous level break)
+zivot(df, var, type="trend")     // break in trend
+\end{lstlisting}
+
+\begin{center}
+\begin{tabular}{llll}
+\toprule
+\textbf{Test} & \textbf{Correction} & \textbf{Break?} & \textbf{CV 5\%} \\
+\midrule
+ADF      & Parametric lags       & No  & $-2{,}86$ \\
+PP       & Non-param. Newey-West & No  & $-2{,}86$ \\
+ZA       & PP + endogenous break & Yes & $-4{,}80$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{nota}
+  Trend-stationary series and series with structural breaks are two cases where
+  the ADF/PP can lead to wrong conclusions. The ZA resolves the second; for the
+  first, including a deterministic trend in the auxiliary equation
+  (\texttt{trend=true}) is sufficient.
+\end{nota}

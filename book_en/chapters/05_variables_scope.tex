@@ -1,0 +1,152 @@
+\chapter{Variables and Scope}
+
+\section{Declaration with \texttt{let}}
+
+Every variable is declared with \lstinline{let}. The declaration binds a
+name to a value:
+
+\begin{lstlisting}
+let x    = 10
+let name = "Hayashi"
+let active = true
+\end{lstlisting}
+
+\lstinline{let} without an initial value does not exist in \hayashi{} —
+every variable is initialised at the point of declaration.
+
+\subsection*{Redeclaration}
+
+A variable may be redeclared with \lstinline{let} in the same scope. The
+new value replaces the previous one without affecting other variables that
+point to the old value:
+
+\begin{lstlisting}
+let x = 5
+let y = x      // y points to 5
+let x = 99     // x is now 99; y remains 5
+display y      // 5
+\end{lstlisting}
+
+\section{Constants with \texttt{const}}
+
+\lstinline{const} declares a name that cannot be redeclared or reassigned
+in the same scope. Useful for configuration values or fixed parameters:
+
+\begin{lstlisting}
+const ALPHA   = 0.05
+const PROJECT = "my_lab"
+\end{lstlisting}
+
+Attempting to assign to a constant produces an error:
+
+\begin{lstlisting}
+const N = 100
+N = 200    // error: cannot assign to constant 'N'
+\end{lstlisting}
+
+\begin{nota}
+  \lstinline{const} in \hayashi{} is evaluated at runtime, not at compile
+  time. The distinction from \lstinline{let} is purely one of binding
+  mutability, not performance.
+\end{nota}
+
+\section{Assignment}
+
+After declaration with \lstinline{let}, a variable can be reassigned with
+\lstinline{=}:
+
+\begin{lstlisting}
+let counter = 0
+counter = counter + 1
+counter = counter + 1
+display counter    // 2
+\end{lstlisting}
+
+Compound assignment operators:
+
+\begin{lstlisting}
+let n = 10
+n += 5     // n = 15
+n -= 3     // n = 12
+n *= 2     // n = 24
+n /= 4     // n = 6
+\end{lstlisting}
+
+\section{Scopes}
+
+Scopes are delimited by \lstinline|{ }| blocks. Variables declared inside
+a block exist only until the end of that block:
+
+\begin{lstlisting}[caption={Variables local to a block}]
+let x = 1
+
+{
+  let y = 2
+  display x    // 1  — x is visible here
+  display y    // 2
+}
+
+display x    // 1
+display y    // error: undefined variable 'y'
+\end{lstlisting}
+
+\subsection*{Scopes in functions}
+
+Each function call creates a new scope. Parameters and local variables are
+destroyed when the function returns:
+
+\begin{lstlisting}
+fn sum(a, b) {
+  let result = a + b
+  return result
+}
+
+display sum(3, 4)    // 7
+display result       // error: undefined variable 'result'
+\end{lstlisting}
+
+\subsection*{Outer scope capture (closures)}
+
+Anonymous functions (closures) capture variables from the scope where they
+were defined:
+
+\begin{lstlisting}
+let base = 100
+
+let add = fn(x) {
+  return x + base    // captures 'base' from outer scope
+}
+
+display add(20)    // 120
+\end{lstlisting}
+
+\section{Special variables}
+
+\subsection*{\texttt{\_n} and \texttt{\_N} in data contexts}
+
+Inside \lstinline{generate} and \lstinline{mutate}, two implicit variables
+are available:
+
+\begin{itemize}
+  \item \lstinline{_n}: index of the current row (starting at 1)
+  \item \lstinline{_N}: total number of rows in the DataFrame
+\end{itemize}
+
+\begin{lstlisting}[caption={Using \_n and \_N}]
+input x
+  10  20  30
+end
+
+generate df id     = _n       // [1, 2, 3]
+generate df weight = 1/_N     // [0.333, 0.333, 0.333]
+\end{lstlisting}
+
+\subsection*{\texttt{\_} (discard)}
+
+The identifier \lstinline{_} discards a value without creating a binding:
+
+\begin{lstlisting}
+for _ in 1..5 {
+  display "iteration"
+}
+\end{lstlisting}

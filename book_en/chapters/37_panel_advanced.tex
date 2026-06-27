@@ -1,0 +1,141 @@
+\chapter{Advanced Panel I — GMM, PCSE and GEE}
+\label{cap:painel_avancado}
+% ── index ──────────────────────────────────────────────────────
+\index{Arellano-Bond|textbf}
+\index{difference GMM|textbf}
+\index{ab@\texttt{ab()}|textbf}
+\index{PCSE|textbf}
+\index{pcse@\texttt{pcse()}|textbf}
+\index{GEE|textbf}
+\index{gee@\texttt{gee()}|textbf}
+\index{Nickell bias|textbf}
+\index{internal instruments}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Limitations of Static Estimators}
+
+Ch.~\ref{cap:painel} presented FE and RE for panels with a constant individual
+effect. Three important extensions arise in empirical applications:
+
+\begin{enumerate}
+  \item \textbf{Dynamics}: when $y_{i,t-1}$ is a regressor, FE is biased
+  (\emph{Nickell bias}): $\hat\rho_{\mathrm{FE}} \xrightarrow{p} \rho - O(1/T)$.
+  The Arellano-Bond estimator uses first-difference GMM to circumvent this.
+  \item \textbf{Cross-sectional dependence}: when errors across units are
+  correlated (macroeconomic data from countries), OLS and FE standard errors are
+  invalid. PCSE (Beck and Katz 1995) corrects this.
+  \item \textbf{Non-Gaussian panel data}: GEE (Liang and Zeger 1986)
+  extends marginal models to panel data with exponential families.
+\end{enumerate}
+
+\subsection*{Arellano-Bond (AB)}
+
+The Arellano and Bond (1991) diff-GMM estimator takes first differences
+to eliminate the individual effect:
+
+\[
+  \Delta y_{it} = \rho\,\Delta y_{i,t-1} + \beta\,\Delta x_{it} + \Delta\varepsilon_{it}
+\]
+
+Instruments: $y_{i,t-2}, y_{i,t-3}, \ldots$ are valid for $\Delta y_{i,t-1}$
+since they are uncorrelated with $\Delta\varepsilon_{it}$, as long as the
+level errors are not serially correlated of order 2 ($m_2$ test).
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{DGP Verification}
+
+\begin{lstlisting}[caption={Panel DGP with endogeneity via individual effect}]
+seed(42)
+generate df unit  = (_n - 1) % 50 + 1
+generate df t     = (_n - (_n-1) % 50 - 1) / 50 + 1
+generate df alpha = unit * 0.05        // individual effect correlated with x
+generate df x     = alpha + (rnormal() - 0.5) * 1.7321
+generate df e     = (rnormal() - 0.5) * 1.7321
+generate df y     = 1.0 + 1.0 * x + alpha + e  // true: b=1.0
+
+// biased OLS (mixes alpha_i with x)
+let m_ols  = ols(y ~ x, df)
+
+// consistent FE (eliminates alpha_i)
+let m_fe   = fe(y ~ x, df, id=unit)
+
+// AB-GMM (dynamic with lags as instruments)
+let m_ab   = ab(y ~ x, df, id=unit, time=t, lags=2)
+
+// PCSE
+let m_pcse = pcse(y ~ x, df, id=unit, time=t)
+
+// GEE
+let m_gee  = gee(y ~ x, df, id=unit)
+\end{lstlisting}
+
+\subsection*{OLS vs.\ FE}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+OLS:  const=1.330  x=1.736***  (bias: +0.74 from mixing alpha_i)
+FE:              x=1.089***  (close to 1.0 — true effect)
+\end{lstlisting}
+
+\subsection*{Arellano-Bond}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+===================== Arellano-Bond Diff-GMM (One-Step) ======================
+Observations: 900  Entities: 50  Instruments: 3  Sargan df: 1
+──────────────────────────────────────────────────────────────────────────────
+Variable       |    Coef | Std Err |       z |  P>|z|
+LD.y           | -0.0242 |  0.0472 |  -0.512 |  0.608
+Δx             |  1.0604 |  0.0464 |  22.869 |  0.000  ***
+──────────────────────────────────────────────────────────────────────────────
+Sargan: χ²(1)=0.7549  p=0.3849   (valid instruments)
+AB m1: z=-6.22  p=0.000 ***      (AR(1) expected in FD)
+AB m2: z=0.001  p=0.999          (no AR(2) — instruments OK)
+\end{lstlisting}
+
+AB estimates $\hat\beta_{\Delta x} = 1{,}06 \approx 1{,}0$. The lag $\hat\rho_{\mathrm{LD.y}} \approx 0$ confirms that the DGP has no true dynamics. The Sargan test does not reject instrument validity; $m_2$ does not reject the absence of second-order autocorrelation.
+
+\subsection*{PCSE}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+ PCSE:  const=1.330  SE=0.0637   x=1.736  SE=0.0498
+ (larger SEs than OLS — corrects cross-sectional correlation)
+\end{lstlisting}
+
+\subsection*{GEE}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+ GEE:  const=1.330 (SE robust=0.0612)  x=1.736 (SE robust=0.0330)
+ Scale: 0.3966   QIC: 399.8152
+\end{lstlisting}
+
+GEE with exchangeable correlation structure provides marginal (population-averaged)
+estimates, with robust standard errors for within-group dependence.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Syntax}
+
+\begin{lstlisting}
+ab(y ~ x, df, id=unit, time=t, lags=2)
+pcse(y ~ x, df, id=unit, time=t)
+gee(y ~ x, df, id=unit)
+gee(y ~ x, df, id=unit, family=binomial, corstr=exchangeable)
+\end{lstlisting}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Estimator} & \textbf{Assumption} & \textbf{When to use} \\
+\midrule
+\texttt{ab}    & i.i.d.\ errors in levels & dynamic panel with small $T$ \\
+\texttt{pcse}  & cross-sectional corr.    & macro panel (small $N$, medium $T$) \\
+\texttt{gee}   & population margin        & panel with non-Gaussian outcome \\
+\bottomrule
+\end{tabular}
+\end{center}

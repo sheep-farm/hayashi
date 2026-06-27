@@ -1,0 +1,24 @@
+// Cap 21 — Diferenças em Diferenças
+// DGP: 500 indivíduos x 2 períodos = 1000 observações
+// Tratados: id <= 250; ATT verdadeiro = 3.0
+
+seed(42)
+input df
+id
+1
+end
+for i in 1..=10 { df = append(df, df) }
+df |> filter(_n <= 1000)
+generate df id      = (_n - 1) % 500 + 1
+generate df post    = _n > 500
+generate df treated = id <= 250
+generate df att     = treated * post
+
+// sem ruído: recuperação exata do ATT
+generate df y = 1.0 + 0.5*post + 3.0*att
+did(y ~ treated + post, df)
+
+// com ruído idiossincrático
+generate df e = rnormal()
+generate df y = 1.0 + 0.5*post + 3.0*att + e
+did(y ~ treated + post, df)

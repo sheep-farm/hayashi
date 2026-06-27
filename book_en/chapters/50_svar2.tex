@@ -1,0 +1,102 @@
+\chapter{SVAR with Long-Run Restrictions}
+\label{cap:svar2}
+% ── index ───────────────────────────────────────────────────────
+\index{Blanchard-Quah, decomposition of|textbf}
+\index{permanent shock|textbf}
+\index{transitory shock|textbf}
+\index{long-run restrictions|textbf}
+\index{SVEC}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Blanchard-Quah Identification}
+
+Ch.~\ref{cap:svar} (Cholesky SVAR) imposes \emph{short-run} restrictions:
+the variable in position 1 is not contemporaneously affected by the second.
+Blanchard and Quah (1989) propose an alternative via \emph{long-run}
+restrictions: permanent and transitory shocks.
+
+The central idea: in macroeconomics, a supply shock has a permanent effect
+on output ($y$), while a demand shock has only a transitory effect. The restriction:
+\[
+  \sum_{h=0}^\infty \Theta_h^{(1,1)} = \text{free}, \quad
+  \sum_{h=0}^\infty \Theta_h^{(1,2)} = 0
+\]
+imposes that shock 2 does not affect $y$ in the long run. This restriction identifies
+the decomposition $B$ without any contemporaneous impact restriction.
+
+\subsection*{BQ Decomposition}
+
+Given the reduced-form VAR $y_t = \Phi_1 y_{t-1} + u_t$:
+\begin{enumerate}
+  \item Compute the sum $C = (I - \Phi_1)^{-1}$ — long-run multiplier
+  \item Factor $C\,\Sigma_u\,C' = F\,F'$ (Cholesky of $F$)
+  \item Extract $B = C^{-1} F$ — the long-run structural shocks
+\end{enumerate}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{DGP Verification}
+
+DGP: bivariate VAR(1) where $y_1$ is a random walk (shock 1 permanent),
+$y_2$ is stationary and responds transitorialy to shock 1.
+
+\begin{lstlisting}[caption={SVAR Blanchard-Quah}]
+seed(42)
+// y1_t = y1_{t-1} + e1_t               (random walk)
+// y2_t = 0.5*y2_{t-1} + 0.4*e1_t + 0.6*e2_t  (stationary)
+
+let m_bq = svar(df, y1, y2, lags=1, id=longrun)
+display m_bq
+let m_irf_bq = sirf(m_bq, steps=20)
+display m_irf_bq
+\end{lstlisting}
+
+\subsection*{B Matrix (structural shocks)}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small, frame=none,
+  numbers=none, backgroundcolor=\color{codbg}]
+SVAR(1) — Long-run restrictions
+B Matrix:
+[ 0.4907   0.0358 ]
+[ 0.1935   0.3031 ]
+\end{lstlisting}
+
+The matrix $B$ is not triangular — unlike Cholesky, long-run restrictions
+do not imply contemporaneous impact restrictions.
+
+\subsection*{Structural IRF}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small, frame=none,
+  numbers=none, backgroundcolor=\color{codbg}]
+Impulse: Shock 1 (permanent)
+  h= 0:  y1=+0.491  y2=+0.194
+  h= 1:  y1=+0.464  y2=+0.087
+  h= 5:  y1=+0.405  y2=-0.003   (effect on y2 decays)
+  h=19:  y1=+0.271  y2=-0.005   (y1 retains permanent effect)
+
+Impulse: Shock 2 (transitory)
+  h= 0:  y1=+0.036  y2=+0.303
+  h= 1:  y1=+0.016  y2=+0.144
+  h= 5:  y1=-0.001  y2=+0.007   (effect on y1 decays to ~0)
+  h=19:  y1=-0.001  y2= 0.000   (transitory confirmed) ✓
+\end{lstlisting}
+
+Shock 2 affects $y_1$ only transitorialy (sum $\to 0$), confirming the
+long-run restriction. Shock 1 has a growing cumulative effect on $y_1$
+— consistent with the unit root.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Syntax}
+
+\begin{lstlisting}
+svar(df, y1, y2, lags=1, id=longrun)     // BQ: long-run restrictions
+svar(df, y1, y2, lags=1, id=cholesky)    // Cholesky: contemporaneous restrictions
+sirf(m_svar, steps=20)                   // structural IRF
+\end{lstlisting}
+
+\begin{nota}
+  BQ identification requires the variables to be integrated of order 1
+  ($I(1)$). For stationary series, $(I - \hat{\Phi}_1)^{-1}$ is finite and
+  the permanent/transitory decomposition has no natural interpretation.
+  Verify unit roots (ch.~\ref{cap:arima}, \ref{cap:raiz_unitaria2})
+  before applying BQ.
+\end{nota}

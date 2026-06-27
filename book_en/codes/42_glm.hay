@@ -1,0 +1,27 @@
+// Cap 42 — GLM Estendido (Gamma, PPML)
+// DGP: y ~ Gamma com link log (dados positivos com caudas pesadas)
+// E[y|x] = exp(0.5 + 1.0*x) — mesmo link que Poisson mas distribuição diferente
+
+seed(42)
+input df
+id
+1
+end
+for i in 1..=9 { df = append(df, df) }
+df |> filter(_n <= 500)
+generate df x = rnormal()
+generate df mu = exp(0.5 + 1.0 * x)
+generate df e = rnormal()
+// Gamma: média mu, variância mu²/shape (simulado como lognormal aproximado)
+generate df y_gamma = mu * exp((rnormal() - 0.5) * 0.6)   // y > 0 sempre
+
+// GLM Gamma com link log
+let m_gamma = glm(y_gamma ~ x, df, family=gamma, link=log)
+display m_gamma
+
+// Dados de comércio bilateral — zero-inflated com heterocedasticidade
+generate df x2 = rnormal()
+generate df trade = round(exp(0.3 + 1.2*x + 0.8*x2) * (rnormal() > 0.2))
+// PPML (Poisson Pseudo MLE) é robusto a zeros e heterocedasticidade
+let m_ppml = glm(trade ~ x + x2, df, family=poisson, link=log)
+display m_ppml

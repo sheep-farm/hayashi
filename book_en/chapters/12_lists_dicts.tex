@@ -1,0 +1,247 @@
+\chapter{Lists and Dictionaries}
+
+\section{Lists}
+
+\subsection{Creation}
+
+\begin{lstlisting}
+let nums   = [1, 2, 3, 4, 5]
+let states = ["TX", "CA", "NY"]
+let mixed  = [1, "two", true]
+let empty  = []
+\end{lstlisting}
+
+\subsection{Index access}
+
+Indices start at 0. Negative indices count from the end:
+
+\begin{lstlisting}
+let xs = [10, 20, 30, 40]
+display xs[0]     // 10
+display xs[3]     // 40
+display xs[-1]    // 40  (last)
+display xs[-2]    // 30
+\end{lstlisting}
+
+Out-of-bounds access produces a runtime error:
+
+\begin{lstlisting}
+xs[10]
+// error: index 10 out of bounds (len=4)
+\end{lstlisting}
+
+\subsection{Length}
+
+\begin{lstlisting}
+len([1, 2, 3])    // 3
+\end{lstlisting}
+
+\subsection{Mutation}
+
+\lstinline{push} appends to the end of a list (mutates in place, returns
+\lstinline{nil}):
+
+\begin{lstlisting}
+let list = [1, 2, 3]
+push(list, 4)
+display list    // [1, 2, 3, 4]
+\end{lstlisting}
+
+\begin{aviso}
+  \lstinline{push} is a mutating function — it modifies \lstinline{list}
+  directly and returns \lstinline{nil}. Do not write
+  \lstinline{let new = push(list, 4)}.
+\end{aviso}
+
+\lstinline{pop} removes and returns the last element:
+
+\begin{lstlisting}
+let last = pop(list)
+\end{lstlisting}
+
+\subsection{Slicing}
+
+\begin{lstlisting}
+let xs = [0, 1, 2, 3, 4, 5]
+display slice(xs, 1, 4)    // [1, 2, 3]  (indices 1..3)
+\end{lstlisting}
+
+\subsection{Iteration}
+
+\begin{lstlisting}
+for x in [10, 20, 30] {
+  display x * 2
+}
+\end{lstlisting}
+
+\subsection{Functional operations}
+
+\begin{lstlisting}
+let xs = [1, 2, 3, 4, 5]
+
+let doubled  = map(xs, fn(x) { x * 2 })
+let evens    = filter(xs, fn(x) { x % 2 == 0 })
+let total    = reduce(xs, 0, fn(acc, x) { acc + x })
+\end{lstlisting}
+
+\section{Ranges}
+\label{sec:ranges}
+
+Ranges are expressions that produce lists of integers. The syntax follows
+Rust:
+
+\begin{lstlisting}[caption={Ranges as lists}]
+let a = 1..5      // [1, 2, 3, 4]    (exclusive)
+let b = 1..=5     // [1, 2, 3, 4, 5] (inclusive)
+\end{lstlisting}
+
+Since they are ordinary lists, ranges work with any function that accepts
+a list:
+
+\begin{lstlisting}
+map(1..=5, fn(x) { x^2 })             // [1, 4, 9, 16, 25]
+filter(1..10, fn(x) { x % 2 == 0 })   // [2, 4, 6, 8]
+len(1..100)                            // 99
+\end{lstlisting}
+
+\subsection{\texttt{chain}}
+
+\lstinline{chain} concatenates multiple lists (or ranges) into one:
+
+\begin{lstlisting}[caption={chain with ranges and lists}]
+chain(1..3, 9..=11)           // [1, 2, 9, 10, 11]
+chain(1..=3, [10, 20], 5..7)  // [1, 2, 3, 10, 20, 5, 6]
+\end{lstlisting}
+
+Typical use: iterating over non-contiguous sequences:
+
+\begin{lstlisting}
+for lag in chain(1..=3, 6..=8) {
+  display f"lag {lag}"
+}
+\end{lstlisting}
+
+\subsection{Composition with closures}
+
+Ranges, \lstinline{chain}, and closures compose naturally in a single
+expression. The syntax \lstinline{|x| expr} defines a closure without the
+ceremony of \lstinline{fn}:
+
+\begin{lstlisting}[caption={Composed expression — single line}]
+let r = map(chain(1..=10, 5..9, 56..70), |n| n * 3)
+\end{lstlisting}
+
+The pipe also works in \lstinline{for} headers, composing transformations
+before entering the loop body:
+
+\begin{lstlisting}[caption={Pipeline in the for header}]
+for i in chain(1..=10, 20..=25) |> filter(|n| (n % 2) == 0) {
+    display i
+}
+\end{lstlisting}
+
+\subsection{Comparison with other languages}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Language} & \textbf{Form} \\
+\midrule
+Python  & \texttt{filter(lambda n: n\%2==0, chain(range(1,11), range(5,9), range(56,70)))} \\
+Rust    & \texttt{(1..=10).chain(5..9).chain(56..70).filter(|n| n\%2==0)} \\
+Haskell & \texttt{filter even \$ [1..10] ++ [5..8] ++ [56..69]} \\
+Julia   & \texttt{Iterators.filter(n->n\%2==0, Iterators.flatten([1:10,5:8,56:69]))} \\
+R       & \texttt{Filter(function(n) n\%\%2==0, c(1:10, 5:8, 56:69))} \\
+\midrule
+Hayashi & \texttt{chain(1..=10,5..9,56..70) |> filter(|n| (n\%2)==0)} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\hayashi{} is the only language in which the pipeline runs strictly
+left-to-right, with no imports, no namespaces, and a variadic
+\lstinline{chain} that treats all arguments symmetrically.
+
+\subsection{Performance note}
+
+\lstinline{chain} materialises ranges into a list before iterating.
+\lstinline{for i in 1..N}, by contrast, iterates directly without
+allocating. \lstinline{chain} is for small non-contiguous sequences —
+lags, years, variable groups. Any contiguous sequence is simply
+\lstinline{1..N} or \lstinline{1..=N}.
+
+\section{Dictionaries}
+
+\subsection{Creation}
+
+\begin{lstlisting}
+let config = {
+  "host": "localhost",
+  "port": 5432,
+  "ssl": true
+}
+
+let empty = {}
+\end{lstlisting}
+
+Keys can be strings or integers. Values can be of any type.
+
+\subsection{Access}
+
+\begin{lstlisting}
+config["host"]    // "localhost"
+config["port"]    // 5432
+\end{lstlisting}
+
+A missing key produces an error:
+
+\begin{lstlisting}
+config["user"]
+// error: key 'user' not found in dict
+\end{lstlisting}
+
+Use \lstinline{try}/\lstinline{catch} for safe access:
+
+\begin{lstlisting}
+let user = try { config["user"] } catch _ { "anonymous" }
+\end{lstlisting}
+
+\subsection{Insertion and update}
+
+\begin{lstlisting}
+let d  = {"a": 1}
+let d2 = dict_set(d, "b", 2)    // {"a":1, "b":2}
+\end{lstlisting}
+
+\lstinline{dict_set} is functional — it returns a new dictionary without
+mutating the original.
+
+\subsection{Checking for a key}
+
+\begin{lstlisting}
+"host" in config    // true
+"password" in config   // false
+\end{lstlisting}
+
+\subsection{Dictionaries as function return values}
+
+Analysis functions often return dictionaries with multiple results:
+
+\begin{lstlisting}[caption={summarize returns a dictionary}]
+load "data.csv" as df
+let stats = summarize(df, income)
+
+display stats["mean"]    // mean
+display stats["sd"]      // standard deviation
+display stats["N"]       // number of observations
+\end{lstlisting}
+
+\subsection{Iterating over dictionaries}
+
+\begin{lstlisting}
+let d = {"a": 1, "b": 2, "c": 3}
+
+for key in keys(d) {
+  display f"{key} = {d[key]}"
+}
+\end{lstlisting}

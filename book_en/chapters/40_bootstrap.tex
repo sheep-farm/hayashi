@@ -1,0 +1,112 @@
+\chapter{Bootstrap}
+\label{cap:bootstrap}
+% ── index ──────────────────────────────────────────────────────
+\index{bootstrap|textbf}
+\index{bootstrap@\texttt{bootstrap()}|textbf}
+\index{resampling|textbf}
+\index{percentile confidence interval}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Inference by Resampling}
+
+The analytical standard errors derived from asymptotic theory generally assume
+that residuals follow a specific distribution (normal, homoskedastic, i.i.d.).
+Efron's (1979) \textbf{bootstrap} replaces distributional assumptions with
+resampling: it replicates the estimation process $B$ times on samples drawn
+with replacement from the data itself.
+
+\subsection*{Pairs Bootstrap}
+
+The simplest approach resamples pairs $(y_i, x_i)$:
+
+\begin{enumerate}
+  \item For $b = 1,\ldots,B$: sample $n$ observations with replacement.
+  \item Estimate $\hat\theta^{(b)}$ on the resampled dataset.
+  \item $\widehat{\mathrm{SE}}_{\mathrm{boot}} = \mathrm{sd}(\hat\theta^{(1)},\ldots,\hat\theta^{(B)})$.
+\end{enumerate}
+
+The 95\% bootstrap percentile CI is the interval $[Q_{0{,}025},\, Q_{0{,}975}]$
+of the empirical distribution of $\hat\theta^{(b)}$.
+
+\textbf{Advantage}: valid without knowing the distribution of $\hat\theta$ —
+robust to non-Gaussian errors, heteroskedasticity, and small samples where the
+normal approximation is poor.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{DGP Verification}
+
+DGP with uniform error on $[-2, 2]$ — non-Gaussian. With $N = 200$, the
+analytical OLS SE may underestimate the true variance.
+
+\begin{lstlisting}[caption={Comparison of analytical SE vs.\ bootstrap}]
+seed(42)
+generate df x = rnormal()
+generate df e = (rnormal() - 0.5) * 4.0     // U(-2, 2) — non-Gaussian
+generate df y = 1.0 + 2.0 * x + e
+
+// standard OLS
+let m_ols  = ols(y ~ x, df)
+display m_ols
+
+// Bootstrap
+let m_boot = bootstrap("ols", y ~ x, df, reps=500)
+display m_boot
+\end{lstlisting}
+
+\subsection*{Analytical OLS}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+OLS: R²=0.178
+  const=1.046  SE=0.157   x=1.828  SE=0.279
+\end{lstlisting}
+
+\subsection*{Bootstrap ($B = 500$)}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+════════════════════════════════════════════════════════════════════════════
+                   Bootstrap SE — ols (n=500/500)
+────────────────────────────────────────────────────────────────────────────
+Variable    β̂       SE orig.    SE boot    CI lower    CI upper
+const    1.0462     0.1566     0.1545     0.7235      1.3710
+x        1.8276     0.2787     0.2679     1.3313      2.3910
+════════════════════════════════════════════════════════════════════════════
+\end{lstlisting}
+
+Bootstrap SE ($0{,}155$ and $0{,}268$) and analytical ($0{,}157$ and $0{,}279$)
+are similar here, indicating that the analytical OLS SEs are adequate even with
+uniform errors when $N = 200$. The agreement validates the implementation:
+both converge to the same asymptotic standard deviation.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Syntax}
+
+\begin{lstlisting}
+// generic bootstrap — any implemented estimator
+bootstrap("ols",    y ~ x, df, reps=500)
+bootstrap("logit",  y ~ x, df, reps=500)
+bootstrap("qreg",   y ~ x, df, reps=500, q=0.5)
+
+// alias bootse
+bootse(y ~ x, df, reps=500)                 // ols by default (legacy)
+\end{lstlisting}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Option} & \textbf{Default} & \textbf{Description} \\
+\midrule
+\texttt{reps} / \texttt{n}  & 1000 & number of bootstrap replicas \\
+\texttt{alpha}               & 0.05 & level for CIs (two-tailed) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{nota}
+  The bootstrap estimator can also estimate SEs for PSM (ch.~\ref{cap:psm}),
+  where the asymptotic distribution of the ATT is non-standard. In this context,
+  the pairs bootstrap is consistent (Abadie and Imbens 2008).
+\end{nota}

@@ -1,0 +1,210 @@
+\chapter{Regression Discontinuity Design}
+\label{cap:rdd}
+% ── index ───────────────────────────────────────────────────────
+\index{regression discontinuity|textbf}
+\index{RDD|see{regression discontinuity}}
+\index{rd@\texttt{rd()}|textbf}
+\index{cutoff threshold}
+\index{running variable}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{The model}
+
+Regression Discontinuity Design (RDD) identifies causal effects when
+treatment is assigned mechanically based on a threshold of a continuous
+observable variable --- the \textbf{running variable} $x$:
+
+\[
+  D_i = \mathbf{1}[x_i \geq c]
+\]
+
+The estimator exploits the fact that individuals immediately below and above the
+threshold $c$ are comparable in all respects except the treatment received. The
+identified effect is the \textbf{LATE at the cutoff} (\emph{Local Average Treatment
+Effect at the cutoff}):
+
+\[
+  \tau_{\mathrm{RDD}}
+  = \lim_{x \downarrow c} E[y \mid x]
+  - \lim_{x \uparrow c} E[y \mid x]
+\]
+
+\begin{nota}
+  The \emph{Sharp} RDD (above) assumes that $D$ changes deterministically at $c$.
+  The \emph{Fuzzy} RDD generalizes to when $D$ increases
+  \emph{discontinuously} at $c$, without a jump from 0 to 1 --- it requires a
+  first stage and is equivalent to a local IV.
+\end{nota}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Identification}
+
+The central assumption is \textbf{continuity of potential outcomes} at
+$c$:
+
+\[
+  E[Y^{(0)} \mid x] \quad \text{and} \quad E[Y^{(1)} \mid x]
+  \quad \text{are continuous at } x = c
+\]
+
+This guarantees that any discontinuity in $E[y \mid x]$ at point $c$ is
+caused by the jump in $D$, and not by another factor that also changes at $c$.
+
+The assumption is violated if agents \emph{manipulate} $x$ to place themselves above or
+below the threshold --- students who revise answers to cross the passing cutoff,
+for example. The McCrary density test (continuity test for the density of $x$ at $c$)
+checks for suspicious bunching of observations on one side of the threshold.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{The estimator}
+
+The standard estimator is \textbf{local linear regression} fit separately on each
+side of the threshold, within a \emph{bandwidth} $h$:
+
+\[
+  \hat\tau = \hat\mu_+ - \hat\mu_-
+\]
+
+where $\hat\mu_+$ and $\hat\mu_-$ are the intercepts of the local linear
+regressions on the right side ($x \in [c, c+h)$) and left side ($x \in (c-h, c)$),
+respectively, weighted by the triangular kernel:
+
+\[
+  K\!\left(\frac{x - c}{h}\right) = \left(1 - \frac{|x-c|}{h}\right)
+  \mathbf{1}[|x-c| \leq h]
+\]
+
+The \emph{bandwidth} $h$ controls the bias-variance trade-off: wider windows reduce
+variance but increase bias (local linearity may be a poor approximation);
+narrower windows are more local but have fewer observations. Hayashi
+selects $h$ automatically by the MSE-optimal criterion (Imbens-Kalyanaraman)
+when \lstinline{bw} is not specified.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{DGP Verification}
+
+\subsection*{Exact recovery (no noise)}
+
+The DGP uses a running variable $x \sim \mathrm{Uniform}(-1, 1)$, threshold at
+$c = 0$ and true effect $\tau = 2{,}0$. The outcome function is linear
+in $x$ on both sides of the threshold, without noise, so RDD should recover
+$\tau$ exactly.
+
+\[
+  y_i = 1{,}0 + 0{,}5\,x_i + 2{,}0\,D_i, \qquad D_i = \mathbf{1}[x_i \geq 0]
+\]
+
+\begin{lstlisting}[caption={Noise-free RDD DGP --- exact recovery}]
+seed(42)
+input df
+id
+1
+end
+for i in 1..=10 { df = append(df, df) }
+df |> filter(_n <= 1000)
+generate df x = runiform() * 2 - 1
+generate df d = x >= 0
+generate df y = 1.0 + 0.5*x + 2.0*d
+rd(y ~ x, 0.0, df)
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+══════════════════════════════════════════════════════════════════════
+ Regression Discontinuity  —  Sharp  —  Local Linear (p=1)
+══════════════════════════════════════════════════════════════════════
+ Outcome: y                   Running var: x
+ Cutoff: 0.0000   Bandwidth: 0.0571   Kernel: Triangular
+ Obs total: 72   N left: 37   N right: 35
+──────────────────────────────────────────────────────────────────────
+ Treatment Effect (τ̂):
+       2.0000   SE     0.0000   z 2.443e15   P>|z|   0.0000  ***
+ 95% CI: [2.0000, 2.0000]
+══════════════════════════════════════════════════════════════════════
+ *** p<0.01  ** p<0.05  * p<0.10
+\end{lstlisting}
+
+The estimator recovers $\hat\tau = 2{,}0000$ exactly. The bandwidth of
+$0{,}0571$ was selected automatically --- of the 1000 observations, 72 lie
+within the window around the cutoff.
+
+\subsection*{With idiosyncratic noise}
+
+Adding idiosyncratic $\varepsilon$, the LATE remains identified:
+
+\begin{lstlisting}[caption={RDD DGP with noise}]
+generate df e = rnormal()
+generate df y = 1.0 + 0.5*x + 2.0*d + e
+rd(y ~ x, 0.0, df)
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+══════════════════════════════════════════════════════════════════════
+ Regression Discontinuity  —  Sharp  —  Local Linear (p=1)
+══════════════════════════════════════════════════════════════════════
+ Outcome: y                   Running var: x
+ Cutoff: 0.0000   Bandwidth: 0.0741   Kernel: Triangular
+ Obs total: 94   N left: 43   N right: 51
+──────────────────────────────────────────────────────────────────────
+ Treatment Effect (τ̂):
+       2.0116   SE     0.1191   z   16.893   P>|z|   0.0000  ***
+ 95% CI: [1.7782, 2.2449]
+══════════════════════════════════════════════════════════════════════
+ *** p<0.01  ** p<0.05  * p<0.10
+\end{lstlisting}
+
+With noise, $\hat\tau = 2{,}0116$ --- the deviation from $2{,}0$ is sampling
+variance. The 95\% CI $[1{,}78;\; 2{,}24]$ covers the true $\tau = 2{,}0$.
+The bandwidth was $0{,}0741$: with more variance, the MSE-optimal criterion
+prefers a narrower window to control bias.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Syntax}
+
+\begin{lstlisting}
+rd(y ~ x, cutoff, df)
+rd(y ~ x, cutoff, df, bw=0.3)
+rd(y ~ x, cutoff, df, bw=0.3, poly=2)
+\end{lstlisting}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Parameter} & \textbf{Default} & \textbf{Description} \\
+\midrule
+\texttt{cutoff}  & required    & threshold value in $x$ \\
+\texttt{bw}      & auto (IK)   & window width $h$ \\
+\texttt{poly}    & \texttt{1}  & degree of local polynomial \\
+\texttt{kernel}  & \texttt{triangular} & \texttt{uniform}, \texttt{epanechnikov} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{lstlisting}[caption={Typical workflow --- test score cutoff and scholarship}]
+load "school.csv" as df
+
+// score centered at threshold 60
+generate df xc = score - 60
+
+let m = rd(approved ~ xc, 0.0, df)
+display m
+\end{lstlisting}
+
+\section{Capturing the result}
+
+\begin{lstlisting}
+let m = rd(y ~ x, 0.0, df)
+display m
+\end{lstlisting}
+
+\begin{nota}
+  In real applications, validate the RDD with falsification tests:
+  (1)~estimate the model using \emph{pre-treatment covariates} as
+  the outcome --- there should be no discontinuity at $c$;
+  (2)~test discontinuities at \emph{placebo thresholds} ($c \pm \delta$)
+  --- they should not be significant; (3)~check the density of $x$ at
+  $c$ (McCrary) to detect manipulation of the running variable.
+\end{nota}

@@ -1,0 +1,145 @@
+\chapter{Data Manipulation}
+
+\section{\texttt{generate} and \texttt{mutate}}
+
+Create or replace columns. The two forms are equivalent in result; they
+differ in mutation semantics:
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Form} & \textbf{Semantics} & \textbf{Style} \\
+\midrule
+\texttt{generate df col = expr}              & Imperative (mutates \texttt{df}) & Stata \\
+\texttt{let df2 = generate(df, col = expr)}  & Functional (df unchanged)        & Functional \\
+\texttt{df |> generate(col = expr)}          & Pipe assign-back (mutates \texttt{df}) & Chaining \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{lstlisting}[caption={generate: imperative form}]
+load "data.csv" as df
+
+generate df lincome = log(income)
+generate df income2 = income^2
+generate df dummy   = if(income > 1000, 1, 0)
+\end{lstlisting}
+
+\begin{lstlisting}[caption={mutate: functional form}]
+let df2 = mutate(df, lincome = log(income), income2 = income^2)
+// df does not have lincome or income2
+// df2 has them
+\end{lstlisting}
+
+\section{\texttt{filter}}
+
+Selects rows that satisfy a condition:
+
+\begin{lstlisting}
+let recent = filter(df, year >= 2010)
+let high   = filter(df, income > 5000 and state == "TX")
+\end{lstlisting}
+
+The imperative form uses \lstinline{keep}:
+
+\begin{lstlisting}
+keep df if year >= 2010
+\end{lstlisting}
+
+\section{\texttt{select} and \texttt{drop}}
+
+\begin{lstlisting}
+// keep only these columns
+let slim   = select(df, year, state, income)
+let no_id  = drop(df, id, code)    // remove these columns
+\end{lstlisting}
+
+\section{\texttt{rename}}
+
+\begin{lstlisting}
+rename df old_name new_name
+// rename family_income to income
+rename df family_income income
+\end{lstlisting}
+
+\section{\texttt{sort}}
+
+\begin{lstlisting}
+sort df year              // ascending
+sort df income desc       // descending
+sort df state year desc   // multiple columns
+\end{lstlisting}
+
+\section{\texttt{dropna}}
+
+Removes rows with missing values:
+
+\begin{lstlisting}
+dropna df                 // remove rows with any NaN
+dropna df income gini     // remove rows with NaN in income or gini
+\end{lstlisting}
+
+\section{\texttt{append}}
+
+Stacks two DataFrames vertically (equivalent to \texttt{rbind}):
+
+\begin{lstlisting}
+let df_total = append(df_2024, df_2025)
+\end{lstlisting}
+
+Columns must be compatible. Columns missing from one DataFrame are filled
+with \texttt{NaN}.
+
+\section{\texttt{collapse} and \texttt{group\_by}}
+
+\lstinline{group_by} aggregates by groups:
+
+\begin{lstlisting}[caption={Aggregation by group}]
+let state_means = group_by(df, state,
+  mean_income = mean(income),
+  n           = count()
+)
+\end{lstlisting}
+
+\lstinline{collapse} is the Stata-style imperative form:
+
+\begin{lstlisting}
+collapse df (mean) income gini, by(state year)
+\end{lstlisting}
+
+\section{\texttt{pivot\_longer} and \texttt{pivot\_wider}}
+
+\begin{lstlisting}[caption={Wide to long}]
+let long = pivot_longer(df,
+  cols   = ["q1", "q2", "q3"],
+  names  = "quarter",
+  values = "value"
+)
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Long to wide}]
+let wide = pivot_wider(df,
+  id     = "county",
+  names  = "year",
+  values = "gdp"
+)
+\end{lstlisting}
+
+\section{\texttt{replace}}
+
+Replaces values conditionally:
+
+\begin{lstlisting}
+// zero out negative values
+replace df income = 0 if income < 0
+replace df gini = . if gini > 1    // mark as missing
+\end{lstlisting}
+
+\section{\texttt{tabulate}}
+
+Frequency table:
+
+\begin{lstlisting}
+tabulate df state
+tabulate df state year    // cross-tabulation
+\end{lstlisting}

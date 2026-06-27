@@ -1,0 +1,404 @@
+\chapter{Quick Reference}
+\label{apendice:referencia}
+% ── index ───────────────────────────────────────────────────────
+\index{quick reference|textbf}
+\index{syntax|textbf}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Types}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Type} & \textbf{Example} & \textbf{Notes} \\
+\midrule
+\texttt{Int}       & \texttt{42}, \texttt{-7}      & 64-bit, signed \\
+\texttt{Float}     & \texttt{3.14}, \texttt{1e-5}  & IEEE 754 \\
+\texttt{Bool}      & \texttt{true}, \texttt{false} & \\
+\texttt{Nil}       & \texttt{nil}                  & Absence of value \\
+\texttt{String}    & \texttt{"text"}               & UTF-8 \\
+\texttt{FString}   & \texttt{f"val: \{x\}"}        & Interpolation \\
+\texttt{List}      & \texttt{[1, 2, 3]}            & 0-based index \\
+\texttt{Dict}      & \texttt{\{"a": 1\}}           & String or int key \\
+\texttt{DataFrame} & \texttt{load "f.csv" as df}   & COW, Float columns \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Operators}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Arithmetic}  & \texttt{+  -  *  /  \^{}  \%} \\
+\textbf{Comparison}  & \texttt{== != > < >= <=} \\
+\textbf{Logical}     & \texttt{and  or  not} \\
+\textbf{Membership}  & \texttt{in} \\
+\textbf{Pipe}        & \texttt{|>} \\
+\textbf{Assignment}  & \texttt{=  +=  -=  *=  /=} \\
+\textbf{Range}       & \texttt{a..b} (exclusive) \quad \texttt{a..=b} (inclusive) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Time series operators}
+
+Available inside \lstinline{generate df col = expr}:
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\texttt{L.x}   & Lag of order 1 \\
+\texttt{L2.x}  & Lag of order 2 \\
+\texttt{F.x}   & Lead of order 1 \\
+\texttt{D.x}   & First difference \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Special constant: \texttt{\_n} = row number (1-based).
+
+\section{Keywords}
+
+\begin{lstlisting}[style=inline, basicstyle=\ttfamily\footnotesize]
+let  const  fn  return  if  else  for  in  while  break  continue
+match  try  catch  and  or  not  true  false  nil
+\end{lstlisting}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Descriptive statistics}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Function} & \textbf{Result} & \textbf{Forms} \\
+\midrule
+\texttt{mean(df, x)}              & $E(X)$             & list / df / \texttt{if =} \\
+\texttt{variance(df, x)}          & $\mathrm{Var}(X)$  & list / df / \texttt{if =} \\
+\texttt{sd(df, x)}                & $\sigma(X)$        & list / df / \texttt{if =} \\
+\texttt{median(df, x)}            & median             & list / df / \texttt{if =} \\
+\texttt{quantile(df, x, p)}       & percentile $p$     & list / df / \texttt{if =} \\
+\texttt{cov(df, x, y)}            & $\mathrm{Cov}(X,Y)$& df / \texttt{if =} \\
+\texttt{corr\_pair(df, x, y)}     & $\rho(X,Y)$        & df / \texttt{if =} \\
+\texttt{summarize(df, x)}         & full dict          & + \texttt{detail=true} \\
+\texttt{correlate(df, x, y, ...)} & correlation matrix & display \\
+\texttt{codebook df}              & per-column summary & display \\
+\texttt{tabulate df col}          & frequencies        & display \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{DataFrame manipulation}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Function} & \textbf{Description} \\
+\midrule
+\texttt{load "f" as df}           & Load file (CSV, parquet) \\
+\texttt{save df "f"}              & Save file \\
+\texttt{count(df [, cond])}       & Number of rows \\
+\texttt{filter(df, cond)}         & Filter rows \\
+\texttt{select(df, cols...)}      & Select columns \\
+\texttt{drop(df, cols...)}        & Drop columns \\
+\texttt{generate df col = expr}   & Create/modify column \\
+\texttt{replace df col = e if c}  & Modify with condition \\
+\texttt{sort(df, col [desc])}     & Sort \\
+\texttt{dropna(df [, cols...])}   & Remove NaN \\
+\texttt{append(df1, df2)}         & Stack vertically \\
+\texttt{merge(df1, df2, on=col)}  & Horizontal join \\
+\texttt{group\_by(df, col, agg)}  & Aggregate by group \\
+\texttt{collapse(df, expr, by=c)} & Collapse by group \\
+\texttt{pivot\_longer(...)}       & Wide $\to$ long \\
+\texttt{pivot\_wider(...)}        & Long $\to$ wide \\
+\texttt{reshape(df, ...)}         & General reshape \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Random generators}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Function} & \textbf{Distribution} \\
+\midrule
+\texttt{rnormal()}       & $U(0,1)$ — uniform, \emph{not} normal$^*$ \\
+\texttt{runiform()}      & $U(0,1)$ — alias of \texttt{rnormal()} \\
+\texttt{rbernoulli(p)}   & Bernoulli with fixed probability $p$ \\
+\texttt{seed(n)}         & Sets PRNG seed for reproducibility \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+{\footnotesize $^*$ \textbf{Warning:} \texttt{rnormal()} in Hayashi generates $U(0,1)$.
+  To simulate $N(0,1)$, use the transformation $\Phi^{-1}(u)$ or the sum of 12 uniform
+  variables (central limit theorem). In future versions, \texttt{rnormal()}
+  may be corrected to $N(0,1)$.}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Linear regression and extensions}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Estimator} & \textbf{Syntax} \\
+\midrule
+OLS               & \texttt{ols(y \textasciitilde{} x1 + x2, df)} \\
+IV/2SLS           & \texttt{iv(y \textasciitilde{} x, \textasciitilde{} z, df)} \\
+GMM               & \texttt{gmm(y \textasciitilde{} x, \textasciitilde{} z1 + z2, df)} \\
+WLS               & \texttt{wls(y \textasciitilde{} x, df, weights="w")} \\
+Rolling OLS       & \texttt{rols(y \textasciitilde{} x, df, window=50)} \\
+\midrule
+LASSO             & \texttt{lasso(y \textasciitilde{} x1+...+xk, df, alpha=0.1)} \\
+Ridge             & \texttt{ridge\_reg(y \textasciitilde{} x1+...+xk, df, alpha=0.5)} \\
+Elastic Net       & \texttt{enet(y \textasciitilde{} x1+...+xk, df, alpha=0.5)} \\
+\midrule
+Bootstrap         & \texttt{bootstrap("ols", y \textasciitilde{} x, df, reps=500)} \\
+\midrule
+Quantile regression  & \texttt{qreg(y \textasciitilde{} x, df, tau=0.5)} \\
+Robust regression    & \texttt{rlm(y \textasciitilde{} x, df)} \\
+LOWESS               & \texttt{lowess(df, y, x, frac=0.3)} \\
+\midrule
+SUR (Zellner)     & \texttt{sur(df, y1 \textasciitilde{} x1, y2 \textasciitilde{} x2)} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+{\footnotesize \textbf{Regularization:} in \texttt{lasso}, \texttt{alpha} is the penalty
+strength $\lambda$ (larger = more zeros). In \texttt{enet}, \texttt{alpha}
+is the L1/(L1+L2) mixing (0 = Ridge, 1 = LASSO).}
+
+\section{Panel data}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Estimator} & \textbf{Syntax} \\
+\midrule
+FE (within)      & \texttt{fe(y \textasciitilde{} x, df, id=unit)} \\
+RE (GLS)         & \texttt{re(y \textasciitilde{} x, df, id=unit)} \\
+FE with IV       & \texttt{feiv(y \textasciitilde{} x, z \textasciitilde{} z+w, df, id="unit")} \\
+Hausman          & \texttt{hausman(m\_fe, m\_re)} \\
+Mundlak (CRE)    & \texttt{mundlak(df, y \textasciitilde{} x, id="unit")} \\
+AB-GMM           & \texttt{ab(y \textasciitilde{} x, df, id=unit, time=t, lags=2)} \\
+PCSE             & \texttt{pcse(y \textasciitilde{} x, df, id=unit, time=t)} \\
+GEE              & \texttt{gee(y \textasciitilde{} x, df, id=unit)} \\
+xtgls            & \texttt{xtgls(y \textasciitilde{} x, df, id=unit, time=t)} \\
+Mixed model      & \texttt{mixedlm(y \textasciitilde{} x, df, id="unit")} \\
+Cond. logit (FE) & \texttt{clogit(y \textasciitilde{} x, df, group="unit")} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Causal inference}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Method} & \textbf{Syntax} \\
+\midrule
+DiD              & \texttt{did(y \textasciitilde{} treated + post, df)} \\
+RDD              & \texttt{rd(y \textasciitilde{} x, 0.0, df)} \\
+PSM              & \texttt{psm(y \textasciitilde{} d + x1, df, k=1, caliper=0.05, boot=200)} \\
+Synthetic control & \texttt{synth("y", treated\_id, t0, df, id="col", time="col")} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+{\footnotesize \textbf{PSM:} without \texttt{caliper}, ATT can be biased even with PSM.
+\textbf{synth:} \texttt{t0} = first post-treatment period (inclusive).}
+
+\section{Special dependent variables}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Model} & \textbf{Syntax} \\
+\midrule
+Logit / Probit     & \texttt{logit(y \textasciitilde{} x, df)} \quad \texttt{probit(y \textasciitilde{} x, df)} \\
+Marginal effects   & \texttt{margins(m, df)} \\
+Multinomial logit  & \texttt{mlogit(y \textasciitilde{} x, df)} \\
+Ordered logit      & \texttt{ologit(y \textasciitilde{} x, df)} \\
+Ordered probit     & \texttt{oprobit(y \textasciitilde{} x, df)} \\
+\midrule
+Poisson            & \texttt{poisson(y \textasciitilde{} x, df)} \\
+Negative binomial  & \texttt{nbreg(y \textasciitilde{} x, df)} \\
+Zero-inflated      & \texttt{zinb(y \textasciitilde{} x, df)} \\
+\midrule
+Tobit              & \texttt{tobit(y \textasciitilde{} x, df)} \\
+Heckman            & \texttt{heckman(y\_out \textasciitilde{} x, s \textasciitilde{} z, df)} \\
+\midrule
+General GLM        & \texttt{glm(y \textasciitilde{} x, df, family=gamma, link=log)} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{GLM Family} & \textbf{Available links} \\
+\midrule
+\texttt{gaussian}  & \texttt{identity}, \texttt{log}, \texttt{inverse} \\
+\texttt{binomial}  & \texttt{logit}, \texttt{probit}, \texttt{cloglog} \\
+\texttt{poisson}   & \texttt{log}, \texttt{identity} \\
+\texttt{gamma}     & \texttt{log}, \texttt{inverse}, \texttt{identity} \\
+\texttt{inverseGaussian} & \texttt{inverse\_squared} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Survival analysis}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Method} & \textbf{Syntax} \\
+\midrule
+Kaplan-Meier & \texttt{km(time, event, df)} \\
+Cox PH       & \texttt{cox(time \textasciitilde{} x1 + x2, df, event=event)} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+{\footnotesize \textbf{Cox:} \texttt{exp(coef)} = hazard ratio.
+\texttt{event} is the failure (1) / censoring (0) indicator column.}
+
+\section{Time series}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Model} & \textbf{Syntax} \\
+\midrule
+ARMA/ARIMA       & \texttt{arima(df, y, p=1, d=0, q=1)} \\
+AR($p$) via OLS  & \texttt{autoreg(df, y, lags=2, trend="c")} \\
+ARDL($p$,$q$)    & \texttt{ardl(y \textasciitilde{} x1 + x2, df, lags=p, xlags=q)} \\
+GARCH            & \texttt{garch(df, y, p=1, q=1)} \\
+EGARCH / GJR     & \texttt{garch(df, y, p=1, q=1, type=egarch)} \\
+\midrule
+ADF              & \texttt{adf(df, var)} \\
+KPSS             & \texttt{kpss(df, var)} \\
+Phillips-Perron  & \texttt{phillips\_perron(df, var)} \\
+Zivot-Andrews    & \texttt{zivot(df, var)} \\
+\midrule
+VAR              & \texttt{var(df, y1, y2, lags=2)} \\
+VECM             & \texttt{vecm(df, y1, y2, lags=1, r=1)} \\
+Cointegration    & \texttt{johansen(df, y1, y2, lags=1)} \\
+Granger          & \texttt{granger(df, y1, y2, lags=2)} \\
+IRF (reduced)    & \texttt{irf(m\_var, steps=12)} \\
+SVAR Cholesky    & \texttt{svar(df, y1, y2, lags=1, id=cholesky)} \\
+SVAR long-run    & \texttt{svar(df, y1, y2, lags=1, id=longrun)} \\
+Structural IRF   & \texttt{sirf(m\_svar, steps=12)} \\
+Markov Switching & \texttt{markov(df, y, k=2, p=1)} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Filters and decomposition}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Filter} & \textbf{Syntax} & \textbf{Output} \\
+\midrule
+Hodrick-Prescott   & \texttt{hprescott(df, y, lambda=1600)}       & \texttt{y\_trend}, \texttt{y\_cycle} \\
+Baxter-King        & \texttt{baxter\_king(df, y, low=6, high=32, k=12)} & \texttt{y\_cycle} \\
+Holt-Winters / ETS & \texttt{holtwinters(df, y, trend=add, seasonal=add, period=12)} & ETS model \\
+STL                & \texttt{stl(df, y, period=12)}               & \texttt{y\_trend}, \texttt{y\_seasonal}, \texttt{y\_resid} \\
+Christiano-Fitz.   & \texttt{christiano\_fitzgerald(df, y, low=6, high=32)} & \texttt{y\_cycle} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+{\footnotesize \textbf{Edge loss:} HP loses endpoints; BK loses $k$ observations at each end;
+CF and STL keep all points.
+\textbf{Note:} \texttt{hamilton()} is an alias for Markov Switching (Hamilton 1989),
+\emph{not} for the Hamilton 2018 filter.
+\textbf{autoreg trend:} \texttt{"c"} = constant (default);
+\texttt{"ct"} = constant + trend; \texttt{"t"} = trend only; \texttt{"n"} = none.
+\textbf{ARDL:} standard formula \texttt{y \textasciitilde{} x}; \texttt{lags} = lags of $y$;
+\texttt{xlags} = lags of each regressor; includes contemporaneous $x$ automatically.}
+
+\section{Multivariate analysis}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Method} & \textbf{Syntax} \\
+\midrule
+PCA               & \texttt{pca(df, v1, v2, ..., n=2)} \\
+Factor analysis   & \texttt{factor(df, v1, v2, ..., n=2, rotation=varimax)} \\
+Canonical corr.   & \texttt{cancorr(df, xvars=["v1","v2"], yvars=["v3","v4"])} \\
+MANOVA            & \texttt{manova(df, y1, y2, by="group")} \\
+KDE               & \texttt{kde(df, var, bwidth=0.5)} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Hypothesis tests}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Test} & \textbf{Syntax} \\
+\midrule
+$t$ — one sample    & \texttt{ttest(df, var, mu=0.0)} \\
+$t$ — two groups    & \texttt{ttest(df, var, by=group)} \\
+$t$ — paired        & \texttt{ttest(df, var1, var2, paired=true)} \\
+ANOVA               & \texttt{anova(df, var, by=group)} \\
+Kruskal-Wallis      & \texttt{kruskal\_wallis(df, var, by=group)} \\
+\midrule
+Normality (SW)      & \texttt{swilk(df, var)} \\
+Normality (SF)      & \texttt{sfrancia(df, var)} \\
+Homoscedasticity    & \texttt{vif(m\_ols)} \\
+Hausman             & \texttt{hausman(m\_fe, m\_re)} \\
+Linear test         & \texttt{test(m, "x1 = x2")} \\
+Linear combination  & \texttt{lincom(m, "x1 + x2")} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Presenting results}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Function} & \textbf{Description} \\
+\midrule
+\texttt{display m}             & Display model result \\
+\texttt{esttab(m1, m2, ...)}   & Comparison table \\
+\texttt{eststo(m, "name")}     & Store model for \texttt{esttab} \\
+\texttt{predict(m, df)}        & Adds column \texttt{yhat} to df \\
+\texttt{margins(m, df)}        & Average marginal effects (AME) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Building a panel (formulas)}
+
+To build a panel from a stacked DataFrame ($N$ units, $T$ periods):
+
+\begin{lstlisting}[style=inline]
+generate df unit = (_n - 1) % N + 1
+generate df t    = (_n - (_n - 1) % N - 1) / N + 1
+\end{lstlisting}
+
+Where \texttt{N} is the number of units. Replace \texttt{N} with the numeric value.
+
+\section{REPL shortcuts}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Shortcut} & \textbf{Action} \\
+\midrule
+\texttt{exit}    & Exit the REPL \\
+\texttt{Ctrl-D}  & Exit the REPL (EOF) \\
+\texttt{Ctrl-C}  & Cancel current line \\
+\texttt{Ctrl-R}  & Search history \\
+\bottomrule
+\end{tabular}
+\end{center}

@@ -1,0 +1,118 @@
+\chapter{Modules and \texttt{source}}
+
+\section{What is a module in Hayashi}
+
+In \hayashi{}, a module is simply a \texttt{.hay} file. There is no
+package system and no export declarations — any definition in the file
+becomes available in the scope of whoever loads it.
+
+This model is intentional: the language is still growing, and the
+complexity of a module system with namespaces, visibility rules, and
+dependency resolution is added when there is real demand. For now,
+\lstinline{source} covers all practical use cases.
+
+\section{The \texttt{source} command}
+
+\lstinline{source} executes a \texttt{.hay} file in the current context.
+All definitions from the file become visible from that point on:
+
+\begin{lstlisting}[caption={Loading a module}]
+source "lib/statistics.hay"
+source "lib/plots.hay"
+
+// functions from statistics.hay and plots.hay are available
+let result = compute_gini(df)
+\end{lstlisting}
+
+\section{Organising a project}
+
+The typical structure of a \hayashi{} project:
+
+\begin{lstlisting}[style=inline]
+project/
+  main.hay           -- entry point
+  lib/
+    data.hay         -- loading and cleaning functions
+    estimators.hay   -- custom econometric functions
+    tables.hay       -- result formatting
+  data/
+    raw.csv
+    panel.dta
+  results/
+\end{lstlisting}
+
+\texttt{main.hay}:
+
+\begin{lstlisting}
+source "lib/data.hay"
+source "lib/estimators.hay"
+source "lib/tables.hay"
+
+load "data/panel.dta" as df
+
+let df_clean = prepare(df)
+let model    = estimate_fe(df_clean, income ~ educ + exp)
+
+regression_table(model, "results/table1.tex")
+\end{lstlisting}
+
+\section{Scope of \texttt{source}}
+
+The file loaded with \lstinline{source} executes in the global scope of
+the main file. This means:
+
+\begin{itemize}
+  \item Functions defined in the file are globally visible.
+  \item Top-level variables in the file are also in global scope.
+  \item There are no namespaces: if two files define
+        \lstinline{fn compute(...)}, the second overwrites the first.
+\end{itemize}
+
+\begin{aviso}
+  Since there are no namespaces, avoid generic names in reusable modules.
+  Prefer \texttt{gini\_compute} over just \texttt{compute}.
+\end{aviso}
+
+\section{Creating a library}
+
+A library file is a \texttt{.hay} file with functions and constants, with
+no top-level code that produces side effects on load:
+
+\begin{lstlisting}[caption={lib/utils.hay}]
+const PI = 3.14159265358979
+
+fn round_to(x, digits) {
+  let factor = 10^digits
+  int(x * factor + 0.5) / float(factor)
+}
+
+fn between(x, lo, hi) {
+  x >= lo and x <= hi
+}
+
+fn clamp(x, lo, hi) {
+  if x < lo { lo } else if x > hi { hi } else { x }
+}
+\end{lstlisting}
+
+\begin{lstlisting}[caption={main.hay}]
+source "lib/utils.hay"
+
+display round_to(3.14159, 2)    // 3.14
+display between(5, 1, 10)       // true
+display clamp(15, 0, 10)        // 10
+\end{lstlisting}
+
+\section{Roadmap}
+
+In future versions, \hayashi{} will have a module system with:
+
+\begin{itemize}
+  \item Explicit namespaces (\texttt{use module::function})
+  \item Distribution via a central registry
+  \item Dependency declarations in a manifest
+\end{itemize}
+
+The transition from \lstinline{source} to that system will be
+backwards-compatible: \texttt{.hay} files will continue to work as
+modules.

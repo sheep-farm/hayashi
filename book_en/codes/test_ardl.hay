@@ -1,0 +1,27 @@
+seed(42)
+input df
+id
+1
+end
+for i in 1..=9 { df = append(df, df) }
+df |> filter(_n <= 300)
+generate df t  = _n
+generate df e  = (rnormal() - 0.5) * 1.0
+generate df x  = (rnormal() - 0.5) * 2.0
+generate df y  = 1.0 + 2.0 * x + 0.5 * (rnormal() - 0.5)
+
+// AutoReg(2): AR puro em y
+let m_ar = autoreg(df, y, lags=2)
+display m_ar
+
+// AutoReg com tendência
+let m_ar_ct = autoreg(df, y, lags=1, trend="ct")
+display m_ar_ct
+
+// ARDL(1,1): 1 lag de y + x contemporâneo e 1 lag de x
+let m_ardl = ardl(y ~ x, df, lags=1, xlags=1)
+display m_ardl
+
+// ARDL(2,2)
+let m_ardl2 = ardl(y ~ x, df, lags=2, xlags=2)
+display m_ardl2

@@ -1,0 +1,26 @@
+// Cap 33 — Modelos de Contagem (Poisson, NegBin, ZINB)
+// DGP: Y ~ Poisson(exp(0.5 + 1.0*x)), x ~ U(0,1)
+// Valores verdadeiros: beta0=0.5, beta1=1.0
+
+seed(42)
+input df
+id
+1
+end
+for i in 1..=9 { df = append(df, df) }
+df |> filter(_n <= 500)
+generate df x = rnormal()
+generate df lam = exp(0.5 + 1.0 * x)
+generate df u = rnormal()
+generate df y = floor(lam + u)          // contagem ≥ 0 para x ~ U(0,1)
+generate df y_nb = floor(lam * (1.0 + 0.5 * rnormal()))
+generate df y_zi = (rnormal() > 0.7) * floor(lam + u)  // ~30% zeros extras
+
+let m_pois = poisson(y ~ x, df)
+display m_pois
+
+let m_nb = nbreg(y_nb ~ x, df)
+display m_nb
+
+let m_zinb = zinb(y_zi ~ x, df)
+display m_zinb

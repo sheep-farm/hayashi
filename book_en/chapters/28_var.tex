@@ -1,0 +1,227 @@
+\chapter{VAR and Granger Causality}
+\label{cap:var}
+% ── index ───────────────────────────────────────────────────────
+\index{VAR|textbf}
+\index{vector autoregressive|see{VAR}}
+\index{var@\texttt{var()}|textbf}
+\index{Granger causality|textbf}
+\index{granger@\texttt{granger()}|textbf}
+\index{impulse response function|textbf}
+\index{irf@\texttt{irf()}|textbf}
+\index{variance decomposition}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{The VAR model}
+
+The Vector Autoregressive model (\textbf{VAR($p$)}) generalizes AR to
+multivariate systems. With $K$ variables and $p$ lags:
+
+\[
+  \mathbf{y}_t = \mathbf{c} + \mathbf{A}_1 \mathbf{y}_{t-1}
+                 + \cdots + \mathbf{A}_p \mathbf{y}_{t-p}
+                 + \boldsymbol{\varepsilon}_t
+\]
+
+where $\mathbf{y}_t = (y_{1t}, \ldots, y_{Kt})'$ is the vector of variables,
+$\mathbf{A}_j$ are $K \times K$ coefficient matrices and
+$\boldsymbol{\varepsilon}_t \sim (0, \Sigma_u)$ is the vector of shocks that are
+uncorrelated over time but potentially correlated with each other.
+
+The VAR is estimated equation by equation via OLS --- each equation is an AR($p$)
+in the $K$ lagged variables. The stationarity condition requires that all
+eigenvalues of $\mathbf{A}_1 + \cdots + \mathbf{A}_p$ lie inside the
+unit circle.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Granger Causality}
+
+$x$ \textbf{Granger-causes} $y$ if lags of $x$ have predictive power
+for $y$ beyond what lags of $y$ alone provide. Formally, the hypothesis tested is:
+\[
+  H_0: A_{12}(1) = A_{12}(2) = \cdots = A_{12}(p) = 0
+\]
+in the equation for $y_1$, where $A_{12}(j)$ is the coefficient of $y_{2,t-j}$.
+
+The test is a standard F-test in the auxiliary equation:
+\[
+  F = \frac{(RSS_r - RSS_u)/p}{RSS_u / (T - 2p - 1)} \sim F(p,\; T-2p-1)
+\]
+
+\begin{nota}
+  Granger causality is \emph{predictability}, not structural causality.
+  $x$ that precedes $y$ and correlates with it passes the test,
+  even without a direct causal relationship.
+\end{nota}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Impulse Response Function}
+
+The \textbf{IRF} (\emph{Impulse Response Function}) traces the effect of a
+unit shock in $y_k$ on all variables over time.
+
+The MA($\infty$) representation of the VAR is $\mathbf{y}_t = \sum_{h=0}^\infty
+\mathbf{\Phi}_h \boldsymbol{\varepsilon}_{t-h}$, with $\mathbf{\Phi}_0 = I$
+and $\mathbf{\Phi}_h = \mathbf{A}_1 \mathbf{\Phi}_{h-1} + \cdots +
+\mathbf{A}_p \mathbf{\Phi}_{h-p}$. The orthogonalized IRF uses the Cholesky
+decomposition of $\Sigma_u$ to isolate uncorrelated shocks --- the
+\textbf{Cholesky ordering} (variable ordering) matters.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{DGP Verification}
+
+The DGP uses a bivariate VAR(1) with an asymmetric causality structure:
+$y_2$ causes $y_1$ (coefficient $0{,}2$), but $y_1$ causes $y_2$
+weakly (coefficient $0{,}1$):
+
+\[
+  \begin{pmatrix} y_{1t} \\ y_{2t} \end{pmatrix}
+  = \begin{pmatrix} 0{,}5 & 0{,}2 \\ 0{,}1 & 0{,}6 \end{pmatrix}
+    \begin{pmatrix} y_{1,t-1} \\ y_{2,t-1} \end{pmatrix}
+  + \begin{pmatrix} \varepsilon_{1t} \\ \varepsilon_{2t} \end{pmatrix}
+\]
+
+\begin{lstlisting}[caption={VAR(1) DGP --- Granger and IRF}]
+seed(42)
+input df
+id
+1
+end
+for i in 1..=9 { df = append(df, df) }
+df |> filter(_n <= 300)
+generate df e1 = rnormal()
+generate df e2 = rnormal()
+generate df y1 = 0.0
+generate df y2 = 0.0
+generate df t  = _n
+let n = nrow(df)
+let i = 2
+while i <= n {
+    let l1 = mean(df, y1, if = t == i - 1)
+    let l2 = mean(df, y2, if = t == i - 1)
+    let a  = mean(df, e1, if = t == i)
+    let b  = mean(df, e2, if = t == i)
+    replace df y1 = 0.5*l1 + 0.2*l2 + a if t == i
+    replace df y2 = 0.1*l1 + 0.6*l2 + b if t == i
+    i = i + 1
+}
+let m = var(df, y1, y2, lags=1)
+display m
+granger(df, y1, y2, lags=1)
+granger(df, y2, y1, lags=1)
+irf(m, steps=6)
+\end{lstlisting}
+
+\subsection*{Model fit}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+VAR(1)  N=299  AIC=-5.0269  BIC=-4.9526
+
+Sigma_u:
+  [ 0.0819  0.0046 ]
+  [ 0.0046  0.0772 ]
+\end{lstlisting}
+
+The residual covariance matrix $\hat\Sigma_u$ is nearly diagonal --- the
+shocks $\varepsilon_1$ and $\varepsilon_2$ are practically orthogonal,
+as specified in the DGP.
+
+\subsection*{Granger Causality}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+================== Granger Causality Test ==================
+  H₀: y2 does not Granger-cause y1   (lags=1)
+  F(1, 296) = 9.4437   p = 0.0023
+  Conclusion: REJECTS H₀ — y2 Granger-causes y1
+
+================== Granger Causality Test ==================
+  H₀: y1 does not Granger-cause y2   (lags=1)
+  F(1, 296) = 4.5768   p = 0.0332
+  Conclusion: REJECTS H₀ — y1 Granger-causes y2
+\end{lstlisting}
+
+Both directions reject $H_0$: $y_2 \to y_1$ with $p = 0{,}002$ and
+$y_1 \to y_2$ with $p = 0{,}033$. The DGP imposes $\phi_{12} = 0{,}2$ and
+$\phi_{21} = 0{,}1$ --- bidirectional causality is detected, although
+$y_2 \to y_1$ is stronger.
+
+\subsection*{Impulse response}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+IRF — VAR(1) — 6 steps
+
+  Impulse: y1
+  ──────────────────────────────────────
+       h          y1          y2
+  ──────────────────────────────────────
+       1      0.2862      0.0161
+       2      0.1430      0.0382
+       3      0.0758      0.0364
+       4      0.0426      0.0286
+       5      0.0251      0.0207
+       6      0.0154      0.0145
+  ──────────────────────────────────────
+
+  Impulse: y2
+  ──────────────────────────────────────
+       h          y1          y2
+  ──────────────────────────────────────
+       1      0.0000      0.2774
+       2      0.0405      0.1595
+       3      0.0432      0.0958
+       4      0.0352      0.0595
+       5      0.0260      0.0378
+       6      0.0183      0.0243
+  ──────────────────────────────────────
+\end{lstlisting}
+
+A shock to $y_1$ has a rapid effect on $y_1$ (decays from $0{,}29$ to
+$0{,}015$ over 6 periods) and a small effect on $y_2$. A shock to $y_2$
+transmits progressively to $y_1$ --- reaches $0{,}043$ at period 3,
+then decays --- capturing the $\phi_{12} = 0{,}2$ channel of the DGP.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Lag selection}
+
+\begin{lstlisting}[caption={Comparison by number of lags}]
+let m1 = var(df, y1, y2, lags=1)
+let m2 = var(df, y1, y2, lags=2)
+let m3 = var(df, y1, y2, lags=3)
+esttab(m1, m2, m3)
+\end{lstlisting}
+
+The lag with the lowest BIC (parsimony) or AIC (fit) is selected.
+With the VAR(1) DGP, $p=1$ is expected to minimize both.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Syntax}
+
+\begin{lstlisting}
+var(df, y1, y2, lags=1)
+var(df, y1, y2, y3, lags=2)
+granger(df, y, x, lags=1)
+irf(m, steps=10)
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Typical workflow --- GDP and inflation}]
+load "macro.csv" as df
+
+adf(df, gdp)
+adf(df, cpi)
+
+let m = var(df, gdp, cpi, lags=2)
+granger(df, gdp, cpi, lags=2)
+granger(df, cpi, gdp, lags=2)
+irf(m, steps=12)
+\end{lstlisting}
+
+\begin{nota}
+  VAR requires \emph{stationary} series. If the variables are I(1) and
+  cointegrated, the appropriate model is the VECM (ch.~\ref{cap:coint}). If
+  they are I(1) but not cointegrated, difference before estimating.
+\end{nota}

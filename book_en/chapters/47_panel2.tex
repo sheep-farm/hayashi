@@ -1,0 +1,112 @@
+\chapter{Advanced Panel II}
+\label{cap:painel2}
+% ── index ───────────────────────────────────────────────────────
+\index{Mundlak, estimator of|textbf}
+\index{mundlak@\texttt{mundlak()}|textbf}
+\index{correlated random effects|see{Mundlak, estimator of}}
+\index{CRE|see{Mundlak, estimator of}}
+\index{xtgls@\texttt{xtgls()}|textbf}
+\index{mixed model|textbf}
+\index{mixedlm@\texttt{mixedlm()}|textbf}
+\index{conditional logit|textbf}
+\index{clogit@\texttt{clogit()}|textbf}
+\index{REML}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Beyond basic FE and RE}
+
+The estimators from ch.~\ref{cap:painel_avancado} (AB-GMM, PCSE, GEE) deal
+with dynamics and heteroscedasticity. Here we cover four complementary approaches:
+
+\begin{itemize}
+  \item \textbf{FE} — reference; standard fixed effects (within estimator)
+  \item \textbf{Mundlak (CRE)} — Correlated Random Effects; tests RE vs FE via $\gamma$
+  \item \textbf{xtgls} — panel GLS; flexible regarding the structure of $\Sigma$
+  \item \textbf{mixedlm} — mixed model with random intercepts
+  \item \textbf{clogit} — conditional logit for binary panel variables
+\end{itemize}
+
+\subsection*{Mundlak Estimator (CRE)}
+
+Mundlak (1978) shows that the RE estimator is equivalent to FE if:
+\[
+  \alpha_i = \gamma'\,\bar{x}_i + u_i \quad u_i \perp x_{it}
+\]
+Regresses $y_{it}$ on $x_{it}$ \emph{and} $\bar{x}_i$ (group mean).
+If $\hat{\gamma} \neq 0$, the fixed effect is necessary.
+
+\subsection*{Panel GLS (xtgls)}
+
+Panel GLS specifies a structure for the error covariance across
+entities. With \texttt{panels=hetero}, each panel has its own variance
+$\sigma_i^2$, allowing heteroscedasticity across panels.
+
+\subsection*{Mixed Model (mixedlm)}
+
+The linear mixed model specifies:
+\[
+  y_{it} = \beta x_{it} + u_i + \varepsilon_{it} \quad u_i \sim N(0, \sigma_u^2)
+\]
+where $u_i$ is a random intercept effect per entity. It differs from standard RE
+by using REML and integrating over $u_i$ via maximum likelihood.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{DGP Verification}
+
+DGP: endogenous static panel. $y = 1 + 2x + \alpha_i + \varepsilon$;
+$\alpha_i = 0{,}05 \cdot i$ correlated with $x$ (via $z$).
+$N = 50$ entities, $T = 20$ periods.
+
+\begin{lstlisting}[caption={Panel II: FE, Mundlak, xtgls, mixedlm, clogit}]
+seed(42)
+generate df unit  = (_n - 1) % 50 + 1
+generate df t     = (_n - (_n - 1) % 50 - 1) / 50 + 1
+generate df alpha = unit * 0.05
+generate df z     = (rnormal() - 0.5) * 1.7321
+generate df x     = 0.5 * z + alpha + (rnormal() - 0.5)
+generate df y     = 1.0 + 2.0 * x + alpha + e
+
+let m_fe   = fe(y ~ x, df, id=unit)
+let m_mund = mundlak(df, y ~ x, id="unit")
+let m_gls  = xtgls(y ~ x, df, id=unit, time=t)
+let m_mix  = mixedlm(y ~ x, df, id="unit")
+generate df yb = (y > 2.5)
+let m_cl   = clogit(yb ~ x, df, group="unit")
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small, frame=none,
+  numbers=none, backgroundcolor=\color{codbg}]
+FE (within):        x = 2.041 ***    (true: 2.0) ✓
+Mundlak:            x = 2.040,  γ(x̄) = 0.939 ***  → rejects RE
+xtgls (hetero):     x = 2.768 ***    (biased without demeaning)
+mixedlm:            x = 2.134 ***    (random intercept: σ²_u = 0.388)
+clogit (yb ~ x):    x = 1.397 ***    (groups with no variation dropped)
+\end{lstlisting}
+
+\subsection*{Mundlak Test}
+
+The test $H_0: \gamma = 0$ (means uncorrelated with $x$) rejects with
+$F = 419{,}96$, $p < 0{,}001$. This confirms that $x$ is endogenous — the
+RE estimator would be inconsistent and FE should be used.
+
+The xtgls without FE removal overestimates $\beta$ because it captures part of the
+individual effect. The mixedlm stays close to FE because it treats $\alpha_i$ as a
+normal random effect.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Syntax}
+
+\begin{lstlisting}
+fe(y ~ x, df, id=unit)                    // Fixed Effects (within)
+mundlak(df, y ~ x, id="unit")             // CRE: includes group means
+xtgls(y ~ x, df, id=unit, time=t)         // panel GLS
+xtgls(y ~ x, df, id=unit, time=t, panels="corr")  // correlated Σ
+mixedlm(y ~ x, df, id="unit")             // mixed model (REML)
+clogit(yb ~ x, df, group="unit")          // conditional logit
+\end{lstlisting}
+
+\begin{nota}
+  In clogit, groups where $y$ does not vary (all 0 or all 1) are
+  automatically dropped because they do not contribute to the conditional
+  likelihood. This reduces the effective sample, but is theoretically correct.
+\end{nota}
