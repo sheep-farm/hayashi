@@ -1,0 +1,224 @@
+\chapter{AutoReg and ARDL}
+\label{cap:ardl}
+% ── index ───────────────────────────────────────────────────────
+\index{ARDL|textbf}
+\index{ardl@\texttt{ardl()}|textbf}
+\index{AutoReg|textbf}
+\index{autoreg@\texttt{autoreg()}|textbf}
+\index{distributed lags|textbf}
+\index{long-run multiplier|textbf}
+\index{Pesaran, cointegration test of}
+\index{bounds test|see{Pesaran, cointegration test of}}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Models with lags in y and x}
+
+The ARIMA model (ch.~\ref{cap:arima}) deals only with the dynamics of $y$.
+In economics, however, the current level of $y$ depends not only on its own past,
+but also on current and past values of regressors $x$. The
+\emph{Autoregressive Distributed Lag} (ARDL) model captures exactly this.
+
+\subsection*{AutoReg(p): pure AR via OLS}
+
+The AR($p$) model writes $y_t$ as a linear function of its own lags:
+\[
+  y_t = c + \sum_{i=1}^p \phi_i\, y_{t-i} + \varepsilon_t
+\]
+Unlike ARIMA (estimated by MLE), \texttt{autoreg()} estimates via
+OLS. This is computationally simpler and asymptotically equivalent
+for stationary processes. The \texttt{trend} option allows including
+a constant and/or a deterministic trend:
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{trend} & \textbf{Deterministic component} \\
+\midrule
+\texttt{"c"}  & Constant (default) \\
+\texttt{"ct"} & Constant + linear trend \\
+\texttt{"t"}  & Trend only \\
+\texttt{"n"}  & None \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection*{ARDL(p, q): distributed lags}
+
+The ARDL($p$, $q$) model combines $p$ lags of $y$ with the
+contemporaneous value and $q$ lags of each regressor $x$:
+\[
+  y_t = c
+        + \sum_{i=1}^p \phi_i\, y_{t-i}
+        + \sum_{j=0}^q \beta_j\, x_{t-j}
+        + \varepsilon_t
+\]
+
+The \textbf{long-run multiplier} of $x$ on $y$ — the total accumulated
+effect after all dynamic adjustments — is:
+\[
+  \theta = \frac{\sum_{j=0}^q \beta_j}{1 - \sum_{i=1}^p \phi_i}
+\]
+For the model to be stationary, $\left|\sum_{i=1}^p \phi_i\right| < 1$ is required.
+
+\subsection*{Relationship with the VECM and the Pesaran test}
+
+When $y$ and $x$ are integrated of order 1 ($I(1)$), the ARDL can be
+rewritten in error correction form. Pesaran, Shin and Smith (2001)
+propose the \emph{bounds test}: tests $H_0$ of no long-run relationship
+via the $F$ statistic applied to the unrestricted ARDL, comparing with
+tabulated critical values. The advantage over Johansen (ch.~\ref{cap:coint}) is that
+the bounds test works regardless of whether $x$ is $I(0)$ or $I(1)$.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{DGP Verification}
+
+DGP: $y_t = 1 + 2x_t + \varepsilon_t$, no autocorrelation in $y$.
+$N = 300$, $x \sim U(-\sqrt{3}, \sqrt{3})$, $\varepsilon \sim U(-0{,}5, 0{,}5)$.
+
+\begin{lstlisting}[caption={AutoReg and ARDL}]
+seed(42)
+// ... (300 obs, generation of x and e)
+generate df y = 1.0 + 2.0 * x + 0.5 * (rnormal() - 0.5)
+
+// Pure AR(2): no true autocorrelation in y → coefs ~0
+let m_ar   = autoreg(df, y, lags=2)
+display m_ar
+
+// AR(1) with deterministic trend
+let m_ar_ct = autoreg(df, y, lags=1, trend="ct")
+display m_ar_ct
+
+// ARDL(1,1)
+let m_ardl  = ardl(y ~ x, df, lags=1, xlags=1)
+display m_ardl
+
+// ARDL(2,2): check whether extra lags are significant
+let m_ardl2 = ardl(y ~ x, df, lags=2, xlags=2)
+display m_ardl2
+\end{lstlisting}
+
+\subsection*{Pure AR(2)}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small, frame=none,
+  numbers=none, backgroundcolor=\color{codbg}]
+================================= AutoReg(2) =================================
+Observations:               298
+R-squared:               0.0004
+AIC:                   905.2221
+
+-------------------------------- Coefficients --------------------------------
+                        coef      std err            t        P>|t|
+------------------------------------------------------------------------------
+const                 0.9904       0.1022       9.6914       0.0000
+y.L1                  0.0007       0.0580       0.0118       0.9906
+y.L2                 -0.0209       0.0581      -0.3597       0.7193
+==============================================================================
+\end{lstlisting}
+
+$R^2 = 0{,}0004$ — lags of $y$ explain nothing, as per the DGP
+(no true autocorrelation). Coefficients \texttt{y.L1} and \texttt{y.L2}
+do not differ from zero.
+
+\subsection*{AR(1) with trend}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small, frame=none,
+  numbers=none, backgroundcolor=\color{codbg}]
+================================= AutoReg(1) =================================
+Trend:                       ct
+
+                        coef      std err            t        P>|t|
+------------------------------------------------------------------------------
+const                 0.9275       0.1394       6.6551       0.0000
+trend                 0.0003       0.0007       0.4172       0.6768
+y.L1                  0.0018       0.0581       0.0310       0.9753
+==============================================================================
+\end{lstlisting}
+
+The deterministic trend ($p = 0{,}68$) and the lag ($p = 0{,}98$) are not
+significant — consistent with a DGP without trend or persistence.
+
+\subsection*{ARDL(1,1)}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small, frame=none,
+  numbers=none, backgroundcolor=\color{codbg}]
+================================= ARDL(1, 1) =================================
+Observations:               299
+R-squared:               0.9836
+AIC:                  -318.6638
+
+                        coef      std err            t        P>|t|
+------------------------------------------------------------------------------
+const                 1.0018       0.0594      16.8580       0.0000
+y.L1                  0.0062       0.0583       0.1061       0.9155
+x1                    1.9648       0.0148     133.1872       0.0000
+x1.L1                -0.0078       0.1156      -0.0675       0.9462
+==============================================================================
+\end{lstlisting}
+
+The model recovers the DGP accurately: \texttt{const} $\approx 1{,}0$,
+\texttt{x1} $\approx 2{,}0$. The coefficient of \texttt{x1.L1} is not
+significant ($p = 0{,}95$), confirming no lagged effect of $x$
+in the DGP. The long-run multiplier is:
+\[
+  \theta = \frac{1{,}9648 + (-0{,}0078)}{1 - 0{,}0062} \approx 1{,}97
+\]
+close to the true value of 2{,}0.
+
+\subsection*{ARDL(2,2)}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small, frame=none,
+  numbers=none, backgroundcolor=\color{codbg}]
+================================= ARDL(2, 2) =================================
+Observations:               298
+R-squared:               0.9838
+AIC:                  -317.3857
+
+                        coef      std err            t        P>|t|
+------------------------------------------------------------------------------
+const                 1.0727       0.0833      12.8843       0.0000
+y.L1                  0.0013       0.0582       0.0220       0.9824
+y.L2                 -0.0662       0.0582      -1.1385       0.2558
+x1                    1.9628       0.0147     133.1320       0.0000
+x1.L1                 0.0018       0.1154       0.0154       0.9877
+x1.L2                 0.1264       0.1153       1.0968       0.2736
+==============================================================================
+\end{lstlisting}
+
+The AIC of ARDL(2,2) ($-317{,}4$) is slightly \emph{higher} (worse) than that
+of ARDL(1,1) ($-318{,}7$) — the extra lags do not compensate for the loss of
+degrees of freedom. AIC/BIC selection favors the more parsimonious model.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Syntax}
+
+\begin{lstlisting}
+// AR(p) via OLS
+autoreg(df, var, lags=1)                       // AR(1) with constant
+autoreg(df, var, lags=p, trend="ct")           // AR(p) with trend
+
+// ARDL(p,q)
+ardl(y ~ x, df, lags=p, xlags=q)              // one regressor
+ardl(gdp ~ inv + exp, df, lags=2, xlags=2)    // multiple regressors
+\end{lstlisting}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Model} & \textbf{Command} & \textbf{Use case} \\
+\midrule
+AR($p$)      & \texttt{autoreg(df, y, lags=p)}       & Pure dynamics of $y$ \\
+ARIMA($p,d,q$) & \texttt{arima(df, y, p=, d=, q=)}  & $I(1)$ with MA \\
+ARDL($p,q$)  & \texttt{ardl(y{\raise.17ex\hbox{$\scriptstyle\sim$}}x, df, lags=p, xlags=q)} & $y$ and $x$ with lags \\
+VECM         & \texttt{vecm(...)}                     & Multivariate cointegration \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{nota}
+  For $I(1)$ series, the ARDL can be rewritten in error correction form.
+  The Pesaran et al.\ (2001) bounds test tests the existence of a
+  long-run relationship without requiring all regressors to be $I(0)$
+  or all $I(1)$ — an advantage over the Johansen test. The $F$ statistic
+  of the test is accessible via \texttt{m\_ardl.bounds\_test(y, x)} in the
+  Rust API of Greeners, but is not yet exposed as a DSL command.
+\end{nota}

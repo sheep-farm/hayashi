@@ -1,0 +1,206 @@
+\chapter{Propensity Score Matching}
+\label{cap:psm}
+% ── index ──────────────────────────────────────────────────────
+\index{propensity score matching|textbf}
+\index{PSM|see{propensity score matching}}
+\index{psm@\texttt{psm()}|textbf}
+\index{propensity score|textbf}
+\index{ATT|see{average treatment effect on the treated}}
+\index{caliper}
+\index{selection bias}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Selection on Observables}
+
+In many observational studies, treatment assignment is not random
+— individuals select into treatment based on observable characteristics
+$X$. If $X$ also affects the outcome $Y$, direct comparison between
+treated and controls produces biased estimates.
+
+\textbf{Propensity Score Matching} (PSM) exploits the Rosenbaum and
+Rubin (1983) theorem: if treatment assignment is independent of potential
+outcomes given $X$ (\emph{ignorability}), then the same independence holds
+given the propensity score $p(X) = P(D=1 \mid X)$:
+
+\[
+  (Y^0, Y^1) \perp D \mid X
+  \quad\Longrightarrow\quad
+  (Y^0, Y^1) \perp D \mid p(X)
+\]
+
+This reduces the high-dimensional problem (conditioning on $X$) to a
+one-dimensional problem (conditioning on $\hat{p}$). PSM:
+\begin{enumerate}
+  \item Estimates $\hat{p}(X_i)$ via logit (propensity score).
+  \item Matches each treated unit with the closest control(s) in $\hat{p}$.
+  \item Computes the ATT as the mean difference in the matched sample.
+\end{enumerate}
+
+The common support (\emph{overlap}) condition: $0 < p(X) < 1$ for all $X$
+is essential — units with probability 0 or 1 of treatment have no counterfactual
+in the other group.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{DGP Verification}
+
+The DGP creates confounding via $x_1$: those with high $x_1$ have a higher
+probability of treatment and also a higher outcome on average. The true ATT is $\tau = 2$.
+
+\[
+  P(D=1 \mid x_1) = 0{,}3 + 0{,}4\,x_1 \in [0{,}30,\; 0{,}70]
+  \qquad
+  y_i = 1 + 2\,d_i + 3\,x_{1i} + \varepsilon_i
+\]
+
+\begin{lstlisting}[caption={DGP with selection on observables}]
+seed(42)
+input df
+id
+1
+end
+for i in 1..=10 { df = append(df, df) }
+df |> filter(_n <= 1000)
+generate df x1 = rnormal()                    // x1 ~ U(0,1)
+generate df u  = rnormal()                    // assignment noise
+generate df d  = (0.3 + 0.4*x1) > u          // P(D=1|x1) ∈ [0.30, 0.70]
+generate df e  = rnormal()
+generate df y  = 1.0 + 2.0*d + 3.0*x1 + e   // true ATT = 2
+\end{lstlisting}
+
+\subsection*{Naive OLS vs.\ OLS with controls}
+
+\begin{lstlisting}[caption={OLS comparison without and with x1 control}]
+let m_ols = ols(y ~ d, df)          // no control: biased
+let m_adj = ols(y ~ d + x1, df)    // with control: unbiased
+display m_ols
+display m_adj
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+── OLS without control ───────────────────────────────
+const  2.9135***  (0.0398)    d  2.2215***  (0.0562)
+N=1000  R²=0.6105
+──────────────────────────────────────────────────────
+
+── OLS with x1 ───────────────────────────────────────
+const  1.5289***  (0.0193)    d  1.9762***  (0.0180)
+x1     3.0053***  (0.0317)
+N=1000  R²=0.9610
+──────────────────────────────────────────────────────
+\end{lstlisting}
+
+OLS without control overestimates $\tau$ by $+0{,}22$ (2.22 vs.\ 2.0) — omitted
+variable bias. Controlling for $x_1$ the OLS recovers $\hat\tau = 1{,}98$,
+indistinguishable from 2.
+
+\subsection*{PSM without caliper}
+
+\begin{lstlisting}[caption={1:1 PSM without caliper}]
+let m_psm = psm(y ~ d + x1, df, k=1, boot=200)
+display m_psm
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+════════════════════════════════════════════════════════════════════════
+ Propensity Score Matching  —  ATT
+════════════════════════════════════════════════════════════════════════
+ Outcome: y   Treatment: d
+ k=1 match   Caliper: none   Bootstrap SE: 200 reps
+ N treated: 503   N controls: 497   N matched treated: 497
+────────────────────────────────────────────────────────────────────────
+ ATT = 2.2168   SE = 0.0643   z = 34.483   P>|z| = 0.0000  ***
+ 95% CI: [2.0908, 2.3428]
+────────────────────────────────────────────────────────────────────────
+ Balance  x1:  μ_Treat=0.542  μ_Ctrl(raw)=0.461  μ_Ctrl(mtch)=0.461
+                SMD_before=0.291   SMD_after=0.291
+ (!) SMD > 0.10 after matching — poorly balanced covariate
+════════════════════════════════════════════════════════════════════════
+\end{lstlisting}
+
+Without a caliper, matching accepts pairs that are distant in $\hat{p}$. Balance
+does not improve (SMD = 0.291 before and after) and the estimate remains biased
+($\hat\tau = 2{,}22$).
+
+\subsection*{PSM with caliper}
+
+The caliper limits the maximum distance allowed in matching. The practical rule
+of Cochran and Rubin (1973) is caliper $= 0{,}2 \times \sigma_{\hat{p}}$, which
+corresponds approximately to $0{,}05$ for uniform scores.
+
+\begin{lstlisting}[caption={PSM with caliper = 0.05}]
+let m_cal = psm(y ~ d + x1, df, k=1, caliper=0.05, boot=200)
+display m_cal
+\end{lstlisting}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+════════════════════════════════════════════════════════════════════════
+ Propensity Score Matching  —  ATT
+════════════════════════════════════════════════════════════════════════
+ Outcome: y   Treatment: d
+ k=1 match   Caliper: 0.0500   Bootstrap SE: 200 reps
+ N treated: 503   N controls: 497   N matched treated: 449
+────────────────────────────────────────────────────────────────────────
+ ATT = 2.0323   SE = 0.0233   z = 87.157   P>|z| = 0.0000  ***
+ 95% CI: [1.9866, 2.0780]
+────────────────────────────────────────────────────────────────────────
+ Balance  x1:  μ_Treat=0.542  μ_Ctrl(raw)=0.461  μ_Ctrl(mtch)=0.485
+                SMD_before=0.291   SMD_after=0.204
+════════════════════════════════════════════════════════════════════════
+\end{lstlisting}
+
+With caliper $= 0{,}05$, the estimated ATT is $2{,}03$ — practically on the
+true value. The cost is the loss of 54 treated units with no acceptable match
+(503 → 449). The caliper reduces the SMD from 0.29 to 0.20, evidencing better
+balance.\footnote{%
+  The \texttt{SMD > 0.10} warning persists because the conventional rule requires
+  SMD $\leq 0{,}10$ (Austin 2009). In this DGP the confounding by $x_1$ is intense
+  ($\beta_{x_1} = 3$) and $N = 1000$; with more observations the caliper could
+  be narrowed to further improve balance.}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Syntax}
+
+\begin{lstlisting}
+psm(outcome ~ treatment + cov1 + cov2, df)
+psm(outcome ~ treatment + cov1 + cov2, df, k=1, caliper=0.05, replace=false, boot=200)
+\end{lstlisting}
+
+The formula: \lstinline{outcome ~ treatment + cov1 + cov2 + ...}. The first
+regressor after \lstinline{~} is the treatment variable; the rest are the
+covariates used in the propensity model.
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Option} & \textbf{Default} & \textbf{Description} \\
+\midrule
+\texttt{k}        & 1       & number of controls per treated unit \\
+\texttt{caliper}  & none    & maximum distance in propensity score \\
+\texttt{replace}  & false   & matching with replacement \\
+\texttt{boot}     & 200     & bootstrap replicas for SE \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{lstlisting}[caption={Typical workflow — program evaluation}]
+load "beneficiarios.csv" as df
+
+// Selection covariates
+let m = psm(renda ~ tratado + idade + educ + regiao, df,
+            k=1, caliper=0.05, boot=500)
+display m
+\end{lstlisting}
+
+\begin{nota}
+  PSM is consistent under \emph{ignorability} (selection on observables):
+  $\{Y^0, Y^1\} \perp D \mid X$. Omitted variables that simultaneously affect
+  $D$ and $Y$ invalidate identification — the same problem that makes IV
+  necessary in ch.~\ref{cap:iv}. Unlike DiD
+  (ch.~\ref{cap:did}), PSM does not eliminate time-constant unobserved confounders.
+\end{nota}

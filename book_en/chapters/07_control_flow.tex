@@ -1,0 +1,93 @@
+\chapter{Control Flow}
+
+\section{\texttt{if} / \texttt{else}}
+
+\begin{lstlisting}[caption={Basic if/else structure}]
+let grade = 7.5
+
+if grade >= 7 {
+  display "passed"
+} else if grade >= 5 {
+  display "make-up exam"
+} else {
+  display "failed"
+}
+\end{lstlisting}
+
+\subsection*{\texttt{if} as an expression}
+
+\lstinline{if} can be used as an expression — it returns the value of the
+chosen branch:
+
+\begin{lstlisting}
+let status = if grade >= 7 { "passed" } else { "failed" }
+display status
+\end{lstlisting}
+
+When used as an expression, both branches must have the same type (or both
+\texttt{nil}).
+
+\section{\texttt{match}}
+
+\lstinline{match} compares a value against multiple patterns. The first
+matching pattern is executed:
+
+\begin{lstlisting}[caption={match with literals}]
+let code = 2
+
+match code {
+  1 => display "beginner"
+  2 => display "intermediate"
+  3 => display "advanced"
+  _ => display "unknown"
+}
+\end{lstlisting}
+
+The \lstinline{_} pattern is the wildcard — it matches any value.
+
+\subsection*{\texttt{match} with strings}
+
+\begin{lstlisting}
+let state = "TX"
+
+match state {
+  "TX" => display "Texas"
+  "CA" => display "California"
+  "NY" => display "New York"
+  _    => display f"Unknown state: {state}"
+}
+\end{lstlisting}
+
+\subsection*{\texttt{match} as an expression}
+
+\begin{lstlisting}
+let description = match code {
+  1 => "beginner"
+  2 => "intermediate"
+  _ => "advanced"
+}
+\end{lstlisting}
+
+\subsection*{Multiple values per arm}
+
+\begin{lstlisting}
+match code {
+  1 | 2    => display "basic"
+  3 | 4    => display "advanced"
+  _        => display "other"
+}
+\end{lstlisting}
+
+\section{Expression block}
+
+A \lstinline|\{ \}| block is an expression that evaluates to the last
+value produced inside it:
+
+\begin{lstlisting}
+let result = {
+  let a = 10
+  let b = 20
+  a + b      // this is the block's value
+}
+display result    // 30
+\end{lstlisting}

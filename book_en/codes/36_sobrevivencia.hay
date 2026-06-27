@@ -1,0 +1,26 @@
+// Cap 36 — Análise de Sobrevivência (Kaplan-Meier, Cox)
+// DGP: tempos de falha ~ Weibull com hazard proporcional em x
+// T = (-ln(U) / exp(0.8*x))^(1/1.5), censurado em c=3
+// Parâmetro verdadeiro: beta_x = 0.8 (log-hazard ratio)
+
+seed(42)
+input df
+id
+1
+end
+for i in 1..=9 { df = append(df, df) }
+df |> filter(_n <= 300)
+generate df x = rbernoulli(0.5)           // x binário: grupo 0 ou 1
+generate df u = rnormal()                  // u ~ U(0,1)
+generate df t_true = exp(-ln(u) / exp(0.8 * x))   // Weibull com beta=0.8
+generate df c = 3.0                        // tempo de censura fixo
+generate df time = t_true * (t_true <= c) + c * (t_true > c)
+generate df event = (t_true <= c)          // 1 = falhou, 0 = censurado
+
+// Kaplan-Meier — curva de sobrevivência marginal
+let m_km = km(time, event, df)
+display m_km
+
+// Cox — hazard proporcional com covariável x
+let m_cox = cox(time ~ x, df, event=event)
+display m_cox

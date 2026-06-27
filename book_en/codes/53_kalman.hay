@@ -1,0 +1,26 @@
+// Cap 53 — Filtro de Kalman
+// DGP: tendência linear + ruído de observação
+// Nível verdadeiro: mu_t = 10 + 0.1*t
+// Observação: y_t = mu_t + e_t,  e_t ~ U(-sqrt(3), sqrt(3))  => sigma ~ 1
+
+seed(42)
+input df
+id
+1
+end
+for i in 1..=8 { df = append(df, df) }
+df |> filter(_n <= 150)
+generate df t     = _n
+generate df noise = (rnormal() - 0.5) * 3.464   // aprox N(0,1) escalado: sd~1.0
+generate df mu    = 10.0 + 0.1 * t              // nível verdadeiro
+generate df y     = mu + noise                  // observação ruidosa
+
+// ─── Local Level (sigma especificado — próximo da verdade)
+kalman(df, y, model="ll", sigma_obs=1.0, sigma_state=0.1)
+
+// ─── Local Linear Trend (sigmas automáticos)
+kalman(df, y, model="llt")
+
+// Verificar: smoothed deve ser próximo de mu
+summarize(df, mu)
+summarize(df, y_smoothed)

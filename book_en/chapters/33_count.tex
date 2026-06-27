@@ -1,0 +1,166 @@
+\chapter{Count Models}
+\label{cap:contagem}
+% ── index ──────────────────────────────────────────────────────
+\index{count models|textbf}
+\index{Poisson, regression|textbf}
+\index{poisson@\texttt{poisson()}|textbf}
+\index{negative binomial|textbf}
+\index{nbreg@\texttt{nbreg()}|textbf}
+\index{ZINB|textbf}
+\index{zinb@\texttt{zinb()}|textbf}
+\index{overdispersion|textbf}
+\index{excess zeros}
+\index{quasi-maximum likelihood}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Count Data and the Inadequacy of OLS}
+
+Outcome variables that take only non-negative integer values
+($Y \in \{0,1,2,\ldots\}$) — number of children, doctor visits, registered
+patents — violate OLS assumptions. OLS can produce negative predictions and
+is inefficient: the variance of $Y$ grows with the mean (right-skewed tail),
+violating homoskedasticity.
+
+\subsection*{Poisson}
+
+The Poisson regression model specifies:
+
+\[
+  Y_i \mid x_i \sim \mathrm{Poisson}(\lambda_i)
+  \qquad
+  \lambda_i = E[Y_i \mid x_i] = \exp(\beta_0 + \beta_1 x_i)
+\]
+
+The log-likelihood function is:
+
+\[
+  \ell(\beta) = \sum_{i=1}^n \left[ y_i\,(\beta_0 + \beta_1 x_i) - \exp(\beta_0 + \beta_1 x_i) - \ln(y_i!) \right]
+\]
+
+A useful property: the Poisson estimator converges to $\beta$ even if
+$Y$ is not strictly Poisson, as long as $E[Y\mid x] = \exp(x'\beta)$
+(quasi-MLE estimator; Gourieroux, Monfort and Trognon 1984).
+
+\subsection*{Negative Binomial}
+
+The Poisson model imposes $E[Y\mid x] = \mathrm{Var}[Y\mid x]$ (equidispersion).
+When the variance exceeds the mean (\emph{overdispersion}), the Negative
+Binomial model (NB2) generalizes:
+
+\[
+  \mathrm{Var}[Y \mid x] = E[Y\mid x] + \alpha\,(E[Y\mid x])^2
+\]
+
+The parameter $\alpha > 0$ captures overdispersion. Poisson is the limiting
+case $\alpha \to 0$.
+
+\subsection*{Zero-Inflated Negative Binomial (ZINB)}
+
+Many applications present excess zeros beyond what any simple count model
+predicts — two-stage processes: first decide whether an event occurs ($D=1$ with
+prob.\ $\pi_i$), then count the frequency. ZINB combines:
+
+\[
+  P(Y_i = 0) = (1-\pi_i) + \pi_i\,(1+\alpha\lambda_i)^{-1/\alpha}
+  \qquad
+  P(Y_i = k) = \pi_i\,P_{\mathrm{NB}}(k \mid \lambda_i,\alpha)\quad (k\geq 1)
+\]
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{DGP Verification}
+
+The DGP creates approximately Poisson counts with $\lambda_i = e^{0{,}5 + x_i}$,
+$x \sim U(0,1)$. The estimator should recover $\beta_0 \approx 0{,}5$ and $\beta_1 \approx 1{,}0$.
+
+\begin{lstlisting}[caption={Poisson, NegBin and ZINB}]
+seed(42)
+generate df x   = rnormal()                          // x ~ U(0,1)
+generate df lam = exp(0.5 + 1.0 * x)
+generate df u   = rnormal()
+generate df y   = floor(lam + u)                     // count ≥ 0
+
+let m_pois = poisson(y ~ x, df)
+display m_pois
+
+let m_nb   = nbreg(y_nb ~ x, df)
+display m_nb
+
+let m_zinb = zinb(y_zi ~ x, df)
+display m_zinb
+\end{lstlisting}
+
+\subsection*{Poisson}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+========================= Poisson Regression Results =========================
+Dep. Variable:     y  || Log-Likelihood:   102.0744  AIC:  -200.1488
+Method:         IRLS  || Pseudo R-sq:        0.7709  N:         500
+------------------------------------------------------------------------------
+                   coef    std err        z    P>|z|
+const            0.5246     0.0602    8.709    0.000      ***
+x                0.9733     0.0960   10.141    0.000      ***
+\end{lstlisting}
+
+$\hat\beta_0 = 0{,}52 \approx 0{,}5$ and $\hat\beta_1 = 0{,}97 \approx 1{,}0$ —
+estimates close to the true values.
+
+\subsection*{Negative Binomial}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+================ Negative Binomial Regression (alpha=0.0010) =================
+                   coef    std err        z    P>|z|
+const            0.4613     0.0177   26.025    0.000      ***
+x                1.1950     0.0276   43.249    0.000      ***
+\end{lstlisting}
+
+$\hat\alpha \approx 0{,}001$ — minimal overdispersion, NegBin collapses to Poisson. With genuinely overdispersed data $\hat\alpha$ is significantly positive.
+
+\subsection*{ZINB}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+=============== Zero-Inflated Negative Binomial (ZINB) Results ===============
+---- Count Model ----
+const  0.2994 (0.1347)  **
+x      1.2435 (0.2051)  ***
+---- Inflate Model (Logit) ----
+z0     0.4392 (0.2264)  *
+z1     0.5121 (0.3828)
+\end{lstlisting}
+
+The zero-inflation equation estimates the probability of a structural zero;
+the count equation models the process conditional on the event occurring.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Syntax}
+
+\begin{lstlisting}
+poisson(y ~ x1 + x2, df)
+nbreg(y ~ x1 + x2, df)
+zinb(y ~ x1 + x2, df)
+zinb(y ~ x1 + x2, df, inflate = z1 + z2)  // separate inflation equation
+\end{lstlisting}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Estimator} & \textbf{When to use} \\
+\midrule
+\texttt{poisson}  & count data with equidispersion; robust quasi-MLE \\
+\texttt{nbreg}    & overdispersion ($\hat\alpha$ sig.\ positive) \\
+\texttt{zinb}     & excess zeros beyond what NB expects \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{nota}
+  Poisson and NB coefficients are log-ratios: $\beta_1 = 1$ implies that a
+  unit increase in $x$ multiplies the expected count by $e^1 \approx 2{,}72$.
+  To obtain \emph{average marginal effects} (AME): use
+  \lstinline{margins(model)}.
+\end{nota}

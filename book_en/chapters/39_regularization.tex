@@ -1,0 +1,149 @@
+\chapter{Regularization and Variable Selection}
+\label{cap:regularizacao}
+% ── index ──────────────────────────────────────────────────────
+\index{regularization|textbf}
+\index{LASSO|textbf}
+\index{lasso@\texttt{lasso()}|textbf}
+\index{Ridge|textbf}
+\index{ridge_reg@\texttt{ridge\_reg()}|textbf}
+\index{Elastic Net|textbf}
+\index{enet@\texttt{enet()}|textbf}
+\index{sparsity|textbf}
+\index{L1 penalty (lasso)}
+\index{L2 penalty (ridge)}
+\index{variable selection}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{The Dimensionality Problem}
+
+With $k$ regressors and small $N$, OLS suffers from \emph{overfitting}: it fits
+the sample noise beyond the signal, increasing out-of-sample error. When
+$k > N$, OLS is not even identified. Regularization penalizes the magnitude of
+the coefficients, trading bias for reduced variance.
+
+\subsection*{LASSO}
+
+LASSO (Tibshirani 1996) minimizes:
+
+\[
+  \hat\beta^{\mathrm{LASSO}} = \arg\min_\beta \left\{ \sum(y_i - x_i'\beta)^2
+  + \lambda \sum_{j=1}^k |\beta_j| \right\}
+\]
+
+The $\ell_1$ penalty forces small coefficients to exactly zero, performing
+automatic \emph{variable selection}. The regularization path — LASSO for
+different $\lambda$ — reveals which variables enter as $\lambda$ decreases
+from $\infty$ (null model) to 0 (OLS).
+
+\subsection*{Ridge}
+
+The $\ell_2$ penalty of Ridge (Hoerl and Kennard 1970) shrinks coefficients
+toward zero without zeroing them:
+
+\[
+  \hat\beta^{\mathrm{Ridge}} = (X'X + \lambda I)^{-1} X'y
+\]
+
+Useful when many variables have small effects (continuum of weak predictors).
+Does not perform variable selection.
+
+\subsection*{Elastic Net}
+
+Elastic Net (Zou and Hastie 2005) combines $\ell_1$ and $\ell_2$:
+
+\[
+  \min_\beta \left\{ \sum(y_i - x_i'\beta)^2
+  + \lambda \left[\rho\sum|\beta_j| + (1-\rho)\sum\beta_j^2\right] \right\}
+\]
+
+Inherits variable selection from LASSO and stability in correlated groups
+from Ridge.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{DGP Verification}
+
+DGP with 10 regressors, only $x_1$ and $x_2$ with non-zero effect.
+$N = 200$ — regime where regularization matters.
+
+\begin{lstlisting}[caption={Sparse DGP — 2 of 10 active variables}]
+seed(42)
+// 10 regressors; y = 1 + 2*x1 + 3*x2 + 0*(x3..x10) + e
+generate df x1  = rnormal()
+...
+generate df y   = 1.0 + 2.0*x1 + 3.0*x2 + e
+
+let m_ols   = ols(y ~ x1+x2+x3+x4+x5+x6+x7+x8+x9+x10, df)
+let m_lasso = lasso(y ~ x1+x2+x3+x4+x5+x6+x7+x8+x9+x10, df, alpha=0.1)
+let m_ridge = ridge_reg(y ~ x1+x2+x3+x4+x5+x6+x7+x8+x9+x10, df, alpha=0.5)
+let m_enet  = enet(y ~ x1+x2+x3+x4+x5+x6+x7+x8+x9+x10, df, alpha=0.5)
+\end{lstlisting}
+
+\subsection*{OLS}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+OLS: R²=0.801  (good in-sample fit, but x3..x10 pollute with non-zero coefs)
+const=0.68  x1=1.93***  x2=2.88***  x3=0.17  x4=0.07  ...  x10=-0.11
+\end{lstlisting}
+
+\subsection*{LASSO}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+LASSO α=0.1: R²=0.772  active vars: 2
+  x1=1.552  x2=2.506  x3..x10 = 0.000  (correctly zeroed)
+\end{lstlisting}
+
+With $\alpha = 0{,}1$ LASSO identifies the two true predictors and
+zeros the eight irrelevant ones.
+
+\subsection*{Ridge}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+Ridge α=0.5: R²=0.801
+  x1=1.878  x2=2.793  x3=0.172  x4=0.081  ...
+  (shrinks but zeros none)
+\end{lstlisting}
+
+\subsection*{Elastic Net}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+ElasticNet α=0.5 l1_ratio=0.5: R²=0.589  active vars: 2
+  x1=0.789  x2=1.550  x3..x10 = 0.000
+\end{lstlisting}
+
+Elastic Net also selects $x_1$ and $x_2$, but with greater total penalization
+(combining $\ell_1$ and $\ell_2$) the coefficients are more shrunk.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Syntax}
+
+\begin{lstlisting}
+lasso(y ~ x1 + x2 + x3, df, alpha=0.1)      // alpha = penalization lambda
+ridge_reg(y ~ x1 + x2 + x3, df, alpha=0.5)
+enet(y ~ x1 + x2 + x3, df, alpha=0.5)       // alpha = L1/(L1+L2) mix
+\end{lstlisting}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Parameter} & \textbf{LASSO} & \textbf{Ridge / Enet} \\
+\midrule
+\texttt{alpha} & penalty $\lambda$ & penalty $\lambda$ \\
+\texttt{alpha=0} & OLS & pure Ridge (Enet) \\
+\texttt{alpha=1} & max L1 & pure L1 (Enet) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{nota}
+  The optimal value of $\alpha$ is typically chosen by cross-validation
+  ($k$-fold). In small samples, LASSO with $\alpha$ via \emph{BIC-LASSO}
+  tends to be more conservative than via CV.
+\end{nota}

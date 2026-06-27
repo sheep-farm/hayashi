@@ -1,0 +1,16 @@
+seed(42)
+input df
+id
+1
+end
+for i in 1..=8 { df = append(df, df) }
+df |> filter(_n <= 150)
+generate df t     = _n
+generate df noise = (rnormal() - 0.5) * 3.464
+generate df mu    = 10.0 + 0.1 * t
+generate df y     = mu + noise
+kalman(df, y, model="ll",  sigma_obs=1.0, sigma_state=0.1)
+kalman(df, y, model="llt")
+// mostrar primeiros 8 t
+let sub = filter(df, t <= 8)
+display sub

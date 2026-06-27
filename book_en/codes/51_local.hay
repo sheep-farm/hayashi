@@ -1,0 +1,29 @@
+// Cap 51 — Estimação Local: WLS, Rolling OLS, LOWESS
+seed(42)
+input df
+id
+1
+end
+for i in 1..=9 { df = append(df, df) }
+df |> filter(_n <= 300)
+generate df t = _n
+generate df x = rnormal()
+generate df w = exp(-0.002 * t)
+generate df e = (rnormal() - 0.5) * 2.0 * (1.0 + x)
+generate df y = 1.0 + 2.0 * x + 0.01 * t + e
+
+// OLS: referência
+let m_ols = ols(y ~ x, df)
+display m_ols
+
+// WLS: pesos w corrigem heterocedasticidade
+let m_wls = wls(y ~ x, df, weights="w")
+display m_wls
+
+// Rolling OLS: janelas deslizantes de 50 observações
+let m_rol = rols(y ~ x + t, df, window=50)
+display m_rol
+
+// LOWESS: suavizador não-paramétrico local (y_var, x_var)
+lowess(df, y, x, frac=0.3)
+display df

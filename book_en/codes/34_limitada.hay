@@ -1,0 +1,30 @@
+// Cap 34 — Modelos de Resposta Limitada (Tobit, Heckman)
+// DGP Tobit: y* = 1 + 2*x + e, y = max(0, y*) — limite inferior em 0
+// DGP Heckman: seleção s=1 iff 0.5+1.5*z+v>0; resultado y=1+2*x+e (só quando s=1)
+// Parâmetros verdadeiros: beta0=1, beta1=2
+
+seed(42)
+input df
+id
+1
+end
+for i in 1..=9 { df = append(df, df) }
+df |> filter(_n <= 500)
+generate df x = rnormal()
+generate df z = rnormal()
+generate df e = (rnormal() - 0.5) * 1.7321   // ~ N(0,1) approx
+generate df v = (rnormal() - 0.5) * 1.7321
+
+// Tobit: censura em zero
+generate df ystar = 1.0 + 2.0 * x + e
+generate df y_tobit = ystar * (ystar > 0)
+
+let m_tobit = tobit(y_tobit ~ x, df)
+display m_tobit
+
+// Heckman: equação de seleção usa z; resultado usa x
+generate df s = (0.5 + 1.5 * z + v) > 0
+generate df y_out = (1.0 + 2.0 * x + e) * s    // observado apenas se s=1
+
+let m_heck = heckman(y_out ~ x, s ~ z, df)
+display m_heck

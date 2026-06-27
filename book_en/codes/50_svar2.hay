@@ -1,0 +1,36 @@
+// Cap 50 — SVAR Avançado: Blanchard-Quah, SVEC
+// BQ: restrições de longo prazo — choque permanente (oferta) e transitório (demanda)
+// SVEC: VECM estrutural
+
+seed(42)
+input df
+id
+1
+end
+for i in 1..=9 { df = append(df, df) }
+df |> filter(_n <= 300)
+generate df t = _n
+generate df e1 = (rnormal() - 0.5) * 1.7321
+generate df e2 = (rnormal() - 0.5) * 1.7321
+generate df y1 = 0.0
+generate df y2 = 0.0
+
+// VAR(1) com choque 1 = permanente (raiz unitária em y1, acumula)
+let i = 2
+while i <= 300 {
+    let it = i
+    let ly1 = mean(df, y1, if = t == it - 1)
+    let ly2 = mean(df, y2, if = t == it - 1)
+    let e1t = mean(df, e1, if = t == it)
+    let e2t = mean(df, e2, if = t == it)
+    replace df y1 = ly1 + e1t if t == it
+    replace df y2 = 0.5 * ly2 + 0.4 * e1t + 0.6 * e2t if t == it
+    i = i + 1
+}
+
+// BQ: choque 1 tem efeito permanente em y1, transitório em y2
+let m_bq = svar(df, y1, y2, lags=1, id=longrun)
+display m_bq
+
+let m_irf_bq = sirf(m_bq, steps=20)
+display m_irf_bq

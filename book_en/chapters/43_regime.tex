@@ -1,0 +1,111 @@
+\chapter{Regime-Switching Models}
+\label{cap:regime}
+% ── index ───────────────────────────────────────────────────────
+\index{Markov Switching|textbf}
+\index{regime switching|textbf}
+\index{markov@\texttt{markov()}|textbf}
+\index{Hamilton, model of|textbf}
+\index{transition probability|textbf}
+\index{Hamilton filter}
+\index{expected regime duration}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Structural heterogeneity over time}
+
+Many economic series exhibit structural changes: different means,
+volatilities or dynamics across distinct periods. Two approaches capture
+this heterogeneity:
+
+\begin{itemize}
+  \item \textbf{Markov Switching} (Hamilton 1989): latent regime follows a
+  Markov chain. The transition probability between regimes is estimated
+  by the EM algorithm together with the parameters of each regime.
+  \item \textbf{Threshold Regression} (Hansen 1997): regime change is
+  determined by an observable variable (threshold variable $q$) crossing a
+  threshold $\gamma$ to be estimated.
+\end{itemize}
+
+\subsection*{Markov-Switching AR(p)}
+
+\[
+  y_t = \mu_{S_t} + \sum_{k=1}^p \phi_k^{(S_t)}\,(y_{t-k} - \mu_{S_t}) + \sigma_{S_t}\,\varepsilon_t
+\]
+
+where $S_t \in \{1,\ldots,K\}$ is the latent regime with transition
+probabilities $P(S_t = j \mid S_{t-1} = i) = p_{ij}$. The parameter $\mu_{S_t}$
+is the regime intercept, $\phi_k^{(S_t)}$ are the AR coefficients and
+$\sigma_{S_t}$ is the regime standard deviation.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{DGP Verification}
+
+DGP with two alternating regimes:
+\begin{itemize}
+  \item Regime 1 (expansion): $\mu_1 = 1{,}0$, $\phi_1 = 0{,}30$, $\sigma_1 = 0{,}5$
+  \item Regime 2 (recession): $\mu_2 = -1{,}0$, $\phi_2 = 0{,}70$, $\sigma_2 = 1{,}5$
+\end{itemize}
+
+\begin{lstlisting}[caption={DGP Markov Switching AR(1) and estimation}]
+seed(42)
+generate df t      = _n
+generate df regime = (t % 60 < 40)   // ~2/3 in regime 1
+// y recursive with parameters conditional on regime
+...
+let m_ms = markov(df, y, k=2, p=1)
+display m_ms
+\end{lstlisting}
+
+\subsection*{Markov Switching}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+===================== Markov Switching AR(1) — 2 regimes =====================
+Observations: 299   Log-L: -155.76   AIC: 327.51   BIC: 357.12
+--------------------------- Transition Matrix --------------------------------
+[ 0.9493   0.0507 ]
+[ 0.0251   0.9749 ]
+--------------------------- Regime 0 (Recession) -----------------------------
+Intercept: -1.2864   AR.L1: 0.6169   Variance: 0.5141
+--------------------------- Regime 1 (Expansion) -----------------------------
+Intercept:  0.9946   AR.L1: 0.2956   Variance: 0.0625
+--------------------------- Expected Durations --------------------------------
+Regime 0: 19.7 periods    Regime 1: 39.9 periods
+\end{lstlisting}
+
+The model recovers the two regimes with good accuracy:
+\begin{itemize}
+  \item Regime 0 (recession): $\hat\mu = -1{,}29$ (true: $-1{,}0$),
+  $\hat\phi = 0{,}62$ (true: 0{,}7). Expected duration 19{,}7 periods.
+  \item Regime 1 (expansion): $\hat\mu = 0{,}99 \approx 1{,}0$,
+  $\hat\phi = 0{,}30$ (true: 0{,}3). Expected duration 39{,}9 periods.
+\end{itemize}
+
+The transition matrix indicates high persistence of both regimes
+($p_{00} = 0{,}95$, $p_{11} = 0{,}97$) — the series rarely switches regime,
+consistent with the DGP ($60\%$ of the time in regime 1).
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Syntax}
+
+\begin{lstlisting}
+markov(df, y, k=2, p=1)    // k regimes, AR of order p
+\end{lstlisting}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Option} & \textbf{Default} & \textbf{Description} \\
+\midrule
+\texttt{k} & 2 & number of regimes \\
+\texttt{p} & 1 & AR order within each regime \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{nota}
+  The number of regimes $k$ is fixed and must be specified a priori.
+  Information criteria (AIC, BIC) compared across models with $k=2$ and
+  $k=3$ guide this choice. For data with $N < 200$, $k > 3$ is rarely
+  identified reliably.
+\end{nota}

@@ -1,0 +1,207 @@
+\chapter{Kalman Filter}
+\label{cap:kalman}
+% ── index ───────────────────────────────────────────────────────
+\index{Kalman filter|textbf}
+\index{kalman@\texttt{kalman()}|textbf}
+\index{Rauch-Tung-Striebel smoother|textbf}
+\index{RTS|see{Rauch-Tung-Striebel smoother}}
+\index{state-space model|textbf}
+\index{local level, model}
+\index{local linear trend, model}
+\index{unobservable state}
+\index{prediction log-likelihood}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Hidden state and noisy observation}
+
+The Kalman filter solves a different problem from all previous models:
+estimating a \emph{latent} variable (the ``state'') that is not directly
+observed, based on noisy measurements over time.
+
+The general state-space model is:
+\begin{align}
+  y_t   &= H\, s_t + \varepsilon_t, \quad \varepsilon_t \sim N(0, R) \label{eq:obs}\\
+  s_t   &= F\, s_{t-1} + R_s\, \eta_t, \quad \eta_t \sim N(0, Q) \label{eq:trans}
+\end{align}
+Equation \eqref{eq:obs} is the \textbf{observation equation}: $y_t$ is what is
+measured, $s_t$ is the latent state and $\varepsilon_t$ is measurement noise. The
+equation \eqref{eq:trans} is the \textbf{transition equation}: the state evolves
+according to a linear dynamic perturbed by $\eta_t$.
+
+\subsection*{Pre-defined models}
+
+Hayashi offers two ready-made models for scalar series:
+
+\medskip
+\textbf{Local Level (LL):}
+\[
+  y_t = \mu_t + \varepsilon_t, \quad
+  \mu_t = \mu_{t-1} + \eta_t
+\]
+The state $\mu_t$ is a random walk — the level drifts over time.
+$\sigma_\varepsilon$ controls observation noise; $\sigma_\eta$ controls
+the rate at which the level changes.
+
+\medskip
+\textbf{Local Linear Trend (LLT):}
+\[
+  y_t = \mu_t + \varepsilon_t, \quad
+  \mu_t = \mu_{t-1} + \nu_{t-1} + \eta_t, \quad
+  \nu_t = \nu_{t-1} + \zeta_t
+\]
+The state is two-dimensional: level $\mu_t$ and slope $\nu_t$.
+The slope varies smoothly over time.
+
+\subsection*{Kalman Filter (forward pass)}
+
+The filter processes observations recursively:
+
+\begin{enumerate}
+  \item \textbf{Prediction}: $\hat{s}_{t|t-1} = F\,\hat{s}_{t-1|t-1}$,\quad
+    $P_{t|t-1} = F P_{t-1|t-1} F' + R_s Q R_s'$
+
+  \item \textbf{Innovation}: $v_t = y_t - H\,\hat{s}_{t|t-1}$,\quad
+    $S_t = H P_{t|t-1} H' + R$
+
+  \item \textbf{Kalman Gain}: $K_t = P_{t|t-1} H' S_t^{-1}$
+
+  \item \textbf{Update}: $\hat{s}_{t|t} = \hat{s}_{t|t-1} + K_t v_t$,\quad
+    $P_{t|t} = (I - K_t H) P_{t|t-1}$
+\end{enumerate}
+
+The result $\hat{s}_{t|t}$ is the \emph{filtered state}: optimal estimate of the
+state using $y_1, \ldots, y_t$ (information up to $t$).
+
+\subsection*{Rauch-Tung-Striebel Smoother (backward pass)}
+
+After the filter, the RTS traverses the series backward and incorporates
+future information:
+\[
+  L_t = P_{t|t}\, F'\, P_{t+1|t}^{-1}, \quad
+  \hat{s}_{t|T} = \hat{s}_{t|t} + L_t\bigl(\hat{s}_{t+1|T} - \hat{s}_{t+1|t}\bigr)
+\]
+The result $\hat{s}_{t|T}$ is the \emph{smoothed state}: uses \emph{all}
+the sample $y_1, \ldots, y_T$. The variance of the smoothed state is always less than or equal
+to that of the filtered state — future information reduces uncertainty.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{DGP Verification}
+
+DGP: true level $\mu_t = 10 + 0{,}1\,t$ (linear trend) observed
+with noise $\varepsilon_t \sim N(0, 1)$. $T = 150$.
+
+\begin{lstlisting}[caption={Kalman Filter: LL and LLT}]
+seed(42)
+generate df mu = 10.0 + 0.1 * t
+generate df y  = mu + noise       // noise ~ N(0,1)
+
+// Local Level (sigma specified)
+kalman(df, y, model="ll", sigma_obs=1.0, sigma_state=0.1)
+
+// Local Linear Trend (automatic sigmas)
+kalman(df, y, model="llt")
+\end{lstlisting}
+
+\subsection*{Output — Local Level}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small, frame=none,
+  numbers=none, backgroundcolor=\color{codbg}]
+Kalman (ll):  T=150  loglik=-278.1966  σ_obs=1.0000  σ_state=0.1000
+  → y_filtered, y_smoothed added to df
+\end{lstlisting}
+
+\subsection*{Output — Local Linear Trend}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small, frame=none,
+  numbers=none, backgroundcolor=\color{codbg}]
+Kalman (llt):  T=150  loglik=-219.2354  σ_obs=0.9663  σ_state=0.0966  σ_slope=0.0097
+  → y_filtered, y_smoothed, y_slope_filtered, y_slope_smoothed added to df
+\end{lstlisting}
+
+The LLT log-likelihood ($-219{,}2$) is substantially higher than the LL's
+($-278{,}2$) because the DGP has a linear trend — the model with a free slope
+better captures the data structure.
+
+\subsection*{Comparison with the true state}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small, frame=none,
+  numbers=none, backgroundcolor=\color{codbg}]
+First 8 observations (LLT):
+
+  t    mu     y       y_smoothed   y_slope_smoothed
+  1   10.10  10.19      9.74           0.13
+  2   10.20  10.35      9.87           0.13
+  3   10.30  10.77      9.99           0.13
+  4   10.40  10.07     10.10           0.13
+  5   10.50   8.89     10.21           0.13
+  6   10.60  10.31     10.33           0.12
+  7   10.70  11.52     10.46           0.12
+  8   10.80  12.01     10.56           0.12
+
+summarize y_smoothed:  mean=17.49  sd=4.35
+summarize mu:          mean=17.55  sd=4.34
+\end{lstlisting}
+
+The smoothed state recovers the true level with remarkable accuracy: mean 17{,}49
+vs 17{,}55. The smoothed slope (\texttt{y\_slope\_smoothed} $\approx
+0{,}13$) is close to the true value of $0{,}1$. The raw series $y$ oscillates
+by $\pm 2$ around $\mu$; the smoother eliminates this noise.
+
+\begin{nota}
+  \textbf{Filtered vs smoothed}: \texttt{y\_filtered} uses only
+  $y_1, \ldots, y_t$ — it is causal and useful for real-time forecasting.
+  \texttt{y\_smoothed} uses the entire $y_1, \ldots, y_T$ — it is retrospective,
+  but optimal for historical analysis. At interior points, the smoothed state
+  is always more accurate; at the last point $t=T$, the two coincide.
+\end{nota}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Syntax}
+
+\begin{lstlisting}
+// Local Level
+kalman(df, y, model="ll")
+kalman(df, y, model="ll", sigma_obs=1.0, sigma_state=0.1)
+
+// Local Linear Trend
+kalman(df, y, model="llt")
+kalman(df, y, model="llt", sigma_obs=0.5, sigma_state=0.05, sigma_slope=0.005)
+\end{lstlisting}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Parameter} & \textbf{Default} & \textbf{Description} \\
+\midrule
+\texttt{model}       & \texttt{"ll"}         & \texttt{"ll"} or \texttt{"llt"} \\
+\texttt{sigma\_obs}  & \texttt{sd(diff(y))/\(\sqrt{2}\)} & Standard deviation of observation noise \\
+\texttt{sigma\_state}& \texttt{sigma\_obs × 0.1}         & Standard deviation of level noise \\
+\texttt{sigma\_slope}& \texttt{sigma\_state × 0.1}       & Standard deviation of slope noise (LLT) \\
+\midrule
+\multicolumn{3}{l}{\textit{Columns added to DataFrame:}} \\
+\texttt{\{var\}\_filtered}        & — & Filtered level (forward pass) \\
+\texttt{\{var\}\_smoothed}        & — & Smoothed level (RTS) \\
+\texttt{\{var\}\_slope\_filtered} & — & Filtered slope (LLT only) \\
+\texttt{\{var\}\_slope\_smoothed} & — & Smoothed slope (LLT only) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Model} & \textbf{Use when} & \textbf{Relation} \\
+\midrule
+LL  & Level drift without clear trend    & Local level UCM (ch.~\ref{cap:filtros}) \\
+LLT & Time-varying trend                 & Generalized stochastic HP filter \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{nota}
+  Hayashi uses the RTS smoother with fixed matrices specified by the
+  user. For joint estimation of variance parameters
+  ($\sigma_\varepsilon$, $\sigma_\eta$) via maximum likelihood,
+  use the \texttt{ucm()} command (ch.~\ref{cap:filtros}), which runs
+  the EM algorithm on the state-space representation.
+\end{nota}

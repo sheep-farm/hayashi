@@ -1,0 +1,144 @@
+\chapter{Time Series Filters and Decomposition}
+\label{cap:filtros}
+% ── index ───────────────────────────────────────────────────────
+\index{decomposition filters|textbf}
+\index{Hodrick-Prescott, filter of|textbf}
+\index{hprescott@\texttt{hprescott()}|textbf}
+\index{Baxter-King, filter of|textbf}
+\index{baxter_king@\texttt{baxter\_king()}|textbf}
+\index{Holt-Winters|textbf}
+\index{holtwinters@\texttt{holtwinters()}|textbf}
+\index{ETS (Error-Trend-Seasonal)|textbf}
+\index{trend}
+\index{cycle}
+\index{seasonality}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Separation of components}
+
+A time series can be decomposed into:
+\[
+  y_t = \tau_t + c_t + s_t + \varepsilon_t
+\]
+where $\tau_t$ is the trend, $c_t$ the cyclical component, $s_t$ the
+seasonality and $\varepsilon_t$ the idiosyncratic noise. Linear filters
+extract one or more of these components from the observed series.
+
+\subsection*{Hodrick-Prescott Filter (HP)}
+
+The HP filter (Hodrick and Prescott 1997) separates trend from cycle by minimizing:
+
+\[
+  \min_{\{\tau_t\}} \left\{ \sum_{t=1}^T (y_t - \tau_t)^2
+  + \lambda \sum_{t=2}^{T-1} [(\tau_{t+1} - \tau_t) - (\tau_t - \tau_{t-1})]^2 \right\}
+\]
+
+The parameter $\lambda$ penalizes changes in the second difference of the trend.
+Canonical values: $\lambda = 1600$ (quarterly), $100$ (annual), $14400$ (monthly).
+
+\subsection*{Baxter-King Filter (BK)}
+
+The BK filter (Baxter and King 1999) extracts a \emph{frequency-band} component:
+it retains periodic variations between $[p_L, p_H]$ periods and eliminates
+trend and high frequencies. For business cycles:
+$p_L = 6$, $p_H = 32$ quarters ($1{,}5$ to $8$ years).
+
+\subsection*{Holt-Winters Exponential Smoothing (ETS)}
+
+The ETS (\emph{Error-Trend-Seasonal}) model by Holt and Winters combines:
+level, trend and seasonality equations updated recursively with
+exponentially declining weights. Parameters $(\alpha, \beta, \gamma)$
+control the speed of adaptation of each component.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{DGP Verification}
+
+DGP with linear trend, annual cycle and semi-annual seasonality, $T = 120$ months.
+
+\begin{lstlisting}[caption={Series with trend, cycle and seasonality}]
+seed(42)
+generate df t       = _n
+generate df trend   = 0.05 * t
+generate df cycle   = 0.5 * sin(t * 3.14159 / 12)
+generate df season  = 0.3 * sin(t * 3.14159 / 6)
+generate df noise   = (rnormal() - 0.5) * 0.3
+generate df y       = 10.0 + trend + cycle + season + noise
+
+hprescott(df, y, lambda=1600)
+display df
+
+baxter_king(df, y, low=6, high=32, k=12)
+display df
+
+let m_hw = holtwinters(df, y, trend=add, seasonal=add, period=12)
+display m_hw
+\end{lstlisting}
+
+\subsection*{Hodrick-Prescott}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+hpfilter: λ=1600  →  y_trend and y_cycle added to df
+  t=1:  y=10.34  y_trend=10.56  y_cycle=-0.22
+  t=2:  y=10.62  y_trend=10.56  y_cycle= 0.06
+  ...
+\end{lstlisting}
+
+The HP adds columns \texttt{y\_trend} (smoothed trend) and \texttt{y\_cycle}
+(cycle = residual).
+
+\subsection*{Baxter-King}
+
+The BK adds \texttt{y\_cycle} with the frequency-band component.
+The first and last $k = 12$ periods are set to \texttt{NaN} — the cost
+of two-sided filters.
+
+\subsection*{Holt-Winters ETS}
+
+\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
+  frame=none, numbers=none, backgroundcolor=\color{codbg},
+  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
+======================== ETS(A,A,A) ========================
+Observations:    120
+Alpha:        0.8000     (level)
+Beta:         0.0500     (trend)
+Gamma:        0.6000     (seasonality)
+SSE:            5.3570
+AIC:          -339.09
+BIC:          -291.70
+============================================================
+\end{lstlisting}
+
+The ETS(A,A,A) model — additive errors, additive trend, additive seasonality —
+fits the smoothing parameters $(\alpha, \beta, \gamma)$
+minimizing SSE. High $\alpha$ (0{,}80) indicates fast level response.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Syntax}
+
+\begin{lstlisting}
+hprescott(df, var, lambda=1600)              // adds var_trend and var_cycle
+baxter_king(df, var, low=6, high=32, k=12)  // adds var_cycle
+holtwinters(df, var, trend=add, seasonal=add, period=12)
+ets(df, var, trend=add, seasonal=add, period=12)  // alias
+\end{lstlisting}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Filter} & \textbf{Output} & \textbf{Typical use} \\
+\midrule
+HP              & trend + cycle         & quarterly macro \\
+BK              & band-pass cycle       & business cycle analysis \\
+Holt-Winters    & ETS model + forecast  & short-term forecasting \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{nota}
+  The HP filter on end-of-sample data suffers from the
+  \emph{end-point problem}: trend and cycle are revised as new
+  data arrives. The BK avoids this problem by using a symmetric window
+  (cost: loses $k$ observations at each end).
+\end{nota}

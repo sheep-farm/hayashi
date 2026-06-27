@@ -1,0 +1,31 @@
+// Cap 46 — Inferência Elementar (ttest, anova, kruskal_wallis)
+seed(42)
+input df
+id
+1
+end
+for i in 1..=9 { df = append(df, df) }
+df |> filter(_n <= 300)
+generate df e   = (rnormal() - 0.5) * 1.7321
+generate df y   = 2.0 + e
+generate df g   = (_n <= 150) * 1 + (_n > 150) * 2   // grupo: 150 obs cada
+generate df yg  = 2.0 + e + (g - 1) * 0.5             // g=2 tem media 2.5
+generate df k   = 1 + (_n > 100) + (_n > 200)          // 3 grupos para ANOVA/KW
+
+// t-test de uma amostra: H0: mu(y) = 2.0
+ttest(df, y, mu=2.0)
+
+// t-test de dois grupos independentes: H0: mu(grupo1) = mu(grupo2)
+ttest(df, yg, by=g)
+
+// t-test pareado: antes vs depois
+generate df y_antes = 2.0 + e
+generate df y_depois = 2.5 + e + (rnormal() - 0.5) * 0.5
+ttest(df, y_antes, y_depois, paired=true)
+
+// ANOVA de um fator: H0: mu1 = mu2 = mu3
+generate df y3 = 1.0 + k * 0.5 + e
+anova(df, y3, by=k)
+
+// Kruskal-Wallis: alternativa não-paramétrica à ANOVA
+kruskal_wallis(df, y3, by=k)
