@@ -53,6 +53,7 @@ pub enum Token {
     Comma,      // ,
     Dot,        // .
     DotDot,     // ..
+    DotDotEq,   // ..=
     Bang,       // !
     Lt,         // <
     LtEq,       // <=
@@ -322,7 +323,12 @@ impl Lexer {
                 Some('.') => {
                     if self.peek() == Some('.') {
                         self.advance();
-                        tokens.push((Token::DotDot, line));
+                        if self.peek() == Some('=') {
+                            self.advance();
+                            tokens.push((Token::DotDotEq, line));
+                        } else {
+                            tokens.push((Token::DotDot, line));
+                        }
                     } else {
                         tokens.push((Token::Dot, line));
                     }
