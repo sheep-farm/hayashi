@@ -311,6 +311,8 @@ pub enum Value {
     DFMResult(DFMModel),
     EtsResult(Rc<greeners::ETSResult>),
     ThresholdResult(Rc<greeners::threshold::ThresholdResult>),
+    AutoRegResult(Rc<greeners::AutoRegResult>),
+    ArdlResult(Rc<greeners::ARDLResult>),
     List(Rc<Vec<Value>>),
     Dict(Rc<std::collections::HashMap<String, Value>>),
     UserFn(Rc<UserFn>),
@@ -381,6 +383,8 @@ impl std::fmt::Display for Value {
             Value::DFMResult(m) => write!(f, "{m}"),
             Value::EtsResult(r) => write!(f, "{r}"),
             Value::ThresholdResult(r) => write!(f, "{r}"),
+            Value::AutoRegResult(r) => write!(f, "{r}"),
+            Value::ArdlResult(r) => write!(f, "{r}"),
             Value::List(v) => {
                 write!(f, "[")?;
                 for (i, item) in v.iter().enumerate() {
@@ -542,7 +546,7 @@ const BUILTIN_NAMES: &[&str] = &[
     "ols", "iv", "logit", "probit", "poisson", "nbreg", "tobit", "heckman",
     "fe", "re", "be", "fe2sls", "ab", "sysgmm", "pcse", "xtgls",
     "qreg", "rlm", "lasso", "ridge", "elasticnet", "cox",
-    "arima", "var", "vecm", "varma", "svar", "garch",
+    "arima", "autoreg", "ardl", "kalman", "var", "vecm", "varma", "svar", "garch",
     "glm", "gee", "mixed", "mlogit", "ologit", "oprobit", "clogit", "cpoisson",
     "gmm", "sur", "three_sls", "fmb", "did", "rd", "psm", "synth",
     "summarize", "tabulate", "tabstat", "correlate", "corr", "pwcorr",
@@ -567,6 +571,7 @@ pub struct Interpreter {
     ts_info: HashMap<String, String>,
     panel_info: HashMap<String, (String, String)>,
     rng_seed: Option<u64>,
+    rng: rand::rngs::StdRng,
     preserved: HashMap<String, Value>,
     stored_models: Vec<Value>,
     return_value: Option<Value>,
@@ -585,6 +590,7 @@ impl Interpreter {
             ts_info: HashMap::new(),
             panel_info: HashMap::new(),
             rng_seed: None,
+            rng: { use rand::SeedableRng; rand::rngs::StdRng::from_entropy() },
             preserved: HashMap::new(),
             stored_models: Vec::new(),
             return_value: None,
@@ -841,12 +847,10 @@ impl Interpreter {
         )))
     }
 
-    pub fn get_rng(&self) -> Box<dyn rand::RngCore> {
-        use rand::SeedableRng;
-        match self.rng_seed {
-            Some(seed) => Box::new(rand::rngs::StdRng::seed_from_u64(seed)),
-            None => Box::new(rand::thread_rng()),
-        }
+    pub fn get_rng(&mut self) -> Box<dyn rand::RngCore> {
+        use rand::{RngCore, SeedableRng};
+        let derived_seed = self.rng.next_u64();
+        Box::new(rand::rngs::StdRng::seed_from_u64(derived_seed))
     }
 
     // ── Avalia expressão ──────────────────────────────────────────────────────
@@ -7496,6 +7500,8 @@ impl Interpreter {
                     _ => return Err(HayashiError::Type("seed must be integer".into())),
                 };
                 self.rng_seed = Some(s);
+                use rand::SeedableRng;
+                self.rng = rand::rngs::StdRng::seed_from_u64(s);
                 println!("set seed {s}");
                 Ok(Value::Nil)
             }
@@ -9805,6 +9811,307 @@ impl Interpreter {
                 };
 
                 Ok(Value::ArimaResult(Rc::new(result)))
+            }
+
+            // ── autoreg ──────────────────────────────────────────────────────
+            // autoreg(df, y, lags=p, trend="c")
+            "autoreg" | "ar" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "autoreg(df, var, lags=p, trend=\"c\"|\"ct\"|\"t\"|\"n\")".into(),
+                    ));
+                }
+
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "autoreg: primeiro argumento deve ser um DataFrame".into(),
+                        ))
+                    }
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
+                };
+                let df = self.maybe_filter_df(&df, opts)?;
+
+                let col_name = match &args[1] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "autoreg: segundo argumento deve ser o nome da variável".into(),
+                        ))
+                    }
+                };
+
+                let y = ndarray::Array1::from(self.eval_col_expr(&Expr::Var(col_name), &df)?);
+
+                let lags = match opt_map.get("lags") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 1,
+                };
+
+                let trend = match opt_map.get("trend") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => "c".to_string(),
+                };
+
+                let result = greeners::AutoReg::fit(&y, lags, None, &trend)
+                    .map_err(|e| self.rt_err(format!("autoreg: {e}")))?;
+
+                Ok(Value::AutoRegResult(Rc::new(result)))
+            }
+
+            // ── ardl ─────────────────────────────────────────────────────────
+            // ardl(y ~ x1 + x2, df, lags=p, xlags=q)
+            "ardl" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "ardl(y ~ x1 + x2, df, lags=p, xlags=q)".into(),
+                    ));
+                }
+
+                let formula_ast = self.resolve_formula(&args[0])?;
+
+                let df_name = match &args[1] {
+                    Expr::Var(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "ardl: segundo argumento deve ser um DataFrame".into(),
+                        ))
+                    }
+                };
+                let df_raw = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
+                };
+                let df = self.maybe_filter_df(&df_raw, opts)?;
+
+                let y_lags = match opt_map.get("lags") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 1,
+                };
+
+                let x_lags = match opt_map.get("xlags") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 1,
+                };
+
+                let formula_str = Self::formula_to_string(&formula_ast);
+                let g_formula = GFormula::parse(&formula_str)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                // to_design_matrix retorna (y, x_com_constante)
+                let (y_vec, x_with_const) = df
+                    .to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                // ARDL::fit adiciona constante própria; remove a coluna de intercepto
+                let x_no_const = if x_with_const.ncols() > 1 {
+                    x_with_const.slice(ndarray::s![.., 1..]).to_owned()
+                } else {
+                    return Err(HayashiError::Runtime(
+                        "ardl: fórmula deve ter pelo menos um regressor além do intercepto".into(),
+                    ));
+                };
+
+                let y_arr = ndarray::Array1::from_vec(y_vec.to_vec());
+
+                let result = greeners::ARDL::fit(&y_arr, &x_no_const, y_lags, x_lags)
+                    .map_err(|e| self.rt_err(format!("ardl: {e}")))?;
+
+                Ok(Value::ArdlResult(Rc::new(result)))
+            }
+
+            // ── kalman ───────────────────────────────────────────────────────
+            // kalman(df, var, model="ll"|"llt", sigma_obs=s, sigma_state=s)
+            //
+            // Modelos pré-definidos (State Space Form):
+            //   "ll"  — Local Level:        y_t = mu_t + e_t
+            //                               mu_t = mu_{t-1} + eta_t
+            //   "llt" — Local Linear Trend: y_t = mu_t + e_t
+            //                               mu_t = mu_{t-1} + nu_{t-1} + eta_t
+            //                               nu_t = nu_{t-1} + zeta_t
+            //
+            // Adiciona colunas {var}_filtered e {var}_smoothed ao DataFrame.
+            "kalman" | "kfilter" | "ssm" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "kalman(df, var, model=\"ll\"|\"llt\", sigma_obs=s, sigma_state=s)".into(),
+                    ));
+                }
+
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type(
+                        "kalman: primeiro argumento deve ser um DataFrame".into(),
+                    )),
+                };
+                let mut df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
+                };
+
+                let var_name = match &args[1] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => return Err(HayashiError::Type(
+                        "kalman: segundo argumento deve ser o nome da variável".into(),
+                    )),
+                };
+
+                let model_kind = match opt_map.get("model") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => "ll".to_string(),
+                };
+
+                let y_vec: Vec<f64> = Self::get_col_f64(&df, &var_name)?.to_vec();
+                let n = y_vec.len();
+                if n < 4 {
+                    return Err(HayashiError::Runtime(
+                        "kalman: série muito curta (mínimo 4 observações)".into(),
+                    ));
+                }
+
+                // Estima sigma_obs a partir de diff(y) se não fornecido
+                let diff_var: f64 = {
+                    let diffs: Vec<f64> = y_vec.windows(2).map(|w| w[1] - w[0]).collect();
+                    let mean = diffs.iter().sum::<f64>() / diffs.len() as f64;
+                    diffs.iter().map(|d| (d - mean).powi(2)).sum::<f64>()
+                        / (diffs.len() - 1) as f64
+                };
+                let sigma_obs_default = (diff_var / 2.0).sqrt().max(1e-6);
+
+                let sigma_obs = match opt_map.get("sigma_obs") {
+                    Some(Value::Float(v)) => *v,
+                    Some(Value::Int(v))   => *v as f64,
+                    _ => sigma_obs_default,
+                };
+                let sigma_state = match opt_map.get("sigma_state") {
+                    Some(Value::Float(v)) => *v,
+                    Some(Value::Int(v))   => *v as f64,
+                    _ => sigma_obs * 0.1,
+                };
+                let sigma_slope = match opt_map.get("sigma_slope") {
+                    Some(Value::Float(v)) => *v,
+                    Some(Value::Int(v))   => *v as f64,
+                    _ => sigma_state * 0.1,
+                };
+
+                // Observações como Vec<Array1<f64>> (escalares embalados)
+                let obs: Vec<ndarray::Array1<f64>> = y_vec
+                    .iter()
+                    .map(|&v| ndarray::Array1::from_vec(vec![v]))
+                    .collect();
+
+                let ss_result = match model_kind.as_str() {
+                    "ll" | "local_level" => {
+                        // H=[[1]], F=[[1]], R=[[1]], Q=[[sigma_state^2]], R_obs=[[sigma_obs^2]]
+                        let model = greeners::StateSpaceModel {
+                            h:     ndarray::Array2::from_elem((1, 1), 1.0),
+                            f:     ndarray::Array2::from_elem((1, 1), 1.0),
+                            r:     ndarray::Array2::from_elem((1, 1), 1.0),
+                            q:     ndarray::Array2::from_elem((1, 1), sigma_state.powi(2)),
+                            r_obs: ndarray::Array2::from_elem((1, 1), sigma_obs.powi(2)),
+                            s0:    ndarray::Array1::from_vec(vec![y_vec[0]]),
+                            p0:    ndarray::Array2::from_elem((1, 1), sigma_obs.powi(2) * 10.0),
+                        };
+                        greeners::state_space_estimate(&model, &obs)
+                            .map_err(|e| self.rt_err(format!("kalman (ll): {e}")))?
+                    }
+                    "llt" | "local_linear_trend" => {
+                        // States: [level, slope]
+                        // H = [[1, 0]]
+                        // F = [[1, 1], [0, 1]]
+                        // R = I_2, Q = diag(sigma_state^2, sigma_slope^2)
+                        let h = ndarray::array![[1.0_f64, 0.0]];
+                        let f = ndarray::array![[1.0_f64, 1.0], [0.0, 1.0]];
+                        let r = ndarray::Array2::<f64>::eye(2);
+                        let mut q = ndarray::Array2::<f64>::zeros((2, 2));
+                        q[[0, 0]] = sigma_state.powi(2);
+                        q[[1, 1]] = sigma_slope.powi(2);
+                        let r_obs = ndarray::Array2::from_elem((1, 1), sigma_obs.powi(2));
+                        let init_slope = if n > 1 { y_vec[1] - y_vec[0] } else { 0.0 };
+                        let model = greeners::StateSpaceModel {
+                            h,
+                            f,
+                            r,
+                            q,
+                            r_obs,
+                            s0: ndarray::Array1::from_vec(vec![y_vec[0], init_slope]),
+                            p0: {
+                                let mut p = ndarray::Array2::<f64>::zeros((2, 2));
+                                p[[0, 0]] = sigma_obs.powi(2) * 10.0;
+                                p[[1, 1]] = sigma_slope.powi(2) * 10.0;
+                                p
+                            },
+                        };
+                        greeners::state_space_estimate(&model, &obs)
+                            .map_err(|e| self.rt_err(format!("kalman (llt): {e}")))?
+                    }
+                    other => {
+                        return Err(HayashiError::Runtime(format!(
+                            "kalman: modelo '{other}' desconhecido — use \"ll\" ou \"llt\""
+                        )))
+                    }
+                };
+
+                // Extrai nível filtrado e suavizado (estado 0 em ambos os modelos)
+                let filtered: ndarray::Array1<f64> = ndarray::Array1::from_vec(
+                    ss_result.filtered_states.iter().map(|s| s[0]).collect(),
+                );
+                let smoothed: ndarray::Array1<f64> = ndarray::Array1::from_vec(
+                    ss_result.smoothed_states.iter().map(|s| s[0]).collect(),
+                );
+
+                let filt_name   = format!("{var_name}_filtered");
+                let smooth_name = format!("{var_name}_smoothed");
+
+                Rc::make_mut(&mut df)
+                    .insert(filt_name.clone(), filtered)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                Rc::make_mut(&mut df)
+                    .insert(smooth_name.clone(), smoothed)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                // Para LLT, adiciona também a tendência (slope = estado 1)
+                if matches!(model_kind.as_str(), "llt" | "local_linear_trend") {
+                    let slope_filt: ndarray::Array1<f64> = ndarray::Array1::from_vec(
+                        ss_result.filtered_states.iter().map(|s| s[1]).collect(),
+                    );
+                    let slope_smooth: ndarray::Array1<f64> = ndarray::Array1::from_vec(
+                        ss_result.smoothed_states.iter().map(|s| s[1]).collect(),
+                    );
+                    let sf_name = format!("{var_name}_slope_filtered");
+                    let ss_name = format!("{var_name}_slope_smoothed");
+                    Rc::make_mut(&mut df)
+                        .insert(sf_name.clone(), slope_filt)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    Rc::make_mut(&mut df)
+                        .insert(ss_name.clone(), slope_smooth)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    println!(
+                        "\nKalman ({}):  T={}  loglik={:.4}  σ_obs={:.4}  σ_state={:.4}  σ_slope={:.4}",
+                        model_kind, n, ss_result.log_likelihood, sigma_obs, sigma_state, sigma_slope
+                    );
+                    println!(
+                        "  → {filt_name}, {smooth_name}, {sf_name}, {ss_name} adicionadas a {df_name}"
+                    );
+                } else {
+                    println!(
+                        "\nKalman ({}):  T={}  loglik={:.4}  σ_obs={:.4}  σ_state={:.4}",
+                        model_kind, n, ss_result.log_likelihood, sigma_obs, sigma_state
+                    );
+                    println!(
+                        "  → {filt_name}, {smooth_name} adicionadas a {df_name}"
+                    );
+                }
+
+                self.env.set(&df_name, Value::DataFrame(df))?;
+                Ok(Value::Nil)
             }
 
             // ── forecast ─────────────────────────────────────────────────────
@@ -19756,14 +20063,18 @@ impl Interpreter {
                 // ── geradores aleatórios (tamanho = n_rows do df) ──
                 if matches!(func.as_str(), "uniform" | "runiform" | "rnormal" | "rbernoulli") {
                     let n = df.n_rows();
+                    use rand::Rng;
                     return Ok(match func.as_str() {
-                        "uniform" | "runiform" => greeners::Transforms::uniform(n),
-                        "rnormal" => greeners::Transforms::rnormal(n),
+                        "uniform" | "runiform" | "rnormal" => {
+                            let rng = &mut self.rng;
+                            (0..n).map(|_| rng.gen::<f64>()).collect()
+                        }
                         "rbernoulli" => {
                             let p = if !args.is_empty() {
                                 self.eval_col_expr(&args[0], df)?[0]
                             } else { 0.5 };
-                            greeners::Transforms::rbernoulli(n, p)
+                            let rng = &mut self.rng;
+                            (0..n).map(|_| if rng.gen::<f64>() < p { 1.0 } else { 0.0 }).collect()
                         }
                         _ => unreachable!(),
                     });
