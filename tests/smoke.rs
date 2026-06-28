@@ -48,10 +48,68 @@ fn assert_ok_contains(name: &str, src: &str, needle: &str) {
     );
 }
 
-fn assert_binary_margins_point_estimates_only(name: &str, estimator: &str, margins_call: &str) {
-    let (ok, out) = run_inline(
-        &format!(
-            r#"
+#[derive(Debug)]
+struct MarginsRow {
+    dydx: f64,
+    se: f64,
+    z: f64,
+    p: f64,
+}
+
+fn parse_margins_row(out: &str, var_name: &str) -> MarginsRow {
+    let row = out
+        .lines()
+        .find(|line| line.split_whitespace().next() == Some(var_name))
+        .unwrap_or_else(|| panic!("missing margins row for {var_name}:\n{out}"));
+    let fields: Vec<&str> = row.split_whitespace().collect();
+    assert!(
+        fields.len() >= 5,
+        "margins row for {var_name} did not include inference columns:\n{row}\n\n{out}"
+    );
+    MarginsRow {
+        dydx: fields[1].parse().unwrap(),
+        se: fields[2].parse().unwrap(),
+        z: fields[3].parse().unwrap(),
+        p: fields[4].parse().unwrap(),
+    }
+}
+
+fn assert_close(label: &str, actual: f64, expected: f64, tol: f64) {
+    assert!(
+        (actual - expected).abs() <= tol,
+        "{label}: expected {expected}, got {actual}"
+    );
+}
+
+fn assert_margins_row_close(
+    model: &str,
+    var_name: &str,
+    row: MarginsRow,
+    expected_dydx: f64,
+    expected_se: f64,
+    expected_z: f64,
+    expected_p: f64,
+) {
+    assert_close(
+        &format!("{model} {var_name} dy/dx"),
+        row.dydx,
+        expected_dydx,
+        5e-6,
+    );
+    assert_close(&format!("{model} {var_name} se"), row.se, expected_se, 5e-6);
+    assert_close(&format!("{model} {var_name} z"), row.z, expected_z, 5e-4);
+    assert_close(&format!("{model} {var_name} p"), row.p, expected_p, 5e-5);
+}
+
+fn assert_binary_margins_match_statsmodels(
+    name: &str,
+    estimator: &str,
+    margins_call: &str,
+    expected_x1: (f64, f64, f64, f64),
+    expected_x2: (f64, f64, f64, f64),
+) {
+    let (ok, out) = run_inline(&format!(
+        r#"
 input df
 y x1 x2
 0 -2.0 0
@@ -98,34 +156,71 @@ end
 let m = {estimator}(y ~ x1 + x2, df)
 {margins_call}
 "#,
-        ),
-    );
+    ));
 
     assert!(ok, "{name} failed:\n{out}");
-    assert!(out.contains("Average Marginal Effects"), "{out}");
-    assert!(out.contains("x1"), "{out}");
-    assert!(out.contains("x2"), "{out}");
     assert!(
-        !out.contains("Std.Err."),
-        "binary margins printed unsupported standard errors:\n{out}"
+        out.contains("Std.Err.") && out.contains("P>|z|"),
+        "{name}: margins output should include valid inference columns:\n{out}"
     );
-    assert!(
-        !out.contains("P>|z|"),
-        "binary margins printed unsupported p-values:\n{out}"
+
+    let x1 = parse_margins_row(&out, "x1");
+    let x2 = parse_margins_row(&out, "x2");
+    assert_margins_row_close(
+        name,
+        "x1",
+        x1,
+        expected_x1.0,
+        expected_x1.1,
+        expected_x1.2,
+        expected_x1.3,
+    );
+    assert_margins_row_close(
+        name,
+        "x2",
+        x2,
+        expected_x2.0,
+        expected_x2.1,
+        expected_x2.2,
+        expected_x2.3,
     );
 }
 
 #[test]
-fn margins_logit_suppresses_invalid_delta_method_inference() {
-    assert_binary_margins_point_estimates_only("logit margins", "logit", "margins(m)");
+fn margins_logit_matches_statsmodels_delta_method() {
+    // statsmodels 0.14.5: Logit(...).fit().get_margeff(at="overall", method="dydx")
+    assert_binary_margins_match_statsmodels(
+        "logit margins",
+        "logit",
+        "margins(m)",
+        (0.074867, 0.024771, 3.022, 0.0025),
+        (-0.014973, 0.143830, -0.104, 0.9171),
+    );
 }
 
 #[test]
-fn margins_probit_at_suppresses_invalid_delta_method_inference() {
-    assert_binary_margins_point_estimates_only(
-        "probit margins at",
+fn margins_probit_matches_statsmodels_delta_method() {
+    // statsmodels 0.14.5: Probit(...).fit().get_margeff(at="overall", method="dydx")
+    assert_binary_margins_match_statsmodels(
+        "probit margins",
+        "probit",
+        "margins(m)",
+        (0.075134, 0.025423, 2.955, 0.0031),
+        (-0.009018, 0.143939, -0.063, 0.9500),
+    );
+}
+
+#[test]
+fn margins_probit_at_matches_statsmodels_delta_method() {
+    // statsmodels 0.14.5: Probit(...).fit().get_margeff(
+    //     at="overall", method="dydx", atexog={2: 1.0}
+    // )
+    assert_binary_margins_match_statsmodels(
+        "probit margins at_x2",
         "probit",
         "margins(m, at_x2=1)",
+        (0.075333, 0.025688, 2.933, 0.0034),
+        (-0.009041, 0.144700, -0.062, 0.9502),
     );
 }
 

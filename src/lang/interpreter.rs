@@ -9,7 +9,8 @@ use greeners::{
     CovarianceType, DataFrame, FixedEffects, Formula as GFormula, Logit, Probit, RandomEffects, IV,
     OLS,
 };
-use ndarray::{Array1, Array2};
+use ndarray::{Array1, Array2, Axis};
+use statrs::distribution::{ContinuousCDF, Normal};
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
@@ -50,6 +51,7 @@ impl std::fmt::Display for OlsModel {
 #[derive(Clone)]
 pub struct BinaryModel {
     pub result: Rc<greeners::discrete::BinaryModelResult>,
+    pub y: Array1<f64>,
     pub x: Array2<f64>,
     pub kind: String,            // "logit" | "probit"
     pub coef_names: Vec<String>, // nomes dos coeficientes para margins
@@ -674,6 +676,51 @@ impl Interpreter {
             "expected {expected}, got {}",
             Self::type_name(got)
         ))
+    }
+
+    fn binary_mle_vcov(
+        kind: &str,
+        params: &Array1<f64>,
+        y: &Array1<f64>,
+        x: &Array2<f64>,
+    ) -> Option<Array2<f64>> {
+        if x.ncols() != params.len() || x.nrows() != y.len() {
+            return None;
+        }
+
+        let xb = x.dot(params);
+        let mut x_weighted = x.to_owned();
+        let normal_dist = match kind {
+            "logit" => None,
+            "probit" => Some(Normal::new(0.0, 1.0).ok()?),
+            _ => return None,
+        };
+
+        for (i, mut row) in x_weighted.axis_iter_mut(Axis(0)).enumerate() {
+            let weight = if kind == "logit" {
+                let p = logistic(xb[i]);
+                p * (1.0 - p)
+            } else {
+                // Observed-information probit Hessian, matching statsmodels:
+                // -H = X' diag(lambda_i * (lambda_i + x_i'beta)) X.
+                let q = if y[i] > 0.5 { 1.0 } else { -1.0 };
+                let qxb = q * xb[i];
+                let p = normal_dist
+                    .as_ref()
+                    .map(|dist| dist.cdf(qxb))
+                    .unwrap_or(f64::NAN)
+                    .clamp(1e-10, 1.0 - 1e-10);
+                let lambda = q * norm_pdf(qxb) / p;
+                lambda * (lambda + xb[i])
+            };
+
+            if !weight.is_finite() || weight <= 0.0 {
+                return None;
+            }
+            row *= weight;
+        }
+
+        x.t().dot(&x_weighted).inv().ok()
     }
 
     fn eval_as_int(&mut self, expr: &Expr, ctx: &str) -> Result<i64> {
@@ -3221,7 +3268,7 @@ impl Interpreter {
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let (_, x) = df
+                let (y, x) = df
                     .to_design_matrix(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let result = Logit::from_formula(&g_formula, &df)
@@ -3229,6 +3276,7 @@ impl Interpreter {
                 let coef_names = Self::coef_names_from_formula(&formula_ast, &df, x.ncols());
                 Ok(Value::BinaryResult(BinaryModel {
                     result: Rc::new(result),
+                    y,
                     x,
                     kind: "logit".into(),
                     coef_names,
@@ -3241,7 +3289,7 @@ impl Interpreter {
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let (_, x) = df
+                let (y, x) = df
                     .to_design_matrix(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let result = Probit::from_formula(&g_formula, &df)
@@ -3249,6 +3297,7 @@ impl Interpreter {
                 let coef_names = Self::coef_names_from_formula(&formula_ast, &df, x.ncols());
                 Ok(Value::BinaryResult(BinaryModel {
                     result: Rc::new(result),
+                    y,
                     x,
                     kind: "probit".into(),
                     coef_names,
@@ -9291,22 +9340,48 @@ impl Interpreter {
                                 x_use = greeners::Margins::with_at(&x_use, idx, *val);
                             }
                         }
-                        // Do not fabricate a covariance matrix for binary-model
-                        // AMEs. Until the real MLE vcov is available, report
-                        // point estimates only instead of invalid inference.
-                        let ame_result = if bm.kind == "logit" {
-                            greeners::Margins::ame_logit(
-                                &bm.result.params,
-                                &x_use,
-                                &bm.coef_names,
-                            )
+                        let vcov =
+                            Self::binary_mle_vcov(&bm.kind, &bm.result.params, &bm.y, &bm.x);
+                        let mut ame_result = if bm.kind == "logit" {
+                            match &vcov {
+                                Some(v) => greeners::Margins::ame_logit_with_vcov(
+                                    &bm.result.params,
+                                    &x_use,
+                                    &bm.coef_names,
+                                    v,
+                                ),
+                                None => greeners::Margins::ame_logit(
+                                    &bm.result.params,
+                                    &x_use,
+                                    &bm.coef_names,
+                                ),
+                            }
                         } else {
-                            greeners::Margins::ame_probit(
-                                &bm.result.params,
-                                &x_use,
-                                &bm.coef_names,
-                            )
+                            match &vcov {
+                                Some(v) => greeners::Margins::ame_probit_with_vcov(
+                                    &bm.result.params,
+                                    &x_use,
+                                    &bm.coef_names,
+                                    v,
+                                ),
+                                None => greeners::Margins::ame_probit(
+                                    &bm.result.params,
+                                    &x_use,
+                                    &bm.coef_names,
+                                ),
+                            }
                         };
+                        if let Ok(normal_dist) = Normal::new(0.0, 1.0) {
+                            for i in 0..ame_result.effects.len() {
+                                let se = ame_result.std_errors[i];
+                                if se.is_finite() && se > 1e-15 {
+                                    let z = ame_result.effects[i] / se;
+                                    ame_result.z_values[i] = z;
+                                    ame_result.p_values[i] =
+                                        2.0 * (1.0 - normal_dist.cdf(z.abs()));
+                                }
+                            }
+                        }
                         let at_label = if at_vals.is_empty() {
                             String::new()
                         } else {
