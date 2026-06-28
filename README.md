@@ -196,22 +196,23 @@ export(m, "html", "table.html")
 | Category | Commands |
 |---|---|
 | Linear | `ols` `reg` `iv` `wls` `glsar` |
-| Panel | `fe` `re` `ab` `sysgmm` `pcse` `xtgls` |
-| Binary | `logit` `probit` `cloglog` `clogit` |
+| Panel | `fe` `re` `be` `feiv` `ab` `sysgmm` `pcse` `xtgls` |
+| Binary | `logit` `probit` `clogit` |
 | Count | `poisson` `nbreg` `zip` `zinb` |
 | Ordinal | `ologit` `oprobit` `mlogit` `cmnlogit` |
 | GMM | `gmm` |
-| Censored | `tobit` `heckman` `truncreg` |
+| Censored | `tobit` `heckman` |
 | Survival | `cox` `km` |
 | Quantile | `qreg` |
 | Regularization | `lasso` `ridge` `elasticnet` |
-| Time series | `arima` `sarima` `garch` `egarch` `gjrgarch` |
-| VAR | `var` `vecm` `svar` `irf` `fevd` |
-| Causal | `did` `rd` `synth` `psmatch` |
+| Time series | `arima` `sarima` `autoreg` `ardl` `kalman` `garch` `egarch` `gjrgarch` |
+| VAR | `var` `vecm` `varma` `svar` `irf` `fevd` |
+| Causal | `did` `rd` `fuzzy_rd` `synth` `psm` |
 | Finance | `fmb` `portsort` `doublesort` |
-| Robust | `rlm` `gee` `glm` `betareg` `mixed` |
+| Robust / flexible | `rlm` `gee` `glm` `betareg` `mixed` `lowess` `gam` |
+| Systems / factors | `sur` `three_sls` `pca` `factor` `dfm` |
 
-All estimators support `if=` for subsamples and `cov=`/`cluster=`/`nw=` for robust SEs. All estimators auto-detect and drop perfectly collinear variables (Stata-style `(omitted)` display).
+Common options include `if=` for subsamples and `cov=`/`cluster=`/`nw=` where supported. Core regression estimators auto-detect and drop perfectly collinear variables (Stata-style `(omitted)` display).
 
 ## Post-estimation
 
