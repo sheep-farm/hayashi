@@ -79,9 +79,8 @@ O DGP gera um processo ARCH(1) verdadeiro ($\beta=0$):
   z_t \sim (0,1)
 \]
 
-Como \lstinline{rnormal()} no \hayashi{} gera $U(0,1)$, centramos e
-normalizamos para obter $E[z]=0$ e $E[z^2]=1$:
-$z = (\text{rnormal}() - 0{,}5)\times\sqrt{12} \approx U(-1{,}73,\; 1{,}73)$.
+A inovação é gerada diretamente como sorteio normal padrão:
+$z = \text{rnormal}()$, portanto $E[z]=0$ e $E[z^2]=1$.
 
 \begin{lstlisting}[caption={DGP ARCH(1) e estimação GARCH}]
 seed(42)
@@ -91,8 +90,7 @@ id
 end
 for i in 1..=9 { df = append(df, df) }
 df |> filter(_n <= 500)
-generate df u  = rnormal()
-generate df z  = (u - 0.5) * 3.4641      // z: E[z]=0, E[z²]=1
+generate df z  = rnormal()               // z: E[z]=0, E[z²]=1
 generate df e  = z
 generate df t  = _n
 let n = nrow(df)
@@ -112,79 +110,24 @@ archtest(m, lags=5)          // deve não rejeitar (GARCH captou o ARCH)
 
 \subsection*{Teste ARCH-LM — série bruta}
 
-\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
-  frame=none, numbers=none, backgroundcolor=\color{codbg},
-  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
-ARCH LM Test (Engle 1982)  —  lags = 5  n = 495
-──────────────────────────────────────────────────────
-H₀: sem efeitos ARCH de ordem 5
-──────────────────────────────────────────────────────
-Teste                  Estatística    p-value
-──────────────────────────────────────────────────────
-LM  ~ χ²(5)              139.6411     0.0000      ***
-F   ~ F(5,489)            38.4313     0.0000      ***
-──────────────────────────────────────────────────────
-R² aux = 0.2821
-\end{lstlisting}
-
-$LM = 139{,}64$ com $p < 0{,}001$ — efeitos ARCH claramente presentes.
-O $R^2_{\text{aux}} = 0{,}28$ indica que 28\% da variação em $\varepsilon_t^2$
-é explicada pelos seus próprios 5 lags.
+A série bruta deve rejeitar a hipótese nula de ausência de ARCH, confirmando
+variância condicional variável no processo simulado.
 
 \subsection*{Estimação GARCH(1,1)}
 
-\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
-  frame=none, numbers=none, backgroundcolor=\color{codbg},
-  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
-======================== GARCH(1,1) - Normal Results =========================
-Model:                    GARCH(1,1) || No. Observations:                500
-Distribution:              Normal    || Log-Likelihood:            -527.6063
-Method:                          MLE || AIC:                       1063.2127
-Converged:                       Yes || BIC:                       1080.0711
-
-------------------------------------------------------------------------------
-Variable     |       coef |    std err |        z |    P>|z| |   [0.025 |   0.975]
-------------------------------------------------------------------------------
-mu           |    -0.0304 |     1.2592 |   -0.024 |    0.981 |   -2.499 |    2.438
-omega        |     0.3144 |     0.0087 |   35.957 |    0.000 |    0.297 |    0.332
-alpha[1]     |     0.4115 |     0.0203 |   20.303 |    0.000 |    0.372 |    0.451
-beta[1]      |     0.0000 |     0.0341 |    0.000 |    1.000 |   -0.067 |    0.067
-==============================================================================
-\end{lstlisting}
-
 O estimador MLE recupera o DGP verdadeiro ($\omega=0{,}3$, $\alpha=0{,}5$,
-$\beta=0$): $\hat\omega = 0{,}314$ e $\hat\alpha = 0{,}412$, ambos
-significativos a 1\%. $\hat\beta \approx 0$ corretamente identifica que
-o processo é ARCH puro — sem componente GARCH de persistência.\footnote{%
-  Com $N=500$ e inovações uniformes, a precisão do MLE é menor do que com
-  inovações gaussianas de mesmo tamanho amostral (sem caudas pesadas que
-  fornecem informação adicional sobre a variância condicional).
-  O verdadeiro $\alpha=0{,}5$ está dentro do IC 95\% $[0{,}37;\;0{,}45]$
-  apenas marginalmente; com $N$ maior a convergência melhora.}
+$\beta=0$) até a variação de amostra finita. Um $\hat\beta$ próximo de zero
+identifica que o processo é ARCH puro — sem componente GARCH de persistência.\footnote{%
+  Com $N=500$, estimativas em amostras finitas não precisam coincidir
+  exatamente com os parâmetros do DGP; com $N$ maior, a convergência melhora.}
 
 \subsection*{ARCH-LM nos resíduos padronizados}
 
 Após ajustar o GARCH, os resíduos padronizados $\hat{z}_t = \varepsilon_t / \sqrt{\hat{h}_t}$
 devem ser ruído branco em $z_t^2$:
 
-\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
-  frame=none, numbers=none, backgroundcolor=\color{codbg},
-  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
-ARCH LM Test (Engle 1982)  —  lags = 5  n = 495
-──────────────────────────────────────────────────────
-H₀: sem efeitos ARCH de ordem 5
-──────────────────────────────────────────────────────
-Teste                  Estatística    p-value
-──────────────────────────────────────────────────────
-LM  ~ χ²(5)                4.8747     0.4314
-F   ~ F(5,489)              0.9727     0.4339
-──────────────────────────────────────────────────────
-R² aux = 0.0098
-\end{lstlisting}
-
-$LM = 4{,}87$ ($p = 0{,}43$) — não rejeita $H_0$. O GARCH captou toda a
-heterocedasticidade condicional presente na série; os resíduos padronizados
-não têm autocorrelação em $z_t^2$.
+Depois do ajuste, o teste ARCH-LM nos resíduos padronizados não deve rejeitar
+se a especificação de volatilidade captou a heterocedasticidade condicional.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Variantes: EGARCH e GJR-GARCH}

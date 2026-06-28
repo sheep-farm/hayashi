@@ -60,8 +60,8 @@ id
 end
 for i in 1..=10 { df = append(df, df) }
 df |> filter(_n <= 1000)
-generate df x1 = rnormal()                    // x1 ~ U(0,1)
-generate df u  = rnormal()                    // assignment noise
+generate df x1 = runiform()                   // x1 ~ U(0,1)
+generate df u  = runiform()                   // assignment noise
 generate df d  = (0.3 + 0.4*x1) > u          // P(D=1|x1) ∈ [0.30, 0.70]
 generate df e  = rnormal()
 generate df y  = 1.0 + 2.0*d + 3.0*x1 + e   // true ATT = 2
@@ -102,28 +102,9 @@ let m_psm = psm(y ~ d + x1, df, k=1, boot=200)
 display m_psm
 \end{lstlisting}
 
-\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
-  frame=none, numbers=none, backgroundcolor=\color{codbg},
-  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
-════════════════════════════════════════════════════════════════════════
- Propensity Score Matching  —  ATT
-════════════════════════════════════════════════════════════════════════
- Outcome: y   Treatment: d
- k=1 match   Caliper: none   Bootstrap SE: 200 reps
- N treated: 503   N controls: 497   N matched treated: 497
-────────────────────────────────────────────────────────────────────────
- ATT = 2.2168   SE = 0.0643   z = 34.483   P>|z| = 0.0000  ***
- 95% CI: [2.0908, 2.3428]
-────────────────────────────────────────────────────────────────────────
- Balance  x1:  μ_Treat=0.542  μ_Ctrl(raw)=0.461  μ_Ctrl(mtch)=0.461
-                SMD_before=0.291   SMD_after=0.291
- (!) SMD > 0.10 after matching — poorly balanced covariate
-════════════════════════════════════════════════════════════════════════
-\end{lstlisting}
-
 Without a caliper, matching accepts pairs that are distant in $\hat{p}$. Balance
-does not improve (SMD = 0.291 before and after) and the estimate remains biased
-($\hat\tau = 2{,}22$).
+may not improve much and the estimate can remain biased if treated units are
+matched to poor controls.
 
 \subsection*{PSM with caliper}
 
@@ -136,28 +117,9 @@ let m_cal = psm(y ~ d + x1, df, k=1, caliper=0.05, boot=200)
 display m_cal
 \end{lstlisting}
 
-\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
-  frame=none, numbers=none, backgroundcolor=\color{codbg},
-  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
-════════════════════════════════════════════════════════════════════════
- Propensity Score Matching  —  ATT
-════════════════════════════════════════════════════════════════════════
- Outcome: y   Treatment: d
- k=1 match   Caliper: 0.0500   Bootstrap SE: 200 reps
- N treated: 503   N controls: 497   N matched treated: 449
-────────────────────────────────────────────────────────────────────────
- ATT = 2.0323   SE = 0.0233   z = 87.157   P>|z| = 0.0000  ***
- 95% CI: [1.9866, 2.0780]
-────────────────────────────────────────────────────────────────────────
- Balance  x1:  μ_Treat=0.542  μ_Ctrl(raw)=0.461  μ_Ctrl(mtch)=0.485
-                SMD_before=0.291   SMD_after=0.204
-════════════════════════════════════════════════════════════════════════
-\end{lstlisting}
-
-With caliper $= 0{,}05$, the estimated ATT is $2{,}03$ — practically on the
-true value. The cost is the loss of 54 treated units with no acceptable match
-(503 → 449). The caliper reduces the SMD from 0.29 to 0.20, evidencing better
-balance.\footnote{%
+With caliper $= 0{,}05$, the estimate should move closer to the true ATT at
+the cost of dropping treated units with no acceptable match. The caliper should
+also improve balance by rejecting distant propensity-score matches.\footnote{%
   The \texttt{SMD > 0.10} warning persists because the conventional rule requires
   SMD $\leq 0{,}10$ (Austin 2009). In this DGP the confounding by $x_1$ is intense
   ($\beta_{x_1} = 3$) and $N = 1000$; with more observations the caliper could
