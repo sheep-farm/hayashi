@@ -74,9 +74,9 @@ $x \sim U(0,1)$. The estimator should recover $\beta_0 \approx 0{,}5$ and $\beta
 
 \begin{lstlisting}[caption={Poisson, NegBin and ZINB}]
 seed(42)
-generate df x   = rnormal()                          // x ~ U(0,1)
+generate df x   = runiform()                         // x ~ U(0,1)
 generate df lam = exp(0.5 + 1.0 * x)
-generate df u   = rnormal()
+generate df u   = runiform()
 generate df y   = floor(lam + u)                     // count ≥ 0
 
 let m_pois = poisson(y ~ x, df)

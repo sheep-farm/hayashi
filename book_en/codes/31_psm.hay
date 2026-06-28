@@ -10,8 +10,8 @@ id
 end
 for i in 1..=10 { df = append(df, df) }
 df |> filter(_n <= 1000)
-generate df x1 = rnormal()
-generate df u  = rnormal()
+generate df x1 = runiform()
+generate df u  = runiform()
 generate df d  = (0.3 + 0.4*x1) > u
 generate df e  = rnormal()
 generate df y  = 1.0 + 2.0*d + 3.0*x1 + e

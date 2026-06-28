@@ -1,6 +1,6 @@
 // Cap 30 — GARCH e Volatilidade Condicional
 // DGP: ARCH(1) com omega=0.3, alpha=0.5, beta=0
-// Inovações: z = (rnormal()-0.5)*sqrt(12) → E[z]=0, E[z²]=1
+// Inovações: z = rnormal() → E[z]=0, E[z²]=1
 // N=500
 
 seed(42)
@@ -10,8 +10,7 @@ id
 end
 for i in 1..=9 { df = append(df, df) }
 df |> filter(_n <= 500)
-generate df u  = rnormal()
-generate df z  = (u - 0.5) * 3.4641
+generate df z  = rnormal()
 generate df e  = z
 generate df t  = _n
 let n = nrow(df)

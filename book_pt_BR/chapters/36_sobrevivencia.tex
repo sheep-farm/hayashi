@@ -66,7 +66,7 @@ proporcional em $x \in \{0,1\}$. O verdadeiro log-hazard ratio é $\beta_x = 0{,
 \begin{lstlisting}[caption={DGP de sobrevivência — Weibull com hazard proporcional}]
 seed(42)
 generate df x      = rbernoulli(0.5)
-generate df u      = rnormal()
+generate df u      = runiform()
 generate df t_true = exp(-ln(u) / exp(0.8 * x))   // Weibull, beta=0.8
 generate df c      = 3.0
 generate df time   = t_true * (t_true <= c) + c * (t_true > c)

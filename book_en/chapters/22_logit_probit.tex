@@ -114,29 +114,11 @@ let m_p = probit(y ~ x, df)
 esttab(m_l, m_p)
 \end{lstlisting}
 
-\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
-  frame=none, numbers=none, backgroundcolor=\color{codbg},
-  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
-                            (1)              (2)
-                          Logit           Probit
-────────────────────────────────────────────────
-const                -0.6772***       -0.4222***
-                       (0.1326)         (0.0821)
-x                     1.3329***        0.8324***
-                       (0.2308)         (0.1427)
-────────────────────────────────────────────────
-N                          1000             1000
-────────────────────────────────────────────────
-* p<0.10  ** p<0.05  *** p<0.01
-\end{lstlisting}
-
 The true parameters are $(\beta_0, \beta_1) = (-1{,}0;\; 2{,}0)$ for
-the Logit. Since \lstinline{rnormal()} generates $U(0,1)$ instead of $\mathcal{N}(0,1)$
-(see ch.~\ref{cap:ols}), $x \in [0,1]$ and the linear predictor $lp \in [-1,1]$
-varies little --- which reduces Fisher information and attenuates estimates
-relative to the true DGP. Probit estimates on the normal scale; the values
-$(-0{,}42;\; 0{,}83)$ are within the 95\% CI of the probit equivalents
-$(-0{,}55;\; 1{,}10)$.
+the Logit DGP with $x_i \sim \mathcal{N}(0,1)$. The Probit estimates are on
+the normal latent-index scale, so they should not be numerically identical to
+the Logit coefficients even when both models describe the same qualitative
+relationship.
 
 \subsection*{Average marginal effects}
 
@@ -147,22 +129,8 @@ economic interpretation, use \lstinline{margins}:
 margins(m_l, df)
 \end{lstlisting}
 
-\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
-  frame=none, numbers=none, backgroundcolor=\color{codbg},
-  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
-════════════════════════════════════════════════════════════
- Average Marginal Effects — LOGIT
-════════════════════════════════════════════════════════════
-Variable                dy/dx   Std.Err.        z    P>|z|
-────────────────────────────────────────────────────────────
-x                    0.321859   0.035576    9.047   0.0000 ***
-────────────────────────────────────────────────────────────
-n = 1000
-════════════════════════════════════════════════════════════
-\end{lstlisting}
-
-A unit increase in $x$ raises the probability of $y=1$ by
-approximately $0{,}32$ percentage points, on average over the sample.
+The marginal effect is positive and varies with the fitted probability; it is
+reported by \lstinline{margins(m_l, df)} on the probability scale.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Syntax}
