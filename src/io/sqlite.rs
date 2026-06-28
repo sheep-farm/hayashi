@@ -14,10 +14,10 @@ pub fn load_sqlite(
     let sql = if let Some(q) = query {
         q.to_string()
     } else if let Some(t) = table {
-        format!("SELECT * FROM \"{t}\"")
+        format!("SELECT * FROM {}", quote_sqlite_identifier(t)?)
     } else {
         let tbl = first_table(&conn)?;
-        format!("SELECT * FROM \"{tbl}\"")
+        format!("SELECT * FROM {}", quote_sqlite_identifier(&tbl)?)
     };
 
     let mut stmt = conn
@@ -120,11 +120,22 @@ fn first_table(conn: &Connection) -> Result<String> {
     Ok(name)
 }
 
+fn quote_sqlite_identifier(name: &str) -> Result<String> {
+    if name.contains('\0') {
+        return Err(HayashiError::Runtime(
+            "SQLite identifier contains NUL byte".into(),
+        ));
+    }
+
+    Ok(format!("\"{}\"", name.replace('"', "\"\"")))
+}
+
 pub fn write_sqlite(df: &greeners::DataFrame, path: &str, table: &str) -> Result<()> {
     let mut conn = Connection::open(path)
         .map_err(|e| HayashiError::Runtime(format!("cannot open '{path}': {e}")))?;
 
     let col_names = df.column_names();
+    let quoted_table = quote_sqlite_identifier(table)?;
 
     let col_defs: Vec<String> = col_names
         .iter()
@@ -135,23 +146,22 @@ pub fn write_sqlite(df: &greeners::DataFrame, path: &str, table: &str) -> Result
                 Ok(greeners::Column::Bool(_)) => "INTEGER",
                 _ => "TEXT",
             };
-            format!("\"{}\" {}", name, dtype)
+            Ok(format!("{} {}", quote_sqlite_identifier(name)?, dtype))
         })
-        .collect();
+        .collect::<Result<Vec<_>>>()?;
 
-    conn.execute(&format!("DROP TABLE IF EXISTS \"{}\"", table), [])
+    conn.execute(&format!("DROP TABLE IF EXISTS {quoted_table}"), [])
         .map_err(|e| HayashiError::Runtime(format!("SQL error: {e}")))?;
 
     conn.execute(
-        &format!("CREATE TABLE \"{}\" ({})", table, col_defs.join(", ")),
+        &format!("CREATE TABLE {quoted_table} ({})", col_defs.join(", ")),
         [],
     )
     .map_err(|e| HayashiError::Runtime(format!("SQL error: {e}")))?;
 
     let placeholders: Vec<&str> = vec!["?"; col_names.len()];
     let insert_sql = format!(
-        "INSERT INTO \"{}\" VALUES ({})",
-        table,
+        "INSERT INTO {quoted_table} VALUES ({})",
         placeholders.join(", ")
     );
 
@@ -185,4 +195,92 @@ pub fn write_sqlite(df: &greeners::DataFrame, path: &str, table: &str) -> Result
         .map_err(|e| HayashiError::Runtime(format!("commit error: {e}")))?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rusqlite::Connection;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn load_table_name_with_embedded_quote() {
+        let file = NamedTempFile::new().unwrap();
+        let path = file.path().to_string_lossy().to_string();
+        let conn = Connection::open(&path).unwrap();
+        conn.execute(
+            "CREATE TABLE \"quoted\"\"table\" (\"value\" INTEGER)",
+            [],
+        )
+        .unwrap();
+        conn.execute("INSERT INTO \"quoted\"\"table\" VALUES (42)", [])
+            .unwrap();
+
+        let (_df, rows) = load_sqlite(&path, Some("quoted\"table"), None).unwrap();
+
+        assert_eq!(rows, 1);
+    }
+
+    #[test]
+    fn write_column_name_with_embedded_quote() {
+        let file = NamedTempFile::new().unwrap();
+        let path = file.path().to_string_lossy().to_string();
+        let df = greeners::DataFrame::builder()
+            .add_column("quoted\"column", vec![1.0, 2.0])
+            .build()
+            .unwrap();
+
+        write_sqlite(&df, &path, "data").unwrap();
+
+        let conn = Connection::open(&path).unwrap();
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM \"data\" WHERE \"quoted\"\"column\" IS NOT NULL",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn write_table_name_with_embedded_quote() {
+        let file = NamedTempFile::new().unwrap();
+        let path = file.path().to_string_lossy().to_string();
+        let df = greeners::DataFrame::builder()
+            .add_column("value", vec![1.0, 2.0])
+            .build()
+            .unwrap();
+
+        write_sqlite(&df, &path, "quoted\"table").unwrap();
+
+        let conn = Connection::open(&path).unwrap();
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM \"quoted\"\"table\"", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn reject_nul_in_identifier() {
+        let err = quote_sqlite_identifier("bad\0name").unwrap_err();
+
+        assert!(err.to_string().contains("NUL"));
+    }
+
+    #[test]
+    fn write_rejects_nul_in_table_name() {
+        let file = NamedTempFile::new().unwrap();
+        let path = file.path().to_string_lossy().to_string();
+        let df = greeners::DataFrame::builder()
+            .add_column("value", vec![1.0])
+            .build()
+            .unwrap();
+
+        let err = write_sqlite(&df, &path, "bad\0name").unwrap_err();
+
+        assert!(err.to_string().contains("NUL"));
+    }
 }
