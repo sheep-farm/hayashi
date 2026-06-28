@@ -211,7 +211,7 @@ m_re = RandomEffects(df['y'], df[['x']]).fit()
 
 \begin{lstlisting}
 generate df p = 1 / (1 + exp(-(-1.0 + 2.0*x)))
-generate df y = rnormal() < p
+generate df y = runiform() < p
 let m_l = logit(y ~ x, df)
 let m_p = probit(y ~ x, df)
 margins(m_l, df)
@@ -258,7 +258,7 @@ print(m_l.get_margeff().summary())
 
 \begin{lstlisting}
 generate df lam = exp(0.5 + 1.0*x)
-generate df y   = floor(lam + rnormal())
+generate df y   = floor(lam + runiform())
 let m_p  = poisson(y ~ x, df)
 let m_nb = nbreg(y ~ x, df)
 \end{lstlisting}
@@ -758,6 +758,6 @@ Table           & \texttt{esttab()}     & \texttt{esttab}$^\dagger$ & \texttt{st
 \noindent
 $^*$ HP and BK in Stata require \texttt{ssc install hprescott} and \texttt{ssc install bking}.\\
 $^\dagger$ \texttt{esttab} in Stata requires \texttt{ssc install estout}.\\[4pt]
-\noindent\textbf{Note on \texttt{rnormal()}:} in Hayashi, it generates $U(0,1)$, \emph{not} $N(0,1)$.
-When replicating DGPs on other platforms, replace with \texttt{runiform()} (Stata),
-\texttt{runif()} (R) or \texttt{np.random.uniform()} (Python).
+\noindent\textbf{Note on random generators:} \texttt{rnormal()} matches the standard-normal
+generator used by Stata, R and Python examples. Use \texttt{runiform()} when the
+DGP needs a $U(0,1)$ draw.

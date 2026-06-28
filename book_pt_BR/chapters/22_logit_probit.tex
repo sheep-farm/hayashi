@@ -114,29 +114,11 @@ let m_p = probit(y ~ x, df)
 esttab(m_l, m_p)
 \end{lstlisting}
 
-\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
-  frame=none, numbers=none, backgroundcolor=\color{codbg},
-  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
-                            (1)              (2)
-                          Logit           Probit
-────────────────────────────────────────────────
-const                -0.6772***       -0.4222***
-                       (0.1326)         (0.0821)
-x                     1.3329***        0.8324***
-                       (0.2308)         (0.1427)
-────────────────────────────────────────────────
-N                          1000             1000
-────────────────────────────────────────────────
-* p<0.10  ** p<0.05  *** p<0.01
-\end{lstlisting}
-
 Os verdadeiros parâmetros são $(\beta_0, \beta_1) = (-1{,}0;\; 2{,}0)$ para
-o Logit. Como \lstinline{rnormal()} gera $U(0,1)$ em vez de $\mathcal{N}(0,1)$
-(ver cap.~\ref{cap:ols}), $x \in [0,1]$ e o preditor linear $lp \in [-1,1]$
-varia pouco — o que reduz a informação de Fisher e atenua as estimativas
-em relação ao DGP verdadeiro. O Probit estima na escala normal; os valores
-$(-0{,}42;\; 0{,}83)$ estão dentro do IC 95\% dos equivalentes probit
-$(-0{,}55;\; 1{,}10)$.
+o DGP Logit com $x_i \sim \mathcal{N}(0,1)$. As estimativas Probit estão na
+escala normal do índice latente; portanto, não devem ser numericamente idênticas
+aos coeficientes Logit mesmo quando os dois modelos descrevem a mesma relação
+qualitativa.
 
 \subsection*{Efeitos marginais médios}
 
@@ -147,22 +129,8 @@ interpretação econômica, usa-se \lstinline{margins}:
 margins(m_l, df)
 \end{lstlisting}
 
-\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
-  frame=none, numbers=none, backgroundcolor=\color{codbg},
-  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
-════════════════════════════════════════════════════════════
- Average Marginal Effects — LOGIT
-════════════════════════════════════════════════════════════
-Variable                dy/dx   Std.Err.        z    P>|z|
-────────────────────────────────────────────────────────────
-x                    0.321859   0.035576    9.047   0.0000 ***
-────────────────────────────────────────────────────────────
-n = 1000
-════════════════════════════════════════════════════════════
-\end{lstlisting}
-
-Um aumento unitário em $x$ eleva a probabilidade de $y=1$ em
-aproximadamente $0{,}32$ pontos percentuais, em média sobre a amostra.
+O efeito marginal é positivo e varia com a probabilidade ajustada; ele é
+reportado por \lstinline{margins(m_l, df)} na escala de probabilidade.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Sintaxe}
