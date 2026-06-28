@@ -4928,6 +4928,19 @@ summarize(df, pop)"#,
 }
 
 #[test]
+fn test_load_json_boolean_and_categorical() {
+    let (ok, out) = run_inline(
+        r#"load "examples/data/sample.json" as df
+        generate df cap_val = capital
+        ols(pop ~ cap_val, df)
+        "#,
+    );
+    assert!(ok, "load json + boolean generate + ols failed:\n{out}");
+    assert!(out.contains("R-squared"), "expected OLS output:\n{out}");
+}
+
+
+#[test]
 fn load_sqlite_then_generate() {
     let (ok, out) = run_inline(
         r#"load "examples/data/sample.db" as df
