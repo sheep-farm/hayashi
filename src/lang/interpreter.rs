@@ -1267,19 +1267,12 @@ impl Interpreter {
         formula_str
     }
 
-    /// Extrai coluna como Array1<f64>; aceita Float e Int.
+    /// Extrai coluna como Array1<f64>; aceita Float, Int, Bool, Categorical, etc. convertendo dinamicamente.
     fn get_col_f64(df: &DataFrame, name: &str) -> Result<ndarray::Array1<f64>> {
-        use greeners::Column;
         let col = df
             .get_column(name)
             .map_err(|_| HayashiError::Runtime(format!("column '{name}' not found")))?;
-        match col {
-            Column::Float(arr) => Ok(arr.clone()),
-            Column::Int(arr) => Ok(arr.mapv(|v| v as f64)),
-            _ => Err(HayashiError::Type(format!(
-                "column '{name}' is not numeric"
-            ))),
-        }
+        Ok(col.to_float())
     }
 
     /// Reconstrói X a partir da lista de nomes de variáveis do modelo.
@@ -20106,11 +20099,8 @@ impl Interpreter {
                 if name == "_N" {
                     return Ok(vec![df.n_rows() as f64; df.n_rows()]);
                 }
-                use greeners::Column;
                 match df.get_column(name) {
-                    Ok(Column::Float(arr)) => Ok(arr.to_vec()),
-                    Ok(Column::Int(arr)) => Ok(arr.iter().map(|&x| x as f64).collect()),
-                    Ok(_) => Err(HayashiError::Type(format!("column '{name}' is not numeric"))),
+                    Ok(col) => Ok(col.to_float().to_vec()),
                     Err(_) => match self.env.get(name) {
                         Some(Value::Float(f)) => Ok(vec![*f; df.n_rows()]),
                         Some(Value::Int(i)) => Ok(vec![*i as f64; df.n_rows()]),
