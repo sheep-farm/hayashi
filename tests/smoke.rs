@@ -48,6 +48,87 @@ fn assert_ok_contains(name: &str, src: &str, needle: &str) {
     );
 }
 
+fn assert_binary_margins_point_estimates_only(name: &str, estimator: &str, margins_call: &str) {
+    let (ok, out) = run_inline(
+        &format!(
+            r#"
+input df
+y x1 x2
+0 -2.0 0
+0 -1.8 1
+1 -1.6 0
+0 -1.4 1
+0 -1.2 0
+1 -1.0 1
+0 -0.8 0
+0 -0.6 1
+1 -0.4 0
+0 -0.2 1
+0 0.0 0
+1 0.2 1
+0 0.4 0
+1 0.6 1
+1 0.8 0
+0 1.0 1
+1 1.2 0
+1 1.4 1
+0 1.6 0
+1 1.8 1
+1 2.0 0
+0 2.2 1
+1 2.4 0
+1 2.6 1
+1 2.8 0
+0 3.0 1
+1 3.2 0
+1 3.4 1
+1 3.6 0
+0 3.8 1
+1 4.0 0
+1 4.2 1
+0 4.4 0
+1 4.6 1
+1 4.8 0
+1 5.0 1
+0 5.2 0
+1 5.4 1
+1 5.6 0
+1 5.8 1
+end
+let m = {estimator}(y ~ x1 + x2, df)
+{margins_call}
+"#,
+        ),
+    );
+
+    assert!(ok, "{name} failed:\n{out}");
+    assert!(out.contains("Average Marginal Effects"), "{out}");
+    assert!(out.contains("x1"), "{out}");
+    assert!(out.contains("x2"), "{out}");
+    assert!(
+        !out.contains("Std.Err."),
+        "binary margins printed unsupported standard errors:\n{out}"
+    );
+    assert!(
+        !out.contains("P>|z|"),
+        "binary margins printed unsupported p-values:\n{out}"
+    );
+}
+
+#[test]
+fn margins_logit_suppresses_invalid_delta_method_inference() {
+    assert_binary_margins_point_estimates_only("logit margins", "logit", "margins(m)");
+}
+
+#[test]
+fn margins_probit_at_suppresses_invalid_delta_method_inference() {
+    assert_binary_margins_point_estimates_only(
+        "probit margins at",
+        "probit",
+        "margins(m, at_x2=1)",
+    );
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // SMOKE TESTS — exemplos .hay offline (17 que passam sem rede)
 // ══════════════════════════════════════════════════════════════════════════════

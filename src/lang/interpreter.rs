@@ -9291,43 +9291,21 @@ impl Interpreter {
                                 x_use = greeners::Margins::with_at(&x_use, idx, *val);
                             }
                         }
-                        // Reconstruir vcov para delta method SEs
-                        let vcov = {
-                            let xt_x = bm.x.t().dot(&bm.x);
-                            use greeners::linalg::LinalgInverse as _;
-                            xt_x.inv().ok().map(|inv| {
-                                let sigma2 = bm.result.params.len() as f64;
-                                &inv * sigma2
-                            })
-                        };
+                        // Do not fabricate a covariance matrix for binary-model
+                        // AMEs. Until the real MLE vcov is available, report
+                        // point estimates only instead of invalid inference.
                         let ame_result = if bm.kind == "logit" {
-                            match &vcov {
-                                Some(v) => greeners::Margins::ame_logit_with_vcov(
-                                    &bm.result.params,
-                                    &x_use,
-                                    &bm.coef_names,
-                                    v,
-                                ),
-                                None => greeners::Margins::ame_logit(
-                                    &bm.result.params,
-                                    &x_use,
-                                    &bm.coef_names,
-                                ),
-                            }
+                            greeners::Margins::ame_logit(
+                                &bm.result.params,
+                                &x_use,
+                                &bm.coef_names,
+                            )
                         } else {
-                            match &vcov {
-                                Some(v) => greeners::Margins::ame_probit_with_vcov(
-                                    &bm.result.params,
-                                    &x_use,
-                                    &bm.coef_names,
-                                    v,
-                                ),
-                                None => greeners::Margins::ame_probit(
-                                    &bm.result.params,
-                                    &x_use,
-                                    &bm.coef_names,
-                                ),
-                            }
+                            greeners::Margins::ame_probit(
+                                &bm.result.params,
+                                &x_use,
+                                &bm.coef_names,
+                            )
                         };
                         let at_label = if at_vals.is_empty() {
                             String::new()
