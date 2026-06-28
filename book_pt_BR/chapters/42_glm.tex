@@ -61,50 +61,28 @@ seed(42)
 generate df x  = rnormal()
 generate df mu = exp(0.5 + 1.0 * x)
 // Gamma: média=mu, variância ~ mu² (simulado via lognormal)
-generate df y_gamma = mu * exp((rnormal() - 0.5) * 0.6)
+generate df y_gamma = mu * exp(rnormal() * 0.6)
 
 let m_gamma = glm(y_gamma ~ x, df, family=gamma, link=log)
 display m_gamma
 
 // PPML com dados de "comércio" (mistura zeros e positivos)
 generate df x2    = rnormal()
-generate df trade = round(exp(0.3 + 1.2*x + 0.8*x2) * (rnormal() > 0.2))
+generate df trade = round(exp(0.3 + 1.2*x + 0.8*x2) * (runiform() > 0.2))
 let m_ppml = glm(trade ~ x + x2, df, family=poisson, link=log)
 display m_ppml
 \end{lstlisting}
 
 \subsection*{GLM Gamma}
 
-\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
-  frame=none, numbers=none, backgroundcolor=\color{codbg},
-  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
-====================== Generalized Linear Model Results ======================
-Family: Gamma  Link: Log  N=500  Dispersion=0.0297
-------------------------------------------------------------------------------
-Variable    coef    std err      z    P>|z|
-const      0.483     0.015   31.49    0.000    ***
-x          1.065     0.027   39.03    0.000    ***
-\end{lstlisting}
-
-$\hat\beta_0 = 0{,}483 \approx 0{,}5$ e $\hat\beta_1 = 1{,}065 \approx 1{,}0$.
-A dispersão $\hat\phi = 0{,}030$ indica variância relativa pequena.
+O modelo Gamma deve recuperar estimativas positivas de intercepto e inclinação,
+próximas ao DGP de média logarítmica, com a dispersão resumindo a variância
+relativa remanescente.
 
 \subsection*{PPML}
 
-\begin{lstlisting}[language={}, basicstyle=\ttfamily\small,
-  frame=none, numbers=none, backgroundcolor=\color{codbg},
-  xleftmargin=0pt, xrightmargin=0pt, breaklines=false]
-Family: Poisson  Link: Log  N=500  Pseudo R²=0.2936
-------------------------------------------------------------------------------
-Variable    coef    std err      z    P>|z|
-const      0.069     0.077    0.91    0.366
-x          1.168     0.090   12.93    0.000    ***
-x2         0.890     0.090    9.91    0.000    ***
-\end{lstlisting}
-
-PPML recupera $\hat\beta_x \approx 1{,}17$ (verdadeiro: 1{,}2) e
-$\hat\beta_{x_2} \approx 0{,}89$ (verdadeiro: 0{,}8), lidando com os zeros
-da variável \texttt{trade}.
+PPML deve recuperar efeitos positivos para as duas covariáveis enquanto lida
+com os zeros da variável \texttt{trade}.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Sintaxe}

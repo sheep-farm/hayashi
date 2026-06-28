@@ -3988,6 +3988,31 @@ generate df N = rnormal()
 }
 
 #[test]
+fn math_rnormal_standard_normal_draws() {
+    let rows = (1..=512)
+        .map(|i| i.to_string())
+        .collect::<Vec<_>>()
+        .join("\n");
+    let script = format!(
+        r#"
+set_seed(12345)
+input df
+X
+{rows}
+end
+generate df N = rnormal()
+assert(min(df, N) < 0, "rnormal should include negative support")
+assert(max(df, N) > 1, "rnormal should exceed one with this seed")
+assert(mean(df, N) > -0.2, "rnormal mean should be near zero")
+assert(mean(df, N) < 0.2, "rnormal mean should be near zero")
+assert(variance(df, N) > 0.7, "rnormal variance should be near one")
+assert(variance(df, N) < 1.3, "rnormal variance should be near one")
+"#
+    );
+    assert_ok("rnormal_standard_normal_draws", &script);
+}
+
+#[test]
 fn math_normal_pdf() {
     assert_ok_contains(
         "normal_pdf",

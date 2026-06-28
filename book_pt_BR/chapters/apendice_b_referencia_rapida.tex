@@ -125,18 +125,13 @@ match  try  catch  and  or  not  true  false  nil
 \toprule
 \textbf{Função} & \textbf{Distribuição} \\
 \midrule
-\texttt{rnormal()}       & $U(0,1)$ — uniforme, \emph{não} normal$^*$ \\
-\texttt{runiform()}      & $U(0,1)$ — alias de \texttt{rnormal()} \\
+\texttt{rnormal()}       & $N(0,1)$ — normal padrão \\
+\texttt{runiform()}      & $U(0,1)$ — uniforme \\
 \texttt{rbernoulli(p)}   & Bernoulli com probabilidade $p$ fixa \\
 \texttt{seed(n)}         & Fixa semente PRNG para reprodutibilidade \\
 \bottomrule
 \end{tabular}
 \end{center}
-
-{\footnotesize $^*$ \textbf{Atenção:} \texttt{rnormal()} em Hayashi gera $U(0,1)$.
-  Para simular $N(0,1)$, use a transformação $\Phi^{-1}(u)$ ou a soma de 12 variáveis
-  uniformes (teorema do limite central). Em versões futuras, \texttt{rnormal()}
-  poderá ser corrigida para $N(0,1)$.}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Regressão linear e extensões}
