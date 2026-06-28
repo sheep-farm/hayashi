@@ -67,6 +67,7 @@ pub enum Expr {
     FString(String),
     Var(String),
     Formula(Formula),
+    Nil,
 
     // aritmética / comparação / lógica: price * 1.5, mpg > 20, a && b
     BinOp {
@@ -285,4 +286,7 @@ pub enum Stmt {
 
     // expr standalone (ex: test(model, white))
     Expr(Expr),
+
+    // Bloco autônomo { stmt* }
+    Block(Vec<Spanned>),
 }

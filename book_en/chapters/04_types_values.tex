@@ -153,3 +153,21 @@ error:
 42 + "3"
 // error: type mismatch — expected Int or Float, got String
 \end{lstlisting}
+
+\section{Type Checking}
+
+To dynamically check the type of a value, \hayashi{} provides the following built-in functions returning a boolean:
+
+\begin{lstlisting}
+is_nil(nil)         // true
+is_int(42)          // true
+is_float(3.14)      // true
+is_bool(true)       // true
+is_str("hello")     // true  (or is_string)
+is_list([1, 2])     // true
+is_dict({"a": 1})   // true
+is_df(df)           // true  (or is_dataframe)
+is_fn(|x| x)        // true  (or is_function)
+\end{lstlisting}
+
+Additionally, the \lstinline{type(x)} (or \lstinline{typeof(x)}) function returns the type of the value as a string (e.g. \lstinline{"int"}, \lstinline{"float"}, \lstinline{"nil"}, etc.).

@@ -861,6 +861,7 @@ impl Interpreter {
             Expr::Int(v) => Ok(Value::Int(*v)),
             Expr::Bool(v) => Ok(Value::Bool(*v)),
             Expr::Str(v) => Ok(Value::Str(v.clone())),
+            Expr::Nil => Ok(Value::Nil),
 
             Expr::FString(template) => {
                 let mut result = String::new();
@@ -1442,6 +1443,69 @@ impl Interpreter {
                 }
                 let v = self.eval_expr(&args[0])?;
                 Ok(Value::Bool(Self::value_as_bool(&v)))
+            }
+            "is_nil" => {
+                if args.len() != 1 {
+                    return Err(HayashiError::Runtime("is_nil(x)".into()));
+                }
+                let v = self.eval_expr(&args[0])?;
+                Ok(Value::Bool(matches!(v, Value::Nil)))
+            }
+            "is_int" => {
+                if args.len() != 1 {
+                    return Err(HayashiError::Runtime("is_int(x)".into()));
+                }
+                let v = self.eval_expr(&args[0])?;
+                Ok(Value::Bool(matches!(v, Value::Int(_))))
+            }
+            "is_float" => {
+                if args.len() != 1 {
+                    return Err(HayashiError::Runtime("is_float(x)".into()));
+                }
+                let v = self.eval_expr(&args[0])?;
+                Ok(Value::Bool(matches!(v, Value::Float(_))))
+            }
+            "is_bool" => {
+                if args.len() != 1 {
+                    return Err(HayashiError::Runtime("is_bool(x)".into()));
+                }
+                let v = self.eval_expr(&args[0])?;
+                Ok(Value::Bool(matches!(v, Value::Bool(_))))
+            }
+            "is_str" | "is_string" => {
+                if args.len() != 1 {
+                    return Err(HayashiError::Runtime("is_str(x)".into()));
+                }
+                let v = self.eval_expr(&args[0])?;
+                Ok(Value::Bool(matches!(v, Value::Str(_))))
+            }
+            "is_list" => {
+                if args.len() != 1 {
+                    return Err(HayashiError::Runtime("is_list(x)".into()));
+                }
+                let v = self.eval_expr(&args[0])?;
+                Ok(Value::Bool(matches!(v, Value::List(_))))
+            }
+            "is_dict" => {
+                if args.len() != 1 {
+                    return Err(HayashiError::Runtime("is_dict(x)".into()));
+                }
+                let v = self.eval_expr(&args[0])?;
+                Ok(Value::Bool(matches!(v, Value::Dict(_))))
+            }
+            "is_df" | "is_dataframe" => {
+                if args.len() != 1 {
+                    return Err(HayashiError::Runtime("is_dataframe(x)".into()));
+                }
+                let v = self.eval_expr(&args[0])?;
+                Ok(Value::Bool(matches!(v, Value::DataFrame(_))))
+            }
+            "is_fn" | "is_function" => {
+                if args.len() != 1 {
+                    return Err(HayashiError::Runtime("is_function(x)".into()));
+                }
+                let v = self.eval_expr(&args[0])?;
+                Ok(Value::Bool(matches!(v, Value::UserFn(_))))
             }
 
             "type" | "typeof" => {
@@ -18854,6 +18918,8 @@ impl Interpreter {
         match op {
             BinOp::Eq => {
                 let eq = match (&l, &r) {
+                    (Value::Nil, Value::Nil) => true,
+                    (Value::Nil, _) | (_, Value::Nil) => false,
                     (Value::Str(a), Value::Str(b)) => a == b,
                     (Value::Bool(a), Value::Bool(b)) => a == b,
                     _ => {
@@ -18866,6 +18932,8 @@ impl Interpreter {
             }
             BinOp::Ne => {
                 let ne = match (&l, &r) {
+                    (Value::Nil, Value::Nil) => false,
+                    (Value::Nil, _) | (_, Value::Nil) => true,
                     (Value::Str(a), Value::Str(b)) => a != b,
                     (Value::Bool(a), Value::Bool(b)) => a != b,
                     _ => {
@@ -19967,6 +20035,10 @@ impl Interpreter {
                     "string literal \"{s}\" cannot be used as numeric — se comparando com coluna string, use: col == \"{s}\""
                 )))
             }
+            Expr::Nil => {
+                let n = df.n_rows();
+                Ok(vec![f64::NAN; n])
+            }
             Expr::Var(name) => {
                 // _n = row number (1-based), _N = total rows
                 if name == "_n" {
@@ -20393,7 +20465,7 @@ impl Interpreter {
                     Value::Float(v) => println!("{v}"),
                     Value::Int(v) => println!("{v}"),
                     Value::Bool(v) => println!("{v}"),
-                    Value::Str(v) => println!("{v}"),
+                    Value::Str(v) => println!("\"{v}\""),
                     Value::Nil => println!("(nil)"),
                     Value::List(lst) => {
                         for v in lst.iter() {
@@ -21485,9 +21557,26 @@ impl Interpreter {
                 } else {
                     let val = self.eval_expr(expr)?;
                     if !matches!(val, Value::Nil) {
-                        println!("{val}");
+                        match &val {
+                            Value::Str(v) => println!("\"{v}\""),
+                            _ => println!("{val}"),
+                        }
                     }
                 }
+            }
+
+            Stmt::Block(stmts) => {
+                self.env.push_scope();
+                for s in stmts {
+                    match self.exec(s) {
+                        Ok(()) => {}
+                        Err(e) => {
+                            self.env.pop_scope();
+                            return Err(e);
+                        }
+                    }
+                }
+                self.env.pop_scope();
             }
         }
         Ok(())

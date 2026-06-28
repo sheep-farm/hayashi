@@ -129,5 +129,6 @@ fn stmt_label(s: &ast::Stmt) -> &'static str {
         ast::Stmt::Input { .. } => "input",
         ast::Stmt::Display(_) => "display",
         ast::Stmt::Expr(_) => "expr",
+        ast::Stmt::Block(_) => "block",
     }
 }

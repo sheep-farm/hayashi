@@ -375,6 +375,10 @@ impl Parser {
                 self.advance();
                 Ok(Expr::Str(s))
             }
+            Token::Nil => {
+                self.advance();
+                Ok(Expr::Nil)
+            }
 
             // if cond { then_expr } else { else_expr }  (expression)
             Token::If => {
@@ -1207,13 +1211,17 @@ impl Parser {
                 Ok(Some(Stmt::Expr(expr)))
             }
 
+            Token::LBrace => {
+                let body = self.parse_block()?;
+                Ok(Some(Stmt::Block(body)))
+            }
+
             Token::Int(_)
             | Token::Float(_)
             | Token::Bool(_)
             | Token::StringLit(_)
             | Token::FStringLit(_)
             | Token::LBracket
-            | Token::LBrace
             | Token::LParen
             | Token::Minus
             | Token::Bang
