@@ -153,7 +153,7 @@
 | Parquet I/O | Native read/write |
 | Fama-MacBeth | Built-in with Newey-West (Stata requires paid addon) |
 | Portfolio sorts | `portsort`, `doublesort` built-in |
-| Auto collinearity | Detected in all estimators, Stata-style `(omitted)` display |
+| Auto collinearity | Detected in core regression estimators, Stata-style `(omitted)` display |
 
 ---
 

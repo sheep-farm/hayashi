@@ -22,10 +22,10 @@ reg(price ~ mpg + weight, auto, cov=hc3)     // HC3, better for small samples
 
 ```hay
 // One-way clustering
-reg(wage ~ educ + exper + tenure, nlsw, cov=cluster(industry))
+reg(wage ~ educ + exper + tenure, nlsw, cluster=industry)
 
 // Two-way clustering (Cameron, Gelbach & Miller)
-reg(ret ~ mktrf + smb + hml, stocks, cov=cluster(firm, month))
+reg(ret ~ mktrf + smb + hml, stocks, cluster=firm, cluster2=month)
 ```
 
 Two-way cluster SE accounts for correlation within both dimensions. Requires enough clusters in each dimension (rule of thumb: 40+).
@@ -61,8 +61,8 @@ reg(f, nlsw)
 
 ```hay
 let m = reg(price ~ mpg + weight, auto)
-predict(m, auto, name="price_hat")              // fitted values
-predict(m, auto, name="resid", type=residual)    // residuals
+predict auto price_hat = m                 // fitted values
+predict auto resid = m, "residuals"         // residuals
 ```
 
 ## Comparing Specifications with `esttab`
@@ -115,5 +115,5 @@ let m2 = reg(lwage ~ educ + exper + exper2, cps)
 let m3 = reg(lwage ~ educ + exper + exper2 + tenure, cps, cov=robust)
 esttab(m1, m2, m3)
 
-predict(m3, cps, name="resid", type=residual)
+predict cps resid = m3, "residuals"
 ```

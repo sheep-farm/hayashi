@@ -65,14 +65,14 @@ When panel structure is ignored but standard errors need to account for within-u
 
 ```hay
 let m_pool = reg(lwage ~ hours + tenure + exper + married + union + educ, wagepan,
-                 cov=cluster(nr))
+                 cluster=nr)
 ```
 
 ## Comparison Table
 
 ```hay
 let m1 = reg(lwage ~ hours + tenure + exper + married + union + educ, wagepan,
-             cov=cluster(nr))
+             cluster=nr)
 let m2 = fe(lwage ~ hours + tenure + exper + married + union, wagepan)
 let m3 = re(lwage ~ hours + tenure + exper + married + union + educ, wagepan)
 

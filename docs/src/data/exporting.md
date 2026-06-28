@@ -61,7 +61,7 @@ load "raw_panel.dta" as df
 generate df lwage = log(wage)
 filter df year >= 2000
 
-let m = fe(lwage ~ educ + exper | firm_id, df, cov=cluster(firm_id))
+let m = fe(lwage ~ educ + exper | firm_id, df, cluster=firm_id)
 
 export(df, "parquet", "data/clean_panel.parquet")
 export(m, "latex", "tables/fe_result.tex")
