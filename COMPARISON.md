@@ -10,11 +10,11 @@
 | Interface | Terminal (REPL + script) + VS Code | GUI + terminal |
 | I/O | CSV, TSV, JSON, DTA, Excel, Parquet, SQLite, ODBC | DTA, CSV, Excel, ODBC |
 | Graphics | SVG + ASCII | PNG/SVG/PDF native |
-| Tests | 428 automated + 60 examples | Internal proprietary suite |
+| Tests | 500+ automated tests + 60 examples | Internal proprietary suite |
 | Scoping | Block-scoped, const, no GC | Global |
 | DataFrames | Multiple simultaneous, Rc COW | Single active dataset (frames since v16) |
 | Types | int, float, bool, str, list, dict, closures | Numeric + string |
-| Collinearity | Auto-detect, Stata-style (omitted) | Manual or addon |
+| Collinearity | Auto-detect in core regression estimators, Stata-style (omitted) | Manual or addon |
 | REPL | Tab completion, syntax highlighting, hints | Basic |
 | Namespaces | Module-based (import as/only) | — |
 | Date/time | date(), year(), month(), dow() | Built-in |
@@ -121,7 +121,7 @@ esttab m_*
 | Beta regression | — | `betareg` | Hayashi only |
 | Fama-MacBeth | `xtfmb` (paid addon) | `fmb` (builtin + NW) | Hayashi superior |
 | Portfolio sorts | manual coding | `portsort`/`doublesort` | Hayashi superior |
-| Collinearity detection | manual `_rmcoll` | auto in all estimators | Hayashi superior |
+| Collinearity detection | manual `_rmcoll` | auto in core regression estimators | Hayashi advantage |
 | Date/time in generate | `year()` etc. | `year()` `month()` etc. | Parity |
 | Mixed/HLM | `mixed` | `mixed` | Partial |
 | Survey | `svy:` | — | Missing |
@@ -285,10 +285,10 @@ frlink 1:1 id, frame(clients)
 - Dynamic formulas: `ols("Y ~ " + v, df)` native
 - Row-wise regex in formulas: `ols(Y ~ X, df, if = regexm(name, "Dr"))`
 - Copy-on-write DataFrames: zero-copy in functions
-- Auto collinearity detection across all estimators (Stata-style (omitted) display)
+- Auto collinearity detection across core regression estimators (Stata-style (omitted) display)
 
 **Developer experience:**
-- 428 automated tests, 60 examples, `cargo test` in <1s
+- 500+ automated tests and 60 examples
 - `help()` with ~115 topics, signature + example for every command
 - VS Code extension (syntax highlighting, run/debug)
 - Tab completion + syntax highlighting in REPL
@@ -312,7 +312,7 @@ frlink 1:1 id, frame(clients)
 
 | | Hayashi | R | Python | Julia |
 |---|---|---|---|---|
-| Econometrics packages | 53 built-in | ~15-20 core (plm, fixest, ivreg, sandwich, vars, ...) | ~10 core (statsmodels, linearmodels) | ~5 core (FixedEffectModels.jl, ...) |
+| Econometrics packages | broad built-in modelling commands | ~15-20 core (plm, fixest, ivreg, sandwich, vars, ...) | ~10 core (statsmodels, linearmodels) | ~5 core (FixedEffectModels.jl, ...) |
 | Setup | `cargo install hayashi-lang` | install.packages × N | pip install × N | Pkg.add × N |
 | Imports needed | 0 | 3-8 per script | 5-10 per script | 3-6 per script |
 | Syntax consistency | one syntax for all | each package has its own API | statsmodels vs linearmodels vs arch | each package differs |
@@ -321,7 +321,7 @@ frlink 1:1 id, frame(clients)
 | Binary size | ~20 MB | ~200 MB runtime | ~500 MB environment | ~700 MB runtime |
 | REPL | tab completion, highlighting, hints | basic | IPython (separate install) | good |
 
-**Note on R's "20,000 packages":** CRAN has ~20,000 packages total, but the vast majority cover bioinformatics, genomics, ecology, psychometrics — not econometrics. The applied econometrics core in R is ~15-20 packages, comparable in scope to Hayashi's 53 built-in estimators. The difference: Hayashi is cohesive (one syntax, zero imports), while R requires assembling packages with inconsistent APIs.
+**Note on R's "20,000 packages":** CRAN has ~20,000 packages total, but the vast majority cover bioinformatics, genomics, ecology, psychometrics — not econometrics. The applied econometrics core in R is ~15-20 packages. Hayashi's claim is different: it offers a cohesive set of built-in modelling commands with one syntax and zero imports, while R requires assembling packages with inconsistent APIs.
 
 ## Extensibility
 
@@ -335,6 +335,6 @@ The Greeners engine (MIT-licensed) can be used independently by Rust developers,
 
 ## Conclusion
 
-Hayashi covers ~97% of the applied econometrics workflow at the graduate level with 53 estimators, 428 automated tests, and full functional parity in estimation, post-estimation, data manipulation, and publishable output. The remaining gaps are specialized niches (survey, SEM, Bayesian, spatial) that few researchers use simultaneously.
+Hayashi targets the applied econometrics workflow at the graduate level with built-in estimators, post-estimation, data manipulation, and publishable output. The remaining gaps are specialised niches (survey, SEM, Bayesian, spatial) that few researchers use simultaneously.
 
 The language goes beyond Stata with modern features (closures, pattern matching, pipe, f-strings, dict, const, try/catch, namespaces, mutate, group_by, pivot) that make scripts more expressive and robust. Pipe assign-back semantics (`df |> f()` modifies source), rich error messages with "did you mean?", stack traces, and source preview make debugging intuitive. Multiple simultaneous DataFrames, block scoping, immutable function parameters, and auto collinearity detection are architectural improvements over Stata's global-state model. Scripts use the `.hay` extension and documentation is available at haylang.dev.

@@ -77,20 +77,26 @@ Load options: `sheet=`, `table=`, `query=`, `sep=`. URLs are downloaded automati
 | `ologit` | `ologit(Y ~ X, df)` | Ordered logit |
 | `oprobit` | `oprobit(Y ~ X, df)` | Ordered probit |
 | `mlogit` | `mlogit(Y ~ X, df)` | Multinomial logit |
-| `cloglog` | `cloglog(Y ~ X, df)` | Complementary log-log |
+| `cmnlogit` | `cmnlogit(Y ~ X, df, group=id, alts=3)` | Conditional multinomial logit |
+| `clogit` | `clogit(Y ~ X, df, group=id)` | Conditional logit |
+| `cpoisson` | `cpoisson(Y ~ X, df, group=id)` | Conditional Poisson / PPML |
 | `poisson` | `poisson(Y ~ X, df)` | Poisson regression |
 | `nbreg` | `nbreg(Y ~ X, df)` | Negative binomial |
 | `zip` | `zip(Y ~ X, df [, inflate=])` | Zero-inflated Poisson |
 | `zinb` | `zinb(Y ~ X, df [, inflate=])` | Zero-inflated negative binomial |
 | `tobit` | `tobit(Y ~ X, df [, ll=, ul=])` | Tobit censored regression |
-| `heckman` | `heckman(Y ~ X, df, select=formula)` | Heckman selection model |
+| `heckman` | `heckman(Y ~ X, S ~ Z, df)` | Heckman selection model |
 | `qreg` | `qreg(Y ~ X, df [, q=0.5])` | Quantile regression |
+| `wls` | `wls(Y ~ X, df, weights="w")` | Weighted least squares |
 | `fe` | `fe(Y ~ X, df [, id=col])` | Fixed effects (within) |
 | `re` | `re(Y ~ X, df [, id=col])` | Random effects (GLS) |
+| `be` | `be(Y ~ X, df [, id=col])` | Between estimator |
+| `feiv` | `feiv(Y ~ Xendog + X, ~ Z, df, id=col)` | Fixed-effects IV |
 | `ab` | `ab(Y ~ X, df, id=, time=)` | Arellano-Bond |
 | `sysgmm` | `sysgmm(Y ~ X, df, id=, time=)` | System GMM (Blundell-Bond) |
 | `pcse` | `pcse(Y ~ X, df, id=, time=)` | Panel-corrected SEs |
 | `xtgls` | `xtgls(Y ~ X, df, id=, time=)` | Feasible GLS for panels |
+| `pthresh` | `pthresh(Y ~ X, df, id=, q=)` | Panel threshold model |
 | `glsar` | `glsar(Y ~ X, df [, lags=])` | GLS with AR errors |
 | `mixed` | `mixed(Y ~ X, df, id=var)` | Mixed-effects / HLM |
 | `lasso` | `lasso(Y ~ X, df [, lambda=])` | Lasso (L1) |
@@ -101,21 +107,35 @@ Load options: `sheet=`, `table=`, `query=`, `sep=`. URLs are downloaded automati
 | `gee` | `gee(Y ~ X, df, id= [, family=, corr=])` | Generalized estimating equations |
 | `betareg` | `betareg(Y ~ X, df)` | Beta regression (proportions) |
 | `arima` | `arima(df, var, p=, d=, q= [, SARIMA])` | ARIMA / SARIMA |
+| `autoreg` | `autoreg(df, var [, lags=])` | Autoregression |
+| `ardl` | `ardl(df, y, x [, p=, q=])` | Autoregressive distributed lag model |
+| `kalman` | `kalman(df, var [, model=])` | State-space Kalman smoothing |
 | `garch` | `garch(df, var [, p=, q=, dist=])` | GARCH volatility |
 | `egarch` | `egarch(df, var [, p=, q=])` | EGARCH (asymmetric) |
+| `gjrgarch` | `gjrgarch(df, var [, p=, q=])` | GJR-GARCH volatility |
 | `var` | `var(df, var1, var2 [, lags=])` | Vector autoregression |
 | `vecm` | `vecm(df, var1, var2 [, lags=, rank=])` | Vector error correction |
+| `varma` | `varma(df, vars [, p=, q=])` | VARMA / VARMAX |
 | `svar` | `svar(df, var1, var2 [, lags=, type=])` | Structural VAR |
+| `ucm` | `ucm(df, var)` | Unobserved components model |
+| `ets` | `ets(df, var)` | Exponential smoothing |
+| `msauto` | `msauto(df, var [, regimes=])` | Markov-switching autoregression |
 | `cox` | `cox(Y ~ X, df [, time=])` | Cox proportional hazards |
 | `km` | `km(df, time=, event= [, by=])` | Kaplan-Meier survival |
 | `did` | `did(Y ~ X, df, treat=, post=)` | Difference-in-differences |
-| `rd` | `rd(Y ~ X, df, running=, cutoff=)` | Regression discontinuity |
-| `synth` | `synth(df, outcome=, treat_unit=, ...)` | Synthetic control |
-| `psm` | `psm(Y ~ X, df [, k=, caliper=])` | Propensity score matching |
+| `rd` | `rd(Y ~ running, cutoff, df [, bw=, poly=])` | Regression discontinuity |
+| `fuzzy_rd` | `fuzzy_rd(Y ~ X, "treat", cutoff, df)` | Fuzzy regression discontinuity |
+| `synth` | `synth("Y", "treated_id", t0, df, id=, time=)` | Synthetic control |
+| `psm` | `psm(Y ~ treat + X, df [, k=, caliper=])` | Propensity score matching |
 | `fmb` | `fmb(Y ~ X, df, time= [, nw=])` | Fama-MacBeth |
 | `lowess` | `lowess(df, y, x [, frac=, it=])` | Local polynomial smoothing |
+| `sur` | `sur(df, y1 ~ x1, y2 ~ x2)` | Seemingly unrelated regressions |
+| `three_sls` | `threesl(df, y1 ~ x1, y2 ~ x2, instruments=[...])` | Three-stage least squares |
 | `pca` | `pca(df, vars [, ncomp=])` | Principal component analysis |
 | `factor` | `factor(df, vars [, nfactors=])` | Factor analysis |
+| `dfm` | `dfm(df, var1, var2 [, factors=])` | Dynamic factor model |
+| `gam` | `gam(Y ~ X, df)` | Generalized additive model |
+| `mice` | `mice(df, vars=["Y", "X1"])` | Multiple imputation |
 
 Panel setup: `xtset(df, id_col, time_col)` -- after declaring, panel estimators infer `id=` and `time=`.
 

@@ -1,25 +1,34 @@
-# All Estimators
+# Estimator Reference
 
-Quick reference for all 46 estimators available in Hayashi.
+Quick reference for the implemented estimator and model commands in Hayashi.
+Aliases are shown with `/`. Common post-estimation commands are listed at the
+end of the page.
 
 ## Cross-Section
 
 | Command | Description | Syntax |
 |---------|-------------|--------|
-| `reg` | OLS linear regression | `reg(Y ~ X1 + X2, df)` |
+| `ols` / `reg` | OLS linear regression | `ols(Y ~ X1 + X2, df)` |
+| `wls` | Weighted least squares | `wls(Y ~ X1 + X2, df, weights="w")` |
 | `iv` | Instrumental variables / 2SLS | `iv(Y ~ X_exog + X_endo, ~ Z + X_exog, df)` |
 | `logit` | Logistic regression | `logit(Y ~ X1 + X2, df)` |
 | `probit` | Probit regression | `probit(Y ~ X1 + X2, df)` |
 | `ologit` | Ordered logit | `ologit(Y ~ X1 + X2, df)` |
 | `oprobit` | Ordered probit | `oprobit(Y ~ X1 + X2, df)` |
 | `mlogit` | Multinomial logit | `mlogit(Y ~ X1 + X2, df, base=1)` |
+| `cmnlogit` | Conditional multinomial logit | `cmnlogit(choice ~ price + quality, df, group=id, alts=3)` |
+| `clogit` | Conditional logit | `clogit(Y ~ X1 + X2, df, group=id)` |
+| `cpoisson` | Conditional Poisson / PPML | `cpoisson(Y ~ X1 + X2, df, group=id)` |
 | `tobit` | Tobit (censored regression) | `tobit(Y ~ X1 + X2, df, ll=0)` |
-| `truncreg` | Truncated regression | `truncreg(Y ~ X1 + X2, df, ll=0)` |
-| `heckman` | Heckman selection model | `heckman(Y ~ X1, select: Z1 + Z2, df)` |
+| `heckman` / `heckit` | Heckman selection model | `heckman(Y ~ X1, S ~ Z1 + Z2, df)` |
 | `qreg` | Quantile regression | `qreg(Y ~ X1 + X2, df, q=0.5)` |
 | `nbreg` | Negative binomial regression | `nbreg(Y ~ X1 + X2, df)` |
 | `poisson` | Poisson regression | `poisson(Y ~ X1 + X2, df)` |
-| `zip` | Zero-inflated Poisson | `zip(Y ~ X1, inflate: Z1 + Z2, df)` |
+| `zip` / `zinb` | Zero-inflated count models | `zip(Y ~ X1, df, inflate=["Z1", "Z2"])` |
+| `rlm` | Robust M-estimation | `rlm(Y ~ X1 + X2, df)` |
+| `glm` | Generalized linear model | `glm(Y ~ X1 + X2, df, family=poisson)` |
+| `gee` | Generalized estimating equations | `gee(Y ~ X1 + X2, df, id=group)` |
+| `betareg` | Beta regression | `betareg(share ~ X1 + X2, df)` |
 
 ## Panel Data
 
@@ -29,50 +38,67 @@ Quick reference for all 46 estimators available in Hayashi.
 | `re` | Random effects (GLS) | `re(Y ~ X1 + X2, df)` |
 | `be` | Between estimator | `be(Y ~ X1 + X2, df)` |
 | `feiv` | FE with instrumental variables | `feiv(Y ~ X_exog + X_endo, ~ Z, df)` |
-| `xtpoisson` | Panel Poisson | `xtpoisson(Y ~ X1 + X2, df, fe)` |
-| `xtlogit` | Panel logit | `xtlogit(Y ~ X1 + X2, df, fe)` |
-| `xtprobit` | Panel probit (RE only) | `xtprobit(Y ~ X1 + X2, df)` |
-| `xtnbreg` | Panel negative binomial | `xtnbreg(Y ~ X1 + X2, df)` |
-| `xttobit` | Panel tobit | `xttobit(Y ~ X1 + X2, df, ll=0)` |
+| `ab` | Arellano-Bond | `ab(Y ~ X1 + X2, df, id=firm, time=year)` |
+| `sysgmm` | System GMM | `sysgmm(Y ~ X1 + X2, df, id=firm, time=year)` |
+| `pcse` | Panel-corrected standard errors | `pcse(Y ~ X1 + X2, df, id=firm, time=year)` |
+| `xtgls` | Feasible GLS for panels | `xtgls(Y ~ X1 + X2, df, id=firm, time=year)` |
+| `pthresh` | Panel threshold model | `pthresh(Y ~ X1, df, id=firm, q=threshold_var)` |
 
 ## Time Series
 
 | Command | Description | Syntax |
 |---------|-------------|--------|
-| `arima` | ARIMA / ARIMAX | `arima(Y, df, order=(p,d,q))` |
-| `garch` | GARCH(p,q) | `garch(Y, df, order=(1,1))` |
-| `egarch` | Exponential GARCH | `egarch(Y, df, order=(1,1))` |
-| `gjrgarch` | GJR-GARCH (threshold) | `gjrgarch(Y, df, order=(1,1))` |
-| `var` | Vector autoregression | `var(Y1 + Y2, df, lags=p)` |
-| `vecm` | Vector error correction | `vecm(Y1 + Y2, df, lags=p, rank=r)` |
-| `arch` | ARCH(q) | `arch(Y, df, order=q)` |
-| `svar` | Structural VAR | `svar(Y1 + Y2, df, lags=p, type=short)` |
+| `arima` / `sarima` | ARIMA / SARIMA | `arima(df, Y, p=1, d=1, q=1)` |
+| `autoreg` | Autoregression | `autoreg(df, Y, lags=2)` |
+| `ardl` | Autoregressive distributed lag model | `ardl(df, Y, X, p=2, q=1)` |
+| `kalman` | State-space Kalman smoothing | `kalman(df, Y, model="ll")` |
+| `garch` / `egarch` / `gjrgarch` | Volatility models | `garch(df, Y, p=1, q=1)` |
+| `var` | Vector autoregression | `var(df, Y1, Y2, lags=2)` |
+| `vecm` | Vector error correction | `vecm(df, Y1, Y2, lags=2, rank=1)` |
+| `varma` | VARMA / VARMAX | `varma(df, [Y1, Y2], p=1, q=1)` |
+| `svar` | Structural VAR | `svar(df, Y1, Y2, lags=2, type=short)` |
+| `ucm` | Unobserved components model | `ucm(df, Y)` |
+| `ets` | Exponential smoothing | `ets(df, Y)` |
+| `msauto` | Markov-switching autoregression | `msauto(df, Y, regimes=2)` |
+| `decompose` / `stl` / `mstl` | Series decomposition | `stl(df, Y, period=12)` |
 
 ## Causal Inference
 
 | Command | Description | Syntax |
 |---------|-------------|--------|
 | `did` | Difference-in-differences | `did(Y ~ X, df, treat=D, post=P)` |
-| `rdd` | Regression discontinuity | `rdd(Y ~ X, df, cutoff=c, running=R)` |
-| `synth` | Synthetic control | `synth(Y, df, treat_unit=id, treat_time=t)` |
-| `psm` | Propensity score matching | `psm(Y ~ X1 + X2, df, treat=D)` |
+| `rd` | Sharp regression discontinuity | `rd(Y ~ running, cutoff, df)` |
+| `fuzzy_rd` | Fuzzy regression discontinuity | `fuzzy_rd(Y ~ running, "treatment", cutoff, df)` |
+| `synth` | Synthetic control | `synth("Y", "treated_id", t0, df, id="unit", time="year")` |
+| `psm` | Propensity score matching | `psm(Y ~ treated + X1 + X2, df)` |
 
 ## Finance
 
 | Command | Description | Syntax |
 |---------|-------------|--------|
 | `fmb` | Fama-MacBeth regression | `fmb(ret ~ beta + size + bm, df, time=month)` |
-| `dcc` | Dynamic conditional correlation | `dcc(Y1 + Y2, df)` |
-| `mgarch` | Multivariate GARCH | `mgarch(Y1 + Y2, df, model=bekk)` |
+| `portsort` | Portfolio sort | `portsort(df, ret, size, n=5)` |
+| `doublesort` | Two-way portfolio sort | `doublesort(df, ret, size, bm, n1=5, n2=5)` |
 
-## Robust / Semiparametric
+## Multivariate and Dimension Reduction
 
 | Command | Description | Syntax |
 |---------|-------------|--------|
-| `rreg` | Robust regression (M-estimator) | `rreg(Y ~ X1 + X2, df)` |
-| `qreg` | Quantile regression | `qreg(Y ~ X1 + X2, df, q=0.5)` |
-| `loess` | Local polynomial smoothing | `loess(Y ~ X, df, bw=0.3)` |
-| `npregress` | Kernel nonparametric regression | `npregress(Y ~ X, df)` |
+| `sur` / `sureg` | Seemingly unrelated regressions | `sur(df, Y1 ~ X1, Y2 ~ X2)` |
+| `three_sls` / `threesl` | Three-stage least squares | `threesl(df, Y1 ~ X1, Y2 ~ X2, instruments=["Z1"])` |
+| `pca` | Principal component analysis | `pca(df, [X1, X2, X3])` |
+| `factor` | Factor analysis | `factor(df, [X1, X2, X3])` |
+| `dfm` | Dynamic factor model | `dfm(df, Y1, Y2, factors=2)` |
+| `manova` | Multivariate ANOVA | `manova(df, [Y1, Y2], by=group)` |
+| `cancorr` | Canonical correlation | `cancorr(df, [X1, X2], [Y1, Y2])` |
+
+## Smoothing, Imputation, and Flexible Models
+
+| Command | Description | Syntax |
+|---------|-------------|--------|
+| `lowess` | Local polynomial smoothing | `lowess(df, Y, X, frac=0.3)` |
+| `gam` | Generalized additive model | `gam(Y ~ X1 + X2, df)` |
+| `mice` | Multiple imputation by chained equations | `mice(df, vars=["Y", "X1", "X2"])` |
 
 ## Regularization
 
@@ -87,39 +113,32 @@ Quick reference for all 46 estimators available in Hayashi.
 | Command | Description | Syntax |
 |---------|-------------|--------|
 | `cox` | Cox proportional hazards | `cox(T ~ X1 + X2, df, event=D)` |
-| `streg` | Parametric survival (Weibull, etc.) | `streg(T ~ X1 + X2, df, event=D, dist=weibull)` |
-
-## Multivariate
-
-| Command | Description | Syntax |
-|---------|-------------|--------|
-| `sureg` | Seemingly unrelated regressions | `sureg(eq1: Y1 ~ X1, eq2: Y2 ~ X2, df)` |
-| `system3sls` | System three-stage least squares | `system3sls(eq1: Y1 ~ X1, eq2: Y2 ~ X2, df)` |
+| `km` | Kaplan-Meier survival curve | `km(df, time=t, event=d)` |
 
 ## Common Options
 
-All estimators accept these where applicable:
+Common options vary by command. Check `help(command)` in the REPL for the
+supported options of a specific estimator.
 
 | Option | Description |
 |--------|-------------|
 | `cov=robust` | Heteroskedasticity-robust SE (HC1) |
 | `cov=hc0` ... `cov=hc4` | Specific HC variant |
-| `cov=cluster(var)` | Cluster-robust SE |
-| `cov=cluster(v1, v2)` | Two-way cluster SE |
+| `cluster=var` | Cluster-robust SE |
+| `cluster=var, cluster2=var2` | Two-way cluster SE |
 | `nw=L` | Newey-West HAC SE with L lags |
 | `if=(condition)` | Subsample estimation |
-| `vce=bootstrap` | Bootstrap standard errors |
+| `bootstrap(est, formula, df, n=N)` | Bootstrap standard errors |
 
 ## Post-Estimation
 
 | Command | Description |
 |---------|-------------|
 | `esttab(m1, m2, ...)` | Side-by-side estimation table |
-| `predict(m, df, ...)` | Fitted values, residuals, probabilities |
+| `predict df var = m [, "kind"]` | Fitted values, residuals, probabilities |
 | `margins(m, type=ame)` | Average marginal effects |
 | `hausman(m_fe, m_re)` | Hausman specification test |
 | `irf(v, ...)` | Impulse response functions |
 | `johansen(...)` | Johansen cointegration test |
 | `testparm(m, vars)` | Joint significance test |
-| `linktest(m)` | Specification link test |
-| `estat_vif(m)` | Variance inflation factors |
+| `vif(m)` | Variance inflation factors |
