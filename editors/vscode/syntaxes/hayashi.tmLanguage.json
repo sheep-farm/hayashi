@@ -102,7 +102,7 @@
       "patterns": [
         {
           "name": "entity.name.function.estimator.hayashi",
-          "match": "\\b(ols|reg|regress|iv|logit|probit|poisson|nbreg|tobit|heckman|truncreg|qreg|fe|re|ab|sysgmm|pcse|xtgls|cox|km|arima|sarima|garch|egarch|gjrgarch|var|vecm|varma|svar|lasso|ridge|elasticnet|did|rd|synth|psmatch|psm|fmb|rlm|gee|glm|betareg|ologit|oprobit|clogit|cloglog|zip|zinb|mlogit|mnlogit|mixed|bootstrap|boot|gmm|sur|pca|ucm|ets|dfm)\\b"
+          "match": "\\b(ols|reg|regress|wls|iv|logit|probit|poisson|nbreg|tobit|heckman|heckit|qreg|fe|re|be|feiv|ab|sysgmm|pcse|xtgls|pthresh|cox|km|arima|sarima|autoreg|ardl|kalman|garch|egarch|gjrgarch|var|vecm|varma|svar|lasso|ridge|elasticnet|did|rd|fuzzy_rd|synth|psm|fmb|portsort|doublesort|rlm|gee|glm|betareg|ologit|oprobit|clogit|cpoisson|cmnlogit|zip|zinb|mlogit|mixed|bootstrap|boot|gmm|sur|sureg|three_sls|threesl|pca|factor|ucm|ets|dfm|gam|mice|lowess)\\b"
         }
       ]
     },

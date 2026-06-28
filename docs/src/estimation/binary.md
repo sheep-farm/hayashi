@@ -99,8 +99,5 @@ Reports one set of coefficients per category (relative to the base). Each coeffi
 let m = logit(inlf ~ nwifeinc + educ + exper + exper2 + age + kidslt6 + kidsge6, mroz)
 
 // Predicted probabilities
-predict(m, mroz, name="p_hat")
-
-// Classification at threshold 0.5
-predict(m, mroz, name="y_hat", type=class, threshold=0.5)
+predict mroz p_hat = m, "pr"
 ```

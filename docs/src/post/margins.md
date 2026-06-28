@@ -20,7 +20,7 @@ Adds a column `yhat` to `df` containing the predicted values from model `m`. For
 ## Residuals
 
 ```
-predict df e = m "residuals"
+predict df e = m, "residuals"
 ```
 
 Adds a column `e` with OLS residuals (Y - Xb). The third argument selects what to predict:
@@ -29,7 +29,6 @@ Adds a column `e` with OLS residuals (Y - Xb). The third argument selects what t
 |---|---|
 | (none) | fitted values |
 | `"residuals"` | residuals |
-| `"stdresid"` | standardized residuals |
 
 ## Delta method — nonlinear combinations
 
