@@ -8201,3 +8201,35 @@ display s["missing"]
         "1",
     );
 }
+
+#[test]
+fn test_nil_literal() {
+    assert_ok_contains(
+        "nil_literal",
+        r#"
+        let x = nil
+        if x == nil {
+            display "is_nil"
+        }
+        "#,
+        "is_nil",
+    );
+}
+
+#[test]
+fn test_all_type_checkers() {
+    assert_ok_contains(
+        "type_checkers",
+        r#"
+        if is_int(42) && !is_int(3.14) { display "int_ok" }
+        if is_float(3.14) && !is_float(42) { display "float_ok" }
+        if is_bool(true) && !is_bool("string") { display "bool_ok" }
+        if is_string("hello") && !is_string(42) { display "string_ok" }
+        if is_list([1,2]) && !is_list(42) { display "list_ok" }
+        if is_dict({"a": 1}) && !is_dict(42) { display "dict_ok" }
+        if is_function(|x| x) && !is_function(42) { display "fn_ok" }
+        if !is_nil(42) && is_nil(nil) { display "nil_ok" }
+        "#,
+        "\"int_ok\"\n\"float_ok\"\n\"bool_ok\"\n\"string_ok\"\n\"list_ok\"\n\"dict_ok\"\n\"fn_ok\"\n\"nil_ok\"",
+    );
+}

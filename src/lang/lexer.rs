@@ -29,6 +29,7 @@ pub enum Token {
     Return,
     Break,
     Continue,
+    Nil,
 
     // Operadores de série temporal: L.x  L2.x  F.x  D.x
     TsLag(usize),
@@ -197,6 +198,7 @@ impl Lexer {
             "return" => Token::Return,
             "break" => Token::Break,
             "continue" => Token::Continue,
+            "nil" => Token::Nil,
             "true" => Token::Bool(true),
             "false" => Token::Bool(false),
             _ => Token::Ident(s),

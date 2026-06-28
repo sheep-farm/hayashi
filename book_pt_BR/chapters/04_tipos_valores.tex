@@ -145,3 +145,21 @@ Tentar somar um \texttt{Int} com uma \texttt{String} produz erro de tipo:
 42 + "3"
 // error: type mismatch — expected Int or Float, got String
 \end{lstlisting}
+
+\section{Verificação de Tipos}
+
+Para verificar dinamicamente o tipo de um valor, \hayashi{} oferece funções embutidas de verificação que retornam um booleano:
+
+\begin{lstlisting}
+is_nil(nil)         // true
+is_int(42)          // true
+is_float(3.14)      // true
+is_bool(true)       // true
+is_str("ola")       // true  (ou is_string)
+is_list([1, 2])     // true
+is_dict({"a": 1})   // true
+is_df(df)           // true  (ou is_dataframe)
+is_fn(|x| x)        // true  (ou is_function)
+\end{lstlisting}
+
+Além disso, a função \lstinline{type(x)} (ou \lstinline{typeof(x)}) retorna o tipo do valor como uma string (ex: \lstinline{"int"}, \lstinline{"float"}, \lstinline{"nil"}, etc.).
