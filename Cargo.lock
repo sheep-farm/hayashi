@@ -1400,6 +1400,7 @@ dependencies = [
  "rustyline",
  "serde",
  "serde_json",
+ "statrs",
  "tempfile",
  "thiserror 2.0.18",
  "ureq",

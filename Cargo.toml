@@ -18,6 +18,7 @@ path = "src/main.rs"
 greeners = { path = "../Greeners" }
 ndarray = "0.17"
 chrono = "0.4"
+statrs = "0.18"
 thiserror = "2"
 rustyline = "14"
 anyhow = "1"
