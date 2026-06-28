@@ -272,7 +272,7 @@ ARMA/ARIMA       & \texttt{arima(df, y, p=1, d=0, q=1)} \\
 AR($p$) via OLS  & \texttt{autoreg(df, y, lags=2, trend="c")} \\
 ARDL($p$,$q$)    & \texttt{ardl(y \textasciitilde{} x1 + x2, df, lags=p, xlags=q)} \\
 GARCH            & \texttt{garch(df, y, p=1, q=1)} \\
-EGARCH / GJR     & \texttt{garch(df, y, p=1, q=1, type=egarch)} \\
+EGARCH / GJR     & \texttt{egarch(df, y, p=1, q=1)} \quad \texttt{gjrgarch(df, y, p=1, q=1)} \\
 \midrule
 ADF              & \texttt{adf(df, var)} \\
 KPSS             & \texttt{kpss(df, var)} \\
