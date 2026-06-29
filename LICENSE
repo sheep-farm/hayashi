@@ -672,3 +672,10 @@ may consider it more useful to permit linking proprietary applications with
 the library.  If this is what you want to do, use the GNU Lesser General
 Public License instead of this License.  But first, please read
 <https://www.gnu.org/licenses/why-not-lgpl.html>.
+
+---
+
+ADDITIONAL PERMISSION: PLUGIN EXCEPTION
+
+As a special exception, the copyright holders of Hayashi give you permission to link/load independent plugins (whether written in Rust, WebAssembly, or any other language) developed using the `hayashi-plugin-sdk` into Hayashi, and to distribute the combined work, without the GPLv3 copyleft requirements applying to those plugins. The plugins themselves may be licensed under any license of the author's choosing, including proprietary/closed-source licenses. All other portions of Hayashi remain strictly under the GPLv3.
+
