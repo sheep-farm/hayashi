@@ -713,34 +713,57 @@ fn pkg_list() {
     for user_entry in &users {
         let user = user_entry.file_name();
         let mut repos: Vec<_> = std::fs::read_dir(user_entry.path())
-            .map(|rd| {
-                rd.filter_map(|e| e.ok())
-                    .filter(|e| e.path().is_dir())
-                    .collect()
-            })
+            .map(|rd| rd.filter_map(|e| e.ok()).collect())
             .unwrap_or_default();
         repos.sort_by_key(|e: &std::fs::DirEntry| e.file_name());
 
         for repo_entry in &repos {
-            if !found {
-                println!("Installed packages (~/.hay/packages/):\n");
-                found = true;
-            }
+            let path = repo_entry.path();
             let repo = repo_entry.file_name();
-            let n_hy = std::fs::read_dir(repo_entry.path())
-                .map(|rd| {
-                    rd.filter_map(|e| e.ok())
-                        .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("hy"))
-                        .count()
-                })
-                .unwrap_or(0);
-            println!(
-                "  {}/{}  ({} file{})",
-                user.to_string_lossy(),
-                repo.to_string_lossy(),
-                n_hy,
-                if n_hy == 1 { "" } else { "s" }
-            );
+
+            if path.is_dir() {
+                let n_hy = std::fs::read_dir(&path)
+                    .map(|rd| {
+                        rd.filter_map(|e| e.ok())
+                            .filter(|e| {
+                                let ext = e.path().extension().and_then(|x| x.to_str()).unwrap_or("").to_lowercase();
+                                ext == "hay" || ext == "hy"
+                            })
+                            .count()
+                    })
+                    .unwrap_or(0);
+
+                if n_hy > 0 {
+                    if !found {
+                        println!("Installed packages (~/.hay/packages/):\n");
+                        found = true;
+                    }
+                    println!(
+                        "  {}/{}  ({} script file{})",
+                        user.to_string_lossy(),
+                        repo.to_string_lossy(),
+                        n_hy,
+                        if n_hy == 1 { "" } else { "s" }
+                    );
+                }
+            } else if path.is_file() {
+                let ext = path.extension().and_then(|x| x.to_str()).unwrap_or("").to_lowercase();
+                if matches!(ext.as_str(), "so" | "dll" | "dylib" | "wasm") {
+                    if !found {
+                        println!("Installed packages (~/.hay/packages/):\n");
+                        found = true;
+                    }
+                    let clean_name = repo.to_string_lossy()
+                        .trim_end_matches(&format!(".{ext}"))
+                        .to_string();
+                    println!(
+                        "  {}/{}  (native {} plugin)",
+                        user.to_string_lossy(),
+                        clean_name,
+                        ext
+                    );
+                }
+            }
         }
     }
     if !found {
