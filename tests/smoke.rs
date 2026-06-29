@@ -6023,6 +6023,19 @@ display len(d2)"#,
 }
 
 #[test]
+fn dict_to_dataframe() {
+    assert_ok_contains(
+        "dict_to_dataframe",
+        r#"
+let d = {"x": [1.0, 2.0], "y": ["a", "b"], "z": [true, false]}
+let df = dataframe(d)
+let m = ols(x ~ z, df)
+display m"#,
+        "Coefficients:",
+    );
+}
+
+#[test]
 fn dict_merge() {
     assert_ok_contains(
         "dict_merge",
