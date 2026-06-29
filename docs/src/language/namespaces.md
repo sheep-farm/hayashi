@@ -4,6 +4,8 @@
 
 `import("module")` loads a `.hay` file once per session. Exported names are namespaced automatically.
 
+Imported modules are executable Hayashi code. Import only files, packages, and URLs you trust; see the [Trust Model](../trust-model.md#packages-and-imports).
+
 ```
 import("finance")
 let m = finance::fmb(ret ~ beta + size, df, time=month)
@@ -89,3 +91,5 @@ import("finance")         // runs once, names go into finance::
 import("https://example.com/utils.hay")
 utils::clean(df)
 ```
+
+Remote modules execute after download. Review the source before importing code into sessions that handle confidential data, credentials, production databases, or published analyses.
