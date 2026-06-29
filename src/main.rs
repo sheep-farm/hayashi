@@ -585,8 +585,61 @@ fn pkg_install(spec: &str) {
 
     let n_hy = files.iter().filter(|e| e.name.ends_with(".hay")).count();
     if n_hy == 0 {
-        eprintln!("hay install: no .hay files found in {user}/{repo}");
-        std::process::exit(1);
+        println!("No .hay scripts found. Checking for native/WASM releases...");
+        let release_url = format!("https://api.github.com/repos/{user}/{repo}/releases/latest");
+        
+        let release_resp = match ureq::get(&release_url)
+            .set("User-Agent", "hay")
+            .set("Accept", "application/vnd.github.v3+json")
+            .call() 
+        {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("hay install: no scripts or native releases found for {user}/{repo}: {e}");
+                std::process::exit(1);
+            }
+        };
+
+        let release_body: String = release_resp.into_string().unwrap_or_default();
+        let release: GhRelease = serde_json::from_str(&release_body).unwrap_or_else(|e| {
+            eprintln!("hay install: cannot parse release payload: {e}");
+            std::process::exit(1);
+        });
+
+        let target = current_target_triple();
+        let ext = current_target_ext();
+
+        let matching_asset = release.assets.iter().find(|asset| {
+            asset.name.contains(target) && asset.name.ends_with(ext)
+        });
+
+        if let Some(asset) = matching_asset {
+            println!("Found binary release for {target}: {}", asset.name);
+            let parent_dir = packages_dir().join(user);
+            std::fs::create_dir_all(&parent_dir).unwrap();
+            let dest_file = parent_dir.join(format!("{repo}.{ext}"));
+            
+            print!("Downloading {} ... ", asset.name);
+            match ureq::get(&asset.browser_download_url).call() {
+                Ok(resp) => {
+                    let mut reader = resp.into_reader();
+                    let mut out_file = std::fs::File::create(&dest_file).unwrap();
+                    if std::io::copy(&mut reader, &mut out_file).is_ok() {
+                        println!("ok");
+                        println!("Successfully installed native plugin {user}/{repo} at {}", dest_file.display());
+                        println!("  use: import(\"{user}/{repo}\")");
+                        return;
+                    } else {
+                        println!("write error");
+                    }
+                }
+                Err(e) => println!("download error: {e}"),
+            }
+        } else {
+            eprintln!("hay install: no compatible release asset found for {target}");
+            std::process::exit(1);
+        }
+        return;
     }
 
     std::fs::create_dir_all(&dest).unwrap_or_else(|e| {
@@ -700,4 +753,37 @@ struct GhEntry {
     name: String,
     r#type: String,
     download_url: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct GhRelease {
+    assets: Vec<GhAsset>,
+}
+
+#[derive(serde::Deserialize)]
+struct GhAsset {
+    name: String,
+    browser_download_url: String,
+}
+
+fn current_target_triple() -> &'static str {
+    match (std::env::consts::OS, std::env::consts::ARCH) {
+        ("linux", "x86_64") => "x86_64-unknown-linux-gnu",
+        ("macos", "aarch64") => "aarch64-apple-darwin",
+        ("macos", "x86_64") => "x86_64-apple-darwin",
+        ("windows", "x86_64") => "x86_64-pc-windows-msvc",
+        (os, arch) => {
+            eprintln!("Unsupported target platform: {os}-{arch}");
+            std::process::exit(1);
+        }
+    }
+}
+
+fn current_target_ext() -> &'static str {
+    match std::env::consts::OS {
+        "linux" => "so",
+        "macos" => "dylib",
+        "windows" => "dll",
+        _ => "so",
+    }
 }

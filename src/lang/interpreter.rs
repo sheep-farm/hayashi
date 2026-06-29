@@ -1068,7 +1068,7 @@ impl Interpreter {
             Some(h) => h,
             None => return,
         };
-        let plugin_dir = std::path::Path::new(&home).join(".hayashi").join("plugins");
+        let plugin_dir = std::path::Path::new(&home).join(".hay").join("plugins");
         if !plugin_dir.is_dir() {
             return;
         }
@@ -1122,10 +1122,10 @@ impl Interpreter {
                 return Ok(cand.to_string());
             }
 
-            // 2. ~/.hayashi/plugins/
+            // 2. ~/.hay/plugins/
             if let Some(home) = std::env::var_os("HOME") {
                 let plugin_path = std::path::Path::new(&home)
-                    .join(".hayashi")
+                    .join(".hay")
                     .join("plugins")
                     .join(cand);
                 if plugin_path.exists() {
@@ -1133,10 +1133,10 @@ impl Interpreter {
                 }
             }
 
-            // 3. ~/.hayashi/packages/ (installed packages)
+            // 3. ~/.hay/packages/ (installed packages)
             if let Some(home) = std::env::var_os("HOME") {
                 let pkg_path = std::path::Path::new(&home)
-                    .join(".hayashi")
+                    .join(".hay")
                     .join("packages")
                     .join(cand);
                 if pkg_path.exists() {
@@ -1164,7 +1164,7 @@ impl Interpreter {
         }
 
         Err(HayashiError::Runtime(format!(
-            "import: module '{}' not found (searched: ./, ~/.hayashi/plugins/, plugin_path, $HAYASHI_PATH)",
+            "import: module '{}' not found (searched: ./, ~/.hay/plugins/, plugin_path, $HAYASHI_PATH)",
             name
         )))
     }
