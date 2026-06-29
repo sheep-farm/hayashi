@@ -1,117 +1,123 @@
-\chapter{Módulos e \texttt{source}}
+\chapter{Módulos, Pacotes e Plugins}
 
-\section{O que é um módulo em Hayashi}
+\section{O Sistema de Módulos do Hayashi}
 
-Em \hayashi{}, um módulo é simplesmente um arquivo \texttt{.hay}. Não há sistema de
-pacotes nem declarações de exportação — qualquer definição no arquivo fica disponível
-no escopo de quem o carrega.
+Em \hayashi{}, o compartilhamento e a organização de código são feitos através de dois comandos principais: \lstinline{source} e \lstinline{import}.
 
-Este modelo é intencional: a linguagem está em crescimento, e a complexidade de um
-sistema de módulos com namespaces, visibilidade e resolução de dependências é adicionada
-quando há demanda real. Por ora, \lstinline{source} cobre a totalidade dos casos de
-uso práticos.
+\subsection{O comando \texttt{source}}
+O comando \lstinline{source} executa um arquivo \texttt{.hay} diretamente no contexto atual. Todas as definições (funções e variáveis) do arquivo ficam visíveis no escopo global de quem o executa, sem namespaces:
 
-\section{O comando \texttt{source}}
-
-\lstinline{source} executa um arquivo \texttt{.hay} no contexto atual. Todas as
-definições do arquivo ficam visíveis a partir desse ponto:
-
-\begin{lstlisting}[caption={Carregando um módulo}]
-source "lib/estatistica.hay"
-source "lib/graficos.hay"
-
-// funções de estatistica.hay e graficos.hay estão disponíveis
-let resultado = calcular_gini(df)
-\end{lstlisting}
-
-\section{Organizando um projeto}
-
-A estrutura típica de um projeto \hayashi{}:
-
-\begin{lstlisting}[style=inline]
-projeto/
-  main.hay           -- ponto de entrada
-  lib/
-    dados.hay        -- funções de limpeza e carga
-    estimadores.hay  -- funções econométricas customizadas
-    tabelas.hay      -- formatação de resultados
-  dados/
-    raw.csv
-    painel.dta
-  resultados/
-\end{lstlisting}
-
-\texttt{main.hay}:
-
-\begin{lstlisting}
-source "lib/dados.hay"
-source "lib/estimadores.hay"
-source "lib/tabelas.hay"
-
-load "dados/painel.dta" as df
-
-let df_limpo = preparar(df)
-let modelo   = estimar_fe(df_limpo, renda ~ educ + exp)
-
-tabela_regressao(modelo, "resultados/tabela1.tex")
-\end{lstlisting}
-
-\section{Escopo de \texttt{source}}
-
-O arquivo carregado com \lstinline{source} executa no escopo global do arquivo
-principal. Isso significa:
-
-\begin{itemize}
-  \item Funções definidas no arquivo são globalmente visíveis.
-  \item Variáveis definidas no nível superior do arquivo também ficam no escopo global.
-  \item Não há namespaces: se dois arquivos definem \lstinline{fn calcular(...)}, o
-        segundo sobrescreve o primeiro.
-\end{itemize}
-
-\begin{aviso}
-  Por não haver namespaces, evite nomes genéricos em módulos reutilizáveis.
-  Prefira \texttt{gini\_calcular} a apenas \texttt{calcular}.
-\end{aviso}
-
-\section{Criando uma biblioteca}
-
-Um arquivo de biblioteca é um arquivo \texttt{.hay} com funções e constantes, sem
-código de nível superior que produza efeitos colaterais na carga:
-
-\begin{lstlisting}[caption={lib/utils.hay}]
-const PI = 3.14159265358979
-
-fn arredondar(x, casas) {
-  let fator = 10^casas
-  int(x * fator + 0.5) / float(fator)
-}
-
-fn entre(x, lo, hi) {
-  x >= lo and x <= hi
-}
-
-fn clamp(x, lo, hi) {
-  if x < lo { lo } else if x > hi { hi } else { x }
-}
-\end{lstlisting}
-
-\begin{lstlisting}[caption={main.hay}]
+\begin{lstlisting}[caption={Uso básico de source}]
 source "lib/utils.hay"
-
-display arredondar(3.14159, 2)    // 3.14
-display entre(5, 1, 10)          // true
-display clamp(15, 0, 10)         // 10
+let resultado = minha_funcao_util(10)
 \end{lstlisting}
 
-\section{Roadmap}
+\subsection{O comando \texttt{import}}
+O comando \lstinline{import} carrega um módulo isolando suas funções sob um **namespace** usando o delimitador \texttt{::}. Isso evita conflitos de nomes e organiza melhor o código:
 
-Em versões futuras, \hayashi{} terá um sistema de módulos com:
+\begin{lstlisting}[caption={Importando com namespace}]
+// Importa e usa o nome do arquivo como namespace padrão
+import("lib/matematica.hay")
+let r1 = matematica::calcular_media([10, 20, 30])
 
-\begin{itemize}
-  \item Namespaces explícitos (\texttt{use modulo::funcao})
-  \item Distribuição via registro central
-  \item Declarações de dependência em manifesto
-\end{itemize}
+// Importa definindo um alias customizado
+import("lib/matematica.hay", as=mat)
+let r2 = mat::calcular_media([10, 20, 30])
 
-A transição de \lstinline{source} para esse sistema será sem quebra de
-compatibilidade: arquivos \texttt{.hay} continuarão funcionando como módulos.
+// Importa apenas funções específicas diretamente para o escopo local
+import("lib/matematica.hay", only=["calcular_media"])
+let r3 = calcular_media([10, 20, 30])
+\end{lstlisting}
+
+---
+
+\section{Gerenciador de Pacotes e Publicação no GitHub}
+
+O \hayashi{} utiliza o **GitHub diretamente como registro de pacotes**. Isso elimina a necessidade de um repositório centralizado proprietário e promove a distribuição descentralizada de código aberto.
+
+\subsection{Comandos do CLI}
+Para gerenciar pacotes de terceiros pelo terminal do sistema operacional, use:
+
+\begin{lstlisting}[style=inline, numbers=none, frame=none]
+hay install usuario/repositorio   -- Instala um pacote do GitHub
+hay remove  usuario/repositorio   -- Desinstala um pacote
+hay list                         -- Lista pacotes instalados
+\end{lstlisting}
+
+\subsection{Estrutura Padrão de um Pacote}
+Para publicar um pacote que qualquer pessoa possa instalar usando \lstinline{hay install}, seu repositório no GitHub deve conter na raiz:
+\begin{enumerate}
+  \item Um arquivo \texttt{plugin.json} definindo os metadados.
+  \item O arquivo de entrada do módulo (um script \texttt{.hay}, binário \texttt{.wasm} ou biblioteca nativa).
+\end{enumerate}
+
+Exemplo de \texttt{plugin.json}:
+\begin{lstlisting}[caption={plugin.json}]
+{
+  "name": "meu_modulo",
+  "version": "1.0.0",
+  "type": "hay",
+  "entry": "meu_modulo.hay"
+}
+\end{lstlisting}
+
+Depois de subir esse repositório no GitHub (ex: \texttt{github.com/joao/financas}), qualquer usuário do mundo poderá instalar e usar no Hayashi:
+\begin{lstlisting}[caption={Instalando e importando o pacote financas}]
+// No terminal do sistema operacional:
+// hay install joao/financas
+
+// No seu script Hayashi:
+import("joao/financas/meu_modulo")
+let juros = financas::calcular_taxa(1000, 12)
+\end{lstlisting}
+
+---
+
+\section{Desenvolvimento de Plugins Avançados}
+
+Para necessidades que exigem alta performance ou integração com outras linguagens, o Hayashi suporta três tipos de plugins sob a mesma sintaxe de \lstinline{import}:
+
+\subsection{1. Plugins de Script (.hay)}
+Desenvolvidos em Hayashi puro. Úteis para funções econométricas compostas e utilitários rápidos.
+
+\subsection{2. Plugins Nativos (Exclusivos em Rust)}
+Os plugins nativos são desenvolvidos exclusivamente em Rust, garantindo segurança de memória ao rodarem no mesmo espaço de endereçamento do Hayashi. Compilados como bibliotecas dinâmicas nativas (\texttt{.so}, \texttt{.dll} ou \texttt{.dylib}), eles se comunicam com o Hayashi via uma FFI C-string JSON estável e desacoplada, eliminando a necessidade de compilação conjunta com a versão exata do Hayashi.
+
+Exemplo de plugin nativo em Rust:
+\begin{lstlisting}[caption={lib.rs do plugin nativo}]
+use std::ffi::{CStr, CString};
+use std::os::raw::c_char;
+
+#[no_mangle]
+pub extern "C" fn somar(args_json_ptr: *const c_char) -> *mut c_char {
+    unsafe {
+        let c_str = CStr::from_ptr(args_json_ptr);
+        let val: serde_json::Value = serde_json::from_str(&c_str.to_string_lossy()).unwrap();
+        let arr = val.as_array().unwrap();
+        
+        let a = arr[0].as_f64().unwrap();
+        let b = arr[1].as_f64().unwrap();
+        
+        let result = serde_json::json!(a + b);
+        CString::new(result.to_string()).unwrap().into_raw()
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn free_string(ptr: *mut c_char) {
+    if !ptr.is_null() {
+        unsafe { let _ = CString::from_raw(ptr); }
+    }
+}
+\end{lstlisting}
+
+Compilado como \texttt{cdylib} e importado no Hayashi:
+\begin{lstlisting}
+import("caminho/libmeu_plugin.so", as=nativo)
+let soma = nativo::somar(5.0, 10.0) // 15
+\end{lstlisting}
+
+\subsection{3. Plugins WebAssembly (WASM - Para demais linguagens)}
+Para desenvolvedores utilizando outras linguagens (como C, Go, Zig, etc.), a compilação deve ser feita obrigatoriamente para WebAssembly (\texttt{.wasm}). Esses arquivos são executados de forma totalmente isolada (sandboxed) através de um motor WASM integrado ao Hayashi, garantindo segurança total (qualquer falha no plugin não derruba o Hayashi) e portabilidade multiplataforma instantânea.
+
+O plugin WASM deve exportar as funções \texttt{alloc(size: i32) -> i32} e \texttt{dealloc(ptr: i32, size: i32)} para gerenciar a passagem de strings JSON na memória linear do WASM, e a função do plugin deve retornar um \texttt{i64} contendo o ponteiro (nos 32 bits superiores) e o tamanho (nos 32 bits inferiores) da string JSON de retorno.

@@ -4,6 +4,7 @@ pub mod help;
 pub mod interpreter;
 pub mod lexer;
 pub mod parser;
+pub mod plugin;
 
 use error::{HayashiError, Result};
 use interpreter::Interpreter;

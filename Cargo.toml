@@ -36,6 +36,8 @@ rust_xlsxwriter = "0.95"
 csv = "1"
 rusqlite = { version = "0.33", features = ["bundled"] }
 odbc-api = { version = "28", optional = true }
+libloading = "0.8"
+wasmi = "0.31"
 
 [features]
 default = []
