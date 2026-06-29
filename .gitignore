@@ -5,3 +5,4 @@ docs/book
 .planning/
 .standards/
 .agents/
+compile_books.sh
