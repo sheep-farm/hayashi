@@ -11418,6 +11418,9 @@ impl Interpreter {
                                 .sqrt()
                         }
                         "median" => {
+                            if vals.iter().any(|v| !v.is_finite()) {
+                                return f64::NAN;
+                            }
                             let mut s = vals.to_vec();
                             s.sort_by(|a, b| a.partial_cmp(b).unwrap());
                             if n % 2 == 0 {
@@ -12761,6 +12764,11 @@ impl Interpreter {
                 };
                 let col = Self::get_col_f64(&df, &var)?;
                 let mut sorted: Vec<f64> = col.iter().filter(|v| v.is_finite()).copied().collect();
+                if sorted.is_empty() {
+                    return Err(HayashiError::Runtime(format!(
+                        "centile: no finite observations in '{var}'"
+                    )));
+                }
                 sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
                 let n = sorted.len();
                 let pcts = match opt_map.get("centiles") {
