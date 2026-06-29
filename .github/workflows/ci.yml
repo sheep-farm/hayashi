@@ -10,6 +10,18 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  advisories:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: git clone --depth 1 --branch develop https://github.com/sheep-farm/Greeners.git ../Greeners
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: cargo-deny
+      - run: cargo install cargo-deny --version 0.19.9 --locked
+      - run: cargo deny check advisories
+
   lint:
     runs-on: ubuntu-latest
     steps:
