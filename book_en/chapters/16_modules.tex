@@ -45,29 +45,20 @@ hay list                     -- List installed packages
 \end{lstlisting}
 
 \subsection{Standard Package Structure}
-To publish a package that anyone can install using \lstinline{hay install}, your GitHub repository must contain in its root:
-\begin{enumerate}
-  \item A \texttt{plugin.json} file defining metadata.
-  \item The module entry point (a \texttt{.hay} script, a \texttt{.wasm} binary, or a native library).
-\end{enumerate}
 
-Example of \texttt{plugin.json}:
-\begin{lstlisting}[caption={plugin.json}]
-{
-  "name": "my_module",
-  "version": "1.0.0",
-  "type": "hay",
-  "entry": "my_module.hay"
-}
-\end{lstlisting}
+Hayashi packages are convention-based and require zero configuration:
+\begin{itemize}
+  \item \textbf{Script Packages}: Simply push your \texttt{.hay} script(s) to the root of a GitHub repository (e.g. \texttt{github.com/john/finance/interest.hay}).
+  \item \textbf{Native Plugins}: Set up a GitHub Actions workflow to build and upload compiled binaries (\texttt{.so}, \texttt{.dll}, \texttt{.dylib}, or \texttt{.wasm}) as assets to a GitHub Release.
+\end{itemize}
 
-Once this repository is pushed to GitHub (e.g., \texttt{github.com/john/finance}), any user in the world can install and use it in Hayashi:
-\begin{lstlisting}[caption={Installing and importing the finance package}]
+Once your package is pushed to GitHub, any user in the world can install and use it in Hayashi:
+\begin{lstlisting}[caption={Installing and importing a package}]
 // In the OS terminal:
 // hay install john/finance
 
 // In your Hayashi script:
-import("john/finance/my_module")
+import("john/finance/interest")
 let rate = finance::compute_rate(1000, 12)
 \end{lstlisting}
 
