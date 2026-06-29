@@ -963,6 +963,106 @@ impl Interpreter {
         }
     }
 
+    fn dict_to_dataframe(&self, map: &HashMap<String, Value>) -> Result<greeners::DataFrame> {
+        let mut columns = HashMap::new();
+        let mut expected_len: Option<usize> = None;
+
+        for (col_name, val) in map {
+            let list = match val {
+                Value::List(lst) => lst,
+                _ => return Err(self.type_err(format!("column '{col_name}' must be a list"))),
+            };
+
+            let len = list.len();
+            if let Some(expected) = expected_len {
+                if len != expected {
+                    return Err(self.rt_err(format!(
+                        "all columns must have the same length (column '{}' has length {}, expected {})",
+                        col_name, len, expected
+                    )));
+                }
+            } else {
+                expected_len = Some(len);
+            }
+
+            if len == 0 {
+                columns.insert(col_name.clone(), greeners::Column::Float(ndarray::Array1::from(vec![])));
+                continue;
+            }
+
+            let first = &list[0];
+            let col = match first {
+                Value::Float(_) => {
+                    let mut data = Vec::with_capacity(len);
+                    for (i, v) in list.iter().enumerate() {
+                        match v {
+                            Value::Float(f) => data.push(*f),
+                            Value::Int(i_val) => data.push(*i_val as f64),
+                            other => return Err(self.type_err(format!(
+                                "element at index {} of column '{}' is not numeric (got {})",
+                                i, col_name, other
+                            ))),
+                        }
+                    }
+                    greeners::Column::Float(ndarray::Array1::from(data))
+                }
+                Value::Int(_) => {
+                    let mut data = Vec::with_capacity(len);
+                    for (i, v) in list.iter().enumerate() {
+                        match v {
+                            Value::Int(i_val) => data.push(*i_val),
+                            Value::Float(f) => data.push(*f as i64),
+                            other => return Err(self.type_err(format!(
+                                "element at index {} of column '{}' is not an integer (got {})",
+                                i, col_name, other
+                            ))),
+                        }
+                    }
+                    greeners::Column::Int(ndarray::Array1::from(data))
+                }
+                Value::Bool(_) => {
+                    let mut data = Vec::with_capacity(len);
+                    for (i, v) in list.iter().enumerate() {
+                        match v {
+                            Value::Bool(b) => data.push(*b),
+                            other => return Err(self.type_err(format!(
+                                "element at index {} of column '{}' is not boolean (got {})",
+                                i, col_name, other
+                            ))),
+                        }
+                    }
+                    greeners::Column::Bool(ndarray::Array1::from(data))
+                }
+                Value::Str(_) => {
+                    let mut data = Vec::with_capacity(len);
+                    for (i, v) in list.iter().enumerate() {
+                        match v {
+                            Value::Str(s) => data.push(s.clone()),
+                            other => return Err(self.type_err(format!(
+                                "element at index {} of column '{}' is not a string (got {})",
+                                i, col_name, other
+                            ))),
+                        }
+                    }
+                    greeners::Column::from_strings(data)
+                }
+                other => return Err(self.type_err(format!(
+                    "unsupported type for column '{}': {}",
+                    col_name, other
+                ))),
+            };
+
+            columns.insert(col_name.clone(), col);
+        }
+
+        if expected_len.is_none() {
+            return Err(self.rt_err("cannot create empty dataframe (no columns)"));
+        }
+
+        greeners::DataFrame::from_columns(columns)
+            .map_err(|e| self.rt_err(format!("failed to create dataframe: {e}")))
+    }
+
     pub fn load_plugins(&mut self) {
         let home = match std::env::var_os("HOME") {
             Some(h) => h,
@@ -1910,6 +2010,20 @@ impl Interpreter {
                         Ok(Value::Dict(Rc::new(new_m)))
                     }
                     _ => Err(HayashiError::Type("dict_remove() requires dict".into())),
+                }
+            }
+
+            "dataframe" => {
+                if args.len() != 1 {
+                    return Err(self.rt_err("dataframe(dict)"));
+                }
+                let d = self.eval_expr(&args[0])?;
+                match d {
+                    Value::Dict(m) => {
+                        let df = self.dict_to_dataframe(&m)?;
+                        Ok(Value::DataFrame(Rc::new(df)))
+                    }
+                    _ => Err(HayashiError::Type("dataframe() requires dict".into())),
                 }
             }
 
