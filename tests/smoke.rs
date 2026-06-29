@@ -4442,6 +4442,29 @@ centile(df, X)
 }
 
 #[test]
+fn centile_all_missing_returns_error() {
+    let (ok, out) = run_inline(
+        r#"
+input df
+X
+.
+.
+end
+centile(df, X)
+"#,
+    );
+    assert!(!ok, "centile should fail on all-missing input:\n{out}");
+    assert!(
+        out.contains("no finite observations"),
+        "centile should return a structured error, not panic:\n{out}"
+    );
+    assert!(
+        !out.contains("panicked at"),
+        "centile should not panic on all-missing input:\n{out}"
+    );
+}
+
+#[test]
 fn recode_basic() {
     assert_ok_contains(
         "recode",
@@ -6377,6 +6400,27 @@ let s = summarize(agg, x)
 display s["mean"]
 "#,
         "25",
+    );
+}
+
+#[test]
+fn group_by_median_missing_returns_nan() {
+    assert_ok_contains(
+        "group_by_median_missing",
+        r#"
+input df
+  g x
+  1 10
+  1 .
+  2 30
+  2 40
+end
+let agg = group_by(df, g, median, x)
+let s = summarize(agg, x)
+assert(s["missing"] == 1, "expected one missing median")
+display "ok"
+"#,
+        "ok",
     );
 }
 
