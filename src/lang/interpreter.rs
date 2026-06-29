@@ -642,6 +642,7 @@ impl Interpreter {
             .map(|(_, c)| c)
     }
 
+    #[allow(dead_code)]
     fn format_stack_trace(&self, innermost: &str, line: usize) -> String {
         let mut frames = Vec::new();
         for (name, ln) in self.call_stack.iter().rev() {
@@ -10585,7 +10586,7 @@ impl Interpreter {
                     }
                 };
 
-                let stats = |v: &[f64]| -> (f64, f64, f64) {
+                let _stats = |v: &[f64]| -> (f64, f64, f64) {
                     // (mean, sd, n)
                     let n = v.len() as f64;
                     let m = v.iter().sum::<f64>() / n;
@@ -10608,6 +10609,9 @@ impl Interpreter {
                         }
                     };
 
+                    use greeners::Stats;
+                    use ndarray::Array1;
+
                     // ── PAREADO: ttest(df, v1, v2, paired=true) ──────────────
                     if args.len() >= 3 && matches!(opt_map.get("paired"), Some(Value::Bool(true))) {
                         let var2 = match &args[2] {
@@ -10618,20 +10622,15 @@ impl Interpreter {
                                 ))
                             }
                         };
-                        let v1 = get_col_vals(&df, &var1)?;
-                        let v2 = get_col_vals(&df, &var2)?;
-                        if v1.len() != v2.len() {
-                            return Err(HayashiError::Runtime(
-                                "paired ttest requires equal-length columns".into(),
-                            ));
-                        }
-                        let diff: Vec<f64> = v1.iter().zip(&v2).map(|(a, b)| a - b).collect();
-                        let (m, s, n) = stats(&diff);
-                        let se = s / n.sqrt();
-                        let t = m / se;
-                        let df_t = n - 1.0;
-                        let p = t_pvalue_two(t, df_t);
-                        let tc = t_critical_95(df_t);
+                        let v1_vec = get_col_vals(&df, &var1)?;
+                        let v2_vec = get_col_vals(&df, &var2)?;
+                        let v1 = Array1::from(v1_vec);
+                        let v2 = Array1::from(v2_vec);
+
+                        let res = Stats::ttest_paired_full(&v1, &v2)
+                            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                        let _tc = t_critical_95(res.df);
                         println!("\nPaired t-test: {var1} - {var2}");
                         println!("{}", "─".repeat(62));
                         println!(
@@ -10642,14 +10641,14 @@ impl Interpreter {
                         println!(
                             "{:<14} {:>6.0}  {:>10.4}  {:>10.4}  [{:.4}, {:.4}]",
                             format!("{var1}-{var2}"),
-                            n,
-                            m,
-                            se,
-                            m - tc * se,
-                            m + tc * se
+                            res.n as f64,
+                            res.mean,
+                            res.std_err,
+                            res.ci_lower,
+                            res.ci_upper
                         );
                         println!("{}", "─".repeat(62));
-                        println!("H0: mean(diff) = 0   t = {t:.4}   df = {df_t:.0}   p = {p:.4}");
+                        println!("H0: mean(diff) = 0   t = {:.4}   df = {:.0}   p = {:.4}", res.t_statistic, res.df, res.p_value);
                         println!();
 
                     // ── DOIS GRUPOS: ttest(df, var, by=group) ────────────────
@@ -10681,22 +10680,22 @@ impl Interpreter {
                             gkeys.sort();
                         }
 
-                        let v1 = &group_data[&gkeys[0]];
-                        let v2 = &group_data[&gkeys[1]];
-                        let (m1, s1, n1) = stats(v1);
-                        let (m2, s2, n2) = stats(v2);
+                        let equal_var = matches!(opt_map.get("unequal"), Some(Value::Bool(false)));
 
-                        // Welch's t
-                        let se1sq = s1 * s1 / n1;
-                        let se2sq = s2 * s2 / n2;
-                        let se = (se1sq + se2sq).sqrt();
-                        let t = (m1 - m2) / se;
-                        let df_t = (se1sq + se2sq).powi(2)
-                            / (se1sq.powi(2) / (n1 - 1.0) + se2sq.powi(2) / (n2 - 1.0));
-                        let p = t_pvalue_two(t, df_t);
-                        let tc = t_critical_95(df_t);
+                        let v1 = Array1::from(group_data[&gkeys[0]].clone());
+                        let v2 = Array1::from(group_data[&gkeys[1]].clone());
 
-                        println!("\nTwo-sample t-test (Welch): {var1} by {by_col}");
+                        let res = Stats::compare_means(&v1, &v2, equal_var)
+                            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                        let tc = t_critical_95(res.df);
+
+                        let title = if equal_var {
+                            format!("Two-sample t-test (Equal Variances): {var1} by {by_col}")
+                        } else {
+                            format!("Two-sample t-test (Welch): {var1} by {by_col}")
+                        };
+                        println!("\n{}", title);
                         println!("{}", "─".repeat(68));
                         println!(
                             "{:<10} {:>6}  {:>10}  {:>10}  {:>10}  {:>10}",
@@ -10704,13 +10703,13 @@ impl Interpreter {
                         );
                         println!("{}", "─".repeat(68));
                         for (g, m, s, n, se_g) in [
-                            (&gkeys[0], m1, s1, n1, (s1 * s1 / n1).sqrt()),
-                            (&gkeys[1], m2, s2, n2, (s2 * s2 / n2).sqrt()),
+                            (&gkeys[0], res.mean1, res.std_dev1, res.n1, res.std_err1),
+                            (&gkeys[1], res.mean2, res.std_dev2, res.n2, res.std_err2),
                         ] {
                             println!(
                                 "{:<10} {:>6.0}  {:>10.4}  {:>10.4}  {:>10.4}  [{:.4}, {:.4}]",
                                 g,
-                                n,
+                                n as f64,
                                 m,
                                 se_g,
                                 s,
@@ -10720,7 +10719,8 @@ impl Interpreter {
                         }
                         println!("{}", "─".repeat(68));
                         println!("diff = mean({}) - mean({})", gkeys[0], gkeys[1]);
-                        println!("H0: diff = 0   Welch's t = {t:.4}   df = {df_t:.2}   p = {p:.4}");
+                        let t_label = if equal_var { "t" } else { "Welch's t" };
+                        println!("H0: diff = 0   {} = {:.4}   df = {:.2}   p = {:.4}", t_label, res.t_statistic, res.df, res.p_value);
                         println!();
 
                     // ── UNI-AMOSTRAL: ttest(df, var, mu=0) ───────────────────
@@ -10731,13 +10731,13 @@ impl Interpreter {
                             None => 0.0,
                             _ => return Err(HayashiError::Type("mu= must be numeric".into())),
                         };
-                        let v = get_col_vals(&df, &var1)?;
-                        let (m, s, n) = stats(&v);
-                        let se = s / n.sqrt();
-                        let t = (m - mu) / se;
-                        let df_t = n - 1.0;
-                        let p = t_pvalue_two(t, df_t);
-                        let tc = t_critical_95(df_t);
+                        let v_vec = get_col_vals(&df, &var1)?;
+                        let v = Array1::from(v_vec);
+
+                        let res = Stats::ttest_1samp_full(&v, mu)
+                            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                        let _tc = t_critical_95(res.df);
 
                         println!("\nOne-sample t-test: {var1}   H0: mean = {mu}");
                         println!("{}", "─".repeat(62));
@@ -10749,14 +10749,14 @@ impl Interpreter {
                         println!(
                             "{:<14} {:>6.0}  {:>10.4}  {:>10.4}  [{:.4}, {:.4}]",
                             var1,
-                            n,
-                            m,
-                            se,
-                            m - tc * se,
-                            m + tc * se
+                            res.n as f64,
+                            res.mean,
+                            res.std_err,
+                            res.ci_lower,
+                            res.ci_upper
                         );
                         println!("{}", "─".repeat(62));
-                        println!("t = {t:.4}   df = {df_t:.0}   p = {p:.4}");
+                        println!("t = {:.4}   df = {:.0}   p = {:.4}", res.t_statistic, res.df, res.p_value);
                         println!();
                     }
                 } else {
