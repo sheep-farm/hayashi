@@ -125,15 +125,17 @@ Confirms the ANOVA without assuming normality.
 
 \begin{lstlisting}
 ttest(df, var, mu=0.0)                  // one sample
-ttest(df, var, by=group)               // two groups (Welch)
-ttest(df, var1, var2, paired=true)     // paired
-anova(df, var, by=group)               // one-way ANOVA
-kruskal_wallis(df, var, by=group)      // Kruskal-Wallis
+ttest(df, var, by=group)                 // two groups (Welch)
+ttest(df, var, by=group, unequal=false) // two groups (Student)
+ttest(df, var1, var2, paired=true)      // paired
+anova(df, var, by=group)                // one-way ANOVA
+kruskal_wallis(df, var, by=group)       // Kruskal-Wallis
 \end{lstlisting}
 
 \begin{nota}
   Welch's test does not assume homoscedasticity and is preferable to the
   classical Student's $t$-test in almost all practical cases. The loss of power
   is negligible when variances are equal; the gain when they differ
-  is substantial.
+  is substantial. If you wish to run the classical Student's t-test, use the
+  option \texttt{unequal=false}.
 \end{nota}
