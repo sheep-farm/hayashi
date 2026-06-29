@@ -56,7 +56,7 @@ Load options: `sheet=`, `table=`, `query=`, `sep=`. URLs are downloaded automati
 | `pwcorr` | `pwcorr(df, var1, var2, ...)` | Pairwise correlations with stars |
 | `ci` | `ci(df, var [, level=0.95])` | Confidence interval for mean |
 | `centile` | `centile(df, var [, percentiles=[]])` | Arbitrary percentiles |
-| `ttest` | `ttest(df, var [, mu= \| by= \| paired])` | T-test (one-sample, two-sample, paired) |
+| `ttest` | `ttest(df, var [, mu= \| by= [, unequal=false] \| paired])` | T-test (one-sample, two-sample, paired) |
 | `xtsum` | `xtsum(df, var)` | Panel summary (between/within) |
 | `count` | `count df [if cond]` | Count observations |
 | `describe` | `describe(df)` | Variable names, types, labels |
