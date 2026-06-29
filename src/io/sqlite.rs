@@ -208,11 +208,8 @@ mod tests {
         let file = NamedTempFile::new().unwrap();
         let path = file.path().to_string_lossy().to_string();
         let conn = Connection::open(&path).unwrap();
-        conn.execute(
-            "CREATE TABLE \"quoted\"\"table\" (\"value\" INTEGER)",
-            [],
-        )
-        .unwrap();
+        conn.execute("CREATE TABLE \"quoted\"\"table\" (\"value\" INTEGER)", [])
+            .unwrap();
         conn.execute("INSERT INTO \"quoted\"\"table\" VALUES (42)", [])
             .unwrap();
 
