@@ -2,7 +2,7 @@
 
 **An interpreted language for applied econometrics.**
 
-Hayashi combines Stata-like syntax with modern language features — closures, pipe operators, pattern matching, namespaces — all running on a pure Rust engine with zero system dependencies.
+Hayashi combines Stata-like syntax with modern language features — closures, pipe operators, pattern matching, namespaces — all running on a pure Rust engine with zero system dependencies in the default build.
 
 ```
 load "wages.dta" as df
@@ -17,12 +17,14 @@ esttab(m1, m2, m3)
 ## Why Hayashi?
 
 - **Free and open source** (GPL-3.0) — no license fees, no restrictions
-- **Single binary** (~20 MB) — no installers, no dependencies, runs anywhere
+- **Single binary** (~20 MB) — no installers, no dependencies for the default build
 - **Broad estimator coverage** — OLS, IV, panel models, Logit/Probit, ARIMA, GARCH, VAR, DID, and more
 - **Modern language** — closures, pipe (`|>`), namespaces (`mod::func()`), f-strings, try/catch
 - **8 I/O formats** — CSV, DTA, Excel, Parquet, JSON, SQLite, TSV, ODBC
 - **Built-in `esttab`** — publication-ready comparison tables in one line
 - **100% Rust** — no C, no Fortran, no BLAS/LAPACK to install
+
+ODBC is optional and requires system ODBC drivers when enabled. If your workflow uses remote data, raw SQL, packages, or ODBC, read the [Trust Model](./trust-model.md).
 
 ## Quick taste
 
