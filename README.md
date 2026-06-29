@@ -132,7 +132,7 @@ let big = filter(list, |x| x > 10)
 | Comparison | `==` `!=` `>` `<` `>=` `<=` |
 | Logical | `&&` (or `&`) `\|\|` `!` |
 | Membership | `in` — works with list, dict (key), string (substring) |
-| Pipe | `\|>` — passes left side as first argument to right side |
+| Pipe | `\|>` — passes left side as first argument (or replacing `_` placeholder) |
 | Index | `list[i]` `dict["key"]` |
 | String | `+` for concatenation |
 
@@ -162,6 +162,7 @@ F-strings support any expression inside `{}` and format specifiers: `.Nf` (decim
 
 value |> |x| x * 3           // pipe with inline closure
 exper |> dobro                // pipe with user function
+df |> ols(lw ~ yos, _)        // pipe using '_' as placeholder for specific argument positions
 ```
 
 ## Data I/O
@@ -444,6 +445,7 @@ let msg = f"mean = {mu:.2f}, n = {n}, p = {p:.4e}"
 
 // Pipe operator (|>)
 [5, 3, 1, 4, 2] |> sort |> reverse |> map(|x| x * 10)
+df |> ols(lw ~ yos, _)             // passes df to the '_' placeholder position
 
 // In operator (membership test)
 if 3 in [1, 2, 3] { ... }
