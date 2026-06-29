@@ -189,7 +189,18 @@ impl Parser {
                     mut args,
                     opts,
                 } => {
-                    args.insert(0, lhs);
+                    let mut found = false;
+                    for arg in args.iter_mut() {
+                        if let Expr::Var(ref name) = arg {
+                            if name == "_" {
+                                *arg = lhs.clone();
+                                found = true;
+                            }
+                        }
+                    }
+                    if !found {
+                        args.insert(0, lhs);
+                    }
                     Expr::Call { func, args, opts }
                 }
                 Expr::Var(name) => Expr::Call {

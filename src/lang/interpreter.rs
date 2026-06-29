@@ -612,7 +612,7 @@ impl Interpreter {
     }
 
     fn levenshtein(a: &str, b: &str) -> usize {
-        let (m, n) = (a.len(), b.len());
+        let (_m, n) = (a.len(), b.len());
         let mut prev: Vec<usize> = (0..=n).collect();
         let mut curr = vec![0; n + 1];
         for (i, ca) in a.chars().enumerate() {
