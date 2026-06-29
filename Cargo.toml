@@ -21,7 +21,6 @@ chrono = "0.4"
 statrs = "0.18"
 thiserror = "2"
 rustyline = "14"
-anyhow = "1"
 dta = "0.6.0"
 ureq = "2"
 serde = { version = "1", features = ["derive"] }
