@@ -745,9 +745,9 @@ impl Parser {
 
     fn parse_for_iter(&mut self) -> Result<ForIter> {
         match self.parse_expr()? {
-            Expr::Range(start, end)          => Ok(ForIter::Range(*start, *end)),
+            Expr::Range(start, end) => Ok(ForIter::Range(*start, *end)),
             Expr::RangeInclusive(start, end) => Ok(ForIter::RangeInclusive(*start, *end)),
-            other                            => Ok(ForIter::Items(other)),
+            other => Ok(ForIter::Items(other)),
         }
     }
 
@@ -1194,7 +1194,16 @@ impl Parser {
                 if self
                     .tokens
                     .get(self.pos + 1)
-                    .map(|(t, _)| matches!(t, Token::PlusEq | Token::MinusEq | Token::StarEq | Token::SlashEq | Token::PercentEq))
+                    .map(|(t, _)| {
+                        matches!(
+                            t,
+                            Token::PlusEq
+                                | Token::MinusEq
+                                | Token::StarEq
+                                | Token::SlashEq
+                                | Token::PercentEq
+                        )
+                    })
                     .unwrap_or(false) =>
             {
                 let name = name.clone();

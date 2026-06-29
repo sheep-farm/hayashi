@@ -284,11 +284,7 @@ smoke!(
     "examples/three_workflows.hay",
     "Hausman"
 );
-smoke!(
-    smoke_count_models,
-    "examples/count_models.hay",
-    "Poisson"
-);
+smoke!(smoke_count_models, "examples/count_models.hay", "Poisson");
 smoke!(smoke_panel, "examples/panel.hay", "FE");
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -4939,7 +4935,6 @@ fn test_load_json_boolean_and_categorical() {
     assert!(out.contains("R-squared"), "expected OLS output:\n{out}");
 }
 
-
 #[test]
 fn load_sqlite_then_generate() {
     let (ok, out) = run_inline(
@@ -6470,12 +6465,16 @@ fn error_did_you_mean_variable() {
 fn error_did_you_mean_function() {
     let (ok, out) = run_inline("input df\nx\n1\nend\nsumarize(df)");
     assert!(!ok);
-    assert!(out.contains("did you mean 'summarize'"), "missing hint:\n{out}");
+    assert!(
+        out.contains("did you mean 'summarize'"),
+        "missing hint:\n{out}"
+    );
 }
 
 #[test]
 fn error_stack_trace() {
-    let (ok, out) = run_inline("fn inner() {\n  let z = nope\n}\nfn outer() {\n  inner()\n}\nouter()");
+    let (ok, out) =
+        run_inline("fn inner() {\n  let z = nope\n}\nfn outer() {\n  inner()\n}\nouter()");
     assert!(!ok);
     assert!(out.contains("in inner()"), "missing inner frame:\n{out}");
     assert!(out.contains("in outer()"), "missing outer frame:\n{out}");
@@ -6485,7 +6484,10 @@ fn error_stack_trace() {
 fn error_type_mismatch() {
     let (ok, out) = run_inline("summarize(42)");
     assert!(!ok);
-    assert!(out.contains("expected DataFrame, got Int"), "missing type info:\n{out}");
+    assert!(
+        out.contains("expected DataFrame, got Int"),
+        "missing type info:\n{out}"
+    );
 }
 
 #[test]
@@ -6726,7 +6728,8 @@ display s["mean"]
 #[test]
 fn generate_fn_call_does_not_modify_original() {
     // generate() como função é puro: df original NÃO deve ter a coluna z
-    let (ok, out) = run_inline(r#"
+    let (ok, out) = run_inline(
+        r#"
 input df
   x
   1
@@ -6735,10 +6738,13 @@ input df
 end
 let df2 = generate(df, z = x^2)
 describe(df)
-"#);
+"#,
+    );
     assert!(ok, "generate_fn_not_modify failed:\n{out}");
-    assert!(!out.contains("| z") && !out.contains("  z "),
-        "original df should not have column z after generate():\n{out}");
+    assert!(
+        !out.contains("| z") && !out.contains("  z "),
+        "original df should not have column z after generate():\n{out}"
+    );
 }
 
 #[test]
@@ -6919,7 +6925,8 @@ describe(df2)
 
 #[test]
 fn select_string_literal_excludes_col() {
-    let (ok, out) = run_inline(r#"
+    let (ok, out) = run_inline(
+        r#"
 input df
   x y z
   1 10 100
@@ -6927,10 +6934,13 @@ input df
 end
 let df2 = select(df, "x", "z")
 describe(df2)
-"#);
+"#,
+    );
     assert!(ok, "select_string_literal_excludes_col failed:\n{out}");
-    assert!(!out.contains(" y ") && !out.contains("\ny\n") && !out.contains("| y"),
-        "y should not appear after select:\n{out}");
+    assert!(
+        !out.contains(" y ") && !out.contains("\ny\n") && !out.contains("| y"),
+        "y should not appear after select:\n{out}"
+    );
 }
 
 #[test]
@@ -6971,22 +6981,27 @@ describe(df2)
 
 #[test]
 fn drop_string_literal_arg() {
-    let (ok, out) = run_inline(r#"
+    let (ok, out) = run_inline(
+        r#"
 input df
   x y z
   1 10 100
 end
 let df2 = drop(df, "y")
 describe(df2)
-"#);
+"#,
+    );
     assert!(ok, "drop_string_literal_arg failed:\n{out}");
-    assert!(!out.contains("| y") && !out.contains(" y "),
-        "y should be dropped:\n{out}");
+    assert!(
+        !out.contains("| y") && !out.contains(" y "),
+        "y should be dropped:\n{out}"
+    );
 }
 
 #[test]
 fn drop_var_indirect_arg() {
-    let (ok, out) = run_inline(r#"
+    let (ok, out) = run_inline(
+        r#"
 input df
   x y z
   1 10 100
@@ -6994,10 +7009,13 @@ end
 let col = "y"
 let df2 = drop(df, col)
 describe(df2)
-"#);
+"#,
+    );
     assert!(ok, "drop_var_indirect_arg failed:\n{out}");
-    assert!(!out.contains("| y") && !out.contains(" y "),
-        "y should be dropped:\n{out}");
+    assert!(
+        !out.contains("| y") && !out.contains(" y "),
+        "y should be dropped:\n{out}"
+    );
 }
 
 #[test]
@@ -7167,16 +7185,20 @@ display errors
 
 #[test]
 fn try_catch_error_message_content() {
-    let (ok, out) = run_inline(r#"
+    let (ok, out) = run_inline(
+        r#"
 try {
     display undefined_xyz
 } catch e {
     display e
 }
-"#);
+"#,
+    );
     assert!(ok, "try_catch_error_content failed:\n{out}");
-    assert!(out.contains("undefined_xyz") || out.contains("xyz"),
-        "error message should mention variable name:\n{out}");
+    assert!(
+        out.contains("undefined_xyz") || out.contains("xyz"),
+        "error message should mention variable name:\n{out}"
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -7265,13 +7287,15 @@ display compute(7)
 
 #[test]
 fn const_in_function_immutable() {
-    let (ok, _out) = run_inline(r#"
+    let (ok, _out) = run_inline(
+        r#"
 fn bad() {
     const x = 10
     x = 20
 }
 bad()
-"#);
+"#,
+    );
     assert!(!ok, "assigning to const in fn should fail");
 }
 
@@ -7315,7 +7339,8 @@ display sign(3)
 
 #[test]
 fn fn_multiple_return_paths_all_hit() {
-    let (ok, out) = run_inline(r#"
+    let (ok, out) = run_inline(
+        r#"
 fn classify(x) {
     if x < 0 { return "negative" }
     if x == 0 { return "zero" }
@@ -7324,7 +7349,8 @@ fn classify(x) {
 display classify(-1)
 display classify(0)
 display classify(1)
-"#);
+"#,
+    );
     assert!(ok, "fn_multiple_paths failed:\n{out}");
     assert!(out.contains("negative"), "missing negative:\n{out}");
     assert!(out.contains("zero"), "missing zero:\n{out}");
@@ -7717,12 +7743,14 @@ display f(42)
 
 #[test]
 fn scope_block_let_dies() {
-    let (ok, out) = run_inline(r#"
+    let (ok, out) = run_inline(
+        r#"
 {
     let inner = 99
 }
 display inner
-"#);
+"#,
+    );
     assert!(!ok, "block let should not leak:\n{out}");
 }
 
@@ -7897,39 +7925,49 @@ display has_key(d2, "b")
 
 #[test]
 fn error_column_not_found_suggest() {
-    let (ok, out) = run_inline(r#"
+    let (ok, out) = run_inline(
+        r#"
 input df
   price quantity
   10 5
   20 10
 end
 summarize(df, prce)
-"#);
+"#,
+    );
     assert!(!ok, "bad column should fail");
     // não exigimos did-you-mean para nomes de coluna (depende da implementação),
     // mas deve falhar com mensagem clara
-    assert!(out.contains("prce") || out.contains("price") || out.contains("not found"),
-        "error should mention the column:\n{out}");
+    assert!(
+        out.contains("prce") || out.contains("price") || out.contains("not found"),
+        "error should mention the column:\n{out}"
+    );
 }
 
 #[test]
 fn error_wrong_arg_count_fn() {
-    let (ok, out) = run_inline(r#"
+    let (ok, out) = run_inline(
+        r#"
 fn add(a, b) { return a + b }
 display add(1)
-"#);
+"#,
+    );
     assert!(!ok, "wrong arg count should fail:\n{out}");
 }
 
 #[test]
 fn error_index_out_of_bounds() {
-    let (ok, out) = run_inline(r#"
+    let (ok, out) = run_inline(
+        r#"
 let lst = [1, 2, 3]
 display lst[10]
-"#);
+"#,
+    );
     assert!(!ok, "out-of-bounds should fail:\n{out}");
-    assert!(out.contains("10") || out.contains("index") || out.contains("bounds"),
-        "error should mention index:\n{out}");
+    assert!(
+        out.contains("10") || out.contains("index") || out.contains("bounds"),
+        "error should mention index:\n{out}"
+    );
 }
 
 #[test]
@@ -7938,22 +7976,32 @@ fn error_type_mismatch_string_plus_int() {
     let (ok, out) = run_inline(r#"display "hello" + 42"#);
     if !ok {
         // mensagem deve mencionar o problema de tipo
-        assert!(out.contains("numeric") || out.contains("type") || out.contains("string") || out.contains("expected"),
-            "type error should be informative:\n{out}");
+        assert!(
+            out.contains("numeric")
+                || out.contains("type")
+                || out.contains("string")
+                || out.contains("expected"),
+            "type error should be informative:\n{out}"
+        );
     }
     // se ok, auto-conversão é aceitável; apenas garantir determinismo
 }
 
 #[test]
 fn error_source_annotation_multiline() {
-    let (ok, out) = run_inline(r#"
+    let (ok, out) = run_inline(
+        r#"
 let a = 1
 let b = 2
 let c = 3
 display d
-"#);
+"#,
+    );
     assert!(!ok);
-    assert!(out.contains("│") || out.contains("|"), "should show source annotation:\n{out}");
+    assert!(
+        out.contains("│") || out.contains("|"),
+        "should show source annotation:\n{out}"
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -8054,8 +8102,10 @@ fn math_modulo_negative() {
     let (ok, out) = run_inline("display -7 % 3");
     assert!(ok, "negative modulo failed:\n{out}");
     // resultado pode ser -1 ou 2 dependendo da convenção; só verifica que é determinístico
-    assert!(out.trim() == "-1" || out.trim() == "2",
-        "unexpected modulo result:\n{out}");
+    assert!(
+        out.trim() == "-1" || out.trim() == "2",
+        "unexpected modulo result:\n{out}"
+    );
 }
 
 #[test]
@@ -8367,13 +8417,15 @@ display count(df2)
 
 #[test]
 fn input_rejects_string_data() {
-    let (ok, out) = run_inline(r#"
+    let (ok, out) = run_inline(
+        r#"
 input df
   name age
   Alice 25
   Bob   30
 end
-"#);
+"#,
+    );
     assert!(!ok, "input with string data should fail");
     assert!(
         out.contains("Alice") || out.contains("não é um número") || out.contains("numérico"),
@@ -8383,13 +8435,15 @@ end
 
 #[test]
 fn input_rejects_quoted_string() {
-    let (ok, out) = run_inline(r#"
+    let (ok, out) = run_inline(
+        r#"
 input df
   x
   "hello"
   2
 end
-"#);
+"#,
+    );
     assert!(!ok, "input with quoted string should fail");
     assert!(
         out.contains("hello") || out.contains("não é um número") || out.contains("numérico"),
