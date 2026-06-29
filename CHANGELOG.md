@@ -3,6 +3,43 @@
 All notable changes to Hayashi are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased] — dev
+
+### Added
+
+- **Hybrid plugin system** (`import_native`): Hayashi now supports three plugin tiers in a single unified `HayashiPlugin` trait:
+  - **Native Rust** (`.so`/`.dll` via `libloading`): plugins export `extern "C"` functions, args/return values are exchanged as JSON strings
+  - **WebAssembly** (`.wasm` via `wasmi`): sandboxed plugins expose `alloc`/`dealloc`/function exports; args serialized to JSON written into guest memory, result packed as `i64` (`high 32 bits = ptr`, `low 32 bits = len`)
+  - **Script** (`.hay`): existing interpreted plugin tier, unchanged
+  - Bidirectional `value_to_json` / `json_to_value` helpers for all Hayashi value types (Float, Int, Bool, Str, List, Dict, DataFrame)
+  - Book chapters updated in EN and PT-BR to document the new import model
+- **Pipe placeholder `_`**: `df |> ols(lw ~ yos, _)` passes the piped value into an arbitrary argument position, not just the first. Works in any expression context.
+- **`ttest` option `unequal=false`**: explicitly request a pooled (equal-variance) t-test. Default remains Welch (unequal variances). Documented in book chapters and command reference.
+
+### Fixed
+
+- **Non-numeric columns in `generate` and estimators**: `get_col_f64` and `eval_col_expr` now call `col.to_float()` instead of hard-failing on Boolean and Categorical columns. Previously, running `ols` or `generate` on a DataFrame loaded from JSON/CSV with boolean columns would panic or raise a type error.
+- **Hardened URL downloads** (security, contributed by Charles Shaw):
+  - Reject `localhost`, `ip6-localhost`, `ip6-loopback`, and `.localhost` hostnames before connecting
+  - Reject all private, loopback, link-local, and unspecified IPv4/IPv6 addresses (SSRF prevention)
+  - Custom resolver validates resolved IPs against the same allowlist (DNS rebinding prevention)
+  - `redirects(0)` prevents redirect-based bypass
+  - 30-second connection timeout and 100 MB download size limit enforced
+- **EGARCH/GJRGARCH function signatures** corrected in the quick reference appendix (EN and PT-BR books)
+
+### Changed
+
+- **`ttest` calculations delegated to Greeners**: the interpreter no longer implements the t-statistic, degrees of freedom, and p-value arithmetic inline. All computation now goes through `greeners::ttest`, keeping the interpreter as a thin dispatcher.
+
+### Removed
+
+- **Unused `anyhow` dependency** removed from `Cargo.toml` (contributed by Charles Shaw)
+
+### Internal / CI
+
+- Format check (`cargo fmt --check`) and Windows smoke test restored to CI pipeline (contributed by Charles Shaw)
+- Dead code warnings silenced in `ttest` dispatch path
+
 ## [0.2.3] — 2026-06-25
 
 ### Added
