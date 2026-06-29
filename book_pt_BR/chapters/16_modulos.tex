@@ -81,40 +81,49 @@ Para necessidades que exigem alta performance ou integração com outras linguag
 Desenvolvidos em Hayashi puro. Úteis para funções econométricas compostas e utilitários rápidos.
 
 \subsection{2. Plugins Nativos (Exclusivos em Rust)}
-Os plugins nativos são desenvolvidos exclusivamente em Rust, garantindo segurança de memória ao rodarem no mesmo espaço de endereçamento do Hayashi. Compilados como bibliotecas dinâmicas nativas (\texttt{.so}, \texttt{.dll} ou \texttt{.dylib}), eles se comunicam com o Hayashi via uma FFI C-string JSON estável e desacoplada, eliminando a necessidade de compilação conjunta com a versão exata do Hayashi.
+Os plugins nativos são desenvolvidos em Rust para garantir máxima performance e segurança de memória. Eles se comunicam com o Hayashi através de uma FFI C-string JSON estável e desacoplada.
 
-Exemplo de plugin nativo em Rust:
-\begin{lstlisting}[caption={lib.rs do plugin nativo}]
-use std::ffi::{CStr, CString};
-use std::os::raw::c_char;
+Para facilitar o desenvolvimento, você deve usar o SDK oficial \texttt{hayashi-plugin-sdk}. O SDK fornece macros de procedimento para gerar automaticamente todo o boilerplate FFI unsafe e lidar com a serialização/deserialização JSON:
 
-#[no_mangle]
-pub extern "C" fn somar(args_json_ptr: *const c_char) -> *mut c_char {
-    unsafe {
-        let c_str = CStr::from_ptr(args_json_ptr);
-        let val: serde_json::Value = serde_json::from_str(&c_str.to_string_lossy()).unwrap();
-        let arr = val.as_array().unwrap();
-        
-        let a = arr[0].as_f64().unwrap();
-        let b = arr[1].as_f64().unwrap();
-        
-        let result = serde_json::json!(a + b);
-        CString::new(result.to_string()).unwrap().into_raw()
-    }
+\begin{lstlisting}[caption={Desenvolvendo um plugin nativo usando o SDK}]
+use hayashi_plugin_sdk::{hayashi_fn, hayashi_plugin};
+
+// A macro #[hayashi_fn] lida automaticamente com a (de)serialização JSON.
+// Você pode usar tipos padrão do Rust (Vec, HashMap, String, primitivos, etc.).
+#[hayashi_fn]
+pub fn distance_to_point(lats: Vec<f64>, lons: Vec<f64>, ref_lat: f64, ref_lon: f64) -> Vec<f64> {
+    lats.iter()
+        .zip(lons.iter())
+        .map(|(&lat, &lon)| {
+            // calculo da distancia de Haversine
+            let r = 6371.0;
+            let d_lat = (ref_lat - lat).to_radians();
+            let d_lon = (ref_lon - lon).to_radians();
+            let a = (d_lat / 2.0).sin().powi(2)
+                + lat.to_radians().cos() * ref_lat.to_radians().cos() * (d_lon / 2.0).sin().powi(2);
+            let c = 2.0 * a.sqrt().atan2((1.0 - a).sqrt());
+            r * c
+        })
+        .collect()
 }
 
-#[no_mangle]
-pub extern "C" fn free_string(ptr: *mut c_char) {
-    if !ptr.is_null() {
-        unsafe { let _ = CString::from_raw(ptr); }
-    }
-}
+// Gera as funções necessárias para limpeza de memória via FFI
+hayashi_plugin!();
 \end{lstlisting}
 
-Compilado como \texttt{cdylib} e importado no Hayashi:
+Compilado como um \texttt{cdylib}, você pode publicar seu plugin criando uma tag (ex: \texttt{v0.1.0}) no GitHub. O workflow de GitHub Actions irá compilar o plugin para Linux (\texttt{.so}), macOS (\texttt{.dylib}) e Windows (\texttt{.dll}), fazendo o upload deles como assets do release.
+
+Qualquer usuário pode instalá-lo utilizando a CLI:
+\begin{lstlisting}[style=inline, numbers=none, frame=none]
+hay install john/spatial
+\end{lstlisting}
+O gerenciador de pacotes baixa automaticamente o binário correto correspondente ao sistema operacional e arquitetura do usuário.
+
+Você pode então carregá-lo e nomear seu namespace no Hayashi:
 \begin{lstlisting}
-import("caminho/libmeu_plugin.so", as=nativo)
-let soma = nativo::somar(5.0, 10.0) // 15
+import("john/spatial", as=geo)
+let dist = geo::distance_to_point(df["lat"], df["lon"], -30.03, -51.22)
+generate df dist_poa = dist
 \end{lstlisting}
 
 \subsection{3. Plugins WebAssembly (WASM - Para demais linguagens)}
