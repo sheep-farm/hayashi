@@ -192,6 +192,8 @@ export(m, "latex", "table.tex")
 export(m, "html", "table.html")
 ```
 
+`query=` is raw SQL executed by SQLite or the configured ODBC database. Remote `load` downloads untrusted input even with URL validation and size/time limits. ODBC support is optional and requires system ODBC drivers. See the [Trust Model](docs/src/trust-model.md).
+
 ## Estimators
 
 | Category | Commands |
@@ -525,6 +527,8 @@ import("finance", as=fin)            // fin::sharpe()
 // Plugin search paths
 plugin_path("/shared/plugins", "/team/lib")
 ```
+
+Packages, imports, and auto-loaded plugins execute Hayashi code in your session. Install and import only code you trust; see the [Trust Model](docs/src/trust-model.md).
 
 Native Rust plugins (`.so`/`.dll`) are planned, enabling third parties to ship optimized estimators and data connectors via Hayashi's namespace system — the same extensibility model as R and Python, with Rust performance.
 
