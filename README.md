@@ -566,4 +566,7 @@ Flávio de Vasconcellos Corrêa — [@sheep-farm](https://github.com/sheep-farm)
 
 ## License
 
-GPL-3.0 — see [LICENSE](LICENSE).
+GPL-3.0 with **Plugin Exception** — see [LICENSE](LICENSE).
+
+This exception explicitly allows linking and loading proprietary/closed-source plugins developed using `hayashi-plugin-sdk` into Hayashi without triggering copyleft requirements.
+
