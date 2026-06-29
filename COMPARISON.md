@@ -327,9 +327,9 @@ frlink 1:1 id, frame(clients)
 
 Hayashi is extensible at two levels:
 
-- **Script plugins (`.hay`)**: any `.hay` file in `~/.hayashi/plugins/` is auto-loaded at startup. Users can also `import("module")` from local paths, `$HAYASHI_PATH`, or URLs. This provides the same community-driven ecosystem dynamic as R (CRAN) and Python (PyPI), with `hay install user/repo` for GitHub-based distribution.
+- **Script plugins (`.hay`)**: any `.hay` file in `~/.hay/packages/` can be loaded via `import`. Users can also `import("module")` from local paths, `$HAY_PATH`, or URLs. This provides the same community-driven ecosystem dynamic as R (CRAN) and Python (PyPI), with `hay install user/repo` for GitHub-based distribution.
 
-- **Native Rust plugins (planned)**: optimized compiled plugins (`.so`/`.dll`) that register new estimators, data sources, or transforms via Hayashi's namespace system. This enables third parties to ship high-performance extensions without modifying the core — the same model that makes R and Python extensible, but with Rust's performance and safety guarantees.
+- **Native Rust & WASM plugins**: fully supported native plugins (`.so`/`.dll`/`.dylib` / `.wasm`) using the `hayashi-plugin-sdk` to register new estimators, data sources, or transforms via Hayashi's namespace system. The package manager `hay install` automatically retrieves OS-compatible binary assets from GitHub Releases. Closed-source proprietary plugins are permitted through Hayashi's GPL-3.0 linking exception.
 
 The Greeners engine (MIT-licensed) can be used independently by Rust developers, while Hayashi (GPL-3.0) provides the user-facing language layer.
 
