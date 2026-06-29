@@ -999,7 +999,11 @@ impl Interpreter {
     }
 
     fn resolve_import(&self, name: &str) -> Result<String> {
-        let has_ext = name.ends_with(".hay") || name.ends_with(".wasm") || name.ends_with(".so") || name.ends_with(".dll") || name.ends_with(".dylib");
+        let has_ext = name.ends_with(".hay")
+            || name.ends_with(".wasm")
+            || name.ends_with(".so")
+            || name.ends_with(".dll")
+            || name.ends_with(".dylib");
         let candidates = if has_ext {
             vec![name.to_string()]
         } else {
@@ -1580,7 +1584,8 @@ impl Interpreter {
                     evaluated_args.push(self.eval_expr(arg)?);
                 }
                 let mut plugin = self.plugins.remove(ns).unwrap();
-                let res = plugin.call(member, &evaluated_args)
+                let res = plugin
+                    .call(member, &evaluated_args)
                     .map_err(|e| HayashiError::Runtime(format!("plugin '{ns}' error: {e}")));
                 self.plugins.insert(ns.to_string(), plugin);
                 return res;
@@ -8042,35 +8047,35 @@ impl Interpreter {
                         .trim_end_matches(".so")
                         .trim_end_matches(".dll")
                         .trim_end_matches(".dylib");
-                    base.rsplit('/')
-                        .next()
-                        .unwrap_or(&module)
-                        .to_string()
+                    base.rsplit('/').next().unwrap_or(&module).to_string()
                 });
 
                 let is_wasm = resolved.ends_with(".wasm");
-                let is_native = resolved.ends_with(".so") || resolved.ends_with(".dll") || resolved.ends_with(".dylib");
+                let is_native = resolved.ends_with(".so")
+                    || resolved.ends_with(".dll")
+                    || resolved.ends_with(".dylib");
 
                 if is_wasm {
                     use super::plugin::WasmPlugin;
-                    let plugin = WasmPlugin::new(&resolved, &ns)
-                        .map_err(|e| self.rt_err(format!("import: failed to load WASM plugin: {e}")))?;
+                    let plugin = WasmPlugin::new(&resolved, &ns).map_err(|e| {
+                        self.rt_err(format!("import: failed to load WASM plugin: {e}"))
+                    })?;
                     self.plugins.insert(ns.clone(), Box::new(plugin));
                     self.imported.insert(module.clone());
                     return Ok(Value::Nil);
                 } else if is_native {
                     use super::plugin::RustNativePlugin;
-                    let plugin = RustNativePlugin::new(&resolved, &ns)
-                        .map_err(|e| self.rt_err(format!("import: failed to load native plugin: {e}")))?;
+                    let plugin = RustNativePlugin::new(&resolved, &ns).map_err(|e| {
+                        self.rt_err(format!("import: failed to load native plugin: {e}"))
+                    })?;
                     self.plugins.insert(ns.clone(), Box::new(plugin));
                     self.imported.insert(module.clone());
                     return Ok(Value::Nil);
                 }
 
                 // Default script plugin (.hay) loading
-                let src = std::fs::read_to_string(&resolved).map_err(|e| {
-                    self.rt_err(format!("import: cannot read '{resolved}': {e}"))
-                })?;
+                let src = std::fs::read_to_string(&resolved)
+                    .map_err(|e| self.rt_err(format!("import: cannot read '{resolved}': {e}")))?;
 
                 self.imported.insert(module.clone());
 

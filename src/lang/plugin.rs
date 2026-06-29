@@ -1,6 +1,6 @@
 use super::interpreter::Value;
-use std::rc::Rc;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 /// Unified Hayashi Plugin Trait
 #[allow(dead_code)]
@@ -35,19 +35,23 @@ pub fn value_to_json(val: &Value) -> serde_json::Value {
                 if let Ok(c) = df.get_column(&col) {
                     match c {
                         greeners::Column::Float(arr) => {
-                            let vals: Vec<serde_json::Value> = arr.iter().map(|&x| serde_json::json!(x)).collect();
+                            let vals: Vec<serde_json::Value> =
+                                arr.iter().map(|&x| serde_json::json!(x)).collect();
                             map.insert(col.to_string(), serde_json::Value::Array(vals));
                         }
                         greeners::Column::Int(arr) => {
-                            let vals: Vec<serde_json::Value> = arr.iter().map(|&x| serde_json::json!(x)).collect();
+                            let vals: Vec<serde_json::Value> =
+                                arr.iter().map(|&x| serde_json::json!(x)).collect();
                             map.insert(col.to_string(), serde_json::Value::Array(vals));
                         }
                         greeners::Column::Bool(arr) => {
-                            let vals: Vec<serde_json::Value> = arr.iter().map(|&x| serde_json::json!(x)).collect();
+                            let vals: Vec<serde_json::Value> =
+                                arr.iter().map(|&x| serde_json::json!(x)).collect();
                             map.insert(col.to_string(), serde_json::Value::Array(vals));
                         }
                         greeners::Column::String(arr) => {
-                            let vals: Vec<serde_json::Value> = arr.iter().map(|s| serde_json::json!(s)).collect();
+                            let vals: Vec<serde_json::Value> =
+                                arr.iter().map(|s| serde_json::json!(s)).collect();
                             map.insert(col.to_string(), serde_json::Value::Array(vals));
                         }
                         _ => {}
@@ -116,8 +120,12 @@ impl HayashiPlugin for RustNativePlugin {
         unsafe {
             // Native plugins export functions with signature:
             // extern "C" fn(*const c_char) -> *mut c_char
-            let func: libloading::Symbol<unsafe extern "C" fn(*const std::os::raw::c_char) -> *mut std::os::raw::c_char> =
-                self.lib.get(func_name.as_bytes()).map_err(|e| e.to_string())?;
+            let func: libloading::Symbol<
+                unsafe extern "C" fn(*const std::os::raw::c_char) -> *mut std::os::raw::c_char,
+            > = self
+                .lib
+                .get(func_name.as_bytes())
+                .map_err(|e| e.to_string())?;
 
             // 1. Serialize args to JSON
             let json_args: Vec<serde_json::Value> = args.iter().map(value_to_json).collect();
@@ -127,7 +135,9 @@ impl HayashiPlugin for RustNativePlugin {
             // 2. Call the function
             let res_ptr = func(c_payload.as_ptr());
             if res_ptr.is_null() {
-                return Err(format!("Native plugin function '{func_name}' returned NULL pointer"));
+                return Err(format!(
+                    "Native plugin function '{func_name}' returned NULL pointer"
+                ));
             }
 
             // 3. Convert return pointer back to string and Value
@@ -135,11 +145,15 @@ impl HayashiPlugin for RustNativePlugin {
             let res_str = c_res.to_string_lossy().to_string();
 
             // 4. Optionally deallocate the returned C string if a deallocator is exported
-            if let Ok(free_func) = self.lib.get::<unsafe extern "C" fn(*mut std::os::raw::c_char)>(b"free_string") {
+            if let Ok(free_func) = self
+                .lib
+                .get::<unsafe extern "C" fn(*mut std::os::raw::c_char)>(b"free_string")
+            {
                 free_func(res_ptr);
             }
 
-            let ret_json: serde_json::Value = serde_json::from_str(&res_str).map_err(|e| e.to_string())?;
+            let ret_json: serde_json::Value =
+                serde_json::from_str(&res_str).map_err(|e| e.to_string())?;
             Ok(json_to_value(&ret_json))
         }
     }
@@ -192,7 +206,7 @@ impl HayashiPlugin for WasmPlugin {
         //   [func_name](args_json_ptr: i32, args_json_len: i32) -> i64
         //
         // High 32 bits of returning i64 encode the pointer, low 32 bits encode length of return JSON.
-        
+
         let alloc = self
             .instance
             .get_export(&self.store, "alloc")
@@ -230,7 +244,9 @@ impl HayashiPlugin for WasmPlugin {
         let len = payload_bytes.len() as i32;
 
         // 2. Allocate memory on the Guest side
-        let ptr = alloc.call(&mut self.store, len).map_err(|e| e.to_string())?;
+        let ptr = alloc
+            .call(&mut self.store, len)
+            .map_err(|e| e.to_string())?;
 
         // 3. Write payload into Guest memory
         memory
@@ -238,7 +254,9 @@ impl HayashiPlugin for WasmPlugin {
             .map_err(|e| e.to_string())?;
 
         // 4. Run the function
-        let ret_encoded = run_func.call(&mut self.store, (ptr, len)).map_err(|e| e.to_string())?;
+        let ret_encoded = run_func
+            .call(&mut self.store, (ptr, len))
+            .map_err(|e| e.to_string())?;
 
         // 5. Destructure returning i64 (high 32 bits = return ptr, low 32 bits = return len)
         let ret_ptr = (ret_encoded >> 32) as i32;
@@ -255,8 +273,9 @@ impl HayashiPlugin for WasmPlugin {
 
         // 7. Parse returned JSON and map back to Value
         let ret_str = String::from_utf8(ret_buf).map_err(|e| e.to_string())?;
-        let ret_json: serde_json::Value = serde_json::from_str(&ret_str).map_err(|e| e.to_string())?;
-        
+        let ret_json: serde_json::Value =
+            serde_json::from_str(&ret_str).map_err(|e| e.to_string())?;
+
         // Deallocate returned JSON buffer on Guest
         let _ = dealloc.call(&mut self.store, (ret_ptr, ret_len));
 
