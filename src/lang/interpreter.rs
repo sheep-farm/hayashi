@@ -587,6 +587,7 @@ pub struct Interpreter {
     current_line: usize,
     imported: HashSet<String>,
     plugin_paths: Vec<String>,
+    pub plugins: HashMap<String, Box<dyn super::plugin::HayashiPlugin>>,
     capturing: bool,
     call_stack: Vec<(String, usize)>,
 }
@@ -606,6 +607,7 @@ impl Interpreter {
             current_line: 0,
             imported: HashSet::new(),
             plugin_paths: Vec::new(),
+            plugins: HashMap::new(),
             capturing: false,
             call_stack: Vec::new(),
         }
@@ -850,54 +852,69 @@ impl Interpreter {
     }
 
     fn resolve_import(&self, name: &str) -> Result<String> {
-        // 1. Current directory
-        if std::path::Path::new(name).exists() {
-            return Ok(name.to_string());
-        }
+        let has_ext = name.ends_with(".hay") || name.ends_with(".wasm") || name.ends_with(".so") || name.ends_with(".dll") || name.ends_with(".dylib");
+        let candidates = if has_ext {
+            vec![name.to_string()]
+        } else {
+            vec![
+                format!("{name}.hay"),
+                format!("{name}.wasm"),
+                format!("{name}.so"),
+                format!("{name}.dll"),
+                format!("{name}.dylib"),
+            ]
+        };
 
-        // 2. ~/.hayashi/plugins/
-        if let Some(home) = std::env::var_os("HOME") {
-            let plugin_path = std::path::Path::new(&home)
-                .join(".hayashi")
-                .join("plugins")
-                .join(name);
-            if plugin_path.exists() {
-                return Ok(plugin_path.to_string_lossy().to_string());
+        for cand in &candidates {
+            // 1. Current directory
+            if std::path::Path::new(cand).exists() {
+                return Ok(cand.to_string());
             }
-        }
 
-        // 3. ~/.hayashi/packages/ (installed packages)
-        if let Some(home) = std::env::var_os("HOME") {
-            let pkg_path = std::path::Path::new(&home)
-                .join(".hayashi")
-                .join("packages")
-                .join(name);
-            if pkg_path.exists() {
-                return Ok(pkg_path.to_string_lossy().to_string());
+            // 2. ~/.hayashi/plugins/
+            if let Some(home) = std::env::var_os("HOME") {
+                let plugin_path = std::path::Path::new(&home)
+                    .join(".hayashi")
+                    .join("plugins")
+                    .join(cand);
+                if plugin_path.exists() {
+                    return Ok(plugin_path.to_string_lossy().to_string());
+                }
             }
-        }
 
-        // 4. User-declared plugin_paths
-        for dir in &self.plugin_paths {
-            let p = std::path::Path::new(dir).join(name);
-            if p.exists() {
-                return Ok(p.to_string_lossy().to_string());
+            // 3. ~/.hayashi/packages/ (installed packages)
+            if let Some(home) = std::env::var_os("HOME") {
+                let pkg_path = std::path::Path::new(&home)
+                    .join(".hayashi")
+                    .join("packages")
+                    .join(cand);
+                if pkg_path.exists() {
+                    return Ok(pkg_path.to_string_lossy().to_string());
+                }
             }
-        }
 
-        // 4. HAYASHI_PATH env var (colon-separated)
-        if let Ok(paths) = std::env::var("HAYASHI_PATH") {
-            for dir in paths.split(':') {
-                let p = std::path::Path::new(dir).join(name);
+            // 4. User-declared plugin_paths
+            for dir in &self.plugin_paths {
+                let p = std::path::Path::new(dir).join(cand);
                 if p.exists() {
                     return Ok(p.to_string_lossy().to_string());
+                }
+            }
+
+            // 5. HAYASHI_PATH env var (colon-separated)
+            if let Ok(paths) = std::env::var("HAYASHI_PATH") {
+                for dir in paths.split(':') {
+                    let p = std::path::Path::new(dir).join(cand);
+                    if p.exists() {
+                        return Ok(p.to_string_lossy().to_string());
+                    }
                 }
             }
         }
 
         Err(HayashiError::Runtime(format!(
             "import: module '{}' not found (searched: ./, ~/.hayashi/plugins/, plugin_path, $HAYASHI_PATH)",
-            name.trim_end_matches(".hay")
+            name
         )))
     }
 
@@ -1411,6 +1428,22 @@ impl Interpreter {
     // ── Funções built-in ──────────────────────────────────────────────────────
 
     fn eval_call(&mut self, func: &str, args: &[Expr], opts: &[Opt]) -> Result<Value> {
+        if let Some(pos) = func.find("::") {
+            let ns = &func[..pos];
+            let member = &func[pos + 2..];
+            if self.plugins.contains_key(ns) {
+                let mut evaluated_args = Vec::new();
+                for arg in args {
+                    evaluated_args.push(self.eval_expr(arg)?);
+                }
+                let mut plugin = self.plugins.remove(ns).unwrap();
+                let res = plugin.call(member, &evaluated_args)
+                    .map_err(|e| HayashiError::Runtime(format!("plugin '{ns}' error: {e}")));
+                self.plugins.insert(ns.to_string(), plugin);
+                return res;
+            }
+        }
+
         let is_mutate = func == "mutate" || func == "generate";
         let opt_map: HashMap<String, Value> = opts
             .iter()
@@ -7759,27 +7792,12 @@ impl Interpreter {
                     return Ok(Value::Nil);
                 }
 
-                let src = if crate::io::fetch::is_url(&module) {
-                    let _tmp = crate::io::fetch::download_to_temp(&module)?;
-                    let path = _tmp
-                        .to_str()
-                        .ok_or_else(|| self.rt_err("temp path is not UTF-8"))?;
-                    std::fs::read_to_string(path).map_err(|e| {
-                        self.rt_err(format!("import: cannot read downloaded module: {e}"))
-                    })?
+                let resolved = if crate::io::fetch::is_url(&module) {
+                    let tmp = crate::io::fetch::download_to_temp(&module)?;
+                    tmp.to_string_lossy().to_string()
                 } else {
-                    let name = if module.ends_with(".hay") {
-                        module.clone()
-                    } else {
-                        format!("{module}.hay")
-                    };
-                    let resolved = self.resolve_import(&name)?;
-                    std::fs::read_to_string(&resolved).map_err(|e| {
-                        self.rt_err(format!("import: cannot read '{resolved}': {e}"))
-                    })?
+                    self.resolve_import(&module)?
                 };
-
-                self.imported.insert(module.clone());
 
                 let alias = match opt_map.get("as") {
                     Some(Value::Str(s)) => Some(s.clone()),
@@ -7797,19 +7815,49 @@ impl Interpreter {
                     _ => None,
                 };
 
-                let before: std::collections::HashSet<String> =
-                    self.env.var_names().into_iter().collect();
-
-                crate::lang::run_source(&src, self)?;
-
-                let ns = alias.unwrap_or_else(|| {
-                    module
+                let ns = alias.clone().unwrap_or_else(|| {
+                    let base = module
                         .trim_end_matches(".hay")
-                        .rsplit('/')
+                        .trim_end_matches(".wasm")
+                        .trim_end_matches(".so")
+                        .trim_end_matches(".dll")
+                        .trim_end_matches(".dylib");
+                    base.rsplit('/')
                         .next()
                         .unwrap_or(&module)
                         .to_string()
                 });
+
+                let is_wasm = resolved.ends_with(".wasm");
+                let is_native = resolved.ends_with(".so") || resolved.ends_with(".dll") || resolved.ends_with(".dylib");
+
+                if is_wasm {
+                    use super::plugin::WasmPlugin;
+                    let plugin = WasmPlugin::new(&resolved, &ns)
+                        .map_err(|e| self.rt_err(format!("import: failed to load WASM plugin: {e}")))?;
+                    self.plugins.insert(ns.clone(), Box::new(plugin));
+                    self.imported.insert(module.clone());
+                    return Ok(Value::Nil);
+                } else if is_native {
+                    use super::plugin::RustNativePlugin;
+                    let plugin = RustNativePlugin::new(&resolved, &ns)
+                        .map_err(|e| self.rt_err(format!("import: failed to load native plugin: {e}")))?;
+                    self.plugins.insert(ns.clone(), Box::new(plugin));
+                    self.imported.insert(module.clone());
+                    return Ok(Value::Nil);
+                }
+
+                // Default script plugin (.hay) loading
+                let src = std::fs::read_to_string(&resolved).map_err(|e| {
+                    self.rt_err(format!("import: cannot read '{resolved}': {e}"))
+                })?;
+
+                self.imported.insert(module.clone());
+
+                let before: std::collections::HashSet<String> =
+                    self.env.var_names().into_iter().collect();
+
+                crate::lang::run_source(&src, self)?;
 
                 let new_names: Vec<String> = self
                     .env
