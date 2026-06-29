@@ -7,7 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
-- **Hybrid plugin system** (`import_native`): Hayashi now supports three plugin tiers in a single unified `HayashiPlugin` trait:
+- **Hybrid plugin system** (`import`): Hayashi now supports three plugin tiers in a single unified `HayashiPlugin` trait:
   - **Native Rust** (`.so`/`.dll` via `libloading`): plugins export `extern "C"` functions, args/return values are exchanged as JSON strings
   - **WebAssembly** (`.wasm` via `wasmi`): sandboxed plugins expose `alloc`/`dealloc`/function exports; args serialized to JSON written into guest memory, result packed as `i64` (`high 32 bits = ptr`, `low 32 bits = len`)
   - **Script** (`.hay`): existing interpreted plugin tier, unchanged
