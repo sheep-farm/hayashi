@@ -1444,6 +1444,33 @@ impl Interpreter {
                     (Value::Dict(_), _) => {
                         Err(HayashiError::Type("dict index must be a string".into()))
                     }
+                    (Value::DataFrame(df), Value::Str(key)) => {
+                        let col = df.get_column(key).map_err(|_| {
+                            HayashiError::Runtime(format!("column '{key}' not found in DataFrame"))
+                        })?;
+                        use greeners::Column;
+                        let vals: Vec<Value> = match col {
+                            Column::Float(arr) => arr.iter().map(|&x| Value::Float(x)).collect(),
+                            Column::Int(arr) => arr.iter().map(|&x| Value::Int(x)).collect(),
+                            Column::Bool(arr) => arr.iter().map(|&x| Value::Bool(x)).collect(),
+                            Column::String(arr) => arr.iter().map(|s| Value::Str(s.clone())).collect(),
+                            Column::Categorical(c) => {
+                                c.codes.iter().map(|&code| {
+                                    let level = c.levels.get(code as usize)
+                                        .map(|s| s.clone())
+                                        .unwrap_or_else(|| "".to_string());
+                                    Value::Str(level)
+                                }).collect()
+                            }
+                            Column::DateTime(arr) => {
+                                arr.iter().map(|dt| Value::Str(dt.to_string())).collect()
+                            }
+                        };
+                        Ok(Value::List(Rc::new(vals)))
+                    }
+                    (Value::DataFrame(_), _) => {
+                        Err(HayashiError::Type("DataFrame column index must be a string".into()))
+                    }
                     (Value::List(v), _) => {
                         let i = match idx_val {
                             Value::Int(i) => i,
@@ -20530,6 +20557,26 @@ impl Interpreter {
                         Some(Value::Float(f)) => Ok(vec![*f; df.n_rows()]),
                         Some(Value::Int(i)) => Ok(vec![*i as f64; df.n_rows()]),
                         Some(Value::Bool(b)) => Ok(vec![if *b { 1.0 } else { 0.0 }; df.n_rows()]),
+                        Some(Value::List(lst)) => {
+                            if lst.len() != df.n_rows() {
+                                return Err(HayashiError::Runtime(format!(
+                                    "list variable '{name}' has length {}, expected {}",
+                                    lst.len(), df.n_rows()
+                                )));
+                            }
+                            let mut data = Vec::with_capacity(lst.len());
+                            for v in lst.iter() {
+                                match v {
+                                    Value::Float(f) => data.push(*f),
+                                    Value::Int(i_val) => data.push(*i_val as f64),
+                                    Value::Bool(b) => data.push(if *b { 1.0 } else { 0.0 }),
+                                    other => return Err(HayashiError::Type(format!(
+                                        "element in list variable '{name}' is not numeric: {other}"
+                                    ))),
+                                }
+                            }
+                            Ok(data)
+                        }
                         _ => Err(HayashiError::Runtime(format!(
                             "'{name}' not found as column or scalar variable"
                         ))),
