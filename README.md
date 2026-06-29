@@ -517,20 +517,23 @@ print("a", "b", sep=", ")     // a, b
 ## Extensibility
 
 ```
-// Script plugins — auto-loaded from ~/.hayashi/plugins/
+// Native & Script plugins — installed to ~/.hay/packages/
 import("finance")                    // finance::sharpe(), finance::sortino()
 import("finance", as=fin)            // fin::sharpe()
 
-// Install from GitHub
+// Install script or native plugin from GitHub
 // $ hay install user/repo
+
+// List installed packages
+// $ hay list
 
 // Plugin search paths
 plugin_path("/shared/plugins", "/team/lib")
 ```
 
-Packages, imports, and auto-loaded plugins execute Hayashi code in your session. Install and import only code you trust; see the [Trust Model](docs/src/trust-model.md).
+Packages, imports, and auto-loaded plugins execute Hayashi/native code in your session. Install and import only code you trust; see the [Trust Model](docs/src/trust-model.md).
 
-Native Rust plugins (`.so`/`.dll`) are planned, enabling third parties to ship optimized estimators and data connectors via Hayashi's namespace system — the same extensibility model as R and Python, with Rust performance.
+Native plugins (`.so`/`.dll`/`.dylib` / `.wasm`) are fully supported, enabling third parties to ship optimized estimators, spatial packages, and data connectors via Hayashi's namespace system (using the `hayashi-plugin-sdk`). Closed-source proprietary plugins are legally permitted through Hayashi's GPL-3.0 Linking Exception.
 
 ## Build & test
 
