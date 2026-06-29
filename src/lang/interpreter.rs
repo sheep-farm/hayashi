@@ -547,31 +547,177 @@ impl Env {
 // ── Interpetador ──────────────────────────────────────────────────────────────
 
 const BUILTIN_NAMES: &[&str] = &[
-    "mean", "sd", "min", "max", "sum", "total", "median", "variance", "quantile",
-    "cov", "corr_pair", "abs", "sqrt", "ln", "log", "exp",
-    "sin", "cos", "tan", "asin", "acos", "atan", "atan2", "ceil", "floor", "round",
-    "sign", "factorial", "comb", "int", "float", "str", "bool", "len", "typeof",
-    "ols", "iv", "logit", "probit", "poisson", "nbreg", "tobit", "heckman",
-    "fe", "re", "be", "fe2sls", "ab", "sysgmm", "pcse", "xtgls",
-    "qreg", "rlm", "lasso", "ridge", "elasticnet", "cox",
-    "arima", "autoreg", "ardl", "kalman", "var", "vecm", "varma", "svar", "garch",
-    "glm", "gee", "mixed", "mlogit", "ologit", "oprobit", "clogit", "cpoisson",
-    "gmm", "sur", "three_sls", "fmb", "did", "rd", "psm", "synth",
-    "summarize", "tabulate", "tabstat", "correlate", "corr", "pwcorr",
-    "describe", "codebook", "ttest", "ci", "centile", "count", "nrow",
-    "filter", "sort", "drop", "keep", "select", "dropna", "rename",
-    "merge", "append", "collapse", "group_by", "reshape",
-    "mutate", "generate", "pivot_longer", "pivot_wider",
-    "anova", "pca", "factor", "manova", "cancorr", "kde", "lowess",
-    "swilk", "sfrancia", "sktest", "omnibus", "dagostino",
-    "vif", "predict", "esttab", "eststo", "margins", "test", "lincom", "nlcom",
-    "bootstrap", "bootse", "histogram", "boxplot", "kdensity", "qqplot",
-    "scatter", "recode", "destring", "winsor", "label", "format",
-    "print", "display", "source", "import", "assert", "timer",
-    "push", "pop", "reverse", "unique", "flatten", "chain", "join", "split",
-    "contains", "starts_with", "ends_with", "lower", "upper", "trim",
-    "substr", "replace", "regexm", "regexr", "regexs",
-    "input", "load", "export",
+    "mean",
+    "sd",
+    "min",
+    "max",
+    "sum",
+    "total",
+    "median",
+    "variance",
+    "quantile",
+    "cov",
+    "corr_pair",
+    "abs",
+    "sqrt",
+    "ln",
+    "log",
+    "exp",
+    "sin",
+    "cos",
+    "tan",
+    "asin",
+    "acos",
+    "atan",
+    "atan2",
+    "ceil",
+    "floor",
+    "round",
+    "sign",
+    "factorial",
+    "comb",
+    "int",
+    "float",
+    "str",
+    "bool",
+    "len",
+    "typeof",
+    "ols",
+    "iv",
+    "logit",
+    "probit",
+    "poisson",
+    "nbreg",
+    "tobit",
+    "heckman",
+    "fe",
+    "re",
+    "be",
+    "fe2sls",
+    "ab",
+    "sysgmm",
+    "pcse",
+    "xtgls",
+    "qreg",
+    "rlm",
+    "lasso",
+    "ridge",
+    "elasticnet",
+    "cox",
+    "arima",
+    "autoreg",
+    "ardl",
+    "kalman",
+    "var",
+    "vecm",
+    "varma",
+    "svar",
+    "garch",
+    "glm",
+    "gee",
+    "mixed",
+    "mlogit",
+    "ologit",
+    "oprobit",
+    "clogit",
+    "cpoisson",
+    "gmm",
+    "sur",
+    "three_sls",
+    "fmb",
+    "did",
+    "rd",
+    "psm",
+    "synth",
+    "summarize",
+    "tabulate",
+    "tabstat",
+    "correlate",
+    "corr",
+    "pwcorr",
+    "describe",
+    "codebook",
+    "ttest",
+    "ci",
+    "centile",
+    "count",
+    "nrow",
+    "filter",
+    "sort",
+    "drop",
+    "keep",
+    "select",
+    "dropna",
+    "rename",
+    "merge",
+    "append",
+    "collapse",
+    "group_by",
+    "reshape",
+    "mutate",
+    "generate",
+    "pivot_longer",
+    "pivot_wider",
+    "anova",
+    "pca",
+    "factor",
+    "manova",
+    "cancorr",
+    "kde",
+    "lowess",
+    "swilk",
+    "sfrancia",
+    "sktest",
+    "omnibus",
+    "dagostino",
+    "vif",
+    "predict",
+    "esttab",
+    "eststo",
+    "margins",
+    "test",
+    "lincom",
+    "nlcom",
+    "bootstrap",
+    "bootse",
+    "histogram",
+    "boxplot",
+    "kdensity",
+    "qqplot",
+    "scatter",
+    "recode",
+    "destring",
+    "winsor",
+    "label",
+    "format",
+    "print",
+    "display",
+    "source",
+    "import",
+    "assert",
+    "timer",
+    "push",
+    "pop",
+    "reverse",
+    "unique",
+    "flatten",
+    "chain",
+    "join",
+    "split",
+    "contains",
+    "starts_with",
+    "ends_with",
+    "lower",
+    "upper",
+    "trim",
+    "substr",
+    "replace",
+    "regexm",
+    "regexr",
+    "regexs",
+    "input",
+    "load",
+    "export",
 ];
 
 pub struct Interpreter {
@@ -598,7 +744,10 @@ impl Interpreter {
             ts_info: HashMap::new(),
             panel_info: HashMap::new(),
             rng_seed: None,
-            rng: { use rand::SeedableRng; rand::rngs::StdRng::from_entropy() },
+            rng: {
+                use rand::SeedableRng;
+                rand::rngs::StdRng::from_entropy()
+            },
             preserved: HashMap::new(),
             stored_models: Vec::new(),
             return_value: None,
@@ -636,7 +785,11 @@ impl Interpreter {
             .iter()
             .filter_map(|c| {
                 let d = Self::levenshtein(name, c);
-                if d > 0 && d <= max_dist { Some((d, c.clone())) } else { None }
+                if d > 0 && d <= max_dist {
+                    Some((d, c.clone()))
+                } else {
+                    None
+                }
             })
             .min_by_key(|(d, _)| *d)
             .map(|(_, c)| c)
@@ -679,10 +832,7 @@ impl Interpreter {
     }
 
     fn type_mismatch(&self, expected: &str, got: &Value) -> HayashiError {
-        self.type_err(format!(
-            "expected {expected}, got {}",
-            Self::type_name(got)
-        ))
+        self.type_err(format!("expected {expected}, got {}", Self::type_name(got)))
     }
 
     fn binary_mle_vcov(
@@ -732,17 +882,16 @@ impl Interpreter {
 
     fn eval_as_int(&mut self, expr: &Expr, ctx: &str) -> Result<i64> {
         match self.eval_expr(expr)? {
-            Value::Int(i)   => Ok(i),
+            Value::Int(i) => Ok(i),
             Value::Float(f) => Ok(f as i64),
-            v => Err(self.type_err(format!("{ctx} must be integer, got {}", Self::type_name(&v)))),
+            v => Err(self.type_err(format!(
+                "{ctx} must be integer, got {}",
+                Self::type_name(&v)
+            ))),
         }
     }
 
-    fn resolve_var_list(
-        &mut self,
-        args: &[Expr],
-        df: &greeners::DataFrame,
-    ) -> Result<Vec<String>> {
+    fn resolve_var_list(&mut self, args: &[Expr], df: &greeners::DataFrame) -> Result<Vec<String>> {
         let col_names = df.column_names();
         let mut names = Vec::new();
         for a in args {
@@ -758,17 +907,15 @@ impl Interpreter {
                             match v {
                                 Value::Str(s) => names.push(s.clone()),
                                 _ => {
-                                    return Err(self.type_err(
-                                        "variable list items must be strings",
-                                    ))
+                                    return Err(self.type_err("variable list items must be strings"))
                                 }
                             }
                         }
                     }
                     _ => {
-                        return Err(self.type_err(
-                            "expected column name, string, or list of strings",
-                        ))
+                        return Err(
+                            self.type_err("expected column name, string, or list of strings")
+                        )
                     }
                 },
             }
@@ -992,17 +1139,13 @@ impl Interpreter {
                 Ok(Value::Str(result))
             }
 
-            Expr::Var(name) => self
-                .env
-                .get(name)
-                .cloned()
-                .ok_or_else(|| {
-                    let known = self.env.all_names();
-                    let hint = Self::suggest(name, &known)
-                        .map(|s| format!(" — did you mean '{s}'?"))
-                        .unwrap_or_default();
-                    self.rt_err(format!("undefined variable '{name}'{hint}"))
-                }),
+            Expr::Var(name) => self.env.get(name).cloned().ok_or_else(|| {
+                let known = self.env.all_names();
+                let hint = Self::suggest(name, &known)
+                    .map(|s| format!(" — did you mean '{s}'?"))
+                    .unwrap_or_default();
+                self.rt_err(format!("undefined variable '{name}'{hint}"))
+            }),
 
             Expr::Formula(_f) => Err(HayashiError::Runtime(
                 "formula must be used inside an estimator call".into(),
@@ -1216,7 +1359,7 @@ impl Interpreter {
 
             Expr::Range(start_expr, end_expr) => {
                 let start = self.eval_as_int(start_expr, "range start")?;
-                let end   = self.eval_as_int(end_expr,   "range end")?;
+                let end = self.eval_as_int(end_expr, "range end")?;
                 let step: i64 = if start <= end { 1 } else { -1 };
                 let mut v = Vec::new();
                 let mut cur = start;
@@ -1229,7 +1372,7 @@ impl Interpreter {
 
             Expr::RangeInclusive(start_expr, end_expr) => {
                 let start = self.eval_as_int(start_expr, "range start")?;
-                let end   = self.eval_as_int(end_expr,   "range end")?;
+                let end = self.eval_as_int(end_expr, "range end")?;
                 let step: i64 = if start <= end { 1 } else { -1 };
                 let mut v = Vec::new();
                 let mut cur = start;
@@ -2078,7 +2221,9 @@ impl Interpreter {
                 let nums: Vec<f64> = if args.len() >= 2 {
                     let df_name = match &args[0] {
                         Expr::Var(n) => n.clone(),
-                        _ => return Err(self.rt_err("median: primeiro argumento deve ser DataFrame")),
+                        _ => {
+                            return Err(self.rt_err("median: primeiro argumento deve ser DataFrame"))
+                        }
                     };
                     let df = match self.env.get(&df_name) {
                         Some(Value::DataFrame(d)) => d.clone(),
@@ -2086,19 +2231,32 @@ impl Interpreter {
                     };
                     let var_name = match &args[1] {
                         Expr::Var(n) | Expr::Str(n) => n.clone(),
-                        _ => return Err(self.rt_err("median: segundo argumento deve ser nome de variável")),
+                        _ => {
+                            return Err(
+                                self.rt_err("median: segundo argumento deve ser nome de variável")
+                            )
+                        }
                     };
                     let col = Self::get_col_f64(&df, &var_name)?;
                     if let Some(cond_opt) = opts.iter().find(|o| o.name == "if") {
                         let mask = self.eval_col_expr(&cond_opt.value, &df)?;
-                        col.iter().zip(mask.iter()).filter(|(_, &m)| m != 0.0).map(|(&v, _)| v).collect()
+                        col.iter()
+                            .zip(mask.iter())
+                            .filter(|(_, &m)| m != 0.0)
+                            .map(|(&v, _)| v)
+                            .collect()
                     } else {
                         col.to_vec()
                     }
                 } else if args.len() == 1 {
                     match self.eval_expr(&args[0])? {
-                        Value::List(lst) => lst.iter().map(Self::value_as_f64).collect::<Result<_>>()?,
-                        other => return Err(self.type_err(format!("median() requires numeric list, got {other}"))),
+                        Value::List(lst) => {
+                            lst.iter().map(Self::value_as_f64).collect::<Result<_>>()?
+                        }
+                        other => {
+                            return Err(self
+                                .type_err(format!("median() requires numeric list, got {other}")))
+                        }
                     }
                 } else {
                     return Err(self.rt_err("median() requires at least 1 argument"));
@@ -2122,7 +2280,11 @@ impl Interpreter {
                 let nums: Vec<f64> = if args.len() >= 2 {
                     let df_name = match &args[0] {
                         Expr::Var(n) => n.clone(),
-                        _ => return Err(self.rt_err("variance: primeiro argumento deve ser DataFrame")),
+                        _ => {
+                            return Err(
+                                self.rt_err("variance: primeiro argumento deve ser DataFrame")
+                            )
+                        }
                     };
                     let df = match self.env.get(&df_name) {
                         Some(Value::DataFrame(d)) => d.clone(),
@@ -2130,19 +2292,32 @@ impl Interpreter {
                     };
                     let var_name = match &args[1] {
                         Expr::Var(n) | Expr::Str(n) => n.clone(),
-                        _ => return Err(self.rt_err("variance: segundo argumento deve ser nome de variável")),
+                        _ => {
+                            return Err(self
+                                .rt_err("variance: segundo argumento deve ser nome de variável"))
+                        }
                     };
                     let col = Self::get_col_f64(&df, &var_name)?;
                     if let Some(cond_opt) = opts.iter().find(|o| o.name == "if") {
                         let mask = self.eval_col_expr(&cond_opt.value, &df)?;
-                        col.iter().zip(mask.iter()).filter(|(_, &m)| m != 0.0).map(|(&v, _)| v).collect()
+                        col.iter()
+                            .zip(mask.iter())
+                            .filter(|(_, &m)| m != 0.0)
+                            .map(|(&v, _)| v)
+                            .collect()
                     } else {
                         col.to_vec()
                     }
                 } else if args.len() == 1 {
                     match self.eval_expr(&args[0])? {
-                        Value::List(lst) => lst.iter().map(Self::value_as_f64).collect::<Result<_>>()?,
-                        other => return Err(self.type_err(format!("variance() requires numeric list, got {other}"))),
+                        Value::List(lst) => {
+                            lst.iter().map(Self::value_as_f64).collect::<Result<_>>()?
+                        }
+                        other => {
+                            return Err(self.type_err(format!(
+                                "variance() requires numeric list, got {other}"
+                            )))
+                        }
                     }
                 } else {
                     return Err(self.rt_err("variance() requires at least 1 argument"));
@@ -2161,7 +2336,11 @@ impl Interpreter {
                 let (nums, p) = if args.len() >= 3 {
                     let df_name = match &args[0] {
                         Expr::Var(n) => n.clone(),
-                        _ => return Err(self.rt_err("quantile: primeiro argumento deve ser DataFrame")),
+                        _ => {
+                            return Err(
+                                self.rt_err("quantile: primeiro argumento deve ser DataFrame")
+                            )
+                        }
                     };
                     let df = match self.env.get(&df_name) {
                         Some(Value::DataFrame(d)) => d.clone(),
@@ -2169,12 +2348,19 @@ impl Interpreter {
                     };
                     let var_name = match &args[1] {
                         Expr::Var(n) | Expr::Str(n) => n.clone(),
-                        _ => return Err(self.rt_err("quantile: segundo argumento deve ser nome de variável")),
+                        _ => {
+                            return Err(self
+                                .rt_err("quantile: segundo argumento deve ser nome de variável"))
+                        }
                     };
                     let col = Self::get_col_f64(&df, &var_name)?;
                     let nums = if let Some(cond_opt) = opts.iter().find(|o| o.name == "if") {
                         let mask = self.eval_col_expr(&cond_opt.value, &df)?;
-                        col.iter().zip(mask.iter()).filter(|(_, &m)| m != 0.0).map(|(&v, _)| v).collect()
+                        col.iter()
+                            .zip(mask.iter())
+                            .filter(|(_, &m)| m != 0.0)
+                            .map(|(&v, _)| v)
+                            .collect()
                     } else {
                         col.to_vec()
                     };
@@ -2187,8 +2373,14 @@ impl Interpreter {
                 } else if args.len() == 2 {
                     let v = self.eval_expr(&args[0])?;
                     let nums = match v {
-                        Value::List(lst) => lst.iter().map(Self::value_as_f64).collect::<Result<_>>()?,
-                        other => return Err(self.type_err(format!("quantile() requires numeric list, got {other}"))),
+                        Value::List(lst) => {
+                            lst.iter().map(Self::value_as_f64).collect::<Result<_>>()?
+                        }
+                        other => {
+                            return Err(self.type_err(format!(
+                                "quantile() requires numeric list, got {other}"
+                            )))
+                        }
                     };
                     let p = match self.eval_expr(&args[1])? {
                         Value::Float(f) => f,
@@ -2230,18 +2422,29 @@ impl Interpreter {
                 };
                 let x_name = match &args[1] {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
-                    _ => return Err(self.rt_err("cov(): segundo argumento deve ser nome de variável")),
+                    _ => {
+                        return Err(
+                            self.rt_err("cov(): segundo argumento deve ser nome de variável")
+                        )
+                    }
                 };
                 let y_name = match &args[2] {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
-                    _ => return Err(self.rt_err("cov(): terceiro argumento deve ser nome de variável")),
+                    _ => {
+                        return Err(
+                            self.rt_err("cov(): terceiro argumento deve ser nome de variável")
+                        )
+                    }
                 };
                 let x_col = Self::get_col_f64(&df, &x_name)?;
                 let y_col = Self::get_col_f64(&df, &y_name)?;
                 let (x_vals, y_vals): (Vec<f64>, Vec<f64>) =
                     if let Some(cond_opt) = opts.iter().find(|o| o.name == "if") {
                         let mask = self.eval_col_expr(&cond_opt.value, &df)?;
-                        x_col.iter().zip(y_col.iter()).zip(mask.iter())
+                        x_col
+                            .iter()
+                            .zip(y_col.iter())
+                            .zip(mask.iter())
                             .filter(|(_, &m)| m != 0.0)
                             .map(|((&xi, &yi), _)| (xi, yi))
                             .unzip()
@@ -2254,9 +2457,12 @@ impl Interpreter {
                 }
                 let mx = x_vals.iter().sum::<f64>() / n as f64;
                 let my = y_vals.iter().sum::<f64>() / n as f64;
-                let c = x_vals.iter().zip(y_vals.iter())
+                let c = x_vals
+                    .iter()
+                    .zip(y_vals.iter())
                     .map(|(&xi, &yi)| (xi - mx) * (yi - my))
-                    .sum::<f64>() / (n - 1) as f64;
+                    .sum::<f64>()
+                    / (n - 1) as f64;
                 Ok(Value::Float(c))
             }
 
@@ -2271,18 +2477,28 @@ impl Interpreter {
                 };
                 let x_name = match &args[1] {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
-                    _ => return Err(self.rt_err("corr_pair(): segundo argumento deve ser nome de variável")),
+                    _ => {
+                        return Err(
+                            self.rt_err("corr_pair(): segundo argumento deve ser nome de variável")
+                        )
+                    }
                 };
                 let y_name = match &args[2] {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
-                    _ => return Err(self.rt_err("corr_pair(): terceiro argumento deve ser nome de variável")),
+                    _ => {
+                        return Err(self
+                            .rt_err("corr_pair(): terceiro argumento deve ser nome de variável"))
+                    }
                 };
                 let x_col = Self::get_col_f64(&df, &x_name)?;
                 let y_col = Self::get_col_f64(&df, &y_name)?;
                 let (x_vals, y_vals): (Vec<f64>, Vec<f64>) =
                     if let Some(cond_opt) = opts.iter().find(|o| o.name == "if") {
                         let mask = self.eval_col_expr(&cond_opt.value, &df)?;
-                        x_col.iter().zip(y_col.iter()).zip(mask.iter())
+                        x_col
+                            .iter()
+                            .zip(y_col.iter())
+                            .zip(mask.iter())
                             .filter(|(_, &m)| m != 0.0)
                             .map(|((&xi, &yi), _)| (xi, yi))
                             .unzip()
@@ -6730,7 +6946,11 @@ impl Interpreter {
                 let instr_ast = self.resolve_formula(&args[1])?;
                 let df_name = match &args[2] {
                     Expr::Var(name) => name.clone(),
-                    _ => return Err(HayashiError::Type("third argument must be a DataFrame variable".into())),
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "third argument must be a DataFrame variable".into(),
+                        ))
+                    }
                 };
                 let df = match self.env.get(&df_name) {
                     Some(Value::DataFrame(df)) => df.clone(),
@@ -6779,7 +6999,8 @@ impl Interpreter {
                         col_idx = 1;
                     }
                     for (j, var_name) in g_instr.independents.iter().enumerate() {
-                        let col_data = df.get(var_name)
+                        let col_data = df
+                            .get(var_name)
                             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                         for i in 0..n_rows {
                             z_mat[[i, col_idx + j]] = col_data[i];
@@ -6788,8 +7009,8 @@ impl Interpreter {
                     z_mat
                 };
 
-                let result = greeners::GMM::fit(&y, &x, &z)
-                    .map_err(|e| self.rt_err(format!("gmm: {e}")))?;
+                let result =
+                    greeners::GMM::fit(&y, &x, &z).map_err(|e| self.rt_err(format!("gmm: {e}")))?;
                 Ok(Value::GmmResult(Rc::new(result)))
             }
 
@@ -6881,8 +7102,7 @@ impl Interpreter {
                     ));
                 }
 
-                let endog_ast =
-                    self.resolve_formula(&args[0])?;
+                let endog_ast = self.resolve_formula(&args[0])?;
                 let instr_ast = self.resolve_formula(&args[1])?;
                 let df_name = match &args[2] {
                     Expr::Var(name) => name.clone(),
@@ -7997,10 +8217,7 @@ impl Interpreter {
                             let total = arr.len();
                             let vals: Vec<f64> = arr.iter().map(|&x| x as f64).collect();
                             let n = vals.len();
-                            println!(
-                                "  {:<20} type: int      obs: {}    missing: 0",
-                                name, total
-                            );
+                            println!("  {:<20} type: int      obs: {}    missing: 0", name, total);
                             if n > 0 {
                                 let mean = vals.iter().sum::<f64>() / n as f64;
                                 let var = vals.iter().map(|x| (x - mean).powi(2)).sum::<f64>()
@@ -8018,17 +8235,15 @@ impl Interpreter {
                                     mean,
                                     sd
                                 );
-                                println!(
-                                    "  min: {:.0}    max: {:.0}",
-                                    min, max
-                                );
+                                println!("  min: {:.0}    max: {:.0}", min, max);
                             }
                         }
                         Column::String(arr) => {
                             let total = arr.len();
                             let non_empty = arr.iter().filter(|s: &&String| !s.is_empty()).count();
                             let missing = total - non_empty;
-                            let mut unique: Vec<&str> = arr.iter().map(|s: &String| s.as_str()).collect();
+                            let mut unique: Vec<&str> =
+                                arr.iter().map(|s: &String| s.as_str()).collect();
                             unique.sort();
                             unique.dedup();
                             println!(
@@ -8037,12 +8252,10 @@ impl Interpreter {
                             );
                             println!("  unique: {}", unique.len());
                             if unique.len() <= 10 {
-                                let examples: Vec<&str> =
-                                    unique.iter().take(10).copied().collect();
+                                let examples: Vec<&str> = unique.iter().take(10).copied().collect();
                                 println!("  values: {}", examples.join(", "));
                             } else {
-                                let first5: Vec<&str> =
-                                    unique.iter().take(5).copied().collect();
+                                let first5: Vec<&str> = unique.iter().take(5).copied().collect();
                                 println!(
                                     "  values: {}, ... ({} more)",
                                     first5.join(", "),
@@ -8054,10 +8267,7 @@ impl Interpreter {
                             let total = arr.len();
                             let trues = arr.iter().filter(|&&b| b).count();
                             let falses = total - trues;
-                            println!(
-                                "  {:<20} type: bool     obs: {}    missing: 0",
-                                name, total
-                            );
+                            println!("  {:<20} type: bool     obs: {}    missing: 0", name, total);
                             println!("  true: {}    false: {}", trues, falses);
                         }
                         _ => {
@@ -8839,7 +9049,8 @@ impl Interpreter {
                             ));
                         }
                         Value::GmmResult(r) => {
-                            let names: Option<Vec<String>> = Some((0..r.params.len()).map(|i| format!("x{i}")).collect());
+                            let names: Option<Vec<String>> =
+                                Some((0..r.params.len()).map(|i| format!("x{i}")).collect());
                             models.push(extract_std(
                                 "GMM",
                                 &names,
@@ -9404,8 +9615,7 @@ impl Interpreter {
                                 x_use = greeners::Margins::with_at(&x_use, idx, *val);
                             }
                         }
-                        let vcov =
-                            Self::binary_mle_vcov(&bm.kind, &bm.result.params, &bm.y, &bm.x);
+                        let vcov = Self::binary_mle_vcov(&bm.kind, &bm.result.params, &bm.y, &bm.x);
                         let mut ame_result = if bm.kind == "logit" {
                             match &vcov {
                                 Some(v) => greeners::Margins::ame_logit_with_vcov(
@@ -9441,8 +9651,7 @@ impl Interpreter {
                                 if se.is_finite() && se > 1e-15 {
                                     let z = ame_result.effects[i] / se;
                                     ame_result.z_values[i] = z;
-                                    ame_result.p_values[i] =
-                                        2.0 * (1.0 - normal_dist.cdf(z.abs()));
+                                    ame_result.p_values[i] = 2.0 * (1.0 - normal_dist.cdf(z.abs()));
                                 }
                             }
                         }
@@ -10064,9 +10273,11 @@ impl Interpreter {
 
                 let df_name = match &args[0] {
                     Expr::Var(n) => n.clone(),
-                    _ => return Err(HayashiError::Type(
-                        "kalman: primeiro argumento deve ser um DataFrame".into(),
-                    )),
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "kalman: primeiro argumento deve ser um DataFrame".into(),
+                        ))
+                    }
                 };
                 let mut df = match self.env.get(&df_name) {
                     Some(Value::DataFrame(d)) => d.clone(),
@@ -10075,9 +10286,11 @@ impl Interpreter {
 
                 let var_name = match &args[1] {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
-                    _ => return Err(HayashiError::Type(
-                        "kalman: segundo argumento deve ser o nome da variável".into(),
-                    )),
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "kalman: segundo argumento deve ser o nome da variável".into(),
+                        ))
+                    }
                 };
 
                 let model_kind = match opt_map.get("model") {
@@ -10097,24 +10310,23 @@ impl Interpreter {
                 let diff_var: f64 = {
                     let diffs: Vec<f64> = y_vec.windows(2).map(|w| w[1] - w[0]).collect();
                     let mean = diffs.iter().sum::<f64>() / diffs.len() as f64;
-                    diffs.iter().map(|d| (d - mean).powi(2)).sum::<f64>()
-                        / (diffs.len() - 1) as f64
+                    diffs.iter().map(|d| (d - mean).powi(2)).sum::<f64>() / (diffs.len() - 1) as f64
                 };
                 let sigma_obs_default = (diff_var / 2.0).sqrt().max(1e-6);
 
                 let sigma_obs = match opt_map.get("sigma_obs") {
                     Some(Value::Float(v)) => *v,
-                    Some(Value::Int(v))   => *v as f64,
+                    Some(Value::Int(v)) => *v as f64,
                     _ => sigma_obs_default,
                 };
                 let sigma_state = match opt_map.get("sigma_state") {
                     Some(Value::Float(v)) => *v,
-                    Some(Value::Int(v))   => *v as f64,
+                    Some(Value::Int(v)) => *v as f64,
                     _ => sigma_obs * 0.1,
                 };
                 let sigma_slope = match opt_map.get("sigma_slope") {
                     Some(Value::Float(v)) => *v,
-                    Some(Value::Int(v))   => *v as f64,
+                    Some(Value::Int(v)) => *v as f64,
                     _ => sigma_state * 0.1,
                 };
 
@@ -10128,13 +10340,13 @@ impl Interpreter {
                     "ll" | "local_level" => {
                         // H=[[1]], F=[[1]], R=[[1]], Q=[[sigma_state^2]], R_obs=[[sigma_obs^2]]
                         let model = greeners::StateSpaceModel {
-                            h:     ndarray::Array2::from_elem((1, 1), 1.0),
-                            f:     ndarray::Array2::from_elem((1, 1), 1.0),
-                            r:     ndarray::Array2::from_elem((1, 1), 1.0),
-                            q:     ndarray::Array2::from_elem((1, 1), sigma_state.powi(2)),
+                            h: ndarray::Array2::from_elem((1, 1), 1.0),
+                            f: ndarray::Array2::from_elem((1, 1), 1.0),
+                            r: ndarray::Array2::from_elem((1, 1), 1.0),
+                            q: ndarray::Array2::from_elem((1, 1), sigma_state.powi(2)),
                             r_obs: ndarray::Array2::from_elem((1, 1), sigma_obs.powi(2)),
-                            s0:    ndarray::Array1::from_vec(vec![y_vec[0]]),
-                            p0:    ndarray::Array2::from_elem((1, 1), sigma_obs.powi(2) * 10.0),
+                            s0: ndarray::Array1::from_vec(vec![y_vec[0]]),
+                            p0: ndarray::Array2::from_elem((1, 1), sigma_obs.powi(2) * 10.0),
                         };
                         greeners::state_space_estimate(&model, &obs)
                             .map_err(|e| self.rt_err(format!("kalman (ll): {e}")))?
@@ -10184,7 +10396,7 @@ impl Interpreter {
                     ss_result.smoothed_states.iter().map(|s| s[0]).collect(),
                 );
 
-                let filt_name   = format!("{var_name}_filtered");
+                let filt_name = format!("{var_name}_filtered");
                 let smooth_name = format!("{var_name}_smoothed");
 
                 Rc::make_mut(&mut df)
@@ -10222,9 +10434,7 @@ impl Interpreter {
                         "\nKalman ({}):  T={}  loglik={:.4}  σ_obs={:.4}  σ_state={:.4}",
                         model_kind, n, ss_result.log_likelihood, sigma_obs, sigma_state
                     );
-                    println!(
-                        "  → {filt_name}, {smooth_name} adicionadas a {df_name}"
-                    );
+                    println!("  → {filt_name}, {smooth_name} adicionadas a {df_name}");
                 }
 
                 self.env.set(&df_name, Value::DataFrame(df))?;
@@ -10648,7 +10858,10 @@ impl Interpreter {
                             res.ci_upper
                         );
                         println!("{}", "─".repeat(62));
-                        println!("H0: mean(diff) = 0   t = {:.4}   df = {:.0}   p = {:.4}", res.t_statistic, res.df, res.p_value);
+                        println!(
+                            "H0: mean(diff) = 0   t = {:.4}   df = {:.0}   p = {:.4}",
+                            res.t_statistic, res.df, res.p_value
+                        );
                         println!();
 
                     // ── DOIS GRUPOS: ttest(df, var, by=group) ────────────────
@@ -10720,7 +10933,10 @@ impl Interpreter {
                         println!("{}", "─".repeat(68));
                         println!("diff = mean({}) - mean({})", gkeys[0], gkeys[1]);
                         let t_label = if equal_var { "t" } else { "Welch's t" };
-                        println!("H0: diff = 0   {} = {:.4}   df = {:.2}   p = {:.4}", t_label, res.t_statistic, res.df, res.p_value);
+                        println!(
+                            "H0: diff = 0   {} = {:.4}   df = {:.2}   p = {:.4}",
+                            t_label, res.t_statistic, res.df, res.p_value
+                        );
                         println!();
 
                     // ── UNI-AMOSTRAL: ttest(df, var, mu=0) ───────────────────
@@ -10748,15 +10964,13 @@ impl Interpreter {
                         println!("{}", "─".repeat(62));
                         println!(
                             "{:<14} {:>6.0}  {:>10.4}  {:>10.4}  [{:.4}, {:.4}]",
-                            var1,
-                            res.n as f64,
-                            res.mean,
-                            res.std_err,
-                            res.ci_lower,
-                            res.ci_upper
+                            var1, res.n as f64, res.mean, res.std_err, res.ci_lower, res.ci_upper
                         );
                         println!("{}", "─".repeat(62));
-                        println!("t = {:.4}   df = {:.0}   p = {:.4}", res.t_statistic, res.df, res.p_value);
+                        println!(
+                            "t = {:.4}   df = {:.0}   p = {:.4}",
+                            res.t_statistic, res.df, res.p_value
+                        );
                         println!();
                     }
                 } else {
@@ -11029,14 +11243,21 @@ impl Interpreter {
                         "min" => vals.iter().cloned().fold(f64::INFINITY, f64::min),
                         "max" => vals.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
                         "sd" => {
-                            if n < 2 { return f64::NAN; }
+                            if n < 2 {
+                                return f64::NAN;
+                            }
                             let m = vals.iter().sum::<f64>() / n as f64;
-                            (vals.iter().map(|x| (x - m).powi(2)).sum::<f64>() / (n - 1) as f64).sqrt()
+                            (vals.iter().map(|x| (x - m).powi(2)).sum::<f64>() / (n - 1) as f64)
+                                .sqrt()
                         }
                         "median" => {
                             let mut s = vals.to_vec();
                             s.sort_by(|a, b| a.partial_cmp(b).unwrap());
-                            if n % 2 == 0 { (s[n / 2 - 1] + s[n / 2]) / 2.0 } else { s[n / 2] }
+                            if n % 2 == 0 {
+                                (s[n / 2 - 1] + s[n / 2]) / 2.0
+                            } else {
+                                s[n / 2]
+                            }
                         }
                         _ => f64::NAN,
                     }
@@ -11044,8 +11265,14 @@ impl Interpreter {
 
                 let mut builder = DataFrame::builder();
                 use greeners::Column;
-                if matches!(df.get_column(&by_col), Ok(Column::Float(_)) | Ok(Column::Int(_))) {
-                    let vals: Vec<f64> = keys.iter().map(|k| k.parse::<f64>().unwrap_or(f64::NAN)).collect();
+                if matches!(
+                    df.get_column(&by_col),
+                    Ok(Column::Float(_)) | Ok(Column::Int(_))
+                ) {
+                    let vals: Vec<f64> = keys
+                        .iter()
+                        .map(|k| k.parse::<f64>().unwrap_or(f64::NAN))
+                        .collect();
                     builder = builder.add_column(&by_col, vals);
                 } else {
                     builder = builder.add_string(&by_col, keys.clone());
@@ -11054,13 +11281,16 @@ impl Interpreter {
                     let vals: Vec<f64> = keys
                         .iter()
                         .map(|key| {
-                            let subset: Vec<f64> = groups[key].iter().map(|&i| col_data[ci][i]).collect();
+                            let subset: Vec<f64> =
+                                groups[key].iter().map(|&i| col_data[ci][i]).collect();
                             agg_fn(&subset)
                         })
                         .collect();
                     builder = builder.add_column(col_name, vals);
                 }
-                let new_df = builder.build().map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let new_df = builder
+                    .build()
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 if !self.capturing {
                     println!("({} groups from {} observations)", keys.len(), n_obs);
                 }
@@ -11084,22 +11314,35 @@ impl Interpreter {
                 };
                 let i_col = match opt_map.get("i") {
                     Some(Value::Str(s)) => s.clone(),
-                    _ => return Err(HayashiError::Runtime("pivot_longer requires i=id_col".into())),
+                    _ => {
+                        return Err(HayashiError::Runtime(
+                            "pivot_longer requires i=id_col".into(),
+                        ))
+                    }
                 };
                 let j_col = match opt_map.get("j") {
                     Some(Value::Str(s)) => s.clone(),
-                    _ => return Err(HayashiError::Runtime("pivot_longer requires j=time_col".into())),
+                    _ => {
+                        return Err(HayashiError::Runtime(
+                            "pivot_longer requires j=time_col".into(),
+                        ))
+                    }
                 };
                 let stubs: Vec<String> = match opt_map.get("stubs") {
-                    Some(Value::List(lst)) => lst.iter().map(|v| match v {
-                        Value::Str(s) => Ok(s.clone()),
-                        _ => Err(HayashiError::Type("stubs must be strings".into())),
-                    }).collect::<Result<_>>()?,
+                    Some(Value::List(lst)) => lst
+                        .iter()
+                        .map(|v| match v {
+                            Value::Str(s) => Ok(s.clone()),
+                            _ => Err(HayashiError::Type("stubs must be strings".into())),
+                        })
+                        .collect::<Result<_>>()?,
                     _ => {
                         if args.len() > 1 {
                             self.resolve_var_list(&args[1..], &df)?
                         } else {
-                            return Err(HayashiError::Runtime("pivot_longer requires stubs".into()));
+                            return Err(HayashiError::Runtime(
+                                "pivot_longer requires stubs".into(),
+                            ));
                         }
                     }
                 };
@@ -11156,7 +11399,9 @@ impl Interpreter {
                     builder = builder.add_column(stub, vals);
                 }
 
-                let new_df = builder.build().map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let new_df = builder
+                    .build()
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 if !self.capturing {
                     println!("pivot_longer: {} → {} observations", n_i, n_long);
                 }
@@ -11179,24 +11424,37 @@ impl Interpreter {
                 };
                 let i_col = match opt_map.get("i") {
                     Some(Value::Str(s)) => s.clone(),
-                    _ => return Err(HayashiError::Runtime("pivot_wider requires i=id_col".into())),
+                    _ => {
+                        return Err(HayashiError::Runtime(
+                            "pivot_wider requires i=id_col".into(),
+                        ))
+                    }
                 };
                 let j_col = match opt_map.get("j") {
                     Some(Value::Str(s)) => s.clone(),
-                    _ => return Err(HayashiError::Runtime("pivot_wider requires j=time_col".into())),
+                    _ => {
+                        return Err(HayashiError::Runtime(
+                            "pivot_wider requires j=time_col".into(),
+                        ))
+                    }
                 };
                 let val_vars: Vec<String> = if args.len() > 1 {
                     self.resolve_var_list(&args[1..], &df)?
                 } else {
                     match opt_map.get("values") {
                         Some(Value::Str(s)) => vec![s.clone()],
-                        Some(Value::List(lst)) => lst.iter().map(|v| match v {
-                            Value::Str(s) => Ok(s.clone()),
-                            _ => Err(HayashiError::Type("values must be strings".into())),
-                        }).collect::<Result<_>>()?,
-                        _ => {
-                            df.column_names().into_iter().filter(|n| n != &i_col && n != &j_col).collect()
-                        }
+                        Some(Value::List(lst)) => lst
+                            .iter()
+                            .map(|v| match v {
+                                Value::Str(s) => Ok(s.clone()),
+                                _ => Err(HayashiError::Type("values must be strings".into())),
+                            })
+                            .collect::<Result<_>>()?,
+                        _ => df
+                            .column_names()
+                            .into_iter()
+                            .filter(|n| n != &i_col && n != &j_col)
+                            .collect(),
                     }
                 };
 
@@ -11222,7 +11480,9 @@ impl Interpreter {
                         let mut vals = vec![f64::NAN; n_wide];
                         for (row, (id, j)) in id_vals.iter().zip(j_strs.iter()).enumerate() {
                             if j == jv {
-                                if let Ok(pos) = unique_ids.binary_search_by(|a| a.partial_cmp(id).unwrap()) {
+                                if let Ok(pos) =
+                                    unique_ids.binary_search_by(|a| a.partial_cmp(id).unwrap())
+                                {
                                     vals[pos] = var_data[row];
                                 }
                             }
@@ -11231,7 +11491,9 @@ impl Interpreter {
                     }
                 }
 
-                let new_df = builder.build().map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let new_df = builder
+                    .build()
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 if !self.capturing {
                     println!("pivot_wider: {} → {} observations", df.n_rows(), n_wide);
                 }
@@ -12778,8 +13040,10 @@ impl Interpreter {
                         ))
                     }
                 };
-                let drop_names: std::collections::HashSet<String> =
-                    self.resolve_var_list(&args[1..], &df)?.into_iter().collect();
+                let drop_names: std::collections::HashSet<String> = self
+                    .resolve_var_list(&args[1..], &df)?
+                    .into_iter()
+                    .collect();
 
                 let all = df.column_names();
                 let keep: Vec<&str> = all
@@ -15648,10 +15912,7 @@ impl Interpreter {
                 println!("  H₀: {var_name} is normally distributed");
                 println!("  n = {}", res.n_obs);
                 println!("{sep}");
-                println!(
-                    "{:<26} {:>10} {:>10} {:>4}",
-                    "Test", "W", "p-value", ""
-                );
+                println!("{:<26} {:>10} {:>10} {:>4}", "Test", "W", "p-value", "");
                 println!("{sep}");
                 println!(
                     "{:<26} {:>10.6} {:>10.4} {:>4}",
@@ -15706,10 +15967,7 @@ impl Interpreter {
                 println!("  H₀: {var_name} is normally distributed");
                 println!("  n = {}", res.n_obs);
                 println!("{sep}");
-                println!(
-                    "{:<26} {:>10} {:>10} {:>4}",
-                    "Test", "W'", "p-value", ""
-                );
+                println!("{:<26} {:>10} {:>10} {:>4}", "Test", "W'", "p-value", "");
                 println!("{sep}");
                 println!(
                     "{:<26} {:>10.6} {:>10.4} {:>4}",
@@ -15763,14 +16021,8 @@ impl Interpreter {
                     "", "Statistic", "Value", "chi2(2)", "p-value"
                 );
                 println!("{sep}");
-                println!(
-                    "{:<16} {:>10} {:>10.4}",
-                    "Skewness", "", skew
-                );
-                println!(
-                    "{:<16} {:>10} {:>10.4}",
-                    "Kurtosis", "", kurt + 3.0
-                );
+                println!("{:<16} {:>10} {:>10.4}", "Skewness", "", skew);
+                println!("{:<16} {:>10} {:>10.4}", "Kurtosis", "", kurt + 3.0);
                 let jb_sig = if jb_p < 0.01 {
                     "***"
                 } else if jb_p < 0.05 {
@@ -18835,9 +19087,7 @@ impl Interpreter {
                         let hint = Self::suggest(other, &known)
                             .map(|s| format!(" — did you mean '{s}'?"))
                             .unwrap_or_default();
-                        return Err(self.rt_err(format!(
-                            "undefined function '{other}'{hint}"
-                        )));
+                        return Err(self.rt_err(format!("undefined function '{other}'{hint}")));
                     }
                 };
 
@@ -21320,17 +21570,20 @@ impl Interpreter {
                     // ── OLS → CSV / LaTeX / HTML ──────────────────────────────
                     (Value::OlsResult(m), "csv") => {
                         let content = m.result.to_csv();
-                        std::fs::write(&path_str, &content).map_err(|e| HayashiError::Io(e.to_string()))?;
+                        std::fs::write(&path_str, &content)
+                            .map_err(|e| HayashiError::Io(e.to_string()))?;
                         println!("Exported OLS → '{path_str}'");
                     }
                     (Value::OlsResult(m), "latex" | "tex") => {
                         let content = m.result.to_latex();
-                        std::fs::write(&path_str, &content).map_err(|e| HayashiError::Io(e.to_string()))?;
+                        std::fs::write(&path_str, &content)
+                            .map_err(|e| HayashiError::Io(e.to_string()))?;
                         println!("Exported OLS → '{path_str}'");
                     }
                     (Value::OlsResult(m), "html" | "htm") => {
                         let content = m.result.to_html();
-                        std::fs::write(&path_str, &content).map_err(|e| HayashiError::Io(e.to_string()))?;
+                        std::fs::write(&path_str, &content)
+                            .map_err(|e| HayashiError::Io(e.to_string()))?;
                         println!("Exported OLS → '{path_str}'");
                     }
 
@@ -21492,22 +21745,28 @@ impl Interpreter {
                         let start = match self.eval_expr(start_expr)? {
                             Value::Int(i) => i,
                             Value::Float(f) => f as i64,
-                            v => return Err(HayashiError::Type(format!(
-                                "for: início do range must be integer, não {v}"
-                            ))),
+                            v => {
+                                return Err(HayashiError::Type(format!(
+                                    "for: início do range must be integer, não {v}"
+                                )))
+                            }
                         };
                         let end = match self.eval_expr(end_expr)? {
                             Value::Int(i) => i,
                             Value::Float(f) => f as i64,
-                            v => return Err(HayashiError::Type(format!(
-                                "for: fim do range must be integer, não {v}"
-                            ))),
+                            v => {
+                                return Err(HayashiError::Type(format!(
+                                    "for: fim do range must be integer, não {v}"
+                                )))
+                            }
                         };
                         let step: i64 = if start <= end { 1 } else { -1 };
                         let mut cur = start;
                         while if step > 0 { cur < end } else { cur > end } {
                             self.env.set(var, Value::Int(cur))?;
-                            if run_body!() { break; }
+                            if run_body!() {
+                                break;
+                            }
                             cur += step;
                         }
                     }
@@ -21515,22 +21774,28 @@ impl Interpreter {
                         let start = match self.eval_expr(start_expr)? {
                             Value::Int(i) => i,
                             Value::Float(f) => f as i64,
-                            v => return Err(HayashiError::Type(format!(
-                                "for: início do range must be integer, não {v}"
-                            ))),
+                            v => {
+                                return Err(HayashiError::Type(format!(
+                                    "for: início do range must be integer, não {v}"
+                                )))
+                            }
                         };
                         let end = match self.eval_expr(end_expr)? {
                             Value::Int(i) => i,
                             Value::Float(f) => f as i64,
-                            v => return Err(HayashiError::Type(format!(
-                                "for: fim do range must be integer, não {v}"
-                            ))),
+                            v => {
+                                return Err(HayashiError::Type(format!(
+                                    "for: fim do range must be integer, não {v}"
+                                )))
+                            }
                         };
                         let step: i64 = if start <= end { 1 } else { -1 };
                         let mut cur = start;
                         while if step > 0 { cur <= end } else { cur >= end } {
                             self.env.set(var, Value::Int(cur))?;
-                            if run_body!() { break; }
+                            if run_body!() {
+                                break;
+                            }
                             cur += step;
                         }
                     }
@@ -21602,7 +21867,11 @@ impl Interpreter {
             },
 
             Stmt::Expr(expr) => {
-                if let Expr::Pipe { source, expr: inner } = expr {
+                if let Expr::Pipe {
+                    source,
+                    expr: inner,
+                } = expr
+                {
                     let val = self.eval_expr(inner)?;
                     if let Expr::Var(name) = source.as_ref() {
                         self.env.set(name, val)?;
