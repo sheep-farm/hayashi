@@ -1292,6 +1292,20 @@ fn lang_help_index() {
 }
 
 #[test]
+fn help_metadata_index_lists_categories() {
+    assert_ok_contains("help_metadata_index", "help()", "POST-ESTIMATION");
+}
+
+#[test]
+fn help_metadata_alias_lookup() {
+    assert_ok_contains(
+        "help_metadata_alias",
+        "help(regress)",
+        "Aliases: reg, regress",
+    );
+}
+
+#[test]
 fn lang_timer() {
     assert_ok_contains(
         "timer",
