@@ -1,4 +1,5 @@
 pub mod ast;
+pub mod commands;
 pub mod error;
 pub mod help;
 pub mod interpreter;
