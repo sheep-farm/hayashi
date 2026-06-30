@@ -39,9 +39,11 @@ let r3 = compute_mean([10, 20, 30])
 To manage third-party packages from your operating system terminal, use:
 
 \begin{lstlisting}[style=inline, numbers=none, frame=none]
-hay install user/repository   -- Install a package from GitHub
-hay remove  user/repository   -- Uninstall a package
-hay list                     -- List installed packages
+hay install usuario/repositorio   -- Install a package from GitHub (-y to skip overwrite prompt)
+hay remove  usuario/repositorio   -- Uninstall a package (deletes script dirs, native files, and metadata)
+hay list                         -- List installed packages and plugins
+hay check-plugin [user/repo]     -- Check integrity/version with remote repository
+hay update [user/repo] [-y]      -- Update package(s) to latest version (-y to skip prompt)
 \end{lstlisting}
 
 \subsection{Standard Package Structure}
