@@ -718,6 +718,7 @@ const BUILTIN_NAMES: &[&str] = &[
     "input",
     "load",
     "export",
+    "write",
 ];
 
 pub struct Interpreter {
@@ -2108,6 +2109,25 @@ impl Interpreter {
                     "trim" => s.trim().to_string(),
                     _ => unreachable!(),
                 }))
+            }
+
+            "write" => {
+                if args.len() != 2 {
+                    return Err(HayashiError::Runtime(
+                        "write(content, path) requires 2 arguments".into(),
+                    ));
+                }
+                let content = match self.eval_expr(&args[0])? {
+                    Value::Str(s) => s,
+                    v => return Err(self.type_err(format!("write: content must be string, got {v}"))),
+                };
+                let path = match self.eval_expr(&args[1])? {
+                    Value::Str(s) => s,
+                    v => return Err(self.type_err(format!("write: path must be string, got {v}"))),
+                };
+                std::fs::write(&path, &content)
+                    .map_err(|e| HayashiError::Io(format!("Failed to write file '{path}': {e}")))?;
+                Ok(Value::Nil)
             }
 
             "contains" => {
