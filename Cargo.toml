@@ -31,7 +31,7 @@ rand = "0.8"
 plotters = { version = "0.3", default-features = false, features = ["svg_backend", "line_series"] }
 calamine = "0.35"
 parquet = { version = "59", default-features = false, features = ["arrow", "snap"] }
-arrow = { version = "59", default-features = false, features = ["csv", "json"] }
+arrow = { version = "59", default-features = false, features = ["csv", "json", "ffi"] }
 rust_xlsxwriter = "0.95"
 csv = "1"
 rusqlite = { version = "0.33", features = ["bundled"] }
