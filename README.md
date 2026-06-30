@@ -521,11 +521,20 @@ print("a", "b", sep=", ")     // a, b
 import("finance")                    // finance::sharpe(), finance::sortino()
 import("finance", as=fin)            // fin::sharpe()
 
-// Install script or native plugin from GitHub
-// $ hay install user/repo
+// Install script or native plugin from GitHub (-y to bypass overwrite prompt)
+// $ hay install user/repo [-y]
+
+// Uninstall a package (successfully deletes native plugin files, dirs, and metadata)
+// $ hay remove user/repo
 
 // List installed packages
 // $ hay list
+
+// Check integrity/version of installed packages with remote GitHub repository
+// $ hay check-plugin [user/repo]
+
+// Update one or all packages to their latest versions (-y to bypass prompt)
+// $ hay update [user/repo] [-y]
 
 // Plugin search paths
 plugin_path("/shared/plugins", "/team/lib")
