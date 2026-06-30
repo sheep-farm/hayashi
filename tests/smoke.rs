@@ -8621,3 +8621,79 @@ fn test_all_type_checkers() {
         "\"int_ok\"\n\"float_ok\"\n\"bool_ok\"\n\"string_ok\"\n\"list_ok\"\n\"dict_ok\"\n\"fn_ok\"\n\"nil_ok\"",
     );
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MULTILINE NEWLINE HANDLING
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn pipe_multiline() {
+    // |> no início de linha continuando a pipe chain
+    assert_ok_contains(
+        "pipe_multiline",
+        r#"let r = [3, 1, 2]
+    |> sort
+    |> reverse
+display r[0]"#,
+        "3",
+    );
+}
+
+#[test]
+fn pipe_multiline_with_args() {
+    // pipe multi-linha com chamadas de funções com argumentos
+    assert_ok_contains(
+        "pipe_multiline_args",
+        r#"let r = [1, 2, 3, 4, 5]
+    |> filter(|x| x > 2)
+    |> map(|x| x * 10)
+display r[0]"#,
+        "30",
+    );
+}
+
+#[test]
+fn list_multiline() {
+    // lista literal com elementos em múltiplas linhas
+    assert_ok_contains(
+        "list_multiline",
+        r#"let xs = [
+    1,
+    2,
+    3
+]
+display xs[1]"#,
+        "2",
+    );
+}
+
+#[test]
+fn list_multiline_strings() {
+    // lista de strings em múltiplas linhas
+    assert_ok_contains(
+        "list_multiline_strings",
+        r#"let names = [
+    "alpha",
+    "beta",
+    "gamma"
+]
+display names[2]"#,
+        "\"gamma\"",
+    );
+}
+
+#[test]
+fn list_multiline_map() {
+    // map sobre lista definida em múltiplas linhas
+    assert_ok_contains(
+        "list_multiline_map",
+        r#"let xs = [
+    10,
+    20,
+    30
+] |> map(|x| x + 1)
+display xs[0]"#,
+        "11",
+    );
+}
+

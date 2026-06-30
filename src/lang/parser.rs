@@ -6,6 +6,7 @@ pub struct Parser {
     tokens: Vec<(Token, usize)>,
     pos: usize,
     paren_depth: usize,
+    bracket_depth: usize, // rastreia [ ]
 }
 
 impl Parser {
@@ -14,11 +15,12 @@ impl Parser {
             tokens,
             pos: 0,
             paren_depth: 0,
+            bracket_depth: 0,
         }
     }
 
     fn peek(&mut self) -> &Token {
-        if self.paren_depth > 0 {
+        if self.paren_depth > 0 || self.bracket_depth > 0 {
             while self.tokens.get(self.pos).map(|(t, _)| t) == Some(&Token::Newline) {
                 self.pos += 1;
             }
@@ -37,8 +39,17 @@ impl Parser {
         self.tokens.get(self.pos).map(|(_, l)| *l).unwrap_or(0)
     }
 
+    /// Verifica se o próximo token não-Newline é `|>` (para continuação de pipe multi-linha).
+    fn next_non_newline_is_pipe_right(&self) -> bool {
+        let mut i = self.pos;
+        while let Some((Token::Newline, _)) = self.tokens.get(i) {
+            i += 1;
+        }
+        matches!(self.tokens.get(i), Some((Token::PipeRight, _)))
+    }
+
     fn advance(&mut self) -> &Token {
-        if self.paren_depth > 0 {
+        if self.paren_depth > 0 || self.bracket_depth > 0 {
             while self.tokens.get(self.pos).map(|(t, _)| t) == Some(&Token::Newline) {
                 self.pos += 1;
             }
@@ -53,6 +64,12 @@ impl Parser {
         }
         if t == &Token::RParen && self.paren_depth > 0 {
             self.paren_depth -= 1;
+        }
+        if t == &Token::LBracket {
+            self.bracket_depth += 1;
+        }
+        if t == &Token::RBracket && self.bracket_depth > 0 {
+            self.bracket_depth -= 1;
         }
         self.pos += 1;
         t
@@ -176,11 +193,13 @@ impl Parser {
             return Ok(Expr::Range(Box::new(lhs), Box::new(rhs)));
         }
 
-        if self.peek() != &Token::PipeRight {
+        // Verifica se o próximo token não-Newline é |> para permitir pipe multi-linha
+        if self.peek() != &Token::PipeRight && !self.next_non_newline_is_pipe_right() {
             return Ok(lhs);
         }
         let source = lhs.clone();
-        while self.peek() == &Token::PipeRight {
+        while self.peek() == &Token::PipeRight || self.next_non_newline_is_pipe_right() {
+            self.skip_newlines(); // consome Newlines antes do |>
             self.advance();
             let rhs = self.parse_or()?;
             lhs = match rhs {
@@ -427,17 +446,22 @@ impl Parser {
                 Ok(inner)
             }
 
-            // Lista literal: [e1, e2, ...]
+            // Lista literal: [e1, e2, ...] — permite quebras de linha entre elementos
             Token::LBracket => {
-                self.advance();
+                self.advance(); // avança LBracket (incrementa bracket_depth)
+                self.skip_newlines();
                 let mut items = Vec::new();
-                while !matches!(self.peek(), Token::RBracket | Token::Eof | Token::Newline) {
+                // bracket_depth > 0 agora: peek() já pula Newlines automaticamente
+                while !matches!(self.peek(), Token::RBracket | Token::Eof) {
                     items.push(self.parse_expr()?);
                     if self.peek() == &Token::Comma {
                         self.advance();
+                        self.skip_newlines();
+                    } else {
+                        break;
                     }
                 }
-                self.expect(&Token::RBracket)?;
+                self.expect(&Token::RBracket)?; // decrementa bracket_depth
                 Ok(Expr::List(items))
             }
 
