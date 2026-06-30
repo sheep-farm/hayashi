@@ -1920,7 +1920,7 @@ impl Interpreter {
             "len" => {
                 if args.len() != 1 {
                     return Err(HayashiError::Runtime(
-                        "len() requires exactly 1 argumento".into(),
+                        "len() requires exactly 1 argument".into(),
                     ));
                 }
                 let v = self.eval_expr(&args[0])?;
@@ -2124,7 +2124,7 @@ impl Interpreter {
             "substr" => {
                 if args.len() < 2 || args.len() > 3 {
                     return Err(HayashiError::Runtime(
-                        "substr(s, início [, comprimento]) requer 2 ou 3 argumentos".into(),
+                        "substr(s, start [, length]) requires 2 or 3 arguments".into(),
                     ));
                 }
                 let s = match self.eval_expr(&args[0])? {
@@ -2400,9 +2400,7 @@ impl Interpreter {
                 let nums: Vec<f64> = if args.len() >= 2 {
                     let df_name = match &args[0] {
                         Expr::Var(n) => n.clone(),
-                        _ => {
-                            return Err(self.rt_err("median: primeiro argumento deve ser DataFrame"))
-                        }
+                        _ => return Err(self.rt_err("median: first argument must be a DataFrame")),
                     };
                     let df = match self.env.get(&df_name) {
                         Some(Value::DataFrame(d)) => d.clone(),
@@ -2412,7 +2410,7 @@ impl Interpreter {
                         Expr::Var(n) | Expr::Str(n) => n.clone(),
                         _ => {
                             return Err(
-                                self.rt_err("median: segundo argumento deve ser nome de variável")
+                                self.rt_err("median: second argument must be a variable name")
                             )
                         }
                     };
@@ -2441,7 +2439,7 @@ impl Interpreter {
                     return Err(self.rt_err("median() requires at least 1 argument"));
                 };
                 if nums.is_empty() {
-                    return Err(self.rt_err("median(): lista vazia"));
+                    return Err(self.rt_err("median(): empty list"));
                 }
                 let mut sorted = nums.clone();
                 sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
@@ -2460,9 +2458,7 @@ impl Interpreter {
                     let df_name = match &args[0] {
                         Expr::Var(n) => n.clone(),
                         _ => {
-                            return Err(
-                                self.rt_err("variance: primeiro argumento deve ser DataFrame")
-                            )
+                            return Err(self.rt_err("variance: first argument must be a DataFrame"))
                         }
                     };
                     let df = match self.env.get(&df_name) {
@@ -2472,8 +2468,9 @@ impl Interpreter {
                     let var_name = match &args[1] {
                         Expr::Var(n) | Expr::Str(n) => n.clone(),
                         _ => {
-                            return Err(self
-                                .rt_err("variance: segundo argumento deve ser nome de variável"))
+                            return Err(
+                                self.rt_err("variance: second argument must be a variable name")
+                            )
                         }
                     };
                     let col = Self::get_col_f64(&df, &var_name)?;
@@ -2503,7 +2500,7 @@ impl Interpreter {
                 };
                 let n = nums.len();
                 if n < 2 {
-                    return Err(self.rt_err("variance(): requer pelo menos 2 observações"));
+                    return Err(self.rt_err("variance(): requires at least 2 observations"));
                 }
                 let mean = nums.iter().sum::<f64>() / n as f64;
                 let v = nums.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n - 1) as f64;
@@ -2516,9 +2513,7 @@ impl Interpreter {
                     let df_name = match &args[0] {
                         Expr::Var(n) => n.clone(),
                         _ => {
-                            return Err(
-                                self.rt_err("quantile: primeiro argumento deve ser DataFrame")
-                            )
+                            return Err(self.rt_err("quantile: first argument must be a DataFrame"))
                         }
                     };
                     let df = match self.env.get(&df_name) {
@@ -2528,8 +2523,9 @@ impl Interpreter {
                     let var_name = match &args[1] {
                         Expr::Var(n) | Expr::Str(n) => n.clone(),
                         _ => {
-                            return Err(self
-                                .rt_err("quantile: segundo argumento deve ser nome de variável"))
+                            return Err(
+                                self.rt_err("quantile: second argument must be a variable name")
+                            )
                         }
                     };
                     let col = Self::get_col_f64(&df, &var_name)?;
@@ -2601,19 +2597,11 @@ impl Interpreter {
                 };
                 let x_name = match &args[1] {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
-                    _ => {
-                        return Err(
-                            self.rt_err("cov(): segundo argumento deve ser nome de variável")
-                        )
-                    }
+                    _ => return Err(self.rt_err("cov(): second argument must be a variable name")),
                 };
                 let y_name = match &args[2] {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
-                    _ => {
-                        return Err(
-                            self.rt_err("cov(): terceiro argumento deve ser nome de variável")
-                        )
-                    }
+                    _ => return Err(self.rt_err("cov(): third argument must be a variable name")),
                 };
                 let x_col = Self::get_col_f64(&df, &x_name)?;
                 let y_col = Self::get_col_f64(&df, &y_name)?;
@@ -2632,7 +2620,7 @@ impl Interpreter {
                     };
                 let n = x_vals.len();
                 if n < 2 {
-                    return Err(self.rt_err("cov(): requer pelo menos 2 observações"));
+                    return Err(self.rt_err("cov(): requires at least 2 observations"));
                 }
                 let mx = x_vals.iter().sum::<f64>() / n as f64;
                 let my = y_vals.iter().sum::<f64>() / n as f64;
@@ -2658,15 +2646,16 @@ impl Interpreter {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
                     _ => {
                         return Err(
-                            self.rt_err("corr_pair(): segundo argumento deve ser nome de variável")
+                            self.rt_err("corr_pair(): second argument must be a variable name")
                         )
                     }
                 };
                 let y_name = match &args[2] {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
                     _ => {
-                        return Err(self
-                            .rt_err("corr_pair(): terceiro argumento deve ser nome de variável"))
+                        return Err(
+                            self.rt_err("corr_pair(): third argument must be a variable name")
+                        )
                     }
                 };
                 let x_col = Self::get_col_f64(&df, &x_name)?;
@@ -2686,7 +2675,7 @@ impl Interpreter {
                     };
                 let n = x_vals.len();
                 if n < 2 {
-                    return Err(self.rt_err("corr_pair(): requer pelo menos 2 observações"));
+                    return Err(self.rt_err("corr_pair(): requires at least 2 observations"));
                 }
                 let mx = x_vals.iter().sum::<f64>() / n as f64;
                 let my = y_vals.iter().sum::<f64>() / n as f64;
@@ -2994,7 +2983,7 @@ impl Interpreter {
             "range" => {
                 if args.len() < 2 || args.len() > 3 {
                     return Err(HayashiError::Runtime(
-                        "range(start, end [, step]) requer 2 ou 3 argumentos".into(),
+                        "range(start, end [, step]) requires 2 or 3 arguments".into(),
                     ));
                 }
                 let start = match self.eval_expr(&args[0])? {
@@ -5769,7 +5758,7 @@ impl Interpreter {
                     Value::OlsResult(m) => m,
                     _ => {
                         return Err(HayashiError::Type(
-                            "gqtest(): suporta apenas modelos OLS".into(),
+                            "gqtest(): only supports OLS models".into(),
                         ))
                     }
                 };
@@ -5827,7 +5816,7 @@ impl Interpreter {
                     Value::OlsResult(m) => m,
                     _ => {
                         return Err(HayashiError::Type(
-                            "bphet(): suporta apenas modelos OLS".into(),
+                            "bphet(): only supports OLS models".into(),
                         ))
                     }
                 };
@@ -9756,7 +9745,7 @@ impl Interpreter {
             "margins" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
-                        "margins() requer um modelo estimado como argumento".into(),
+                        "margins() requires an estimated model as an argument".into(),
                     ));
                 }
                 let model = self.eval_expr(&args[0])?;
@@ -10081,7 +10070,8 @@ impl Interpreter {
             "vecm" => {
                 if args.len() < 3 {
                     return Err(HayashiError::Runtime(
-                        "vecm() requer (dataframe, var1, var2, ..., lags=p, rank=r)".into(),
+                        "vecm() requires arguments: dataframe, var1, var2, ..., lags=p, rank=r"
+                            .into(),
                     ));
                 }
 
@@ -10129,7 +10119,7 @@ impl Interpreter {
             "var" => {
                 if args.len() < 3 {
                     return Err(HayashiError::Runtime(
-                        "var() requer (dataframe, var1, var2, ..., lags=p)".into(),
+                        "var() requires arguments: dataframe, var1, var2, ..., lags=p".into(),
                     ));
                 }
 
@@ -10171,11 +10161,11 @@ impl Interpreter {
             // irf(model, steps=10)
             "irf" => {
                 if args.is_empty() {
-                    return Err(HayashiError::Runtime("irf() requer um modelo VAR".into()));
+                    return Err(HayashiError::Runtime("irf() requires a VAR model".into()));
                 }
                 let model = match self.eval_expr(&args[0])? {
                     Value::VarResult(m) => m,
-                    _ => return Err(HayashiError::Type("irf() requer um modelo VAR".into())),
+                    _ => return Err(HayashiError::Type("irf() requires a VAR model".into())),
                 };
 
                 let steps = match opt_map.get("steps") {
@@ -10222,11 +10212,11 @@ impl Interpreter {
             // fevd(model, steps=10)
             "fevd" => {
                 if args.is_empty() {
-                    return Err(HayashiError::Runtime("fevd() requer um modelo VAR".into()));
+                    return Err(HayashiError::Runtime("fevd() requires a VAR model".into()));
                 }
                 let model = match self.eval_expr(&args[0])? {
                     Value::VarResult(m) => m,
-                    _ => return Err(HayashiError::Type("fevd() requer um modelo VAR".into())),
+                    _ => return Err(HayashiError::Type("fevd() requires a VAR model".into())),
                 };
 
                 let steps = match opt_map.get("steps") {
@@ -10279,7 +10269,7 @@ impl Interpreter {
             "arima" | "sarima" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
-                        "arima() requer (dataframe, variável, p=, d=, q=)".into(),
+                        "arima() requires arguments: dataframe, variable, p=, d=, q=".into(),
                     ));
                 }
 
@@ -10641,7 +10631,7 @@ impl Interpreter {
             "forecast" | "fcast" | "predict_h" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
-                        "forecast() requer um modelo ARIMA".into(),
+                        "forecast() requires an ARIMA model".into(),
                     ));
                 }
 
@@ -10649,7 +10639,7 @@ impl Interpreter {
                     Value::ArimaResult(m) => m,
                     _ => {
                         return Err(HayashiError::Type(
-                            "forecast() requer um modelo ARIMA".into(),
+                            "forecast() requires an ARIMA model".into(),
                         ))
                     }
                 };
@@ -10821,7 +10811,7 @@ impl Interpreter {
                     Value::OlsResult(m) => m,
                     _ => {
                         return Err(HayashiError::Type(
-                            "lincom() suporta apenas modelos OLS".into(),
+                            "lincom() only supports OLS models".into(),
                         ))
                     }
                 };
@@ -13537,19 +13527,20 @@ impl Interpreter {
             "ljungbox" | "ljung_box" | "portmanteau" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
-                        "ljungbox() requer uma série ou modelo".into(),
+                        "ljungbox() requires a series or model".into(),
                     ));
                 }
 
                 let series = match self.eval_expr(&args[0])? {
                     Value::DataFrame(df) => {
-                        let col_name = match args.get(1) {
-                            Some(Expr::Var(n)) => n.clone(),
-                            _ => return Err(HayashiError::Runtime(
-                                "ljungbox(df, varname): second argument must be o nome da coluna"
-                                    .into(),
-                            )),
-                        };
+                        let col_name =
+                            match args.get(1) {
+                                Some(Expr::Var(n)) => n.clone(),
+                                _ => return Err(HayashiError::Runtime(
+                                    "ljungbox(df, varname): second argument must be a column name"
+                                        .into(),
+                                )),
+                            };
                         Array1::from(self.eval_col_expr(&Expr::Var(col_name), &df)?)
                     }
                     // resíduos padronizados de GARCH
@@ -13560,7 +13551,7 @@ impl Interpreter {
                     Value::OlsResult(m) => m.residuals.clone(),
                     _ => {
                         return Err(HayashiError::Type(
-                            "ljungbox(): argumento deve ser DataFrame, GARCH, ARIMA ou OLS".into(),
+                            "ljungbox(): argument must be a DataFrame, GARCH, ARIMA, or OLS".into(),
                         ))
                     }
                 };
@@ -13630,14 +13621,14 @@ impl Interpreter {
             "leverage" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
-                        "leverage() requer um modelo OLS".into(),
+                        "leverage() requires an OLS model".into(),
                     ));
                 }
                 let ols = match self.eval_expr(&args[0])? {
                     Value::OlsResult(m) => m,
                     _ => {
                         return Err(HayashiError::Type(
-                            "leverage() suporta apenas modelos OLS".into(),
+                            "leverage() only supports OLS models".into(),
                         ))
                     }
                 };
@@ -13691,13 +13682,15 @@ impl Interpreter {
             // D_i = (e_i²·h_i) / (k·MSE·(1−h_i)²)
             "cooks" => {
                 if args.is_empty() {
-                    return Err(HayashiError::Runtime("cooks() requer um modelo OLS".into()));
+                    return Err(HayashiError::Runtime(
+                        "cooks() requires an OLS model".into(),
+                    ));
                 }
                 let ols = match self.eval_expr(&args[0])? {
                     Value::OlsResult(m) => m,
                     _ => {
                         return Err(HayashiError::Type(
-                            "cooks() suporta apenas modelos OLS".into(),
+                            "cooks() only supports OLS models".into(),
                         ))
                     }
                 };
@@ -13751,15 +13744,11 @@ impl Interpreter {
             // VIF_j = 1/(1−R²_j); VIF>10 indica multicolinearidade grave
             "vif" => {
                 if args.is_empty() {
-                    return Err(HayashiError::Runtime("vif() requer um modelo OLS".into()));
+                    return Err(HayashiError::Runtime("vif() requires an OLS model".into()));
                 }
                 let ols = match self.eval_expr(&args[0])? {
                     Value::OlsResult(m) => m,
-                    _ => {
-                        return Err(HayashiError::Type(
-                            "vif() suporta apenas modelos OLS".into(),
-                        ))
-                    }
+                    _ => return Err(HayashiError::Type("vif() only supports OLS models".into())),
                 };
 
                 let vifs = greeners::Diagnostics::vif(&ols.x)
@@ -13804,14 +13793,14 @@ impl Interpreter {
             "condnum" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
-                        "condnum() requer um modelo OLS".into(),
+                        "condnum() requires an OLS model".into(),
                     ));
                 }
                 let ols = match self.eval_expr(&args[0])? {
                     Value::OlsResult(m) => m,
                     _ => {
                         return Err(HayashiError::Type(
-                            "condnum() suporta apenas modelos OLS".into(),
+                            "condnum() only supports OLS models".into(),
                         ))
                     }
                 };
@@ -13852,14 +13841,14 @@ impl Interpreter {
             "durbinwatson" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
-                        "durbinwatson() requer um modelo OLS".into(),
+                        "durbinwatson() requires an OLS model".into(),
                     ));
                 }
                 let ols = match self.eval_expr(&args[0])? {
                     Value::OlsResult(m) => m,
                     _ => {
                         return Err(HayashiError::Type(
-                            "durbinwatson() suporta apenas modelos OLS".into(),
+                            "durbinwatson() only supports OLS models".into(),
                         ))
                     }
                 };
@@ -13893,13 +13882,15 @@ impl Interpreter {
             // Requer modelo OLS — regride u² nos regressores e seus quadrados
             "white" => {
                 if args.is_empty() {
-                    return Err(HayashiError::Runtime("white() requer um modelo OLS".into()));
+                    return Err(HayashiError::Runtime(
+                        "white() requires an OLS model".into(),
+                    ));
                 }
                 let ols = match self.eval_expr(&args[0])? {
                     Value::OlsResult(m) => m,
                     _ => {
                         return Err(HayashiError::Type(
-                            "white() suporta apenas modelos OLS".into(),
+                            "white() only supports OLS models".into(),
                         ))
                     }
                 };
@@ -13948,13 +13939,15 @@ impl Interpreter {
             // Requer modelo OLS — adiciona ŷ², ..., ŷ^power como regressores
             "reset" => {
                 if args.is_empty() {
-                    return Err(HayashiError::Runtime("reset() requer um modelo OLS".into()));
+                    return Err(HayashiError::Runtime(
+                        "reset() requires an OLS model".into(),
+                    ));
                 }
                 let ols = match self.eval_expr(&args[0])? {
                     Value::OlsResult(m) => m,
                     _ => {
                         return Err(HayashiError::Type(
-                            "reset() suporta apenas modelos OLS".into(),
+                            "reset() only supports OLS models".into(),
                         ))
                     }
                 };
@@ -14014,7 +14007,7 @@ impl Interpreter {
             "jb" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
-                        "jb() requer uma série ou modelo".into(),
+                        "jb() requires a series or model".into(),
                     ));
                 }
 
@@ -14024,8 +14017,7 @@ impl Interpreter {
                             Some(Expr::Var(n)) => n.clone(),
                             _ => {
                                 return Err(HayashiError::Runtime(
-                                    "jb(df, varname): second argument must be o nome da coluna"
-                                        .into(),
+                                    "jb(df, varname): second argument must be a column name".into(),
                                 ))
                             }
                         };
@@ -14036,7 +14028,7 @@ impl Interpreter {
                     Value::GarchResult(m) => m.standardized_residuals.clone(),
                     _ => {
                         return Err(HayashiError::Type(
-                            "jb(): argumento deve ser DataFrame, OLS, ARIMA ou GARCH".into(),
+                            "jb(): argument must be a DataFrame, OLS, ARIMA, or GARCH".into(),
                         ))
                     }
                 };
@@ -14082,7 +14074,7 @@ impl Interpreter {
             "bgodfrey" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
-                        "bgodfrey() requer um modelo OLS".into(),
+                        "bgodfrey() requires an OLS model".into(),
                     ));
                 }
 
@@ -14090,7 +14082,7 @@ impl Interpreter {
                     Value::OlsResult(m) => m,
                     _ => {
                         return Err(HayashiError::Type(
-                            "bgodfrey() suporta apenas modelos OLS".into(),
+                            "bgodfrey() only supports OLS models".into(),
                         ))
                     }
                 };
@@ -14154,32 +14146,33 @@ impl Interpreter {
             "archtest" | "arch_test" | "engle_arch" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
-                        "archtest() requer uma série ou modelo GARCH".into(),
+                        "archtest() requires a series or GARCH model".into(),
                     ));
                 }
 
-                let series =
-                    match self.eval_expr(&args[0])? {
-                        // série bruta: archtest(df, varname, lags=5)
-                        Value::DataFrame(df) => {
-                            let col_name = match args.get(1) {
-                            Some(Expr::Var(n)) => n.clone(),
-                            _ => return Err(HayashiError::Runtime(
-                                "archtest(df, varname): second argument must be o nome da coluna"
-                                    .into(),
-                            )),
-                        };
-                            Array1::from(self.eval_col_expr(&Expr::Var(col_name), &df)?)
-                        }
-                        // resíduos de GARCH: archtest(model, lags=5)
-                        // usa resíduos padronizados z_t = ε_t/√h_t — sob H₀ de
-                        // especificação correta, z_t² não deve ter autocorrelação
-                        Value::GarchResult(m) => m.standardized_residuals.clone(),
-                        _ => return Err(HayashiError::Type(
-                            "archtest(): primeiro argumento deve ser um DataFrame ou modelo GARCH"
-                                .into(),
-                        )),
-                    };
+                let series = match self.eval_expr(&args[0])? {
+                    // série bruta: archtest(df, varname, lags=5)
+                    Value::DataFrame(df) => {
+                        let col_name =
+                            match args.get(1) {
+                                Some(Expr::Var(n)) => n.clone(),
+                                _ => return Err(HayashiError::Runtime(
+                                    "archtest(df, varname): second argument must be a column name"
+                                        .into(),
+                                )),
+                            };
+                        Array1::from(self.eval_col_expr(&Expr::Var(col_name), &df)?)
+                    }
+                    // resíduos de GARCH: archtest(model, lags=5)
+                    // usa resíduos padronizados z_t = ε_t/√h_t — sob H₀ de
+                    // especificação correta, z_t² não deve ter autocorrelação
+                    Value::GarchResult(m) => m.standardized_residuals.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "archtest(): first argument must be a DataFrame or GARCH model".into(),
+                        ))
+                    }
+                };
 
                 let lags = match opt_map.get("lags") {
                     Some(Value::Int(v)) => *v as usize,
@@ -14246,7 +14239,7 @@ impl Interpreter {
             "forecast_vol" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
-                        "forecast_vol() requer um modelo GARCH".into(),
+                        "forecast_vol() requires a GARCH model".into(),
                     ));
                 }
 
@@ -14254,7 +14247,7 @@ impl Interpreter {
                     Value::GarchResult(m) => m,
                     _ => {
                         return Err(HayashiError::Type(
-                            "forecast_vol() requer um modelo GARCH/EGARCH/GJRGARCH".into(),
+                            "forecast_vol() requires a GARCH/EGARCH/GJRGARCH model".into(),
                         ))
                     }
                 };
@@ -14302,7 +14295,7 @@ impl Interpreter {
             "diagnostics" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
-                        "diagnostics() requer um modelo (OLS, GARCH ou ARIMA)".into(),
+                        "diagnostics() requires a model (OLS, GARCH, or ARIMA)".into(),
                     ));
                 }
 
@@ -15707,7 +15700,7 @@ impl Interpreter {
                 }
                 let model = match self.eval_expr(&args[0])? {
                     Value::SVarResult(m) => m,
-                    _ => return Err(HayashiError::Type("sirf() requer um modelo SVAR".into())),
+                    _ => return Err(HayashiError::Type("sirf() requires an SVAR model".into())),
                 };
                 let steps = match opt_map.get("steps") {
                     Some(Value::Int(v)) => *v as usize,
@@ -15755,7 +15748,7 @@ impl Interpreter {
                 }
                 let model = match self.eval_expr(&args[0])? {
                     Value::SVarResult(m) => m,
-                    _ => return Err(HayashiError::Type("sfevd() requer um modelo SVAR".into())),
+                    _ => return Err(HayashiError::Type("sfevd() requires an SVAR model".into())),
                 };
                 let steps = match opt_map.get("steps") {
                     Some(Value::Int(v)) => *v as usize,
@@ -16038,7 +16031,7 @@ impl Interpreter {
                     Value::OlsResult(m) => m.residuals.to_vec(),
                     _ => {
                         return Err(HayashiError::Type(
-                            "omnibus() suporta apenas modelos OLS".into(),
+                            "omnibus() only supports OLS models".into(),
                         ))
                     }
                 };
@@ -16268,7 +16261,7 @@ impl Interpreter {
                     Value::OlsResult(m) => m,
                     _ => {
                         return Err(HayashiError::Type(
-                            "harveycollier() suporta apenas modelos OLS".into(),
+                            "harveycollier() only supports OLS models".into(),
                         ))
                     }
                 };
@@ -18900,16 +18893,17 @@ impl Interpreter {
                         "residplot(model, width=60, height=20)".into(),
                     ));
                 }
-                let (fitted, resids, mname) = match self.eval_expr(&args[0])? {
-                    Value::OlsResult(m) => {
-                        let yhat = m.x.dot(&m.result.params).to_vec();
-                        (yhat, m.residuals.to_vec(), "OLS".to_string())
-                    }
-                    _ => return Err(HayashiError::Type(
-                        "residplot() suporta apenas modelos OLS; para GLM use predict + scatter"
-                            .into(),
-                    )),
-                };
+                let (fitted, resids, mname) =
+                    match self.eval_expr(&args[0])? {
+                        Value::OlsResult(m) => {
+                            let yhat = m.x.dot(&m.result.params).to_vec();
+                            (yhat, m.residuals.to_vec(), "OLS".to_string())
+                        }
+                        _ => return Err(HayashiError::Type(
+                            "residplot() only supports OLS models; for GLM use predict + scatter"
+                                .into(),
+                        )),
+                    };
                 let w = match opt_map.get("width") {
                     Some(Value::Int(v)) => *v as usize,
                     Some(Value::Float(v)) => *v as usize,
@@ -20681,7 +20675,7 @@ impl Interpreter {
                 if matches!(func.as_str(), "rowmean" | "rowsum" | "rowmin" | "rowmax" | "rowtotal" | "rowmiss") {
                     if args.is_empty() {
                         return Err(HayashiError::Runtime(
-                            format!("{func}() requer ao menos uma coluna")
+                            format!("{func}() requires at least one column")
                         ));
                     }
                     let cols: Vec<Vec<f64>> = args.iter()
@@ -20722,7 +20716,7 @@ impl Interpreter {
                             let col_name = match &args[0] {
                                 Expr::Var(name) => name.clone(),
                                 _ => return Err(HayashiError::Runtime(
-                                    "group() requer o nome de uma coluna".into()
+                                    "group() requires a column name".into()
                                 )),
                             };
                             let strs = Self::col_to_strings(df, &col_name)?;
