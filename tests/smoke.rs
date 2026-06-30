@@ -1292,6 +1292,20 @@ fn lang_help_index() {
 }
 
 #[test]
+fn help_metadata_index_lists_categories() {
+    assert_ok_contains("help_metadata_index", "help()", "POST-ESTIMATION");
+}
+
+#[test]
+fn help_metadata_alias_lookup() {
+    assert_ok_contains(
+        "help_metadata_alias",
+        "help(regress)",
+        "Aliases: reg, regress",
+    );
+}
+
+#[test]
 fn lang_timer() {
     assert_ok_contains(
         "timer",
@@ -6050,11 +6064,11 @@ fn dict_to_dataframe() {
     assert_ok_contains(
         "dict_to_dataframe",
         r#"
-let d = {"x": [1.0, 2.0], "y": ["a", "b"], "z": [true, false]}
+let d = {"x": [1.0, 2.0, 3.0, 4.0], "y": ["a", "b", "c", "d"], "z": [true, false, true, false]}
 let df = dataframe(d)
 let m = ols(x ~ z, df)
 display m"#,
-        "Coefficients:",
+        "OLS Regression Results",
     );
 }
 

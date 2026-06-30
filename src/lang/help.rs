@@ -37,47 +37,19 @@ pub fn help_about() -> String {
     )
 }
 
-pub fn help_text(topic: &str) -> Option<&'static str> {
+pub fn help_text(topic: &str) -> Option<String> {
+    let topic = topic.trim();
+    if topic.is_empty() {
+        return Some(crate::lang::commands::metadata::help_index());
+    }
+    if let Some(help) = crate::lang::commands::metadata::command_help(topic) {
+        return Some(help.to_string());
+    }
+    legacy_help_text(topic).map(str::to_string)
+}
+
+fn legacy_help_text(topic: &str) -> Option<&'static str> {
     let h = match topic {
-        "" => concat!(
-            "Hayashi — Applied Econometrics Language\n\n",
-            "ESTIMATORS:\n",
-            "  ols/reg  logit  probit  iv  poisson  nbreg  tobit  qreg\n",
-            "  fe  re  ab  sysgmm  pcse  xtgls  heckman  cox  km\n",
-            "  lasso  ridge  elasticnet  garch  egarch  arima  autoreg  ardl  kalman  var  vecm  svar\n",
-            "  did  rd  synth  psm  glm  rlm  gee  betareg  mixed  glsar\n",
-            "  ologit  oprobit  mlogit  cloglog  zip  zinb\n\n",
-            "POST-ESTIMATION:\n",
-            "  test  nlcom  margins  predict  esttab  estat  hausman  lincom\n",
-            "  bootstrap  bootse  influence  vif  irf  fevd  coefplot\n\n",
-            "DATA:\n",
-            "  load (csv/tsv/json/dta/xlsx/parquet/sqlite/odbc)  export\n",
-            "  generate  mutate  replace  drop  keep/select  dropna  rename  sort  filter\n",
-            "  merge  append  collapse  group_by  reshape  pivot_longer  pivot_wider\n",
-            "  encode  decode  winsor  tabgen\n",
-            "  summarize  tabulate  tabstat  xtsum  ttest  correlate  pwcorr\n",
-            "  list  describe  codebook  count  ci  centile  duplicates  label  recode\n\n",
-            "TESTS:\n",
-            "  adf  kpss  pp  ljungbox  archtest  granger  johansen\n",
-            "  bptest  white  jb  reset  dw  swilk  sfrancia  sktest\n\n",
-            "GRAPHS:\n",
-            "  scatter  histogram  boxplot  kdensity  acfplot  pacfplot\n",
-            "  qqplot  corrplot  graph_scatter  graph_line  graph_hist  graph_coef\n\n",
-            "FINANCE:\n",
-            "  fmb  portsort  doublesort\n\n",
-            "LANGUAGE:\n",
-            "  let  const  if/else  for  while  fn  return  display  input\n",
-            "  source  export  print  quietly  capture  assert  timer  set_seed\n\n",
-            "COLLECTIONS:\n",
-            "  List: push pop insert remove clear reverse index slice join\n",
-            "        map unique flatten sort range len\n",
-            "  Dict: {\"k\": v}  keys values has_key dict_set dict_remove dict_merge\n\n",
-            "STRINGS:\n",
-            "  upper lower trim substr split str_replace contains\n",
-            "  regexm regexr regexra regexs\n\n",
-            "Type help(command) for details. Ex: help(ols)\n",
-            "Type help(about) for project info.\n",
-        ),
         "ols" | "reg" | "regress" => concat!(
             "ols(formula, df [, options])\n",
             "  Aliases: reg, regress\n\n",
