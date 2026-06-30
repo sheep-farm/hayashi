@@ -1130,19 +1130,30 @@ impl Interpreter {
         };
 
         for cand in &candidates {
+            let is_native_or_wasm = cand.ends_with(".wasm")
+                || cand.ends_with(".so")
+                || cand.ends_with(".dll")
+                || cand.ends_with(".dylib");
+
+            // No perfil de release (produção), restringimos plugins nativos/WASM
+            // a serem carregados exclusivamente de ~/.hay/packages/.
+            let restrict_to_packages = is_native_or_wasm && !cfg!(debug_assertions);
+
             // 1. Current directory
-            if std::path::Path::new(cand).exists() {
+            if !restrict_to_packages && std::path::Path::new(cand).exists() {
                 return Ok(cand.to_string());
             }
 
             // 2. ~/.hay/plugins/
-            if let Some(home) = std::env::var_os("HOME") {
-                let plugin_path = std::path::Path::new(&home)
-                    .join(".hay")
-                    .join("plugins")
-                    .join(cand);
-                if plugin_path.exists() {
-                    return Ok(plugin_path.to_string_lossy().to_string());
+            if !restrict_to_packages {
+                if let Some(home) = std::env::var_os("HOME") {
+                    let plugin_path = std::path::Path::new(&home)
+                        .join(".hay")
+                        .join("plugins")
+                        .join(cand);
+                    if plugin_path.exists() {
+                        return Ok(plugin_path.to_string_lossy().to_string());
+                    }
                 }
             }
 
@@ -1158,19 +1169,23 @@ impl Interpreter {
             }
 
             // 4. User-declared plugin_paths
-            for dir in &self.plugin_paths {
-                let p = std::path::Path::new(dir).join(cand);
-                if p.exists() {
-                    return Ok(p.to_string_lossy().to_string());
+            if !restrict_to_packages {
+                for dir in &self.plugin_paths {
+                    let p = std::path::Path::new(dir).join(cand);
+                    if p.exists() {
+                        return Ok(p.to_string_lossy().to_string());
+                    }
                 }
             }
 
             // 5. HAYASHI_PATH env var (colon-separated)
-            if let Ok(paths) = std::env::var("HAYASHI_PATH") {
-                for dir in paths.split(':') {
-                    let p = std::path::Path::new(dir).join(cand);
-                    if p.exists() {
-                        return Ok(p.to_string_lossy().to_string());
+            if !restrict_to_packages {
+                if let Ok(paths) = std::env::var("HAYASHI_PATH") {
+                    for dir in paths.split(':') {
+                        let p = std::path::Path::new(dir).join(cand);
+                        if p.exists() {
+                            return Ok(p.to_string_lossy().to_string());
+                        }
                     }
                 }
             }

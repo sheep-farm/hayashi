@@ -316,7 +316,7 @@ frlink 1:1 id, frame(clients)
 | Setup | `cargo install hayashi-lang` | install.packages × N | pip install × N | Pkg.add × N |
 | Imports needed | 0 | 3-8 per script | 5-10 per script | 3-6 per script |
 | Syntax consistency | one syntax for all | each package has its own API | statsmodels vs linearmodels vs arch | each package differs |
-| Extensibility | `.hay` scripts + native Rust plugins (planned) | R packages (CRAN) | pip packages (PyPI) | Julia packages (Pkg) |
+| Extensibility | `.hay` scripts + native (Rust/WASM) + Arrow zero-copy | R packages (CRAN) | pip packages (PyPI) | Julia packages (Pkg) |
 | System deps | none (pure Rust) | R runtime + BLAS | Python + NumPy + SciPy + BLAS | Julia runtime + BLAS |
 | Binary size | ~20 MB | ~200 MB runtime | ~500 MB environment | ~700 MB runtime |
 | REPL | tab completion, highlighting, hints | basic | IPython (separate install) | good |
@@ -329,7 +329,7 @@ Hayashi is extensible at two levels:
 
 - **Script plugins (`.hay`)**: any `.hay` file in `~/.hay/packages/` can be loaded via `import`. Users can also `import("module")` from local paths, `$HAY_PATH`, or URLs. This provides the same community-driven ecosystem dynamic as R (CRAN) and Python (PyPI), with `hay install user/repo` for GitHub-based distribution.
 
-- **Native Rust & WASM plugins**: fully supported native plugins (`.so`/`.dll`/`.dylib` / `.wasm`) using the `hayashi-plugin-sdk` to register new estimators, data sources, or transforms via Hayashi's namespace system. The package manager `hay install` automatically retrieves OS-compatible binary assets from GitHub Releases. Closed-source proprietary plugins are permitted through Hayashi's GPL-3.0 linking exception.
+- **Native Rust & WASM plugins**: fully supported native plugins (`.so`/`.dll`/`.dylib` / `.wasm`) using the `hayashi-plugin-sdk`. They register new estimators, data sources, or transforms via Hayashi's namespace system. The package manager `hay install` automatically retrieves OS-compatible binary assets from GitHub Releases. Native plugins support transparent, high-performance **zero-copy memory sharing using the Apache Arrow FFI format**, allowing third parties to build data-intensive packages (like Spatial, SEM, and Survey estimators) without performance bottlenecks. Closed-source proprietary plugins are permitted through Hayashi's GPL-3.0 linking exception.
 
 The Greeners engine (MIT-licensed) can be used independently by Rust developers, while Hayashi (GPL-3.0) provides the user-facing language layer.
 
