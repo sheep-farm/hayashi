@@ -6064,10 +6064,11 @@ fn dict_to_dataframe() {
     assert_ok_contains(
         "dict_to_dataframe",
         r#"
-let d = {"x": [1.0, 2.0], "y": ["a", "b"], "z": [true, false]}
+let d = {"x": [1.0, 2.0, 3.0, 4.0], "y": ["a", "b", "c", "d"], "z": [true, false, true, false]}
 let df = dataframe(d)
-display nrow(df)"#,
-        "2",
+let m = ols(x ~ z, df)
+display m"#,
+        "OLS Regression Results",
     );
 }
 

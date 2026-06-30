@@ -38,7 +38,8 @@ pub fn help_about() -> String {
 }
 
 pub fn help_text(topic: &str) -> Option<String> {
-    if topic.trim().is_empty() {
+    let topic = topic.trim();
+    if topic.is_empty() {
         return Some(crate::lang::commands::metadata::help_index());
     }
     if let Some(help) = crate::lang::commands::metadata::command_help(topic) {
