@@ -303,7 +303,11 @@ pub fn value_to_json(val: &Value, use_arrow: bool, temp_boxes: &mut Vec<(usize, 
 }
 
 /// Helper to deserialize JSON back into Value
-pub fn json_to_value(jval: &serde_json::Value, returned_arrow_ptrs: &mut Vec<(usize, usize)>) -> Value {
+pub fn json_to_value(
+    jval: &serde_json::Value,
+    returned_arrow_ptrs: &mut Vec<(usize, usize)>,
+    host_allocated: &std::collections::HashSet<usize>
+) -> Value {
     match jval {
         serde_json::Value::Null => Value::Nil,
         serde_json::Value::Bool(b) => Value::Bool(*b),
@@ -316,7 +320,7 @@ pub fn json_to_value(jval: &serde_json::Value, returned_arrow_ptrs: &mut Vec<(us
         }
         serde_json::Value::String(s) => Value::Str(s.clone()),
         serde_json::Value::Array(arr) => {
-            let lst: Vec<Value> = arr.iter().map(|v| json_to_value(v, returned_arrow_ptrs)).collect();
+            let lst: Vec<Value> = arr.iter().map(|v| json_to_value(v, returned_arrow_ptrs, host_allocated)).collect();
             Value::List(Rc::new(lst))
         }
         serde_json::Value::Object(obj) => {
@@ -324,17 +328,22 @@ pub fn json_to_value(jval: &serde_json::Value, returned_arrow_ptrs: &mut Vec<(us
                 if let (Some(arr_ptr), Some(sch_ptr)) = (arr_val.as_u64(), sch_val.as_u64()) {
                     let array_ptr = arr_ptr as *mut FFI_ArrowArray;
                     let schema_ptr = sch_ptr as *mut FFI_ArrowSchema;
+                    let is_host = host_allocated.contains(&(arr_ptr as usize));
                     unsafe {
                         if let Ok(array_data) = arrow::ffi::from_ffi(std::ptr::read(array_ptr), &*schema_ptr) {
                             let array_ref = make_array(array_data);
                             if let arrow::datatypes::DataType::Struct(_) = array_ref.data_type() {
                                 if let Ok(df) = arrow_to_dataframe(&array_ref) {
-                                    returned_arrow_ptrs.push((arr_ptr as usize, sch_ptr as usize));
+                                    if !is_host {
+                                        returned_arrow_ptrs.push((arr_ptr as usize, sch_ptr as usize));
+                                    }
                                     return Value::DataFrame(Rc::new(df));
                                 }
                             } else {
                                 if let Ok(col) = arrow_to_column(&array_ref) {
-                                    returned_arrow_ptrs.push((arr_ptr as usize, sch_ptr as usize));
+                                    if !is_host {
+                                        returned_arrow_ptrs.push((arr_ptr as usize, sch_ptr as usize));
+                                    }
                                     return column_to_value(&col);
                                 }
                             }
@@ -345,7 +354,7 @@ pub fn json_to_value(jval: &serde_json::Value, returned_arrow_ptrs: &mut Vec<(us
             
             let mut map = HashMap::new();
             for (k, v) in obj.iter() {
-                map.insert(k.clone(), json_to_value(v, returned_arrow_ptrs));
+                map.insert(k.clone(), json_to_value(v, returned_arrow_ptrs, host_allocated));
             }
             Value::Dict(Rc::new(map))
         }
@@ -395,8 +404,34 @@ impl HayashiPlugin for RustNativePlugin {
             // 2. Call the function
             let res_ptr = func(c_payload.as_ptr());
 
-            // 3. Free host-allocated FFI boxes immediately after call returns
-            for (arr_ptr, sch_ptr) in temp_boxes {
+            if res_ptr.is_null() {
+                return Err(format!(
+                    "Native plugin function '{func_name}' returned NULL pointer"
+                ));
+            }
+
+            // 3. Convert return pointer back to string and Value
+            let c_res = std::ffi::CStr::from_ptr(res_ptr);
+            let res_str = c_res.to_string_lossy().to_string();
+
+            // 4. Deallocate the returned C string
+            if let Ok(free_func) = self
+                .lib
+                .get::<unsafe extern "C" fn(*mut std::os::raw::c_char)>(b"free_string")
+            {
+                free_func(res_ptr);
+            }
+
+            // 5. Deserialize JSON, collecting any guest-allocated Arrow pointers
+            let ret_json: serde_json::Value =
+                serde_json::from_str(&res_str).map_err(|e| e.to_string())?;
+            
+            let host_allocated_set: std::collections::HashSet<usize> = temp_boxes.iter().map(|(arr, _)| *arr).collect();
+            let mut returned_arrow_ptrs = Vec::new();
+            let val = json_to_value(&ret_json, &mut returned_arrow_ptrs, &host_allocated_set);
+
+            // 6. Free host-allocated FFI boxes after deserialization has reconstructed the data
+            for &(arr_ptr, sch_ptr) in &temp_boxes {
                 let mut arr_box = Box::from_raw(arr_ptr as *mut FFI_ArrowArray);
                 arr_box.release = None;
                 drop(arr_box);
@@ -405,31 +440,6 @@ impl HayashiPlugin for RustNativePlugin {
                 drop(sch_box);
             }
 
-            if res_ptr.is_null() {
-                return Err(format!(
-                    "Native plugin function '{func_name}' returned NULL pointer"
-                ));
-            }
-
-            // 4. Convert return pointer back to string and Value
-            let c_res = std::ffi::CStr::from_ptr(res_ptr);
-            let res_str = c_res.to_string_lossy().to_string();
-
-            // 5. Deallocate the returned C string
-            if let Ok(free_func) = self
-                .lib
-                .get::<unsafe extern "C" fn(*mut std::os::raw::c_char)>(b"free_string")
-            {
-                free_func(res_ptr);
-            }
-
-            // 6. Deserialize JSON, collecting any guest-allocated Arrow pointers
-            let ret_json: serde_json::Value =
-                serde_json::from_str(&res_str).map_err(|e| e.to_string())?;
-            
-            let mut returned_arrow_ptrs = Vec::new();
-            let val = json_to_value(&ret_json, &mut returned_arrow_ptrs);
-
             // 7. Clean up guest-allocated Arrow pointers using plugin's free_arrow_pointers hook
             if !returned_arrow_ptrs.is_empty() {
                 if let Ok(free_arrow_func) = self
@@ -437,7 +447,15 @@ impl HayashiPlugin for RustNativePlugin {
                     .get::<unsafe extern "C" fn(*mut FFI_ArrowArray, *mut FFI_ArrowSchema)>(b"free_arrow_pointers")
                 {
                     for (arr_ptr, sch_ptr) in returned_arrow_ptrs {
-                        free_arrow_func(arr_ptr as *mut FFI_ArrowArray, sch_ptr as *mut FFI_ArrowSchema);
+                        let arr = arr_ptr as *mut FFI_ArrowArray;
+                        let sch = sch_ptr as *mut FFI_ArrowSchema;
+                        if !arr.is_null() {
+                            (*arr).release = None;
+                        }
+                        if !sch.is_null() {
+                            (*sch).release = None;
+                        }
+                        free_arrow_func(arr, sch);
                     }
                 }
             }
@@ -561,6 +579,6 @@ impl HayashiPlugin for WasmPlugin {
         let _ = dealloc.call(&mut self.store, (ret_ptr, ret_len));
 
         let mut returned_arrow_ptrs = Vec::new();
-        Ok(json_to_value(&ret_json, &mut returned_arrow_ptrs))
+        Ok(json_to_value(&ret_json, &mut returned_arrow_ptrs, &std::collections::HashSet::new()))
     }
 }
