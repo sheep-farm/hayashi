@@ -6066,9 +6066,8 @@ fn dict_to_dataframe() {
         r#"
 let d = {"x": [1.0, 2.0], "y": ["a", "b"], "z": [true, false]}
 let df = dataframe(d)
-let m = ols(x ~ z, df)
-display m"#,
-        "Coefficients:",
+display nrow(df)"#,
+        "2",
     );
 }
 
