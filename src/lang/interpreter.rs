@@ -986,7 +986,10 @@ impl Interpreter {
             }
 
             if len == 0 {
-                columns.insert(col_name.clone(), greeners::Column::Float(ndarray::Array1::from(vec![])));
+                columns.insert(
+                    col_name.clone(),
+                    greeners::Column::Float(ndarray::Array1::from(vec![])),
+                );
                 continue;
             }
 
@@ -998,10 +1001,12 @@ impl Interpreter {
                         match v {
                             Value::Float(f) => data.push(*f),
                             Value::Int(i_val) => data.push(*i_val as f64),
-                            other => return Err(self.type_err(format!(
-                                "element at index {} of column '{}' is not numeric (got {})",
-                                i, col_name, other
-                            ))),
+                            other => {
+                                return Err(self.type_err(format!(
+                                    "element at index {} of column '{}' is not numeric (got {})",
+                                    i, col_name, other
+                                )))
+                            }
                         }
                     }
                     greeners::Column::Float(ndarray::Array1::from(data))
@@ -1012,10 +1017,12 @@ impl Interpreter {
                         match v {
                             Value::Int(i_val) => data.push(*i_val),
                             Value::Float(f) => data.push(*f as i64),
-                            other => return Err(self.type_err(format!(
-                                "element at index {} of column '{}' is not an integer (got {})",
-                                i, col_name, other
-                            ))),
+                            other => {
+                                return Err(self.type_err(format!(
+                                    "element at index {} of column '{}' is not an integer (got {})",
+                                    i, col_name, other
+                                )))
+                            }
                         }
                     }
                     greeners::Column::Int(ndarray::Array1::from(data))
@@ -1025,10 +1032,12 @@ impl Interpreter {
                     for (i, v) in list.iter().enumerate() {
                         match v {
                             Value::Bool(b) => data.push(*b),
-                            other => return Err(self.type_err(format!(
-                                "element at index {} of column '{}' is not boolean (got {})",
-                                i, col_name, other
-                            ))),
+                            other => {
+                                return Err(self.type_err(format!(
+                                    "element at index {} of column '{}' is not boolean (got {})",
+                                    i, col_name, other
+                                )))
+                            }
                         }
                     }
                     greeners::Column::Bool(ndarray::Array1::from(data))
@@ -1038,18 +1047,22 @@ impl Interpreter {
                     for (i, v) in list.iter().enumerate() {
                         match v {
                             Value::Str(s) => data.push(s.clone()),
-                            other => return Err(self.type_err(format!(
-                                "element at index {} of column '{}' is not a string (got {})",
-                                i, col_name, other
-                            ))),
+                            other => {
+                                return Err(self.type_err(format!(
+                                    "element at index {} of column '{}' is not a string (got {})",
+                                    i, col_name, other
+                                )))
+                            }
                         }
                     }
                     greeners::Column::from_strings(data)
                 }
-                other => return Err(self.type_err(format!(
-                    "unsupported type for column '{}': {}",
-                    col_name, other
-                ))),
+                other => {
+                    return Err(self.type_err(format!(
+                        "unsupported type for column '{}': {}",
+                        col_name, other
+                    )))
+                }
             };
 
             columns.insert(col_name.clone(), col);
@@ -1453,24 +1466,30 @@ impl Interpreter {
                             Column::Float(arr) => arr.iter().map(|&x| Value::Float(x)).collect(),
                             Column::Int(arr) => arr.iter().map(|&x| Value::Int(x)).collect(),
                             Column::Bool(arr) => arr.iter().map(|&x| Value::Bool(x)).collect(),
-                            Column::String(arr) => arr.iter().map(|s| Value::Str(s.clone())).collect(),
-                            Column::Categorical(c) => {
-                                c.codes.iter().map(|&code| {
-                                    let level = c.levels.get(code as usize)
+                            Column::String(arr) => {
+                                arr.iter().map(|s| Value::Str(s.clone())).collect()
+                            }
+                            Column::Categorical(c) => c
+                                .codes
+                                .iter()
+                                .map(|&code| {
+                                    let level = c
+                                        .levels
+                                        .get(code as usize)
                                         .map(|s| s.clone())
                                         .unwrap_or_else(|| "".to_string());
                                     Value::Str(level)
-                                }).collect()
-                            }
+                                })
+                                .collect(),
                             Column::DateTime(arr) => {
                                 arr.iter().map(|dt| Value::Str(dt.to_string())).collect()
                             }
                         };
                         Ok(Value::List(Rc::new(vals)))
                     }
-                    (Value::DataFrame(_), _) => {
-                        Err(HayashiError::Type("DataFrame column index must be a string".into()))
-                    }
+                    (Value::DataFrame(_), _) => Err(HayashiError::Type(
+                        "DataFrame column index must be a string".into(),
+                    )),
                     (Value::List(v), _) => {
                         let i = match idx_val {
                             Value::Int(i) => i,

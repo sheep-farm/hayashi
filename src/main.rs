@@ -587,15 +587,17 @@ fn pkg_install(spec: &str) {
     if n_hy == 0 {
         println!("No .hay scripts found. Checking for native/WASM releases...");
         let release_url = format!("https://api.github.com/repos/{user}/{repo}/releases/latest");
-        
+
         let release_resp = match ureq::get(&release_url)
             .set("User-Agent", "hay")
             .set("Accept", "application/vnd.github.v3+json")
-            .call() 
+            .call()
         {
             Ok(r) => r,
             Err(e) => {
-                eprintln!("hay install: no scripts or native releases found for {user}/{repo}: {e}");
+                eprintln!(
+                    "hay install: no scripts or native releases found for {user}/{repo}: {e}"
+                );
                 std::process::exit(1);
             }
         };
@@ -609,16 +611,17 @@ fn pkg_install(spec: &str) {
         let target = current_target_triple();
         let ext = current_target_ext();
 
-        let matching_asset = release.assets.iter().find(|asset| {
-            asset.name.contains(target) && asset.name.ends_with(ext)
-        });
+        let matching_asset = release
+            .assets
+            .iter()
+            .find(|asset| asset.name.contains(target) && asset.name.ends_with(ext));
 
         if let Some(asset) = matching_asset {
             println!("Found binary release for {target}: {}", asset.name);
             let parent_dir = packages_dir().join(user);
             std::fs::create_dir_all(&parent_dir).unwrap();
             let dest_file = parent_dir.join(format!("{repo}.{ext}"));
-            
+
             print!("Downloading {} ... ", asset.name);
             match ureq::get(&asset.browser_download_url).call() {
                 Ok(resp) => {
@@ -626,7 +629,10 @@ fn pkg_install(spec: &str) {
                     let mut out_file = std::fs::File::create(&dest_file).unwrap();
                     if std::io::copy(&mut reader, &mut out_file).is_ok() {
                         println!("ok");
-                        println!("Successfully installed native plugin {user}/{repo} at {}", dest_file.display());
+                        println!(
+                            "Successfully installed native plugin {user}/{repo} at {}",
+                            dest_file.display()
+                        );
                         println!("  use: import(\"{user}/{repo}\")");
                         return;
                     } else {
@@ -726,7 +732,12 @@ fn pkg_list() {
                     .map(|rd| {
                         rd.filter_map(|e| e.ok())
                             .filter(|e| {
-                                let ext = e.path().extension().and_then(|x| x.to_str()).unwrap_or("").to_lowercase();
+                                let ext = e
+                                    .path()
+                                    .extension()
+                                    .and_then(|x| x.to_str())
+                                    .unwrap_or("")
+                                    .to_lowercase();
                                 ext == "hay" || ext == "hy"
                             })
                             .count()
@@ -747,13 +758,18 @@ fn pkg_list() {
                     );
                 }
             } else if path.is_file() {
-                let ext = path.extension().and_then(|x| x.to_str()).unwrap_or("").to_lowercase();
+                let ext = path
+                    .extension()
+                    .and_then(|x| x.to_str())
+                    .unwrap_or("")
+                    .to_lowercase();
                 if matches!(ext.as_str(), "so" | "dll" | "dylib" | "wasm") {
                     if !found {
                         println!("Installed packages (~/.hay/packages/):\n");
                         found = true;
                     }
-                    let clean_name = repo.to_string_lossy()
+                    let clean_name = repo
+                        .to_string_lossy()
                         .trim_end_matches(&format!(".{ext}"))
                         .to_string();
                     println!(
