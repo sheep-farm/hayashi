@@ -48,6 +48,15 @@ fn assert_ok_contains(name: &str, src: &str, needle: &str) {
     );
 }
 
+fn assert_err_contains(name: &str, src: &str, needle: &str) {
+    let (ok, out) = run_inline(src);
+    assert!(!ok, "{name} unexpectedly succeeded:\n{out}");
+    assert!(
+        out.contains(needle),
+        "{name}: output missing '{needle}':\n{out}"
+    );
+}
+
 #[derive(Debug)]
 struct MarginsRow {
     dydx: f64,
@@ -649,6 +658,19 @@ end
 tabulate(df, group)
 "#,
         "Freq",
+    );
+}
+
+#[test]
+fn tabulate_nan_string_group_does_not_panic() {
+    assert_ok_contains(
+        "tabulate_nan_string_group",
+        r#"
+let d = {"group": ["1", "NaN", "2"]}
+let df = dataframe(d)
+tabulate(df, group)
+"#,
+        "NaN",
     );
 }
 
@@ -3176,6 +3198,19 @@ ttest(df, Y, by=group)
 }
 
 #[test]
+fn ttest_by_nan_string_group_does_not_panic() {
+    assert_err_contains(
+        "ttest_nan_string_group",
+        r#"
+let d = {"Y": [10, 12, 20], "group": ["1", "NaN", "2"]}
+let df = dataframe(d)
+ttest(df, Y, by=group)
+"#,
+        "two-sample ttest requires exactly 2 groups",
+    );
+}
+
+#[test]
 fn ttest_paired() {
     assert_ok_contains(
         "ttest_paired",
@@ -3306,6 +3341,20 @@ let agg = collapse(df, sum, Y, by=group)
 list(agg)
 "#,
         "group",
+    );
+}
+
+#[test]
+fn collapse_by_nan_string_group_does_not_panic() {
+    assert_ok_contains(
+        "collapse_nan_string_group",
+        r#"
+let d = {"Y": [10, 20, 30], "group": ["1", "NaN", "2"]}
+let df = dataframe(d)
+let agg = collapse(df, sum, Y, by=group)
+list(agg)
+"#,
+        "NaN",
     );
 }
 
