@@ -39,9 +39,11 @@ O \hayashi{} utiliza o **GitHub diretamente como registro de pacotes**. Isso eli
 Para gerenciar pacotes de terceiros pelo terminal do sistema operacional, use:
 
 \begin{lstlisting}[style=inline, numbers=none, frame=none]
-hay install usuario/repositorio   -- Instala um pacote do GitHub
-hay remove  usuario/repositorio   -- Desinstala um pacote
-hay list                         -- Lista pacotes instalados
+hay install usuario/repositorio   -- Instala um pacote do GitHub (-y para pular prompt de sobrescrita)
+hay remove  usuario/repositorio   -- Desinstala um pacote (deleta arquivos, pastas e metadados)
+hay list                         -- Lista pacotes e plugins instalados
+hay check-plugin [user/repo]     -- Verifica a integridade/versao contra o repositorio remoto
+hay update [user/repo] [-y]      -- Atualiza o(s) pacote(s) para a versao mais recente (-y pula prompt)
 \end{lstlisting}
 
 \subsection{Estrutura Padrão de um Pacote}
