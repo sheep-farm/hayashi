@@ -1,0 +1,6 @@
+[advisories]
+# `paste` is currently transitive through greeners/faer/gemm, parquet,
+# statrs/nalgebra/simba, and wasmi_core. RUSTSEC lists no safe upgrade.
+ignore = [
+    { id = "RUSTSEC-2024-0436", reason = "Transitive only; no safe upgrade is currently available." },
+]
