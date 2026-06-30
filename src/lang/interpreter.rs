@@ -11094,17 +11094,7 @@ impl Interpreter {
                                 gkeys.len()
                             )));
                         }
-                        let all_num = gkeys.iter().all(|s| s.parse::<f64>().is_ok());
-                        if all_num {
-                            gkeys.sort_by(|a, b| {
-                                a.parse::<f64>()
-                                    .unwrap()
-                                    .partial_cmp(&b.parse::<f64>().unwrap())
-                                    .unwrap()
-                            });
-                        } else {
-                            gkeys.sort();
-                        }
+                        Self::sort_maybe_numeric_strings(&mut gkeys);
 
                         let equal_var = matches!(opt_map.get("unequal"), Some(Value::Bool(false)));
 
@@ -11273,17 +11263,7 @@ impl Interpreter {
 
                 // ordena chaves de grupo
                 let mut keys: Vec<String> = groups.keys().cloned().collect();
-                let keys_numeric = keys.iter().all(|s| s.parse::<f64>().is_ok());
-                if keys_numeric {
-                    keys.sort_by(|a, b| {
-                        a.parse::<f64>()
-                            .unwrap()
-                            .partial_cmp(&b.parse::<f64>().unwrap())
-                            .unwrap()
-                    });
-                } else {
-                    keys.sort();
-                }
+                Self::sort_maybe_numeric_strings(&mut keys);
 
                 // função de agregação: NaN nos dados propaga NaN no resultado (IEEE 754)
                 let agg = |vals: &[f64]| -> f64 {
@@ -11432,17 +11412,7 @@ impl Interpreter {
                     groups.entry(v.clone()).or_default().push(i);
                 }
                 let mut keys: Vec<String> = groups.keys().cloned().collect();
-                let keys_numeric = keys.iter().all(|s| s.parse::<f64>().is_ok());
-                if keys_numeric {
-                    keys.sort_by(|a, b| {
-                        a.parse::<f64>()
-                            .unwrap()
-                            .partial_cmp(&b.parse::<f64>().unwrap())
-                            .unwrap()
-                    });
-                } else {
-                    keys.sort();
-                }
+                Self::sort_maybe_numeric_strings(&mut keys);
 
                 let agg_fn = |vals: &[f64]| -> f64 {
                     let n = vals.len();
@@ -19580,6 +19550,29 @@ impl Interpreter {
         }
     }
 
+    fn finite_numeric_string(value: &str) -> Option<f64> {
+        value.parse::<f64>().ok().filter(|v| v.is_finite())
+    }
+
+    fn sort_maybe_numeric_strings(values: &mut [String]) {
+        if values
+            .iter()
+            .all(|value| Self::finite_numeric_string(value).is_some())
+        {
+            values.sort_by(|a, b| {
+                match (
+                    Self::finite_numeric_string(a),
+                    Self::finite_numeric_string(b),
+                ) {
+                    (Some(a), Some(b)) => a.partial_cmp(&b).unwrap_or(std::cmp::Ordering::Equal),
+                    _ => a.cmp(b),
+                }
+            });
+        } else {
+            values.sort();
+        }
+    }
+
     // ── Nomes dos coeficientes a partir da fórmula ────────────────────────────
 
     // Ordena um DataFrame por uma única coluna (ascendente).
@@ -19652,16 +19645,7 @@ impl Interpreter {
                         .collect::<std::collections::HashSet<_>>()
                         .into_iter()
                         .collect();
-                    if unique.iter().all(|s| s.parse::<f64>().is_ok()) {
-                        unique.sort_by(|a, b| {
-                            a.parse::<f64>()
-                                .unwrap()
-                                .partial_cmp(&b.parse::<f64>().unwrap())
-                                .unwrap()
-                        });
-                    } else {
-                        unique.sort();
-                    }
+                    Self::sort_maybe_numeric_strings(&mut unique);
                     for val in unique.into_iter().skip(1) {
                         names.push(format!("{v}={val}"));
                     }
@@ -19693,6 +19677,10 @@ impl Interpreter {
                     }
                 })
                 .collect()),
+            Ok(Column::String(arr)) => Ok(arr.to_vec()),
+            Ok(Column::Categorical(cat)) => Ok((0..df.n_rows())
+                .map(|row| cat.get_string(row).unwrap_or("").to_string())
+                .collect()),
             _ => df.get_string(name).map(|arr| arr.to_vec()).map_err(|_| {
                 HayashiError::Runtime(format!(
                     "column '{name}' not found or has unsupported type for tabulate"
@@ -19713,17 +19701,7 @@ impl Interpreter {
         }
 
         let mut unique: Vec<String> = counts.keys().cloned().collect();
-        let all_num = unique.iter().all(|s| s.parse::<f64>().is_ok());
-        if all_num {
-            unique.sort_by(|a, b| {
-                a.parse::<f64>()
-                    .unwrap()
-                    .partial_cmp(&b.parse::<f64>().unwrap())
-                    .unwrap()
-            });
-        } else {
-            unique.sort();
-        }
+        Self::sort_maybe_numeric_strings(&mut unique);
 
         let label_w = var
             .len()
@@ -19782,17 +19760,7 @@ impl Interpreter {
 
         // valores únicos, ordenados
         let sort_strs = |mut v: Vec<String>| -> Vec<String> {
-            let all_num = v.iter().all(|s| s.parse::<f64>().is_ok());
-            if all_num {
-                v.sort_by(|a, b| {
-                    a.parse::<f64>()
-                        .unwrap()
-                        .partial_cmp(&b.parse::<f64>().unwrap())
-                        .unwrap()
-                });
-            } else {
-                v.sort();
-            }
+            Self::sort_maybe_numeric_strings(&mut v);
             v
         };
 
