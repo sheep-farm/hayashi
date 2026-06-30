@@ -117,6 +117,18 @@ let dist = geo::distance_to_point(df["lat"], df["lon"], -30.03, -51.22)
 generate df dist_poa = dist
 \end{lstlisting}
 
+\subsubsection{Considerações de Segurança e Memória: JSON ABI vs. Zero-Copy FFI}
+Embora a ABI JSON baseada em C-strings padrão ofereça um desacoplamento e segurança extremos (já que evoluções no esquema JSON não quebram layouts de memória física), ela pode se tornar um gargalo ao compartilhar grandes volumes de dados (Big Data) devido ao overhead de serialização.
+
+Para mitigar esse problema, o Hayashi suporta compartilhamento de memória zero-copy transparente utilizando o formato FFI do Apache Arrow para trocas complexas de arrays e dataframes. Isso é feito de forma automática passando ponteiros de structs FFI (\texttt{FFI\_ArrowArray} e \texttt{FFI\_ArrowSchema}). Contudo, desenvolvedores devem buscar o equilíbrio ideal:
+\begin{itemize}
+    \item \textbf{JSON C String}: Oferece máximo desacoplamento, segurança e compatibilidade de versão binária entre diferentes compilações de compiladores. Indicado para rotinas de controle, pequenos volumes de dados e extensibilidade geral.
+    \item \textbf{Apache Arrow Zero-Copy}: Oferece máxima velocidade e zero overhead de alocação de memória. Indicado para cálculos de uso intensivo de dados, inferência de redes neurais ou grandes estimações econométricas. Exige uma coordenação estrita do ciclo de vida de memória (prevenção manual de bugs de liberação dupla na fronteira FFI).
+\end{itemize}
+
+Esta dualidade representa uma decisão de projeto intencional da linguagem Hayashi. Limitar o suporte a zero-copy estritamente a DataFrames e colunas homogêneas protege o ecossistema contra o perigo de quebras de compatibilidade binária (ABI) em estruturas de controle e dados complexas, as quais são leves para serializar via JSON C String. Dessa forma, mantém-se a estabilidade e a facilidade de manutenção de longo prazo da linguagem sem comprometer a performance no tráfego de dados volumosos.
+
+
 \subsection{3. Plugins WebAssembly (WASM - Para demais linguagens)}
 Para desenvolvedores utilizando outras linguagens (como C, Go, Zig, etc.), a compilação deve ser feita obrigatoriamente para WebAssembly (\texttt{.wasm}). Esses arquivos são executados de forma totalmente isolada (sandboxed) através de um motor WASM integrado ao Hayashi, garantindo segurança total (qualquer falha no plugin não derruba o Hayashi) e portabilidade multiplataforma instantânea.
 

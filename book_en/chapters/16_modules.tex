@@ -117,6 +117,18 @@ let dist = geo::distance_to_point(df["lat"], df["lon"], -30.03, -51.22)
 generate df dist_poa = dist
 \end{lstlisting}
 
+\subsubsection{Security and Memory Considerations: JSON ABI vs. Zero-Copy FFI}
+While the default C-string JSON ABI offers extreme safety and decoupling (as any schema evolution in JSON doesn't break memory layouts), it can become a bottleneck when sharing large volumes of data (Big Data) due to serialization overhead. 
+
+To bridge this gap, Hayashi supports transparent zero-copy memory sharing using the Apache Arrow FFI format for complex array/dataframe exchanges. This is implemented automatically by passing pointers to FFI structs (\texttt{FFI\_ArrowArray} and \texttt{FFI\_ArrowSchema}) in a zero-copy manner. However, developers must find the right balance:
+\begin{itemize}
+    \item \textbf{JSON C String}: Offers maximum decoupling, safety, and binary version compatibility across different compiler versions. Best for control routines, small datasets, and general extensibility.
+    \item \textbf{Apache Arrow Zero-Copy}: Offers maximum speed and zero memory allocation overhead. Best for data-intensive calculations, deep learning inference, or large econometric estimations. It requires strict memory lifecycle coordination (manual prevention of double-free bugs on the FFI boundary).
+\end{itemize}
+
+This duality represents an intentional design decision of the Hayashi language. Restricting zero-copy support strictly to DataFrames and homogeneous columns protects the ecosystem from binary compatibility (ABI) breakage in complex control structures and metadata, which are cheap to serialize via JSON C String. This guarantees long-term stability and ease of maintenance of the language without sacrificing performance on large data volume exchanges.
+
+
 \subsection{3. WebAssembly Plugins (WASM - For other languages)}
 For developers using other languages (such as C, Go, Zig, etc.), plugins must be compiled to WebAssembly (\texttt{.wasm}). They run inside a fully sandboxed environment via Hayashi's built-in WASM engine, ensuring absolute safety (any crash inside the plugin will not crash Hayashi itself) and instant cross-platform portability.
 
