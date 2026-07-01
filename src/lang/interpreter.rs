@@ -2119,7 +2119,9 @@ impl Interpreter {
                 }
                 let content = match self.eval_expr(&args[0])? {
                     Value::Str(s) => s,
-                    v => return Err(self.type_err(format!("write: content must be string, got {v}"))),
+                    v => {
+                        return Err(self.type_err(format!("write: content must be string, got {v}")))
+                    }
                 };
                 let path = match self.eval_expr(&args[1])? {
                     Value::Str(s) => s,

@@ -473,7 +473,7 @@ impl Parser {
             // Dict literal: {"key": value, ...}
             Token::LBrace => {
                 self.advance(); // consome LBrace
-                // Incrementa manualmente: dentro do dict, Newlines são ignorados
+                                // Incrementa manualmente: dentro do dict, Newlines são ignorados
                 self.brace_depth += 1;
                 let mut pairs = Vec::new();
                 while !matches!(self.peek(), Token::RBrace | Token::Eof) {

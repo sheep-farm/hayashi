@@ -302,7 +302,7 @@ fn run() {
 
     let verbose = args.iter().any(|a| a == "--verbose" || a == "-v");
     let yes = args.iter().any(|a| a == "--yes" || a == "-y");
-    
+
     let args_clean: Vec<&str> = args
         .iter()
         .map(String::as_str)
@@ -368,7 +368,9 @@ fn run() {
         }
         Some(unknown) => {
             eprintln!("hay: unknown argument '{unknown}'");
-            eprintln!("Usage: hay [script.hay | - | install | remove | list | update | check-plugin]");
+            eprintln!(
+                "Usage: hay [script.hay | - | install | remove | list | update | check-plugin]"
+            );
             std::process::exit(1);
         }
         None => {}
@@ -579,7 +581,12 @@ fn pkg_install_internal(spec: &str, force_overwrite: bool) {
 
     if !force_overwrite {
         if let Some(installed_path) = is_pkg_installed(user, repo) {
-            print!("Package {}/{} is already installed at {}. Overwrite? (y/N): ", user, repo, installed_path.display());
+            print!(
+                "Package {}/{} is already installed at {}. Overwrite? (y/N): ",
+                user,
+                repo,
+                installed_path.display()
+            );
             use std::io::Write;
             let _ = std::io::stdout().flush();
             let mut input = String::new();
@@ -831,7 +838,7 @@ fn migrate_legacy_packages() {
                     for repo_entry in repos.filter_map(|e| e.ok()) {
                         let path = repo_entry.path();
                         let repo_name = repo_entry.file_name().to_string_lossy().to_string();
-                        
+
                         if path.is_dir() {
                             let metadata_file = pkg_metadata_path(&user, &repo_name);
                             if !metadata_file.exists() {
@@ -845,9 +852,14 @@ fn migrate_legacy_packages() {
                                 write_pkg_metadata(&meta);
                             }
                         } else if path.is_file() {
-                            let ext = path.extension().and_then(|x| x.to_str()).unwrap_or("").to_lowercase();
+                            let ext = path
+                                .extension()
+                                .and_then(|x| x.to_str())
+                                .unwrap_or("")
+                                .to_lowercase();
                             if matches!(ext.as_str(), "so" | "dll" | "dylib" | "wasm") {
-                                let clean_name = repo_name.trim_end_matches(&format!(".{ext}")).to_string();
+                                let clean_name =
+                                    repo_name.trim_end_matches(&format!(".{ext}")).to_string();
                                 let metadata_file = pkg_metadata_path(&user, &clean_name);
                                 if !metadata_file.exists() {
                                     let meta = PkgMetadata {
@@ -884,7 +896,8 @@ fn get_installed_packages() -> Vec<PkgMetadata> {
                             let name = repo_entry.file_name().to_string_lossy().to_string();
                             if name.ends_with(".metadata.json") {
                                 if let Ok(content) = std::fs::read_to_string(&path) {
-                                    if let Ok(meta) = serde_json::from_str::<PkgMetadata>(&content) {
+                                    if let Ok(meta) = serde_json::from_str::<PkgMetadata>(&content)
+                                    {
                                         pkgs.push(meta);
                                     }
                                 }
@@ -900,29 +913,35 @@ fn get_installed_packages() -> Vec<PkgMetadata> {
 
 fn check_pkg_integrity(meta: &PkgMetadata) -> Result<(String, bool), String> {
     if meta.pkg_type == "native" {
-        let release_url = format!("https://api.github.com/repos/{}/{}/releases/latest", meta.user, meta.repo);
+        let release_url = format!(
+            "https://api.github.com/repos/{}/{}/releases/latest",
+            meta.user, meta.repo
+        );
         let resp = ureq::get(&release_url)
             .set("User-Agent", "hay")
             .set("Accept", "application/vnd.github.v3+json")
             .call()
             .map_err(|e| e.to_string())?;
-        
+
         let body: String = resp.into_string().map_err(|e| e.to_string())?;
         let release: GhRelease = serde_json::from_str(&body).map_err(|e| e.to_string())?;
-        
+
         let up_to_date = meta.version == release.tag_name;
         Ok((release.tag_name, up_to_date))
     } else {
-        let commit_url = format!("https://api.github.com/repos/{}/{}/commits", meta.user, meta.repo);
+        let commit_url = format!(
+            "https://api.github.com/repos/{}/{}/commits",
+            meta.user, meta.repo
+        );
         let resp = ureq::get(&commit_url)
             .set("User-Agent", "hay")
             .set("Accept", "application/vnd.github.v3+json")
             .call()
             .map_err(|e| e.to_string())?;
-        
+
         let body: String = resp.into_string().map_err(|e| e.to_string())?;
         let commits: Vec<GhCommitInfo> = serde_json::from_str(&body).map_err(|e| e.to_string())?;
-        
+
         if let Some(first) = commits.first() {
             let up_to_date = meta.version == first.sha;
             Ok((first.sha.clone(), up_to_date))
@@ -934,7 +953,7 @@ fn check_pkg_integrity(meta: &PkgMetadata) -> Result<(String, bool), String> {
 
 fn pkg_check_plugin(spec_opt: Option<&str>) {
     migrate_legacy_packages();
-    
+
     if let Some(spec) = spec_opt {
         let (user, repo) = if let Some(pos) = spec.find('/') {
             (&spec[..pos], &spec[pos + 1..])
@@ -942,16 +961,22 @@ fn pkg_check_plugin(spec_opt: Option<&str>) {
             eprintln!("hay check-plugin: expected 'user/repo', got '{spec}'");
             std::process::exit(1);
         };
-        
+
         match read_pkg_metadata(user, repo) {
             Some(meta) => {
                 println!("Checking {}/{} ...", user, repo);
                 match check_pkg_integrity(&meta) {
                     Ok((remote_ver, up_to_date)) => {
                         if up_to_date {
-                            println!("  {}/{} is UP TO DATE (version {})", user, repo, meta.version);
+                            println!(
+                                "  {}/{} is UP TO DATE (version {})",
+                                user, repo, meta.version
+                            );
                         } else {
-                            println!("  {}/{} has updates available (local: {}, remote: {})", user, repo, meta.version, remote_ver);
+                            println!(
+                                "  {}/{} has updates available (local: {}, remote: {})",
+                                user, repo, meta.version, remote_ver
+                            );
                         }
                     }
                     Err(e) => {
@@ -970,16 +995,22 @@ fn pkg_check_plugin(spec_opt: Option<&str>) {
             println!("No packages installed.");
             return;
         }
-        
+
         println!("Checking installed packages:");
         for meta in pkgs {
             println!("Checking {}/{} ...", meta.user, meta.repo);
             match check_pkg_integrity(&meta) {
                 Ok((remote_ver, up_to_date)) => {
                     if up_to_date {
-                        println!("  {}/{} is UP TO DATE (version {})", meta.user, meta.repo, meta.version);
+                        println!(
+                            "  {}/{} is UP TO DATE (version {})",
+                            meta.user, meta.repo, meta.version
+                        );
                     } else {
-                        println!("  {}/{} has updates available (local: {}, remote: {})", meta.user, meta.repo, meta.version, remote_ver);
+                        println!(
+                            "  {}/{} has updates available (local: {}, remote: {})",
+                            meta.user, meta.repo, meta.version, remote_ver
+                        );
                     }
                 }
                 Err(e) => {
@@ -1013,14 +1044,20 @@ fn pkg_update(spec_opt: Option<&str>, auto_confirm: bool) {
         match check_pkg_integrity(&meta) {
             Ok((remote_ver, up_to_date)) => {
                 if up_to_date {
-                    println!("Package {}/{} is already up to date (version {}).", user, repo, meta.version);
+                    println!(
+                        "Package {}/{} is already up to date (version {}).",
+                        user, repo, meta.version
+                    );
                     return;
                 }
-                
+
                 let confirm = if auto_confirm {
                     true
                 } else {
-                    print!("Update package {}/{} to {}? (y/N): ", user, repo, remote_ver);
+                    print!(
+                        "Update package {}/{} to {}? (y/N): ",
+                        user, repo, remote_ver
+                    );
                     use std::io::Write;
                     let _ = std::io::stdout().flush();
                     let mut input = String::new();
@@ -1079,7 +1116,10 @@ fn pkg_update(spec_opt: Option<&str>, auto_confirm: bool) {
                         let confirm = if auto_confirm {
                             true
                         } else {
-                            print!("  Update package {}/{} to {}? (y/N): ", meta.user, meta.repo, remote_ver);
+                            print!(
+                                "  Update package {}/{} to {}? (y/N): ",
+                                meta.user, meta.repo, remote_ver
+                            );
                             use std::io::Write;
                             let _ = std::io::stdout().flush();
                             let mut input = String::new();
@@ -1100,7 +1140,10 @@ fn pkg_update(spec_opt: Option<&str>, auto_confirm: bool) {
                     let confirm = if auto_confirm {
                         true
                     } else {
-                        print!("  Attempt update for {}/{} anyway? (y/N): ", meta.user, meta.repo);
+                        print!(
+                            "  Attempt update for {}/{} anyway? (y/N): ",
+                            meta.user, meta.repo
+                        );
                         use std::io::Write;
                         let _ = std::io::stdout().flush();
                         let mut input = String::new();
@@ -1218,7 +1261,9 @@ struct PkgMetadata {
 }
 
 fn pkg_metadata_path(user: &str, repo: &str) -> std::path::PathBuf {
-    packages_dir().join(user).join(format!("{repo}.metadata.json"))
+    packages_dir()
+        .join(user)
+        .join(format!("{repo}.metadata.json"))
 }
 
 fn read_pkg_metadata(user: &str, repo: &str) -> Option<PkgMetadata> {
