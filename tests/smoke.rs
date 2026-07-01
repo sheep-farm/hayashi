@@ -8697,3 +8697,75 @@ display xs[0]"#,
     );
 }
 
+
+// ── Testes de regressão: dict literal multi-linha ─────────────────────────
+
+#[test]
+fn dict_multiline_basic() {
+    // dict literal com pares em múltiplas linhas
+    assert_ok_contains(
+        "dict_multiline_basic",
+        r#"let d = {
+    "x": 10,
+    "y": 20
+}
+display d["x"]"#,
+        "10",
+    );
+}
+
+#[test]
+fn dict_multiline_string_values() {
+    // dict com strings em múltiplas linhas
+    assert_ok_contains(
+        "dict_multiline_string_values",
+        r#"let d = {
+    "name": "Hayashi",
+    "version": "0.2.6"
+}
+display d["name"]"#,
+        "\"Hayashi\"",
+    );
+}
+
+#[test]
+fn dict_multiline_trailing_comma() {
+    // dict com vírgula trailing na última linha (deve ser tolerado)
+    assert_ok_contains(
+        "dict_multiline_trailing_comma",
+        r#"let d = {
+    "a": 1,
+    "b": 2,
+}
+display d["b"]"#,
+        "2",
+    );
+}
+
+#[test]
+fn dict_multiline_nested_list() {
+    // dict com lista como valor, tudo em múltiplas linhas
+    assert_ok_contains(
+        "dict_multiline_nested_list",
+        r#"let d = {
+    "xs": [1, 2, 3],
+    "ys": [4, 5, 6]
+}
+display d["xs"][0]"#,
+        "1",
+    );
+}
+
+#[test]
+fn dict_multiline_in_call() {
+    // dict multi-linha como argumento de função
+    assert_ok_contains(
+        "dict_multiline_in_call",
+        r#"let df = dataframe({
+    "a": [10, 20, 30],
+    "b": [1, 2, 3]
+})
+display nrow(df)"#,
+        "3",
+    );
+}

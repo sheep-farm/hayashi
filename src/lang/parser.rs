@@ -7,6 +7,7 @@ pub struct Parser {
     pos: usize,
     paren_depth: usize,
     bracket_depth: usize, // rastreia [ ]
+    brace_depth: usize,   // rastreia { }
 }
 
 impl Parser {
@@ -16,11 +17,12 @@ impl Parser {
             pos: 0,
             paren_depth: 0,
             bracket_depth: 0,
+            brace_depth: 0,
         }
     }
 
     fn peek(&mut self) -> &Token {
-        if self.paren_depth > 0 || self.bracket_depth > 0 {
+        if self.paren_depth > 0 || self.bracket_depth > 0 || self.brace_depth > 0 {
             while self.tokens.get(self.pos).map(|(t, _)| t) == Some(&Token::Newline) {
                 self.pos += 1;
             }
@@ -49,7 +51,7 @@ impl Parser {
     }
 
     fn advance(&mut self) -> &Token {
-        if self.paren_depth > 0 || self.bracket_depth > 0 {
+        if self.paren_depth > 0 || self.bracket_depth > 0 || self.brace_depth > 0 {
             while self.tokens.get(self.pos).map(|(t, _)| t) == Some(&Token::Newline) {
                 self.pos += 1;
             }
@@ -71,6 +73,9 @@ impl Parser {
         if t == &Token::RBracket && self.bracket_depth > 0 {
             self.bracket_depth -= 1;
         }
+        // Nota: LBrace/RBrace NÃO são rastreados aqui.
+        // O brace_depth é gerenciado manualmente apenas no parse_dict_expr
+        // para evitar suprimir Newlines dentro de blocos if/for/fn.
         self.pos += 1;
         t
     }
@@ -467,7 +472,9 @@ impl Parser {
 
             // Dict literal: {"key": value, ...}
             Token::LBrace => {
-                self.advance();
+                self.advance(); // consome LBrace
+                // Incrementa manualmente: dentro do dict, Newlines são ignorados
+                self.brace_depth += 1;
                 let mut pairs = Vec::new();
                 while !matches!(self.peek(), Token::RBrace | Token::Eof) {
                     let key = self.parse_expr()?;
@@ -478,6 +485,7 @@ impl Parser {
                         self.advance();
                     }
                 }
+                self.brace_depth -= 1; // decrementa antes do RBrace
                 self.expect(&Token::RBrace)?;
                 Ok(Expr::Dict(pairs))
             }
