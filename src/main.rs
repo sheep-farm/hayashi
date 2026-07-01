@@ -393,7 +393,9 @@ fn run_script(path: &str, verbose: bool) {
     }
 }
 
-fn brace_depth(s: &str) -> i32 {
+/// Calcula a profundidade de delimitadores abertos numa linha para o REPL.
+/// Conta {, [, ( como +1 e }, ], ) como -1, ignorando o interior de strings.
+fn open_depth(s: &str) -> i32 {
     let mut depth: i32 = 0;
     let mut in_string = false;
     let mut prev = '\0';
@@ -403,8 +405,8 @@ fn brace_depth(s: &str) -> i32 {
         }
         if !in_string {
             match c {
-                '{' => depth += 1,
-                '}' => depth -= 1,
+                '{' | '[' | '(' => depth += 1,
+                '}' | ']' | ')' => depth -= 1,
                 _ => {}
             }
         }
@@ -431,7 +433,8 @@ fn run_repl() {
 
     loop {
         *vars.borrow_mut() = interp.env.var_names();
-        let prompt = if depth > 0 { "      > " } else { "hay> " };
+        let is_continuation = depth > 0 || buf.trim_end().ends_with("|>");
+        let prompt = if is_continuation { "      > " } else { "hay> " };
         match rl.readline(prompt) {
             Ok(line) => {
                 let trimmed = line.trim();
@@ -466,20 +469,28 @@ fn run_repl() {
 
                 buf.push_str(trimmed);
                 buf.push('\n');
-                depth += brace_depth(trimmed);
+                // depth rastreia delimitadores não fechados: {}, [], ()
+                depth += open_depth(trimmed);
 
-                if depth <= 0 {
-                    depth = 0;
-                    let source = buf.trim().to_string();
-                    if !source.is_empty() {
-                        let _ = rl.add_history_entry(&source);
-                        match lang::run_source(&source, &mut interp) {
-                            Ok(()) => {}
-                            Err(e) => eprintln!("error: {e}"),
-                        }
-                    }
-                    buf.clear();
+                // Continua acumulando se:
+                // (a) há delimitadores abertos (depth > 0), OU
+                // (b) o buffer (sem espaços finais) termina com |>
+                let buf_trimmed = buf.trim_end();
+                let trailing_pipe = buf_trimmed.ends_with("|>");
+                if depth > 0 || trailing_pipe {
+                    continue;
                 }
+
+                depth = 0;
+                let source = buf.trim().to_string();
+                if !source.is_empty() {
+                    let _ = rl.add_history_entry(&source);
+                    match lang::run_source(&source, &mut interp) {
+                        Ok(()) => {}
+                        Err(e) => eprintln!("error: {e}"),
+                    }
+                }
+                buf.clear();
             }
             Err(ReadlineError::Interrupted) => {
                 if !buf.is_empty() {
