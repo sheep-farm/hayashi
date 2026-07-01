@@ -8697,7 +8697,6 @@ display xs[0]"#,
     );
 }
 
-
 // ── Testes de regressão: dict literal multi-linha ─────────────────────────
 
 #[test]

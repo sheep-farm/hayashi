@@ -1,13 +1,13 @@
 use super::interpreter::Value;
-use std::collections::HashMap;
-use std::rc::Rc;
-use std::sync::Arc;
 use arrow::array::{
-    Array, ArrayRef, BooleanArray, Float64Array, Int64Array, StringArray, make_array,
+    make_array, Array, ArrayRef, BooleanArray, Float64Array, Int64Array, StringArray,
 };
 use arrow::ffi::{FFI_ArrowArray, FFI_ArrowSchema};
 use greeners::Column;
 use ndarray::Array1;
+use std::collections::HashMap;
+use std::rc::Rc;
+use std::sync::Arc;
 
 /// Unified Hayashi Plugin Trait
 #[allow(dead_code)]
@@ -50,10 +50,10 @@ pub fn column_to_arrow(col: &Column) -> ArrayRef {
 pub fn dataframe_to_arrow(df: &greeners::DataFrame) -> ArrayRef {
     use arrow::array::StructArray;
     use arrow::datatypes::{Field, Fields};
-    
+
     let mut fields = Vec::new();
     let mut arrays = Vec::new();
-    
+
     for col_name in df.column_names() {
         if let Ok(col) = df.get_column(&col_name) {
             let array = column_to_arrow(&col);
@@ -61,7 +61,7 @@ pub fn dataframe_to_arrow(df: &greeners::DataFrame) -> ArrayRef {
             arrays.push(array);
         }
     }
-    
+
     let struct_array = StructArray::try_new(Fields::from(fields), arrays, None).unwrap();
     Arc::new(struct_array) as ArrayRef
 }
@@ -70,12 +70,14 @@ pub fn dataframe_to_arrow(df: &greeners::DataFrame) -> ArrayRef {
 pub fn arrow_to_dataframe(array: &ArrayRef) -> Result<greeners::DataFrame, String> {
     use arrow::array::StructArray;
     use arrow::datatypes::DataType;
-    
+
     match array.data_type() {
         DataType::Struct(fields) => {
-            let struct_array = array.as_any().downcast_ref::<StructArray>()
+            let struct_array = array
+                .as_any()
+                .downcast_ref::<StructArray>()
                 .ok_or_else(|| "failed to downcast StructArray".to_string())?;
-            
+
             let mut columns = HashMap::new();
             for (i, field) in fields.iter().enumerate() {
                 let col_name = field.name().clone();
@@ -83,7 +85,7 @@ pub fn arrow_to_dataframe(array: &ArrayRef) -> Result<greeners::DataFrame, Strin
                 let col = arrow_to_column(col_array)?;
                 columns.insert(col_name, col);
             }
-            
+
             greeners::DataFrame::from_columns(columns)
                 .map_err(|e| format!("failed to build DataFrame: {e}"))
         }
@@ -94,55 +96,59 @@ pub fn arrow_to_dataframe(array: &ArrayRef) -> Result<greeners::DataFrame, Strin
 /// Converte um ArrayRef do Arrow em uma coluna do Greeners.
 pub fn arrow_to_column(array: &ArrayRef) -> Result<Column, String> {
     use arrow::datatypes::DataType;
-    
+
     let len = array.len();
     match array.data_type() {
         DataType::Float64 => {
-            let arr = array.as_any().downcast_ref::<Float64Array>()
+            let arr = array
+                .as_any()
+                .downcast_ref::<Float64Array>()
                 .ok_or_else(|| "failed to downcast Float64Array".to_string())?;
-            let vec: Vec<f64> = (0..len).map(|i| {
-                if arr.is_null(i) {
-                    f64::NAN
-                } else {
-                    arr.value(i)
-                }
-            }).collect();
+            let vec: Vec<f64> = (0..len)
+                .map(|i| {
+                    if arr.is_null(i) {
+                        f64::NAN
+                    } else {
+                        arr.value(i)
+                    }
+                })
+                .collect();
             Ok(Column::Float(Array1::from(vec)))
         }
         DataType::Int64 => {
-            let arr = array.as_any().downcast_ref::<Int64Array>()
+            let arr = array
+                .as_any()
+                .downcast_ref::<Int64Array>()
                 .ok_or_else(|| "failed to downcast Int64Array".to_string())?;
-            let vec: Vec<i64> = (0..len).map(|i| {
-                if arr.is_null(i) {
-                    0
-                } else {
-                    arr.value(i)
-                }
-            }).collect();
+            let vec: Vec<i64> = (0..len)
+                .map(|i| if arr.is_null(i) { 0 } else { arr.value(i) })
+                .collect();
             Ok(Column::Int(Array1::from(vec)))
         }
         DataType::Boolean => {
-            let arr = array.as_any().downcast_ref::<BooleanArray>()
+            let arr = array
+                .as_any()
+                .downcast_ref::<BooleanArray>()
                 .ok_or_else(|| "failed to downcast BooleanArray".to_string())?;
-            let vec: Vec<bool> = (0..len).map(|i| {
-                if arr.is_null(i) {
-                    false
-                } else {
-                    arr.value(i)
-                }
-            }).collect();
+            let vec: Vec<bool> = (0..len)
+                .map(|i| if arr.is_null(i) { false } else { arr.value(i) })
+                .collect();
             Ok(Column::Bool(Array1::from(vec)))
         }
         DataType::Utf8 => {
-            let arr = array.as_any().downcast_ref::<StringArray>()
+            let arr = array
+                .as_any()
+                .downcast_ref::<StringArray>()
                 .ok_or_else(|| "failed to downcast StringArray".to_string())?;
-            let vec: Vec<String> = (0..len).map(|i| {
-                if arr.is_null(i) {
-                    "".to_string()
-                } else {
-                    arr.value(i).to_string()
-                }
-            }).collect();
+            let vec: Vec<String> = (0..len)
+                .map(|i| {
+                    if arr.is_null(i) {
+                        "".to_string()
+                    } else {
+                        arr.value(i).to_string()
+                    }
+                })
+                .collect();
             Ok(Column::String(Array1::from(vec)))
         }
         other => Err(format!("unsupported Arrow type for Column: {:?}", other)),
@@ -155,9 +161,15 @@ pub fn column_to_value(col: &Column) -> Value {
         Column::Float(arr) => Value::List(Rc::new(arr.iter().map(|&x| Value::Float(x)).collect())),
         Column::Int(arr) => Value::List(Rc::new(arr.iter().map(|&x| Value::Int(x)).collect())),
         Column::Bool(arr) => Value::List(Rc::new(arr.iter().map(|&x| Value::Bool(x)).collect())),
-        Column::String(arr) => Value::List(Rc::new(arr.iter().map(|s| Value::Str(s.clone())).collect())),
-        Column::Categorical(cat) => Value::List(Rc::new(cat.to_strings().into_iter().map(Value::Str).collect())),
-        Column::DateTime(arr) => Value::List(Rc::new(arr.iter().map(|dt| Value::Str(dt.to_string())).collect())),
+        Column::String(arr) => {
+            Value::List(Rc::new(arr.iter().map(|s| Value::Str(s.clone())).collect()))
+        }
+        Column::Categorical(cat) => Value::List(Rc::new(
+            cat.to_strings().into_iter().map(Value::Str).collect(),
+        )),
+        Column::DateTime(arr) => Value::List(Rc::new(
+            arr.iter().map(|dt| Value::Str(dt.to_string())).collect(),
+        )),
     }
 }
 
@@ -166,7 +178,7 @@ pub fn list_to_column(lst: &[Value]) -> Option<Column> {
     if lst.is_empty() {
         return None;
     }
-    
+
     match &lst[0] {
         Value::Float(_) => {
             let mut vec = Vec::with_capacity(lst.len());
@@ -215,7 +227,11 @@ pub fn list_to_column(lst: &[Value]) -> Option<Column> {
 }
 
 /// Helper to serialize Value into JSON for WASM/FFI exchanges
-pub fn value_to_json(val: &Value, use_arrow: bool, temp_boxes: &mut Vec<(usize, usize)>) -> serde_json::Value {
+pub fn value_to_json(
+    val: &Value,
+    use_arrow: bool,
+    temp_boxes: &mut Vec<(usize, usize)>,
+) -> serde_json::Value {
     match val {
         Value::Float(f) => serde_json::json!(f),
         Value::Int(i) => serde_json::json!(i),
@@ -231,17 +247,26 @@ pub fn value_to_json(val: &Value, use_arrow: bool, temp_boxes: &mut Vec<(usize, 
                             let array_ptr = Box::into_raw(Box::new(ffi_array)) as usize;
                             let schema_ptr = Box::into_raw(Box::new(ffi_schema)) as usize;
                             temp_boxes.push((array_ptr, schema_ptr));
-                            
+
                             let mut col_map = serde_json::Map::new();
-                            col_map.insert("__arrow_array_ptr__".to_string(), serde_json::json!(array_ptr));
-                            col_map.insert("__arrow_schema_ptr__".to_string(), serde_json::json!(schema_ptr));
+                            col_map.insert(
+                                "__arrow_array_ptr__".to_string(),
+                                serde_json::json!(array_ptr),
+                            );
+                            col_map.insert(
+                                "__arrow_schema_ptr__".to_string(),
+                                serde_json::json!(schema_ptr),
+                            );
                             return serde_json::Value::Object(col_map);
                         }
                         Err(_) => {}
                     }
                 }
             }
-            let arr: Vec<serde_json::Value> = lst.iter().map(|v| value_to_json(v, use_arrow, temp_boxes)).collect();
+            let arr: Vec<serde_json::Value> = lst
+                .iter()
+                .map(|v| value_to_json(v, use_arrow, temp_boxes))
+                .collect();
             serde_json::Value::Array(arr)
         }
         Value::Dict(dct) => {
@@ -259,10 +284,16 @@ pub fn value_to_json(val: &Value, use_arrow: bool, temp_boxes: &mut Vec<(usize, 
                         let array_ptr = Box::into_raw(Box::new(ffi_array)) as usize;
                         let schema_ptr = Box::into_raw(Box::new(ffi_schema)) as usize;
                         temp_boxes.push((array_ptr, schema_ptr));
-                        
+
                         let mut df_map = serde_json::Map::new();
-                        df_map.insert("__arrow_array_ptr__".to_string(), serde_json::json!(array_ptr));
-                        df_map.insert("__arrow_schema_ptr__".to_string(), serde_json::json!(schema_ptr));
+                        df_map.insert(
+                            "__arrow_array_ptr__".to_string(),
+                            serde_json::json!(array_ptr),
+                        );
+                        df_map.insert(
+                            "__arrow_schema_ptr__".to_string(),
+                            serde_json::json!(schema_ptr),
+                        );
                         return serde_json::Value::Object(df_map);
                     }
                     Err(_) => {}
@@ -306,7 +337,7 @@ pub fn value_to_json(val: &Value, use_arrow: bool, temp_boxes: &mut Vec<(usize, 
 pub fn json_to_value(
     jval: &serde_json::Value,
     returned_arrow_ptrs: &mut Vec<(usize, usize)>,
-    host_allocated: &std::collections::HashSet<usize>
+    host_allocated: &std::collections::HashSet<usize>,
 ) -> Value {
     match jval {
         serde_json::Value::Null => Value::Nil,
@@ -320,29 +351,39 @@ pub fn json_to_value(
         }
         serde_json::Value::String(s) => Value::Str(s.clone()),
         serde_json::Value::Array(arr) => {
-            let lst: Vec<Value> = arr.iter().map(|v| json_to_value(v, returned_arrow_ptrs, host_allocated)).collect();
+            let lst: Vec<Value> = arr
+                .iter()
+                .map(|v| json_to_value(v, returned_arrow_ptrs, host_allocated))
+                .collect();
             Value::List(Rc::new(lst))
         }
         serde_json::Value::Object(obj) => {
-            if let (Some(arr_val), Some(sch_val)) = (obj.get("__arrow_array_ptr__"), obj.get("__arrow_schema_ptr__")) {
+            if let (Some(arr_val), Some(sch_val)) = (
+                obj.get("__arrow_array_ptr__"),
+                obj.get("__arrow_schema_ptr__"),
+            ) {
                 if let (Some(arr_ptr), Some(sch_ptr)) = (arr_val.as_u64(), sch_val.as_u64()) {
                     let array_ptr = arr_ptr as *mut FFI_ArrowArray;
                     let schema_ptr = sch_ptr as *mut FFI_ArrowSchema;
                     let is_host = host_allocated.contains(&(arr_ptr as usize));
                     unsafe {
-                        if let Ok(array_data) = arrow::ffi::from_ffi(std::ptr::read(array_ptr), &*schema_ptr) {
+                        if let Ok(array_data) =
+                            arrow::ffi::from_ffi(std::ptr::read(array_ptr), &*schema_ptr)
+                        {
                             let array_ref = make_array(array_data);
                             if let arrow::datatypes::DataType::Struct(_) = array_ref.data_type() {
                                 if let Ok(df) = arrow_to_dataframe(&array_ref) {
                                     if !is_host {
-                                        returned_arrow_ptrs.push((arr_ptr as usize, sch_ptr as usize));
+                                        returned_arrow_ptrs
+                                            .push((arr_ptr as usize, sch_ptr as usize));
                                     }
                                     return Value::DataFrame(Rc::new(df));
                                 }
                             } else {
                                 if let Ok(col) = arrow_to_column(&array_ref) {
                                     if !is_host {
-                                        returned_arrow_ptrs.push((arr_ptr as usize, sch_ptr as usize));
+                                        returned_arrow_ptrs
+                                            .push((arr_ptr as usize, sch_ptr as usize));
                                     }
                                     return column_to_value(&col);
                                 }
@@ -351,10 +392,13 @@ pub fn json_to_value(
                     }
                 }
             }
-            
+
             let mut map = HashMap::new();
             for (k, v) in obj.iter() {
-                map.insert(k.clone(), json_to_value(v, returned_arrow_ptrs, host_allocated));
+                map.insert(
+                    k.clone(),
+                    json_to_value(v, returned_arrow_ptrs, host_allocated),
+                );
             }
             Value::Dict(Rc::new(map))
         }
@@ -397,7 +441,10 @@ impl HayashiPlugin for RustNativePlugin {
 
             // 1. Serialize args to JSON (collecting host FFI boxes in temp_boxes)
             let mut temp_boxes = Vec::new();
-            let json_args: Vec<serde_json::Value> = args.iter().map(|v| value_to_json(v, true, &mut temp_boxes)).collect();
+            let json_args: Vec<serde_json::Value> = args
+                .iter()
+                .map(|v| value_to_json(v, true, &mut temp_boxes))
+                .collect();
             let payload = serde_json::Value::Array(json_args).to_string();
             let c_payload = std::ffi::CString::new(payload).map_err(|e| e.to_string())?;
 
@@ -425,8 +472,9 @@ impl HayashiPlugin for RustNativePlugin {
             // 5. Deserialize JSON, collecting any guest-allocated Arrow pointers
             let ret_json: serde_json::Value =
                 serde_json::from_str(&res_str).map_err(|e| e.to_string())?;
-            
-            let host_allocated_set: std::collections::HashSet<usize> = temp_boxes.iter().map(|(arr, _)| *arr).collect();
+
+            let host_allocated_set: std::collections::HashSet<usize> =
+                temp_boxes.iter().map(|(arr, _)| *arr).collect();
             let mut returned_arrow_ptrs = Vec::new();
             let val = json_to_value(&ret_json, &mut returned_arrow_ptrs, &host_allocated_set);
 
@@ -444,7 +492,9 @@ impl HayashiPlugin for RustNativePlugin {
             if !returned_arrow_ptrs.is_empty() {
                 if let Ok(free_arrow_func) = self
                     .lib
-                    .get::<unsafe extern "C" fn(*mut FFI_ArrowArray, *mut FFI_ArrowSchema)>(b"free_arrow_pointers")
+                    .get::<unsafe extern "C" fn(*mut FFI_ArrowArray, *mut FFI_ArrowSchema)>(
+                        b"free_arrow_pointers",
+                    )
                 {
                     for (arr_ptr, sch_ptr) in returned_arrow_ptrs {
                         let arr = arr_ptr as *mut FFI_ArrowArray;
@@ -537,7 +587,10 @@ impl HayashiPlugin for WasmPlugin {
 
         // 1. Serialize args to JSON string (Arrow is not used for WASM sandbox)
         let mut temp_boxes = Vec::new();
-        let json_args: Vec<serde_json::Value> = args.iter().map(|v| value_to_json(v, false, &mut temp_boxes)).collect();
+        let json_args: Vec<serde_json::Value> = args
+            .iter()
+            .map(|v| value_to_json(v, false, &mut temp_boxes))
+            .collect();
         let payload = serde_json::Value::Array(json_args).to_string();
         let payload_bytes = payload.as_bytes();
         let len = payload_bytes.len() as i32;
@@ -579,6 +632,10 @@ impl HayashiPlugin for WasmPlugin {
         let _ = dealloc.call(&mut self.store, (ret_ptr, ret_len));
 
         let mut returned_arrow_ptrs = Vec::new();
-        Ok(json_to_value(&ret_json, &mut returned_arrow_ptrs, &std::collections::HashSet::new()))
+        Ok(json_to_value(
+            &ret_json,
+            &mut returned_arrow_ptrs,
+            &std::collections::HashSet::new(),
+        ))
     }
 }
