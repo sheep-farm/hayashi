@@ -1163,8 +1163,7 @@ impl Interpreter {
 
             // ── Fixed Effects ─────────────────────────────────────────────────
             "fe" => {
-                let (formula_ast, df, _df_name, id_col) =
-                    self.extract_panel_args(args, opt_map)?;
+                let (formula_ast, df, _df_name, id_col) = self.extract_panel_args(args, opt_map)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 // FE elimina o intercepto via within-transform; forçamos - 1
                 // para evitar coluna de zeros pós-demeaning (singular matrix)
@@ -1200,8 +1199,7 @@ impl Interpreter {
 
             // ── Random Effects ────────────────────────────────────────────────
             "re" => {
-                let (formula_ast, df, _df_name, id_col) =
-                    self.extract_panel_args(args, opt_map)?;
+                let (formula_ast, df, _df_name, id_col) = self.extract_panel_args(args, opt_map)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1232,8 +1230,7 @@ impl Interpreter {
                 // ftest_fe(formula, df, id=col)
                 // H₀: todos os efeitos individuais são zero (pooled OLS adequado)
                 // H₁: efeitos individuais existem (use FE)
-                let (formula_ast, df, _df_name, id_col) =
-                    self.extract_panel_args(args, opt_map)?;
+                let (formula_ast, df, _df_name, id_col) = self.extract_panel_args(args, opt_map)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
 
                 // FE (within)
@@ -1323,8 +1320,7 @@ impl Interpreter {
                 // pesaran_cd(formula, df, id=col)
                 // H₀: resíduos independentes entre entidades (sem dependência cross-seccional)
                 // H₁: dependência cross-seccional presente
-                let (formula_ast, df, _df_name, id_col) =
-                    self.extract_panel_args(args, opt_map)?;
+                let (formula_ast, df, _df_name, id_col) = self.extract_panel_args(args, opt_map)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1404,8 +1400,7 @@ impl Interpreter {
                 // bplm(formula, df, id=col)
                 // H₀: sem efeitos individuais (σ²_u = 0) — pooled OLS adequado
                 // H₁: efeitos individuais existem — use FE ou RE
-                let (formula_ast, df, _df_name, id_col) =
-                    self.extract_panel_args(args, opt_map)?;
+                let (formula_ast, df, _df_name, id_col) = self.extract_panel_args(args, opt_map)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1585,8 +1580,7 @@ impl Interpreter {
 
             // ── Arellano-Bond Diff-GMM (OLD mundlak removed — use new mundlak above) ─
             "mundlak_OLD_REMOVED" => {
-                let (formula_ast, df, _df_name, id_col) =
-                    self.extract_panel_args(args, opt_map)?;
+                let (formula_ast, df, _df_name, id_col) = self.extract_panel_args(args, opt_map)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
