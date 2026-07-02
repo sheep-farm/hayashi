@@ -40,7 +40,7 @@ cases:
 
     '
   dimension: numerical
-  status: blocked
+  status: pass
 - id: ets_gdp
   notes: 'Exponential smoothing state-space model on US real GDP.
 
@@ -118,7 +118,7 @@ cases:
 
     '
   dimension: numerical
-  status: blocked
+  status: pass
 - id: wls_hprice1
   notes: WLS with weights generated inside Hayashi to avoid sandbox file issues.
   dimension: numerical

@@ -17,11 +17,18 @@ model <- lm(lprice ~ nearinc * y81, data = kielmc)
 
 summary_model <- summary(model)
 
+name_map <- c(
+  "(Intercept)" = "const",
+  "nearinc" = "treated",
+  "y81" = "post",
+  "nearinc:y81" = "treated:post"
+)
+
 coefs <- as.numeric(coef(model))
-names(coefs) <- names(coef(model))
+names(coefs) <- name_map[names(coef(model))]
 
 std_errors <- as.numeric(summary_model$coefficients[, "Std. Error"])
-names(std_errors) <- rownames(summary_model$coefficients)
+names(std_errors) <- name_map[rownames(summary_model$coefficients)]
 
 result <- list(
   coefficients = as.list(coefs),

@@ -2,10 +2,6 @@
 
 This validation case estimates a difference-in-differences model for the effect of incinerator proximity on log house prices.
 
-## Status
-
-`blocked` — Hayashi's `did` output reports only the ATT and group means, not a full coefficient table. The validation orchestrator therefore cannot compare the output against the OLS interaction coefficients from R and Python.
-
 ## Model
 
 ```

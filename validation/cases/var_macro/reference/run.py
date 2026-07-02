@@ -24,11 +24,21 @@ else:
 # VAR(2) on GDP and consumption.
 model = VAR(macro[["gdp", "cons"]].astype(float).dropna()).fit(maxlags=2)
 
+def row_to_hayashi(row_name):
+    if row_name == "const":
+        return "const"
+    # row_name is like "L1.gdp" or "L2.cons"
+    if row_name.startswith("L") and "." in row_name:
+        lag, var = row_name.split(".", 1)
+        return f"{var}.{lag}"
+    return row_name
+
 coefs = {}
 std_errors = {}
 for eq_name in model.params.columns:
     for idx, row_name in enumerate(model.params.index):
-        key = f"{eq_name}_{row_name}"
+        hay_name = row_to_hayashi(row_name)
+        key = f"{eq_name}_{hay_name}"
         coefs[key] = float(model.params.loc[row_name, eq_name])
         std_errors[key] = float(model.stderr.loc[row_name, eq_name])
 
