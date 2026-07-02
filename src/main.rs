@@ -401,40 +401,69 @@ fn run_script(path: &str, verbose: bool) {
 
 /// Runs the empirical validation programme by invoking `validation/run.py`.
 fn run_validation() {
-    let exe = std::env::current_exe().expect("hay: cannot locate own executable");
-    let hay_dir = exe
-        .parent()
-        .expect("hay: executable has no parent directory");
-    let validation_dir = hay_dir.join("validation");
-    let run_py = validation_dir.join("run.py");
+    // Prefer the validation directory relative to the current working directory
+    // (typical for development and CI), then fall back to the executable's
+    // directory (typical for a self-contained installation).
+    let (run_py, hay_dir) = std::env::current_dir()
+        .ok()
+        .map(|d| d.join("validation").join("run.py"))
+        .filter(|p| p.exists())
+        .map(|p| {
+            let base = p.parent().and_then(|p| p.parent()).map(|p| p.to_path_buf());
+            (p, base)
+        })
+        .or_else(|| {
+            let exe = std::env::current_exe().ok()?;
+            let bin_dir = exe.parent()?;
+            let candidate = bin_dir.join("validation").join("run.py");
+            if candidate.exists() {
+                let base = Some(bin_dir.to_path_buf());
+                Some((candidate, base))
+            } else {
+                None
+            }
+        })
+        .unwrap_or_else(|| {
+            eprintln!("hay: validation programme not found");
+            eprintln!(
+                "       Looked for ./validation/run.py and <hay-binary>/validation/run.py."
+            );
+            eprintln!(
+                "       Run this from a checkout/installation that includes the validation/ directory."
+            );
+            std::process::exit(1);
+        });
 
-    if !run_py.exists() {
-        eprintln!(
-            "hay: validation programme not found at {}",
-            run_py.display()
-        );
-        eprintln!("       Run this from a build that includes the validation/ directory.");
-        std::process::exit(1);
-    }
-
-    let python = if std::process::Command::new("python")
-        .arg("--version")
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false)
-    {
-        "python"
+    let python = if let Some(venv) = hay_dir.as_deref().and_then(|p| p.parent()).map(|p| {
+        p.join("validation")
+            .join(".venv")
+            .join("bin")
+            .join("python")
+    }) {
+        if venv.exists() {
+            venv
+        } else if std::process::Command::new("python")
+            .arg("--version")
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
+        {
+            std::path::PathBuf::from("python")
+        } else {
+            std::path::PathBuf::from("python3")
+        }
     } else {
-        "python3"
+        std::path::PathBuf::from("python3")
     };
 
-    let status = std::process::Command::new(python)
-        .arg(&run_py)
-        .current_dir(hay_dir)
-        .status()
-        .expect("hay: failed to spawn validation runner");
+    let mut cmd = std::process::Command::new(python);
+    cmd.arg(&run_py);
+    if let Some(dir) = hay_dir {
+        cmd.current_dir(dir);
+    }
+    let status = cmd.status().expect("hay: failed to spawn validation runner");
 
     std::process::exit(status.code().unwrap_or(1));
 }

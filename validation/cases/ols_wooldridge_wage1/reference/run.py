@@ -1,4 +1,3 @@
-:
 # Reference implementation in Python/statsmodels for the Wooldridge wage1 OLS case.
 
 import json
@@ -20,7 +19,7 @@ if not CSV_PATH.exists():
         from wooldridge import data
         df = data("wage1")
     except ImportError:
-        # Fallback: download from a public source if wooldridge-python is unavailable.
+        # Fallback: download from a public source if wooldridge package is unavailable.
         url = "https://raw.githubusercontent.com/vincentarelbundock/Rdatasets/master/csv/wooldridge/wage1.csv"
         df = pd.read_csv(url)
     df.to_csv(CSV_PATH, index=False)
@@ -43,13 +42,10 @@ result = {
 out_dir = CASE_DIR / "reference"
 out_dir.mkdir(parents=True, exist_ok=True)
 
+# Write JSON for the orchestrator to compare.
 with open(out_dir / "expected.json", "w") as f:
     json.dump(result, f, indent=2)
 
-# Also write a CSV aligned with the Hayashi output format for direct diffing.
-out_csv = pd.DataFrame({
-    "Variable": list(coefs.keys()),
-    "Coef": list(coefs.values()),
-    "Std_Err": list(std_errors.values()),
-})
-out_csv.to_csv(out_dir / "expected.csv", index=False)
+# Also emit JSON on stdout so the orchestrator can avoid reading files.
+print(json.dumps(result))
+
