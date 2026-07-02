@@ -1,0 +1,6 @@
+// ARMA(1,1) estimado sobre dados simulados do Capítulo 26 do livro.
+load "validation/cases/arma_book/data/arma.csv" as df
+
+let m = arima(df, y, p=1, d=0, q=1)
+
+export(m, "txt", "/dev/stdout")

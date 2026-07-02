@@ -1,0 +1,32 @@
+id: var-book
+title: VAR(1) on simulated data from the Hayashi book
+estimator_family: var
+status: active
+dimension: numerical
+
+dataset:
+  name: simulated_var1
+  source: DGP from book_pt_BR/codes/28_var.hay
+  size: 300 observations
+
+references:
+  - R
+  - Python
+
+reference_scripts:
+  R: cases/var_book/reference/run.R
+  Python: cases/var_book/reference/run.py
+
+hayashi_script: cases/var_book/hayashi/run.hay
+
+output_format: txt
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 5e-3
+    standard_errors: 1e-2
+
+notes: Uses the same simulated bivariate VAR(1) DGP as Chapter 28 of the book.

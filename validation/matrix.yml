@@ -3,12 +3,21 @@ cases:
   notes: Arellano-Bond difference GMM for dynamic panel investment demand.
   dimension: numerical
   status: pass
+- id: ar_book
+  notes: Uses the same simulated AR(1) DGP as Chapter 26 of the book.
+  dimension: numerical
+  status: pass
 - id: ardl_gdp
   notes: ARDL(1,1) model of US real GDP on consumption.
   dimension: numerical
   status: pass
 - id: arima_gdp
   notes: ARIMA(1,1,1) on log US real GDP via exact Gaussian MLE.
+  dimension: numerical
+  status: pass
+- id: arma_book
+  notes: Uses the same simulated ARMA(1,1) DGP as Chapter 26 of the book. Intercept
+    is excluded from comparison because Hayashi profiles it out in MLE (SE = 0).
   dimension: numerical
   status: pass
 - id: autoreg_gdp
@@ -26,6 +35,11 @@ cases:
 - id: ets_gdp
   notes: Exponential smoothing state-space model on US real GDP. Blocked because Hayashi
     uses SSE grid search while references use MLE.
+  dimension: numerical
+  status: pass
+- id: garch_book
+  notes: Uses the same simulated GARCH(1,1) DGP as Chapter 30 of the book. MLE tolerances
+    are looser because the optimizer may stop at slightly different points.
   dimension: numerical
   status: pass
 - id: garch_nyse
@@ -50,6 +64,10 @@ cases:
   status: pass
 - id: logit_mroz
   notes: Logit labour-force participation on the Mroz dataset.
+  dimension: numerical
+  status: pass
+- id: ma_book
+  notes: Uses the same simulated MA(1) DGP as Chapter 26 of the book.
   dimension: numerical
   status: pass
 - id: ols_wooldridge_wage1
@@ -78,6 +96,10 @@ cases:
   status: pass
 - id: tobit_mroz
   notes: Tobit regression of hours worked with left censoring at zero.
+  dimension: numerical
+  status: pass
+- id: var_book
+  notes: Uses the same simulated bivariate VAR(1) DGP as Chapter 28 of the book.
   dimension: numerical
   status: pass
 - id: var_macro
