@@ -1,0 +1,6 @@
+// VAR(1) estimado sobre dados simulados do Capítulo 28 do livro.
+load "validation/cases/var_book/data/var.csv" as df
+
+let m = var(df, y1, y2, lags=1)
+
+export(m, "txt", "/dev/stdout")

@@ -1,0 +1,6 @@
+// AR(1) estimado sobre dados simulados do Capítulo 26 do livro.
+load "validation/cases/ar_book/data/ar.csv" as df
+
+let m = arima(df, y, p=1, d=0, q=0)
+
+export(m, "txt", "/dev/stdout")
