@@ -1,0 +1,44 @@
+id: arima-gdp
+title: ARIMA(1,1,1) on log US real GDP
+estimator_family: arima
+status: blocked
+dimension: numerical
+
+dataset:
+  name: statsmodels::macrodata
+  source: statsmodels.datasets / Rdatasets
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-2
+    standard_errors: 1e-2
+
+output_format: txt
+
+hayashi_script: cases/arima_gdp/hayashi/run.hay
+reference_scripts:
+  R: cases/arima_gdp/reference/run.R
+  Python: cases/arima_gdp/reference/run.py
+
+notes: |
+  ARIMA(1,1,1) on log US real GDP.
+  Currently blocked: Hayashi uses Hannan-Rissanen estimation, while R/Python
+  use MLE. The resulting AR and MA coefficients differ substantially, so the
+  case cannot be validated against standard references until either the
+  estimator method is configurable or a Hannan-Rissanen reference is added.
+
+result:
+  summary: "Blocked: Hayashi ARIMA method (Hannan-Rissanen) differs from MLE references"
+  known_differences:
+    - "Hayashi ar.L1 = 0.567 vs R/Python ar.L1 ≈ 0.934"
+    - "Hayashi ma.L1 = -0.273 vs R/Python ma.L1 ≈ -0.590"
+    - "Hayashi does not report sigma2"
+  issues_opened: []

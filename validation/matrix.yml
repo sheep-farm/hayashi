@@ -1,43 +1,95 @@
 cases:
+- id: arima_gdp
+  notes: 'ARIMA(1,1,1) on log US real GDP.
+
+    Currently blocked: Hayashi uses Hannan-Rissanen estimation, while R/Python
+
+    use MLE. The resulting AR and MA coefficients differ substantially, so the
+
+    case cannot be validated against standard references until either the
+
+    estimator method is configurable or a Hannan-Rissanen reference is added.
+
+    '
+  dimension: numerical
+  status: blocked
 - id: autoreg_gdp
   notes: AR(1) on US real GDP with constant and trend.
   dimension: numerical
+  status: pass
 - id: cox_heart
   notes: Cox proportional hazards regression for survival time after heart transplant.
   dimension: numerical
+  status: pass
+- id: did_kielmc
+  notes: 'Difference-in-differences effect of incinerator proximity on log house prices.
+
+    Currently blocked: Hayashi''s DiD output reports only the ATT and group means,
+
+    not a full coefficient table. The orchestrator cannot parse the ATT scalar
+
+    into the coefficient/standard-error structure used for comparison.
+
+    '
+  dimension: numerical
+  status: blocked
 - id: garch_nyse
   notes: GARCH(1,1) on NYSE returns.
   dimension: numerical
+  status: pass
 - id: gmm_card
   notes: GMM returns to schooling with nearc4 as instrument for education.
   dimension: numerical
+  status: pass
 - id: iv_card
   notes: IV with education endogenous and nearc4 as instrument.
   dimension: numerical
+  status: pass
 - id: logit_mroz
   notes: Logit labour-force participation on the Mroz dataset.
   dimension: numerical
+  status: pass
 - id: ols_wooldridge_wage1
   notes: First real-dataset validation case.
   dimension: numerical
+  status: pass
 - id: panel_fe_grunfeld
   notes: Panel fixed-effects investment demand model (Grunfeld).
   dimension: numerical
+  status: pass
 - id: poisson_fertil2
   notes: Poisson regression for number of children on the fertil2 dataset.
   dimension: numerical
+  status: pass
 - id: probit_mroz
   notes: Probit labour-force participation on the Mroz dataset.
   dimension: numerical
+  status: pass
 - id: quantile_wage1
   notes: Median quantile regression of wage on education, experience, and tenure.
   dimension: numerical
+  status: pass
 - id: re_grunfeld
   notes: Random-effects investment demand model (Grunfeld).
   dimension: numerical
+  status: pass
 - id: tobit_mroz
   notes: Tobit regression of hours worked with left censoring at zero.
   dimension: numerical
+  status: pass
+- id: var_macro
+  notes: 'VAR(2) on US real GDP and consumption.
+
+    Currently blocked: Hayashi''s VAR output reports only the residual covariance
+
+    matrix (Sigma_u), not per-equation coefficients. The orchestrator cannot
+
+    compare coefficients until the estimator prints a full coefficient table.
+
+    '
+  dimension: numerical
+  status: blocked
 - id: wls_hprice1
   notes: WLS with weights generated inside Hayashi to avoid sandbox file issues.
   dimension: numerical
+  status: pass
