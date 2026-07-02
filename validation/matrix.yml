@@ -1,4 +1,12 @@
 cases:
+- id: ab_grunfeld
+  notes: Arellano-Bond difference GMM for dynamic panel investment demand.
+  dimension: numerical
+  status: blocked
+- id: ardl_gdp
+  notes: ARDL(1,1) model of US real GDP on consumption.
+  dimension: numerical
+  status: pass
 - id: arima_gdp
   notes: 'ARIMA(1,1,1) on log US real GDP.
 
@@ -33,10 +41,28 @@ cases:
     '
   dimension: numerical
   status: blocked
+- id: ets_gdp
+  notes: 'Exponential smoothing state-space model on US real GDP.
+
+    Currently blocked: Hayashi''s `ets` prints the smoothing parameters
+
+    (alpha, beta, gamma) as summary lines, not in a coefficient table with
+
+    standard errors. The orchestrator cannot parse this output into the
+
+    coefficient/standard-error structure used for comparison.
+
+    '
+  dimension: numerical
+  status: blocked
 - id: garch_nyse
   notes: GARCH(1,1) on NYSE returns.
   dimension: numerical
   status: pass
+- id: glsar_hprice1
+  notes: GLS with AR(1) errors on housing price equation.
+  dimension: numerical
+  status: blocked
 - id: gmm_card
   notes: GMM returns to schooling with nearc4 as instrument for education.
   dimension: numerical
@@ -45,6 +71,10 @@ cases:
   notes: IV with education endogenous and nearc4 as instrument.
   dimension: numerical
   status: pass
+- id: lasso_hprice1
+  notes: Lasso regression of house price on lot size, square footage and bedrooms.
+  dimension: numerical
+  status: blocked
 - id: logit_mroz
   notes: Logit labour-force participation on the Mroz dataset.
   dimension: numerical

@@ -1,0 +1,8 @@
+// Load the Wooldridge hprice1 dataset from CSV.
+load "validation/cases/lasso_hprice1/data/hprice1.csv" as df
+
+// Lasso regression of house price on lot size, square footage and bedrooms.
+let m = lasso(price ~ lotsize + sqrft + bdrms, df)
+
+// Export coefficient table for automated comparison.
+export(m, "txt", "/dev/stdout")
