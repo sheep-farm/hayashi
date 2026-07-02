@@ -1,0 +1,13 @@
+Package: hayashi.validation
+Type: Validation
+Title: R dependencies for Hayashi validation programme
+Version: 0.1.0
+Authors@R: 
+    person("Hayashi", "Project", role = c("aut", "cre"))
+Description: Records the R packages required to run the reference scripts
+    in the Hayashi empirical validation programme.
+License: MIT
+Encoding: UTF-8
+Imports:
+    wooldridge,
+    jsonlite
