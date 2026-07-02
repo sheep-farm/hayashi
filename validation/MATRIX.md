@@ -2,7 +2,8 @@
 
 | Family | Dataset | Reference | Status | Blocking Issue | Notes |
 |---|---|---:|---|---|---|
-| ols | wooldridge::wage1 | R, Python | pass | — |  |
+| ols | wooldridge::wage1 | R, Python | pass | — | First real-dataset validation case. |
+| wls | wooldridge::hprice1 | R, Python | pass | — | WLS with weights generated inside Hayashi to avoid sandbox file issues. |
 
 ## Status legend
 

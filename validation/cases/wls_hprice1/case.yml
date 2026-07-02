@@ -1,0 +1,34 @@
+id: wls-hprice1
+title: WLS housing price equation on Wooldridge hprice1
+estimator_family: wls
+status: not-started
+dimension: numerical
+
+dataset:
+  name: wooldridge::hprice1
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-6
+    standard_errors: 1e-6
+
+hayashi_script: cases/wls_hprice1/hayashi/run.hay
+reference_scripts:
+  R: cases/wls_hprice1/reference/run.R
+  Python: cases/wls_hprice1/reference/run.py
+
+notes: WLS with weights generated inside Hayashi to avoid sandbox file issues.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []
