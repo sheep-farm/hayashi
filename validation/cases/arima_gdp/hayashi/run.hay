@@ -4,8 +4,8 @@ load "validation/cases/arima_gdp/data/macrodata.csv" as df
 // Build log GDP.
 generate df lgdp = log(gdp)
 
-// ARIMA(1,1,1) on log GDP.
-let m = arima(df, lgdp, p=1, d=1, q=1)
+// ARIMA(1,1,1) on log GDP via CSS-MLE to match R/Python references.
+let m = arima(df, lgdp, p=1, d=1, q=1, method="mle")
 
 // Export coefficient table for automated comparison.
 export(m, "txt", "/dev/stdout")

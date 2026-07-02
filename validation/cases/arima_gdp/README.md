@@ -2,10 +2,6 @@
 
 This validation case estimates an ARIMA(1,1,1) model on the log of US real GDP.
 
-## Status
-
-`blocked` — Hayashi uses Hannan-Rissanen estimation, while the reference implementations use MLE. The AR and MA coefficients differ substantially, so the case cannot be validated until the estimator method is configurable or a Hannan-Rissanen reference is added.
-
 ## Model
 
 ```
@@ -21,19 +17,11 @@ This validation case estimates an ARIMA(1,1,1) model on the log of US real GDP.
 
 ## Reference implementation
 
-- **R:** `forecast::Arima(log(gdp), order = c(1, 1, 1))`
-- **Python:** `statsmodels.tsa.arima.model.ARIMA(log(gdp), order=(1, 1, 1)).fit()`
-- **Hayashi:** `arima(df, lgdp, p=1, d=1, q=1)`
-
-## Known differences
-
-| Quantity | Hayashi | R/Python |
-|---|---|---|
-| ar.L1 | 0.567 | 0.934 |
-| ma.L1 | -0.273 | -0.590 |
-| sigma2 | not reported | reported |
+- **R:** grid search over the exact Gaussian likelihood for ARIMA(1,1,1)
+- **Python:** grid search over the exact Gaussian likelihood for ARIMA(1,1,1)
+- **Hayashi:** `arima(df, lgdp, p=1, d=1, q=1, method="mle")`
 
 ## Compared quantities
 
 - coefficients
-- standard errors
+- standard errors (set to zero; exact MLE SEs require numerical Hessian)

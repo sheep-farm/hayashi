@@ -565,7 +565,7 @@ impl Interpreter {
                 let y = self.eval_col_expr(&Expr::Var(col_name.clone()), &df)?;
                 let y = ndarray::Array1::from(y);
 
-                // opts: p, d, q (ARIMA); P, D, Q, s (SARIMA)
+                // opts: p, d, q (ARIMA); P, D, Q, s (SARIMA); method ("hr" | "mle")
                 let get_usize = |key: &str, default: usize| -> usize {
                     match opt_map.get(key) {
                         Some(Value::Int(v)) => *v as usize,
@@ -578,16 +578,36 @@ impl Interpreter {
                 let d = get_usize("d", 1);
                 let q = get_usize("q", 1);
 
+                let method = match opt_map.get("method") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => "hr".to_string(),
+                };
+
                 let result = if func == "sarima" {
                     let sp = get_usize("P", 0);
                     let sd = get_usize("D", 0);
                     let sq = get_usize("Q", 0);
                     let s = get_usize("s", 12);
-                    greeners::ARIMA::fit_sarimax(&y, (p, d, q), (sp, sd, sq, s), None)
-                        .map_err(|e| self.rt_err(format!("SARIMA: {e}")))?
+                    if method == "mle" && (sp > 0 || sd > 0 || sq > 0) {
+                        return Err(self.rt_err(
+                            "SARIMA MLE is not supported; use method='hr' for seasonal models",
+                        ));
+                    }
+                    if method == "mle" {
+                        greeners::ARIMA::fit_mle(&y, (p, d, q))
+                            .map_err(|e| self.rt_err(format!("ARIMA(MLE): {e}")))?
+                    } else {
+                        greeners::ARIMA::fit_sarimax(&y, (p, d, q), (sp, sd, sq, s), None)
+                            .map_err(|e| self.rt_err(format!("SARIMA: {e}")))?
+                    }
                 } else {
-                    greeners::ARIMA::fit(&y, (p, d, q))
-                        .map_err(|e| self.rt_err(format!("ARIMA: {e}")))?
+                    if method == "mle" {
+                        greeners::ARIMA::fit_mle(&y, (p, d, q))
+                            .map_err(|e| self.rt_err(format!("ARIMA(MLE): {e}")))?
+                    } else {
+                        greeners::ARIMA::fit(&y, (p, d, q))
+                            .map_err(|e| self.rt_err(format!("ARIMA: {e}")))?
+                    }
                 };
 
                 Ok(Value::ArimaResult(Rc::new(result)))
