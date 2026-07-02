@@ -1,0 +1,36 @@
+id: quantile-wage1
+title: Quantile wage regression on Wooldridge wage1
+estimator_family: qreg
+status: not-started
+dimension: numerical
+
+dataset:
+  name: wooldridge::wage1
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-4
+    standard_errors: 1e-1
+
+output_format: txt
+
+hayashi_script: cases/quantile_wage1/hayashi/run.hay
+reference_scripts:
+  R: cases/quantile_wage1/reference/run.R
+  Python: cases/quantile_wage1/reference/run.py
+
+notes: Median quantile regression of wage on education, experience, and tenure.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []
