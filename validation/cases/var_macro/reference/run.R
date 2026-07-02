@@ -21,15 +21,25 @@ write.csv(macro, file.path(data_dir, "macrodata.csv"), row.names = FALSE)
 macro <- macro[complete.cases(macro[, c("gdp", "cons")]), ]
 model <- VAR(macro[, c("gdp", "cons")], p = 2, type = "const")
 
-# Extract coefficients and standard errors per equation.
+# Extract coefficients and standard errors per equation, mapping to Hayashi names.
 all_coefs <- list()
 all_ses <- list()
 for (eq in names(coef(model))) {
   mat <- coef(model)[[eq]]
   for (i in seq_len(nrow(mat))) {
     name <- rownames(mat)[i]
-    all_coefs[[paste0(eq, "_", name)]] <- as.numeric(mat[i, "Estimate"])
-    all_ses[[paste0(eq, "_", name)]] <- as.numeric(mat[i, "Std. Error"])
+    hay_name <- if (name == "(Intercept)") {
+      paste0(eq, "_const")
+    } else if (grepl("\\.l\\d+$", name)) {
+      parts <- strsplit(name, "\\.")[[1]]
+      lag <- parts[length(parts)]
+      var <- paste(parts[-length(parts)], collapse = ".")
+      paste0(eq, "_", var, ".L", gsub("l", "", lag))
+    } else {
+      paste0(eq, "_", name)
+    }
+    all_coefs[[hay_name]] <- as.numeric(mat[i, "Estimate"])
+    all_ses[[hay_name]] <- as.numeric(mat[i, "Std. Error"])
   }
 }
 
