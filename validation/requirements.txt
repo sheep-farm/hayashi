@@ -4,5 +4,6 @@
 statsmodels>=0.14
 wooldridge>=0.0.2
 linearmodels>=5.0
+arch>=6.0
 pandas>=2.0
 pyyaml>=6.0

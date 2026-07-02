@@ -10,6 +10,7 @@
 | probit | wooldridge::mroz | R, Python | pass | — | Probit labour-force participation on the Mroz dataset. |
 | qreg | wooldridge::wage1 | R, Python | pass | — | Median quantile regression of wage on education, experience, and tenure. |
 | re | grunfeld | R, Python | pass | — | Random-effects investment demand model (Grunfeld). |
+| tobit | wooldridge::mroz | R, Python | pass | — | Tobit regression of hours worked with left censoring at zero. |
 | wls | wooldridge::hprice1 | R, Python | pass | — | WLS with weights generated inside Hayashi to avoid sandbox file issues. |
 
 ## Status legend
