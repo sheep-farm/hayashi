@@ -1,0 +1,36 @@
+id: poisson-fertil2
+title: Poisson fertility model on Wooldridge fertil2
+estimator_family: poisson
+status: not-started
+dimension: numerical
+
+dataset:
+  name: wooldridge::fertil2
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-3
+    standard_errors: 1e-3
+
+output_format: txt
+
+hayashi_script: cases/poisson_fertil2/hayashi/run.hay
+reference_scripts:
+  R: cases/poisson_fertil2/reference/run.R
+  Python: cases/poisson_fertil2/reference/run.py
+
+notes: Poisson regression for number of children on the fertil2 dataset.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []
