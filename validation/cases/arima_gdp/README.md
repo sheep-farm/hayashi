@@ -23,5 +23,5 @@ This validation case estimates an ARIMA(1,1,1) model on the log of US real GDP.
 
 ## Compared quantities
 
-- coefficients
-- standard errors (set to zero; exact MLE SEs require numerical Hessian)
+- coefficients (standard errors are not compared because the numerical Hessian of
+  the truncated exact likelihood is unstable near this optimum)

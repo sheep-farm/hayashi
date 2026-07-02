@@ -132,11 +132,11 @@ coefs = {
     "ar.L1": float(best_phi),
     "ma.L1": float(best_theta),
 }
-std_errors = {name: 0.0 for name in coefs}
+
 
 result = {
     "coefficients": coefs,
-    "standard_errors": std_errors,
+    "standard_errors": {name: 0.0 for name in coefs},
 }
 
 out_dir = CASE_DIR / "reference"
