@@ -56,7 +56,7 @@ pub fn dataframe_to_arrow(df: &greeners::DataFrame) -> ArrayRef {
 
     for col_name in df.column_names() {
         if let Ok(col) = df.get_column(&col_name) {
-            let array = column_to_arrow(col);
+            let array = column_to_arrow(&col);
             fields.push(Field::new(&col_name, array.data_type().clone(), true));
             arrays.push(array);
         }
@@ -242,21 +242,24 @@ pub fn value_to_json(
             if use_arrow && !lst.is_empty() {
                 if let Some(col) = list_to_column(lst) {
                     let arrow_array = column_to_arrow(&col);
-                    if let Ok((ffi_array, ffi_schema)) = arrow::ffi::to_ffi(&arrow_array.into_data()) {
-                        let array_ptr = Box::into_raw(Box::new(ffi_array)) as usize;
-                        let schema_ptr = Box::into_raw(Box::new(ffi_schema)) as usize;
-                        temp_boxes.push((array_ptr, schema_ptr));
+                    match arrow::ffi::to_ffi(&arrow_array.into_data()) {
+                        Ok((ffi_array, ffi_schema)) => {
+                            let array_ptr = Box::into_raw(Box::new(ffi_array)) as usize;
+                            let schema_ptr = Box::into_raw(Box::new(ffi_schema)) as usize;
+                            temp_boxes.push((array_ptr, schema_ptr));
 
-                        let mut col_map = serde_json::Map::new();
-                        col_map.insert(
-                            "__arrow_array_ptr__".to_string(),
-                            serde_json::json!(array_ptr),
-                        );
-                        col_map.insert(
-                            "__arrow_schema_ptr__".to_string(),
-                            serde_json::json!(schema_ptr),
-                        );
-                        return serde_json::Value::Object(col_map);
+                            let mut col_map = serde_json::Map::new();
+                            col_map.insert(
+                                "__arrow_array_ptr__".to_string(),
+                                serde_json::json!(array_ptr),
+                            );
+                            col_map.insert(
+                                "__arrow_schema_ptr__".to_string(),
+                                serde_json::json!(schema_ptr),
+                            );
+                            return serde_json::Value::Object(col_map);
+                        }
+                        Err(_) => {}
                     }
                 }
             }
@@ -276,21 +279,24 @@ pub fn value_to_json(
         Value::DataFrame(df) => {
             if use_arrow {
                 let arrow_array = dataframe_to_arrow(df);
-                if let Ok((ffi_array, ffi_schema)) = arrow::ffi::to_ffi(&arrow_array.into_data()) {
-                    let array_ptr = Box::into_raw(Box::new(ffi_array)) as usize;
-                    let schema_ptr = Box::into_raw(Box::new(ffi_schema)) as usize;
-                    temp_boxes.push((array_ptr, schema_ptr));
+                match arrow::ffi::to_ffi(&arrow_array.into_data()) {
+                    Ok((ffi_array, ffi_schema)) => {
+                        let array_ptr = Box::into_raw(Box::new(ffi_array)) as usize;
+                        let schema_ptr = Box::into_raw(Box::new(ffi_schema)) as usize;
+                        temp_boxes.push((array_ptr, schema_ptr));
 
-                    let mut df_map = serde_json::Map::new();
-                    df_map.insert(
-                        "__arrow_array_ptr__".to_string(),
-                        serde_json::json!(array_ptr),
-                    );
-                    df_map.insert(
-                        "__arrow_schema_ptr__".to_string(),
-                        serde_json::json!(schema_ptr),
-                    );
-                    return serde_json::Value::Object(df_map);
+                        let mut df_map = serde_json::Map::new();
+                        df_map.insert(
+                            "__arrow_array_ptr__".to_string(),
+                            serde_json::json!(array_ptr),
+                        );
+                        df_map.insert(
+                            "__arrow_schema_ptr__".to_string(),
+                            serde_json::json!(schema_ptr),
+                        );
+                        return serde_json::Value::Object(df_map);
+                    }
+                    Err(_) => {}
                 }
             }
             let mut map = serde_json::Map::new();
