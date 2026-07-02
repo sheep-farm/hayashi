@@ -26,6 +26,15 @@ def log(msg: str) -> None:
     print(msg, file=sys.stderr)
 
 
+def _is_number(token: str) -> bool:
+    """Return True if token is a valid signed decimal number."""
+    try:
+        float(token)
+        return True
+    except ValueError:
+        return False
+
+
 def run_command(cmd: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
     log(f"  $ {' '.join(cmd)}")
     return subprocess.run(
@@ -144,16 +153,26 @@ def parse_hayashi_txt_table(text: str) -> dict[str, dict[str, float]]:
             line = line.strip()
             if not line or line.startswith("-") or line.startswith("="):
                 continue
-            # Split on whitespace and require at least three tokens: name, coef, se.
+            # Stop at the start of a secondary section (e.g., Heckman selection equation).
+            lower = line.lower()
+            if any(marker in lower for marker in ("equação de seleção", "selection equation", "seleção", "γ̂", "gamma")):
+                break
+            # Split on whitespace and reconstruct the variable name, allowing
+            # names like "lambda (IMR)" where the first token is not a number.
             parts = line.split()
             if len(parts) < 3:
                 continue
+            i = 0
+            while i < len(parts) and not _is_number(parts[i]):
+                i += 1
+            if i == 0 or i + 2 > len(parts):
+                continue
+            var = " ".join(parts[:i])
             try:
-                coef = float(parts[1])
-                se = float(parts[2])
+                coef = float(parts[i])
+                se = float(parts[i + 1])
             except ValueError:
                 continue
-            var = parts[0]
             # Normalise intercept label across implementations.
             if var == "const":
                 var = "Intercept"
@@ -174,10 +193,16 @@ def parse_reference_json(path: Path) -> dict[str, Any]:
 
 
 def normalise_intercept(data: dict[str, Any]) -> dict[str, Any]:
-    """Rename 'const' to 'Intercept' in coefficient/standard-error dicts."""
+    """Rename 'const' to 'Intercept' and clean up Heckman lambda label in coefficient/standard-error dicts."""
     for key in ("coefficients", "standard_errors"):
-        if key in data and "const" in data[key]:
-            data[key]["Intercept"] = data[key].pop("const")
+        if key not in data:
+            continue
+        d = data[key]
+        if "const" in d:
+            d["Intercept"] = d.pop("const")
+        # Hayashi prints the inverse Mills ratio as "lambda (IMR)".
+        if "lambda (IMR)" in d:
+            d["lambda_IMR"] = d.pop("lambda (IMR)")
     return data
 
 
