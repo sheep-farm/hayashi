@@ -16,9 +16,7 @@ impl Interpreter {
         opt_map: &HashMap<String, Value>,
     ) -> Result<Option<Value>> {
         let result: Result<Value> = match func {
-            "reg" | "regress" => {
-                self.eval_call("ols", args, opts)
-            }
+            "reg" | "regress" => self.eval_call("ols", args, opts),
 
             // ── Fama-MacBeth (1973) ──────────────────────────────────────────
             // fmb(formula, df, time=col)
@@ -363,7 +361,7 @@ impl Interpreter {
                 };
                 let df = self.maybe_filter_df(&df_raw, opts)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
-                let cov = Self::resolve_cov_full(&opt_map, &df)?;
+                let cov = Self::resolve_cov_full(opt_map, &df)?;
 
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -407,7 +405,7 @@ impl Interpreter {
                     Some(Value::DataFrame(df)) => df.clone(),
                     _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
-                let cov = Self::resolve_cov_full(&opt_map, &df)?;
+                let cov = Self::resolve_cov_full(opt_map, &df)?;
 
                 let endog_str = Self::formula_to_string(&endog_ast);
                 let instr_str = Self::formula_to_string(&instr_ast);
@@ -897,8 +895,7 @@ impl Interpreter {
                     None => 1,
                     _ => return Err(HayashiError::Runtime("rd: poly must be integer".into())),
                 };
-                let kernel =
-                    rd_kernel_opt(opt_map.get("kernel")).map_err(HayashiError::Runtime)?;
+                let kernel = rd_kernel_opt(opt_map.get("kernel")).map_err(HayashiError::Runtime)?;
 
                 let result = greeners::RD::fit(
                     &y,
@@ -982,8 +979,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let kernel =
-                    rd_kernel_opt(opt_map.get("kernel")).map_err(HayashiError::Runtime)?;
+                let kernel = rd_kernel_opt(opt_map.get("kernel")).map_err(HayashiError::Runtime)?;
 
                 let result = greeners::RD::fit_fuzzy(
                     &y,
@@ -1208,7 +1204,7 @@ impl Interpreter {
                 let var_names = df
                     .formula_var_names(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let cov = Self::resolve_cov_full(&opt_map, &df)?;
+                let cov = Self::resolve_cov_full(opt_map, &df)?;
                 let result =
                     greeners::Poisson::fit_with_names(&y_vec, &x_mat, cov, Some(var_names))
                         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1227,7 +1223,7 @@ impl Interpreter {
                 let var_names = df
                     .formula_var_names(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let cov = Self::resolve_cov_full(&opt_map, &df)?;
+                let cov = Self::resolve_cov_full(opt_map, &df)?;
                 let result = greeners::NegBin::fit_with_names(&y_vec, &x_mat, cov, Some(var_names))
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 Ok(Value::NegBinResult(Rc::new(result)))
@@ -1310,7 +1306,7 @@ impl Interpreter {
                 let y = Self::get_col_f64(&df, &formula_ast.lhs)?;
                 let treated = Self::get_col_f64(&df, rhs_vars[0])?;
                 let post = Self::get_col_f64(&df, rhs_vars[1])?;
-                let cov = Self::resolve_cov_full(&opt_map, &df)?;
+                let cov = Self::resolve_cov_full(opt_map, &df)?;
                 let result = greeners::DiffInDiff::fit(&y, &treated, &post, cov)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 Ok(Value::DidResult(Rc::new(result)))
@@ -1486,7 +1482,7 @@ impl Interpreter {
                     },
                     _ => return Err(HayashiError::Type("norm= must be string".into())),
                 };
-                let cov = Self::resolve_cov_full(&opt_map, &df)?;
+                let cov = Self::resolve_cov_full(opt_map, &df)?;
                 let result =
                     greeners::RLM::fit_with_names(&y_vec, &x_mat, &norm, cov, Some(var_names))
                         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1596,7 +1592,7 @@ impl Interpreter {
                     _ => return Err(HayashiError::Type("weights= must be string".into())),
                 };
                 let weights = Self::get_col_f64(&df, &w_name)?;
-                let cov = Self::resolve_cov_full(&opt_map, &df)?;
+                let cov = Self::resolve_cov_full(opt_map, &df)?;
                 let var_names = df
                     .formula_var_names(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1968,7 +1964,7 @@ impl Interpreter {
                 let var_names = df
                     .formula_var_names(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let cov = Self::resolve_cov_full(&opt_map, &df)?;
+                let cov = Self::resolve_cov_full(opt_map, &df)?;
 
                 let alpha_val = match opt_map.get("alpha") {
                     Some(Value::Float(v)) => *v,
