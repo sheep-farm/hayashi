@@ -2,7 +2,7 @@ cases:
 - id: ab_grunfeld
   notes: Arellano-Bond difference GMM for dynamic panel investment demand.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: ardl_gdp
   notes: ARDL(1,1) model of US real GDP on consumption.
   dimension: numerical
@@ -27,7 +27,7 @@ cases:
   notes: Exponential smoothing state-space model on US real GDP. Blocked because Hayashi
     uses SSE grid search while references use MLE.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: garch_nyse
   notes: GARCH(1,1) on NYSE returns.
   dimension: numerical

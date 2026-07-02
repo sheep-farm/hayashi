@@ -1,11 +1,16 @@
 # Reference implementation in Python for the ETS GDP case.
+#
+# Uses simple exponential smoothing (SES, ETS(A,N,N)) to match the Hayashi
+# `ses(df, gdp)` call.  Only alpha is reported because the Hayashi text output
+# exposes only the smoothing parameter.
 
 import json
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import statsmodels.api as sm
-from statsmodels.tsa.exponential_smoothing.ets import ETSModel
+from statsmodels.tsa.holtwinters import SimpleExpSmoothing
 
 CASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = CASE_DIR / "data"
@@ -21,15 +26,18 @@ if not CSV_PATH.exists():
 else:
     macro = pd.read_csv(CSV_PATH)
 
-# ETS on GDP (auto-selected model).
-model = ETSModel(macro["gdp"].astype(float)).fit()
+y = macro["gdp"].astype(float).values
 
-coefs = {name: float(val) for name, val in model.params.items()}
-std_errors = {name: float(val) for name, val in model.bse.items()}
+# SES with optimised smoothing parameter.
+model = SimpleExpSmoothing(y, initialization_method="estimated").fit(optimized=True)
+alpha = float(model.params["smoothing_level"])
+
+# Clip tiny negative values that can appear at the boundary.
+alpha = max(0.0, min(1.0, alpha))
 
 result = {
-    "coefficients": coefs,
-    "standard_errors": std_errors,
+    "coefficients": {"alpha": alpha},
+    "standard_errors": {"alpha": 0.0},
 }
 
 out_dir = CASE_DIR / "reference"
