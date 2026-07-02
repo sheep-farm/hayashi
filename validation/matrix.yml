@@ -5,6 +5,12 @@ cases:
 - id: cox_heart
   notes: Cox proportional hazards regression for survival time after heart transplant.
   dimension: numerical
+- id: garch_nyse
+  notes: GARCH(1,1) on NYSE returns.
+  dimension: numerical
+- id: gmm_card
+  notes: GMM returns to schooling with nearc4 as instrument for education.
+  dimension: numerical
 - id: iv_card
   notes: IV with education endogenous and nearc4 as instrument.
   dimension: numerical
