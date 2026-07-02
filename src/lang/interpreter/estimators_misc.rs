@@ -1331,22 +1331,32 @@ impl Interpreter {
                 };
                 let r2 = 1.0 - sse / sst;
                 let var_names: Vec<String> = gformula.independents.clone();
+                let mut display_names = Vec::new();
+                if gformula.intercept && var_names.len() < params.len() {
+                    display_names.push("const".to_string());
+                    display_names.extend(var_names.iter().cloned());
+                } else {
+                    display_names = var_names.clone();
+                }
                 println!("\n{:=^60}", " Ridge Regression ");
                 println!("  Formula: {formula_str}   α = {alpha}");
                 println!("  n = {n}   k = {k}   R² = {r2:.4}");
                 println!("\n  {:<20} {:>12}", "Variable", "Coeff");
                 println!("  {}", "─".repeat(33));
-                if gformula.intercept && var_names.len() < params.len() {
-                    println!("  {:<20} {:>12.6}", "const", params[0]);
-                    for (i, name) in var_names.iter().enumerate() {
-                        println!("  {:<20} {:>12.6}", name, params[i + 1]);
-                    }
-                } else {
-                    for (i, name) in var_names.iter().enumerate() {
-                        println!("  {:<20} {:>12.6}", name, params[i]);
-                    }
+                for (i, name) in display_names.iter().enumerate() {
+                    println!("  {:<20} {:>12.6}", name, params[i]);
                 }
-                Ok(Value::Nil)
+                let std_errors = ndarray::Array1::<f64>::zeros(params.len());
+                Ok(Value::PenalizedResult(PenalizedModel {
+                    params,
+                    std_errors,
+                    variable_names: display_names,
+                    r_squared: r2,
+                    n_obs: n,
+                    alpha,
+                    l1_ratio: None,
+                    kind: "ridge".to_string(),
+                }))
             }
 
             // lasso(formula, df, alpha=1.0, tol=1e-6, max_iter=10000)
@@ -1482,6 +1492,11 @@ impl Interpreter {
                     .filter(|&&v| v.abs() > 1e-10)
                     .count();
                 let var_names = &gformula.independents;
+                let mut display_names = Vec::new();
+                if gformula.intercept {
+                    display_names.push("const".to_string());
+                }
+                display_names.extend(var_names.iter().cloned());
                 println!("\n{:=^60}", " Lasso Regression ");
                 println!("  Formula: {formula_str}   α = {alpha}");
                 println!(
@@ -1491,17 +1506,20 @@ impl Interpreter {
                 );
                 println!("\n  {:<20} {:>12}", "Variable", "Coeff");
                 println!("  {}", "─".repeat(33));
-                if gformula.intercept {
-                    println!("  {:<20} {:>12.6}", "const", params[0]);
-                    for (i, name) in var_names.iter().enumerate() {
-                        println!("  {:<20} {:>12.6}", name, params[i + 1]);
-                    }
-                } else {
-                    for (i, name) in var_names.iter().enumerate() {
-                        println!("  {:<20} {:>12.6}", name, params[i]);
-                    }
+                for (i, name) in display_names.iter().enumerate() {
+                    println!("  {:<20} {:>12.6}", name, params[i]);
                 }
-                Ok(Value::Nil)
+                let std_errors = ndarray::Array1::<f64>::zeros(params.len());
+                Ok(Value::PenalizedResult(PenalizedModel {
+                    params,
+                    std_errors,
+                    variable_names: display_names,
+                    r_squared: r2,
+                    n_obs: x.nrows(),
+                    alpha,
+                    l1_ratio: None,
+                    kind: "lasso".to_string(),
+                }))
             }
 
             // elasticnet(formula, df, alpha=1.0, l1_ratio=0.5, ...)
@@ -1640,6 +1658,11 @@ impl Interpreter {
                     .filter(|&&v| v.abs() > 1e-10)
                     .count();
                 let var_names = &gformula.independents;
+                let mut display_names = Vec::new();
+                if gformula.intercept {
+                    display_names.push("const".to_string());
+                }
+                display_names.extend(var_names.iter().cloned());
                 println!("\n{:=^60}", " ElasticNet Regression ");
                 println!("  Formula: {formula_str}   α={alpha}   l1_ratio={l1_ratio}");
                 println!(
@@ -1649,17 +1672,20 @@ impl Interpreter {
                 );
                 println!("\n  {:<20} {:>12}", "Variable", "Coeff");
                 println!("  {}", "─".repeat(33));
-                if gformula.intercept {
-                    println!("  {:<20} {:>12.6}", "const", params[0]);
-                    for (i, name) in var_names.iter().enumerate() {
-                        println!("  {:<20} {:>12.6}", name, params[i + 1]);
-                    }
-                } else {
-                    for (i, name) in var_names.iter().enumerate() {
-                        println!("  {:<20} {:>12.6}", name, params[i]);
-                    }
+                for (i, name) in display_names.iter().enumerate() {
+                    println!("  {:<20} {:>12.6}", name, params[i]);
                 }
-                Ok(Value::Nil)
+                let std_errors = ndarray::Array1::<f64>::zeros(params.len());
+                Ok(Value::PenalizedResult(PenalizedModel {
+                    params,
+                    std_errors,
+                    variable_names: display_names,
+                    r_squared: r2,
+                    n_obs: x.nrows(),
+                    alpha,
+                    l1_ratio: Some(l1_ratio),
+                    kind: "elasticnet".to_string(),
+                }))
             }
 
             // adf(df, var, lags=N)

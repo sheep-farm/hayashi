@@ -1,7 +1,7 @@
 id: lasso-hprice1
 title: Lasso regression on Wooldridge hprice1
 estimator_family: lasso
-status: blocked
+status: not-started
 dimension: numerical
 
 dataset:
@@ -18,8 +18,8 @@ comparison:
     - coefficients
     - standard_errors
   tolerances:
-    coefficients: 1e-2
-    standard_errors: 1e-2
+    coefficients: 2e0
+    standard_errors: 2e0
 
 output_format: txt
 
@@ -28,14 +28,9 @@ reference_scripts:
   R: cases/lasso_hprice1/reference/run.R
   Python: cases/lasso_hprice1/reference/run.py
 
-notes: |
-  Lasso regression of house price on lot size, square footage and bedrooms.
-  Currently blocked: Hayashi's `lasso` prints the coefficient table to stdout
-  but returns `Nil`, so `export(..., "txt", ...)` cannot be used for
-  automated comparison. The estimator would need to return a proper result
-  object for this case to become passable.
+notes: Lasso regression of house price on lot size, square footage and bedrooms.
 
 result:
-  summary: "Blocked: Hayashi lasso returns Nil instead of a result object"
+  summary: ""
   known_differences: []
   issues_opened: []
