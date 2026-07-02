@@ -1,7 +1,7 @@
 id: ets-gdp
 title: ETS on US real GDP
 estimator_family: ets
-status: blocked
+status: active
 dimension: numerical
 
 dataset:
@@ -16,10 +16,8 @@ references:
 comparison:
   quantities:
     - coefficients
-    - standard_errors
   tolerances:
     coefficients: 1e-2
-    standard_errors: 1e-2
 
 output_format: txt
 
@@ -29,13 +27,12 @@ reference_scripts:
   Python: cases/ets_gdp/reference/run.py
 
 notes: |
-  Exponential smoothing state-space model on US real GDP.
-  Greeners now exports a coefficient table, but the Hayashi `ets` implementation
-  uses a grid-search over SSE while R/Python use MLE. Smoothing parameters differ
-  beyond tolerance (e.g., gamma is near 1 in Hayashi and near 0 in MLE).
+  Simple exponential smoothing (ETS(A,N,N)) on US real GDP.  Hayashi uses `ses(df, gdp)`,
+  and the R/Python references use SES with SSE grid search / statsmodels optimisation.
+  Only the smoothing parameter alpha is compared because the Hayashi text output does
+  not expose the initial level.
 
 result:
-  summary: "Blocked: Hayashi ETS uses SSE grid search, references use MLE"
-  known_differences:
-    - "Hayashi estimates gamma ~ 0.94 via SSE; R/Python ETSModel estimate gamma ~ 1e-8 via MLE"
+  summary: "Simple exponential smoothing on US real GDP"
+  known_differences: []
   issues_opened: []

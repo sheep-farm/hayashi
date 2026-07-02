@@ -1,7 +1,7 @@
 id: ab-grunfeld
 title: Arellano-Bond dynamic panel on Grunfeld investment
 estimator_family: ab
-status: not-started
+status: active
 dimension: numerical
 
 dataset:
