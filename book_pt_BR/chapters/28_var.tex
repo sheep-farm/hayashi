@@ -226,3 +226,10 @@ irf(m, steps=12)
   cointegradas, o modelo adequado é o VECM (cap.~\ref{cap:coint}). Se
   forem I(1) mas não cointegradas, diferencie antes de estimar.
 \end{nota}
+
+\section{Validação empírica}
+
+O DGP VAR(1) deste capítulo corresponde ao caso de validação
+\texttt{var_book} em \texttt{validation/cases/}. O caso compara a estimação
+OLS equação por equação do \hayashi{} com referências em R e Python. Execute
+\lstinline{hay validate} para ver o estado atual.
