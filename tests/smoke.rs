@@ -1328,6 +1328,81 @@ fn help_metadata_alias_lookup() {
 }
 
 #[test]
+fn help_bare_keyword_if() {
+    assert_ok_contains("help_bare_if", "help(if)", "Conditional expression");
+}
+
+#[test]
+fn help_bare_keyword_for() {
+    assert_ok_contains("help_bare_for", "help(for)", "Loop over range");
+}
+
+#[test]
+fn help_dw() {
+    assert_ok_contains("help_dw", "help(dw)", "Durbin-Watson");
+}
+
+#[test]
+fn help_xtsum() {
+    assert_ok_contains("help_xtsum", "help(xtsum)", "within/between");
+}
+
+#[test]
+fn help_self_doc() {
+    assert_ok_contains("help_self_doc", "help(help)", "Show command index");
+}
+
+#[test]
+fn help_wls() {
+    assert_ok_contains("help_wls", "help(wls)", "Weighted Least Squares");
+}
+
+#[test]
+fn help_sur() {
+    assert_ok_contains("help_sur", "help(sur)", "Seemingly Unrelated");
+}
+
+#[test]
+fn help_fuzzy_rd() {
+    assert_ok_contains("help_fuzzy_rd", "help(fuzzy_rd)", "Fuzzy Regression");
+}
+
+#[test]
+fn help_eststo() {
+    assert_ok_contains("help_eststo", "help(eststo)", "Store a model");
+}
+
+#[test]
+fn help_testparm() {
+    assert_ok_contains("help_testparm", "help(testparm)", "Joint F-test");
+}
+
+#[test]
+fn help_median() {
+    assert_ok_contains("help_median", "help(median)", "Median");
+}
+
+#[test]
+fn help_is_int() {
+    assert_ok_contains("help_is_int", "help(is_int)", "Type predicates");
+}
+
+#[test]
+fn help_dataframe() {
+    assert_ok_contains("help_dataframe", "help(dataframe)", "DataFrame");
+}
+
+#[test]
+fn help_drop_collinear() {
+    assert_ok_contains("help_drop_collinear", "help(drop_collinear)", "collinear");
+}
+
+#[test]
+fn help_tsset() {
+    assert_ok_contains("help_tsset", "help(tsset)", "time-series");
+}
+
+#[test]
 fn lang_timer() {
     assert_ok_contains(
         "timer",
