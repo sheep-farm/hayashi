@@ -86,43 +86,71 @@ def parse_hayashi_csv_from_string(text: str) -> dict[str, dict[str, float]]:
 
 
 def parse_hayashi_txt_table(text: str) -> dict[str, dict[str, float]]:
-    """Parse a plain-text coefficient table from Hayashi (IV, logit, probit, etc.).
+    """Parse a plain-text coefficient table from Hayashi (IV, logit, probit, poisson, etc.).
 
-    The table is expected to contain a header row with "Variable", "coef", and
-    "std err" columns, followed by data rows.
+    The table may use pipe separators (IV/logit/probit) or aligned whitespace
+    (Poisson-style statsmodels output). We detect the header by looking for
+    "coef" and "std err" and then parse the data rows accordingly.
     """
     import re
 
     # Locate the header line by looking for the column titles.
+    lines = text.splitlines()
     start_idx = -1
-    for i, line in enumerate(text.splitlines()):
-        if "Variable" in line and "coef" in line and "std err" in line:
+    for i, line in enumerate(lines):
+        if "coef" in line and "std err" in line:
             start_idx = i
             break
     if start_idx == -1:
         raise ValueError(f"Text table header not found in Hayashi output: {text[:200]!r}")
 
+    header = lines[start_idx]
+    pipe_delimited = " | " in header
     result = {"coefficients": {}, "standard_errors": {}}
-    # Match lines like: "educ       |    0.1320 |    0.0540 |    2.440 |    0.015"
-    # Also tolerate "(omitted)" rows and skip them.
-    pattern = re.compile(r"^\s*(\S.*?)\s*\|\s*([-+]?\d+\.?\d*)\s*\|\s*([-+]?\d+\.?\d*)\s*\|")
-    for line in text.splitlines()[start_idx + 1:]:
-        line = line.strip()
-        if not line or line.startswith("-") or line.startswith("="):
-            continue
-        m = pattern.match(line)
-        if not m:
-            continue
-        var = m.group(1).strip()
-        if var.lower() == "variable":
-            continue
-        if "(omitted)" in line:
-            continue
-        # Normalise intercept label across implementations.
-        if var == "const":
-            var = "Intercept"
-        result["coefficients"][var] = float(m.group(2))
-        result["standard_errors"][var] = float(m.group(3))
+
+    if pipe_delimited:
+        # Match lines like: "educ       |    0.1320 |    0.0540 |    2.440 |    0.015"
+        pattern = re.compile(r"^\s*(\S.*?)\s*\|\s*([-+]?\d+\.?\d*)\s*\|\s*([-+]?\d+\.?\d*)\s*\|")
+        for line in lines[start_idx + 1:]:
+            line = line.strip()
+            if not line or line.startswith("-") or line.startswith("="):
+                continue
+            m = pattern.match(line)
+            if not m:
+                continue
+            var = m.group(1).strip()
+            if var.lower() == "variable":
+                continue
+            if "(omitted)" in line:
+                continue
+            # Normalise intercept label across implementations.
+            if var == "const":
+                var = "Intercept"
+            result["coefficients"][var] = float(m.group(2))
+            result["standard_errors"][var] = float(m.group(3))
+    else:
+        # Whitespace-aligned table (Poisson style). Header row is followed by
+        # a divider and then rows where the first token is the variable name.
+        for line in lines[start_idx + 1:]:
+            line = line.strip()
+            if not line or line.startswith("-") or line.startswith("="):
+                continue
+            # Split on whitespace and require at least three tokens: name, coef, se.
+            parts = line.split()
+            if len(parts) < 3:
+                continue
+            try:
+                coef = float(parts[1])
+                se = float(parts[2])
+            except ValueError:
+                continue
+            var = parts[0]
+            # Normalise intercept label across implementations.
+            if var == "const":
+                var = "Intercept"
+            result["coefficients"][var] = coef
+            result["standard_errors"][var] = se
+
     return result
 
 
