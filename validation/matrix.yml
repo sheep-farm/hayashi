@@ -1,4 +1,10 @@
 cases:
+- id: iv_card
+  notes: IV with education endogenous and nearc4 as instrument.
+  dimension: numerical
+- id: logit_mroz
+  notes: Logit labour-force participation on the Mroz dataset.
+  dimension: numerical
 - id: ols_wooldridge_wage1
   notes: First real-dataset validation case.
   dimension: numerical
