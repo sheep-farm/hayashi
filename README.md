@@ -235,6 +235,15 @@ predict df e = m, "residuals"    // residuals
 bootstrap(ols, Y ~ X, df, n=1000)
 influence(m)                 // DFFITS, Cook's D, leverage
 vif(m)                       // variance inflation factors
+
+// Store and compare models
+eststo(m1)
+eststo(m2)
+esttab()                     // model comparison table
+estclear()                   // clear stored models
+
+// Joint F-test
+ testparm(m, ["X1", "X2"])  // H0: selected coefficients = 0
 ```
 
 ## Data manipulation
@@ -271,12 +280,19 @@ pivot_wider(df, i=id, j=year, values=gdp)
 replace df Y = 0 if X > 10
 merge(df1, df2, key=id, type=left)
 append(df1, df2)
+encode(df, region)               // string -> numeric
+decode(df, region_num, labels=["north", "south", "east", "west"])
 winsor(df, Y, p=0.01)
 dropna(df, price, mpg)
 rename(df, old, new)
 label(df, Y, "GDP per capita")
 duplicates(df, id, action=drop)
+drop_collinear(df)               // remove perfectly collinear columns
 preserve(df) / restore(df)
+
+// Time-series declaration (required for L.x, F.x, D.x operators)
+tsset df year
+xtset(df, firm, year)            // panel structure
 ```
 
 ## Date/time
@@ -319,6 +335,9 @@ ttest(df, Y, by=group)
 ci(df, Y, level=0.99)
 centile(df, Y, percentiles=[10, 50, 90])
 describe(df)
+
+// Panel summary
+xtsum(df, wage, hours, id=firm)       // within/between decomposition
 
 // Normality tests
 swilk(df, Y)                         // Shapiro-Wilk
@@ -372,8 +391,20 @@ display d["name"]
 keys(d)  values(d)  has_key(d, "name")
 dict_set(d, "city", "SP")  dict_remove(d, "age")  dict_merge(d1, d2)
 
+// Build DataFrame from dict of lists
+let df = dataframe({"x": [1, 2, 3], "y": [4, 5, 6]})
+
+// Type predicates
+is_int(42)       // true
+is_str("hello")  // true
+is_df(df)        // true
+
 // Type conversions
 int(3.9)  float(42)  str(true)  bool(0)  type(x)
+
+// Median
+median([1, 3, 2])
+median(df, price)
 ```
 
 ## Control flow
@@ -454,6 +485,9 @@ if 3 in [1, 2, 3] { ... }
 if "key" in dict { ... }
 if "lo" in "hello" { ... }
 
+// Substring / membership
+contains("hello", "ell")         // true
+
 // Regex
 regexm(s, "[0-9]+")              // match → bool
 regexr(s, "[0-9]+", "NUM")       // replace first
@@ -508,7 +542,7 @@ assert(n > 0, "empty data")
 timer(ols(Y ~ X, df))         // time execution
 set_seed(42)                   // reproducibility
 source("other_script.hay")     // run another script
-help(ols)                      // help() has ~115 topics with examples
+help(ols)                      // help() has ~210 topics with examples
 help(about)                    // project info (version, license, author)
 print("x =", x, "y =", y)    // multi-arg with sep= and end=
 print("a", "b", sep=", ")     // a, b
