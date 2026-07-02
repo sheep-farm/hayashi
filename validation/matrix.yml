@@ -1,4 +1,7 @@
 cases:
 - id: ols_wooldridge_wage1
-  notes: ''
+  notes: First real-dataset validation case.
+  dimension: numerical
+- id: wls_hprice1
+  notes: WLS with weights generated inside Hayashi to avoid sandbox file issues.
   dimension: numerical
