@@ -344,7 +344,7 @@ impl Interpreter {
                             }
                             let mut s = vals.to_vec();
                             s.sort_by(|a, b| a.partial_cmp(b).unwrap());
-                            if n % 2 == 0 {
+                            if n.is_multiple_of(2) {
                                 (s[n / 2 - 1] + s[n / 2]) / 2.0
                             } else {
                                 s[n / 2]
@@ -492,7 +492,7 @@ impl Interpreter {
                             }
                             let mut s = vals.to_vec();
                             s.sort_by(|a, b| a.partial_cmp(b).unwrap());
-                            if n % 2 == 0 {
+                            if n.is_multiple_of(2) {
                                 (s[n / 2 - 1] + s[n / 2]) / 2.0
                             } else {
                                 s[n / 2]
@@ -1154,7 +1154,7 @@ impl Interpreter {
                         // coluna id: repete cada valor n_suf vezes
                         let id_out: Vec<String> = id_vals
                             .iter()
-                            .flat_map(|v| std::iter::repeat(v.clone()).take(n_suf))
+                            .flat_map(|v| std::iter::repeat_n(v.clone(), n_suf))
                             .collect();
                         builder = builder.add_string(&i_col, id_out);
 
@@ -1169,14 +1169,14 @@ impl Interpreter {
                                 Ok(Column::Float(arr)) => {
                                     let vals: Vec<f64> = arr
                                         .iter()
-                                        .flat_map(|&v| std::iter::repeat(v).take(n_suf))
+                                        .flat_map(|&v| std::iter::repeat_n(v, n_suf))
                                         .collect();
                                     builder = builder.add_column(pc, vals);
                                 }
                                 Ok(Column::Int(arr)) => {
                                     let vals: Vec<f64> = arr
                                         .iter()
-                                        .flat_map(|&v| std::iter::repeat(v as f64).take(n_suf))
+                                        .flat_map(|&v| std::iter::repeat_n(v as f64, n_suf))
                                         .collect();
                                     builder = builder.add_column(pc, vals);
                                 }

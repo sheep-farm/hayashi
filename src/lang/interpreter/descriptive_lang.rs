@@ -8,7 +8,7 @@ impl Interpreter {
         &mut self,
         func: &str,
         args: &[Expr],
-        opts: &[Opt],
+        _opts: &[Opt],
         opt_map: &HashMap<String, Value>,
     ) -> Result<Option<Value>> {
         let result: Result<Value> = match func {
@@ -657,7 +657,7 @@ impl Interpreter {
                 };
                 self.labels
                     .entry(df_name.clone())
-                    .or_insert_with(HashMap::new)
+                    .or_default()
                     .insert(var_name.clone(), description.clone());
                 println!("label {df_name}.{var_name} = \"{description}\"");
                 Ok(Value::Nil)
@@ -1540,7 +1540,7 @@ impl Interpreter {
                 if fmt == "latex" || fmt == "tex" {
                     buf.push_str("\\begin{tabular}{l");
                     for _ in 0..n_models {
-                        buf.push_str("r");
+                        buf.push('r');
                     }
                     buf.push_str("}\n\\hline\\hline\n");
                     // cabeçalho
@@ -1558,7 +1558,7 @@ impl Interpreter {
                         if var == "_cons" {
                             continue;
                         } // _cons vai no final
-                        buf.push_str(&format!("{var}"));
+                        buf.push_str(&var.to_string());
                         for mi in &models {
                             let coefs = &mi.coefs;
                             let row = coefs.iter().find(|(nm, _, _, _)| nm == var);
@@ -1579,7 +1579,7 @@ impl Interpreter {
                                 .is_some()
                         });
                         if has_se {
-                            buf.push_str(" ");
+                            buf.push(' ');
                             for mi in &models {
                                 let coefs = &mi.coefs;
                                 let row = coefs.iter().find(|(nm, _, _, _)| nm == var);
@@ -1613,7 +1613,7 @@ impl Interpreter {
                                 .is_some()
                         });
                         if has_se {
-                            buf.push_str(" ");
+                            buf.push(' ');
                             for mi in &models {
                                 let coefs = &mi.coefs;
                                 let row = coefs.iter().find(|(nm, _, _, _)| nm == "_cons");

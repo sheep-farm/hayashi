@@ -218,7 +218,7 @@ impl Interpreter {
                 if flagged.is_empty() {
                     println!("Nenhuma observação acima do cutoff.");
                 } else {
-                    println!("{:<8} {:>10}  {}", "obs", "h_i", "");
+                    println!("{:<8} {:>10}  ", "obs", "h_i");
                     println!("{sep}");
                     for (i, hi) in &flagged {
                         println!("{:<8} {:>10.4}  high leverage", i, hi);
@@ -275,7 +275,7 @@ impl Interpreter {
                 if flagged.is_empty() {
                     println!("Nenhuma observação influente acima do cutoff.");
                 } else {
-                    println!("{:<8} {:>10}  {}", "obs", "D_i", "");
+                    println!("{:<8} {:>10}  ", "obs", "D_i");
                     println!("{sep}");
                     for (i, di) in &flagged {
                         let label = if *di > 1.0 {
@@ -313,7 +313,7 @@ impl Interpreter {
                 let sep = "─".repeat(40);
                 println!("\nVariance Inflation Factor (VIF)");
                 println!("{sep}");
-                println!("{:<20} {:>8}  {}", "Variável", "VIF", "Diagnóstico");
+                println!("{:<20} {:>8}  Diagnóstico", "Variável", "VIF");
                 println!("{sep}");
                 for (i, &v) in vifs.iter().enumerate() {
                     let name = names.get(i).map(|s| s.as_str()).unwrap_or("?");
