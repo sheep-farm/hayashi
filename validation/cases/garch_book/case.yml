@@ -1,0 +1,28 @@
+id: garch-book
+title: GARCH(1,1) on simulated data from the Hayashi book
+estimator_family: garch
+status: active
+dimension: numerical
+
+dataset:
+  name: simulated_garch11
+  source: DGP from book_pt_BR/codes/30_garch.hay
+  size: 500 observations
+
+references:
+  - Python
+
+reference_scripts:
+  Python: cases/garch_book/reference/run.py
+
+hayashi_script: cases/garch_book/hayashi/run.hay
+
+output_format: txt
+
+comparison:
+  quantities:
+    - coefficients
+  tolerances:
+    coefficients: 5e-2
+
+notes: Uses the same simulated GARCH(1,1) DGP as Chapter 30 of the book. Coefficients only because GARCH standard-error approximations differ widely between implementations.
