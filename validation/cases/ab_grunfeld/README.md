@@ -2,11 +2,17 @@
 
 This validation case estimates an Arellano-Bond difference GMM model for dynamic panel investment demand.
 
+## Status
+
+`active`
+
 ## Model
 
 ```
 inv_{it} = α inv_{i,t-1} + β_1 value_{it} + β_2 capital_{it} + η_i + ε_{it}
 ```
+
+Estimated in first differences with `inv_{i,t-2}` as the (collapsed) instrument for `Δ inv_{i,t-1}`.
 
 ## Dataset
 
@@ -17,9 +23,9 @@ inv_{it} = α inv_{i,t-1} + β_1 value_{it} + β_2 capital_{it} + η_i + ε_{it}
 
 ## Reference implementation
 
-- **R:** `plm::pgmm(inv ~ lag(inv, 1) + value + capital | lag(inv, 2:3), data = grunfeld, effect = "individual", model = "onestep", transformation = "d")`
+- **R:** one-step difference GMM in base R (no `plm` dependency): `inv_{i,t-2}` instruments `Δ inv_{i,t-1}`; robust sandwich standard errors.
 - **Hayashi:** `ab(inv ~ value + capital, df, id=firm, time=year, lags=1)`
-- **Python:** not used; no standard Arellano-Bond implementation in Python matches the same syntax.
+- **Python:** not used.
 
 ## Compared quantities
 

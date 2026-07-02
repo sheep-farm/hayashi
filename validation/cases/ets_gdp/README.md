@@ -1,18 +1,19 @@
 # ETS on US real GDP
 
-This validation case estimates an exponential smoothing state-space model on US real GDP.
+This validation case estimates a simple exponential smoothing (SES, ETS(A,N,N)) model on US real GDP.
 
 ## Status
 
-`blocked` — Greeners now prints a coefficient table, but Hayashi's `ets` uses a grid search over SSE while R/Python use MLE. The estimated smoothing parameters therefore differ beyond tolerance.
+`active`
 
 ## Model
 
 ```
-gdp_t = level + trend + seasonal + ε_t
+ℓ_t = α y_t + (1 - α) ℓ_{t-1}
+ŷ_{t+1} = ℓ_t
 ```
 
-with automatic model selection.
+with α estimated by one-step SSE minimisation.
 
 ## Dataset
 
@@ -23,18 +24,16 @@ with automatic model selection.
 
 ## Reference implementation
 
-- **R:** `forecast::ets(gdp)`
-- **Python:** `statsmodels.tsa.exponential_smoothing.ets.ETSModel(gdp).fit()`
-- **Hayashi:** `ets(df, gdp)`
+- **R:** SSE grid search over α in `[0.001, 0.999]` with first observation as initial level.
+- **Python:** `statsmodels.tsa.holtwinters.SimpleExpSmoothing(gdp, initialization_method="estimated").fit(optimized=True)`
+- **Hayashi:** `ses(df, gdp)`
 
 ## Compared quantities
 
-- coefficients
-- standard errors
+- `alpha` (smoothing parameter)
 
 ## Tolerances
 
 | Quantity | Tolerance | Rationale |
 |---|---|---|
-| coefficients | 1e-2 | ETS parameterisation differs slightly across packages |
-| standard_errors | 1e-2 | R fallback does not report analytical SEs |
+| coefficients | 1e-2 | SES estimates differ only at the boundary (α ≈ 1) |
