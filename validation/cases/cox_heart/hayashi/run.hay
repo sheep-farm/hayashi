@@ -1,0 +1,8 @@
+// Load the heart transplant dataset from CSV.
+load "validation/cases/cox_heart/data/heart.csv" as df
+
+// Cox proportional hazards: survival time after heart transplant.
+let m = cox(time ~ age, df, event=censored)
+
+// Export coefficient table for automated comparison.
+export(m, "txt", "/dev/stdout")
