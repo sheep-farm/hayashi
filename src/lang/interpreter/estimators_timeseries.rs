@@ -392,7 +392,7 @@ impl Interpreter {
             // durbinwatson(model)
             // Durbin-Watson: detecta autocorrelação de primeira ordem nos resíduos OLS
             // DW ≈ 2 → sem autocorrelação; DW < 2 → positiva; DW > 2 → negativa
-            "durbinwatson" => {
+            "durbinwatson" | "dw" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
                         "durbinwatson() requires an OLS model".into(),
