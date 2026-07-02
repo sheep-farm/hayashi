@@ -56,7 +56,7 @@ def parse_hayashi_csv(path: Path) -> dict[str, dict[str, float]]:
 
 
 def parse_hayashi_csv_from_string(text: str) -> dict[str, dict[str, float]]:
-    """Parse the CSV produced by Hayashi OLS export from a string.
+    """Parse the CSV produced by Hayashi OLS/WLS export from a string.
 
     Hayashi may print an "Exported OLS → ..." line before the CSV data, so we
     locate the header row and parse from there.
@@ -85,9 +85,63 @@ def parse_hayashi_csv_from_string(text: str) -> dict[str, dict[str, float]]:
     return result
 
 
+def parse_hayashi_txt_table(text: str) -> dict[str, dict[str, float]]:
+    """Parse a plain-text coefficient table from Hayashi (IV, logit, probit, etc.).
+
+    The table is expected to contain a header row with "Variable", "coef", and
+    "std err" columns, followed by data rows.
+    """
+    import re
+
+    # Locate the header line by looking for the column titles.
+    start_idx = -1
+    for i, line in enumerate(text.splitlines()):
+        if "Variable" in line and "coef" in line and "std err" in line:
+            start_idx = i
+            break
+    if start_idx == -1:
+        raise ValueError(f"Text table header not found in Hayashi output: {text[:200]!r}")
+
+    result = {"coefficients": {}, "standard_errors": {}}
+    # Match lines like: "educ       |    0.1320 |    0.0540 |    2.440 |    0.015"
+    # Also tolerate "(omitted)" rows and skip them.
+    pattern = re.compile(r"^\s*(\S.*?)\s*\|\s*([-+]?\d+\.?\d*)\s*\|\s*([-+]?\d+\.?\d*)\s*\|")
+    for line in text.splitlines()[start_idx + 1:]:
+        line = line.strip()
+        if not line or line.startswith("-") or line.startswith("="):
+            continue
+        m = pattern.match(line)
+        if not m:
+            continue
+        var = m.group(1).strip()
+        if var.lower() == "variable":
+            continue
+        if "(omitted)" in line:
+            continue
+        # Normalise intercept label across implementations.
+        if var == "const":
+            var = "Intercept"
+        result["coefficients"][var] = float(m.group(2))
+        result["standard_errors"][var] = float(m.group(3))
+    return result
+
+
 def parse_reference_json(path: Path) -> dict[str, Any]:
     with open(path) as f:
-        return json.load(f)
+        result = json.load(f)
+    # Normalise intercept label across implementations.
+    for key in ("coefficients", "standard_errors"):
+        if key in result and "const" in result[key]:
+            result[key]["Intercept"] = result[key].pop("const")
+    return result
+
+
+def normalise_intercept(data: dict[str, Any]) -> dict[str, Any]:
+    """Rename 'const' to 'Intercept' in coefficient/standard-error dicts."""
+    for key in ("coefficients", "standard_errors"):
+        if key in data and "const" in data[key]:
+            data[key]["Intercept"] = data[key].pop("const")
+    return data
 
 
 def approx_equal(a: float, b: float, tol: float) -> bool:
@@ -217,12 +271,12 @@ def run_case(case: dict[str, Any]) -> tuple[str, list[str]]:
     reference: dict[str, Any] | None = None
     if py_res and py_res.stdout.strip():
         try:
-            reference = json.loads(py_res.stdout.strip().splitlines()[-1])
+            reference = normalise_intercept(json.loads(py_res.stdout.strip().splitlines()[-1]))
         except json.JSONDecodeError as e:
             return "blocked", [f"Could not parse reference stdout as JSON: {e}"]
     if reference is None and r_res and r_res.stdout.strip():
         try:
-            reference = json.loads(r_res.stdout.strip().splitlines()[-1])
+            reference = normalise_intercept(json.loads(r_res.stdout.strip().splitlines()[-1]))
         except json.JSONDecodeError as e:
             return "blocked", [f"Could not parse reference stdout as JSON: {e}"]
     if reference is None:
@@ -231,18 +285,28 @@ def run_case(case: dict[str, Any]) -> tuple[str, list[str]]:
             return "blocked", [f"Reference output not found: {expected_json}"]
         reference = parse_reference_json(expected_json)
 
-    # Prefer the stdout emitted by Hayashi; fall back to the written CSV.
+    # Prefer the stdout emitted by Hayashi; fall back to the written file.
     hayashi: dict[str, dict[str, float]] | None = None
+    output_format = case.get("output_format", "csv")
     if hay_res.stdout.strip():
         try:
-            hayashi = parse_hayashi_csv_from_string(hay_res.stdout)
+            if output_format == "txt":
+                hayashi = normalise_intercept(parse_hayashi_txt_table(hay_res.stdout))
+            else:
+                hayashi = normalise_intercept(parse_hayashi_csv_from_string(hay_res.stdout))
         except Exception as e:
-            return "blocked", [f"Could not parse Hayashi stdout as CSV: {e}"]
+            return "blocked", [f"Could not parse Hayashi stdout ({output_format}): {e}"]
     if hayashi is None:
-        hayashi_csv = hayashi_dir / "output.csv"
-        if not hayashi_csv.exists():
-            return "blocked", [f"Hayashi output not found: {hayashi_csv}"]
-        hayashi = parse_hayashi_csv(hayashi_csv)
+        if output_format == "txt":
+            hayashi_txt = hayashi_dir / "output.txt"
+            if not hayashi_txt.exists():
+                return "blocked", [f"Hayashi output not found: {hayashi_txt}"]
+            hayashi = normalise_intercept(parse_hayashi_txt_table(hayashi_txt.read_text()))
+        else:
+            hayashi_csv = hayashi_dir / "output.csv"
+            if not hayashi_csv.exists():
+                return "blocked", [f"Hayashi output not found: {hayashi_csv}"]
+            hayashi = normalise_intercept(parse_hayashi_csv(hayashi_csv))
 
     # Compare declared quantities.
     tolerances = case.get("comparison", {}).get("tolerances", {})
