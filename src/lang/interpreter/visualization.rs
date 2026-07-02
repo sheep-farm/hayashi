@@ -7,7 +7,7 @@ impl Interpreter {
         &mut self,
         func: &str,
         args: &[Expr],
-        opts: &[Opt],
+        _opts: &[Opt],
         opt_map: &HashMap<String, Value>,
     ) -> Result<Option<Value>> {
         let result: Result<Value> = match func {
@@ -695,7 +695,7 @@ impl Interpreter {
                 };
                 let title = match opt_map.get("title") {
                     Some(Value::Str(s)) => s.clone(),
-                    _ => format!("{y_name}"),
+                    _ => y_name.to_string(),
                 };
                 let w = match opt_map.get("width") {
                     Some(Value::Int(v)) => *v as u32,

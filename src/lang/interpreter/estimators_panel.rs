@@ -105,20 +105,17 @@ impl Interpreter {
                         };
                         self.env
                             .set("__boot_df__", Value::DataFrame(Rc::new(boot_df)))?;
-                        match self.eval_call(
+                        if let Ok(ref result) = self.eval_call(
                             &estimator_name,
                             &[formula_expr.clone(), Expr::Var("__boot_df__".into())],
                             &extra_opts,
                         ) {
-                            Ok(ref result) => {
-                                if let Some(params) = Self::extract_params(result) {
-                                    for j in 0..k.min(params.len()) {
-                                        boot_coefs[[b, j]] = params[j];
-                                    }
-                                    n_ok += 1;
+                            if let Some(params) = Self::extract_params(result) {
+                                for j in 0..k.min(params.len()) {
+                                    boot_coefs[[b, j]] = params[j];
                                 }
+                                n_ok += 1;
                             }
-                            Err(_) => {}
                         }
                     }
                     self.env.remove("__boot_df__");
@@ -584,7 +581,7 @@ impl Interpreter {
                     })
                     .collect();
                 let (lm, p) = greeners::PanelDiagnostics::breusch_pagan_lm(&resids, &entity_ids)
-                    .map_err(|e| HayashiError::Runtime(e))?;
+                    .map_err(HayashiError::Runtime)?;
                 let sig = if p < 0.01 {
                     "***"
                 } else if p < 0.05 {
@@ -667,7 +664,7 @@ impl Interpreter {
                 let (rho, t_stat, p, n_pairs) = greeners::PanelDiagnostics::wooldridge_serial(
                     &y_vec, &x_mat, &id_vals, &time_vals,
                 )
-                .map_err(|e| HayashiError::Runtime(e))?;
+                .map_err(HayashiError::Runtime)?;
                 let sig = if p < 0.01 {
                     "***"
                 } else if p < 0.05 {
@@ -752,7 +749,7 @@ impl Interpreter {
                     })
                     .collect();
                 let (cd, p) = greeners::PanelDiagnostics::pesaran_cd(&resids, &entity_ids)
-                    .map_err(|e| HayashiError::Runtime(e))?;
+                    .map_err(HayashiError::Runtime)?;
                 let sig = if p < 0.01 {
                     "***"
                 } else if p < 0.05 {
@@ -824,7 +821,7 @@ impl Interpreter {
                     .collect();
                 let (f_stat, p, k, gamma, gamma_se) =
                     greeners::PanelDiagnostics::mundlak(&y_vec, &x_mat, &id_vals)
-                        .map_err(|e| HayashiError::Runtime(e))?;
+                        .map_err(HayashiError::Runtime)?;
                 let sig = if p < 0.01 {
                     "***"
                 } else if p < 0.05 {
@@ -926,7 +923,7 @@ impl Interpreter {
                 let (m1, p1, m2, p2) = greeners::PanelDiagnostics::arellano_bond_test(
                     &y_vec, &x_mat, &id_vals, &time_vals,
                 )
-                .map_err(|e| HayashiError::Runtime(e))?;
+                .map_err(HayashiError::Runtime)?;
                 let sig = |p: f64| {
                     if p < 0.01 {
                         "***"
@@ -1167,7 +1164,7 @@ impl Interpreter {
             // ── Fixed Effects ─────────────────────────────────────────────────
             "fe" => {
                 let (formula_ast, df, _df_name, id_col) =
-                    self.extract_panel_args(args, &opt_map)?;
+                    self.extract_panel_args(args, opt_map)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 // FE elimina o intercepto via within-transform; forçamos - 1
                 // para evitar coluna de zeros pós-demeaning (singular matrix)
@@ -1204,7 +1201,7 @@ impl Interpreter {
             // ── Random Effects ────────────────────────────────────────────────
             "re" => {
                 let (formula_ast, df, _df_name, id_col) =
-                    self.extract_panel_args(args, &opt_map)?;
+                    self.extract_panel_args(args, opt_map)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1236,7 +1233,7 @@ impl Interpreter {
                 // H₀: todos os efeitos individuais são zero (pooled OLS adequado)
                 // H₁: efeitos individuais existem (use FE)
                 let (formula_ast, df, _df_name, id_col) =
-                    self.extract_panel_args(args, &opt_map)?;
+                    self.extract_panel_args(args, opt_map)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
 
                 // FE (within)
@@ -1279,7 +1276,7 @@ impl Interpreter {
                 let (f_stat, p) = greeners::PanelDiagnostics::f_test_fixed_effects(
                     ssr_pooled, ssr_fe, n, n_entities, k,
                 )
-                .map_err(|e| HayashiError::Runtime(e))?;
+                .map_err(HayashiError::Runtime)?;
 
                 let df_num = n_entities - 1;
                 let df_denom = n - n_entities - k;
@@ -1327,7 +1324,7 @@ impl Interpreter {
                 // H₀: resíduos independentes entre entidades (sem dependência cross-seccional)
                 // H₁: dependência cross-seccional presente
                 let (formula_ast, df, _df_name, id_col) =
-                    self.extract_panel_args(args, &opt_map)?;
+                    self.extract_panel_args(args, opt_map)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1361,7 +1358,7 @@ impl Interpreter {
                 let t_bar = residuals.len() as f64 / n_entities as f64;
 
                 let (cd, p) = greeners::PanelDiagnostics::pesaran_cd(&residuals, &entity_ids)
-                    .map_err(|e| HayashiError::Runtime(e))?;
+                    .map_err(HayashiError::Runtime)?;
 
                 let sig = if p < 0.01 {
                     "***"
@@ -1408,7 +1405,7 @@ impl Interpreter {
                 // H₀: sem efeitos individuais (σ²_u = 0) — pooled OLS adequado
                 // H₁: efeitos individuais existem — use FE ou RE
                 let (formula_ast, df, _df_name, id_col) =
-                    self.extract_panel_args(args, &opt_map)?;
+                    self.extract_panel_args(args, opt_map)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1444,7 +1441,7 @@ impl Interpreter {
                 let t_bar = n as f64 / n_entities as f64;
 
                 let (lm, p) = greeners::PanelDiagnostics::breusch_pagan_lm(&residuals, &entity_ids)
-                    .map_err(|e| HayashiError::Runtime(e))?;
+                    .map_err(HayashiError::Runtime)?;
 
                 let sig = if p < 0.01 {
                     "***"
@@ -1492,8 +1489,8 @@ impl Interpreter {
                 // H₀: Π_s = 0 para todo s (RE consistente)
                 // H₁: pelo menos um Π_s ≠ 0 (efeitos correlacionados com X — use FE)
                 // Generalização do Mundlak: usa valores em TODOS os períodos, não só a média
-                let (formula_ast, df, df_name, id_col) = self.extract_panel_args(args, &opt_map)?;
-                let time_col = self.get_time_col(&df_name, &opt_map)?;
+                let (formula_ast, df, df_name, id_col) = self.extract_panel_args(args, opt_map)?;
+                let time_col = self.get_time_col(&df_name, opt_map)?;
 
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
@@ -1530,7 +1527,7 @@ impl Interpreter {
                         &entity_ids,
                         &time_vals,
                     )
-                    .map_err(|e| HayashiError::Runtime(e))?;
+                    .map_err(HayashiError::Runtime)?;
 
                 let n_obs = y_vec.len();
                 let df1 = k_active;
@@ -1589,7 +1586,7 @@ impl Interpreter {
             // ── Arellano-Bond Diff-GMM (OLD mundlak removed — use new mundlak above) ─
             "mundlak_OLD_REMOVED" => {
                 let (formula_ast, df, _df_name, id_col) =
-                    self.extract_panel_args(args, &opt_map)?;
+                    self.extract_panel_args(args, opt_map)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1629,7 +1626,7 @@ impl Interpreter {
 
                 let (f_stat, p, k, gamma_hat, gamma_se) =
                     greeners::PanelDiagnostics::mundlak(&y_vec, &x_mat, &entity_ids)
-                        .map_err(|e| HayashiError::Runtime(e))?;
+                        .map_err(HayashiError::Runtime)?;
 
                 let df1 = k;
                 let df2_exact = if n > 2 * k + 1 { n - 2 * k - 1 } else { 1 };
@@ -1701,8 +1698,8 @@ impl Interpreter {
             // Estima y_it = ρ y_{i,t-1} + X_it'β + α_i + ε_it via Diff-GMM.
             // Instrumenta Δy_{i,t-1} com y_{i,t-2},...,y_{i,t-lags-1} (collapsed).
             "ab" => {
-                let (formula_ast, df, df_name, id_col) = self.extract_panel_args(args, &opt_map)?;
-                let time_col = self.get_time_col(&df_name, &opt_map)?;
+                let (formula_ast, df, df_name, id_col) = self.extract_panel_args(args, opt_map)?;
+                let time_col = self.get_time_col(&df_name, opt_map)?;
 
                 let max_lags: usize = match opt_map.get("lags") {
                     Some(Value::Int(v)) => (*v).max(1) as usize,
@@ -1853,8 +1850,8 @@ impl Interpreter {
             // Empilha eq. em 1ª diferença (instrumentadas com níveis defasados)
             // + eq. em níveis (instrumentadas com Δy_{t-1} e ΔX_{t-1}).
             "sysgmm" => {
-                let (formula_ast, df, df_name, id_col) = self.extract_panel_args(args, &opt_map)?;
-                let time_col = self.get_time_col(&df_name, &opt_map)?;
+                let (formula_ast, df, df_name, id_col) = self.extract_panel_args(args, opt_map)?;
+                let time_col = self.get_time_col(&df_name, opt_map)?;
 
                 let max_lags: usize = match opt_map.get("lags") {
                     Some(Value::Int(v)) => (*v).max(1) as usize,
@@ -2028,8 +2025,8 @@ impl Interpreter {
             // ── PCSE — Panel-Corrected Standard Errors (Beck & Katz 1995) ─────
             // pcse(formula, df, id=col, time=col)
             "pcse" => {
-                let (formula_ast, df, df_name, id_col) = self.extract_panel_args(args, &opt_map)?;
-                let time_col = self.get_time_col(&df_name, &opt_map)?;
+                let (formula_ast, df, df_name, id_col) = self.extract_panel_args(args, opt_map)?;
+                let time_col = self.get_time_col(&df_name, opt_map)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -2052,8 +2049,8 @@ impl Interpreter {
             // ── Panel GLS — Parks (1967) / Stata xtgls ───────────────────────
             // xtgls(formula, df, id=col, time=col [, panels="hetero"|"corr"])
             "xtgls" => {
-                let (formula_ast, df, df_name, id_col) = self.extract_panel_args(args, &opt_map)?;
-                let time_col = self.get_time_col(&df_name, &opt_map)?;
+                let (formula_ast, df, df_name, id_col) = self.extract_panel_args(args, opt_map)?;
+                let time_col = self.get_time_col(&df_name, opt_map)?;
                 let panels_opt = match opt_map.get("panels") {
                     Some(Value::Str(s)) if s == "corr" => greeners::GlsPanels::Correlated,
                     Some(Value::Str(s)) if s == "hetero" || s == "heteroscedastic" => {
@@ -2097,8 +2094,8 @@ impl Interpreter {
                 // Testa autocorrelação serial nos resíduos da equação em 1ª diferença.
                 // m1: DEVE rejeitar H₀ (FD induz AR(1) por construção)
                 // m2: NÃO deve rejeitar H₀ (valida instrumentos y_{i,t-2} do GMM)
-                let (formula_ast, df, df_name, id_col) = self.extract_panel_args(args, &opt_map)?;
-                let time_col = self.get_time_col(&df_name, &opt_map)?;
+                let (formula_ast, df, df_name, id_col) = self.extract_panel_args(args, opt_map)?;
+                let time_col = self.get_time_col(&df_name, opt_map)?;
 
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
@@ -2142,7 +2139,7 @@ impl Interpreter {
                     &entity_ids,
                     &time_vals,
                 )
-                .map_err(|e| HayashiError::Runtime(e))?;
+                .map_err(HayashiError::Runtime)?;
 
                 let sig = |p: f64| {
                     if p < 0.01 {
@@ -2229,8 +2226,8 @@ impl Interpreter {
 
             // ── wooldridge_OLD_REMOVED (substituído pelo novo acima) ──────────
             "wooldridge_OLD_REMOVED" => {
-                let (formula_ast, df, df_name, id_col) = self.extract_panel_args(args, &opt_map)?;
-                let time_col = self.get_time_col(&df_name, &opt_map)?;
+                let (formula_ast, df, df_name, id_col) = self.extract_panel_args(args, opt_map)?;
+                let time_col = self.get_time_col(&df_name, opt_map)?;
 
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
@@ -2274,7 +2271,7 @@ impl Interpreter {
                     &entity_ids,
                     &time_vals,
                 )
-                .map_err(|e| HayashiError::Runtime(e))?;
+                .map_err(HayashiError::Runtime)?;
 
                 let df_t = n_entities - 1;
                 let sig = if p < 0.01 {
