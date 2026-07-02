@@ -10,7 +10,7 @@
 | did | wooldridge::kielmc | R, Python | pass | — | Difference-in-differences effect of incinerator proximity on log house prices. Currently blocked: Hayashi's DiD output reports only the ATT and group means, not a full coefficient table. The orchestrator cannot parse the ATT scalar into the coefficient/standard-error structure used for comparison.  |
 | ets | statsmodels::macrodata | R, Python | blocked | — | Exponential smoothing state-space model on US real GDP. Currently blocked: Hayashi's `ets` prints the smoothing parameters (alpha, beta, gamma) as summary lines, not in a coefficient table with standard errors. The orchestrator cannot parse this output into the coefficient/standard-error structure used for comparison.  |
 | garch | wooldridge::nyse | R, Python | pass | — | GARCH(1,1) on NYSE returns. |
-| glsar | wooldridge::hprice1 | R, Python | blocked | — | GLS with AR(1) errors on housing price equation. |
+| glsar | wooldridge::hprice1 | R, Python | pass | — | GLS with AR(1) errors on housing price equation. |
 | gmm | wooldridge::card | R, Python | pass | — | GMM returns to schooling with nearc4 as instrument for education. |
 | iv | wooldridge::card | R, Python | pass | — | IV with education endogenous and nearc4 as instrument. |
 | lasso | wooldridge::hprice1 | R, Python | blocked | — | Lasso regression of house price on lot size, square footage and bedrooms. |
