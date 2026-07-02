@@ -6,7 +6,7 @@ estimator.
 ## Dataset
 
 - **Name:** <dataset name>
-- **Source:** <URL or package>
+- **Source:** <URL, package, or DGP from `book_pt_BR/codes/XX.hay`>
 - **Licence:** <licence>
 - **Size:** <rows x cols>
 
