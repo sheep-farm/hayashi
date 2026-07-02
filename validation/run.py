@@ -301,21 +301,43 @@ def main() -> int:
     with open(MATRIX_YML) as f:
         matrix = yaml.safe_load(f) or {}
 
-    cases = matrix.get("cases", [])
+    registry = matrix.get("cases", [])
+    registry_ids = {entry.get("id") for entry in registry if entry.get("id")}
+
+    # Auto-discover every case directory containing a case.yml.
+    discovered: list[dict[str, Any]] = []
+    for case_yml in sorted(VALIDATION_DIR.glob("cases/*/case.yml")):
+        case_id = case_yml.parent.name
+        with open(case_yml) as f:
+            case = yaml.safe_load(f) or {}
+        case["id"] = case_id
+        discovered.append(case)
+
+    # Merge registry entries with discovered cases. Registry entries provide
+    # optional metadata (notes, dimension) but are not required.
+    cases_by_id: dict[str, dict[str, Any]] = {}
+    for case in discovered:
+        cases_by_id[case["id"]] = case
+    for entry in registry:
+        case_id = entry.get("id")
+        if not case_id or case_id not in cases_by_id:
+            continue
+        cases_by_id[case_id]["notes"] = entry.get("notes", cases_by_id[case_id].get("notes", ""))
+        cases_by_id[case_id]["dimension"] = entry.get("dimension", cases_by_id[case_id].get("dimension", "numerical"))
+
+    cases = list(cases_by_id.values())
+    log(f"Discovered {len(cases)} validation case(s)")
     if not cases:
-        log("No cases registered in matrix.yml")
+        log("No validation cases found in validation/cases/*/case.yml")
         return 0
 
-    # Validate that every registered case has the required fields.
-    for case in cases:
-        if not case.get("id"):
-            log("WARNING: skipping registry entry without id")
-            continue
+    # Warn about registry entries that no longer exist on disk.
+    discovered_ids = {case["id"] for case in cases}
+    for case_id in registry_ids - discovered_ids:
+        log(f"WARNING: registry entry '{case_id}' has no case.yml on disk; skipping")
 
     overall_status = "pass"
     for case in cases:
-        if not case.get("id"):
-            continue
         status, failures = run_case(case)
         case["status"] = status
         if status != "pass":
@@ -323,7 +345,15 @@ def main() -> int:
         summary = "; ".join(failures) if failures else "matches reference"
         case.setdefault("result", {})["summary"] = summary
 
-    # Write updated matrix.yml.
+    # Write updated matrix.yml (id + notes + dimension for each discovered case).
+    matrix["cases"] = [
+        {
+            "id": case["id"],
+            "notes": case.get("notes", ""),
+            "dimension": case.get("dimension", "numerical"),
+        }
+        for case in cases
+    ]
     with open(MATRIX_YML, "w") as f:
         yaml.dump(matrix, f, sort_keys=False, allow_unicode=True)
 

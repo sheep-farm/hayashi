@@ -82,9 +82,12 @@ validation/
 2. Fill in dataset source, estimator family, reference software, quantities,
    tolerances, and status.
 3. Write `hayashi/run.hay`, `reference/run.R`, and `reference/run.py`.
-4. Ensure all scripts write a JSON file with the same keys.
-5. Register the case in `matrix.yml`.
-6. Run `python validation/run.py` and commit the updated `MATRIX.md`.
+4. Ensure each script emits the comparable output on `stdout` (and optionally
+   writes it to `cases/<id>/reference/expected.*` and
+   `cases/<id>/hayashi/output.*` for debugging).
+5. Optional: add an entry to `matrix.yml` with `id`, `dimension`, and `notes`.
+   If omitted, `hay validate` auto-discovers the case from the filesystem.
+6. Run `hay validate` and commit the updated `MATRIX.md`.
 
 ## Methodological guardrails
 
