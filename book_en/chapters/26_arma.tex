@@ -245,3 +245,12 @@ let yhat = predict(m, "xb")
   illustrate the structure of the process. In real use, data are loaded
   from a file with \lstinline{load} and the loop is not needed.
 \end{nota}
+
+\section{Empirical validation}
+
+The DGPs in this chapter are used as automated validation cases in
+\texttt{validation/cases/}: \texttt{ar_book}, \texttt{ma_book}, and
+\texttt{arma_book}. Each case runs the \hayashi{} script and compares it with
+R and Python reference implementations that replicate \hayashi{}'s default
+Hannan-Rissanen estimator. Run \lstinline{hay validate} to see the current
+status.
