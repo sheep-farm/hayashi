@@ -345,6 +345,20 @@ sfrancia(df, Y)                      // Shapiro-Francia
 sktest(df, Y)                        // Skewness/Kurtosis (JB + D'Agostino)
 ```
 
+## Validation programme
+
+Hayashi includes a reproducible, automated empirical validation programme in
+`validation/`. It compares Hayashi output against reference implementations
+(R and Python/statsmodels) on real datasets:
+
+```bash
+pip install -r validation/requirements.txt
+Rscript -e 'install.packages(c("wooldridge", "jsonlite"))'
+python validation/run.py
+```
+
+See `validation/README.md` for the full protocol.
+
 ## Graphs
 
 ```

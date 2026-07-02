@@ -1,0 +1,7 @@
+# Python dependencies for the Hayashi validation programme
+# Install with: pip install -r validation/requirements.txt
+
+statsmodels>=0.14
+wooldridge-python>=0.0.2
+pandas>=2.0
+pyyaml>=6.0
