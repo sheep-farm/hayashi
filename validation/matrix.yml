@@ -17,6 +17,12 @@ cases:
 - id: probit_mroz
   notes: Probit labour-force participation on the Mroz dataset.
   dimension: numerical
+- id: quantile_wage1
+  notes: Median quantile regression of wage on education, experience, and tenure.
+  dimension: numerical
+- id: re_grunfeld
+  notes: Random-effects investment demand model (Grunfeld).
+  dimension: numerical
 - id: wls_hprice1
   notes: WLS with weights generated inside Hayashi to avoid sandbox file issues.
   dimension: numerical
