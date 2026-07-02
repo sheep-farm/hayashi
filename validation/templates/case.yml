@@ -6,7 +6,7 @@ dimension: numerical
 
 dataset:
   name: <dataset name>
-  source: <URL or package name>
+  source: <URL, package name, or DGP from book_pt_BR/codes/XX.hay>
   licence: <licence>
   checksum: <sha256 if file is committed>
   download_script: <optional script to fetch data>

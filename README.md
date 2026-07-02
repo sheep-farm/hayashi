@@ -349,7 +349,8 @@ sktest(df, Y)                        // Skewness/Kurtosis (JB + D'Agostino)
 
 Hayashi includes a reproducible, automated empirical validation programme in
 `validation/`. It compares Hayashi output against reference implementations
-(R and Python/statsmodels) on real datasets:
+(R and Python/statsmodels) on real datasets and on simulated DGPs taken from
+the Hayashi book chapters:
 
 ```bash
 python -m venv validation/.venv
@@ -358,7 +359,8 @@ Rscript -e 'install.packages(c("wooldridge", "jsonlite"))'
 hay validate
 ```
 
-See `validation/README.md` for the full protocol.
+See `validation/README.md` for the full protocol and `validation/MATRIX.md` for
+the current status of every case.
 
 ## Graphs
 

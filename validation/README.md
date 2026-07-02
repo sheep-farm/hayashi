@@ -82,12 +82,24 @@ validation/
 2. Fill in dataset source, estimator family, reference software, quantities,
    tolerances, and status.
 3. Write `hayashi/run.hay`, `reference/run.R`, and `reference/run.py`.
+   For book-based cases, generate the dataset from the same DGP used in
+   `book_pt_BR/codes/*.hay` (or `book_en/codes/*.hay`) so the reference
+   implementation can reproduce the exact series.
 4. Ensure each script emits the comparable output on `stdout` (and optionally
    writes it to `cases/<id>/reference/expected.*` and
    `cases/<id>/hayashi/output.*` for debugging).
 5. Optional: add an entry to `matrix.yml` with `id`, `dimension`, and `notes`.
    If omitted, `hay validate` auto-discovers the case from the filesystem.
 6. Run `hay validate` and commit the updated `MATRIX.md`.
+
+### Book-based simulated cases
+
+Cases derived from the Hayashi book use the same DGP as the corresponding
+chapter script. The reference implementation should replicate the estimator
+used by Hayashi (e.g., Hannan-Rissanen for the default `arima()` path) so that
+coefficients match exactly. Coefficients and standard errors are compared
+when the reference can reproduce the same inference; otherwise only
+coefficients are compared with a documented rationale.
 
 ## Methodological guardrails
 
