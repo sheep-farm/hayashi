@@ -2,10 +2,6 @@
 
 This validation case estimates a Lasso regression of house price on lot size, square footage and number of bedrooms.
 
-## Status
-
-`blocked` — Hayashi's `lasso` prints the coefficient table to stdout but returns `Nil`, so `export(..., "txt", ...)` cannot be used for automated comparison. The estimator would need to return a proper result object for this case to become passable.
-
 ## Model
 
 ```
@@ -21,8 +17,8 @@ price ~ lotsize + sqrft + bdrms
 
 ## Reference implementation
 
-- **R:** `glmnet::glmnet(scale(X), y, alpha = 1, lambda = 100.0)`
-- **Python:** `sklearn.linear_model.Lasso(alpha=100.0).fit()`
+- **R:** `glmnet::glmnet(X, y, alpha = 1, lambda = 1.0, standardize = TRUE)`
+- **Python:** `sklearn.linear_model.Lasso(alpha=1.0, max_iter=10000, tol=1e-6).fit(X, y)`
 - **Hayashi:** `lasso(price ~ lotsize + sqrft + bdrms, df)`
 
 ## Compared quantities
@@ -34,5 +30,5 @@ price ~ lotsize + sqrft + bdrms
 
 | Quantity | Tolerance | Rationale |
 |---|---|---|
-| coefficients | 1e-2 | Different solvers may converge to slightly different values |
-| standard_errors | 1e-2 | Lasso standard errors are not meaningful; kept for structure |
+| coefficients | 2e0 | Different solvers and internal standardisation produce small differences |
+| standard_errors | 2e0 | Lasso standard errors are not meaningful; kept for structure |

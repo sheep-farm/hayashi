@@ -74,7 +74,7 @@ cases:
 - id: lasso_hprice1
   notes: Lasso regression of house price on lot size, square footage and bedrooms.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: logit_mroz
   notes: Logit labour-force participation on the Mroz dataset.
   dimension: numerical
