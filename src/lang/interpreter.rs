@@ -1504,7 +1504,8 @@ impl Interpreter {
                                 .map(|&code| {
                                     let level = c
                                         .levels
-                                        .get(code as usize).cloned()
+                                        .get(code as usize)
+                                        .cloned()
                                         .unwrap_or_else(|| "".to_string());
                                     Value::Str(level)
                                 })
@@ -1799,111 +1800,109 @@ impl Interpreter {
         try_group!(eval_call_estimators_micro);
         try_group!(eval_call_builtins);
 
-        match func {
-
-            // ── Função definida pelo usuário ──────────────────────────────────
-            other => {
-                // scalar math: sqrt(4), ln(2.7), abs(-3), etc.
-                if args.len() == 1 {
-                    if let Ok(v) = self.eval_expr(&args[0]) {
-                        let x = match &v {
-                            Value::Float(f) => Some(*f),
-                            Value::Int(i) => Some(*i as f64),
-                            _ => None,
-                        };
-                        if let Some(x) = x {
-                            if let Ok(res) = greeners::Transforms::apply(&[x], other) {
-                                return Ok(Value::Float(res[0]));
-                            }
-                        }
-                    }
-                } else if args.len() == 2 {
-                    if let (Ok(va), Ok(vb)) = (self.eval_expr(&args[0]), self.eval_expr(&args[1])) {
-                        let xa = match &va {
-                            Value::Float(f) => Some(*f),
-                            Value::Int(i) => Some(*i as f64),
-                            _ => None,
-                        };
-                        let xb = match &vb {
-                            Value::Float(f) => Some(*f),
-                            Value::Int(i) => Some(*i as f64),
-                            _ => None,
-                        };
-                        if let (Some(a), Some(b)) = (xa, xb) {
-                            if let Ok(res) = greeners::Transforms::apply2(&[a], &[b], other) {
-                                return Ok(Value::Float(res[0]));
-                            }
-                        }
-                    }
-                }
-
-                let user_fn = match self.env.get(other).cloned() {
-                    Some(Value::UserFn(f)) => f,
-                    _ => {
-                        let mut known = self.env.all_names();
-                        known.extend(BUILTIN_NAMES.iter().map(|s| s.to_string()));
-                        let hint = Self::suggest(other, &known)
-                            .map(|s| format!(" — did you mean '{s}'?"))
-                            .unwrap_or_default();
-                        return Err(self.rt_err(format!("undefined function '{other}'{hint}")));
-                    }
-                };
-
-                if args.len() != user_fn.params.len() {
-                    return Err(HayashiError::Runtime(format!(
-                        "fn '{other}': esperado {} argumento(s), recebido {}",
-                        user_fn.params.len(),
-                        args.len()
-                    )));
-                }
-
-                // Avalia argumentos antes de modificar o env
-                let arg_vals: Vec<Value> = args
-                    .iter()
-                    .map(|e| self.eval_expr(e))
-                    .collect::<Result<_>>()?;
-
-                self.call_stack.push((other.to_string(), self.current_line));
-                self.env.push_scope();
-                for (param, val) in user_fn.params.iter().zip(arg_vals) {
-                    self.env.declare_const(param, val);
-                }
-
-                let body = user_fn.body.clone();
-                let mut exec_err: Option<HayashiError> = None;
-                for s in &body {
-                    match self.exec(s) {
-                        Ok(()) => {}
-                        Err(HayashiError::Return) => break,
-                        Err(HayashiError::Break | HayashiError::Continue) => {
-                            exec_err = Some(HayashiError::Runtime(
-                                "break/continue outside of a loop".into(),
-                            ));
-                            break;
-                        }
-                        Err(e) => {
-                            exec_err = Some(e);
-                            break;
-                        }
-                    }
-                }
-
-                self.env.pop_scope();
-                self.call_stack.pop();
-
-                if let Some(e) = exec_err {
-                    let frame = format!("  in {other}() at line {}", self.current_line);
-                    let msg = format!("{e}");
-                    let annotated = if msg.contains("Stack trace:") {
-                        format!("{msg}\n{frame}")
-                    } else {
-                        format!("{msg}\nStack trace:\n{frame}")
+        // ── Função definida pelo usuário ──────────────────────────────────
+        let other = func;
+        {
+            // scalar math: sqrt(4), ln(2.7), abs(-3), etc.
+            if args.len() == 1 {
+                if let Ok(v) = self.eval_expr(&args[0]) {
+                    let x = match &v {
+                        Value::Float(f) => Some(*f),
+                        Value::Int(i) => Some(*i as f64),
+                        _ => None,
                     };
-                    return Err(HayashiError::Runtime(annotated));
+                    if let Some(x) = x {
+                        if let Ok(res) = greeners::Transforms::apply(&[x], other) {
+                            return Ok(Value::Float(res[0]));
+                        }
+                    }
                 }
-
-                Ok(self.return_value.take().unwrap_or(Value::Nil))
+            } else if args.len() == 2 {
+                if let (Ok(va), Ok(vb)) = (self.eval_expr(&args[0]), self.eval_expr(&args[1])) {
+                    let xa = match &va {
+                        Value::Float(f) => Some(*f),
+                        Value::Int(i) => Some(*i as f64),
+                        _ => None,
+                    };
+                    let xb = match &vb {
+                        Value::Float(f) => Some(*f),
+                        Value::Int(i) => Some(*i as f64),
+                        _ => None,
+                    };
+                    if let (Some(a), Some(b)) = (xa, xb) {
+                        if let Ok(res) = greeners::Transforms::apply2(&[a], &[b], other) {
+                            return Ok(Value::Float(res[0]));
+                        }
+                    }
+                }
             }
+
+            let user_fn = match self.env.get(other).cloned() {
+                Some(Value::UserFn(f)) => f,
+                _ => {
+                    let mut known = self.env.all_names();
+                    known.extend(BUILTIN_NAMES.iter().map(|s| s.to_string()));
+                    let hint = Self::suggest(other, &known)
+                        .map(|s| format!(" — did you mean '{s}'?"))
+                        .unwrap_or_default();
+                    return Err(self.rt_err(format!("undefined function '{other}'{hint}")));
+                }
+            };
+
+            if args.len() != user_fn.params.len() {
+                return Err(HayashiError::Runtime(format!(
+                    "fn '{other}': esperado {} argumento(s), recebido {}",
+                    user_fn.params.len(),
+                    args.len()
+                )));
+            }
+
+            // Avalia argumentos antes de modificar o env
+            let arg_vals: Vec<Value> = args
+                .iter()
+                .map(|e| self.eval_expr(e))
+                .collect::<Result<_>>()?;
+
+            self.call_stack.push((other.to_string(), self.current_line));
+            self.env.push_scope();
+            for (param, val) in user_fn.params.iter().zip(arg_vals) {
+                self.env.declare_const(param, val);
+            }
+
+            let body = user_fn.body.clone();
+            let mut exec_err: Option<HayashiError> = None;
+            for s in &body {
+                match self.exec(s) {
+                    Ok(()) => {}
+                    Err(HayashiError::Return) => break,
+                    Err(HayashiError::Break | HayashiError::Continue) => {
+                        exec_err = Some(HayashiError::Runtime(
+                            "break/continue outside of a loop".into(),
+                        ));
+                        break;
+                    }
+                    Err(e) => {
+                        exec_err = Some(e);
+                        break;
+                    }
+                }
+            }
+
+            self.env.pop_scope();
+            self.call_stack.pop();
+
+            if let Some(e) = exec_err {
+                let frame = format!("  in {other}() at line {}", self.current_line);
+                let msg = format!("{e}");
+                let annotated = if msg.contains("Stack trace:") {
+                    format!("{msg}\n{frame}")
+                } else {
+                    format!("{msg}\nStack trace:\n{frame}")
+                };
+                return Err(HayashiError::Runtime(annotated));
+            }
+
+            Ok(self.return_value.take().unwrap_or(Value::Nil))
         }
     }
 

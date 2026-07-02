@@ -10,7 +10,7 @@ impl Interpreter {
         func: &str,
         args: &[Expr],
         opts: &[Opt],
-        opt_map: &HashMap<String, Value>,
+        _opt_map: &HashMap<String, Value>,
     ) -> Result<Option<Value>> {
         let result: Result<Value> = match func {
             // ── Type conversions ─────────────────────────────────────────────

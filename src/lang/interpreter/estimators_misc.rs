@@ -297,7 +297,8 @@ impl Interpreter {
                 let (ci_lo, ci_hi) = ds
                     .conf_int_mean(alpha)
                     .map_err(|e| self.rt_err(format!("summarize_w CI: {e}")))?;
-                let label = w_ref.map_or("(pesos iguais)".to_string(), |_| "(ponderado)".to_string());
+                let label =
+                    w_ref.map_or("(pesos iguais)".to_string(), |_| "(ponderado)".to_string());
                 println!("\n{:=^60}", format!(" DescrStats {label} — {var_name} "));
                 println!(
                     "{:<20} {:>12}   {:<20} {:>12}",
