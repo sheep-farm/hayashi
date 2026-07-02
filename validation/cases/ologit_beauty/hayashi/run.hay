@@ -1,0 +1,6 @@
+// Ordered Logit sobre avaliação de aparência (looks) do Wooldridge beauty.
+load "validation/cases/ologit_beauty/data/beauty.csv" as df
+
+let m = ologit(looks ~ female + educ + exper + black, df)
+
+export(m, "txt", "/dev/stdout")

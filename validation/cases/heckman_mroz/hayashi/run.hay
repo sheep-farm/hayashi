@@ -1,0 +1,10 @@
+// Load the Wooldridge mroz dataset (subset for Heckman selection model).
+load "validation/cases/heckman_mroz/data/mroz.csv" as df
+
+// Heckman two-step (Heckit):
+//   outcome equation: lwage ~ educ + exper + expersq
+//   selection equation: inlf ~ educ + age + kidslt6 + kidsge6 + nwifeinc
+let m = heckman(lwage ~ educ + exper + expersq, inlf ~ educ + age + kidslt6 + kidsge6 + nwifeinc, df)
+
+// Export coefficient table for automated comparison.
+export(m, "txt", "/dev/stdout")

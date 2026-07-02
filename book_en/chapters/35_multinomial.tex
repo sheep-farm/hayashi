@@ -144,3 +144,11 @@ mlogit(y ~ x1 + x2, df, base=1)    // explicit base alternative
   on the others. For panel choice data with correlated alternatives, use
   \lstinline{clogit} (ch.~\ref{cap:painel2}).
 \end{nota}
+
+\section{Empirical validation}
+
+The Wooldridge \texttt{beauty} dataset is used in the \texttt{ologit_beauty}
+validation case in \texttt{validation/cases/}. The case estimates an ordered
+logit in \hayashi{} and compares it with \texttt{MASS::polr} in R and with
+\texttt{statsmodels.miscmodels.ordinal_model} in Python. Run
+\lstinline{hay validate} to see the current status.
