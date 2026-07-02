@@ -352,7 +352,8 @@ Hayashi includes a reproducible, automated empirical validation programme in
 (R and Python/statsmodels) on real datasets:
 
 ```bash
-pip install -r validation/requirements.txt
+python -m venv validation/.venv
+validation/.venv/bin/pip install -r validation/requirements.txt
 Rscript -e 'install.packages(c("wooldridge", "jsonlite"))'
 hay validate
 ```

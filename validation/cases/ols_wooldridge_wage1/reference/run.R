@@ -1,4 +1,3 @@
-:
 # Reference implementation in R for the Wooldridge wage1 OLS case.
 
 library(wooldridge)
@@ -37,10 +36,5 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 write_json(result, file.path(out_dir, "expected.json"), pretty = TRUE, auto_unbox = TRUE)
 
-# Also write a CSV aligned with the Hayashi output format for direct diffing.
-out_csv <- data.frame(
-  Variable = names(coefs),
-  Coef = coefs,
-  Std_Err = std_errors
-)
-write.csv(out_csv, file.path(out_dir, "expected.csv"), row.names = FALSE)
+# Also emit JSON on stdout so the orchestrator can avoid reading files.
+cat(toJSON(result, pretty = TRUE, auto_unbox = TRUE))
