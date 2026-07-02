@@ -4,6 +4,8 @@
 |---|---|---:|---|---|---|
 | autoreg | statsmodels::macrodata | R, Python | pass | — | AR(1) on US real GDP with constant and trend. |
 | cox | statsmodels::heart | R, Python | pass | — | Cox proportional hazards regression for survival time after heart transplant. |
+| garch | wooldridge::nyse | R, Python | pass | — | GARCH(1,1) on NYSE returns. |
+| gmm | wooldridge::card | R, Python | pass | — | GMM returns to schooling with nearc4 as instrument for education. |
 | iv | wooldridge::card | R, Python | pass | — | IV with education endogenous and nearc4 as instrument. |
 | logit | wooldridge::mroz | R, Python | pass | — | Logit labour-force participation on the Mroz dataset. |
 | ols | wooldridge::wage1 | R, Python | pass | — | First real-dataset validation case. |
