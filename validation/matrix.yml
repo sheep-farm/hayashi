@@ -54,6 +54,11 @@ cases:
   notes: GMM returns to schooling with nearc4 as instrument for education.
   dimension: numerical
   status: pass
+- id: heckman_mroz
+  notes: Two-step Heckman (Heckit) on the Mroz dataset. SEs are approximate because
+    the reference implementations are two-step.
+  dimension: numerical
+  status: pass
 - id: iv_card
   notes: IV with education endogenous and nearc4 as instrument.
   dimension: numerical
@@ -68,6 +73,10 @@ cases:
   status: pass
 - id: ma_book
   notes: Uses the same simulated MA(1) DGP as Chapter 26 of the book.
+  dimension: numerical
+  status: pass
+- id: ologit_beauty
+  notes: Ordered logit of looks (2, 3, 4) on female, educ, exper, black.
   dimension: numerical
   status: pass
 - id: ols_wooldridge_wage1
