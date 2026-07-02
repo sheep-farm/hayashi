@@ -76,6 +76,25 @@ bool(42)       // true
 bool(nil)      // false
 ```
 
+## Type predicates
+
+```
+is_int(42)        // true
+is_float(3.14)    // true
+is_bool(true)     // true
+is_str("hello")   // true
+is_list([1, 2])   // true
+is_dict({"a": 1}) // true
+is_df(df)         // true
+is_fn(|x| x)      // true
+```
+
+## Build a DataFrame from a dict
+
+```
+let df = dataframe({"x": [1, 2, 3], "y": [4, 5, 6]})
+```
+
 ## List operations
 
 Lists are ordered, heterogeneous collections. `push` and `pop` mutate in-place; all others return a new list.
