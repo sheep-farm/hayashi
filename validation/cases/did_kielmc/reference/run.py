@@ -26,8 +26,14 @@ else:
 # Difference-in-differences via interaction.
 model = smf.ols("lprice ~ nearinc * y81", data=df).fit()
 
-coefs = {name: float(val) for name, val in model.params.items()}
-std_errors = {name: float(val) for name, val in model.bse.items()}
+name_map = {
+    "Intercept": "const",
+    "nearinc": "treated",
+    "y81": "post",
+    "nearinc:y81": "treated:post",
+}
+coefs = {name_map.get(name, name): float(val) for name, val in model.params.items()}
+std_errors = {name_map.get(name, name): float(val) for name, val in model.bse.items()}
 
 result = {
     "coefficients": coefs,

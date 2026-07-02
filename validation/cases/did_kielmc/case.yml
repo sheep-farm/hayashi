@@ -1,7 +1,7 @@
 id: did-kielmc
 title: Difference-in-differences on Kiel-McClain housing prices
 estimator_family: did
-status: blocked
+status: not-started
 dimension: numerical
 
 dataset:
@@ -28,14 +28,9 @@ reference_scripts:
   R: cases/did_kielmc/reference/run.R
   Python: cases/did_kielmc/reference/run.py
 
-notes: |
-  Difference-in-differences effect of incinerator proximity on log house prices.
-  Currently blocked: Hayashi's DiD output reports only the ATT and group means,
-  not a full coefficient table. The orchestrator cannot parse the ATT scalar
-  into the coefficient/standard-error structure used for comparison.
+notes: Difference-in-differences effect of incinerator proximity on log house prices.
 
 result:
-  summary: "Blocked: Hayashi DiD output lacks coefficient table"
-  known_differences:
-    - "Hayashi reports ATT and group means; references report OLS interaction coefficients"
+  summary: ""
+  known_differences: []
   issues_opened: []

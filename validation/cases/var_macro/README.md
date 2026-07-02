@@ -2,10 +2,6 @@
 
 This validation case estimates a vector autoregression of order 2 on US real GDP and consumption.
 
-## Status
-
-`blocked` — Hayashi's `var` output reports only the residual covariance matrix (Sigma_u), not per-equation coefficients. The validation orchestrator therefore cannot compare the output against the per-equation coefficients from R and Python.
-
 ## Model
 
 ```
