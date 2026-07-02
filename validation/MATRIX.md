@@ -2,7 +2,7 @@
 
 | Family | Dataset | Reference | Status | Blocking Issue | Notes |
 |---|---|---:|---|---|---|
-| ols | wooldridge::wage1 | R, Python | pass | — | First real-dataset validation case. |
+| ols | wooldridge::wage1 | R, Python | pass | — |  |
 
 ## Status legend
 

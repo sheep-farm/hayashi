@@ -463,7 +463,9 @@ fn run_validation() {
     if let Some(dir) = hay_dir {
         cmd.current_dir(dir);
     }
-    let status = cmd.status().expect("hay: failed to spawn validation runner");
+    let status = cmd
+        .status()
+        .expect("hay: failed to spawn validation runner");
 
     std::process::exit(status.code().unwrap_or(1));
 }
