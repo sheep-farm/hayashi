@@ -402,12 +402,17 @@ fn run_script(path: &str, verbose: bool) {
 /// Runs the empirical validation programme by invoking `validation/run.py`.
 fn run_validation() {
     let exe = std::env::current_exe().expect("hay: cannot locate own executable");
-    let hay_dir = exe.parent().expect("hay: executable has no parent directory");
+    let hay_dir = exe
+        .parent()
+        .expect("hay: executable has no parent directory");
     let validation_dir = hay_dir.join("validation");
     let run_py = validation_dir.join("run.py");
 
     if !run_py.exists() {
-        eprintln!("hay: validation programme not found at {}", run_py.display());
+        eprintln!(
+            "hay: validation programme not found at {}",
+            run_py.display()
+        );
         eprintln!("       Run this from a build that includes the validation/ directory.");
         std::process::exit(1);
     }
