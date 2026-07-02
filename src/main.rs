@@ -350,6 +350,10 @@ fn run() {
             pkg_check_plugin(pkg_opt);
             return;
         }
+        Some("validate") => {
+            run_validation();
+            return;
+        }
         Some("remove") | Some("uninstall") => {
             let pkg = args_clean.get(2).unwrap_or_else(|| {
                 eprintln!("Usage: hay remove package_name");
@@ -369,7 +373,7 @@ fn run() {
         Some(unknown) => {
             eprintln!("hay: unknown argument '{unknown}'");
             eprintln!(
-                "Usage: hay [script.hay | - | install | remove | list | update | check-plugin]"
+                "Usage: hay [script.hay | - | install | remove | list | update | check-plugin | validate]"
             );
             std::process::exit(1);
         }
@@ -393,6 +397,41 @@ fn run_script(path: &str, verbose: bool) {
         eprintln!("error: {e}");
         std::process::exit(1);
     }
+}
+
+/// Runs the empirical validation programme by invoking `validation/run.py`.
+fn run_validation() {
+    let exe = std::env::current_exe().expect("hay: cannot locate own executable");
+    let hay_dir = exe.parent().expect("hay: executable has no parent directory");
+    let validation_dir = hay_dir.join("validation");
+    let run_py = validation_dir.join("run.py");
+
+    if !run_py.exists() {
+        eprintln!("hay: validation programme not found at {}", run_py.display());
+        eprintln!("       Run this from a build that includes the validation/ directory.");
+        std::process::exit(1);
+    }
+
+    let python = if std::process::Command::new("python")
+        .arg("--version")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+    {
+        "python"
+    } else {
+        "python3"
+    };
+
+    let status = std::process::Command::new(python)
+        .arg(&run_py)
+        .current_dir(hay_dir)
+        .status()
+        .expect("hay: failed to spawn validation runner");
+
+    std::process::exit(status.code().unwrap_or(1));
 }
 
 /// Calcula a profundidade de delimitadores abertos numa linha para o REPL.
@@ -544,6 +583,7 @@ fn print_help() {
     println!("    hay list                 List installed packages");
     println!("    hay update [user/repo]   Update package(s) (-y to bypass prompt)");
     println!("    hay check-plugin [name]  Check integrity/version with remote repository");
+    println!("    hay validate             Run the empirical validation programme (R/Python)");
     println!();
     println!("In REPL, type help() for full command list or help(cmd) for details.");
 }
