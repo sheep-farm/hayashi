@@ -354,7 +354,7 @@ Hayashi includes a reproducible, automated empirical validation programme in
 ```bash
 pip install -r validation/requirements.txt
 Rscript -e 'install.packages(c("wooldridge", "jsonlite"))'
-python validation/run.py
+hay validate
 ```
 
 See `validation/README.md` for the full protocol.
