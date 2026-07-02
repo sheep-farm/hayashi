@@ -44,10 +44,10 @@ pub const HELP_INDEX_GROUPS: &[CommandIndexGroup] = &[
     CommandIndexGroup {
         category: CommandCategory::Estimator,
         entries: &[
-            "ols/reg  logit  probit  iv  poisson  nbreg  tobit  qreg",
-            "fe  re  ab  sysgmm  pcse  xtgls  heckman  cox  km",
+            "ols/reg  wls  logit  probit  iv  poisson  nbreg  tobit  qreg",
+            "fe  re  ab  sur  sysgmm  pcse  xtgls  heckman  cox  km",
             "lasso  ridge  elasticnet  garch  egarch  arima  autoreg  ardl  kalman  var  vecm  svar",
-            "did  rd  synth  psm  glm  rlm  gee  betareg  mixed  glsar",
+            "did  rd  fuzzy_rd  synth  psm  glm  rlm  gee  betareg  mixed  glsar",
             "ologit  oprobit  mlogit  cloglog  zip  zinb",
         ],
     },
@@ -55,7 +55,7 @@ pub const HELP_INDEX_GROUPS: &[CommandIndexGroup] = &[
         category: CommandCategory::PostEstimation,
         entries: &[
             "test  nlcom  margins  predict  esttab  estat  hausman  lincom",
-            "bootstrap  bootse  influence  vif  irf  fevd  coefplot",
+            "bootstrap  bootse  influence  vif  irf  fevd  coefplot  eststo  testparm  estclear",
         ],
     },
     CommandIndexGroup {
@@ -162,6 +162,18 @@ pub const COMMAND_SPECS: &[CommandSpec] = &[
             "  Example:\n",
             "    xtset(df, firm, year)\n",
             "    let m = fe(Y ~ X1 + X2, df)\n",
+        ),
+    },
+    CommandSpec {
+        name: "tsset",
+        aliases: &[],
+        help: concat!(
+            "tsset df time_col\n",
+            "  Declare time-series structure and sort DataFrame by time.\n",
+            "  Required for time-series operators L.x, F.x, D.x.\n\n",
+            "  Example:\n",
+            "    tsset df year\n",
+            "    generate df ly = log(L.gdp)\n",
         ),
     },
     CommandSpec {

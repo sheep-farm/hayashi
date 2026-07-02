@@ -675,6 +675,28 @@ impl Parser {
         }
     }
 
+    fn is_kw_bare_arg(&mut self) -> bool {
+        // Palavras-chave que NÃO podem ser identificadores isolados em
+        // expressões (help(if), help(for), etc.). Outras como count/load/return
+        // já são tratadas como Expr::Var pelo parse_primary.
+        let is_kw = matches!(
+            self.peek(),
+            Token::If
+                | Token::Else
+                | Token::For
+                | Token::While
+                | Token::Fn
+                | Token::Let
+                | Token::Tsset
+        );
+        let next_is_terminator = self
+            .tokens
+            .get(self.pos + 1)
+            .map(|(t, _)| matches!(t, Token::RParen | Token::Comma))
+            .unwrap_or(false);
+        is_kw && next_is_terminator
+    }
+
     fn parse_call_args(&mut self) -> Result<(Vec<Expr>, Vec<Opt>)> {
         let mut args = Vec::new();
         let mut opts = Vec::new();
@@ -729,6 +751,21 @@ impl Parser {
                     name: kw_name,
                     value: val,
                 });
+            } else if self.is_kw_bare_arg() {
+                // Palavra-chave usada como argumento isolado (ex: help(if), help(for))
+                let kw_name = match self.peek() {
+                    Token::If => "if",
+                    Token::Else => "else",
+                    Token::For => "for",
+                    Token::While => "while",
+                    Token::Fn => "fn",
+                    Token::Let => "let",
+                    Token::Tsset => "tsset",
+                    _ => "?",
+                }
+                .to_string();
+                self.advance();
+                args.push(Expr::Str(kw_name));
             } else if let Token::Ident(name) = self.peek().clone() {
                 // lookahead: é opt=val?
                 if self
