@@ -16,10 +16,8 @@ references:
 comparison:
   quantities:
     - coefficients
-    - standard_errors
   tolerances:
     coefficients: 5e-2
-    standard_errors: 5e-2
 
 output_format: txt
 

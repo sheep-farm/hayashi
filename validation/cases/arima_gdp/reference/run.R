@@ -142,12 +142,9 @@ for (phi in seq(best_phi - 0.05, best_phi + 0.05, by = 0.01)) {
   }
 }
 
-coefs <- c(intercept = mean(z), "ar.L1" = best_phi, "ma.L1" = best_theta)
-std_errors <- c(intercept = 0.0, "ar.L1" = 0.0, "ma.L1" = 0.0)
-
 result <- list(
-  coefficients = as.list(coefs),
-  standard_errors = as.list(std_errors)
+  coefficients = list(intercept = mean(z), "ar.L1" = best_phi, "ma.L1" = best_theta),
+  standard_errors = list(intercept = 0.0, "ar.L1" = 0.0, "ma.L1" = 0.0)
 )
 
 out_dir <- "validation/cases/arima_gdp/reference"
