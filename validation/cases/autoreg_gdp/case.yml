@@ -1,0 +1,36 @@
+id: autoreg-gdp
+title: AR(1) on US real GDP with constant and trend
+estimator_family: autoreg
+status: not-started
+dimension: numerical
+
+dataset:
+  name: statsmodels::macrodata
+  source: statsmodels.datasets / Rdatasets
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-2
+    standard_errors: 2e-1
+
+output_format: txt
+
+hayashi_script: cases/autoreg_gdp/hayashi/run.hay
+reference_scripts:
+  R: cases/autoreg_gdp/reference/run.R
+  Python: cases/autoreg_gdp/reference/run.py
+
+notes: AR(1) on US real GDP with constant and trend.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []
