@@ -1,0 +1,41 @@
+id: ets-gdp
+title: ETS on US real GDP
+estimator_family: ets
+status: blocked
+dimension: numerical
+
+dataset:
+  name: statsmodels::macrodata
+  source: statsmodels.datasets / Rdatasets
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-2
+    standard_errors: 1e-2
+
+output_format: txt
+
+hayashi_script: cases/ets_gdp/hayashi/run.hay
+reference_scripts:
+  R: cases/ets_gdp/reference/run.R
+  Python: cases/ets_gdp/reference/run.py
+
+notes: |
+  Exponential smoothing state-space model on US real GDP.
+  Currently blocked: Hayashi's `ets` prints the smoothing parameters
+  (alpha, beta, gamma) as summary lines, not in a coefficient table with
+  standard errors. The orchestrator cannot parse this output into the
+  coefficient/standard-error structure used for comparison.
+
+result:
+  summary: "Blocked: Hayashi ETS output lacks coefficient table"
+  known_differences: []
+  issues_opened: []

@@ -1,0 +1,8 @@
+// Load the Wooldridge grunfeld dataset from CSV.
+load "validation/cases/ab_grunfeld/data/grunfeld.csv" as df
+
+// Arellano-Bond difference GMM for dynamic panel investment demand.
+let m = ab(inv ~ value + capital, df, id=firm, time=year, lags=1)
+
+// Export coefficient table for automated comparison.
+export(m, "txt", "/dev/stdout")

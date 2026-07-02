@@ -1,0 +1,8 @@
+// Load the US macro dataset from CSV.
+load "validation/cases/ets_gdp/data/macrodata.csv" as df
+
+// ETS on US real GDP.
+let m = ets(df, gdp)
+
+// Export ETS results for automated comparison.
+export(m, "txt", "/dev/stdout")
