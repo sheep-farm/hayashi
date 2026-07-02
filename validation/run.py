@@ -397,7 +397,7 @@ def update_matrix_md(cases: list[dict[str, Any]]) -> None:
         status = case.get("status", "not-started")
         issue = case.get("result", {}).get("issues_opened", [])
         issue_str = ", ".join(str(i) for i in issue) if issue else "—"
-        notes = case.get("notes", "")
+        notes = case.get("notes", "").replace("\n", " ")
         lines.append(f"| {family} | {dataset} | {refs} | {status} | {issue_str} | {notes} |")
 
     lines.extend([
@@ -466,19 +466,32 @@ def main() -> int:
 
     overall_status = "pass"
     for case in cases:
-        status, failures = run_case(case)
+        declared_status = case.get("status", "not-started")
+        if declared_status in ("blocked", "not-supported"):
+            # Keep the declared status and skip execution; the case files
+            # should document why it is blocked/not-supported.
+            status = declared_status
+            failures = []
+            summary = case.get("result", {}).get("summary", "")
+            log(f"\n[case] {case['id']}: {case.get('title', '')}")
+            log(f"  {declared_status.upper()}: {summary}")
+        else:
+            status, failures = run_case(case)
         case["status"] = status
-        if status != "pass":
-            overall_status = status
-        summary = "; ".join(failures) if failures else "matches reference"
+        if status == "fail":
+            overall_status = "fail"
+        elif status == "blocked" and overall_status != "fail":
+            overall_status = "blocked"
+        summary = "; ".join(failures) if failures else case.get("result", {}).get("summary", "matches reference")
         case.setdefault("result", {})["summary"] = summary
 
-    # Write updated matrix.yml (id + notes + dimension for each discovered case).
+    # Write updated matrix.yml (id + notes + dimension + status for each discovered case).
     matrix["cases"] = [
         {
             "id": case["id"],
             "notes": case.get("notes", ""),
             "dimension": case.get("dimension", "numerical"),
+            "status": case.get("status", "not-started"),
         }
         for case in cases
     ]
@@ -489,7 +502,7 @@ def main() -> int:
     update_matrix_md(cases)
 
     log(f"\nOverall status: {overall_status}")
-    return 0 if overall_status == "pass" else 1
+    return 0 if overall_status != "fail" else 1
 
 
 if __name__ == "__main__":

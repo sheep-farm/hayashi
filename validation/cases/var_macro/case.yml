@@ -1,0 +1,41 @@
+id: var-macro
+title: VAR(2) on US real GDP and consumption
+estimator_family: var
+status: blocked
+dimension: numerical
+
+dataset:
+  name: statsmodels::macrodata
+  source: statsmodels.datasets / Rdatasets
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-2
+    standard_errors: 1e-2
+
+output_format: txt
+
+hayashi_script: cases/var_macro/hayashi/run.hay
+reference_scripts:
+  R: cases/var_macro/reference/run.R
+  Python: cases/var_macro/reference/run.py
+
+notes: |
+  VAR(2) on US real GDP and consumption.
+  Currently blocked: Hayashi's VAR output reports only the residual covariance
+  matrix (Sigma_u), not per-equation coefficients. The orchestrator cannot
+  compare coefficients until the estimator prints a full coefficient table.
+
+result:
+  summary: "Blocked: Hayashi VAR output lacks per-equation coefficients"
+  known_differences:
+    - "Hayashi reports Sigma_u only; references report per-equation AR coefficients"
+  issues_opened: []
