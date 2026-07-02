@@ -1,4 +1,3 @@
-:
 #!/usr/bin/env python3
 """Hayashi empirical validation programme orchestrator.
 
@@ -42,16 +41,47 @@ def check_executable(name: str) -> bool:
     return shutil.which(name) is not None
 
 
+def python_executable() -> str:
+    """Return the Python interpreter to use, preferring a local venv."""
+    venv_python = VALIDATION_DIR / ".venv" / "bin" / "python"
+    if venv_python.exists():
+        return str(venv_python)
+    return "python" if check_executable("python") else "python3"
+
+
 def parse_hayashi_csv(path: Path) -> dict[str, dict[str, float]]:
-    """Parse the CSV produced by Hayashi OLS export."""
-    import csv
-    result = {"coefficients": {}, "standard_errors": {}}
+    """Parse the CSV produced by Hayashi OLS export from a file."""
     with open(path) as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            var = row["Variable"]
-            result["coefficients"][var] = float(row["Coef"])
-            result["standard_errors"][var] = float(row["Std_Err"])
+        return parse_hayashi_csv_from_string(f.read())
+
+
+def parse_hayashi_csv_from_string(text: str) -> dict[str, dict[str, float]]:
+    """Parse the CSV produced by Hayashi OLS export from a string.
+
+    Hayashi may print an "Exported OLS → ..." line before the CSV data, so we
+    locate the header row and parse from there.
+    """
+    import csv
+    import io
+
+    header = "Variable,Coef,Std_Err"
+    start = text.find(header)
+    if start == -1:
+        raise ValueError(f"CSV header not found in Hayashi output: {text[:200]!r}")
+
+    result = {"coefficients": {}, "standard_errors": {}}
+    reader = csv.DictReader(io.StringIO(text[start:]))
+    for row in reader:
+        var = row.get("Variable")
+        coef = row.get("Coef")
+        se = row.get("Std_Err")
+        if not var or coef is None or se is None or coef == "" or se == "":
+            continue
+        # Normalise intercept label across implementations.
+        if var == "const":
+            var = "Intercept"
+        result["coefficients"][var] = float(coef)
+        result["standard_errors"][var] = float(se)
     return result
 
 
@@ -84,7 +114,7 @@ def compare_quantities(
 
         ref_val = reference[quantity]
         hay_val = hayashi[quantity]
-        tol = tolerances[quantity]
+        tol = float(tolerances[quantity])
 
         if isinstance(ref_val, dict):
             # Compare per-coefficient quantities (e.g., coefficients).
@@ -122,59 +152,97 @@ def run_case(case: dict[str, Any]) -> tuple[str, list[str]]:
     # Ensure data directory exists.
     data_dir.mkdir(parents=True, exist_ok=True)
 
-    # Run reference scripts first (they may produce the dataset).
+    # Resolve script paths relative to the validation directory.
     reference_scripts = case.get("reference_scripts", {})
     references = case.get("references", [])
+    available_refs: list[str] = []
+    reference_errors: list[str] = []
+    r_res: subprocess.CompletedProcess[str] | None = None
+    py_res: subprocess.CompletedProcess[str] | None = None
 
     if "R" in references and "R" in reference_scripts:
         if not check_executable("Rscript"):
-            return "blocked", ["Rscript not found in PATH"]
-        r_script = reference_scripts["R"]
-        r_res = run_command(["Rscript", r_script])
-        if r_res.returncode != 0:
-            return "blocked", [f"R script failed:\n{r_res.stderr}"]
+            log("  Rscript not found; skipping R reference")
+        else:
+            r_script = str(VALIDATION_DIR / reference_scripts["R"])
+            r_res = run_command(["Rscript", r_script])
+            if r_res.returncode == 0:
+                available_refs.append("R")
+            else:
+                reference_errors.append(f"R script failed:\n{r_res.stderr}")
 
     if "Python" in references and "Python" in reference_scripts:
-        if not check_executable("python") and not check_executable("python3"):
-            return "blocked", ["python/python3 not found in PATH"]
-        py_exe = "python" if check_executable("python") else "python3"
-        py_script = reference_scripts["Python"]
-        py_res = run_command([py_exe, py_script])
-        if py_res.returncode != 0:
-            return "blocked", [f"Python script failed:\n{py_res.stderr}"]
+        py_exe = python_executable()
+        if not Path(py_exe).exists() and not check_executable(py_exe):
+            log("  python/python3 not found; skipping Python reference")
+        else:
+            py_script = str(VALIDATION_DIR / reference_scripts["Python"])
+            py_res = run_command([py_exe, py_script])
+            if py_res.returncode == 0:
+                available_refs.append("Python")
+            else:
+                log(f"  Python script failed:\n{py_res.stderr}")
+                reference_errors.append(f"Python script failed:\n{py_res.stderr}")
 
     if "Stata" in references and "Stata" in reference_scripts:
         if not check_executable("stata"):
             log("  Stata not found; skipping Stata reference")
         else:
-            st_script = reference_scripts["Stata"]
+            st_script = str(VALIDATION_DIR / reference_scripts["Stata"])
             st_res = run_command(["stata", "-b", "do", st_script])
-            if st_res.returncode != 0:
+            if st_res.returncode == 0:
+                available_refs.append("Stata")
+            else:
                 log(f"  Stata script failed:\n{st_res.stderr}")
+
+    if not available_refs:
+        msg = ["No reference implementation could run."] + reference_errors
+        return "blocked", msg
 
     # Run Hayashi script.
     if not check_executable("hay"):
-        # Fall back to the local debug binary.
-        hay_exe = str(ROOT_DIR / "target" / "debug" / "hay")
+        # Fall back to the local release binary.
+        hay_exe = str(ROOT_DIR / "target" / "release" / "hay")
     else:
         hay_exe = "hay"
 
-    hay_script = case.get("hayashi_script", f"cases/{case_id}/hayashi/run.hay")
+    hay_script = str(VALIDATION_DIR / case.get("hayashi_script", f"cases/{case_id}/hayashi/run.hay"))
     hay_res = run_command([hay_exe, hay_script])
     if hay_res.returncode != 0:
         return "blocked", [f"Hayashi script failed:\n{hay_res.stderr}"]
 
     # Parse outputs.
-    expected_json = reference_dir / "expected.json"
-    hayashi_csv = hayashi_dir / "output.csv"
+    # Prefer the stdout emitted by the reference/Python scripts; fall back to
+    # the written JSON file if stdout is empty (e.g., when run directly).
+    reference: dict[str, Any] | None = None
+    if py_res and py_res.stdout.strip():
+        try:
+            reference = json.loads(py_res.stdout.strip().splitlines()[-1])
+        except json.JSONDecodeError as e:
+            return "blocked", [f"Could not parse reference stdout as JSON: {e}"]
+    if reference is None and r_res and r_res.stdout.strip():
+        try:
+            reference = json.loads(r_res.stdout.strip().splitlines()[-1])
+        except json.JSONDecodeError as e:
+            return "blocked", [f"Could not parse reference stdout as JSON: {e}"]
+    if reference is None:
+        expected_json = reference_dir / "expected.json"
+        if not expected_json.exists():
+            return "blocked", [f"Reference output not found: {expected_json}"]
+        reference = parse_reference_json(expected_json)
 
-    if not expected_json.exists():
-        return "blocked", [f"Reference output not found: {expected_json}"]
-    if not hayashi_csv.exists():
-        return "blocked", [f"Hayashi output not found: {hayashi_csv}"]
-
-    reference = parse_reference_json(expected_json)
-    hayashi = parse_hayashi_csv(hayashi_csv)
+    # Prefer the stdout emitted by Hayashi; fall back to the written CSV.
+    hayashi: dict[str, dict[str, float]] | None = None
+    if hay_res.stdout.strip():
+        try:
+            hayashi = parse_hayashi_csv_from_string(hay_res.stdout)
+        except Exception as e:
+            return "blocked", [f"Could not parse Hayashi stdout as CSV: {e}"]
+    if hayashi is None:
+        hayashi_csv = hayashi_dir / "output.csv"
+        if not hayashi_csv.exists():
+            return "blocked", [f"Hayashi output not found: {hayashi_csv}"]
+        hayashi = parse_hayashi_csv(hayashi_csv)
 
     # Compare declared quantities.
     tolerances = case.get("comparison", {}).get("tolerances", {})
@@ -238,13 +306,22 @@ def main() -> int:
         log("No cases registered in matrix.yml")
         return 0
 
+    # Validate that every registered case has the required fields.
+    for case in cases:
+        if not case.get("id"):
+            log("WARNING: skipping registry entry without id")
+            continue
+
     overall_status = "pass"
     for case in cases:
+        if not case.get("id"):
+            continue
         status, failures = run_case(case)
         case["status"] = status
         if status != "pass":
             overall_status = status
-        case.setdefault("result", {})["summary"] = "; ".join(failures) if failures else "matches reference"
+        summary = "; ".join(failures) if failures else "matches reference"
+        case.setdefault("result", {})["summary"] = summary
 
     # Write updated matrix.yml.
     with open(MATRIX_YML, "w") as f:

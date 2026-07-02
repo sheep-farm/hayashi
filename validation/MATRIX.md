@@ -2,7 +2,7 @@
 
 | Family | Dataset | Reference | Status | Blocking Issue | Notes |
 |---|---|---:|---|---|---|
-| OLS | Wooldridge `wage1` | R / Python | not-started | — | wage ~ educ + exper + tenure |
+| ols | wooldridge::wage1 | R, Python | pass | — | First real-dataset validation case. |
 
 ## Status legend
 
@@ -13,3 +13,4 @@
 - `not-started` — registered but not implemented.
 
 This matrix is generated from `validation/matrix.yml` by `validation/run.py`.
+
