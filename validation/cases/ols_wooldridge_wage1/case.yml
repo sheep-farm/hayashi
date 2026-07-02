@@ -26,6 +26,8 @@ reference_scripts:
   R: cases/ols_wooldridge_wage1/reference/run.R
   Python: cases/ols_wooldridge_wage1/reference/run.py
 
+notes: First real-dataset validation case.
+
 result:
   summary: ""
   known_differences: []

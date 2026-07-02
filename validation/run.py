@@ -322,7 +322,9 @@ def main() -> int:
         case_id = entry.get("id")
         if not case_id or case_id not in cases_by_id:
             continue
-        cases_by_id[case_id]["notes"] = entry.get("notes", cases_by_id[case_id].get("notes", ""))
+        # Registry notes are optional; if present they override the case.yml notes.
+        if entry.get("notes"):
+            cases_by_id[case_id]["notes"] = entry["notes"]
         cases_by_id[case_id]["dimension"] = entry.get("dimension", cases_by_id[case_id].get("dimension", "numerical"))
 
     cases = list(cases_by_id.values())
