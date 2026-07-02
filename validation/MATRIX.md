@@ -2,6 +2,7 @@
 
 | Family | Dataset | Reference | Status | Blocking Issue | Notes |
 |---|---|---:|---|---|---|
+| cox | statsmodels::heart | R, Python | pass | — | Cox proportional hazards regression for survival time after heart transplant. |
 | iv | wooldridge::card | R, Python | pass | — | IV with education endogenous and nearc4 as instrument. |
 | logit | wooldridge::mroz | R, Python | pass | — | Logit labour-force participation on the Mroz dataset. |
 | ols | wooldridge::wage1 | R, Python | pass | — | First real-dataset validation case. |
