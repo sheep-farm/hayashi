@@ -1,0 +1,25 @@
+cases:
+  - id: ols-wooldridge-wage1
+    title: OLS wage equation on Wooldridge wage1
+    estimator_family: ols
+    status: not-started
+    dimension: numerical
+    dataset:
+      name: wooldridge::wage1
+      source: R package wooldridge (publicly available)
+      licence: public teaching dataset
+    references:
+      - R
+      - Python
+    comparison:
+      quantities:
+        - coefficients
+        - standard_errors
+        - r_squared
+        - nobs
+      tolerances:
+        coefficients: 1e-6
+        standard_errors: 1e-6
+        r_squared: 1e-8
+        nobs: 0
+    notes: "First real-dataset validation case."

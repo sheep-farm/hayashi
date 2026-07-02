@@ -1,0 +1,40 @@
+id: <case-id>
+title: <short human-readable title>
+estimator_family: <ols|iv|logit|probit|fe|re|did|rd|...>
+status: not-started
+dimension: numerical
+
+dataset:
+  name: <dataset name>
+  source: <URL or package name>
+  licence: <licence>
+  checksum: <sha256 if file is committed>
+  download_script: <optional script to fetch data>
+
+references:
+  - R
+  - Python
+  # - Stata  # uncomment only if Stata is available locally
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+    - r_squared
+    - nobs
+  tolerances:
+    coefficients: 1e-6
+    standard_errors: 1e-6
+    r_squared: 1e-8
+    nobs: 0
+
+hayashi_script: cases/<case-id>/hayashi/run.hay
+reference_scripts:
+  R: cases/<case-id>/reference/run.R
+  Python: cases/<case-id>/reference/run.py
+  Stata: cases/<case-id>/reference/run.do
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []
