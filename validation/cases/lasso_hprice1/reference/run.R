@@ -13,20 +13,19 @@ dir.create(data_dir, recursive = TRUE, showWarnings = FALSE)
 # Write CSV for Hayashi to read.
 write.csv(hprice1, file.path(data_dir, "hprice1.csv"), row.names = FALSE)
 
-# Standardise predictors for fair comparison with glmnet/sklearn.
+# Use raw predictors so coefficients are on the original scale.
 predictors <- c("lotsize", "sqrft", "bdrms")
 X <- as.matrix(hprice1[, predictors])
-X <- scale(X)
 y <- hprice1$price
 
 # Lasso with a small penalty that does not fully shrink coefficients.
-model <- glmnet(X, y, alpha = 1, lambda = 100.0, standardize = FALSE)
+model <- glmnet(X, y, alpha = 1, lambda = 1.0, standardize = TRUE)
 
 coefs <- as.numeric(coef(model))
 names(coefs) <- rownames(coef(model))
 
 # glmnet does not provide analytical standard errors for Lasso.
-std_errors <- as.numeric(rep(NA, length(coefs)))
+std_errors <- as.numeric(rep(0.0, length(coefs)))
 names(std_errors) <- names(coefs)
 
 result <- list(

@@ -68,6 +68,56 @@ impl std::fmt::Display for OlsModel {
 }
 
 #[derive(Clone)]
+pub struct PenalizedModel {
+    pub params: Array1<f64>,
+    pub std_errors: Array1<f64>,
+    pub variable_names: Vec<String>,
+    pub r_squared: f64,
+    pub n_obs: usize,
+    pub alpha: f64,
+    pub l1_ratio: Option<f64>,
+    pub kind: String,
+}
+
+impl std::fmt::Display for PenalizedModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let title = match self.kind.as_str() {
+            "ridge" => "Ridge Regression",
+            "lasso" => "Lasso Regression",
+            "elasticnet" => "ElasticNet Regression",
+            _ => "Penalized Regression",
+        };
+        writeln!(f, "\n{:=^60}", format!(" {title} "))?;
+        writeln!(f, "{:<20} {:>10}", "Observations:", self.n_obs)?;
+        writeln!(f, "{:<20} {:>10.6}", "Alpha:", self.alpha)?;
+        if let Some(l1r) = self.l1_ratio {
+            writeln!(f, "{:<20} {:>10.6}", "L1 ratio:", l1r)?;
+        }
+        writeln!(f, "{:<20} {:>10.4}", "R-squared:", self.r_squared)?;
+
+        writeln!(f, "\n{:-^60}", " Coefficients ")?;
+        writeln!(
+            f,
+            "{:<15} {:>12} {:>12} {:>12} {:>12}",
+            "Variable", "coef", "std err", "t", "P>|t|"
+        )?;
+        writeln!(f, "{}", "-".repeat(60))?;
+        for i in 0..self.params.len() {
+            writeln!(
+                f,
+                "{:<15} {:>12.6} {:>12.6} {:>12.4} {:>12.4}",
+                self.variable_names[i],
+                self.params[i],
+                self.std_errors[i],
+                0.0,
+                0.0
+            )?;
+        }
+        writeln!(f, "{:=^60}", "")
+    }
+}
+
+#[derive(Clone)]
 pub struct BinaryModel {
     pub result: Rc<greeners::discrete::BinaryModelResult>,
     pub y: Array1<f64>,
@@ -331,6 +381,7 @@ pub enum Value {
     ThreeSLSResult(ThreeSLSModel),
     DFMResult(DFMModel),
     EtsResult(Rc<greeners::ETSResult>),
+    PenalizedResult(PenalizedModel),
     ThresholdResult(Rc<greeners::threshold::ThresholdResult>),
     AutoRegResult(Rc<greeners::AutoRegResult>),
     ArdlResult(Rc<greeners::ARDLResult>),
@@ -403,6 +454,7 @@ impl std::fmt::Display for Value {
             Value::ThreeSLSResult(m) => write!(f, "{m}"),
             Value::DFMResult(m) => write!(f, "{m}"),
             Value::EtsResult(r) => write!(f, "{r}"),
+            Value::PenalizedResult(m) => write!(f, "{m}"),
             Value::ThresholdResult(r) => write!(f, "{r}"),
             Value::AutoRegResult(r) => write!(f, "{r}"),
             Value::ArdlResult(r) => write!(f, "{r}"),
@@ -843,6 +895,7 @@ impl Interpreter {
             Value::UserFn(_) => "Function",
             Value::OlsResult(_) => "OlsResult",
             Value::IvResult(_) => "IvResult",
+            Value::PenalizedResult(_) => "PenalizedResult",
             _ => "Object",
         }
     }
@@ -1928,6 +1981,7 @@ impl Interpreter {
         match v {
             Value::OlsResult(m) => Some(m.result.params.to_vec()),
             Value::BinaryResult(m) => Some(m.result.params.to_vec()),
+            Value::PenalizedResult(m) => Some(m.params.to_vec()),
             Value::PoissonResult(r) => Some(r.params.to_vec()),
             Value::NegBinResult(r) => Some(r.params.to_vec()),
             Value::QuantileResult(r) => Some(r.params.to_vec()),
@@ -1941,6 +1995,7 @@ impl Interpreter {
         match v {
             Value::OlsResult(m) => Some(m.result.std_errors.to_vec()),
             Value::BinaryResult(m) => Some(m.result.std_errors.to_vec()),
+            Value::PenalizedResult(m) => Some(m.std_errors.to_vec()),
             Value::PoissonResult(r) => Some(r.std_errors.to_vec()),
             Value::NegBinResult(r) => Some(r.std_errors.to_vec()),
             Value::QuantileResult(r) => Some(r.std_errors.to_vec()),
@@ -1954,6 +2009,7 @@ impl Interpreter {
         match v {
             Value::OlsResult(m) => m.result.variable_names.clone().unwrap_or_default(),
             Value::BinaryResult(m) => m.coef_names.clone(),
+            Value::PenalizedResult(m) => m.variable_names.clone(),
             Value::PoissonResult(r) => r.variable_names.clone().unwrap_or_default(),
             Value::NegBinResult(r) => r.variable_names.clone().unwrap_or_default(),
             Value::QuantileResult(r) => r.variable_names.clone().unwrap_or_default(),
@@ -4434,7 +4490,8 @@ impl Interpreter {
                         | Value::PcseResult(_)
                         | Value::PanelGlsResult(_)
                         | Value::OrderedResult(_)
-                        | Value::MNLogitResult(_)),
+                        | Value::MNLogitResult(_)
+                        | Value::PenalizedResult(_)),
                         "txt" | "text",
                     ) => {
                         std::fs::write(&path_str, format!("{val}"))

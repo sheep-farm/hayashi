@@ -23,14 +23,13 @@ if not CSV_PATH.exists():
 else:
     df = pd.read_csv(CSV_PATH)
 
-# Standardise predictors for fair comparison with glmnet/sklearn.
+# Use raw predictors on the original scale for fair comparison with Hayashi.
 predictors = ["lotsize", "sqrft", "bdrms"]
 X = df[predictors].astype(float)
-X = (X - X.mean()) / X.std()
 y = df["price"].astype(float)
 
 # Lasso with a small penalty that does not fully shrink coefficients.
-model = Lasso(alpha=100.0, max_iter=10000).fit(X, y)
+model = Lasso(alpha=1.0, max_iter=10000, tol=1e-6).fit(X, y)
 
 coefs = {"Intercept": float(model.intercept_)}
 for name, val in zip(predictors, model.coef_):
