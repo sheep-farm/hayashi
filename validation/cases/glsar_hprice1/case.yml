@@ -1,0 +1,42 @@
+id: glsar-hprice1
+title: GLSAR(1) on Wooldridge hprice1
+estimator_family: glsar
+status: blocked
+dimension: numerical
+
+dataset:
+  name: wooldridge::hprice1
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-3
+    standard_errors: 1e-3
+
+output_format: txt
+
+hayashi_script: cases/glsar_hprice1/hayashi/run.hay
+reference_scripts:
+  R: cases/glsar_hprice1/reference/run.R
+  Python: cases/glsar_hprice1/reference/run.py
+
+notes: |
+  GLS with AR(1) errors on housing price equation.
+  Currently blocked: Hayashi and statsmodels converge to different AR(1) rho
+  estimates, so the coefficients differ beyond reasonable tolerance. A common
+  reference implementation would be needed before this case can be validated.
+
+result:
+  summary: "Blocked: Hayashi GLSAR rho differs from statsmodels GLSAR reference"
+  known_differences:
+    - "Hayashi rho[1] = -0.0846; Python statsmodels GLSAR produces different rho"
+    - "Intercept: Hayashi -26.7 vs Python -22.8"
+  issues_opened: []

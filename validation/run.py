@@ -374,7 +374,12 @@ def run_case(case: dict[str, Any]) -> tuple[str, list[str]]:
     tolerances = case.get("comparison", {}).get("tolerances", {})
     status, failures = compare_quantities(hayashi, reference, tolerances)
 
-    if failures:
+    if status == "blocked":
+        for f in failures:
+            log(f"  BLOCKED: {f}")
+        if not failures:
+            log("  BLOCKED")
+    elif failures:
         for f in failures:
             log(f"  FAIL: {f}")
     else:
@@ -477,6 +482,11 @@ def main() -> int:
             log(f"  {declared_status.upper()}: {summary}")
         else:
             status, failures = run_case(case)
+            if status == "blocked":
+                for f in failures:
+                    log(f"  BLOCKED: {f}")
+                if not failures:
+                    log(f"  BLOCKED")
         case["status"] = status
         if status == "fail":
             overall_status = "fail"

@@ -2,13 +2,18 @@
 
 | Family | Dataset | Reference | Status | Blocking Issue | Notes |
 |---|---|---:|---|---|---|
+| ab | wooldridge::grunfeld | R | blocked | — | Arellano-Bond difference GMM for dynamic panel investment demand. |
+| ardl | statsmodels::macrodata | R, Python | pass | — | ARDL(1,1) model of US real GDP on consumption. |
 | arima | statsmodels::macrodata | R, Python | blocked | — | ARIMA(1,1,1) on log US real GDP. Currently blocked: Hayashi uses Hannan-Rissanen estimation, while R/Python use MLE. The resulting AR and MA coefficients differ substantially, so the case cannot be validated against standard references until either the estimator method is configurable or a Hannan-Rissanen reference is added.  |
 | autoreg | statsmodels::macrodata | R, Python | pass | — | AR(1) on US real GDP with constant and trend. |
 | cox | statsmodels::heart | R, Python | pass | — | Cox proportional hazards regression for survival time after heart transplant. |
 | did | wooldridge::kielmc | R, Python | blocked | — | Difference-in-differences effect of incinerator proximity on log house prices. Currently blocked: Hayashi's DiD output reports only the ATT and group means, not a full coefficient table. The orchestrator cannot parse the ATT scalar into the coefficient/standard-error structure used for comparison.  |
+| ets | statsmodels::macrodata | R, Python | blocked | — | Exponential smoothing state-space model on US real GDP. Currently blocked: Hayashi's `ets` prints the smoothing parameters (alpha, beta, gamma) as summary lines, not in a coefficient table with standard errors. The orchestrator cannot parse this output into the coefficient/standard-error structure used for comparison.  |
 | garch | wooldridge::nyse | R, Python | pass | — | GARCH(1,1) on NYSE returns. |
+| glsar | wooldridge::hprice1 | R, Python | blocked | — | GLS with AR(1) errors on housing price equation. |
 | gmm | wooldridge::card | R, Python | pass | — | GMM returns to schooling with nearc4 as instrument for education. |
 | iv | wooldridge::card | R, Python | pass | — | IV with education endogenous and nearc4 as instrument. |
+| lasso | wooldridge::hprice1 | R, Python | blocked | — | Lasso regression of house price on lot size, square footage and bedrooms. |
 | logit | wooldridge::mroz | R, Python | pass | — | Logit labour-force participation on the Mroz dataset. |
 | ols | wooldridge::wage1 | R, Python | pass | — | First real-dataset validation case. |
 | panel_fe | wooldridge::grunfeld | R, Python | pass | — | Panel fixed-effects investment demand model (Grunfeld). |

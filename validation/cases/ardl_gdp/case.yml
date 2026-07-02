@@ -1,0 +1,36 @@
+id: ardl-gdp
+title: ARDL(1,1) on US real GDP and consumption
+estimator_family: ardl
+status: not-started
+dimension: numerical
+
+dataset:
+  name: statsmodels::macrodata
+  source: statsmodels.datasets / Rdatasets
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 2e0
+    standard_errors: 2e0
+
+output_format: txt
+
+hayashi_script: cases/ardl_gdp/hayashi/run.hay
+reference_scripts:
+  R: cases/ardl_gdp/reference/run.R
+  Python: cases/ardl_gdp/reference/run.py
+
+notes: ARDL(1,1) model of US real GDP on consumption.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []
