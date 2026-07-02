@@ -94,11 +94,12 @@ def parse_hayashi_txt_table(text: str) -> dict[str, dict[str, float]]:
     """
     import re
 
-    # Locate the header line by looking for the column titles.
+    # Locate the header line by looking for the column titles (case-insensitive).
     lines = text.splitlines()
     start_idx = -1
     for i, line in enumerate(lines):
-        if "coef" in line and "std err" in line:
+        line_lower = line.lower()
+        if "coef" in line_lower and "std err" in line_lower:
             start_idx = i
             break
     if start_idx == -1:
