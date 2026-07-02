@@ -1,0 +1,36 @@
+id: ologit-beauty
+title: Ordered logit of beauty rating on Wooldridge beauty
+estimator_family: logit
+status: not-started
+dimension: numerical
+
+dataset:
+  name: wooldridge::beauty
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-3
+    standard_errors: 5e-2
+
+output_format: txt
+
+hayashi_script: cases/ologit_beauty/hayashi/run.hay
+reference_scripts:
+  R: cases/ologit_beauty/reference/run.R
+  Python: cases/ologit_beauty/reference/run.py
+
+notes: Ordered logit of looks (2, 3, 4) on female, educ, exper, black.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []
