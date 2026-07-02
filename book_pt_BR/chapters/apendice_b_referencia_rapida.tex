@@ -66,6 +66,25 @@ match  try  catch  and  or  not  true  false  nil
 \end{lstlisting}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\section{Funções auxiliares}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Função} & \textbf{Descrição} \\
+\midrule
+\texttt{dataframe(\{"x": [1, 2]\})} & Constroi DataFrame a partir de dict \\
+\texttt{is\_int(x)}  & Testa se \texttt{x} é int \\
+\texttt{is\_str(x)}  & Testa se \texttt{x} é string \\
+\texttt{is\_df(x)}   & Testa se \texttt{x} é DataFrame \\
+\texttt{is\_fn(x)}   & Testa se \texttt{x} é função \\
+\texttt{contains(s, sub)} & Verifica se \texttt{sub} está em \texttt{s} \\
+\texttt{type(x)}      & Retorna nome do tipo \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Estatística descritiva}
 
 \begin{center}
@@ -84,6 +103,7 @@ match  try  catch  and  or  not  true  false  nil
 \texttt{correlate(df, x, y, ...)} & matriz de correlação & display \\
 \texttt{codebook df}              & sumário por coluna & display \\
 \texttt{tabulate df col}          & frequências        & display \\
+\texttt{xtsum(df, x, id=unit)}    & painel: within/between  & display \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -113,6 +133,23 @@ match  try  catch  and  or  not  true  false  nil
 \texttt{pivot\_longer(...)}       & Largo → longo \\
 \texttt{pivot\_wider(...)}        & Longo → largo \\
 \texttt{reshape(df, ...)}         & Reshape geral \\
+\texttt{encode(df, col)}          & String → numérico \\
+\texttt{decode(df, col, labels)}  & Numérico → string \\
+\texttt{drop\_collinear(df)}       & Remove colunas colineares \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Declaração de estrutura}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Comando} & \textbf{Efeito} \\
+\midrule
+\texttt{xtset df id time}  & Declara painel (unidade e tempo) \\
+\texttt{tsset df time}     & Declara série temporal (habilita L.x, F.x, D.x) \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -152,6 +189,7 @@ Ridge             & \texttt{ridge\_reg(y \textasciitilde{} x1+...+xk, df, alpha=
 Elastic Net       & \texttt{enet(y \textasciitilde{} x1+...+xk, df, alpha=0.5)} \\
 \midrule
 Bootstrap         & \texttt{bootstrap("ols", y \textasciitilde{} x, df, reps=500)} \\
+Bootstrap SE      & \texttt{bootse("ols", y \textasciitilde{} x, df, n=500)} \\
 \midrule
 Regressão quantílica & \texttt{qreg(y \textasciitilde{} x, df, tau=0.5)} \\
 Regressão robusta    & \texttt{rlm(y \textasciitilde{} x, df)} \\
@@ -197,6 +235,7 @@ Logit cond. (FE)& \texttt{clogit(y \textasciitilde{} x, df, group="unit")} \\
 \midrule
 DiD              & \texttt{did(y \textasciitilde{} treated + post, df)} \\
 RDD              & \texttt{rd(y \textasciitilde{} x, 0.0, df)} \\
+Fuzzy RDD        & \texttt{fuzzy\_rd(y \textasciitilde{} x, "treat", 0.0, df)} \\
 PSM              & \texttt{psm(y \textasciitilde{} d + x1, df, k=1, caliper=0.05, boot=200)} \\
 Controle sintético & \texttt{synth("y", treated\_id, t0, df, id="col", time="col")} \\
 \bottomrule
@@ -351,6 +390,7 @@ Normalidade (SF)    & \texttt{sfrancia(df, var)} \\
 Homocedasticidade   & \texttt{vif(m\_ols)} \\
 Hausman             & \texttt{hausman(m\_fe, m\_re)} \\
 Teste linear        & \texttt{test(m, "x1 = x2")} \\
+Teste conjunto      & \texttt{testparm(m, ["x1", "x2"])} \\
 Combinação linear   & \texttt{lincom(m, "x1 + x2")} \\
 \bottomrule
 \end{tabular}
@@ -365,7 +405,8 @@ Combinação linear   & \texttt{lincom(m, "x1 + x2")} \\
 \midrule
 \texttt{display m}             & Exibe resultado do modelo \\
 \texttt{esttab(m1, m2, ...)}   & Tabela comparativa \\
-\texttt{eststo(m, "nome")}     & Armazena modelo para \texttt{esttab} \\
+\texttt{eststo(m)}             & Armazena modelo para \texttt{esttab} \\
+\texttt{estclear()}            & Limpa modelos armazenados \\
 \texttt{predict(m, df)}        & Adiciona coluna \texttt{yhat} ao df \\
 \texttt{margins(m, df)}        & Efeitos marginais médios (AME) \\
 \bottomrule
