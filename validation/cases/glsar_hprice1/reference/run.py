@@ -25,10 +25,13 @@ else:
     df = pd.read_csv(CSV_PATH)
 
 # GLSAR(1) on housing price equation.
-model = GLSAR.from_formula("price ~ lotsize + sqrft + bdrms", data=df, rho=1).fit()
+# Use iterative_fit so statsmodels actually estimates the AR(1) rho,
+# matching Hayashi's Cochrane-Orcutt procedure.
+model = GLSAR.from_formula("price ~ lotsize + sqrft + bdrms", data=df, rho=1)
+res = model.iterative_fit(maxiter=10)
 
-coefs = {name: float(val) for name, val in model.params.items()}
-std_errors = {name: float(val) for name, val in model.bse.items()}
+coefs = {name: float(val) for name, val in res.params.items()}
+std_errors = {name: float(val) for name, val in res.bse.items()}
 
 result = {
     "coefficients": coefs,

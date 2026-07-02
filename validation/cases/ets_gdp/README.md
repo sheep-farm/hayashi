@@ -4,7 +4,7 @@ This validation case estimates an exponential smoothing state-space model on US 
 
 ## Status
 
-`blocked` — Hayashi's `ets` prints the smoothing parameters (alpha, beta, gamma) as summary lines, not in a coefficient table with standard errors. The orchestrator cannot parse this output into the coefficient/standard-error structure used for comparison.
+`blocked` — Greeners now prints a coefficient table, but Hayashi's `ets` uses a grid search over SSE while R/Python use MLE. The estimated smoothing parameters therefore differ beyond tolerance.
 
 ## Model
 
