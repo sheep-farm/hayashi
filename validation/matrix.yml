@@ -1,4 +1,7 @@
 cases:
+- id: autoreg_gdp
+  notes: AR(1) on US real GDP with constant and trend.
+  dimension: numerical
 - id: cox_heart
   notes: Cox proportional hazards regression for survival time after heart transplant.
   dimension: numerical

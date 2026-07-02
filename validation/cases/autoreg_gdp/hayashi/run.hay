@@ -1,0 +1,8 @@
+// Load the US macro dataset from CSV.
+load "validation/cases/autoreg_gdp/data/macrodata.csv" as df
+
+// AR(1) on GDP with constant and trend.
+let m = autoreg(df, gdp, lags=1, trend="ct")
+
+// Export coefficient table for automated comparison.
+export(m, "txt", "/dev/stdout")
