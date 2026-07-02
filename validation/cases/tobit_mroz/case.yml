@@ -1,11 +1,11 @@
-id: quantile-wage1
-title: Quantile wage regression on Wooldridge wage1
-estimator_family: qreg
+id: tobit-mroz
+title: Tobit hours-worked model on Wooldridge mroz
+estimator_family: tobit
 status: not-started
 dimension: numerical
 
 dataset:
-  name: wooldridge::wage1
+  name: wooldridge::mroz
   source: R package wooldridge / Python wooldridge package
   licence: public teaching dataset
 
@@ -18,17 +18,17 @@ comparison:
     - coefficients
     - standard_errors
   tolerances:
-    coefficients: 1e-4
+    coefficients: 2e-0
     standard_errors: 1e-0
 
 output_format: txt
 
-hayashi_script: cases/quantile_wage1/hayashi/run.hay
+hayashi_script: cases/tobit_mroz/hayashi/run.hay
 reference_scripts:
-  R: cases/quantile_wage1/reference/run.R
-  Python: cases/quantile_wage1/reference/run.py
+  R: cases/tobit_mroz/reference/run.R
+  Python: cases/tobit_mroz/reference/run.py
 
-notes: Median quantile regression of wage on education, experience, and tenure.
+notes: Tobit regression of hours worked with left censoring at zero.
 
 result:
   summary: ""

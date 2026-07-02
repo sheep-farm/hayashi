@@ -23,6 +23,9 @@ cases:
 - id: re_grunfeld
   notes: Random-effects investment demand model (Grunfeld).
   dimension: numerical
+- id: tobit_mroz
+  notes: Tobit regression of hours worked with left censoring at zero.
+  dimension: numerical
 - id: wls_hprice1
   notes: WLS with weights generated inside Hayashi to avoid sandbox file issues.
   dimension: numerical
