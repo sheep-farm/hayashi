@@ -8,6 +8,12 @@ cases:
 - id: ols_wooldridge_wage1
   notes: First real-dataset validation case.
   dimension: numerical
+- id: panel_fe_grunfeld
+  notes: Panel fixed-effects investment demand model (Grunfeld).
+  dimension: numerical
+- id: probit_mroz
+  notes: Probit labour-force participation on the Mroz dataset.
+  dimension: numerical
 - id: wls_hprice1
   notes: WLS with weights generated inside Hayashi to avoid sandbox file issues.
   dimension: numerical
