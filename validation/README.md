@@ -25,7 +25,7 @@ against tolerances, and updates `MATRIX.md`.
 ## Requirements
 
 - Hayashi CLI (`hay`) built from the repository.
-- R with `Rscript` and the `wooldridge` package.
+- R with `Rscript` and the packages listed in `DESCRIPTION` (`wooldridge`, `jsonlite`, `MASS`, `glmnet`, `systemfit`).
 - Python 3 with the packages listed in `requirements.txt`.
 - Stata is optional and only used when `stata` is found in `$PATH`.
 
@@ -38,12 +38,12 @@ pip install -r validation/requirements.txt
 Install R dependencies:
 
 ```bash
-Rscript -e 'install.packages("wooldridge", repos="https://cloud.r-project.org/")'
+Rscript -e 'install.packages(c("wooldridge", "jsonlite", "MASS", "glmnet", "systemfit"), repos="https://cloud.r-project.org/")'
 ```
 
 ## Reference implementation coverage
 
-Most cases provide both an R and a Python reference implementation. In some cases, however, the R reference is not currently exercised because a required R package (e.g., `glmnet`, `systemfit`, `sampleSelection`, `MatchIt`, `rdrobust`) is not installed, or the estimator is implemented manually in base R/Python because no suitable packaged reference is available. Each case's `README.md` documents the exact situation; the Python reference is the primary source of truth whenever the R reference is skipped.
+Most cases provide both an R and a Python reference implementation. The validation runner runs both references when they are available and compares Hayashi against each independently. A few cases implement the estimator manually in base R/Python because no suitable packaged reference is available; each case's `README.md` documents the exact packages and implementation choices.
 
 ## Directory layout
 
