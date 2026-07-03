@@ -1,0 +1,8 @@
+// Load the US macro dataset from CSV.
+load "validation/cases/ardl_gdp/data/macrodata.csv" as df
+
+// ARDL(1,1) on GDP and consumption.
+let m = ardl(gdp ~ cons, df, lags=1, xlags=1)
+
+// Export coefficient table for automated comparison.
+export(m, "txt", "/dev/stdout")

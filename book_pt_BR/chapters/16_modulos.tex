@@ -1,117 +1,137 @@
-\chapter{Módulos e \texttt{source}}
+\chapter{Módulos, Pacotes e Plugins}
 
-\section{O que é um módulo em Hayashi}
+\section{O Sistema de Módulos do Hayashi}
 
-Em \hayashi{}, um módulo é simplesmente um arquivo \texttt{.hay}. Não há sistema de
-pacotes nem declarações de exportação — qualquer definição no arquivo fica disponível
-no escopo de quem o carrega.
+Em \hayashi{}, o compartilhamento e a organização de código são feitos através de dois comandos principais: \lstinline{source} e \lstinline{import}.
 
-Este modelo é intencional: a linguagem está em crescimento, e a complexidade de um
-sistema de módulos com namespaces, visibilidade e resolução de dependências é adicionada
-quando há demanda real. Por ora, \lstinline{source} cobre a totalidade dos casos de
-uso práticos.
+\subsection{O comando \texttt{source}}
+O comando \lstinline{source} executa um arquivo \texttt{.hay} diretamente no contexto atual. Todas as definições (funções e variáveis) do arquivo ficam visíveis no escopo global de quem o executa, sem namespaces:
 
-\section{O comando \texttt{source}}
-
-\lstinline{source} executa um arquivo \texttt{.hay} no contexto atual. Todas as
-definições do arquivo ficam visíveis a partir desse ponto:
-
-\begin{lstlisting}[caption={Carregando um módulo}]
-source "lib/estatistica.hay"
-source "lib/graficos.hay"
-
-// funções de estatistica.hay e graficos.hay estão disponíveis
-let resultado = calcular_gini(df)
-\end{lstlisting}
-
-\section{Organizando um projeto}
-
-A estrutura típica de um projeto \hayashi{}:
-
-\begin{lstlisting}[style=inline]
-projeto/
-  main.hay           -- ponto de entrada
-  lib/
-    dados.hay        -- funções de limpeza e carga
-    estimadores.hay  -- funções econométricas customizadas
-    tabelas.hay      -- formatação de resultados
-  dados/
-    raw.csv
-    painel.dta
-  resultados/
-\end{lstlisting}
-
-\texttt{main.hay}:
-
-\begin{lstlisting}
-source "lib/dados.hay"
-source "lib/estimadores.hay"
-source "lib/tabelas.hay"
-
-load "dados/painel.dta" as df
-
-let df_limpo = preparar(df)
-let modelo   = estimar_fe(df_limpo, renda ~ educ + exp)
-
-tabela_regressao(modelo, "resultados/tabela1.tex")
-\end{lstlisting}
-
-\section{Escopo de \texttt{source}}
-
-O arquivo carregado com \lstinline{source} executa no escopo global do arquivo
-principal. Isso significa:
-
-\begin{itemize}
-  \item Funções definidas no arquivo são globalmente visíveis.
-  \item Variáveis definidas no nível superior do arquivo também ficam no escopo global.
-  \item Não há namespaces: se dois arquivos definem \lstinline{fn calcular(...)}, o
-        segundo sobrescreve o primeiro.
-\end{itemize}
-
-\begin{aviso}
-  Por não haver namespaces, evite nomes genéricos em módulos reutilizáveis.
-  Prefira \texttt{gini\_calcular} a apenas \texttt{calcular}.
-\end{aviso}
-
-\section{Criando uma biblioteca}
-
-Um arquivo de biblioteca é um arquivo \texttt{.hay} com funções e constantes, sem
-código de nível superior que produza efeitos colaterais na carga:
-
-\begin{lstlisting}[caption={lib/utils.hay}]
-const PI = 3.14159265358979
-
-fn arredondar(x, casas) {
-  let fator = 10^casas
-  int(x * fator + 0.5) / float(fator)
-}
-
-fn entre(x, lo, hi) {
-  x >= lo and x <= hi
-}
-
-fn clamp(x, lo, hi) {
-  if x < lo { lo } else if x > hi { hi } else { x }
-}
-\end{lstlisting}
-
-\begin{lstlisting}[caption={main.hay}]
+\begin{lstlisting}[caption={Uso básico de source}]
 source "lib/utils.hay"
-
-display arredondar(3.14159, 2)    // 3.14
-display entre(5, 1, 10)          // true
-display clamp(15, 0, 10)         // 10
+let resultado = minha_funcao_util(10)
 \end{lstlisting}
 
-\section{Roadmap}
+\subsection{O comando \texttt{import}}
+O comando \lstinline{import} carrega um módulo isolando suas funções sob um **namespace** usando o delimitador \texttt{::}. Isso evita conflitos de nomes e organiza melhor o código:
 
-Em versões futuras, \hayashi{} terá um sistema de módulos com:
+\begin{lstlisting}[caption={Importando com namespace}]
+// Importa e usa o nome do arquivo como namespace padrão
+import("lib/matematica.hay")
+let r1 = matematica::calcular_media([10, 20, 30])
 
+// Importa definindo um alias customizado
+import("lib/matematica.hay", as=mat)
+let r2 = mat::calcular_media([10, 20, 30])
+
+// Importa apenas funções específicas diretamente para o escopo local
+import("lib/matematica.hay", only=["calcular_media"])
+let r3 = calcular_media([10, 20, 30])
+\end{lstlisting}
+
+---
+
+\section{Gerenciador de Pacotes e Publicação no GitHub}
+
+O \hayashi{} utiliza o **GitHub diretamente como registro de pacotes**. Isso elimina a necessidade de um repositório centralizado proprietário e promove a distribuição descentralizada de código aberto.
+
+\subsection{Comandos do CLI}
+Para gerenciar pacotes de terceiros pelo terminal do sistema operacional, use:
+
+\begin{lstlisting}[style=inline, numbers=none, frame=none]
+hay install usuario/repositorio   -- Instala um pacote do GitHub (-y para pular prompt de sobrescrita)
+hay remove  usuario/repositorio   -- Desinstala um pacote (deleta arquivos, pastas e metadados)
+hay list                         -- Lista pacotes e plugins instalados
+hay check-plugin [user/repo]     -- Verifica a integridade/versao contra o repositorio remoto
+hay update [user/repo] [-y]      -- Atualiza o(s) pacote(s) para a versao mais recente (-y pula prompt)
+\end{lstlisting}
+
+\subsection{Estrutura Padrão de um Pacote}
+
+Os pacotes do Hayashi são baseados em convenção e exigem configuração zero:
 \begin{itemize}
-  \item Namespaces explícitos (\texttt{use modulo::funcao})
-  \item Distribuição via registro central
-  \item Declarações de dependência em manifesto
+  \item \textbf{Pacotes de Script}: Basta fazer push de seus scripts \texttt{.hay} para a raiz de um repositório no GitHub (ex: \texttt{github.com/joao/financas/juros.hay}).
+  \item \textbf{Plugins Nativos}: Configure um workflow do GitHub Actions para compilar e subir os binários gerados (\texttt{.so}, \texttt{.dll}, \texttt{.dylib} ou \texttt{.wasm}) como assets em um GitHub Release.
 \end{itemize}
 
-A transição de \lstinline{source} para esse sistema será sem quebra de
-compatibilidade: arquivos \texttt{.hay} continuarão funcionando como módulos.
+Depois de subir seu pacote no GitHub, qualquer usuário do mundo poderá instalar e usar no Hayashi:
+\begin{lstlisting}[caption={Instalando e importando um pacote}]
+// No terminal do sistema operacional:
+// hay install joao/financas
+
+// No seu script Hayashi:
+import("joao/financas/juros")
+let taxa = financas::calcular_taxa(1000, 12)
+\end{lstlisting}
+
+---
+
+\section{Desenvolvimento de Plugins Avançados}
+
+Para necessidades que exigem alta performance ou integração com outras linguagens, o Hayashi suporta três tipos de plugins sob a mesma sintaxe de \lstinline{import}:
+
+\subsection{1. Plugins de Script (.hay)}
+Desenvolvidos em Hayashi puro. Úteis para funções econométricas compostas e utilitários rápidos.
+
+\subsection{2. Plugins Nativos (Exclusivos em Rust)}
+Os plugins nativos são desenvolvidos em Rust para garantir máxima performance e segurança de memória. Eles se comunicam com o Hayashi através de uma FFI C-string JSON estável e desacoplada.
+
+Para facilitar o desenvolvimento, você deve usar o SDK oficial \texttt{hayashi-plugin-sdk}. O SDK fornece macros de procedimento para gerar automaticamente todo o boilerplate FFI unsafe e lidar com a serialização/deserialização JSON:
+
+\begin{lstlisting}[caption={Desenvolvendo um plugin nativo usando o SDK}]
+use hayashi_plugin_sdk::{hayashi_fn, hayashi_plugin};
+
+// A macro #[hayashi_fn] lida automaticamente com a (de)serialização JSON.
+// Você pode usar tipos padrão do Rust (Vec, HashMap, String, primitivos, etc.).
+#[hayashi_fn]
+pub fn distance_to_point(lats: Vec<f64>, lons: Vec<f64>, ref_lat: f64, ref_lon: f64) -> Vec<f64> {
+    lats.iter()
+        .zip(lons.iter())
+        .map(|(&lat, &lon)| {
+            // calculo da distancia de Haversine
+            let r = 6371.0;
+            let d_lat = (ref_lat - lat).to_radians();
+            let d_lon = (ref_lon - lon).to_radians();
+            let a = (d_lat / 2.0).sin().powi(2)
+                + lat.to_radians().cos() * ref_lat.to_radians().cos() * (d_lon / 2.0).sin().powi(2);
+            let c = 2.0 * a.sqrt().atan2((1.0 - a).sqrt());
+            r * c
+        })
+        .collect()
+}
+
+// Gera as funções necessárias para limpeza de memória via FFI
+hayashi_plugin!();
+\end{lstlisting}
+
+Compilado como um \texttt{cdylib}, você pode publicar seu plugin criando uma tag (ex: \texttt{v0.1.0}) no GitHub. O workflow de GitHub Actions irá compilar o plugin para Linux (\texttt{.so}), macOS (\texttt{.dylib}) e Windows (\texttt{.dll}), fazendo o upload deles como assets do release.
+
+Qualquer usuário pode instalá-lo utilizando a CLI:
+\begin{lstlisting}[style=inline, numbers=none, frame=none]
+hay install john/spatial
+\end{lstlisting}
+O gerenciador de pacotes baixa automaticamente o binário correto correspondente ao sistema operacional e arquitetura do usuário.
+
+Você pode então carregá-lo e nomear seu namespace no Hayashi:
+\begin{lstlisting}
+import("john/spatial", as=geo)
+let dist = geo::distance_to_point(df["lat"], df["lon"], -30.03, -51.22)
+generate df dist_poa = dist
+\end{lstlisting}
+
+\subsubsection{Considerações de Segurança e Memória: JSON ABI vs. Zero-Copy FFI}
+Embora a ABI JSON baseada em C-strings padrão ofereça um desacoplamento e segurança extremos (já que evoluções no esquema JSON não quebram layouts de memória física), ela pode se tornar um gargalo ao compartilhar grandes volumes de dados (Big Data) devido ao overhead de serialização.
+
+Para mitigar esse problema, o Hayashi suporta compartilhamento de memória zero-copy transparente utilizando o formato FFI do Apache Arrow para trocas complexas de arrays e dataframes. Isso é feito de forma automática passando ponteiros de structs FFI (\texttt{FFI\_ArrowArray} e \texttt{FFI\_ArrowSchema}). Contudo, desenvolvedores devem buscar o equilíbrio ideal:
+\begin{itemize}
+    \item \textbf{JSON C String}: Oferece máximo desacoplamento, segurança e compatibilidade de versão binária entre diferentes compilações de compiladores. Indicado para rotinas de controle, pequenos volumes de dados e extensibilidade geral.
+    \item \textbf{Apache Arrow Zero-Copy}: Oferece máxima velocidade e zero overhead de alocação de memória. Indicado para cálculos de uso intensivo de dados, inferência de redes neurais ou grandes estimações econométricas. Exige uma coordenação estrita do ciclo de vida de memória (prevenção manual de bugs de liberação dupla na fronteira FFI).
+\end{itemize}
+
+Esta dualidade representa uma decisão de projeto intencional da linguagem Hayashi. Limitar o suporte a zero-copy estritamente a DataFrames e colunas homogêneas protege o ecossistema contra o perigo de quebras de compatibilidade binária (ABI) em estruturas de controle e dados complexas, as quais são leves para serializar via JSON C String. Dessa forma, mantém-se a estabilidade e a facilidade de manutenção de longo prazo da linguagem sem comprometer a performance no tráfego de dados volumosos.
+
+
+\subsection{3. Plugins WebAssembly (WASM - Para demais linguagens)}
+Para desenvolvedores utilizando outras linguagens (como C, Go, Zig, etc.), a compilação deve ser feita obrigatoriamente para WebAssembly (\texttt{.wasm}). Esses arquivos são executados de forma totalmente isolada (sandboxed) através de um motor WASM integrado ao Hayashi, garantindo segurança total (qualquer falha no plugin não derruba o Hayashi) e portabilidade multiplataforma instantânea.
+
+O plugin WASM deve exportar as funções \texttt{alloc(size: i32) -> i32} e \texttt{dealloc(ptr: i32, size: i32)} para gerenciar a passagem de strings JSON na memória linear do WASM, e a função do plugin deve retornar um \texttt{i64} contendo o ponteiro (nos 32 bits superiores) e o tamanho (nos 32 bits inferiores) da string JSON de retorno.

@@ -1,0 +1,34 @@
+id: ab-grunfeld
+title: Arellano-Bond dynamic panel on Grunfeld investment
+estimator_family: ab
+status: active
+dimension: numerical
+
+dataset:
+  name: wooldridge::grunfeld
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+
+references:
+  - R
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-3
+    standard_errors: 1e-3
+
+output_format: txt
+
+hayashi_script: cases/ab_grunfeld/hayashi/run.hay
+reference_scripts:
+  R: cases/ab_grunfeld/reference/run.R
+
+notes: Arellano-Bond difference GMM for dynamic panel investment demand.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []

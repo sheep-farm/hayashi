@@ -102,6 +102,21 @@ let sample = survey
 display count(sample)
 \end{lstlisting}
 
+\section{Using placeholders}
+
+If you need to pass the left-hand side value to a specific argument position other than the first one, you can use the underscore (\lstinline{_}) as a placeholder:
+
+\begin{lstlisting}
+expr |> f(a, _)
+// equivalent to: f(a, expr)
+\end{lstlisting}
+
+This is particularly useful when piping DataFrames into estimators (like \lstinline{ols} or \lstinline{iv}), where the DataFrame is not the first argument:
+
+\begin{lstlisting}
+let model = df |> ols(y ~ x1 + x2, _)
+\end{lstlisting}
+
 \section{Pipe with closures}
 
 The \lstinline{|>} operator also works with closures:

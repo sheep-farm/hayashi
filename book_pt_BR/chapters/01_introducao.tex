@@ -85,6 +85,24 @@ pacotes disponíveis — compete na clareza da sintaxe para a tarefa específica
 econometria aplicada. Um script de regressão com dados de painel em \hayashi{} tem
 menos ruído visual que o equivalente em qualquer outra linguagem.
 
+\section{Programa de validação empírica}
+
+\hayashi{} inclui um programa de validação reprodutível no diretório
+\texttt{validation/}. Cada caso executa um script \hayashi{} e o compara,
+ dentro de tolerâncias declaradas, com implementações de referência em R e
+Python (statsmodels). Os casos usam tanto datasets reais públicos quanto DGPs
+simulados retirados dos capítulos deste livro.
+
+Para executar a validação completa:
+
+\begin{lstlisting}[caption={Executar o programa de validação}]
+python -m venv validation/.venv
+validation/.venv/bin/pip install -r validation/requirements.txt
+hay validate
+\end{lstlisting}
+
+O estado atual de cada caso está registrado em \texttt{validation/MATRIX.md}.
+
 \section{Estrutura deste livro}
 
 Este volume cobre a Parte~I: a linguagem em si.

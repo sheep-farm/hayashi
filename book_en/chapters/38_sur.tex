@@ -113,3 +113,12 @@ The first argument is the DataFrame; the remaining arguments are formulas (one p
   efficiency gain. The gain is maximized when the regressors are orthogonal
   across equations and the cross-equation error correlation is high.
 \end{nota}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Empirical validation}
+
+The Wooldridge \texttt{grunfeld} investment dataset is used in the
+\texttt{sur_grunfeld} validation case in \texttt{validation/cases/}. The case
+estimates a two-equation SUR system in \hayashi{} and compares the coefficients
+with reference implementations in R and Python. Run \lstinline{hay validate} to
+see the current status.

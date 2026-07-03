@@ -164,3 +164,13 @@ zinb(y ~ x1 + x2, df, inflate = z1 + z2)  // separate inflation equation
   To obtain \emph{average marginal effects} (AME): use
   \lstinline{margins(model)}.
 \end{nota}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Empirical validation}
+
+The Wooldridge \texttt{fertil2} dataset is used in the validation cases
+\texttt{poisson_fertil2} and \texttt{nbreg_fertil2} in \texttt{validation/cases/}.
+The cases estimate Poisson and Negative Binomial models for the number of
+children in \hayashi{} and compare the coefficients and standard errors with
+reference implementations in R and Python. Run \lstinline{hay validate} to see the
+current status.

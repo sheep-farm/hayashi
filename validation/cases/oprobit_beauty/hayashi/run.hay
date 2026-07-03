@@ -1,0 +1,7 @@
+// Ordered probit of self-reported beauty rating (looks) on female, education,
+// experience and black indicator using the Wooldridge beauty dataset.
+load "validation/cases/oprobit_beauty/data/beauty.csv" as df
+
+let m = oprobit(looks ~ female + educ + exper + black, df)
+
+export(m, "txt", "/dev/stdout")

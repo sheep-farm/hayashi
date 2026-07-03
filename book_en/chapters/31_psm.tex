@@ -166,3 +166,11 @@ display m
   necessary in ch.~\ref{cap:iv}. Unlike DiD
   (ch.~\ref{cap:did}), PSM does not eliminate time-constant unobserved confounders.
 \end{nota}
+
+\section{Empirical validation}
+
+The Wooldridge \texttt{jtrain3} dataset is used in the \texttt{psm_jtrain3}
+validation case in \texttt{validation/cases/}. The case estimates the ATT of
+a job-training programme by PSM in \hayashi{} and compares it with a Python
+reference implementation. Run \lstinline{hay validate} to see the current
+status.

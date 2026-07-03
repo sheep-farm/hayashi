@@ -1,0 +1,7 @@
+// Negative binomial regression for number of children on age, education,
+// electric and urban indicators using the Wooldridge fertil2 dataset.
+load "validation/cases/nbreg_fertil2/data/fertil2.csv" as df
+
+let m = negbin(children ~ age + educ + electric + urban, df)
+
+export(m, "txt", "/dev/stdout")

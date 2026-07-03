@@ -1,0 +1,36 @@
+id: re-grunfeld
+title: Random-effects investment demand on Grunfeld
+estimator_family: re
+status: active
+dimension: numerical
+
+dataset:
+  name: grunfeld
+  source: statsmodels.datasets / plm package
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-1
+    standard_errors: 1e-3
+
+output_format: txt
+
+hayashi_script: cases/re_grunfeld/hayashi/run.hay
+reference_scripts:
+  R: cases/re_grunfeld/reference/run.R
+  Python: cases/re_grunfeld/reference/run.py
+
+notes: Random-effects investment demand model (Grunfeld).
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []

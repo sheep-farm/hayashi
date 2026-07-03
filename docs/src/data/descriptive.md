@@ -62,11 +62,11 @@ One-sample test against a hypothesized mean:
 ttest df wage, mu=50000
 ```
 
-Two-sample test (equal variances assumed by default):
+Two-sample test (unequal variances assumed by default):
 
 ```
 ttest df wage, by=female
-ttest df wage, by=female, unequal=true
+ttest df wage, by=female, unequal=false
 ```
 
 Paired test:

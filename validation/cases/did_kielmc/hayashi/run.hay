@@ -1,0 +1,8 @@
+// Load the Wooldridge Kiel-McClain dataset from CSV.
+load "validation/cases/did_kielmc/data/kielmc.csv" as df
+
+// Difference-in-differences: effect of incinerator proximity on log house prices.
+let m = did(lprice ~ nearinc + y81, df, treat=nearinc, post=y81)
+
+// Export DiD results for automated comparison.
+export(m, "txt", "/dev/stdout")

@@ -1,0 +1,9 @@
+// Load the Wooldridge grunfeld dataset from CSV.
+load "validation/cases/panel_fe_grunfeld/data/grunfeld.csv" as df
+
+// Declare panel structure and estimate fixed-effects investment demand.
+xtset(df, firm, year)
+let m = fe(inv ~ value + capital, df)
+
+// Export coefficient table for automated comparison.
+export(m, "txt", "/dev/stdout")

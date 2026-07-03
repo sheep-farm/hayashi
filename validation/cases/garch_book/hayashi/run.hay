@@ -1,0 +1,6 @@
+// GARCH(1,1) estimado sobre dados simulados do Capítulo 30 do livro.
+load "validation/cases/garch_book/data/garch.csv" as df
+
+let m = garch(df, e, p=1, q=1)
+
+export(m, "txt", "/dev/stdout")

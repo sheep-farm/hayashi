@@ -144,3 +144,12 @@ mlogit(y ~ x1 + x2, df, base=1)    // alternativa base explícita
   alternativas não depende das demais. Para dados de painel de escolha com
   alternativas correlacionadas, use \lstinline{clogit} (cap.~\ref{cap:painel2}).
 \end{nota}
+
+\section{Validação empírica}
+
+O dataset \texttt{beauty} do Wooldridge é usado nos casos de validação
+\texttt{ologit_beauty} e \texttt{oprobit_beauty} em \texttt{validation/cases/},
+e o dataset \texttt{AER::TravelMode} é usado no caso \texttt{mlogit_mode}. Os
+casos estimam modelos de logit ordenado, probit ordenado e logit multinomial
+no \hayashi{} e comparam os coeficientes com implementações de referência em R
+e Python. Execute \lstinline{hay validate} para ver o estado atual.

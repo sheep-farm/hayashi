@@ -1,9 +1,11 @@
 pub mod ast;
+pub mod commands;
 pub mod error;
 pub mod help;
 pub mod interpreter;
 pub mod lexer;
 pub mod parser;
+pub mod plugin;
 
 use error::{HayashiError, Result};
 use interpreter::Interpreter;
@@ -21,7 +23,9 @@ pub fn run_source_verbose(src: &str, interp: &mut Interpreter, verbose: bool) ->
         eprintln!("[hayashi] {} tokens parsed", tokens.len());
     }
     let mut parser = Parser::new(tokens);
-    let stmts = parser.parse_program().map_err(|e| annotate_error(src, &e))?;
+    let stmts = parser
+        .parse_program()
+        .map_err(|e| annotate_error(src, &e))?;
     if verbose {
         eprintln!("[hayashi] {} statements", stmts.len());
     }

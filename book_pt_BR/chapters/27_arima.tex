@@ -212,3 +212,10 @@ let m = arima(df, taxa, p=1, d=1, q=0)
 display m
 let yhat = predict(m, "xb")
 \end{lstlisting}
+
+\section{Validação empírica}
+
+O DGP de passeio aleatório deste capítulo é usado no caso de validação
+\texttt{arima_book} em \texttt{validation/cases/}. O caso estima um
+ARIMA(1,1,0) em \hayashi{} e o compara com as implementações de referência em
+R e Python. Execute \lstinline{hay validate} para ver o estado atual.

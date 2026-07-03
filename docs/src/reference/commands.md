@@ -33,15 +33,17 @@ Load options: `sheet=`, `table=`, `query=`, `sep=`. URLs are downloaded automati
 | `collapse` | `collapse(df, stat, vars, by=group)` | Aggregate by group (mean, sd, min, max, median, count, sum) |
 | `reshape` | `reshape(df, id=col, stubs=[...])` | Reshape wide to long |
 | `encode` | `encode(df, col [, gen=new])` | String to numeric encoding |
-| `decode` | `decode(df, col)` | Numeric to string |
+| `decode` | `decode(df, col, labels=[...])` | Numeric to string |
 | `winsor` | `winsor(df, var, p=0.01 [, gen=])` | Winsorize at percentiles |
 | `tabgen` | `tabgen(df, var [, prefix=])` | Generate dummy variables |
 | `recode` | `recode(df, var, from=[], to=[])` | Recode values |
 | `destring` | `destring(df, var)` | Convert string column to numeric |
 | `duplicates` | `duplicates(df, var [, action=])` | Report, drop, or tag duplicates |
 | `label` | `label(df, var, "desc")` | Attach variable label |
+| `drop_collinear` | `drop_collinear(df [, vars=[...]])` | Remove perfectly collinear columns |
 | `preserve` | `preserve(df)` | Snapshot DataFrame |
 | `restore` | `restore(df)` | Restore to last snapshot |
+| `dataframe` | `dataframe({"x": [1, 2]})` | Build DataFrame from dict of lists |
 
 ---
 
@@ -56,9 +58,10 @@ Load options: `sheet=`, `table=`, `query=`, `sep=`. URLs are downloaded automati
 | `pwcorr` | `pwcorr(df, var1, var2, ...)` | Pairwise correlations with stars |
 | `ci` | `ci(df, var [, level=0.95])` | Confidence interval for mean |
 | `centile` | `centile(df, var [, percentiles=[]])` | Arbitrary percentiles |
-| `ttest` | `ttest(df, var [, mu= \| by= \| paired])` | T-test (one-sample, two-sample, paired) |
+| `ttest` | `ttest(df, var [, mu= \| by= [, unequal=false] \| paired])` | T-test (one-sample, two-sample, paired) |
 | `xtsum` | `xtsum(df, var)` | Panel summary (between/within) |
 | `count` | `count df [if cond]` | Count observations |
+| `median` | `median(list)` or `median(df, x)` | Median |
 | `describe` | `describe(df)` | Variable names, types, labels |
 | `list` | `list(df [, vars=[], n=10])` | Show observations |
 | `anova` | `anova(df, var, by="group")` | One-way ANOVA |
@@ -156,6 +159,8 @@ Covariance options (where applicable): `cov=nonrobust|HC1|HC2|HC3|HC4|robust`, `
 | `predict` | `predict df var = m [, "kind"]` | Predicted values (xb, residuals, pr, count) |
 | `esttab` | `esttab(m1, m2 [, fmt=, path=])` | Model comparison table |
 | `eststo` | `eststo(expr)` | Store model for `esttab` |
+| `estclear` | `estclear()` | Clear stored models |
+| `testparm` | `testparm(m, ["x1", "x2"])` | Joint F-test |
 | `estat` / `ic` | `estat(m1, m2)` | AIC/BIC comparison |
 | `hausman` | `hausman(m_fe, m_re)` | Hausman specification test |
 | `lincom` | `lincom(m, expr)` | Linear combination of coefficients |

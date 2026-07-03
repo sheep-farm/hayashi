@@ -1,0 +1,20 @@
+// Load the Wooldridge card dataset from CSV.
+load "validation/cases/gmm_card/data/card.csv" as df
+
+// Convert integer/boolean columns to float for GMM.
+generate df fnearc4 = nearc4 + 0.0
+generate df fexper = exper + 0.0
+generate df fexpersq = expersq + 0.0
+generate df fsmsa = smsa + 0.0
+generate df fblack = black + 0.0
+generate df fsouth = south + 0.0
+
+// GMM returns-to-schooling with nearc4 as instrument for education.
+let m = gmm(
+    lwage ~ educ + fexper + fexpersq + fsmsa + fblack + fsouth,
+    ~ fnearc4 + fexper + fexpersq + fsmsa + fblack + fsouth,
+    df
+)
+
+// Export coefficient table for automated comparison.
+export(m, "txt", "/dev/stdout")

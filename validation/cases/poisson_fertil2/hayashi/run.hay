@@ -1,0 +1,8 @@
+// Load the Wooldridge fertil2 dataset from CSV.
+load "validation/cases/poisson_fertil2/data/fertil2.csv" as df
+
+// Poisson regression for number of children.
+let m = poisson(children ~ educ + age + agesq + evermarr + urban + electric + tv, df)
+
+// Export coefficient table for automated comparison.
+export(m, "txt", "/dev/stdout")

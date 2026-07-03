@@ -236,3 +236,11 @@ display m
   \hayashi{} displays the post/pre ratio as a descriptive heuristic; placebo tests
   are implemented manually via a loop over units.
 \end{nota}
+
+\section{Empirical validation}
+
+The \texttt{synth_smoking} validation case in \texttt{validation/cases/}
+estimates a synthetic control on a simulated panel (10 donors, 1 treated unit,
+20 periods). The case compares the average post-treatment effect in \hayashi{}
+with a Python reference implementation. Run \lstinline{hay validate} to see the
+current status.

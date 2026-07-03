@@ -68,7 +68,7 @@ pub fn load_dta(path: &str) -> Result<(DataFrame, usize)> {
                     let name = &variables[i].0;
                     match value {
                         DtaValue::Double(d) => {
-                            let v = (*d).present().map(|x| x as f64).unwrap_or(f64::NAN);
+                            let v = (*d).present().unwrap_or(f64::NAN);
                             float_cols.get_mut(name).unwrap().push(v);
                         }
                         DtaValue::Float(f) => {

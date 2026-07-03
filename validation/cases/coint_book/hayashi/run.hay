@@ -1,0 +1,6 @@
+// VECM(1) on simulated cointegrated data: y = 2*x + e2, x = cumsum(e1)
+load "validation/cases/coint_book/data/coint.csv" as df
+
+let m = vecm(df, y, x, lags=1)
+
+export(m, "txt", "/dev/stdout")

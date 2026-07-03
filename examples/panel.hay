@@ -23,5 +23,5 @@ print(m_re)
 predict df lucro_hat = m_ols
 predict df residuo   = m_ols, "residuals"
 
-export(m_ols, "latex", "/tmp/painel_ols.tex")
-export(m_fe,  "txt",   "/tmp/painel_fe.txt")
+export(m_ols, "latex", "target/painel_ols.tex")
+export(m_fe,  "txt",   "target/painel_fe.txt")

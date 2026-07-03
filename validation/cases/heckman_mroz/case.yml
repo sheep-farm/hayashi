@@ -1,0 +1,36 @@
+id: heckman-mroz
+title: Heckman two-step selection model on Wooldridge mroz
+estimator_family: heckman
+status: active
+dimension: numerical
+
+dataset:
+  name: wooldridge::mroz
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 5e-2
+    standard_errors: 1e-1
+
+output_format: txt
+
+hayashi_script: cases/heckman_mroz/hayashi/run.hay
+reference_scripts:
+  R: cases/heckman_mroz/reference/run.R
+  Python: cases/heckman_mroz/reference/run.py
+
+notes: Two-step Heckman (Heckit) on the Mroz dataset. SEs are approximate because the reference implementations are two-step.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []

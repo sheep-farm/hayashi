@@ -1,0 +1,36 @@
+id: cox-heart
+title: Cox proportional hazards on heart transplant survival
+estimator_family: cox
+status: active
+dimension: numerical
+
+dataset:
+  name: statsmodels::heart
+  source: statsmodels.datasets / Rdatasets
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-3
+    standard_errors: 1e-3
+
+output_format: txt
+
+hayashi_script: cases/cox_heart/hayashi/run.hay
+reference_scripts:
+  R: cases/cox_heart/reference/run.R
+  Python: cases/cox_heart/reference/run.py
+
+notes: Cox proportional hazards regression for survival time after heart transplant.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []

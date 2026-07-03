@@ -1,6 +1,6 @@
 # Installation
 
-Hayashi ships as a single binary (`hay`, ~20 MB) with zero runtime dependencies.
+Hayashi ships as a single binary (`hay`, ~20 MB) with zero runtime dependencies in the default build.
 
 ## Pre-built binaries
 
@@ -47,6 +47,8 @@ ODBC connectivity is behind a feature flag (requires `unixodbc-dev` or equivalen
 ```bash
 cargo build --release --features odbc
 ```
+
+ODBC is optional and uses system ODBC drivers at runtime. See the [Trust Model](../trust-model.md) before connecting Hayashi scripts to shared or production databases.
 
 ## Verify
 

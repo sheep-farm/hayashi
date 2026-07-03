@@ -1,0 +1,7 @@
+// Elastic Net regression of log house price on log lot size, log square footage,
+// bedrooms and colonial dummy using the Wooldridge hprice1 dataset.
+load "validation/cases/elasticnet_hprice1/data/hprice1.csv" as df
+
+let m = elasticnet(lprice ~ llotsize + lsqrft + bdrms + colonial, df, alpha=0.1, l1_ratio=0.5)
+
+export(m, "txt", "/dev/stdout")

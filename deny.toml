@@ -1,0 +1,14 @@
+[advisories]
+# `paste` is currently transitive through greeners/faer/gemm, parquet,
+# statrs/nalgebra/simba, and wasmi_core. RUSTSEC lists no safe upgrade.
+ignore = [
+    { id = "RUSTSEC-2024-0436", reason = "Transitive only; no safe upgrade is currently available." },
+    # quick-xml 0.39 is pulled in by calamine 0.35.0 (Excel I/O). The two
+    # RUSTSEC-2026-019* advisories require XML parsing of untrusted input with
+    # namespace resolution; Hayashi uses calamine only for local/user-supplied
+    # spreadsheets, not as a server-side XML parser. calamine has not released a
+    # version using quick-xml >= 0.41 yet, so this is accepted until upstream
+    # updates.
+    { id = "RUSTSEC-2026-0194", reason = "Blocked by calamine 0.35.0; local-only Excel parsing, not a remote XML service." },
+    { id = "RUSTSEC-2026-0195", reason = "Blocked by calamine 0.35.0; local-only Excel parsing, not a remote XML service." },
+]

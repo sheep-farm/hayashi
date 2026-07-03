@@ -87,6 +87,24 @@ on the volume of available packages — it competes on the clarity of syntax
 for the specific task of applied econometrics. A panel regression script in
 \hayashi{} has less visual noise than its equivalent in any other language.
 
+\section{Empirical validation programme}
+
+\hayashi{} includes a reproducible validation programme in the
+\texttt{validation/} directory. Each case runs a \hayashi{} script and
+compares it, within declared tolerances, against reference implementations in
+R and Python (statsmodels). The cases use both public real datasets and
+simulated DGPs taken from the chapters of this book.
+
+To run the full validation suite:
+
+\begin{lstlisting}[caption={Run the validation programme}]
+python -m venv validation/.venv
+validation/.venv/bin/pip install -r validation/requirements.txt
+hay validate
+\end{lstlisting}
+
+The current status of every case is recorded in \texttt{validation/MATRIX.md}.
+
 \section{Structure of this book}
 
 \begin{description}
