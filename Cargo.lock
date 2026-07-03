@@ -1346,7 +1346,9 @@ dependencies = [
 
 [[package]]
 name = "greeners"
-version = "1.4.10-dev"
+version = "1.4.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38d8f6ecece56a075dc8283088f4bc9ac91299992b7dc04544e3b0c74f6593cd"
 dependencies = [
  "argmin",
  "argmin-math",
