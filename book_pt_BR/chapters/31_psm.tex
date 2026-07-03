@@ -167,3 +167,11 @@ display m
   (cap.~\ref{cap:did}), o PSM não elimina confusores não observados
   constantes no tempo.
 \end{nota}
+
+\section{Validação empírica}
+
+O dataset \texttt{jtrain3} do Wooldridge é usado no caso de validação
+\texttt{psm_jtrain3} em \texttt{validation/cases/}. O caso estima o ATT de
+um programa de treinamento por PSM em \hayashi{} e o compara com uma
+implementação de referência em Python. Execute \lstinline{hay validate} para
+ver o estado atual.

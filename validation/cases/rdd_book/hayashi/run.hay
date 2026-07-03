@@ -1,0 +1,6 @@
+// Sharp RDD on the simulated DGP from the Hayashi book chapter 24.
+// x ~ Uniform(-1, 1); cutoff = 0; true treatment effect = 2.0.
+
+load "validation/cases/rdd_book/data/rdd_book.csv" as df
+
+rd(y ~ x, 0.0, df)
