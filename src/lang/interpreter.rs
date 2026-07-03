@@ -106,11 +106,7 @@ impl std::fmt::Display for PenalizedModel {
             writeln!(
                 f,
                 "{:<15} {:>12.6} {:>12.6} {:>12.4} {:>12.4}",
-                self.variable_names[i],
-                self.params[i],
-                self.std_errors[i],
-                0.0,
-                0.0
+                self.variable_names[i], self.params[i], self.std_errors[i], 0.0, 0.0
             )?;
         }
         writeln!(f, "{:=^60}", "")
@@ -1425,7 +1421,7 @@ impl Interpreter {
                 Err(self.rt_err("match: no arm matched"))
             }
 
-            Expr::IfExpr {
+            Expr::If {
                 cond,
                 then_expr,
                 else_expr,
@@ -2645,14 +2641,14 @@ impl Interpreter {
             if let Some((pr, pc)) = prev_col {
                 // Fill between previous and current column
                 if pc < col {
-                    for c in pc..=col {
+                    (pc..=col).for_each(|c| {
                         let t = (c - pc) as f64 / (col - pc).max(1) as f64;
-                        let r = (pr as f64 + t * (row as f64 - pr as f64)).round() as usize;
-                        let r = r.min(h - 1);
+                        let r = ((pr as f64 + t * (row as f64 - pr as f64)).round() as usize)
+                            .min(h - 1);
                         if grid[r][c] == ' ' {
                             grid[r][c] = '─';
                         }
-                    }
+                    });
                 }
             }
             grid[row][col] = '●';
@@ -2740,12 +2736,8 @@ impl Interpreter {
 
         // Build boxplot line
         let mut line = vec![' '; w];
-        for c in c_wlo..=c_whi {
-            line[c] = '─';
-        }
-        for c in c_q1..=c_q3 {
-            line[c] = '█';
-        }
+        line[c_wlo..=c_whi].fill('─');
+        line[c_q1..=c_q3].fill('█');
         line[c_wlo] = '├';
         line[c_whi] = '┤';
         line[c_q1] = '▐';
@@ -2846,13 +2838,12 @@ impl Interpreter {
         println!(" {title}");
         println!("{:=<width$}", "");
         let half = width / 2;
-        for lag in 1..=max_lag {
-            let v = values[lag];
+        for (lag, v) in values.iter().enumerate().skip(1) {
             let bar_len = ((v.abs() * half as f64).round() as usize).min(half);
             let in_ci = v.abs() <= ci;
             let bar_char = if in_ci { '─' } else { '█' };
             let bar: String = std::iter::repeat_n(bar_char, bar_len).collect();
-            let (left, right) = if v >= 0.0 {
+            let (left, right) = if *v >= 0.0 {
                 (format!("{:<half$}", " "), bar.to_string())
             } else {
                 let pad = half - bar_len;
@@ -2968,28 +2959,33 @@ impl Interpreter {
 
     // ── Matriz de correlação como heatmap de texto ────────────────────────────
     fn ascii_corrplot(cols: &[Vec<f64>], names: &[String]) {
-        let k = cols.len();
         let n = cols[0].len();
         let means: Vec<f64> = cols
             .iter()
             .map(|c| c.iter().sum::<f64>() / n as f64)
             .collect();
         // Calcula correlações
-        let mut corr = vec![vec![0.0f64; k]; k];
-        for i in 0..k {
-            for j in 0..k {
-                let xi: Vec<f64> = cols[i].iter().map(|x| x - means[i]).collect();
-                let xj: Vec<f64> = cols[j].iter().map(|x| x - means[j]).collect();
-                let num: f64 = xi.iter().zip(&xj).map(|(a, b)| a * b).sum();
-                let di: f64 = xi.iter().map(|a| a * a).sum::<f64>().sqrt();
-                let dj: f64 = xj.iter().map(|b| b * b).sum::<f64>().sqrt();
-                corr[i][j] = if di * dj < 1e-15 {
-                    0.0
-                } else {
-                    num / (di * dj)
-                };
-            }
-        }
+        let corr: Vec<Vec<f64>> = cols
+            .iter()
+            .enumerate()
+            .map(|(i, col_i)| {
+                let xi: Vec<f64> = col_i.iter().map(|x| x - means[i]).collect();
+                let di = xi.iter().map(|a| a * a).sum::<f64>().sqrt();
+                cols.iter()
+                    .enumerate()
+                    .map(|(j, col_j)| {
+                        let xj: Vec<f64> = col_j.iter().map(|x| x - means[j]).collect();
+                        let num: f64 = xi.iter().zip(&xj).map(|(a, b)| a * b).sum();
+                        let dj = xj.iter().map(|b| b * b).sum::<f64>().sqrt();
+                        if di * dj < 1e-15 {
+                            0.0
+                        } else {
+                            num / (di * dj)
+                        }
+                    })
+                    .collect()
+            })
+            .collect();
         // Largura do nome
         let nw = names.iter().map(|n| n.len()).max().unwrap_or(4).max(4);
         // Cabeçalho
@@ -3002,10 +2998,10 @@ impl Interpreter {
         }
         println!();
         // Linhas
-        for i in 0..k {
-            print!("{:>nw$}", &names[i][..names[i].len().min(nw)]);
-            for j in 0..k {
-                let v = corr[i][j];
+        for (name, row) in names.iter().zip(&corr) {
+            let name_disp = &name[..name.len().min(nw)];
+            print!("{:>nw$}", name_disp);
+            for v in row {
                 // Representação por blocos: ████ para |r|=1, ░░░░ para r≈0
                 let shade = if v.abs() >= 0.9 {
                     "████"
@@ -3018,12 +3014,12 @@ impl Interpreter {
                 } else {
                     "    "
                 };
-                let sign = if v < 0.0 { "-" } else { "+" };
-                print!(" {sign}{shade}",);
+                let sign = if *v < 0.0 { "-" } else { "+" };
+                print!(" {sign}{shade}");
             }
             print!("   ");
-            for j in 0..k {
-                print!(" {:>6.3}", corr[i][j]);
+            for v in row {
+                print!(" {:>6.3}", v);
             }
             println!();
         }

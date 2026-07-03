@@ -2268,10 +2268,8 @@ impl Interpreter {
                 let names = &model.var_result.var_names;
                 let sep = "─".repeat(14 + k * 12);
                 println!(
-                    "\nSVAR Structural IRF — {} — id: {} — {} passos",
-                    format!("VAR({})", model.var_result.lags),
-                    model.identification,
-                    steps
+                    "\nSVAR Structural IRF — VAR({}) — id: {} — {} passos",
+                    model.var_result.lags, model.identification, steps
                 );
                 for j in 0..k {
                     println!("\n  Impulso: {}", names[j]);
@@ -2316,9 +2314,8 @@ impl Interpreter {
                 let names = &model.var_result.var_names;
                 let sep = "─".repeat(14 + k * 12);
                 println!(
-                    "\nSVAR Structural FEVD — {} — id: {}",
-                    format!("VAR({})", model.var_result.lags),
-                    model.identification
+                    "\nSVAR Structural FEVD — VAR({}) — id: {}",
+                    model.var_result.lags, model.identification
                 );
                 for i in 0..k {
                     println!("\n  Resposta: {}", names[i]);

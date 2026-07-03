@@ -2034,7 +2034,7 @@ impl Interpreter {
                     let fn_val = self.eval_expr(&args[1])?;
                     let mut result = Vec::new();
                     for item in lst.iter() {
-                        let pred = self.call_value_fn(&fn_val, &[item.clone()])?;
+                        let pred = self.call_value_fn(&fn_val, std::slice::from_ref(item))?;
                         if Self::value_as_bool(&pred) {
                             result.push(item.clone());
                         }

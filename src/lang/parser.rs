@@ -432,7 +432,7 @@ impl Parser {
                 self.expect(&Token::LBrace)?;
                 let else_expr = self.parse_expr()?;
                 self.expect(&Token::RBrace)?;
-                Ok(Expr::IfExpr {
+                Ok(Expr::If {
                     cond: Box::new(cond),
                     then_expr: Box::new(then_expr),
                     else_expr: Box::new(else_expr),
@@ -1137,7 +1137,6 @@ impl Parser {
                         match self.peek().clone() {
                             Token::Newline | Token::Eof => break,
                             Token::Float(v) => {
-                                let v = v;
                                 self.advance();
                                 row.push(v);
                             }

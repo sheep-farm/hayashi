@@ -526,19 +526,18 @@ impl Interpreter {
                     .ok_or_else(|| HayashiError::Runtime("coefplot: modelo sem params".into()))?;
                 let se = Self::extract_se(&model).unwrap_or_default();
                 let names = Self::extract_var_names(&model);
-                let k = params.len();
                 let z = 1.96_f64;
 
                 // coletar (nome, coef, ci_lo, ci_hi) excluindo constante
                 let mut rows: Vec<(&str, f64, f64, f64)> = Vec::new();
-                for i in 0..k {
+                for (i, p) in params.iter().enumerate() {
                     let name = names.get(i).map(|s| s.as_str()).unwrap_or("?");
                     if name == "_cons" || name == "const" {
                         continue;
                     }
-                    let ci_lo = params[i] - z * se.get(i).unwrap_or(&0.0);
-                    let ci_hi = params[i] + z * se.get(i).unwrap_or(&0.0);
-                    rows.push((name, params[i], ci_lo, ci_hi));
+                    let ci_lo = *p - z * se.get(i).unwrap_or(&0.0);
+                    let ci_hi = *p + z * se.get(i).unwrap_or(&0.0);
+                    rows.push((name, *p, ci_lo, ci_hi));
                 }
                 if rows.is_empty() {
                     println!("(no coefficients to plot)");
@@ -583,9 +582,7 @@ impl Interpreter {
                         line[zero_col] = '│';
                     }
                     // CI bar
-                    for j in c_lo..=c_hi.min(width - 1) {
-                        line[j] = '─';
-                    }
+                    line[c_lo..=c_hi.min(width - 1)].fill('─');
                     // point estimate
                     if c_pt < width {
                         line[c_pt] = '●';
@@ -805,15 +802,15 @@ impl Interpreter {
                 let mut plot_coefs = Vec::new();
                 let mut plot_lo = Vec::new();
                 let mut plot_hi = Vec::new();
-                for i in 0..params.len() {
+                for (i, p) in params.iter().enumerate() {
                     let name = names.get(i).map(|s| s.as_str()).unwrap_or("?");
                     if name == "_cons" || name == "const" {
                         continue;
                     }
                     plot_names.push(name.to_string());
-                    plot_coefs.push(params[i]);
-                    plot_lo.push(params[i] - z * se.get(i).unwrap_or(&0.0));
-                    plot_hi.push(params[i] + z * se.get(i).unwrap_or(&0.0));
+                    plot_coefs.push(*p);
+                    plot_lo.push(*p - z * se.get(i).unwrap_or(&0.0));
+                    plot_hi.push(*p + z * se.get(i).unwrap_or(&0.0));
                 }
                 crate::io::plot::Plot::coefplot(
                     &plot_names,

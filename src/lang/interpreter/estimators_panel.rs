@@ -846,12 +846,12 @@ impl Interpreter {
                     .map(|s| s.as_str())
                     .collect();
                 println!(" {:<20} {:>10}  {:>10}", "Variável (γ̂)", "Coef", "Std Err");
-                for i in 0..k.min(gamma.len()) {
+                for (i, g) in gamma.iter().enumerate().take(k.min(gamma.len())) {
                     let nm = slope_names.get(i).copied().unwrap_or("?");
                     println!(
                         " {:<20} {:>10.4}  {:>10.4}",
                         nm,
-                        gamma[i],
+                        g,
                         gamma_se.get(i).copied().unwrap_or(f64::NAN)
                     );
                 }
