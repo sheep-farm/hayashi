@@ -206,6 +206,70 @@ def normalise_intercept(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def parse_hayashi_psm(text: str) -> dict[str, dict[str, float]]:
+    """Parse ATT and SE from the PSM summary block.
+
+    Used when the generic coefficient table is not present (e.g. before the
+    parsable Parameters table was added to the PSM display).
+    """
+    import re
+
+    m = re.search(r"ATT\s*=\s*([-+]?\d+\.?\d*(?:[eE][-+]?\d+)?)", text)
+    se_m = re.search(r"SE\s*=\s*([-+]?\d+\.?\d*(?:[eE][-+]?\d+)?)", text)
+    if not m or not se_m:
+        raise ValueError(f"Could not parse PSM ATT/SE from Hayashi output: {text[:200]!r}")
+    return {
+        "coefficients": {"ATT": float(m.group(1))},
+        "standard_errors": {"ATT": float(se_m.group(1))},
+    }
+
+
+def parse_hayashi_rd(text: str) -> dict[str, dict[str, float]]:
+    """Parse τ̂ and SE from the RDD summary block."""
+    import re
+
+    # Find the treatment-effect line. It may appear just below a header such as
+    # "Efeito de Tratamento (τ̂):".
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if "τ̂" in line or "Efeito de Tratamento" in line:
+            # The next non-empty line contains the numbers.
+            for j in range(i + 1, len(lines)):
+                candidate = lines[j].strip()
+                if not candidate:
+                    continue
+                numbers = re.findall(r"[-+]?\d+\.?\d*(?:[eE][-+]?\d+)?", candidate)
+                if len(numbers) >= 2:
+                    return {
+                        "coefficients": {"tau": float(numbers[0])},
+                        "standard_errors": {"tau": float(numbers[1])},
+                    }
+                break
+            break
+    raise ValueError(f"Could not parse RDD tau/SE from Hayashi output: {text[:200]!r}")
+
+
+def parse_hayashi_synth(text: str) -> dict[str, dict[str, float]]:
+    """Parse the post-treatment effect table and return the mean ATT."""
+    import re
+
+    effects: list[float] = []
+    lines = text.splitlines()
+    for line in lines:
+        # Post-treatment rows are marked with an asterisk.
+        if "*" not in line:
+            continue
+        # Extract all numeric tokens.
+        numbers = re.findall(r"[-+]?\d+\.?\d*(?:[eE][-+]?\d+)?", line)
+        if len(numbers) >= 3:
+            # The right-most column is the effect.
+            effects.append(float(numbers[-1]))
+    if not effects:
+        raise ValueError(f"Could not parse synthetic-control post-treatment effects: {text[:200]!r}")
+    att = sum(effects) / len(effects)
+    return {"coefficients": {"ATT": att}}
+
+
 def approx_equal(a: float, b: float, tol: float) -> bool:
     if math.isnan(a) and math.isnan(b):
         return True
@@ -350,6 +414,7 @@ def run_case(case: dict[str, Any]) -> tuple[str, list[str]]:
     # Prefer the stdout emitted by Hayashi; fall back to the written file.
     hayashi: dict[str, dict[str, float]] | None = None
     output_format = case.get("output_format", "csv")
+    family = case.get("estimator_family", "")
     if hay_res.stdout.strip():
         try:
             if output_format == "txt":
@@ -357,7 +422,18 @@ def run_case(case: dict[str, Any]) -> tuple[str, list[str]]:
             else:
                 hayashi = normalise_intercept(parse_hayashi_csv_from_string(hay_res.stdout))
         except Exception as e:
-            return "blocked", [f"Could not parse Hayashi stdout ({output_format}): {e}"]
+            # Fall back to family-specific parsers for causal estimators.
+            try:
+                if family == "psm":
+                    hayashi = normalise_intercept(parse_hayashi_psm(hay_res.stdout))
+                elif family == "rd" or family == "rdd":
+                    hayashi = normalise_intercept(parse_hayashi_rd(hay_res.stdout))
+                elif family == "synth":
+                    hayashi = normalise_intercept(parse_hayashi_synth(hay_res.stdout))
+                else:
+                    raise
+            except Exception:
+                return "blocked", [f"Could not parse Hayashi stdout ({output_format}): {e}"]
     if hayashi is None:
         if output_format == "txt":
             hayashi_txt = hayashi_dir / "output.txt"

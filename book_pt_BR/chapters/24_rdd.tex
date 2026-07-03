@@ -210,3 +210,11 @@ display m
   — não devem ser significativas; (3)~verifique a densidade de $x$ em
   $c$ (McCrary) para detectar manipulação da variável de corrida.
 \end{nota}
+
+\section{Validação empírica}
+
+O DGP deste capítulo com variável de corrida uniforme e limiar em 0 é usado
+no caso de validação \texttt{rdd_book} em \texttt{validation/cases/}. O
+caso estima o efeito de tratamento por RDD em \hayashi{} e o compara com
+implementações de referência em R e Python. Execute \lstinline{hay validate}
+para ver o estado atual.
