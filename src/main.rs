@@ -351,7 +351,7 @@ fn run() {
             return;
         }
         Some("validate") => {
-            run_validation();
+            run_validation(&args_clean[2..]);
             return;
         }
         Some("remove") | Some("uninstall") => {
@@ -400,7 +400,7 @@ fn run_script(path: &str, verbose: bool) {
 }
 
 /// Runs the empirical validation programme by invoking `validation/run.py`.
-fn run_validation() {
+fn run_validation(args: &[&str]) {
     // Prefer the validation directory relative to the current working directory
     // (typical for development and CI), then fall back to the executable's
     // directory (typical for a self-contained installation).
@@ -460,6 +460,7 @@ fn run_validation() {
 
     let mut cmd = std::process::Command::new(python);
     cmd.arg(&run_py);
+    cmd.args(args);
     if let Some(dir) = hay_dir {
         cmd.current_dir(dir);
     }
@@ -619,7 +620,7 @@ fn print_help() {
     println!("    hay list                 List installed packages");
     println!("    hay update [user/repo]   Update package(s) (-y to bypass prompt)");
     println!("    hay check-plugin [name]  Check integrity/version with remote repository");
-    println!("    hay validate             Run the empirical validation programme (R/Python)");
+    println!("    hay validate [options]   Run the empirical validation programme (R/Python)");
     println!();
     println!("In REPL, type help() for full command list or help(cmd) for details.");
 }
