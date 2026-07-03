@@ -1423,7 +1423,7 @@ dependencies = [
 
 [[package]]
 name = "hayashi-lang"
-version = "0.2.6-dev"
+version = "0.2.6"
 dependencies = [
  "arrow",
  "calamine",
