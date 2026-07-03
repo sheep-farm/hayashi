@@ -1218,7 +1218,7 @@ impl Interpreter {
                 let fn_val = self.eval_expr(&args[1])?;
                 let mut result = Vec::with_capacity(lst.len());
                 for item in lst.iter() {
-                    let val = self.call_value_fn(&fn_val, &[item.clone()])?;
+                    let val = self.call_value_fn(&fn_val, std::slice::from_ref(item))?;
                     result.push(val);
                 }
                 Ok(Value::List(Rc::new(result)))

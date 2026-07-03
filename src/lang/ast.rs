@@ -135,7 +135,7 @@ pub enum Expr {
     },
 
     // if cond { expr } else { expr }  (expression, returns value)
-    IfExpr {
+    If {
         cond: Box<Expr>,
         then_expr: Box<Expr>,
         else_expr: Box<Expr>,

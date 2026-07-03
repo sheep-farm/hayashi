@@ -696,7 +696,7 @@ impl Interpreter {
                 out.push_str("\n── F de 1ª Etapa (partial F em instrumentos excluídos)\n");
                 out.push_str(&first_stage_lines);
                 out.push_str(&format!("\n── Cragg-Donald Wald F = {:.4}\n", cd_stat));
-                out.push_str(&"   (λ_min do núcleo de concentração / L)\n".to_string());
+                out.push_str("   (λ_min do núcleo de concentração / L)\n");
                 out.push_str(&format!("\n{sy_line}"));
                 out.push_str(&format!("{thin}\n"));
                 out.push_str(" Regra de bolso: F > 10 (Staiger & Stock 1997)\n");
