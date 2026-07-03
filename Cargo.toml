@@ -15,7 +15,7 @@ name = "hay"
 path = "src/main.rs"
 
 [dependencies]
-greeners = { path = "../Greeners" }
+greeners = "1.4.10"
 ndarray = "0.17"
 chrono = "0.4"
 statrs = "0.18"
