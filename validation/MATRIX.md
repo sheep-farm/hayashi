@@ -5,9 +5,11 @@
 | ab | wooldridge::grunfeld | R | pass | — | Arellano-Bond difference GMM for dynamic panel investment demand. |
 | arima | simulated_ar1 | R, Python | pass | — | Uses the same simulated AR(1) DGP as Chapter 26 of the book. |
 | ardl | statsmodels::macrodata | R, Python | pass | — | ARDL(1,1) model of US real GDP on consumption. |
+| arima | simulated_rw | R, Python | pass | — | ARIMA(1,1,0) on a simulated random walk with seed 42. Intercept is excluded from comparison because R/Python references are estimated without trend. |
 | arima | statsmodels::macrodata | R, Python | pass | — | ARIMA(1,1,1) on log US real GDP via exact Gaussian MLE. |
 | arima | simulated_arma11 | R, Python | pass | — | Uses the same simulated ARMA(1,1) DGP as Chapter 26 of the book. Intercept is excluded from comparison because Hayashi profiles it out in MLE (SE = 0). |
 | autoreg | statsmodels::macrodata | R, Python | pass | — | AR(1) on US real GDP with constant and trend. |
+| vecm | simulated_cointegrated | R, Python | pass | — | VECM(1) on a simulated cointegrated system where y = 2*x + e2 and x = cumsum(e1). Only the cointegration (beta) and adjustment (alpha) coefficients are compared. |
 | cox | statsmodels::heart | R, Python | pass | — | Cox proportional hazards regression for survival time after heart transplant. |
 | did | wooldridge::kielmc | R, Python | pass | — | Difference-in-differences effect of incinerator proximity on log house prices. |
 | ets | statsmodels::macrodata | R, Python | pass | — | Exponential smoothing state-space model on US real GDP. Blocked because Hayashi uses SSE grid search while references use MLE. |
