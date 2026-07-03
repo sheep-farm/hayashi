@@ -106,11 +106,7 @@ impl std::fmt::Display for PenalizedModel {
             writeln!(
                 f,
                 "{:<15} {:>12.6} {:>12.6} {:>12.4} {:>12.4}",
-                self.variable_names[i],
-                self.params[i],
-                self.std_errors[i],
-                0.0,
-                0.0
+                self.variable_names[i], self.params[i], self.std_errors[i], 0.0, 0.0
             )?;
         }
         writeln!(f, "{:=^60}", "")
