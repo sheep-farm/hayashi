@@ -105,12 +105,26 @@ cases:
   notes: Probit labour-force participation on the Mroz dataset.
   dimension: numerical
   status: pass
+- id: psm_jtrain3
+  notes: 1:1 nearest-neighbor propensity score matching with caliper 0.2 and bootstrap
+    SE.
+  dimension: numerical
+  status: pass
 - id: quantile_wage1
   notes: Median quantile regression of wage on education, experience, and tenure.
   dimension: numerical
   status: pass
+- id: rdd_book
+  notes: Sharp RDD with local linear regression, triangular kernel and Imbens-Kalyanaraman
+    bandwidth.
+  dimension: numerical
+  status: pass
 - id: re_grunfeld
   notes: Random-effects investment demand model (Grunfeld).
+  dimension: numerical
+  status: pass
+- id: synth_smoking
+  notes: Synthetic-control ATT on a simulated panel with 10 donors and 1 treated unit.
   dimension: numerical
   status: pass
 - id: tobit_mroz

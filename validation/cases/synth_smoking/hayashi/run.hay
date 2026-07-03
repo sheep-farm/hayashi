@@ -1,0 +1,14 @@
+// Synthetic control on the simulated panel stored in data/synth_smoking.csv.
+// The CSV is produced by the Python reference so both implementations use the
+// same data.  Panel: 10 units, 20 periods, unit 1 treated from year 11.
+
+load "validation/cases/synth_smoking/data/synth_smoking.csv" as df
+
+// Hayashi loads integer columns as int; convert identifiers/time to float.
+replace df unit = unit * 1.0
+replace df year = year * 1.0
+replace df d = d * 1.0
+
+let m = synth("y", 1, 11, df, id="unit", time="year")
+
+export(m, "txt", "/dev/stdout")
