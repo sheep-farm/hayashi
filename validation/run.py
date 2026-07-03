@@ -5,6 +5,7 @@ Reads validation/matrix.yml, runs reference and Hayashi scripts for each case,
 compares declared quantities against tolerances, and updates MATRIX.md.
 """
 
+import argparse
 import json
 import math
 import os
@@ -605,13 +606,34 @@ def update_matrix_md(cases: list[dict[str, Any]]) -> None:
     MATRIX_MD.write_text("\n".join(lines) + "\n")
 
 
-def main() -> int:
-    log("Hayashi empirical validation programme")
-    log(f"Root: {ROOT_DIR}")
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Run Hayashi empirical validation cases.",
+    )
+    parser.add_argument(
+        "--case",
+        dest="case_ids",
+        action="append",
+        default=[],
+        metavar="CASE_ID",
+        help="Run only the named validation case. May be repeated.",
+    )
+    parser.add_argument(
+        "--list",
+        action="store_true",
+        help="List discovered validation cases and exit.",
+    )
+    parser.add_argument(
+        "--no-write",
+        action="store_true",
+        help="Do not rewrite validation/matrix.yml or validation/MATRIX.md.",
+    )
+    return parser.parse_args(argv)
 
+
+def load_cases() -> tuple[dict[str, Any], list[dict[str, Any]], set[str], set[str]]:
     if not MATRIX_YML.exists():
-        log(f"ERROR: {MATRIX_YML} not found")
-        return 1
+        raise FileNotFoundError(f"{MATRIX_YML} not found")
 
     with open(MATRIX_YML) as f:
         matrix = yaml.safe_load(f) or {}
@@ -640,19 +662,47 @@ def main() -> int:
         # Registry notes are optional; if present they override the case.yml notes.
         if entry.get("notes"):
             cases_by_id[case_id]["notes"] = entry["notes"]
-        cases_by_id[case_id]["dimension"] = entry.get("dimension", cases_by_id[case_id].get("dimension", "numerical"))
+        cases_by_id[case_id]["dimension"] = entry.get(
+            "dimension",
+            cases_by_id[case_id].get("dimension", "numerical"),
+        )
+        cases_by_id[case_id]["status"] = entry.get(
+            "status",
+            cases_by_id[case_id].get("status", "not-started"),
+        )
 
     cases = list(cases_by_id.values())
-    log(f"Discovered {len(cases)} validation case(s)")
-    if not cases:
-        log("No validation cases found in validation/cases/*/case.yml")
-        return 0
-
-    # Warn about registry entries that no longer exist on disk.
     discovered_ids = {case["id"] for case in cases}
-    for case_id in registry_ids - discovered_ids:
-        log(f"WARNING: registry entry '{case_id}' has no case.yml on disk; skipping")
+    return matrix, cases, registry_ids, discovered_ids
 
+
+def list_cases(cases: list[dict[str, Any]]) -> None:
+    for case in cases:
+        print(f"{case['id']}\t{case.get('title', '')}")
+
+
+def select_cases(cases: list[dict[str, Any]], case_ids: list[str]) -> list[dict[str, Any]]:
+    if not case_ids:
+        return cases
+
+    cases_by_id = {case["id"]: case for case in cases}
+    missing = [case_id for case_id in case_ids if case_id not in cases_by_id]
+    if missing:
+        known = ", ".join(sorted(cases_by_id))
+        missing_str = ", ".join(missing)
+        raise ValueError(f"Unknown validation case(s): {missing_str}\nKnown cases: {known}")
+
+    seen: set[str] = set()
+    selected: list[dict[str, Any]] = []
+    for case_id in case_ids:
+        if case_id in seen:
+            continue
+        seen.add(case_id)
+        selected.append(cases_by_id[case_id])
+    return selected
+
+
+def run_cases(cases: list[dict[str, Any]]) -> str:
     overall_status = "pass"
     for case in cases:
         declared_status = case.get("status", "not-started")
@@ -678,7 +728,10 @@ def main() -> int:
             overall_status = "blocked"
         summary = "; ".join(failures) if failures else case.get("result", {}).get("summary", "matches reference")
         case.setdefault("result", {})["summary"] = summary
+    return overall_status
 
+
+def write_matrix(matrix: dict[str, Any], cases: list[dict[str, Any]]) -> None:
     # Write updated matrix.yml (id + notes + dimension + status for each discovered case).
     matrix["cases"] = [
         {
@@ -694,6 +747,48 @@ def main() -> int:
 
     # Regenerate MATRIX.md.
     update_matrix_md(cases)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv if argv is not None else sys.argv[1:])
+
+    log("Hayashi empirical validation programme")
+    log(f"Root: {ROOT_DIR}")
+
+    try:
+        matrix, cases, registry_ids, discovered_ids = load_cases()
+    except FileNotFoundError as e:
+        log(f"ERROR: {e}")
+        return 1
+
+    log(f"Discovered {len(cases)} validation case(s)")
+    if not cases:
+        log("No validation cases found in validation/cases/*/case.yml")
+        return 0
+
+    # Warn about registry entries that no longer exist on disk.
+    for case_id in registry_ids - discovered_ids:
+        log(f"WARNING: registry entry '{case_id}' has no case.yml on disk; skipping")
+
+    if args.list:
+        list_cases(cases)
+        return 0
+
+    try:
+        selected_cases = select_cases(cases, args.case_ids)
+    except ValueError as e:
+        log(f"ERROR: {e}")
+        return 1
+
+    if args.case_ids:
+        log(f"Selected {len(selected_cases)} validation case(s)")
+
+    overall_status = run_cases(selected_cases)
+
+    if args.no_write:
+        log("Skipping matrix update (--no-write)")
+    else:
+        write_matrix(matrix, cases)
 
     log(f"\nOverall status: {overall_status}")
     return 0 if overall_status != "fail" else 1
