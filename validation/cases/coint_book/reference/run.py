@@ -73,7 +73,34 @@ def johansen_vecm(data: np.ndarray, lags: int, rank: int) -> dict:
     cointegration_term = r1 @ beta_est
     alpha_est = r0.T @ cointegration_term @ np.linalg.inv(cointegration_term.T @ cointegration_term)
 
-    return {"alpha": alpha_est, "beta": beta_est}
+    # Simple OLS conditional standard errors for alpha: regress r0_j on the
+    # cointegration term (already orthogonal to the constant) without intercept.
+    alpha_se = np.zeros((k, rank))
+    for r in range(rank):
+        ec = cointegration_term[:, r]
+        ss_ec = np.sum(ec * ec)
+        for j in range(k):
+            a = alpha_est[j, r]
+            resid = r0[:, j] - a * ec
+            sigma2 = np.sum(resid * resid) / max(1, n_eff - 2)
+            alpha_se[j, r] = float(np.sqrt(sigma2 / ss_ec))
+
+    # Approximate beta standard errors from the static long-run OLS regression
+    # y ~ x (with intercept). The slope SE is used for beta_y2; the intercept
+    # SE is used as a rough proxy for beta_y1 (the Johansen vector is not
+    # normalized here, so this is intentionally approximate).
+    y_level = data[:, 0]
+    x_level = data[:, 1]
+    X_ols = np.column_stack((np.ones(t_total), x_level))
+    beta_ols = np.linalg.inv(X_ols.T @ X_ols) @ (X_ols.T @ y_level)
+    resid_ols = y_level - X_ols @ beta_ols
+    sigma2_ols = np.sum(resid_ols * resid_ols) / max(1, t_total - 2)
+    cov_ols = sigma2_ols * np.linalg.inv(X_ols.T @ X_ols)
+    beta_se = np.zeros((k, rank))
+    beta_se[0, 0] = float(np.sqrt(cov_ols[0, 0]))  # intercept SE as proxy for beta_y1
+    beta_se[1, 0] = float(np.sqrt(cov_ols[1, 1]))  # slope SE as proxy for beta_y2
+
+    return {"alpha": alpha_est, "beta": beta_est, "alpha_se": alpha_se, "beta_se": beta_se}
 
 
 df = pd.read_csv(DATA_DIR / "coint.csv")
@@ -83,6 +110,8 @@ res = johansen_vecm(data, lags=1, rank=1)
 
 beta = res["beta"]
 alpha = res["alpha"]
+beta_se = res["beta_se"]
+alpha_se = res["alpha_se"]
 
 result = {
     "coefficients": {
@@ -92,10 +121,10 @@ result = {
         "alpha_1_y2": float(alpha[1, 0]),
     },
     "standard_errors": {
-        "beta_1_y1": 0.0,
-        "beta_1_y2": 0.0,
-        "alpha_1_y1": 0.0,
-        "alpha_1_y2": 0.0,
+        "beta_1_y1": float(beta_se[0, 0]),
+        "beta_1_y2": float(beta_se[1, 0]),
+        "alpha_1_y1": float(alpha_se[0, 0]),
+        "alpha_1_y2": float(alpha_se[1, 0]),
     },
 }
 
