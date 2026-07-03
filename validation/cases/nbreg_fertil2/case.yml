@@ -1,0 +1,36 @@
+id: nbreg_fertil2
+title: Negative binomial regression on Wooldridge fertil2
+estimator_family: negbin
+status: active
+dimension: numerical
+
+dataset:
+  name: wooldridge::fertil2
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 2e-1
+    standard_errors: 5e-1
+
+output_format: txt
+
+hayashi_script: cases/nbreg_fertil2/hayashi/run.hay
+reference_scripts:
+  R: cases/nbreg_fertil2/reference/run.R
+  Python: cases/nbreg_fertil2/reference/run.py
+
+notes: Negative binomial regression for number of children on age, education, electric and urban indicators.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []

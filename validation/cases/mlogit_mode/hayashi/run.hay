@@ -1,0 +1,7 @@
+// Multinomial logit of chosen travel mode on income, wait time, vehicle cost
+// and travel time using the AER TravelMode dataset.
+load "validation/cases/mlogit_mode/data/mode.csv" as df
+
+let m = mlogit(mode ~ income + wait + vcost + travel, df)
+
+export(m, "txt", "/dev/stdout")

@@ -1,0 +1,7 @@
+// Seemingly Unrelated Regressions (Zellner FGLS) on the Grunfeld data.
+// Two equations: value ~ invest + capital and invest ~ value + capital.
+load "validation/cases/sur_grunfeld/data/grunfeld.csv" as df
+
+let m = sur(df, value ~ inv + capital, inv ~ value + capital)
+
+export(m, "txt", "/dev/stdout")
