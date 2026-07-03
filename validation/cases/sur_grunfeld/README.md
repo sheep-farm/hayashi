@@ -22,8 +22,8 @@ The Wooldridge `grunfeld` data names the investment variable `inv`.
 
 ## Reference implementation
 
-- **R:** `systemfit::systemfit(list(eq1 = value ~ inv + capital, eq2 = inv ~ value + capital), data = df, method = "SUR")` (requires the `systemfit` package)
-- **Python:** manual Zellner FGLS using OLS residuals and block-diagonal GLS
+- **Python:** primary reference implementation (manual Zellner FGLS using OLS residuals and block-diagonal GLS).
+- **R:** a reference script is provided but not currently exercised by the validation runner because the `systemfit` package is not installed. The validation currently relies on the Python reference.
 - **Hayashi:** `sur(df, value ~ inv + capital, inv ~ value + capital)`
 
 ## Compared quantities
@@ -36,7 +36,3 @@ The Wooldridge `grunfeld` data names the investment variable `inv`.
 | Quantity | Tolerance | Rationale |
 |---|---|---|
 | coefficients | 1e-1 | FGLS estimates and covariance approximations may differ slightly across implementations |
-
-## Notes
-
-The R reference requires the `systemfit` package. If it is not installed the R script is skipped and the Python reference is used for comparison.

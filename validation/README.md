@@ -41,6 +41,10 @@ Install R dependencies:
 Rscript -e 'install.packages("wooldridge", repos="https://cloud.r-project.org/")'
 ```
 
+## Reference implementation coverage
+
+Most cases provide both an R and a Python reference implementation. In some cases, however, the R reference is not currently exercised because a required R package (e.g., `glmnet`, `systemfit`, `sampleSelection`, `MatchIt`, `rdrobust`) is not installed, or the estimator is implemented manually in base R/Python because no suitable packaged reference is available. Each case's `README.md` documents the exact situation; the Python reference is the primary source of truth whenever the R reference is skipped.
+
 ## Directory layout
 
 ```text

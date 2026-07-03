@@ -25,10 +25,8 @@ psm(re78 ~ train + age + educ + black + hisp + married +
 
 ## Reference implementation
 
-- **Python:** `statsmodels.logit` for propensity score; `sklearn.NearestNeighbors`
-  for 1:1 nearest-neighbor matching; bootstrap SE with 200 replications.
-- **R:** `glm(family = binomial)` for propensity score; manual nearest-neighbor
-  matching; bootstrap SE with 200 replications.
+- **Python:** primary reference implementation (`statsmodels.logit` for propensity score; `sklearn.NearestNeighbors` for 1:1 nearest-neighbor matching; bootstrap SE with 200 replications).
+- **R:** a reference script is provided and implements the matching manually in base R (`glm(family = binomial)` for propensity score; manual 1:1 nearest-neighbor matching; bootstrap SE with 200 replications). It does not require the `MatchIt` package. When R is unavailable, the validation relies on the Python reference.
 
 ## Compared quantities
 
