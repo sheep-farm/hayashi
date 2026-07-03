@@ -190,3 +190,10 @@ display m
   Verify with ADF before estimating. If the series are $I(1)$ but not
   cointegrated, use the VAR in first differences (ch.~\ref{cap:var}).
 \end{nota}
+
+\section{Empirical validation}
+
+The cointegrated DGP in this chapter is used in the \texttt{coint_book}
+validation case in \texttt{validation/cases/}. The case estimates a rank-1
+VECM in \hayashi{} and compares it with reference implementations in R and
+Python. Run \lstinline{hay validate} to see the current status.

@@ -11,6 +11,11 @@ cases:
   notes: ARDL(1,1) model of US real GDP on consumption.
   dimension: numerical
   status: pass
+- id: arima_book
+  notes: ARIMA(1,1,0) on a simulated random walk with seed 42. Intercept is excluded
+    from comparison because R/Python references are estimated without trend.
+  dimension: numerical
+  status: pass
 - id: arima_gdp
   notes: ARIMA(1,1,1) on log US real GDP via exact Gaussian MLE.
   dimension: numerical
@@ -22,6 +27,11 @@ cases:
   status: pass
 - id: autoreg_gdp
   notes: AR(1) on US real GDP with constant and trend.
+  dimension: numerical
+  status: pass
+- id: coint_book
+  notes: VECM(1) on a simulated cointegrated system where y = 2*x + e2 and x = cumsum(e1).
+    Only the cointegration (beta) and adjustment (alpha) coefficients are compared.
   dimension: numerical
   status: pass
 - id: cox_heart
