@@ -761,3 +761,74 @@ $^\dagger$ \texttt{esttab} in Stata requires \texttt{ssc install estout}.\\[4pt]
 \noindent\textbf{Note on random generators:} \texttt{rnormal()} matches the standard-normal
 generator used by Stata, R and Python examples. Use \texttt{runiform()} when the
 DGP needs a $U(0,1)$ draw.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Validation matrix}
+\label{sec:validation_matrix}
+
+In addition to the code examples in this appendix, all of \hayashi{} is
+systematically validated against reference implementations. The validation
+programme is in the \texttt{validation/} directory and is run with:
+
+\begin{lstlisting}
+hay validate
+\end{lstlisting}
+
+Table~\ref{tab:validation_matrix} lists the current validation cases, with the
+estimator family, the data source, and the references (R, Python and/or Stata)
+used for comparison. Full details --- tolerances, notes and status --- are in
+\texttt{validation/MATRIX.md}.
+
+{\footnotesize\setlength{\tabcolsep}{4pt}%
+\begin{longtable}{llll}
+\label{tab:validation_matrix}
+\toprule
+\textbf{Case ID} & \textbf{Family} & \textbf{Dataset/Source} & \textbf{References (R/Python/Stata)} \\
+\midrule
+\endfirsthead
+\multicolumn{4}{l}{\footnotesize\itshape (continued)} \\[2pt]
+\toprule
+\textbf{Case ID} & \textbf{Family} & \textbf{Dataset/Source} & \textbf{References (R/Python/Stata)} \\
+\midrule
+\endhead
+\midrule
+\multicolumn{4}{r}{\footnotesize\itshape (continued on next page)} \\
+\endfoot
+\bottomrule
+\endlastfoot
+%
+\texttt{ab\_grunfeld} & \texttt{ab} & \texttt{wooldridge::grunfeld} & R \\
+\texttt{ar\_book} & \texttt{arima} & \texttt{simulated\_ar1} & R, Python \\
+\texttt{ardl\_gdp} & \texttt{ardl} & \texttt{statsmodels::macrodata} & R, Python \\
+\texttt{arima\_book} & \texttt{arima} & \texttt{simulated\_rw} & R, Python \\
+\texttt{arima\_gdp} & \texttt{arima} & \texttt{statsmodels::macrodata} & R, Python \\
+\texttt{arma\_book} & \texttt{arima} & \texttt{simulated\_arma11} & R, Python \\
+\texttt{autoreg\_gdp} & \texttt{autoreg} & \texttt{statsmodels::macrodata} & R, Python \\
+\texttt{coint\_book} & \texttt{vecm} & \texttt{simulated\_cointegrated} & R, Python \\
+\texttt{cox\_heart} & \texttt{cox} & \texttt{statsmodels::heart} & R, Python \\
+\texttt{did\_kielmc} & \texttt{did} & \texttt{wooldridge::kielmc} & R, Python \\
+\texttt{ets\_gdp} & \texttt{ets} & \texttt{statsmodels::macrodata} & R, Python \\
+\texttt{garch\_book} & \texttt{garch} & \texttt{simulated\_garch11} & Python \\
+\texttt{garch\_nyse} & \texttt{garch} & \texttt{wooldridge::nyse} & R, Python \\
+\texttt{glsar\_hprice1} & \texttt{glsar} & \texttt{wooldridge::hprice1} & R, Python \\
+\texttt{gmm\_card} & \texttt{gmm} & \texttt{wooldridge::card} & R, Python \\
+\texttt{heckman\_mroz} & \texttt{heckman} & \texttt{wooldridge::mroz} & R, Python \\
+\texttt{iv\_card} & \texttt{iv} & \texttt{wooldridge::card} & R, Python \\
+\texttt{lasso\_hprice1} & \texttt{lasso} & \texttt{wooldridge::hprice1} & R, Python \\
+\texttt{logit\_mroz} & \texttt{logit} & \texttt{wooldridge::mroz} & R, Python \\
+\texttt{ma\_book} & \texttt{arima} & \texttt{simulated\_ma1} & R, Python \\
+\texttt{ologit\_beauty} & \texttt{logit} & \texttt{wooldridge::beauty} & R, Python \\
+\texttt{ols\_wooldridge\_wage1} & \texttt{ols} & \texttt{wooldridge::wage1} & R, Python \\
+\texttt{panel\_fe\_grunfeld} & \texttt{panel\_fe} & \texttt{wooldridge::grunfeld} & R, Python \\
+\texttt{poisson\_fertil2} & \texttt{poisson} & \texttt{wooldridge::fertil2} & R, Python \\
+\texttt{probit\_mroz} & \texttt{probit} & \texttt{wooldridge::mroz} & R, Python \\
+\texttt{psm\_jtrain3} & \texttt{psm} & \texttt{wooldridge::jtrain3} & R, Python \\
+\texttt{quantile\_wage1} & \texttt{qreg} & \texttt{wooldridge::wage1} & R, Python \\
+\texttt{re\_grunfeld} & \texttt{re} & \texttt{grunfeld} & R, Python \\
+\texttt{rdd\_book} & \texttt{rdd} & \texttt{rdd\_book} & R, Python \\
+\texttt{synth\_smoking} & \texttt{synth} & \texttt{synth\_smoking} & R, Python \\
+\texttt{tobit\_mroz} & \texttt{tobit} & \texttt{wooldridge::mroz} & R, Python \\
+\texttt{var\_book} & \texttt{var} & \texttt{simulated\_var1} & R, Python \\
+\texttt{var\_macro} & \texttt{var} & \texttt{statsmodels::macrodata} & R, Python \\
+\texttt{wls\_hprice1} & \texttt{wls} & \texttt{wooldridge::hprice1} & R, Python \\
+\end{longtable}}
