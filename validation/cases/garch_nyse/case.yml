@@ -1,7 +1,7 @@
 id: garch-nyse
 title: GARCH(1,1) on NYSE returns
 estimator_family: garch
-status: not-started
+status: active
 dimension: numerical
 
 dataset:

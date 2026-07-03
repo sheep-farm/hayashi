@@ -1,7 +1,7 @@
 id: ologit-beauty
 title: Ordered logit of beauty rating on Wooldridge beauty
 estimator_family: logit
-status: not-started
+status: active
 dimension: numerical
 
 dataset:

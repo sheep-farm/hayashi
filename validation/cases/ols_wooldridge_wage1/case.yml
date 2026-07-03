@@ -1,7 +1,7 @@
 id: ols-wooldridge-wage1
 title: OLS wage equation on Wooldridge wage1
 estimator_family: ols
-status: not-started
+status: active
 dimension: numerical
 
 dataset:

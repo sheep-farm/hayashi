@@ -1,7 +1,7 @@
 id: tobit-mroz
 title: Tobit hours-worked model on Wooldridge mroz
 estimator_family: tobit
-status: not-started
+status: active
 dimension: numerical
 
 dataset:

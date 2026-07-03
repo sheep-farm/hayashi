@@ -1,7 +1,7 @@
 id: did-kielmc
 title: Difference-in-differences on Kiel-McClain housing prices
 estimator_family: did
-status: not-started
+status: active
 dimension: numerical
 
 dataset:

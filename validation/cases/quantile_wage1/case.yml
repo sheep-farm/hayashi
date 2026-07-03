@@ -1,7 +1,7 @@
 id: quantile-wage1
 title: Quantile wage regression on Wooldridge wage1
 estimator_family: qreg
-status: not-started
+status: active
 dimension: numerical
 
 dataset:

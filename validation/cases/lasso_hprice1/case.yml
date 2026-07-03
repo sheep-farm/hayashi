@@ -1,7 +1,7 @@
 id: lasso-hprice1
 title: Lasso regression on Wooldridge hprice1
 estimator_family: lasso
-status: not-started
+status: active
 dimension: numerical
 
 dataset:
