@@ -3,6 +3,7 @@ use plotters::prelude::*;
 pub struct Plot;
 
 impl Plot {
+    #[allow(clippy::too_many_arguments)]
     pub fn scatter(
         x: &[f64],
         y: &[f64],
@@ -45,6 +46,7 @@ impl Plot {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn line(
         x: &[f64],
         y: &[f64],
@@ -139,6 +141,7 @@ impl Plot {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn coefplot(
         names: &[String],
         coefs: &[f64],

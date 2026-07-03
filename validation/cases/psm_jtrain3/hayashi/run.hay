@@ -1,0 +1,29 @@
+// 1:1 nearest-neighbor propensity score matching on Wooldridge jtrain3.
+// Outcome: re78; Treatment: train; Covariates: age, educ, black, hisp,
+// married, unem74, unem75, re74, re75.
+
+load "validation/cases/psm_jtrain3/data/jtrain3.csv" as df
+
+// Hayashi loads 0/1 columns as booleans and integer columns as int.
+// Convert all variables used by the estimator to float.
+replace df train = train * 1.0
+replace df age = age * 1.0
+replace df educ = educ * 1.0
+replace df black = black * 1.0
+replace df hisp = hisp * 1.0
+replace df married = married * 1.0
+replace df unem74 = unem74 * 1.0
+replace df unem75 = unem75 * 1.0
+replace df re74 = re74 * 1.0
+replace df re75 = re75 * 1.0
+replace df re78 = re78 * 1.0
+
+let m = psm(
+    re78 ~ train + age + educ + black + hisp + married + unem74 + unem75 + re74 + re75,
+    df,
+    k=1,
+    caliper=0.2,
+    boot=200
+)
+
+export(m, "txt", "/dev/stdout")

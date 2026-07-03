@@ -202,3 +202,10 @@ display m_garch
   com caudas muito pesadas (criptomoedas, câmbio em crises), a distribuição
   $t$ geralmente melhora o ajuste. Comparar AIC/BIC entre especificações.
 \end{nota}
+
+\section{Validação empírica}
+
+O DGP ARCH(1) deste capítulo corresponde ao caso de validação
+\texttt{garch_book} em \texttt{validation/cases/}. O caso compara os
+coeficientes MLE do \hayashi{} com a referência Python \texttt{arch}. Execute
+\lstinline{hay validate} para ver o estado atual.

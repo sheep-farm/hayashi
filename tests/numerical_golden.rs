@@ -89,14 +89,10 @@ fn parse_model_csv(csv: &str) -> HashMap<String, CoefRow> {
             CoefRow {
                 coef: fields[1]
                     .parse()
-                    .unwrap_or_else(|e| {
-                        panic!("invalid coefficient on line {}: {e}", line_no + 1)
-                    }),
-                std_err: fields[2]
-                    .parse()
-                    .unwrap_or_else(|e| {
-                        panic!("invalid standard error on line {}: {e}", line_no + 1)
-                    }),
+                    .unwrap_or_else(|e| panic!("invalid coefficient on line {}: {e}", line_no + 1)),
+                std_err: fields[2].parse().unwrap_or_else(|e| {
+                    panic!("invalid standard error on line {}: {e}", line_no + 1)
+                }),
             },
         );
     }

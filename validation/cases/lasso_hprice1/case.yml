@@ -1,0 +1,36 @@
+id: lasso-hprice1
+title: Lasso regression on Wooldridge hprice1
+estimator_family: lasso
+status: active
+dimension: numerical
+
+dataset:
+  name: wooldridge::hprice1
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 2e0
+    standard_errors: 2e0
+
+output_format: txt
+
+hayashi_script: cases/lasso_hprice1/hayashi/run.hay
+reference_scripts:
+  R: cases/lasso_hprice1/reference/run.R
+  Python: cases/lasso_hprice1/reference/run.py
+
+notes: Lasso regression of house price on lot size, square footage and bedrooms.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []

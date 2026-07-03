@@ -301,10 +301,12 @@ fn run() {
     let args: Vec<String> = std::env::args().collect();
 
     let verbose = args.iter().any(|a| a == "--verbose" || a == "-v");
+    let yes = args.iter().any(|a| a == "--yes" || a == "-y");
+
     let args_clean: Vec<&str> = args
         .iter()
         .map(String::as_str)
-        .filter(|a| *a != "--verbose" && *a != "-v")
+        .filter(|a| *a != "--verbose" && *a != "-v" && *a != "--yes" && *a != "-y")
         .collect();
 
     match args_clean.get(1).copied() {
@@ -332,10 +334,24 @@ fn run() {
         }
         Some("install") => {
             let pkg = args_clean.get(2).unwrap_or_else(|| {
-                eprintln!("Usage: hay install user/repo");
+                eprintln!("Usage: hay install user/repo [-y]");
                 std::process::exit(1);
             });
-            pkg_install(pkg);
+            pkg_install_internal(pkg, yes);
+            return;
+        }
+        Some("update") => {
+            let pkg_opt = args_clean.get(2).copied();
+            pkg_update(pkg_opt, yes);
+            return;
+        }
+        Some("check-plugin") => {
+            let pkg_opt = args_clean.get(2).copied();
+            pkg_check_plugin(pkg_opt);
+            return;
+        }
+        Some("validate") => {
+            run_validation();
             return;
         }
         Some("remove") | Some("uninstall") => {
@@ -356,7 +372,9 @@ fn run() {
         }
         Some(unknown) => {
             eprintln!("hay: unknown argument '{unknown}'");
-            eprintln!("Usage: hay [script.hay | - | install | remove | list]");
+            eprintln!(
+                "Usage: hay [script.hay | - | install | remove | list | update | check-plugin | validate]"
+            );
             std::process::exit(1);
         }
         None => {}
@@ -381,7 +399,80 @@ fn run_script(path: &str, verbose: bool) {
     }
 }
 
-fn brace_depth(s: &str) -> i32 {
+/// Runs the empirical validation programme by invoking `validation/run.py`.
+fn run_validation() {
+    // Prefer the validation directory relative to the current working directory
+    // (typical for development and CI), then fall back to the executable's
+    // directory (typical for a self-contained installation).
+    let (run_py, hay_dir) = std::env::current_dir()
+        .ok()
+        .map(|d| d.join("validation").join("run.py"))
+        .filter(|p| p.exists())
+        .map(|p| {
+            let base = p.parent().and_then(|p| p.parent()).map(|p| p.to_path_buf());
+            (p, base)
+        })
+        .or_else(|| {
+            let exe = std::env::current_exe().ok()?;
+            let bin_dir = exe.parent()?;
+            let candidate = bin_dir.join("validation").join("run.py");
+            if candidate.exists() {
+                let base = Some(bin_dir.to_path_buf());
+                Some((candidate, base))
+            } else {
+                None
+            }
+        })
+        .unwrap_or_else(|| {
+            eprintln!("hay: validation programme not found");
+            eprintln!(
+                "       Looked for ./validation/run.py and <hay-binary>/validation/run.py."
+            );
+            eprintln!(
+                "       Run this from a checkout/installation that includes the validation/ directory."
+            );
+            std::process::exit(1);
+        });
+
+    let python = if let Some(venv) = hay_dir.as_deref().and_then(|p| p.parent()).map(|p| {
+        p.join("validation")
+            .join(".venv")
+            .join("bin")
+            .join("python")
+    }) {
+        if venv.exists() {
+            venv
+        } else if std::process::Command::new("python")
+            .arg("--version")
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
+        {
+            std::path::PathBuf::from("python")
+        } else {
+            std::path::PathBuf::from("python3")
+        }
+    } else {
+        std::path::PathBuf::from("python3")
+    };
+
+    let mut cmd = std::process::Command::new(python);
+    cmd.arg(&run_py);
+    if let Some(dir) = hay_dir {
+        cmd.current_dir(dir);
+    }
+    let status = cmd
+        .status()
+        .expect("hay: failed to spawn validation runner");
+
+    std::process::exit(status.code().unwrap_or(1));
+}
+
+/// Calcula a profundidade de delimitadores abertos numa linha para o REPL.
+/// Conta {, [, ( como +1 e }, ], ) como -1, ignorando o interior de strings.
+fn open_depth(s: &str) -> i32 {
     let mut depth: i32 = 0;
     let mut in_string = false;
     let mut prev = '\0';
@@ -391,8 +482,8 @@ fn brace_depth(s: &str) -> i32 {
         }
         if !in_string {
             match c {
-                '{' => depth += 1,
-                '}' => depth -= 1,
+                '{' | '[' | '(' => depth += 1,
+                '}' | ']' | ')' => depth -= 1,
                 _ => {}
             }
         }
@@ -419,7 +510,8 @@ fn run_repl() {
 
     loop {
         *vars.borrow_mut() = interp.env.var_names();
-        let prompt = if depth > 0 { "      > " } else { "hay> " };
+        let is_continuation = depth > 0 || buf.trim_end().ends_with("|>");
+        let prompt = if is_continuation { "      > " } else { "hay> " };
         match rl.readline(prompt) {
             Ok(line) => {
                 let trimmed = line.trim();
@@ -454,20 +546,28 @@ fn run_repl() {
 
                 buf.push_str(trimmed);
                 buf.push('\n');
-                depth += brace_depth(trimmed);
+                // depth rastreia delimitadores não fechados: {}, [], ()
+                depth += open_depth(trimmed);
 
-                if depth <= 0 {
-                    depth = 0;
-                    let source = buf.trim().to_string();
-                    if !source.is_empty() {
-                        let _ = rl.add_history_entry(&source);
-                        match lang::run_source(&source, &mut interp) {
-                            Ok(()) => {}
-                            Err(e) => eprintln!("error: {e}"),
-                        }
-                    }
-                    buf.clear();
+                // Continua acumulando se:
+                // (a) há delimitadores abertos (depth > 0), OU
+                // (b) o buffer (sem espaços finais) termina com |>
+                let buf_trimmed = buf.trim_end();
+                let trailing_pipe = buf_trimmed.ends_with("|>");
+                if depth > 0 || trailing_pipe {
+                    continue;
                 }
+
+                depth = 0;
+                let source = buf.trim().to_string();
+                if !source.is_empty() {
+                    let _ = rl.add_history_entry(&source);
+                    match lang::run_source(&source, &mut interp) {
+                        Ok(()) => {}
+                        Err(e) => eprintln!("error: {e}"),
+                    }
+                }
+                buf.clear();
             }
             Err(ReadlineError::Interrupted) => {
                 if !buf.is_empty() {
@@ -514,9 +614,12 @@ fn print_help() {
     println!("    summarize  tabulate  ttest  correlate  list  describe");
     println!();
     println!("PACKAGES:");
-    println!("    hay install user/repo    Install from GitHub");
-    println!("    hay remove  name         Uninstall a package");
+    println!("    hay install user/repo    Install from GitHub (-y to bypass overwrite prompt)");
+    println!("    hay remove  user/repo    Uninstall a package");
     println!("    hay list                 List installed packages");
+    println!("    hay update [user/repo]   Update package(s) (-y to bypass prompt)");
+    println!("    hay check-plugin [name]  Check integrity/version with remote repository");
+    println!("    hay validate             Run the empirical validation programme (R/Python)");
     println!();
     println!("In REPL, type help() for full command list or help(cmd) for details.");
 }
@@ -526,7 +629,25 @@ fn packages_dir() -> std::path::PathBuf {
     std::path::Path::new(&home).join(".hay").join("packages")
 }
 
+fn is_pkg_installed(user: &str, repo: &str) -> Option<std::path::PathBuf> {
+    let dir = packages_dir().join(user).join(repo);
+    if dir.exists() && dir.is_dir() {
+        return Some(dir);
+    }
+    let ext = current_target_ext();
+    let file = packages_dir().join(user).join(format!("{repo}.{ext}"));
+    if file.exists() && file.is_file() {
+        return Some(file);
+    }
+    None
+}
+
+#[allow(dead_code)]
 fn pkg_install(spec: &str) {
+    pkg_install_internal(spec, false);
+}
+
+fn pkg_install_internal(spec: &str, force_overwrite: bool) {
     let (user, repo) = if let Some(pos) = spec.find('/') {
         (&spec[..pos], &spec[pos + 1..])
     } else {
@@ -534,13 +655,31 @@ fn pkg_install(spec: &str) {
         std::process::exit(1);
     };
 
-    let dest = packages_dir().join(user).join(repo);
-    if dest.exists() {
-        println!("{user}/{repo}: already installed at {}", dest.display());
-        println!("  use 'hay remove {user}/{repo}' first to reinstall");
-        return;
+    if !force_overwrite {
+        if let Some(installed_path) = is_pkg_installed(user, repo) {
+            print!(
+                "Package {}/{} is already installed at {}. Overwrite? (y/N): ",
+                user,
+                repo,
+                installed_path.display()
+            );
+            use std::io::Write;
+            let _ = std::io::stdout().flush();
+            let mut input = String::new();
+            if std::io::stdin().read_line(&mut input).is_ok() {
+                let trimmed = input.trim().to_lowercase();
+                if trimmed != "y" && trimmed != "yes" {
+                    println!("Installation cancelled.");
+                    return;
+                }
+            } else {
+                println!("Installation cancelled.");
+                return;
+            }
+        }
     }
 
+    let dest = packages_dir().join(user).join(repo);
     let api_url = format!("https://api.github.com/repos/{user}/{repo}/contents/");
     println!("Fetching {user}/{repo}...");
 
@@ -585,8 +724,77 @@ fn pkg_install(spec: &str) {
 
     let n_hy = files.iter().filter(|e| e.name.ends_with(".hay")).count();
     if n_hy == 0 {
-        eprintln!("hay install: no .hay files found in {user}/{repo}");
-        std::process::exit(1);
+        println!("No .hay scripts found. Checking for native/WASM releases...");
+        let release_url = format!("https://api.github.com/repos/{user}/{repo}/releases/latest");
+
+        let release_resp = match ureq::get(&release_url)
+            .set("User-Agent", "hay")
+            .set("Accept", "application/vnd.github.v3+json")
+            .call()
+        {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!(
+                    "hay install: no scripts or native releases found for {user}/{repo}: {e}"
+                );
+                std::process::exit(1);
+            }
+        };
+
+        let release_body: String = release_resp.into_string().unwrap_or_default();
+        let release: GhRelease = serde_json::from_str(&release_body).unwrap_or_else(|e| {
+            eprintln!("hay install: cannot parse release payload: {e}");
+            std::process::exit(1);
+        });
+
+        let target = current_target_triple();
+        let ext = current_target_ext();
+
+        let matching_asset = release
+            .assets
+            .iter()
+            .find(|asset| asset.name.contains(target) && asset.name.ends_with(ext));
+
+        if let Some(asset) = matching_asset {
+            println!("Found binary release for {target}: {}", asset.name);
+            let parent_dir = packages_dir().join(user);
+            std::fs::create_dir_all(&parent_dir).unwrap();
+            let dest_file = parent_dir.join(format!("{repo}.{ext}"));
+
+            print!("Downloading {} ... ", asset.name);
+            match ureq::get(&asset.browser_download_url).call() {
+                Ok(resp) => {
+                    let mut reader = resp.into_reader();
+                    let mut out_file = std::fs::File::create(&dest_file).unwrap();
+                    if std::io::copy(&mut reader, &mut out_file).is_ok() {
+                        println!("ok");
+
+                        let meta = PkgMetadata {
+                            user: user.to_string(),
+                            repo: repo.to_string(),
+                            version: release.tag_name.clone(),
+                            installed_at: chrono::Utc::now().to_rfc3339(),
+                            pkg_type: "native".to_string(),
+                        };
+                        write_pkg_metadata(&meta);
+
+                        println!(
+                            "Successfully installed native plugin {user}/{repo} at {}",
+                            dest_file.display()
+                        );
+                        println!("  use: import(\"{user}/{repo}\")");
+                        return;
+                    } else {
+                        println!("write error");
+                    }
+                }
+                Err(e) => println!("download error: {e}"),
+            }
+        } else {
+            eprintln!("hay install: no compatible release asset found for {target}");
+            std::process::exit(1);
+        }
+        return;
     }
 
     std::fs::create_dir_all(&dest).unwrap_or_else(|e| {
@@ -613,6 +821,31 @@ fn pkg_install(spec: &str) {
         }
     }
 
+    let commit_url = format!("https://api.github.com/repos/{user}/{repo}/commits");
+    let mut version = "unknown".to_string();
+    if let Ok(c_resp) = ureq::get(&commit_url)
+        .set("User-Agent", "hay")
+        .set("Accept", "application/vnd.github.v3+json")
+        .call()
+    {
+        if let Ok(c_body) = c_resp.into_string() {
+            if let Ok(commits) = serde_json::from_str::<Vec<GhCommitInfo>>(&c_body) {
+                if let Some(first) = commits.first() {
+                    version = first.sha.clone();
+                }
+            }
+        }
+    }
+
+    let meta = PkgMetadata {
+        user: user.to_string(),
+        repo: repo.to_string(),
+        version,
+        installed_at: chrono::Utc::now().to_rfc3339(),
+        pkg_type: "script".to_string(),
+    };
+    write_pkg_metadata(&meta);
+
     println!(
         "Installed {user}/{repo}: {installed} file(s) → {}",
         dest.display()
@@ -621,27 +854,393 @@ fn pkg_install(spec: &str) {
 }
 
 fn pkg_remove(spec: &str) {
-    let dest = if let Some(pos) = spec.find('/') {
-        packages_dir().join(&spec[..pos]).join(&spec[pos + 1..])
+    let (user, repo) = if let Some(pos) = spec.find('/') {
+        (&spec[..pos], &spec[pos + 1..])
     } else {
-        packages_dir().join(spec)
+        eprintln!("hay remove: expected 'user/repo', got '{spec}'");
+        std::process::exit(1);
     };
-    if !dest.exists() {
+
+    let dir = packages_dir().join(user).join(repo);
+    let ext = current_target_ext();
+    let file = packages_dir().join(user).join(format!("{repo}.{ext}"));
+    let meta_file = pkg_metadata_path(user, repo);
+
+    let mut removed = false;
+
+    if dir.exists() && dir.is_dir() {
+        std::fs::remove_dir_all(&dir).unwrap_or_else(|e| {
+            eprintln!("hay remove: cannot remove {}: {e}", dir.display());
+            std::process::exit(1);
+        });
+        removed = true;
+    }
+
+    if file.exists() && file.is_file() {
+        std::fs::remove_file(&file).unwrap_or_else(|e| {
+            eprintln!("hay remove: cannot remove {}: {e}", file.display());
+            std::process::exit(1);
+        });
+        removed = true;
+    }
+
+    if meta_file.exists() {
+        let _ = std::fs::remove_file(&meta_file);
+    }
+
+    if !removed {
         eprintln!("hay remove: package '{spec}' not installed");
         std::process::exit(1);
     }
-    std::fs::remove_dir_all(&dest).unwrap_or_else(|e| {
-        eprintln!("hay remove: cannot remove {}: {e}", dest.display());
-        std::process::exit(1);
-    });
-    // remove empty user dir
-    if let Some(parent) = dest.parent() {
-        let _ = std::fs::remove_dir(parent);
+
+    let user_dir = packages_dir().join(user);
+    if user_dir.exists() {
+        let _ = std::fs::remove_dir(&user_dir);
     }
+
     println!("Removed {spec}");
 }
 
+fn migrate_legacy_packages() {
+    let dir = packages_dir();
+    if !dir.is_dir() {
+        return;
+    }
+    if let Ok(users) = std::fs::read_dir(&dir) {
+        for user_entry in users.filter_map(|e| e.ok()) {
+            if user_entry.path().is_dir() {
+                let user = user_entry.file_name().to_string_lossy().to_string();
+                if let Ok(repos) = std::fs::read_dir(user_entry.path()) {
+                    for repo_entry in repos.filter_map(|e| e.ok()) {
+                        let path = repo_entry.path();
+                        let repo_name = repo_entry.file_name().to_string_lossy().to_string();
+
+                        if path.is_dir() {
+                            let metadata_file = pkg_metadata_path(&user, &repo_name);
+                            if !metadata_file.exists() {
+                                let meta = PkgMetadata {
+                                    user: user.clone(),
+                                    repo: repo_name,
+                                    version: "unknown".to_string(),
+                                    installed_at: "unknown".to_string(),
+                                    pkg_type: "script".to_string(),
+                                };
+                                write_pkg_metadata(&meta);
+                            }
+                        } else if path.is_file() {
+                            let ext = path
+                                .extension()
+                                .and_then(|x| x.to_str())
+                                .unwrap_or("")
+                                .to_lowercase();
+                            if matches!(ext.as_str(), "so" | "dll" | "dylib" | "wasm") {
+                                let clean_name =
+                                    repo_name.trim_end_matches(&format!(".{ext}")).to_string();
+                                let metadata_file = pkg_metadata_path(&user, &clean_name);
+                                if !metadata_file.exists() {
+                                    let meta = PkgMetadata {
+                                        user: user.clone(),
+                                        repo: clean_name,
+                                        version: "unknown".to_string(),
+                                        installed_at: "unknown".to_string(),
+                                        pkg_type: "native".to_string(),
+                                    };
+                                    write_pkg_metadata(&meta);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn get_installed_packages() -> Vec<PkgMetadata> {
+    let mut pkgs = Vec::new();
+    let dir = packages_dir();
+    if !dir.is_dir() {
+        return pkgs;
+    }
+    if let Ok(users) = std::fs::read_dir(&dir) {
+        for user_entry in users.filter_map(|e| e.ok()) {
+            if user_entry.path().is_dir() {
+                if let Ok(repos) = std::fs::read_dir(user_entry.path()) {
+                    for repo_entry in repos.filter_map(|e| e.ok()) {
+                        let path = repo_entry.path();
+                        if path.is_file() {
+                            let name = repo_entry.file_name().to_string_lossy().to_string();
+                            if name.ends_with(".metadata.json") {
+                                if let Ok(content) = std::fs::read_to_string(&path) {
+                                    if let Ok(meta) = serde_json::from_str::<PkgMetadata>(&content)
+                                    {
+                                        pkgs.push(meta);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    pkgs
+}
+
+fn check_pkg_integrity(meta: &PkgMetadata) -> Result<(String, bool), String> {
+    if meta.pkg_type == "native" {
+        let release_url = format!(
+            "https://api.github.com/repos/{}/{}/releases/latest",
+            meta.user, meta.repo
+        );
+        let resp = ureq::get(&release_url)
+            .set("User-Agent", "hay")
+            .set("Accept", "application/vnd.github.v3+json")
+            .call()
+            .map_err(|e| e.to_string())?;
+
+        let body: String = resp.into_string().map_err(|e| e.to_string())?;
+        let release: GhRelease = serde_json::from_str(&body).map_err(|e| e.to_string())?;
+
+        let up_to_date = meta.version == release.tag_name;
+        Ok((release.tag_name, up_to_date))
+    } else {
+        let commit_url = format!(
+            "https://api.github.com/repos/{}/{}/commits",
+            meta.user, meta.repo
+        );
+        let resp = ureq::get(&commit_url)
+            .set("User-Agent", "hay")
+            .set("Accept", "application/vnd.github.v3+json")
+            .call()
+            .map_err(|e| e.to_string())?;
+
+        let body: String = resp.into_string().map_err(|e| e.to_string())?;
+        let commits: Vec<GhCommitInfo> = serde_json::from_str(&body).map_err(|e| e.to_string())?;
+
+        if let Some(first) = commits.first() {
+            let up_to_date = meta.version == first.sha;
+            Ok((first.sha.clone(), up_to_date))
+        } else {
+            Err("No commits found in remote repository".to_string())
+        }
+    }
+}
+
+fn pkg_check_plugin(spec_opt: Option<&str>) {
+    migrate_legacy_packages();
+
+    if let Some(spec) = spec_opt {
+        let (user, repo) = if let Some(pos) = spec.find('/') {
+            (&spec[..pos], &spec[pos + 1..])
+        } else {
+            eprintln!("hay check-plugin: expected 'user/repo', got '{spec}'");
+            std::process::exit(1);
+        };
+
+        match read_pkg_metadata(user, repo) {
+            Some(meta) => {
+                println!("Checking {}/{} ...", user, repo);
+                match check_pkg_integrity(&meta) {
+                    Ok((remote_ver, up_to_date)) => {
+                        if up_to_date {
+                            println!(
+                                "  {}/{} is UP TO DATE (version {})",
+                                user, repo, meta.version
+                            );
+                        } else {
+                            println!(
+                                "  {}/{} has updates available (local: {}, remote: {})",
+                                user, repo, meta.version, remote_ver
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        println!("  {}/{} check failed: {}", user, repo, e);
+                    }
+                }
+            }
+            None => {
+                eprintln!("hay check-plugin: package '{spec}' not installed");
+                std::process::exit(1);
+            }
+        }
+    } else {
+        let pkgs = get_installed_packages();
+        if pkgs.is_empty() {
+            println!("No packages installed.");
+            return;
+        }
+
+        println!("Checking installed packages:");
+        for meta in pkgs {
+            println!("Checking {}/{} ...", meta.user, meta.repo);
+            match check_pkg_integrity(&meta) {
+                Ok((remote_ver, up_to_date)) => {
+                    if up_to_date {
+                        println!(
+                            "  {}/{} is UP TO DATE (version {})",
+                            meta.user, meta.repo, meta.version
+                        );
+                    } else {
+                        println!(
+                            "  {}/{} has updates available (local: {}, remote: {})",
+                            meta.user, meta.repo, meta.version, remote_ver
+                        );
+                    }
+                }
+                Err(e) => {
+                    println!("  {}/{} check failed: {}", meta.user, meta.repo, e);
+                }
+            }
+        }
+    }
+}
+
+fn pkg_update(spec_opt: Option<&str>, auto_confirm: bool) {
+    migrate_legacy_packages();
+
+    if let Some(spec) = spec_opt {
+        let (user, repo) = if let Some(pos) = spec.find('/') {
+            (&spec[..pos], &spec[pos + 1..])
+        } else {
+            eprintln!("hay update: expected 'user/repo', got '{spec}'");
+            std::process::exit(1);
+        };
+
+        let meta = match read_pkg_metadata(user, repo) {
+            Some(m) => m,
+            None => {
+                eprintln!("hay update: package '{spec}' not installed");
+                std::process::exit(1);
+            }
+        };
+
+        println!("Checking updates for {}/{} ...", user, repo);
+        match check_pkg_integrity(&meta) {
+            Ok((remote_ver, up_to_date)) => {
+                if up_to_date {
+                    println!(
+                        "Package {}/{} is already up to date (version {}).",
+                        user, repo, meta.version
+                    );
+                    return;
+                }
+
+                let confirm = if auto_confirm {
+                    true
+                } else {
+                    print!(
+                        "Update package {}/{} to {}? (y/N): ",
+                        user, repo, remote_ver
+                    );
+                    use std::io::Write;
+                    let _ = std::io::stdout().flush();
+                    let mut input = String::new();
+                    if std::io::stdin().read_line(&mut input).is_ok() {
+                        let trimmed = input.trim().to_lowercase();
+                        trimmed == "y" || trimmed == "yes"
+                    } else {
+                        false
+                    }
+                };
+
+                if confirm {
+                    pkg_install_internal(spec, true);
+                } else {
+                    println!("Update cancelled.");
+                }
+            }
+            Err(e) => {
+                println!("Check failed for {}/{}: {}", user, repo, e);
+                let confirm = if auto_confirm {
+                    true
+                } else {
+                    print!("Attempt update for {}/{} anyway? (y/N): ", user, repo);
+                    use std::io::Write;
+                    let _ = std::io::stdout().flush();
+                    let mut input = String::new();
+                    if std::io::stdin().read_line(&mut input).is_ok() {
+                        let trimmed = input.trim().to_lowercase();
+                        trimmed == "y" || trimmed == "yes"
+                    } else {
+                        false
+                    }
+                };
+                if confirm {
+                    pkg_install_internal(spec, true);
+                } else {
+                    println!("Update cancelled.");
+                }
+            }
+        }
+    } else {
+        let pkgs = get_installed_packages();
+        if pkgs.is_empty() {
+            println!("No packages installed.");
+            return;
+        }
+
+        println!("Checking all packages for updates vistas...");
+        for meta in pkgs {
+            println!("Checking {}/{} ...", meta.user, meta.repo);
+            match check_pkg_integrity(&meta) {
+                Ok((remote_ver, up_to_date)) => {
+                    if up_to_date {
+                        println!("  {}/{} is up to date.", meta.user, meta.repo);
+                    } else {
+                        let confirm = if auto_confirm {
+                            true
+                        } else {
+                            print!(
+                                "  Update package {}/{} to {}? (y/N): ",
+                                meta.user, meta.repo, remote_ver
+                            );
+                            use std::io::Write;
+                            let _ = std::io::stdout().flush();
+                            let mut input = String::new();
+                            if std::io::stdin().read_line(&mut input).is_ok() {
+                                let trimmed = input.trim().to_lowercase();
+                                trimmed == "y" || trimmed == "yes"
+                            } else {
+                                false
+                            }
+                        };
+                        if confirm {
+                            pkg_install_internal(&format!("{}/{}", meta.user, meta.repo), true);
+                        }
+                    }
+                }
+                Err(e) => {
+                    println!("  {}/{} check failed: {}", meta.user, meta.repo, e);
+                    let confirm = if auto_confirm {
+                        true
+                    } else {
+                        print!(
+                            "  Attempt update for {}/{} anyway? (y/N): ",
+                            meta.user, meta.repo
+                        );
+                        use std::io::Write;
+                        let _ = std::io::stdout().flush();
+                        let mut input = String::new();
+                        if std::io::stdin().read_line(&mut input).is_ok() {
+                            let trimmed = input.trim().to_lowercase();
+                            trimmed == "y" || trimmed == "yes"
+                        } else {
+                            false
+                        }
+                    };
+                    if confirm {
+                        pkg_install_internal(&format!("{}/{}", meta.user, meta.repo), true);
+                    }
+                }
+            }
+        }
+    }
+}
+
 fn pkg_list() {
+    migrate_legacy_packages();
     let dir = packages_dir();
     if !dir.is_dir() {
         println!("No packages installed.");
@@ -660,38 +1259,106 @@ fn pkg_list() {
     for user_entry in &users {
         let user = user_entry.file_name();
         let mut repos: Vec<_> = std::fs::read_dir(user_entry.path())
-            .map(|rd| {
-                rd.filter_map(|e| e.ok())
-                    .filter(|e| e.path().is_dir())
-                    .collect()
-            })
+            .map(|rd| rd.filter_map(|e| e.ok()).collect())
             .unwrap_or_default();
         repos.sort_by_key(|e: &std::fs::DirEntry| e.file_name());
 
         for repo_entry in &repos {
-            if !found {
-                println!("Installed packages (~/.hay/packages/):\n");
-                found = true;
-            }
+            let path = repo_entry.path();
             let repo = repo_entry.file_name();
-            let n_hy = std::fs::read_dir(repo_entry.path())
-                .map(|rd| {
-                    rd.filter_map(|e| e.ok())
-                        .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("hy"))
-                        .count()
-                })
-                .unwrap_or(0);
-            println!(
-                "  {}/{}  ({} file{})",
-                user.to_string_lossy(),
-                repo.to_string_lossy(),
-                n_hy,
-                if n_hy == 1 { "" } else { "s" }
-            );
+
+            if path.is_dir() {
+                let n_hy = std::fs::read_dir(&path)
+                    .map(|rd| {
+                        rd.filter_map(|e| e.ok())
+                            .filter(|e| {
+                                let ext = e
+                                    .path()
+                                    .extension()
+                                    .and_then(|x| x.to_str())
+                                    .unwrap_or("")
+                                    .to_lowercase();
+                                ext == "hay" || ext == "hy"
+                            })
+                            .count()
+                    })
+                    .unwrap_or(0);
+
+                if n_hy > 0 {
+                    if !found {
+                        println!("Installed packages (~/.hay/packages/):\n");
+                        found = true;
+                    }
+                    println!(
+                        "  {}/{}  ({} script file{})",
+                        user.to_string_lossy(),
+                        repo.to_string_lossy(),
+                        n_hy,
+                        if n_hy == 1 { "" } else { "s" }
+                    );
+                }
+            } else if path.is_file() {
+                let ext = path
+                    .extension()
+                    .and_then(|x| x.to_str())
+                    .unwrap_or("")
+                    .to_lowercase();
+                if matches!(ext.as_str(), "so" | "dll" | "dylib" | "wasm") {
+                    if !found {
+                        println!("Installed packages (~/.hay/packages/):\n");
+                        found = true;
+                    }
+                    let clean_name = repo
+                        .to_string_lossy()
+                        .trim_end_matches(&format!(".{ext}"))
+                        .to_string();
+                    println!(
+                        "  {}/{}  (native {} plugin)",
+                        user.to_string_lossy(),
+                        clean_name,
+                        ext
+                    );
+                }
+            }
         }
     }
     if !found {
         println!("No packages installed.");
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+struct PkgMetadata {
+    user: String,
+    repo: String,
+    version: String,
+    installed_at: String,
+    pkg_type: String, // "native" or "script"
+}
+
+fn pkg_metadata_path(user: &str, repo: &str) -> std::path::PathBuf {
+    packages_dir()
+        .join(user)
+        .join(format!("{repo}.metadata.json"))
+}
+
+fn read_pkg_metadata(user: &str, repo: &str) -> Option<PkgMetadata> {
+    let path = pkg_metadata_path(user, repo);
+    if path.exists() {
+        if let Ok(content) = std::fs::read_to_string(path) {
+            return serde_json::from_str(&content).ok();
+        }
+    }
+    None
+}
+
+fn write_pkg_metadata(meta: &PkgMetadata) {
+    let path = pkg_metadata_path(&meta.user, &meta.repo);
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    if let Ok(content) = serde_json::to_string_pretty(meta) {
+        let _ = std::fs::write(path, content);
     }
 }
 
@@ -700,4 +1367,43 @@ struct GhEntry {
     name: String,
     r#type: String,
     download_url: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct GhRelease {
+    tag_name: String,
+    assets: Vec<GhAsset>,
+}
+
+#[derive(serde::Deserialize)]
+struct GhAsset {
+    name: String,
+    browser_download_url: String,
+}
+
+#[derive(serde::Deserialize)]
+struct GhCommitInfo {
+    sha: String,
+}
+
+fn current_target_triple() -> &'static str {
+    match (std::env::consts::OS, std::env::consts::ARCH) {
+        ("linux", "x86_64") => "x86_64-unknown-linux-gnu",
+        ("macos", "aarch64") => "aarch64-apple-darwin",
+        ("macos", "x86_64") => "x86_64-apple-darwin",
+        ("windows", "x86_64") => "x86_64-pc-windows-msvc",
+        (os, arch) => {
+            eprintln!("Unsupported target platform: {os}-{arch}");
+            std::process::exit(1);
+        }
+    }
+}
+
+fn current_target_ext() -> &'static str {
+    match std::env::consts::OS {
+        "linux" => "so",
+        "macos" => "dylib",
+        "windows" => "dll",
+        _ => "so",
+    }
 }

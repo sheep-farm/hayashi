@@ -148,3 +148,10 @@ heckman(y ~ x1 + x2, s ~ z1 + z2, df)            // two steps
   Without exclusion, the model is identified only by functional non-linearity —
   unstable estimates.
 \end{aviso}
+
+\section{Empirical validation}
+
+The \texttt{mroz} dataset is used in the \texttt{heckman_mroz} validation case
+in \texttt{validation/cases/}. The case estimates the Heckman two-step
+selection model in \hayashi{} and compares it with Heckit implementations in
+R and Python. Run \lstinline{hay validate} to see the current status.

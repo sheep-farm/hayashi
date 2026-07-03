@@ -1,0 +1,36 @@
+id: tobit-mroz
+title: Tobit hours-worked model on Wooldridge mroz
+estimator_family: tobit
+status: active
+dimension: numerical
+
+dataset:
+  name: wooldridge::mroz
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 2e-0
+    standard_errors: 1e-0
+
+output_format: txt
+
+hayashi_script: cases/tobit_mroz/hayashi/run.hay
+reference_scripts:
+  R: cases/tobit_mroz/reference/run.R
+  Python: cases/tobit_mroz/reference/run.py
+
+notes: Tobit regression of hours worked with left censoring at zero.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []

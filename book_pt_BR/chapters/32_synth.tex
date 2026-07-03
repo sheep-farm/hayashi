@@ -240,3 +240,11 @@ display m
   O \hayashi{} exibe a razão pós/pré como heurística descritiva; testes de
   placebo são implementados manualmente via loop sobre as unidades.
 \end{nota}
+
+\section{Validação empírica}
+
+O caso de validação \texttt{synth_smoking} em \texttt{validation/cases/}
+estima um controle sintético sobre um painel simulado (10 doadores, 1 unidade
+ tratada, 20 períodos). O caso compara o efeito pós-tratamento médio do
+\hayashi{} com uma implementação de referência em Python. Execute
+\lstinline{hay validate} para ver o estado atual.

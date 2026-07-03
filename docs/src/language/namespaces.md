@@ -4,6 +4,8 @@
 
 `import("module")` loads a `.hay` file once per session. Exported names are namespaced automatically.
 
+Imported modules are executable Hayashi code. Import only files, packages, and URLs you trust; see the [Trust Model](../trust-model.md#packages-and-imports).
+
 ```
 import("finance")
 let m = finance::fmb(ret ~ beta + size, df, time=month)
@@ -35,8 +37,8 @@ import("utils", only=["clean", "winsorize"])
 When you call `import("module")`, Hayashi searches:
 
 1. Current directory (`./module.hay`)
-2. `~/.hayashi/plugins/`
-3. Installed packages (`~/.hayashi/packages/`)
+2. `~/.hay/plugins/`
+3. Installed packages (`~/.hay/packages/`)
 4. Directories registered with `plugin_path()`
 5. `$HAYASHI_PATH` environment variable
 
@@ -44,14 +46,16 @@ When you call `import("module")`, Hayashi searches:
 
 ### Auto-load
 
-All `.hay` files in `~/.hayashi/plugins/` are loaded automatically at startup. Place utility functions there to make them available in every session.
+All `.hay` files in `~/.hay/plugins/` are loaded automatically at startup. Place utility functions there to make them available in every session.
 
 ### Installing packages
 
 ```bash
-hay install user/repo     # download .hay files from GitHub
-hay remove  name          # uninstall
-hay list                  # show installed packages
+hay install user/repo        # download script/plugin from GitHub (-y to bypass overwrite prompt)
+hay remove  user/repo        # uninstall package (deletes script dirs, native files, and metadata)
+hay list                     # show installed packages and plugins
+hay check-plugin [user/repo] # check integrity/version with remote repository
+hay update [user/repo] [-y]  # update package(s) to latest version (-y to bypass prompt)
 ```
 
 After installing:
@@ -89,3 +93,5 @@ import("finance")         // runs once, names go into finance::
 import("https://example.com/utils.hay")
 utils::clean(df)
 ```
+
+Remote modules execute after download. Review the source before importing code into sessions that handle confidential data, credentials, production databases, or published analyses.

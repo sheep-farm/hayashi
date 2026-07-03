@@ -1,0 +1,8 @@
+// Load the Wooldridge mroz dataset from CSV.
+load "validation/cases/logit_mroz/data/mroz.csv" as df
+
+// Labour-force participation logit.
+let m = logit(inlf ~ nwifeinc + educ + exper + age + kidslt6 + kidsge6, df)
+
+// Export coefficient table for automated comparison.
+export(m, "txt", "/dev/stdout")

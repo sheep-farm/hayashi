@@ -1,0 +1,32 @@
+id: arma-book
+title: ARMA(1,1) on simulated data from the Hayashi book
+estimator_family: arima
+status: active
+dimension: numerical
+
+dataset:
+  name: simulated_arma11
+  source: DGP from book_pt_BR/codes/26_arma.hay
+  size: 500 observations
+
+references:
+  - R
+  - Python
+
+reference_scripts:
+  R: cases/arma_book/reference/run.R
+  Python: cases/arma_book/reference/run.py
+
+hayashi_script: cases/arma_book/hayashi/run.hay
+
+output_format: txt
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-3
+    standard_errors: 1e-2
+
+notes: Uses the same simulated ARMA(1,1) DGP as Chapter 26 of the book. Reference replicates Hayashi's default Hannan-Rissanen two-step estimator.

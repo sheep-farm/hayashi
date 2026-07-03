@@ -4,3 +4,11 @@ ROADMAP_INTERNAL.md
 docs/book
 .planning/
 .standards/
+.agents/
+compile_books.sh
+validation/.venv
+validation/cases/**/data/
+validation/cases/**/hayashi/output.csv
+validation/cases/**/reference/expected.*
+
+

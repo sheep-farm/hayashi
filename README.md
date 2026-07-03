@@ -2,7 +2,7 @@
 
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-2021-orange.svg)](https://www.rust-lang.org)
-[![Version](https://img.shields.io/badge/version-0.2.5-blue.svg)](Cargo.toml)
+[![Version](https://img.shields.io/badge/version-0.2.6-blue.svg)](Cargo.toml)
 [![crates.io](https://img.shields.io/crates/v/hayashi-lang.svg)](https://crates.io/crates/hayashi-lang)
 [![CI](https://github.com/sheep-farm/hayashi/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/sheep-farm/hayashi/actions/workflows/ci.yml?query=branch%3Amaster)
 
@@ -132,7 +132,7 @@ let big = filter(list, |x| x > 10)
 | Comparison | `==` `!=` `>` `<` `>=` `<=` |
 | Logical | `&&` (or `&`) `\|\|` `!` |
 | Membership | `in` — works with list, dict (key), string (substring) |
-| Pipe | `\|>` — passes left side as first argument to right side |
+| Pipe | `\|>` — passes left side as first argument (or replacing `_` placeholder) |
 | Index | `list[i]` `dict["key"]` |
 | String | `+` for concatenation |
 
@@ -162,6 +162,7 @@ F-strings support any expression inside `{}` and format specifiers: `.Nf` (decim
 
 value |> |x| x * 3           // pipe with inline closure
 exper |> dobro                // pipe with user function
+df |> ols(lw ~ yos, _)        // pipe using '_' as placeholder for specific argument positions
 ```
 
 ## Data I/O
@@ -190,6 +191,8 @@ export(df, "sqlite", "out.db")
 export(m, "latex", "table.tex")
 export(m, "html", "table.html")
 ```
+
+`query=` is raw SQL executed by SQLite or the configured ODBC database. Remote `load` downloads untrusted input even with URL validation and size/time limits. ODBC support is optional and requires system ODBC drivers. See the [Trust Model](docs/src/trust-model.md).
 
 ## Estimators
 
@@ -232,6 +235,15 @@ predict df e = m, "residuals"    // residuals
 bootstrap(ols, Y ~ X, df, n=1000)
 influence(m)                 // DFFITS, Cook's D, leverage
 vif(m)                       // variance inflation factors
+
+// Store and compare models
+eststo(m1)
+eststo(m2)
+esttab()                     // model comparison table
+estclear()                   // clear stored models
+
+// Joint F-test
+ testparm(m, ["X1", "X2"])  // H0: selected coefficients = 0
 ```
 
 ## Data manipulation
@@ -268,12 +280,19 @@ pivot_wider(df, i=id, j=year, values=gdp)
 replace df Y = 0 if X > 10
 merge(df1, df2, key=id, type=left)
 append(df1, df2)
+encode(df, region)               // string -> numeric
+decode(df, region_num, labels=["north", "south", "east", "west"])
 winsor(df, Y, p=0.01)
 dropna(df, price, mpg)
 rename(df, old, new)
 label(df, Y, "GDP per capita")
 duplicates(df, id, action=drop)
+drop_collinear(df)               // remove perfectly collinear columns
 preserve(df) / restore(df)
+
+// Time-series declaration (required for L.x, F.x, D.x operators)
+tsset df year
+xtset(df, firm, year)            // panel structure
 ```
 
 ## Date/time
@@ -317,11 +336,31 @@ ci(df, Y, level=0.99)
 centile(df, Y, percentiles=[10, 50, 90])
 describe(df)
 
+// Panel summary
+xtsum(df, wage, hours, id=firm)       // within/between decomposition
+
 // Normality tests
 swilk(df, Y)                         // Shapiro-Wilk
 sfrancia(df, Y)                      // Shapiro-Francia
 sktest(df, Y)                        // Skewness/Kurtosis (JB + D'Agostino)
 ```
+
+## Validation programme
+
+Hayashi includes a reproducible, automated empirical validation programme in
+`validation/`. It compares Hayashi output against reference implementations
+(R and Python/statsmodels) on real datasets and on simulated DGPs taken from
+the Hayashi book chapters:
+
+```bash
+python -m venv validation/.venv
+validation/.venv/bin/pip install -r validation/requirements.txt
+Rscript -e 'install.packages(c("wooldridge", "jsonlite"))'
+hay validate
+```
+
+See `validation/README.md` for the full protocol and `validation/MATRIX.md` for
+the current status of every case.
 
 ## Graphs
 
@@ -369,8 +408,20 @@ display d["name"]
 keys(d)  values(d)  has_key(d, "name")
 dict_set(d, "city", "SP")  dict_remove(d, "age")  dict_merge(d1, d2)
 
+// Build DataFrame from dict of lists
+let df = dataframe({"x": [1, 2, 3], "y": [4, 5, 6]})
+
+// Type predicates
+is_int(42)       // true
+is_str("hello")  // true
+is_df(df)        // true
+
 // Type conversions
 int(3.9)  float(42)  str(true)  bool(0)  type(x)
+
+// Median
+median([1, 3, 2])
+median(df, price)
 ```
 
 ## Control flow
@@ -444,11 +495,15 @@ let msg = f"mean = {mu:.2f}, n = {n}, p = {p:.4e}"
 
 // Pipe operator (|>)
 [5, 3, 1, 4, 2] |> sort |> reverse |> map(|x| x * 10)
+df |> ols(lw ~ yos, _)             // passes df to the '_' placeholder position
 
 // In operator (membership test)
 if 3 in [1, 2, 3] { ... }
 if "key" in dict { ... }
 if "lo" in "hello" { ... }
+
+// Substring / membership
+contains("hello", "ell")         // true
 
 // Regex
 regexm(s, "[0-9]+")              // match → bool
@@ -504,7 +559,7 @@ assert(n > 0, "empty data")
 timer(ols(Y ~ X, df))         // time execution
 set_seed(42)                   // reproducibility
 source("other_script.hay")     // run another script
-help(ols)                      // help() has ~115 topics with examples
+help(ols)                      // help() has ~210 topics with examples
 help(about)                    // project info (version, license, author)
 print("x =", x, "y =", y)    // multi-arg with sep= and end=
 print("a", "b", sep=", ")     // a, b
@@ -513,18 +568,32 @@ print("a", "b", sep=", ")     // a, b
 ## Extensibility
 
 ```
-// Script plugins — auto-loaded from ~/.hayashi/plugins/
+// Native & Script plugins — installed to ~/.hay/packages/
 import("finance")                    // finance::sharpe(), finance::sortino()
 import("finance", as=fin)            // fin::sharpe()
 
-// Install from GitHub
-// $ hay install user/repo
+// Install script or native plugin from GitHub (-y to bypass overwrite prompt)
+// $ hay install user/repo [-y]
+
+// Uninstall a package (successfully deletes native plugin files, dirs, and metadata)
+// $ hay remove user/repo
+
+// List installed packages
+// $ hay list
+
+// Check integrity/version of installed packages with remote GitHub repository
+// $ hay check-plugin [user/repo]
+
+// Update one or all packages to their latest versions (-y to bypass prompt)
+// $ hay update [user/repo] [-y]
 
 // Plugin search paths
 plugin_path("/shared/plugins", "/team/lib")
 ```
 
-Native Rust plugins (`.so`/`.dll`) are planned, enabling third parties to ship optimized estimators and data connectors via Hayashi's namespace system — the same extensibility model as R and Python, with Rust performance.
+Packages, imports, and auto-loaded plugins execute Hayashi/native code in your session. Install and import only code you trust; see the [Trust Model](docs/src/trust-model.md).
+
+Native plugins (`.so`/`.dll`/`.dylib` / `.wasm`) are fully supported, enabling third parties to ship optimized estimators, spatial packages, and data connectors via Hayashi's namespace system (using the `hayashi-plugin-sdk`). Closed-source proprietary plugins are legally permitted through Hayashi's GPL-3.0 Linking Exception.
 
 ## Build & test
 
@@ -564,4 +633,7 @@ Flávio de Vasconcellos Corrêa — [@sheep-farm](https://github.com/sheep-farm)
 
 ## License
 
-GPL-3.0 — see [LICENSE](LICENSE).
+GPL-3.0 with **Plugin Exception** — see [LICENSE](LICENSE).
+
+This exception explicitly allows linking and loading proprietary/closed-source plugins developed using `hayashi-plugin-sdk` into Hayashi without triggering copyleft requirements.
+

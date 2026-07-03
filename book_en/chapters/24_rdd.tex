@@ -208,3 +208,11 @@ display m
   --- they should not be significant; (3)~check the density of $x$ at
   $c$ (McCrary) to detect manipulation of the running variable.
 \end{nota}
+
+\section{Empirical validation}
+
+The DGP in this chapter with a uniform running variable and cutoff at 0 is
+used in the \texttt{rdd_book} validation case in \texttt{validation/cases/}.
+The case estimates the treatment effect by RDD in \hayashi{} and compares it
+with R and Python reference implementations. Run \lstinline{hay validate} to
+see the current status.

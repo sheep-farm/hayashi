@@ -1,0 +1,32 @@
+id: ma-book
+title: MA(1) on simulated data from the Hayashi book
+estimator_family: arima
+status: active
+dimension: numerical
+
+dataset:
+  name: simulated_ma1
+  source: DGP from book_pt_BR/codes/26_arma.hay
+  size: 500 observations
+
+references:
+  - R
+  - Python
+
+reference_scripts:
+  R: cases/ma_book/reference/run.R
+  Python: cases/ma_book/reference/run.py
+
+hayashi_script: cases/ma_book/hayashi/run.hay
+
+output_format: txt
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 5e-3
+    standard_errors: 1e-2
+
+notes: Uses the same simulated MA(1) DGP as Chapter 26 of the book.

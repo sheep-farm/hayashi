@@ -1,0 +1,34 @@
+id: sur_grunfeld
+title: Seemingly Unrelated Regressions on Wooldridge grunfeld
+estimator_family: sur
+status: active
+dimension: numerical
+
+dataset:
+  name: wooldridge::grunfeld
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+  tolerances:
+    coefficients: 1e-1
+
+output_format: txt
+
+hayashi_script: cases/sur_grunfeld/hayashi/run.hay
+reference_scripts:
+  R: cases/sur_grunfeld/reference/run.R
+  Python: cases/sur_grunfeld/reference/run.py
+
+notes: Two-equation SUR (Zellner FGLS) on the Grunfeld investment data.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []

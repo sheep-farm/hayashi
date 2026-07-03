@@ -1,0 +1,36 @@
+id: did-kielmc
+title: Difference-in-differences on Kiel-McClain housing prices
+estimator_family: did
+status: active
+dimension: numerical
+
+dataset:
+  name: wooldridge::kielmc
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-3
+    standard_errors: 1e-3
+
+output_format: txt
+
+hayashi_script: cases/did_kielmc/hayashi/run.hay
+reference_scripts:
+  R: cases/did_kielmc/reference/run.R
+  Python: cases/did_kielmc/reference/run.py
+
+notes: Difference-in-differences effect of incinerator proximity on log house prices.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []

@@ -1,6 +1,7 @@
 # Summary
 
 [Introduction](./intro.md)
+- [Trust Model](./trust-model.md)
 
 ---
 

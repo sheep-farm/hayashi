@@ -678,6 +678,7 @@ LASSO           & \texttt{lasso()}      & \texttt{lasso linear} & \texttt{glmnet
 Ridge           & \texttt{ridge\_reg()} & —                     & \texttt{glmnet(a=0)}   & \texttt{Ridge()} \\
 Elastic Net     & \texttt{enet()}       & —                     & \texttt{glmnet(a=.5)}  & \texttt{ElasticNet()} \\
 Bootstrap       & \texttt{bootstrap()}  & \texttt{bootstrap:}   & \texttt{boot()}        & \texttt{resample()} \\
+Bootstrap SE    & \texttt{bootse()}     & —                     & —                      & —                     \\
 LOWESS          & \texttt{lowess()}     & \texttt{lowess}       & \texttt{lowess()}      & \texttt{lowess()} \\
 Quant. reg.     & \texttt{qreg()}       & \texttt{qreg}         & \texttt{rq()}          & \texttt{QuantReg()} \\
 SUR             & \texttt{sur()}        & \texttt{sureg}        & \texttt{systemfit()}   & \texttt{SUR()} \\
@@ -693,6 +694,7 @@ Mundlak (CRE)   & \texttt{mundlak()}    & manual                & \texttt{mundla
 xtgls           & \texttt{xtgls()}      & \texttt{xtgls}        & \texttt{pggls()}       & — \\
 Modelo misto    & \texttt{mixedlm()}    & \texttt{mixed}        & \texttt{lme4::lmer()}  & \texttt{MixedLM()} \\
 Logit FE        & \texttt{clogit()}     & \texttt{clogit}       & \texttt{clogit()}      & \texttt{ConditionalLogit()} \\
+Resumo painel   & \texttt{xtsum()}      & \texttt{xtsum}        & —                      & —                     \\
 \midrule
 \multicolumn{5}{l}{\textit{Variáveis dependentes especiais}} \\
 Logit           & \texttt{logit()}      & \texttt{logit}        & \texttt{glm(logit)}    & \texttt{smf.logit()} \\
@@ -711,6 +713,7 @@ Ef. marginais   & \texttt{margins()}    & \texttt{margins}      & \texttt{margin
 \multicolumn{5}{l}{\textit{Inferência causal}} \\
 DiD             & \texttt{did()}        & \texttt{diff}         & \texttt{lm()}          & \texttt{smf.ols()} \\
 RDD             & \texttt{rd()}         & \texttt{rdrobust}     & \texttt{rdrobust()}    & \texttt{rdd()} \\
+Fuzzy RDD       & \texttt{fuzzy\_rd()}   & \texttt{rdrobust}     & \texttt{rdrobust()}    & \texttt{rdd()} \\
 PSM             & \texttt{psm()}        & \texttt{psmatch2}     & \texttt{matchit()}     & manual \\
 Controle sint.  & \texttt{synth()}      & \texttt{synth}        & \texttt{Synth}         & \texttt{pysynth} \\
 \midrule
@@ -752,7 +755,10 @@ Teste $t$       & \texttt{ttest()}      & \texttt{ttest}        & \texttt{t.test
 ANOVA           & \texttt{anova()}      & \texttt{anova}        & \texttt{aov()}         & \texttt{f\_oneway()} \\
 Kruskal-Wallis  & \texttt{kruskal\_wallis()} & \texttt{kwallis} & \texttt{kruskal.test()} & \texttt{kruskal()} \\
 Normalidade     & \texttt{swilk()}      & \texttt{swilk}        & \texttt{shapiro.test()} & \texttt{shapiro()} \\
+Teste conjunto  & \texttt{testparm()}   & \texttt{testparm}     & \texttt{linearHypothesis()} & \texttt{wald\_test()} \\
 Tabela          & \texttt{esttab()}     & \texttt{esttab}$^\dagger$ & \texttt{stargazer()} & \texttt{summary\_col()} \\
+Armazenar modelo& \texttt{eststo()}     & \texttt{eststo}       & —                      & —                     \\
+Limpar modelos  & \texttt{estclear()}   & —                     & —                      & —                     \\
 \end{longtable}}
 
 \noindent
@@ -761,3 +767,74 @@ $^\dagger$ \texttt{esttab} no Stata requer \texttt{ssc install estout}.\\[4pt]
 \noindent\textbf{Nota sobre geradores aleatórios:} \texttt{rnormal()} corresponde ao
 gerador normal padrão usado nos exemplos de Stata, R e Python. Use
 \texttt{runiform()} quando o DGP exigir um sorteio $U(0,1)$.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Matriz de validação}
+\label{sec:matriz_validacao}
+
+Além dos exemplos de código deste apêndice, todo \hayashi{} é validado
+sistematicamente contra implementações de referência. O programa de
+validação está no diretório \texttt{validation/} e é executado com:
+
+\begin{lstlisting}
+hay validate
+\end{lstlisting}
+
+A Tabela~\ref{tab:matriz_validacao} lista os casos de validação atuais, com a
+família de estimadores, a fonte dos dados e as referências (R, Python e/ou
+Stata) usadas na comparação. Os detalhes completos --- tolerâncias, notas e
+status --- estão em \texttt{validation/MATRIX.md}.
+
+{\footnotesize\setlength{\tabcolsep}{4pt}%
+\begin{longtable}{llll}
+\toprule
+\label{tab:matriz_validacao}
+\textbf{ID do Caso} & \textbf{Família} & \textbf{Dataset/Fonte} & \textbf{Referências (R/Python/Stata)} \\
+\midrule
+\endfirsthead
+\multicolumn{4}{l}{\footnotesize\itshape (continuação)} \\[2pt]
+\toprule
+\textbf{ID do Caso} & \textbf{Família} & \textbf{Dataset/Fonte} & \textbf{Referências (R/Python/Stata)} \\
+\midrule
+\endhead
+\midrule
+\multicolumn{4}{r}{\footnotesize\itshape (continua na próxima página)} \\
+\endfoot
+\bottomrule
+\endlastfoot
+%
+\texttt{ab\_grunfeld} & \texttt{ab} & \texttt{wooldridge::grunfeld} & R \\
+\texttt{ar\_book} & \texttt{arima} & \texttt{simulated\_ar1} & R, Python \\
+\texttt{ardl\_gdp} & \texttt{ardl} & \texttt{statsmodels::macrodata} & R, Python \\
+\texttt{arima\_book} & \texttt{arima} & \texttt{simulated\_rw} & R, Python \\
+\texttt{arima\_gdp} & \texttt{arima} & \texttt{statsmodels::macrodata} & R, Python \\
+\texttt{arma\_book} & \texttt{arima} & \texttt{simulated\_arma11} & R, Python \\
+\texttt{autoreg\_gdp} & \texttt{autoreg} & \texttt{statsmodels::macrodata} & R, Python \\
+\texttt{coint\_book} & \texttt{vecm} & \texttt{simulated\_cointegrated} & R, Python \\
+\texttt{cox\_heart} & \texttt{cox} & \texttt{statsmodels::heart} & R, Python \\
+\texttt{did\_kielmc} & \texttt{did} & \texttt{wooldridge::kielmc} & R, Python \\
+\texttt{ets\_gdp} & \texttt{ets} & \texttt{statsmodels::macrodata} & R, Python \\
+\texttt{garch\_book} & \texttt{garch} & \texttt{simulated\_garch11} & Python \\
+\texttt{garch\_nyse} & \texttt{garch} & \texttt{wooldridge::nyse} & R, Python \\
+\texttt{glsar\_hprice1} & \texttt{glsar} & \texttt{wooldridge::hprice1} & R, Python \\
+\texttt{gmm\_card} & \texttt{gmm} & \texttt{wooldridge::card} & R, Python \\
+\texttt{heckman\_mroz} & \texttt{heckman} & \texttt{wooldridge::mroz} & R, Python \\
+\texttt{iv\_card} & \texttt{iv} & \texttt{wooldridge::card} & R, Python \\
+\texttt{lasso\_hprice1} & \texttt{lasso} & \texttt{wooldridge::hprice1} & R, Python \\
+\texttt{logit\_mroz} & \texttt{logit} & \texttt{wooldridge::mroz} & R, Python \\
+\texttt{ma\_book} & \texttt{arima} & \texttt{simulated\_ma1} & R, Python \\
+\texttt{ologit\_beauty} & \texttt{logit} & \texttt{wooldridge::beauty} & R, Python \\
+\texttt{ols\_wooldridge\_wage1} & \texttt{ols} & \texttt{wooldridge::wage1} & R, Python \\
+\texttt{panel\_fe\_grunfeld} & \texttt{panel\_fe} & \texttt{wooldridge::grunfeld} & R, Python \\
+\texttt{poisson\_fertil2} & \texttt{poisson} & \texttt{wooldridge::fertil2} & R, Python \\
+\texttt{probit\_mroz} & \texttt{probit} & \texttt{wooldridge::mroz} & R, Python \\
+\texttt{psm\_jtrain3} & \texttt{psm} & \texttt{wooldridge::jtrain3} & R, Python \\
+\texttt{quantile\_wage1} & \texttt{qreg} & \texttt{wooldridge::wage1} & R, Python \\
+\texttt{re\_grunfeld} & \texttt{re} & \texttt{grunfeld} & R, Python \\
+\texttt{rdd\_book} & \texttt{rdd} & \texttt{rdd\_book} & R, Python \\
+\texttt{synth\_smoking} & \texttt{synth} & \texttt{synth\_smoking} & R, Python \\
+\texttt{tobit\_mroz} & \texttt{tobit} & \texttt{wooldridge::mroz} & R, Python \\
+\texttt{var\_book} & \texttt{var} & \texttt{simulated\_var1} & R, Python \\
+\texttt{var\_macro} & \texttt{var} & \texttt{statsmodels::macrodata} & R, Python \\
+\texttt{wls\_hprice1} & \texttt{wls} & \texttt{wooldridge::hprice1} & R, Python \\
+\end{longtable}}

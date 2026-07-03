@@ -1,0 +1,8 @@
+// Load the US macro dataset from CSV.
+load "validation/cases/var_macro/data/macrodata.csv" as df
+
+// VAR(2) on GDP and consumption.
+let m = var(df, gdp, cons, lags=2)
+
+// Export VAR results for automated comparison.
+export(m, "txt", "/dev/stdout")

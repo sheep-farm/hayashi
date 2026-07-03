@@ -6,6 +6,8 @@ pub struct Parser {
     tokens: Vec<(Token, usize)>,
     pos: usize,
     paren_depth: usize,
+    bracket_depth: usize, // rastreia [ ]
+    brace_depth: usize,   // rastreia { }
 }
 
 impl Parser {
@@ -14,11 +16,13 @@ impl Parser {
             tokens,
             pos: 0,
             paren_depth: 0,
+            bracket_depth: 0,
+            brace_depth: 0,
         }
     }
 
     fn peek(&mut self) -> &Token {
-        if self.paren_depth > 0 {
+        if self.paren_depth > 0 || self.bracket_depth > 0 || self.brace_depth > 0 {
             while self.tokens.get(self.pos).map(|(t, _)| t) == Some(&Token::Newline) {
                 self.pos += 1;
             }
@@ -37,8 +41,17 @@ impl Parser {
         self.tokens.get(self.pos).map(|(_, l)| *l).unwrap_or(0)
     }
 
+    /// Verifica se o próximo token não-Newline é `|>` (para continuação de pipe multi-linha).
+    fn next_non_newline_is_pipe_right(&self) -> bool {
+        let mut i = self.pos;
+        while let Some((Token::Newline, _)) = self.tokens.get(i) {
+            i += 1;
+        }
+        matches!(self.tokens.get(i), Some((Token::PipeRight, _)))
+    }
+
     fn advance(&mut self) -> &Token {
-        if self.paren_depth > 0 {
+        if self.paren_depth > 0 || self.bracket_depth > 0 || self.brace_depth > 0 {
             while self.tokens.get(self.pos).map(|(t, _)| t) == Some(&Token::Newline) {
                 self.pos += 1;
             }
@@ -54,6 +67,15 @@ impl Parser {
         if t == &Token::RParen && self.paren_depth > 0 {
             self.paren_depth -= 1;
         }
+        if t == &Token::LBracket {
+            self.bracket_depth += 1;
+        }
+        if t == &Token::RBracket && self.bracket_depth > 0 {
+            self.bracket_depth -= 1;
+        }
+        // Nota: LBrace/RBrace NÃO são rastreados aqui.
+        // O brace_depth é gerenciado manualmente apenas no parse_dict_expr
+        // para evitar suprimir Newlines dentro de blocos if/for/fn.
         self.pos += 1;
         t
     }
@@ -176,11 +198,13 @@ impl Parser {
             return Ok(Expr::Range(Box::new(lhs), Box::new(rhs)));
         }
 
-        if self.peek() != &Token::PipeRight {
+        // Verifica se o próximo token não-Newline é |> para permitir pipe multi-linha
+        if self.peek() != &Token::PipeRight && !self.next_non_newline_is_pipe_right() {
             return Ok(lhs);
         }
         let source = lhs.clone();
-        while self.peek() == &Token::PipeRight {
+        while self.peek() == &Token::PipeRight || self.next_non_newline_is_pipe_right() {
+            self.skip_newlines(); // consome Newlines antes do |>
             self.advance();
             let rhs = self.parse_or()?;
             lhs = match rhs {
@@ -189,7 +213,18 @@ impl Parser {
                     mut args,
                     opts,
                 } => {
-                    args.insert(0, lhs);
+                    let mut found = false;
+                    for arg in args.iter_mut() {
+                        if let Expr::Var(ref name) = arg {
+                            if name == "_" {
+                                *arg = lhs.clone();
+                                found = true;
+                            }
+                        }
+                    }
+                    if !found {
+                        args.insert(0, lhs);
+                    }
                     Expr::Call { func, args, opts }
                 }
                 Expr::Var(name) => Expr::Call {
@@ -397,7 +432,7 @@ impl Parser {
                 self.expect(&Token::LBrace)?;
                 let else_expr = self.parse_expr()?;
                 self.expect(&Token::RBrace)?;
-                Ok(Expr::IfExpr {
+                Ok(Expr::If {
                     cond: Box::new(cond),
                     then_expr: Box::new(then_expr),
                     else_expr: Box::new(else_expr),
@@ -416,23 +451,30 @@ impl Parser {
                 Ok(inner)
             }
 
-            // Lista literal: [e1, e2, ...]
+            // Lista literal: [e1, e2, ...] — permite quebras de linha entre elementos
             Token::LBracket => {
-                self.advance();
+                self.advance(); // avança LBracket (incrementa bracket_depth)
+                self.skip_newlines();
                 let mut items = Vec::new();
-                while !matches!(self.peek(), Token::RBracket | Token::Eof | Token::Newline) {
+                // bracket_depth > 0 agora: peek() já pula Newlines automaticamente
+                while !matches!(self.peek(), Token::RBracket | Token::Eof) {
                     items.push(self.parse_expr()?);
                     if self.peek() == &Token::Comma {
                         self.advance();
+                        self.skip_newlines();
+                    } else {
+                        break;
                     }
                 }
-                self.expect(&Token::RBracket)?;
+                self.expect(&Token::RBracket)?; // decrementa bracket_depth
                 Ok(Expr::List(items))
             }
 
             // Dict literal: {"key": value, ...}
             Token::LBrace => {
-                self.advance();
+                self.advance(); // consome LBrace
+                                // Incrementa manualmente: dentro do dict, Newlines são ignorados
+                self.brace_depth += 1;
                 let mut pairs = Vec::new();
                 while !matches!(self.peek(), Token::RBrace | Token::Eof) {
                     let key = self.parse_expr()?;
@@ -443,6 +485,7 @@ impl Parser {
                         self.advance();
                     }
                 }
+                self.brace_depth -= 1; // decrementa antes do RBrace
                 self.expect(&Token::RBrace)?;
                 Ok(Expr::Dict(pairs))
             }
@@ -632,6 +675,28 @@ impl Parser {
         }
     }
 
+    fn is_kw_bare_arg(&mut self) -> bool {
+        // Palavras-chave que NÃO podem ser identificadores isolados em
+        // expressões (help(if), help(for), etc.). Outras como count/load/return
+        // já são tratadas como Expr::Var pelo parse_primary.
+        let is_kw = matches!(
+            self.peek(),
+            Token::If
+                | Token::Else
+                | Token::For
+                | Token::While
+                | Token::Fn
+                | Token::Let
+                | Token::Tsset
+        );
+        let next_is_terminator = self
+            .tokens
+            .get(self.pos + 1)
+            .map(|(t, _)| matches!(t, Token::RParen | Token::Comma))
+            .unwrap_or(false);
+        is_kw && next_is_terminator
+    }
+
     fn parse_call_args(&mut self) -> Result<(Vec<Expr>, Vec<Opt>)> {
         let mut args = Vec::new();
         let mut opts = Vec::new();
@@ -686,6 +751,21 @@ impl Parser {
                     name: kw_name,
                     value: val,
                 });
+            } else if self.is_kw_bare_arg() {
+                // Palavra-chave usada como argumento isolado (ex: help(if), help(for))
+                let kw_name = match self.peek() {
+                    Token::If => "if",
+                    Token::Else => "else",
+                    Token::For => "for",
+                    Token::While => "while",
+                    Token::Fn => "fn",
+                    Token::Let => "let",
+                    Token::Tsset => "tsset",
+                    _ => "?",
+                }
+                .to_string();
+                self.advance();
+                args.push(Expr::Str(kw_name));
             } else if let Token::Ident(name) = self.peek().clone() {
                 // lookahead: é opt=val?
                 if self
@@ -734,9 +814,9 @@ impl Parser {
 
     fn parse_for_iter(&mut self) -> Result<ForIter> {
         match self.parse_expr()? {
-            Expr::Range(start, end)          => Ok(ForIter::Range(*start, *end)),
+            Expr::Range(start, end) => Ok(ForIter::Range(*start, *end)),
             Expr::RangeInclusive(start, end) => Ok(ForIter::RangeInclusive(*start, *end)),
-            other                            => Ok(ForIter::Items(other)),
+            other => Ok(ForIter::Items(other)),
         }
     }
 
@@ -1057,7 +1137,6 @@ impl Parser {
                         match self.peek().clone() {
                             Token::Newline | Token::Eof => break,
                             Token::Float(v) => {
-                                let v = v;
                                 self.advance();
                                 row.push(v);
                             }
@@ -1183,7 +1262,16 @@ impl Parser {
                 if self
                     .tokens
                     .get(self.pos + 1)
-                    .map(|(t, _)| matches!(t, Token::PlusEq | Token::MinusEq | Token::StarEq | Token::SlashEq | Token::PercentEq))
+                    .map(|(t, _)| {
+                        matches!(
+                            t,
+                            Token::PlusEq
+                                | Token::MinusEq
+                                | Token::StarEq
+                                | Token::SlashEq
+                                | Token::PercentEq
+                        )
+                    })
                     .unwrap_or(false) =>
             {
                 let name = name.clone();

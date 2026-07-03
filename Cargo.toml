@@ -1,6 +1,6 @@
 [package]
 name = "hayashi-lang"
-version = "0.2.5"
+version = "0.2.6"
 authors = ["Flávio de Vasconcellos Corrêa <flavio.vcorrea@ufpel.edu.br>"]
 edition = "2021"
 description = "An interpreted language for applied econometrics — Stata-like syntax, modern features, zero cost"
@@ -15,15 +15,15 @@ name = "hay"
 path = "src/main.rs"
 
 [dependencies]
-greeners = "1.4.9"
+greeners = "1.4.10"
 ndarray = "0.17"
 chrono = "0.4"
 statrs = "0.18"
 thiserror = "2"
 rustyline = "14"
-anyhow = "1"
 dta = "0.6.0"
 ureq = "2"
+url = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tempfile = "3"
@@ -31,12 +31,21 @@ rand = "0.8"
 plotters = { version = "0.3", default-features = false, features = ["svg_backend", "line_series"] }
 calamine = "0.35"
 parquet = { version = "59", default-features = false, features = ["arrow", "snap"] }
-arrow = { version = "59", default-features = false, features = ["csv", "json"] }
+arrow = { version = "59", default-features = false, features = ["csv", "json", "ffi"] }
 rust_xlsxwriter = "0.95"
 csv = "1"
 rusqlite = { version = "0.33", features = ["bundled"] }
 odbc-api = { version = "28", optional = true }
+libloading = "0.8"
+wasmi = "0.31"
 
 [features]
 default = []
 odbc = ["dep:odbc-api"]
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 256
+panic = 'abort'
+strip = 'symbols'

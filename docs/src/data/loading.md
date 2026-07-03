@@ -30,6 +30,8 @@ load "survey.db" as df, query="SELECT * FROM resp WHERE year >= 2000"
 load "raw.txt" as df, sep="|"
 ```
 
+`query=` is raw SQL executed by SQLite or the configured ODBC database. Use `table=` for simple table loads, and see the [Trust Model](../trust-model.md#raw-sql) before running SQL against shared databases.
+
 ## Remote files
 
 `load` accepts URLs directly:
@@ -37,6 +39,8 @@ load "raw.txt" as df, sep="|"
 ```
 load "https://example.com/data/cpi.csv" as df
 ```
+
+Remote files are downloaded and parsed as data. Hayashi validates HTTP(S) URLs and applies network/download limits, but remote data is still untrusted input. See the [Trust Model](../trust-model.md#remote-data).
 
 ## Multiple DataFrames
 
@@ -74,6 +78,8 @@ load "dsn=MyPostgres" as df, query="SELECT * FROM panel WHERE country = 'BRA'"
 ```
 
 Requires a configured ODBC DSN on the system. Hayashi links `libodbc` at runtime.
+
+ODBC DSNs can point at production databases and require external system drivers. Prefer read-only credentials for analysis scripts. See the [Trust Model](../trust-model.md#odbc).
 
 ## Notes
 

@@ -104,6 +104,21 @@ let amostra = pnad
 display count(amostra)
 \end{lstlisting}
 
+\section{Uso de placeholders}
+
+Se você precisar passar o valor da esquerda para uma posição específica de argumento diferente da primeira, pode utilizar o caractere underscore (\lstinline{_}) como placeholder:
+
+\begin{lstlisting}
+expr |> f(a, _)
+// equivale a: f(a, expr)
+\end{lstlisting}
+
+Isso é particularmente útil ao passar DataFrames para estimadores (como \lstinline{ols} ou \lstinline{iv}), onde o DataFrame não é o primeiro argumento:
+
+\begin{lstlisting}
+let modelo = df |> ols(y ~ x1 + x2, _)
+\end{lstlisting}
+
 \section{Pipe com closures}
 
 O operador \lstinline{|>} também funciona com closures:

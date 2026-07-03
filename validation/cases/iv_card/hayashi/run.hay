@@ -1,0 +1,8 @@
+// Load the Wooldridge card dataset from CSV.
+load "validation/cases/iv_card/data/card.csv" as df
+
+// Card returns-to-schooling IV: educ is endogenous, nearc4 is the instrument.
+let m = iv(lwage ~ educ + exper + expersq + black + south + smsa, ~ nearc4 + exper + expersq + black + south + smsa, df)
+
+// Export coefficient table for automated comparison.
+export(m, "txt", "/dev/stdout")

@@ -1,0 +1,34 @@
+id: arima-gdp
+title: ARIMA(1,1,1) on log US real GDP
+estimator_family: arima
+status: active
+dimension: numerical
+
+dataset:
+  name: statsmodels::macrodata
+  source: statsmodels.datasets / Rdatasets
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+  tolerances:
+    coefficients: 5e-2
+
+output_format: txt
+
+hayashi_script: cases/arima_gdp/hayashi/run.hay
+reference_scripts:
+  R: cases/arima_gdp/reference/run.R
+  Python: cases/arima_gdp/reference/run.py
+
+notes: ARIMA(1,1,1) on log US real GDP via CSS-MLE to match R/Python.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []

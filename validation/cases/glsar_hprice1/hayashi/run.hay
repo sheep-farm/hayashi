@@ -1,0 +1,8 @@
+// Load the Wooldridge hprice1 dataset from CSV.
+load "validation/cases/glsar_hprice1/data/hprice1.csv" as df
+
+// GLS with AR(1) errors on housing price equation.
+let m = glsar(price ~ lotsize + sqrft + bdrms, df, order=1)
+
+// Export coefficient table for automated comparison.
+export(m, "txt", "/dev/stdout")

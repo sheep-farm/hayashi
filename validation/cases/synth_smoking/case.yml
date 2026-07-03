@@ -1,0 +1,34 @@
+id: synth-smoking
+title: Synthetic control on simulated smoking-style panel
+estimator_family: synth
+status: active
+dimension: numerical
+
+dataset:
+  name: synth_smoking
+  source: Simulated DGP from the Hayashi book chapter 32
+  licence: simulated
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+  tolerances:
+    coefficients: 1e-1
+
+output_format: txt
+
+hayashi_script: cases/synth_smoking/hayashi/run.hay
+reference_scripts:
+  R: cases/synth_smoking/reference/run.R
+  Python: cases/synth_smoking/reference/run.py
+
+notes: Synthetic-control ATT on a simulated panel with 10 donors and 1 treated unit.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []
