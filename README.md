@@ -1,6 +1,7 @@
 # Hayashi
 
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
+[![Docs: CC BY-SA 4.0](https://img.shields.io/badge/Docs-CC%20BY--SA%204.0-lightgrey.svg)](LICENSE-BOOKS.md)
 [![Rust](https://img.shields.io/badge/Rust-2021-orange.svg)](https://www.rust-lang.org)
 [![Version](https://img.shields.io/badge/version-0.2.7--dev-yellow.svg)](Cargo.toml)
 [![crates.io](https://img.shields.io/crates/v/hayashi-lang.svg)](https://crates.io/crates/hayashi-lang)
