@@ -379,7 +379,9 @@ impl Interpreter {
                 }
 
                 let result = greeners::VECM::fit(&data, lags, rank)
-                    .map_err(|e| self.rt_err(format!("VECM: {e}")))?;
+                    .map_err(|e| self.rt_err(format!("VECM: {e}")))?
+                    .with_inference(200)
+                    .map_err(|e| self.rt_err(format!("VECM inference: {e}")))?;
 
                 Ok(Value::VecmResult(Rc::new(result)))
             }
