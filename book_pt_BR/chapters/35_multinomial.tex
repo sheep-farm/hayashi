@@ -147,8 +147,9 @@ mlogit(y ~ x1 + x2, df, base=1)    // alternativa base explícita
 
 \section{Validação empírica}
 
-O dataset \texttt{beauty} do Wooldridge é usado no caso de validação
-\texttt{ologit_beauty} em \texttt{validation/cases/}. O caso estima um logit
-ordenado de \hayashi{} e o compara com \texttt{MASS::polr} em R e com
-\texttt{statsmodels.miscmodels.ordinal_model} em Python. Execute
-\lstinline{hay validate} para ver o estado atual.
+O dataset \texttt{beauty} do Wooldridge é usado nos casos de validação
+\texttt{ologit_beauty} e \texttt{oprobit_beauty} em \texttt{validation/cases/},
+e o dataset \texttt{AER::TravelMode} é usado no caso \texttt{mlogit_mode}. Os
+casos estimam modelos de logit ordenado, probit ordenado e logit multinomial
+no \hayashi{} e comparam os coeficientes com implementações de referência em R
+e Python. Execute \lstinline{hay validate} para ver o estado atual.

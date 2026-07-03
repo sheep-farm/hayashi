@@ -1,0 +1,36 @@
+id: oprobit_beauty
+title: Ordered probit of beauty rating on Wooldridge beauty
+estimator_family: oprobit
+status: active
+dimension: numerical
+
+dataset:
+  name: wooldridge::beauty
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-1
+    standard_errors: 5e-1
+
+output_format: txt
+
+hayashi_script: cases/oprobit_beauty/hayashi/run.hay
+reference_scripts:
+  R: cases/oprobit_beauty/reference/run.R
+  Python: cases/oprobit_beauty/reference/run.py
+
+notes: Ordered probit model of self-reported beauty rating (looks 2-5) on female, education, experience and black indicators.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []

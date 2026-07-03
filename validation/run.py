@@ -270,6 +270,102 @@ def parse_hayashi_synth(text: str) -> dict[str, dict[str, float]]:
     return {"coefficients": {"ATT": att}}
 
 
+def parse_hayashi_mlogit(text: str) -> dict[str, dict[str, float]]:
+    """Parse a multinomial-logit coefficient table with per-category sections.
+
+    Hayashi prints one coefficient block per non-base category, e.g.
+    "y=1.0 vs base y=4.0".  We flatten the coefficients by prefixing the
+    category label so that every {category}:{variable} pair is unique.
+    """
+    import re
+
+    section_re = re.compile(r"y=([0-9.]+)\s+vs base y=[0-9.]+")
+    result: dict[str, dict[str, float]] = {"coefficients": {}, "standard_errors": {}}
+    current_cat: str | None = None
+
+    for line in text.splitlines():
+        m = section_re.search(line)
+        if m:
+            current_cat = m.group(1)
+            continue
+        if current_cat is None:
+            continue
+        line = line.strip()
+        if not line or line.startswith("-") or line.startswith("="):
+            continue
+        lower = line.lower()
+        if "variable" in lower or "coef" in lower or "std err" in lower:
+            continue
+        parts = line.split()
+        if len(parts) < 3:
+            continue
+        var = parts[0]
+        if var.lower() == "variable":
+            continue
+        try:
+            coef = float(parts[1])
+            se = float(parts[2])
+        except ValueError:
+            continue
+        if var == "const":
+            var = "Intercept"
+        key = f"{current_cat}:{var}"
+        result["coefficients"][key] = coef
+        result["standard_errors"][key] = se
+
+    if not result["coefficients"]:
+        raise ValueError(f"Could not parse multinomial-logit coefficient table: {text[:200]!r}")
+    return result
+
+
+def parse_hayashi_sur(text: str) -> dict[str, dict[str, float]]:
+    """Parse a SUR coefficient table with per-equation sections.
+
+    Hayashi prints a block for each equation, e.g. "Equation: value".
+    We flatten the coefficients by prefixing the equation name so that
+    every {equation}:{variable} pair is unique.
+    """
+    import re
+
+    section_re = re.compile(r"Equation:\s+(\S+)")
+    result: dict[str, dict[str, float]] = {"coefficients": {}, "standard_errors": {}}
+    current_eq: str | None = None
+
+    for line in text.splitlines():
+        m = section_re.search(line)
+        if m:
+            current_eq = m.group(1)
+            continue
+        if current_eq is None:
+            continue
+        line = line.strip()
+        if not line or line.startswith("-") or line.startswith("="):
+            continue
+        lower = line.lower()
+        if "variable" in lower or "coef" in lower or "std err" in lower or "r²" in lower:
+            continue
+        parts = line.split()
+        if len(parts) < 3:
+            continue
+        var = parts[0]
+        if var.lower() == "variable":
+            continue
+        try:
+            coef = float(parts[1])
+            se = float(parts[2])
+        except ValueError:
+            continue
+        if var == "const":
+            var = "Intercept"
+        key = f"{current_eq}:{var}"
+        result["coefficients"][key] = coef
+        result["standard_errors"][key] = se
+
+    if not result["coefficients"]:
+        raise ValueError(f"Could not parse SUR coefficient table: {text[:200]!r}")
+    return result
+
+
 def approx_equal(a: float, b: float, tol: float) -> bool:
     if math.isnan(a) and math.isnan(b):
         return True
@@ -417,7 +513,11 @@ def run_case(case: dict[str, Any]) -> tuple[str, list[str]]:
     family = case.get("estimator_family", "")
     if hay_res.stdout.strip():
         try:
-            if output_format == "txt":
+            if family == "mlogit":
+                hayashi = normalise_intercept(parse_hayashi_mlogit(hay_res.stdout))
+            elif family == "sur":
+                hayashi = normalise_intercept(parse_hayashi_sur(hay_res.stdout))
+            elif output_format == "txt":
                 hayashi = normalise_intercept(parse_hayashi_txt_table(hay_res.stdout))
             else:
                 hayashi = normalise_intercept(parse_hayashi_csv_from_string(hay_res.stdout))

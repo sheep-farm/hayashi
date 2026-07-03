@@ -1,0 +1,34 @@
+id: elasticnet_hprice1
+title: Elastic Net regression on Wooldridge hprice1
+estimator_family: elasticnet
+status: active
+dimension: numerical
+
+dataset:
+  name: wooldridge::hprice1
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+  tolerances:
+    coefficients: 1e-1
+
+output_format: txt
+
+hayashi_script: cases/elasticnet_hprice1/hayashi/run.hay
+reference_scripts:
+  R: cases/elasticnet_hprice1/reference/run.R
+  Python: cases/elasticnet_hprice1/reference/run.py
+
+notes: Elastic Net regression of log house price on log lot size, log square footage, bedrooms and colonial dummy.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []
