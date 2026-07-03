@@ -26,8 +26,8 @@ inlf ~ educ + age + kidslt6 + kidsge6 + nwifeinc
 
 ## Reference implementation
 
-- **Python:** primary reference implementation (manual two-step using `statsmodels.probit`, a manually computed inverse Mills ratio, and OLS with the Heckman (1979) corrected covariance matrix).
-- **R:** a reference script is provided and implements the two-step estimator manually in base R (`glm(..., family = binomial(link = "probit"))`, a manually computed inverse Mills ratio, and OLS with the Heckman (1979) corrected covariance matrix). It does not require the `sampleSelection` package. When R is unavailable, the validation relies on the Python reference.
+- **Python:** reference implementation using a manual two-step estimator in NumPy/Pandas (`statsmodels.probit` or an internal Newton-Raphson probit, a manually computed inverse Mills ratio, and OLS with the Heckman (1979) corrected covariance matrix).
+- **R:** reference implementation using a manual two-step estimator in base R (`glm(..., family = binomial(link = "probit"))`, a manually computed inverse Mills ratio, and OLS with the Heckman (1979) corrected covariance matrix). Both references are run by the validation runner.
 - **Hayashi:** `heckman(lwage ~ educ + exper + expersq, inlf ~ educ + age + kidslt6 + kidsge6 + nwifeinc, df)`
 
 ## Compared quantities

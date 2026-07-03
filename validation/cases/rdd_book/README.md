@@ -26,8 +26,8 @@ rd(y ~ x, 0.0, df)
 
 ## Reference implementation
 
-- **Python:** primary reference implementation (local linear regression with triangular kernel and Imbens-Kalyanaraman bandwidth selector; HC1 standard errors).
-- **R:** a reference script is provided and implements the local linear regression manually in base R (triangular kernel, Imbens-Kalyanaraman bandwidth selector, HC1 standard errors). It does not require the `rdrobust` package. When R is unavailable, the validation relies on the Python reference.
+- **Python:** reference implementation using a local linear regression in NumPy/Pandas (triangular kernel and Imbens-Kalyanaraman bandwidth selector; HC1 standard errors).
+- **R:** reference implementation using a local linear regression in base R (triangular kernel, Imbens-Kalyanaraman bandwidth selector, HC1 standard errors). Both references are run by the validation runner.
 
 ## Compared quantities
 

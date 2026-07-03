@@ -17,8 +17,8 @@ lprice ~ llotsize + lsqrft + bdrms + colonial
 
 ## Reference implementation
 
-- **Python:** primary reference implementation.
-- **R:** a reference script is provided but currently fails because the `glmnet` and `jsonlite` packages are not installed. The validation currently relies on the Python reference.
+- **Python:** reference implementation using `scikit-learn` (`sklearn.linear_model.ElasticNet`).
+- **R:** reference implementation using `glmnet::glmnet`. Both references are run by the validation runner.
 - **Hayashi:** `elasticnet(lprice ~ llotsize + lsqrft + bdrms + colonial, df, alpha=0.1, l1_ratio=0.5)`
 
 ## Compared quantities
