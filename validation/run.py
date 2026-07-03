@@ -493,6 +493,14 @@ def update_matrix_md(cases: list[dict[str, Any]]) -> None:
         "",
         "This matrix is generated from `validation/matrix.yml` by `validation/run.py`.",
         "",
+        "This matrix covers the core empirical estimators. Some commands are",
+        "intentionally excluded for the reasons described in the \"Estimators not",
+        "covered by validation\" section of the README.",
+        "",
+        "Esta matriz abrange os estimadores empíricos centrais. Alguns comandos são",
+        "deixados de fora intencionalmente pelos motivos descritos na seção",
+        "\"Estimators not covered by validation\" do README.",
+        "",
     ])
     MATRIX_MD.write_text("\n".join(lines) + "\n")
 

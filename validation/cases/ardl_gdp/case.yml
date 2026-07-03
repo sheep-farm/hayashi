@@ -1,7 +1,7 @@
 id: ardl-gdp
 title: ARDL(1,1) on US real GDP and consumption
 estimator_family: ardl
-status: not-started
+status: active
 dimension: numerical
 
 dataset:

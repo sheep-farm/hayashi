@@ -1,7 +1,7 @@
 id: cox-heart
 title: Cox proportional hazards on heart transplant survival
 estimator_family: cox
-status: not-started
+status: active
 dimension: numerical
 
 dataset:

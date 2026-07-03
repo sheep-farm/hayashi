@@ -1,7 +1,7 @@
 id: iv-card
 title: IV returns to schooling on Wooldridge card
 estimator_family: iv
-status: not-started
+status: active
 dimension: numerical
 
 dataset:

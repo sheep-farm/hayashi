@@ -1,7 +1,7 @@
 id: poisson-fertil2
 title: Poisson fertility model on Wooldridge fertil2
 estimator_family: poisson
-status: not-started
+status: active
 dimension: numerical
 
 dataset:

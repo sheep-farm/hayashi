@@ -1,7 +1,7 @@
 id: re-grunfeld
 title: Random-effects investment demand on Grunfeld
 estimator_family: re
-status: not-started
+status: active
 dimension: numerical
 
 dataset:

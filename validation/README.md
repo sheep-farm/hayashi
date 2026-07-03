@@ -130,3 +130,24 @@ The validation programme covers four dimensions:
    prediction, export.
 4. **Runtime reliability** — no panics, hangs, silent miscomputations, or
    misleading results.
+
+## Estimators not covered by validation
+
+Not every command in Hayashi is a validation case. The programme focuses on
+core empirical estimators and intentionally excludes some command categories:
+
+- **Diagnostic/test commands** (e.g., `adf`, `kpss`, `granger`,
+  `engle_granger`, `johansen`, `ljungbox`, `white`, `reset`, `bgodfrey`,
+  `archtest`, `hausman`) — validated indirectly through the estimators that use
+  them.
+- **Utility/data manipulation commands** (e.g., `generate`, `filter`,
+  `summarize`, `load`, `export`) — covered by `cargo test`, not by empirical
+  validation.
+- **Visualization commands** (e.g., `plot`, `scatter`, `histogram`) — not part
+  of numerical validation.
+- **Niche or hard-to-reference estimators** (e.g., `portfolio_sort`,
+  `double_sort`, Fama-MacBeth, dynamic factor, GAM, multiple imputation) —
+  require specialised datasets or lack canonical open-source reference
+  implementations.
+- **Estimators with output format limitations** (e.g., `svar`, `svec`) —
+  require changes to the Greeners export format before they can be parsed.

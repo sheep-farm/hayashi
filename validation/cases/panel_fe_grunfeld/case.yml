@@ -1,7 +1,7 @@
 id: panel-fe-grunfeld
 title: Fixed-effects investment demand on Wooldridge grunfeld
 estimator_family: panel_fe
-status: not-started
+status: active
 dimension: numerical
 
 dataset:
