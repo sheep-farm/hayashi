@@ -17,8 +17,8 @@ lprice ~ llotsize + lsqrft + bdrms + colonial
 
 ## Reference implementation
 
-- **R:** `MASS::lm.ridge(lprice ~ llotsize + lsqrft + bdrms + colonial, data = df, lambda = 0.1)`
-- **Python:** `sklearn.linear_model.Ridge(alpha=0.1, fit_intercept=False)` on the intercept-augmented design matrix
+- **Python:** primary reference implementation.
+- **R:** a reference script using `MASS::lm.ridge` is provided and runs successfully. The validation runner prefers the Python reference when both are available, so the R reference is available and would be used if the Python reference is unavailable or if the runner is configured to use R.
 - **Hayashi:** `ridge(lprice ~ llotsize + lsqrft + bdrms + colonial, df, alpha=0.1)`
 
 ## Compared quantities

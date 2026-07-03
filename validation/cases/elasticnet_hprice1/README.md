@@ -17,8 +17,8 @@ lprice ~ llotsize + lsqrft + bdrms + colonial
 
 ## Reference implementation
 
-- **R:** `glmnet::glmnet(X, y, alpha = 0.5, lambda = 0.1, standardize = TRUE)` (requires the `glmnet` package)
-- **Python:** `sklearn.linear_model.ElasticNet` after manually standardising X and centring y, so the intercept is unpenalised and the parameterisation matches Hayashi's solver
+- **Python:** primary reference implementation.
+- **R:** a reference script is provided but currently fails because the `glmnet` and `jsonlite` packages are not installed. The validation currently relies on the Python reference.
 - **Hayashi:** `elasticnet(lprice ~ llotsize + lsqrft + bdrms + colonial, df, alpha=0.1, l1_ratio=0.5)`
 
 ## Compared quantities
@@ -30,7 +30,3 @@ lprice ~ llotsize + lsqrft + bdrms + colonial
 | Quantity | Tolerance | Rationale |
 |---|---|---|
 | coefficients | 1e-1 | Different solvers and internal standardisation may produce small differences; the Python reference uses the same alpha/l1_ratio parameterisation as Hayashi |
-
-## Notes
-
-The R reference requires the `glmnet` package. If `glmnet` is not installed the R script is skipped and the Python reference is used for comparison.
