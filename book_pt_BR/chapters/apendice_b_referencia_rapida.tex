@@ -62,8 +62,10 @@ Constante especial: \texttt{\_n} = número de linha (base 1).
 
 \begin{lstlisting}[style=inline, basicstyle=\ttfamily\footnotesize]
 let  const  fn  return  if  else  for  in  while  break  continue
-match  try  catch  and  or  not  true  false  nil
+match  try  catch  and  or  not  true  false  nil  quietly
 \end{lstlisting}
+
+\lstinline{quietly on} suprime a saída automática; \lstinline{quietly off} restaura. A flag respeita escopo.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Funções auxiliares}

@@ -150,3 +150,41 @@ for _ in 1..5 {
   display "iteration"
 }
 \end{lstlisting}
+
+\section{Block expressions}
+
+A block can be used as an expression. It evaluates a sequence of statements and returns the value of the last expression. Variables declared inside the block are local to it:
+
+\begin{lstlisting}[caption={Block expression returning a value}]
+let df = {
+  let raw = load("data.csv")
+  generate raw y = log(x)
+  keep(raw, ["date", "y"])
+  raw
+}
+\end{lstlisting}
+
+After the block, \lstinline{df} is available but \lstinline{raw} is gone.
+
+\section{Output control}
+
+\lstinline{quietly on} suppresses automatic output from statements and estimators. \lstinline{print(...)} and \lstinline{display ...} still appear. \lstinline{quietly off} restores normal output. The flag is scope-aware:
+
+\begin{lstlisting}[caption={quietly on/off with scope}]
+quietly on
+
+let df = {
+  let a = load("a.csv")
+  let b = load("b.csv")
+  let m = merge(a, b, key=id, type=inner)
+  generate m z = x - y
+  m
+}
+
+quietly off
+
+ols(z ~ x, df)
+print("done")
+\end{lstlisting}
+
+Inside the block, \lstinline{quietly off} would temporarily enable output; it reverts to \lstinline{quietly on} when the block ends.

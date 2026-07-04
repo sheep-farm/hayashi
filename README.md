@@ -104,11 +104,49 @@ Function parameters are `const` by default — data enters immutable, result exi
 | If statement | `if cond { } else if { } else { }` | No |
 | If expression | `if cond { a } else { b }` | Yes |
 | Match | `match expr { pat => result, _ => default }` | Yes |
+| Block expression | `{ stmt; ...; expr }` | Yes |
 | For loop | `for i in 1..10 { }` / `for v in list { }` | No |
 | While loop | `while cond { }` | No |
 | Try/catch | `try { } catch e { }` | No |
 | Break/continue | `break` / `continue` | — |
 | Return | `return expr` | — |
+
+### Block expressions
+
+A block `{ stmt; ...; expr }` evaluates a sequence of statements and returns the value of the last expression. Variables declared inside the block are local to it.
+
+```
+let df = {
+    let raw = load("data.csv")
+    generate raw y = log(x)
+    keep(raw, ["date", "y"])
+    raw
+}
+// df is available; raw and the temporary columns are gone
+```
+
+### Output control
+
+`quietly on` suppresses automatic output from statements and estimators. `print(...)` and `display ...` still appear. `quietly off` restores normal output. The flag is scope-aware: a toggle inside a block reverts when the block ends.
+
+```
+quietly on
+
+let df = {
+    let a = load("a.csv")
+    let b = load("b.csv")
+    let m = merge(a, b, key=id, type=inner)
+    generate m z = x - y
+    m
+}
+
+quietly off
+
+ols(z ~ x, df)
+print("done")
+```
+
+Both `quietly on` and `quietly()` (function form) share the same suppression mechanism, so new commands need no special handling — they just use the internal output channel.
 
 ### Functions and closures
 
@@ -554,7 +592,9 @@ fn f(n) {
 ## Misc
 
 ```
-quietly(ols(Y ~ X, df))       // suppress output
+quietly on                    // suppress automatic output from here
+quietly off                   // restore automatic output
+quietly(ols(Y ~ X, df))       // suppress one expression
 capture(ols(Y ~ X, df))       // ignore errors
 assert(n > 0, "empty data")
 timer(ols(Y ~ X, df))         // time execution
