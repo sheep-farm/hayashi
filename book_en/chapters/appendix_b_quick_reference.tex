@@ -62,8 +62,10 @@ Special constant: \texttt{\_n} = row number (1-based).
 
 \begin{lstlisting}[style=inline, basicstyle=\ttfamily\footnotesize]
 let  const  fn  return  if  else  for  in  while  break  continue
-match  try  catch  and  or  not  true  false  nil
+match  try  catch  and  or  not  true  false  nil  quietly
 \end{lstlisting}
+
+\lstinline{quietly on} suppresses automatic output; \lstinline{quietly off} restores it. The flag is scope-aware.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Descriptive statistics}

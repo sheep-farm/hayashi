@@ -146,3 +146,41 @@ for _ in 1..5 {
   display "iteração"
 }
 \end{lstlisting}
+
+\section{Blocos expressão}
+
+Um bloco pode ser usado como expressão. Ele avalia uma sequência de statements e retorna o valor da última expressão. Variáveis declaradas dentro do bloco são locais a ele:
+
+\begin{lstlisting}[caption={Bloco expressão retornando um valor}]
+let df = {
+  let raw = load("dados.csv")
+  generate raw y = log(x)
+  keep(raw, ["date", "y"])
+  raw
+}
+\end{lstlisting}
+
+Após o bloco, \lstinline{df} está disponível, mas \lstinline{raw} não.
+
+\section{Controle de saída}
+
+\lstinline{quietly on} suprime a saída automática de statements e estimadores. \lstinline{print(...)} e \lstinline{display ...} continuam aparecendo. \lstinline{quietly off} restaura a saída normal. A flag respeita escopo:
+
+\begin{lstlisting}[caption={quietly on/off com escopo}]
+quietly on
+
+let df = {
+  let a = load("a.csv")
+  let b = load("b.csv")
+  let m = merge(a, b, key=id, type=inner)
+  generate m z = x - y
+  m
+}
+
+quietly off
+
+ols(z ~ x, df)
+print("pronto")
+\end{lstlisting}
+
+Dentro do bloco, \lstinline{quietly off} habilitaria temporariamente a saída; ao sair do bloco, ela volta para \lstinline{quietly on}.
