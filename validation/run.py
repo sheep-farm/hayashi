@@ -628,6 +628,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         action="store_true",
         help="Do not rewrite validation/matrix.yml or validation/MATRIX.md.",
     )
+    parser.add_argument(
+        "--allow-blocked",
+        action="store_true",
+        help="Exit successfully when the overall status is blocked.",
+    )
     return parser.parse_args(argv)
 
 
@@ -749,6 +754,14 @@ def write_matrix(matrix: dict[str, Any], cases: list[dict[str, Any]]) -> None:
     update_matrix_md(cases)
 
 
+def exit_code_for_status(overall_status: str, allow_blocked: bool = False) -> int:
+    if overall_status == "fail":
+        return 1
+    if overall_status == "blocked" and not allow_blocked:
+        return 1
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv if argv is not None else sys.argv[1:])
 
@@ -791,7 +804,7 @@ def main(argv: list[str] | None = None) -> int:
         write_matrix(matrix, cases)
 
     log(f"\nOverall status: {overall_status}")
-    return 0 if overall_status != "fail" else 1
+    return exit_code_for_status(overall_status, args.allow_blocked)
 
 
 if __name__ == "__main__":

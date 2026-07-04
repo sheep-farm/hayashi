@@ -35,10 +35,20 @@ Useful runner options:
 python validation/run.py --list
 python validation/run.py --case heckman_mroz
 python validation/run.py --case heckman_mroz --case ols_cluster_wagepan --no-write
+python validation/run.py --allow-blocked
 ```
 
 The same options can be passed through `hay validate`, for example
 `hay validate --case heckman_mroz --no-write`.
+
+## Exit codes
+
+- `0` — all selected cases pass, or the runner is used only for listing cases.
+- `1` — at least one selected case fails, the requested case is unknown, or the
+  overall status is `blocked`.
+
+Use `--allow-blocked` when regenerating dashboards or doing exploratory
+validation work where a known blocked case should not fail the command.
 
 ## Requirements
 
