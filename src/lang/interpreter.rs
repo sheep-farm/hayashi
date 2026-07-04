@@ -1627,6 +1627,25 @@ impl Interpreter {
                 }
                 Ok(Value::List(Rc::new(v)))
             }
+
+            Expr::Block(stmts, final_expr) => {
+                self.env.push_scope();
+                let mut result = Value::Nil;
+                for s in stmts {
+                    match self.exec(&(s.clone(), 0)) {
+                        Ok(()) => {}
+                        Err(e) => {
+                            self.env.pop_scope();
+                            return Err(e);
+                        }
+                    }
+                }
+                if let Some(e) = final_expr {
+                    result = self.eval_expr(e)?;
+                }
+                self.env.pop_scope();
+                Ok(result)
+            }
         }
     }
 
