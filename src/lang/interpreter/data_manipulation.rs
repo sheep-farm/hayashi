@@ -2025,6 +2025,26 @@ impl Interpreter {
                 Ok(Value::DataFrame(Rc::new(new_df)))
             }
 
+            // ── ffill ─────────────────────────────────────────────────────────
+            // ffill(df) -> forward-fill de NaN em todas as colunas float
+            "ffill" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "ffill(df) requires a DataFrame as first argument".into(),
+                    ));
+                }
+                let df = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(df) => df,
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "ffill: first argument must be a DataFrame".into(),
+                        ))
+                    }
+                };
+                let new_df = df.fillna_ffill().map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                Ok(Value::DataFrame(Rc::new(new_df)))
+            }
+
             // ── filter ───────────────────────────────────────────────────────
             // filter(df, condition_expr) → DataFrame com linhas onde cond ≠ 0
             "filter" => {
