@@ -355,7 +355,7 @@ fn run() {
             return;
         }
         Some("dist-update") => {
-            dist_update();
+            dist_update(&args_clean[2..]);
             return;
         }
         Some("remove") | Some("uninstall") => {
@@ -475,9 +475,52 @@ fn run_validation(args: &[&str]) {
     std::process::exit(status.code().unwrap_or(1));
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DistUpdateMode {
+    Install,
+    Check,
+    Help,
+}
+
+fn parse_dist_update_args(args: &[&str]) -> Result<DistUpdateMode, String> {
+    match args {
+        [] => Ok(DistUpdateMode::Install),
+        ["--help"] | ["-h"] => Ok(DistUpdateMode::Help),
+        ["--check"] | ["--dry-run"] => Ok(DistUpdateMode::Check),
+        [unknown] => Err(format!("unknown dist-update option '{unknown}'")),
+        _ => Err(format!(
+            "unexpected dist-update arguments: {}",
+            args.join(" ")
+        )),
+    }
+}
+
+fn print_dist_update_help() {
+    println!("hay dist-update — check and install the latest hay release from GitHub");
+    println!();
+    println!("USAGE:");
+    println!("    hay dist-update             Check and install the latest release");
+    println!("    hay dist-update --check     Report whether an update is available");
+    println!("    hay dist-update --dry-run   Alias for --check");
+    println!("    hay dist-update --help      Show this help");
+}
+
 /// Checks GitHub for a newer hay release and, if found, downloads and replaces
 /// the current binary in-place.
-fn dist_update() {
+fn dist_update(args: &[&str]) {
+    let mode = match parse_dist_update_args(args) {
+        Ok(DistUpdateMode::Help) => {
+            print_dist_update_help();
+            return;
+        }
+        Ok(mode) => mode,
+        Err(e) => {
+            eprintln!("hay dist-update: {e}");
+            eprintln!("Try `hay dist-update --help`.");
+            std::process::exit(1);
+        }
+    };
+
     let current = VERSION;
     println!("hay dist-update: current version {current}");
 
@@ -521,6 +564,13 @@ fn dist_update() {
             std::process::exit(1);
         });
 
+    if mode == DistUpdateMode::Check {
+        println!("hay dist-update: update available: {remote_version}");
+        println!("hay dist-update: asset: {}", asset.name);
+        println!("hay dist-update: check only; not downloading or replacing the binary");
+        return;
+    }
+
     let exe_path = std::env::current_exe().unwrap_or_else(|e| {
         eprintln!("hay dist-update: cannot locate current executable: {e}");
         std::process::exit(1);
@@ -538,7 +588,10 @@ fn dist_update() {
     match ureq::get(&asset.browser_download_url).call() {
         Ok(resp) => {
             let mut reader = resp.into_reader();
-            let mut file = std::fs::File::create(&archive_path).unwrap();
+            let mut file = std::fs::File::create(&archive_path).unwrap_or_else(|e| {
+                eprintln!("hay dist-update: cannot create archive file: {e}");
+                std::process::exit(1);
+            });
             std::io::copy(&mut reader, &mut file).unwrap_or_else(|e| {
                 eprintln!("hay dist-update: download failed: {e}");
                 std::process::exit(1);
@@ -551,7 +604,10 @@ fn dist_update() {
     }
 
     let extract_dir = tmp_dir.join("extract");
-    std::fs::create_dir_all(&extract_dir).unwrap();
+    std::fs::create_dir_all(&extract_dir).unwrap_or_else(|e| {
+        eprintln!("hay dist-update: cannot create extraction directory: {e}");
+        std::process::exit(1);
+    });
     if let Err(e) = archive_cmd(&archive_path, &extract_dir) {
         eprintln!("hay dist-update: cannot extract archive: {e}");
         std::process::exit(1);
@@ -582,7 +638,12 @@ fn dist_update() {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let mut perms = std::fs::metadata(&exe_path).unwrap().permissions();
+        let mut perms = std::fs::metadata(&exe_path)
+            .unwrap_or_else(|e| {
+                eprintln!("hay dist-update: cannot inspect installed binary: {e}");
+                std::process::exit(1);
+            })
+            .permissions();
         perms.set_mode(0o755);
         let _ = std::fs::set_permissions(&exe_path, perms);
     }
@@ -647,7 +708,11 @@ fn dist_asset_kind() -> (&'static str, Extractor) {
 
 /// Searches the extracted archive for the new hay binary.
 fn find_extracted_bin(dir: &std::path::Path) -> Option<std::path::PathBuf> {
-    let name = if std::env::consts::OS == "windows" { "hay.exe" } else { "hay" };
+    let name = if std::env::consts::OS == "windows" {
+        "hay.exe"
+    } else {
+        "hay"
+    };
     let mut queue = vec![dir.to_path_buf()];
     while let Some(current) = queue.pop() {
         if let Ok(entries) = std::fs::read_dir(&current) {
@@ -669,7 +734,10 @@ fn find_extracted_bin(dir: &std::path::Path) -> Option<std::path::PathBuf> {
 fn is_newer_version(remote: &str, current: &str) -> bool {
     fn parse(v: &str) -> (Vec<u32>, Option<&str>) {
         let v = v.trim_start_matches('v');
-        let (num, pre) = v.split_once('-').map(|(n, p)| (n, Some(p))).unwrap_or((v, None));
+        let (num, pre) = v
+            .split_once('-')
+            .map(|(n, p)| (n, Some(p)))
+            .unwrap_or((v, None));
         let nums: Vec<u32> = num
             .split('.')
             .filter_map(|s| s.parse::<u32>().ok())
@@ -698,6 +766,43 @@ fn is_newer_version(remote: &str, current: &str) -> bool {
         (Some(_), None) => false,
         (None, None) => false,
         (Some(a), Some(b)) => a > b,
+    }
+}
+
+#[cfg(test)]
+mod dist_update_tests {
+    use super::{parse_dist_update_args, DistUpdateMode};
+
+    #[test]
+    fn dist_update_without_args_installs() {
+        assert_eq!(parse_dist_update_args(&[]), Ok(DistUpdateMode::Install));
+    }
+
+    #[test]
+    fn dist_update_help_does_not_install() {
+        assert_eq!(
+            parse_dist_update_args(&["--help"]),
+            Ok(DistUpdateMode::Help)
+        );
+        assert_eq!(parse_dist_update_args(&["-h"]), Ok(DistUpdateMode::Help));
+    }
+
+    #[test]
+    fn dist_update_check_modes_do_not_install() {
+        assert_eq!(
+            parse_dist_update_args(&["--check"]),
+            Ok(DistUpdateMode::Check)
+        );
+        assert_eq!(
+            parse_dist_update_args(&["--dry-run"]),
+            Ok(DistUpdateMode::Check)
+        );
+    }
+
+    #[test]
+    fn dist_update_rejects_unknown_or_extra_args() {
+        assert!(parse_dist_update_args(&["--force"]).is_err());
+        assert!(parse_dist_update_args(&["--check", "--force"]).is_err());
     }
 }
 
@@ -851,7 +956,7 @@ fn print_help() {
     println!("    hay update [user/repo]   Update package(s) (-y to bypass prompt)");
     println!("    hay check-plugin [name]  Check integrity/version with remote repository");
     println!("    hay validate [options]   Run the empirical validation programme (R/Python)");
-    println!("    hay dist-update          Check and install the latest hay release from GitHub");
+    println!("    hay dist-update [--check] Check/install the latest hay release from GitHub");
     println!();
     println!("In REPL, type help() for full command list or help(cmd) for details.");
 }
