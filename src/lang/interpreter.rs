@@ -14,6 +14,31 @@ use statrs::distribution::{ContinuousCDF, Normal};
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
+/// Saída automática da linguagem: respeita `quiet_mode` e `capturing`.
+/// Use para todo print que não seja uma saída explícita do usuário (print/display).
+#[macro_export]
+macro_rules! emit {
+    ($self:expr, $($arg:tt)*) => {
+        if !$self.capturing && !$self.env.quiet_mode() {
+            print!($($arg)*);
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! emitln {
+    ($self:expr) => {
+        if !$self.capturing && !$self.env.quiet_mode() {
+            println!();
+        }
+    };
+    ($self:expr, $($arg:tt)*) => {
+        if !$self.capturing && !$self.env.quiet_mode() {
+            println!($($arg)*);
+        }
+    };
+}
+
 // ── eval_call() dividido por categoria (ver src/lang/interpreter/) ──────────
 // Cada submódulo implementa `impl Interpreter { fn eval_call_X(...) -> Result<Option<Value>> }`
 // Retorna `Ok(None)` quando `func` não pertence à categoria, para o dispatcher tentar a próxima.
@@ -500,23 +525,37 @@ impl Scope {
 
 pub struct Env {
     scopes: Vec<Scope>,
+    quiet_mode: bool,
+    quiet_stack: Vec<bool>,
 }
 
 impl Env {
     pub fn new() -> Self {
         Self {
             scopes: vec![Scope::new()],
+            quiet_mode: false,
+            quiet_stack: Vec::new(),
         }
     }
 
     pub fn push_scope(&mut self) {
+        self.quiet_stack.push(self.quiet_mode);
         self.scopes.push(Scope::new());
     }
 
     pub fn pop_scope(&mut self) {
         if self.scopes.len() > 1 {
             self.scopes.pop();
+            self.quiet_mode = self.quiet_stack.pop().unwrap_or(false);
         }
+    }
+
+    pub fn quiet_mode(&self) -> bool {
+        self.quiet_mode
+    }
+
+    pub fn set_quiet_mode(&mut self, mode: bool) {
+        self.quiet_mode = mode;
     }
 
     pub fn declare(&mut self, name: &str, val: Value) -> Result<()> {
@@ -3619,7 +3658,8 @@ impl Interpreter {
                 }
                 let df =
                     greeners::DataFrame::new(col_map).map_err(|e| self.rt_err(e.to_string()))?;
-                println!(
+                emitln!(
+                    self,
                     "input → {alias} ({n} obs, {} vars: {})",
                     k,
                     headers.join(", ")
@@ -3691,7 +3731,7 @@ impl Interpreter {
                             ));
                         };
                         let (df, n_rows) = crate::io::odbc::load_odbc(conn_str, &sql)?;
-                        println!("Loaded ODBC → {alias} ({n_rows} rows)");
+                        emitln!(self, "Loaded ODBC → {alias} ({n_rows} rows)");
                         self.env.set(alias, Value::DataFrame(Rc::new(df)))?;
                     }
                     #[cfg(not(feature = "odbc"))]
@@ -3706,7 +3746,7 @@ impl Interpreter {
                     // ── Arquivo / URL ───────────────────────────────────────
                     let _tmp;
                     let local_path: &str = if crate::io::fetch::is_url(&path_str) {
-                        println!("Downloading '{}'…", path_str);
+                        emitln!(self, "Downloading '{}'…", path_str);
                         _tmp = crate::io::fetch::download_to_temp(&path_str)?;
                         _tmp.to_str()
                             .ok_or_else(|| self.rt_err("temp path is not UTF-8"))?
@@ -3755,7 +3795,7 @@ impl Interpreter {
                             }
                         }
                     };
-                    println!("Loaded '{}' → {alias} ({} rows)", path_str, n_rows);
+                    emitln!(self, "Loaded '{}' → {alias} ({} rows)", path_str, n_rows);
                     self.env.set(alias, Value::DataFrame(Rc::new(df)))?;
                 } // else (não-ODBC)
             }
@@ -4352,7 +4392,7 @@ impl Interpreter {
                 Rc::make_mut(&mut df_val)
                     .insert(varname.clone(), arr)
                     .map_err(|e: greeners::GreenersError| self.rt_err(e.to_string()))?;
-                println!("({} obs)  {df}.{varname} generated", df_val.n_rows());
+                emitln!(self, "({} obs)  {df}.{varname} generated", df_val.n_rows());
                 self.env.set(df, Value::DataFrame(df_val))?;
             }
 
@@ -4792,8 +4832,8 @@ impl Interpreter {
                     let val = self.eval_expr(expr)?;
                     if !matches!(val, Value::Nil) {
                         match &val {
-                            Value::Str(v) => println!("\"{v}\""),
-                            _ => println!("{val}"),
+                            Value::Str(v) => emitln!(self, "\"{v}\""),
+                            _ => emitln!(self, "{val}"),
                         }
                     }
                 }
@@ -4811,6 +4851,14 @@ impl Interpreter {
                     }
                 }
                 self.env.pop_scope();
+            }
+
+            Stmt::QuietlyOn => {
+                self.env.set_quiet_mode(true);
+            }
+
+            Stmt::QuietlyOff => {
+                self.env.set_quiet_mode(false);
             }
         }
         Ok(())

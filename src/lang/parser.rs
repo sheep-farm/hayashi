@@ -1330,6 +1330,24 @@ impl Parser {
                 Ok(Some(Stmt::Assign { name, value }))
             }
 
+            Token::Quietly => {
+                self.advance(); // consome quietly
+                match self.peek() {
+                    Token::Ident(s) if s == "on" => {
+                        self.advance();
+                        Ok(Some(Stmt::QuietlyOn))
+                    }
+                    Token::Ident(s) if s == "off" => {
+                        self.advance();
+                        Ok(Some(Stmt::QuietlyOff))
+                    }
+                    other => Err(HayashiError::Parse {
+                        line,
+                        msg: format!("expected 'on' or 'off' after quietly, got {other:?}"),
+                    }),
+                }
+            }
+
             Token::Ident(_) => {
                 let expr = self.parse_expr()?;
                 Ok(Some(Stmt::Expr(expr)))

@@ -29,6 +29,7 @@ pub enum Token {
     Return,
     Break,
     Continue,
+    Quietly,
     Nil,
 
     // Operadores de série temporal: L.x  L2.x  F.x  D.x
@@ -198,6 +199,7 @@ impl Lexer {
             "return" => Token::Return,
             "break" => Token::Break,
             "continue" => Token::Continue,
+            "quietly" => Token::Quietly,
             "nil" => Token::Nil,
             "true" => Token::Bool(true),
             "false" => Token::Bool(false),
