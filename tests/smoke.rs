@@ -1038,6 +1038,101 @@ estat(m1)
     );
 }
 
+#[test]
+fn tidy_ols_basic() {
+    assert_ok_contains(
+        "tidy_ols",
+        r#"
+input df
+Y X
+10 2
+12 3
+8 1
+15 5
+11 2
+14 4
+end
+let m = ols(Y ~ X, df)
+let t = tidy(m)
+print(t)
+"#,
+        "variable",
+    );
+}
+
+#[test]
+fn glance_ols_basic() {
+    assert_ok_contains(
+        "glance_ols",
+        r#"
+input df
+Y X
+10 2
+12 3
+8 1
+15 5
+11 2
+14 4
+end
+let m = ols(Y ~ X, df)
+let g = glance(m)
+print(g)
+"#,
+        "r2",
+    );
+}
+
+#[test]
+fn rolling_ols_basic() {
+    assert_ok_contains(
+        "rolling_ols",
+        r#"
+input df
+Y X
+1 1
+2 2
+3 3
+4 4
+5 5
+6 6
+7 7
+8 8
+9 9
+10 10
+end
+let roll = rolling(Y ~ X, df, window=5)
+print(roll)
+"#,
+        "Rolling Regression",
+    );
+}
+
+#[test]
+fn tidy_rolling_wide_format() {
+    assert_ok_contains(
+        "tidy_rolling",
+        r#"
+input df
+Y X
+1 1
+2 2
+3 3
+4 4
+5 5
+6 6
+7 7
+8 8
+9 9
+10 10
+end
+let roll = rolling(Y ~ X, df, window=5)
+let t = tidy(roll)
+print(t)
+"#,
+        "const",
+    );
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // FINANÇAS — portsort, doublesort, fmb
 // ══════════════════════════════════════════════════════════════════════════════
