@@ -62,8 +62,10 @@ Constante especial: \texttt{\_n} = número de linha (base 1).
 
 \begin{lstlisting}[style=inline, basicstyle=\ttfamily\footnotesize]
 let  const  fn  return  if  else  for  in  while  break  continue
-match  try  catch  and  or  not  true  false  nil
+match  try  catch  and  or  not  true  false  nil  quietly
 \end{lstlisting}
+
+\lstinline{quietly on} suprime a saída automática; \lstinline{quietly off} restaura. A flag respeita escopo.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Funções auxiliares}
@@ -126,6 +128,7 @@ match  try  catch  and  or  not  true  false  nil
 \texttt{replace df col = e if c}  & Modifica com condição \\
 \texttt{sort(df, col [desc])}     & Ordena \\
 \texttt{dropna(df [, cols...])}   & Remove NaN \\
+\texttt{ffill(df)}                & Preenche NaN com último valor válido \\
 \texttt{append(df1, df2)}         & Empilha verticalmente \\
 \texttt{merge(df1, df2, on=col)}  & Junção horizontal \\
 \texttt{group\_by(df, col, agg)}  & Agrega por grupo \\
@@ -136,6 +139,23 @@ match  try  catch  and  or  not  true  false  nil
 \texttt{encode(df, col)}          & String → numérico \\
 \texttt{decode(df, col, labels)}  & Numérico → string \\
 \texttt{drop\_collinear(df)}       & Remove colunas colineares \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Auxiliares de arquivo e I/O}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Função} & \textbf{Descrição} \\
+\midrule
+\texttt{file\_exists(path)}       & Retorna true se o path existe \\
+\texttt{ensure\_dir(path)}        & Cria diretório (e pais) \\
+\texttt{write(content, path)}     & Escreve string em arquivo \\
+\texttt{export(df, "csv", path)}   & Salva DataFrame em CSV \\
+\texttt{load "path" as df}        & Carrega CSV/parquet em DataFrame \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -182,7 +202,7 @@ OLS               & \texttt{ols(y \textasciitilde{} x1 + x2, df)} \\
 IV/2SLS           & \texttt{iv(y \textasciitilde{} x, \textasciitilde{} z, df)} \\
 GMM               & \texttt{gmm(y \textasciitilde{} x, \textasciitilde{} z1 + z2, df)} \\
 WLS               & \texttt{wls(y \textasciitilde{} x, df, weights="w")} \\
-Rolling OLS       & \texttt{rols(y \textasciitilde{} x, df, window=50)} \\
+Rolling OLS       & \texttt{rolling(y \textasciitilde{} x, df, window=50 [, date=col])} \\
 \midrule
 LASSO             & \texttt{lasso(y \textasciitilde{} x1+...+xk, df, alpha=0.1)} \\
 Ridge             & \texttt{ridge\_reg(y \textasciitilde{} x1+...+xk, df, alpha=0.5)} \\
@@ -409,6 +429,8 @@ Combinação linear   & \texttt{lincom(m, "x1 + x2")} \\
 \texttt{estclear()}            & Limpa modelos armazenados \\
 \texttt{predict(m, df)}        & Adiciona coluna \texttt{yhat} ao df \\
 \texttt{margins(m, df)}        & Efeitos marginais médios (AME) \\
+\texttt{tidy(m)}               & DataFrame organizado de coeficientes \\
+\texttt{glance(m)}              & DataFrame de resumo do modelo (1 linha) \\
 \bottomrule
 \end{tabular}
 \end{center}

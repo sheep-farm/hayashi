@@ -80,6 +80,16 @@ dropna df                 // remove linhas com qualquer NaN
 dropna df renda gini
 \end{lstlisting}
 
+\section{\texttt{ffill}}
+
+Forward-fill substitui \texttt{NaN} pelo último valor não ausente. Útil quando
+uma série mensal ou trimestral precisa ser expandida para frequência diária:
+
+\begin{lstlisting}[caption={Preenchendo uma taxa mensal em dados diários}]
+let daily = merge(asset, rf, key=date, type=left)
+let daily = ffill(daily)
+\end{lstlisting}
+
 \section{\texttt{append}}
 
 Empilha dois DataFrames verticalmente (equivalente a \texttt{rbind}):
@@ -143,4 +153,48 @@ Tabela de frequências:
 \begin{lstlisting}
 tabulate df uf
 tabulate df uf ano    // tabulação cruzada
+\end{lstlisting}
+
+\section{Auxiliares de arquivo}
+
+Pequenos auxiliares para scripts que persistem dados ou verificam cache:
+
+\begin{lstlisting}[caption={Auxiliares de cache}]
+ensure_dir("cache")                    // cria diretório se não existir
+if file_exists("cache/dados.csv") {
+    load "cache/dados.csv" as df
+} else {
+    let df = download(...)
+    export(df, "csv", "cache/dados.csv")
+}
+
+write("texto bruto", "nota.txt")     // escreve string em arquivo
+\end{lstlisting}
+
+\section{\texttt{rolling}}
+
+\texttt{rolling} estima OLS em uma janela móvel. É útil para visualizar
+coeficientes que variam no tempo ou testar a estabilidade de parâmetros.
+Uma coluna \texttt{date} opcional armazena o rótulo do final de cada
+janela.
+
+\begin{lstlisting}[caption={OLS rolante com rótulos de data}]
+let roll = rolling(y ~ x1 + x2, df, window=252, date=date)
+let betas = tidy(roll)
+print(betas)
+\end{lstlisting}
+
+\section{\texttt{tidy} e \texttt{glance}}
+
+Essas funções convertem objetos de modelo em DataFrames. \texttt{tidy}
+retorna um DataFrame organizado com coeficientes, erros-padrão e
+intervalos de confiança. Para modelos \texttt{rolling}, retorna uma
+linha por janela com colunas \texttt{date}, \texttt{r2} e uma coluna de
+coeficiente por variável. \texttt{glance} retorna um resumo de uma
+linha com estatísticas de ajuste.
+
+\begin{lstlisting}[caption={Tidy e glance}]
+let m = ols(y ~ x1 + x2, df)
+let coefs = tidy(m)
+let summary = glance(m)
 \end{lstlisting}

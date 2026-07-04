@@ -1007,7 +1007,7 @@ impl Interpreter {
             }
 
             // ── Rolling OLS (janela deslizante) ───────────────────────────────
-            // rolling(y ~ x1 + x2, df, window=30)
+            // rolling(y ~ x1 + x2, df, window=30 [, date=date_col])
             // Estima OLS para cada janela de tamanho `window`
             // Útil para: coeficientes time-varying, testes de estabilidade
             "rolling" | "rols" => {
@@ -1027,7 +1027,19 @@ impl Interpreter {
                     }
                     _ => return Err(HayashiError::Type("window= must be integer".into())),
                 };
-                let result = greeners::RollingOLS::fit(&y_vec, &x_mat, window)
+                let dates: Option<Vec<String>> = match opt_map.get("date") {
+                    Some(Value::Str(col)) => {
+                        let arr = df.get_string(col)
+                            .map_err(|e| HayashiError::Runtime(format!("rolling: date column: {e}")))?;
+                        Some(arr.to_vec())
+                    }
+                    None => None,
+                    _ => return Err(HayashiError::Type("rolling: date= must be string column name".into())),
+                };
+                let var_names = df.formula_var_names(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(format!("rolling: variable names: {e}")))?;
+                let dates_ref = dates.as_deref();
+                let result = greeners::RollingOLS::fit(&y_vec, &x_mat, window, dates_ref, Some(var_names))
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 Ok(Value::RollingResult(Rc::new(result)))
             }

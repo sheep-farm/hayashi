@@ -1018,7 +1018,8 @@ impl Interpreter {
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let n_matched = result_rows.iter().filter(|(_, r2)| r2.is_some()).count();
                 let n_out = result_rows.len();
-                println!(
+                emitln!(
+                    self,
                     "({n_matched} matched, {} not matched, {n_out} total)",
                     n_out - n_matched
                 );
@@ -2020,7 +2021,27 @@ impl Interpreter {
                     .build()
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-                println!("({n_drop} observations dropped, {n_kept} remaining)");
+                emitln!(self, "({n_drop} observations dropped, {n_kept} remaining)");
+                Ok(Value::DataFrame(Rc::new(new_df)))
+            }
+
+            // ── ffill ─────────────────────────────────────────────────────────
+            // ffill(df) -> forward-fill de NaN em todas as colunas float
+            "ffill" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "ffill(df) requires a DataFrame as first argument".into(),
+                    ));
+                }
+                let df = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(df) => df,
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "ffill: first argument must be a DataFrame".into(),
+                        ))
+                    }
+                };
+                let new_df = df.fillna_ffill().map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 Ok(Value::DataFrame(Rc::new(new_df)))
             }
 
@@ -2427,7 +2448,8 @@ impl Interpreter {
                     generated.push(o.name.clone());
                 }
                 if !self.capturing {
-                    println!(
+                    emitln!(
+                        self,
                         "({} obs)  {} column(s) generated: {}",
                         df_val.n_rows(),
                         generated.len(),
@@ -2460,7 +2482,8 @@ impl Interpreter {
                     .select(&refs)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-                println!(
+                emitln!(
+                    self,
                     "({} variables kept, {} dropped)",
                     refs.len(),
                     n_before - refs.len()

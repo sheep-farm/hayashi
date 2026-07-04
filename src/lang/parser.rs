@@ -470,24 +470,28 @@ impl Parser {
                 Ok(Expr::List(items))
             }
 
-            // Dict literal: {"key": value, ...}
+            // Dict literal: {"key": value, ...}  ou bloco expressão: { stmt; ...; expr }
             Token::LBrace => {
-                self.advance(); // consome LBrace
-                                // Incrementa manualmente: dentro do dict, Newlines são ignorados
-                self.brace_depth += 1;
-                let mut pairs = Vec::new();
-                while !matches!(self.peek(), Token::RBrace | Token::Eof) {
-                    let key = self.parse_expr()?;
-                    self.expect(&Token::Colon)?;
-                    let val = self.parse_expr()?;
-                    pairs.push((key, val));
-                    if self.peek() == &Token::Comma {
-                        self.advance();
+                if self.is_dict_literal() {
+                    self.advance(); // consome LBrace
+                                    // Incrementa manualmente: dentro do dict, Newlines são ignorados
+                    self.brace_depth += 1;
+                    let mut pairs = Vec::new();
+                    while !matches!(self.peek(), Token::RBrace | Token::Eof) {
+                        let key = self.parse_expr()?;
+                        self.expect(&Token::Colon)?;
+                        let val = self.parse_expr()?;
+                        pairs.push((key, val));
+                        if self.peek() == &Token::Comma {
+                            self.advance();
+                        }
                     }
+                    self.brace_depth -= 1; // decrementa antes do RBrace
+                    self.expect(&Token::RBrace)?;
+                    Ok(Expr::Dict(pairs))
+                } else {
+                    self.parse_block_expr()
                 }
-                self.brace_depth -= 1; // decrementa antes do RBrace
-                self.expect(&Token::RBrace)?;
-                Ok(Expr::Dict(pairs))
             }
 
             // Fórmula sem LHS: ~ z1 + z2
@@ -807,6 +811,38 @@ impl Parser {
         }
         self.expect(&Token::RBrace)?;
         Ok(stmts)
+    }
+
+    // ── Bloco expressão: { stmt; ...; expr } ───────────────────────────────────
+
+    fn is_dict_literal(&mut self) -> bool {
+        // Olha à frente do LBrace atual: {"key": ...} começa com StringLit seguido de ':'.
+        matches!(self.tokens.get(self.pos + 1).map(|t| &t.0), Some(Token::StringLit(_)))
+            && self.tokens.get(self.pos + 2).map(|t| &t.0) == Some(&Token::Colon)
+    }
+
+    fn parse_block_expr(&mut self) -> Result<Expr> {
+        self.expect(&Token::LBrace)?;
+        self.brace_depth += 1;
+        self.skip_newlines();
+        let mut stmts = Vec::new();
+        while !matches!(self.peek(), Token::RBrace | Token::Eof) {
+            if let Some(s) = self.parse_stmt()? {
+                stmts.push(s);
+            }
+            self.skip_newlines();
+        }
+        self.brace_depth -= 1;
+        self.expect(&Token::RBrace)?;
+        // Se a última statement for uma expressão, ela é o valor de retorno do bloco.
+        let final_expr = if let Some(Stmt::Expr(e)) = stmts.last() {
+            let e = e.clone();
+            stmts.pop();
+            Some(Box::new(e))
+        } else {
+            None
+        };
+        Ok(Expr::Block(stmts, final_expr))
     }
 
     // ── Iterador do for ────────────────────────────────────────────────────────
@@ -1292,6 +1328,24 @@ impl Parser {
                     rhs: Box::new(rhs),
                 };
                 Ok(Some(Stmt::Assign { name, value }))
+            }
+
+            Token::Quietly => {
+                self.advance(); // consome quietly
+                match self.peek() {
+                    Token::Ident(s) if s == "on" => {
+                        self.advance();
+                        Ok(Some(Stmt::QuietlyOn))
+                    }
+                    Token::Ident(s) if s == "off" => {
+                        self.advance();
+                        Ok(Some(Stmt::QuietlyOff))
+                    }
+                    other => Err(HayashiError::Parse {
+                        line,
+                        msg: format!("expected 'on' or 'off' after quietly, got {other:?}"),
+                    }),
+                }
             }
 
             Token::Ident(_) => {

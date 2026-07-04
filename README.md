@@ -3,7 +3,7 @@
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
 [![Docs: CC BY-SA 4.0](https://img.shields.io/badge/Docs-CC%20BY--SA%204.0-lightgrey.svg)](LICENSE-BOOKS.md)
 [![Rust](https://img.shields.io/badge/Rust-2021-orange.svg)](https://www.rust-lang.org)
-[![Version](https://img.shields.io/badge/version-0.2.6-blue.svg)](Cargo.toml)
+[![Version](https://img.shields.io/badge/version-0.2.7--dev-yellow.svg)](Cargo.toml)
 [![crates.io](https://img.shields.io/crates/v/hayashi-lang.svg)](https://crates.io/crates/hayashi-lang)
 [![CI](https://github.com/sheep-farm/hayashi/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/sheep-farm/hayashi/actions/workflows/ci.yml?query=branch%3Amaster)
 
@@ -104,11 +104,49 @@ Function parameters are `const` by default — data enters immutable, result exi
 | If statement | `if cond { } else if { } else { }` | No |
 | If expression | `if cond { a } else { b }` | Yes |
 | Match | `match expr { pat => result, _ => default }` | Yes |
+| Block expression | `{ stmt; ...; expr }` | Yes |
 | For loop | `for i in 1..10 { }` / `for v in list { }` | No |
 | While loop | `while cond { }` | No |
 | Try/catch | `try { } catch e { }` | No |
 | Break/continue | `break` / `continue` | — |
 | Return | `return expr` | — |
+
+### Block expressions
+
+A block `{ stmt; ...; expr }` evaluates a sequence of statements and returns the value of the last expression. Variables declared inside the block are local to it.
+
+```
+let df = {
+    let raw = load("data.csv")
+    generate raw y = log(x)
+    keep(raw, ["date", "y"])
+    raw
+}
+// df is available; raw and the temporary columns are gone
+```
+
+### Output control
+
+`quietly on` suppresses automatic output from statements and estimators. `print(...)` and `display ...` still appear. `quietly off` restores normal output. The flag is scope-aware: a toggle inside a block reverts when the block ends.
+
+```
+quietly on
+
+let df = {
+    let a = load("a.csv")
+    let b = load("b.csv")
+    let m = merge(a, b, key=id, type=inner)
+    generate m z = x - y
+    m
+}
+
+quietly off
+
+ols(z ~ x, df)
+print("done")
+```
+
+Both `quietly on` and `quietly()` (function form) share the same suppression mechanism, so new commands need no special handling — they just use the internal output channel.
 
 ### Functions and closures
 
@@ -285,6 +323,7 @@ encode(df, region)               // string -> numeric
 decode(df, region_num, labels=["north", "south", "east", "west"])
 winsor(df, Y, p=0.01)
 dropna(df, price, mpg)
+ffill(df)                           // forward-fill NaN em colunas float
 rename(df, old, new)
 label(df, Y, "GDP per capita")
 duplicates(df, id, action=drop)
@@ -554,7 +593,9 @@ fn f(n) {
 ## Misc
 
 ```
-quietly(ols(Y ~ X, df))       // suppress output
+quietly on                    // suppress automatic output from here
+quietly off                   // restore automatic output
+quietly(ols(Y ~ X, df))       // suppress one expression
 capture(ols(Y ~ X, df))       // ignore errors
 assert(n > 0, "empty data")
 timer(ols(Y ~ X, df))         // time execution
@@ -563,6 +604,9 @@ source("other_script.hay")     // run another script
 help(ols)                      // help() has ~210 topics with examples
 help(about)                    // project info (version, license, author)
 print("x =", x, "y =", y)    // multi-arg with sep= and end=
+file_exists("cache/data.csv")  // bool
+ensure_dir("cache")            // create directory if missing
+write("text", "note.txt")      // write string to file
 print("a", "b", sep=", ")     // a, b
 ```
 

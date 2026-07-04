@@ -1346,9 +1346,7 @@ dependencies = [
 
 [[package]]
 name = "greeners"
-version = "1.4.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38d8f6ecece56a075dc8283088f4bc9ac91299992b7dc04544e3b0c74f6593cd"
+version = "1.4.11-dev"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1425,7 +1423,7 @@ dependencies = [
 
 [[package]]
 name = "hayashi-lang"
-version = "0.2.6"
+version = "0.2.7-dev"
 dependencies = [
  "arrow",
  "calamine",
