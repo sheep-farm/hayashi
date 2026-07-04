@@ -323,6 +323,7 @@ encode(df, region)               // string -> numeric
 decode(df, region_num, labels=["north", "south", "east", "west"])
 winsor(df, Y, p=0.01)
 dropna(df, price, mpg)
+ffill(df)                           // forward-fill NaN em colunas float
 rename(df, old, new)
 label(df, Y, "GDP per capita")
 duplicates(df, id, action=drop)
@@ -603,6 +604,9 @@ source("other_script.hay")     // run another script
 help(ols)                      // help() has ~210 topics with examples
 help(about)                    // project info (version, license, author)
 print("x =", x, "y =", y)    // multi-arg with sep= and end=
+file_exists("cache/data.csv")  // bool
+ensure_dir("cache")            // create directory if missing
+write("text", "note.txt")      // write string to file
 print("a", "b", sep=", ")     // a, b
 ```
 

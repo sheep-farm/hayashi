@@ -79,6 +79,17 @@ dropna df                 // remove rows with any NaN
 dropna df income gini     // remove rows with NaN in income or gini
 \end{lstlisting}
 
+\section{\texttt{ffill}}
+
+Forward-fill replaces \texttt{NaN} with the most recent non-missing value.
+Useful when a monthly or quarterly series must be expanded to a daily
+frequency:
+
+\begin{lstlisting}[caption={Forward-filling a monthly rate into daily data}]
+let daily = merge(asset, rf, key=date, type=left)
+let daily = ffill(daily)
+\end{lstlisting}
+
 \section{\texttt{append}}
 
 Stacks two DataFrames vertically (equivalent to \texttt{rbind}):
@@ -142,4 +153,20 @@ Frequency table:
 \begin{lstlisting}
 tabulate df state
 tabulate df state year    // cross-tabulation
+\end{lstlisting}
+
+\section{File-system helpers}
+
+Small helpers for scripts that persist data or check for cached files:
+
+\begin{lstlisting}[caption={Cache helpers}]
+ensure_dir("cache")                    // create directory if missing
+if file_exists("cache/data.csv") {
+    load "cache/data.csv" as df
+} else {
+    let df = download(...)
+    export(df, "csv", "cache/data.csv")
+}
+
+write("raw text", "note.txt")        // write string to file
 \end{lstlisting}

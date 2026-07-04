@@ -128,6 +128,7 @@ match  try  catch  and  or  not  true  false  nil  quietly
 \texttt{replace df col = e if c}  & Modifica com condição \\
 \texttt{sort(df, col [desc])}     & Ordena \\
 \texttt{dropna(df [, cols...])}   & Remove NaN \\
+\texttt{ffill(df)}                & Preenche NaN com último valor válido \\
 \texttt{append(df1, df2)}         & Empilha verticalmente \\
 \texttt{merge(df1, df2, on=col)}  & Junção horizontal \\
 \texttt{group\_by(df, col, agg)}  & Agrega por grupo \\
@@ -138,6 +139,23 @@ match  try  catch  and  or  not  true  false  nil  quietly
 \texttt{encode(df, col)}          & String → numérico \\
 \texttt{decode(df, col, labels)}  & Numérico → string \\
 \texttt{drop\_collinear(df)}       & Remove colunas colineares \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Auxiliares de arquivo e I/O}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Função} & \textbf{Descrição} \\
+\midrule
+\texttt{file\_exists(path)}       & Retorna true se o path existe \\
+\texttt{ensure\_dir(path)}        & Cria diretório (e pais) \\
+\texttt{write(content, path)}     & Escreve string em arquivo \\
+\texttt{export(df, "csv", path)}   & Salva DataFrame em CSV \\
+\texttt{load "path" as df}        & Carrega CSV/parquet em DataFrame \\
 \bottomrule
 \end{tabular}
 \end{center}

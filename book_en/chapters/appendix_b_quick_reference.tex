@@ -108,6 +108,7 @@ match  try  catch  and  or  not  true  false  nil  quietly
 \texttt{replace df col = e if c}  & Modify with condition \\
 \texttt{sort(df, col [desc])}     & Sort \\
 \texttt{dropna(df [, cols...])}   & Remove NaN \\
+\texttt{ffill(df)}                & Forward-fill NaN in float columns \\
 \texttt{append(df1, df2)}         & Stack vertically \\
 \texttt{merge(df1, df2, on=col)}  & Horizontal join \\
 \texttt{group\_by(df, col, agg)}  & Aggregate by group \\
@@ -115,6 +116,23 @@ match  try  catch  and  or  not  true  false  nil  quietly
 \texttt{pivot\_longer(...)}       & Wide $\to$ long \\
 \texttt{pivot\_wider(...)}        & Long $\to$ wide \\
 \texttt{reshape(df, ...)}         & General reshape \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{File and I/O helpers}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Function} & \textbf{Description} \\
+\midrule
+\texttt{file\_exists(path)}       & Return true if path exists \\
+\texttt{ensure\_dir(path)}        & Create directory (and parents) \\
+\texttt{write(content, path)}     & Write string to file \\
+\texttt{export(df, "csv", path)}   & Save DataFrame to CSV \\
+\texttt{load "path" as df}        & Load CSV/parquet into DataFrame \\
 \bottomrule
 \end{tabular}
 \end{center}
