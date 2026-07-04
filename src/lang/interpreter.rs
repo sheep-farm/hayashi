@@ -3333,6 +3333,26 @@ impl Interpreter {
                             let strs = Self::col_to_strings(df, &col_name)?;
                             return Ok(greeners::Transforms::group(&strs));
                         }
+                        "date" => {
+                            let col_name = match &args[0] {
+                                Expr::Var(name) => name.clone(),
+                                _ => return Err(HayashiError::Runtime(
+                                    "date() requires a column name".into()
+                                )),
+                            };
+                            let strs = Self::col_to_strings(df, &col_name)?;
+                            let result: Vec<f64> = strs
+                                .iter()
+                                .map(|s| {
+                                    chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
+                                        .ok()
+                                        .and_then(|d| d.and_hms_opt(0, 0, 0))
+                                        .map(|dt| dt.and_utc().timestamp() as f64)
+                                        .unwrap_or(f64::NAN)
+                                })
+                                .collect();
+                            return Ok(result);
+                        }
                         "year" | "month" | "day" | "hour" | "minute" | "second" | "dow" => {
                             let col_name = match &args[0] {
                                 Expr::Var(name) => name.clone(),
