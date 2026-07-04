@@ -5,6 +5,46 @@ use super::*;
 /// escalares (mean/sum/min/max/std/...) com suporte a `if=`.
 /// Extraído de `eval_call` (ver src/lang/interpreter.rs).
 impl Interpreter {
+    /// Helper for `tidy`: build a tidy coefficient map from model result vectors.
+    fn build_tidy_coef_map(
+        &self,
+        names: Vec<String>,
+        params: &ndarray::Array1<f64>,
+        std_errors: &ndarray::Array1<f64>,
+        t_values: &ndarray::Array1<f64>,
+        p_values: &ndarray::Array1<f64>,
+        conf_lower: &ndarray::Array1<f64>,
+        conf_upper: &ndarray::Array1<f64>,
+    ) -> std::collections::HashMap<String, Value> {
+        let n = params.len();
+        let name_col: Vec<Value> = (0..n)
+            .map(|i| {
+                Value::Str(
+                    names
+                        .get(i)
+                        .cloned()
+                        .unwrap_or_else(|| format!("x{i}")),
+                )
+            })
+            .collect();
+        let coef_col: Vec<Value> = params.iter().map(|&v| Value::Float(v)).collect();
+        let se_col: Vec<Value> = std_errors.iter().map(|&v| Value::Float(v)).collect();
+        let t_col: Vec<Value> = t_values.iter().map(|&v| Value::Float(v)).collect();
+        let p_col: Vec<Value> = p_values.iter().map(|&v| Value::Float(v)).collect();
+        let cl_col: Vec<Value> = conf_lower.iter().map(|&v| Value::Float(v)).collect();
+        let cu_col: Vec<Value> = conf_upper.iter().map(|&v| Value::Float(v)).collect();
+
+        let mut map = std::collections::HashMap::new();
+        map.insert("variable".into(), Value::List(Rc::new(name_col)));
+        map.insert("coef".into(), Value::List(Rc::new(coef_col)));
+        map.insert("std_err".into(), Value::List(Rc::new(se_col)));
+        map.insert("t".into(), Value::List(Rc::new(t_col)));
+        map.insert("p_value".into(), Value::List(Rc::new(p_col)));
+        map.insert("conf_low".into(), Value::List(Rc::new(cl_col)));
+        map.insert("conf_high".into(), Value::List(Rc::new(cu_col)));
+        map
+    }
+
     pub(super) fn eval_call_builtins(
         &mut self,
         func: &str,
@@ -342,24 +382,15 @@ impl Interpreter {
                 match val {
                     Value::OlsResult(m) => {
                         let r = &m.result;
-                        let names = r.variable_names.clone().unwrap_or_default();
-                        let n = r.params.len();
-                        let name_col: Vec<Value> = (0..n)
-                            .map(|i| Value::Str(names.get(i).cloned().unwrap_or_else(|| format!("x{i}"))))
-                            .collect();
-                        let coef_col: Vec<Value> = r.params.iter().map(|&v| Value::Float(v)).collect();
-                        let se_col: Vec<Value> = r.std_errors.iter().map(|&v| Value::Float(v)).collect();
-                        let t_col: Vec<Value> = r.t_values.iter().map(|&v| Value::Float(v)).collect();
-                        let p_col: Vec<Value> = r.p_values.iter().map(|&v| Value::Float(v)).collect();
-                        let cl_col: Vec<Value> = r.conf_lower.iter().map(|&v| Value::Float(v)).collect();
-                        let cu_col: Vec<Value> = r.conf_upper.iter().map(|&v| Value::Float(v)).collect();
-                        map.insert("variable".into(), Value::List(Rc::new(name_col)));
-                        map.insert("coef".into(), Value::List(Rc::new(coef_col)));
-                        map.insert("std_err".into(), Value::List(Rc::new(se_col)));
-                        map.insert("t".into(), Value::List(Rc::new(t_col)));
-                        map.insert("p_value".into(), Value::List(Rc::new(p_col)));
-                        map.insert("conf_low".into(), Value::List(Rc::new(cl_col)));
-                        map.insert("conf_high".into(), Value::List(Rc::new(cu_col)));
+                        map = self.build_tidy_coef_map(
+                            r.variable_names.clone().unwrap_or_default(),
+                            &r.params,
+                            &r.std_errors,
+                            &r.t_values,
+                            &r.p_values,
+                            &r.conf_lower,
+                            &r.conf_upper,
+                        );
                     }
                     Value::RollingResult(r) => {
                         let dates = r.dates.clone();
@@ -411,15 +442,16 @@ impl Interpreter {
                 match val {
                     Value::OlsResult(m) => {
                         let r = &m.result;
-                        map.insert("r2".into(), Value::Float(r.r_squared));
-                        map.insert("adj_r2".into(), Value::Float(r.adj_r_squared));
-                        map.insert("n".into(), Value::Int(r.n_obs as i64));
-                        map.insert("f_stat".into(), Value::Float(r.f_statistic));
-                        map.insert("prob_f".into(), Value::Float(r.prob_f));
-                        map.insert("aic".into(), Value::Float(r.aic));
-                        map.insert("bic".into(), Value::Float(r.bic));
-                        map.insert("log_lik".into(), Value::Float(r.log_likelihood));
-                        map.insert("sigma".into(), Value::Float(r.sigma));
+                        let scalar = |v: f64| Value::List(Rc::new(vec![Value::Float(v)]));
+                        map.insert("r2".into(), scalar(r.r_squared));
+                        map.insert("adj_r2".into(), scalar(r.adj_r_squared));
+                        map.insert("n".into(), Value::List(Rc::new(vec![Value::Int(r.n_obs as i64)])));
+                        map.insert("f_stat".into(), scalar(r.f_statistic));
+                        map.insert("prob_f".into(), scalar(r.prob_f));
+                        map.insert("aic".into(), scalar(r.aic));
+                        map.insert("bic".into(), scalar(r.bic));
+                        map.insert("log_lik".into(), scalar(r.log_likelihood));
+                        map.insert("sigma".into(), scalar(r.sigma));
                     }
                     _ => return Err(HayashiError::Type("glance: unsupported model type".into())),
                 }
