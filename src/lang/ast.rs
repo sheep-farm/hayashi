@@ -266,6 +266,10 @@ pub enum Stmt {
     Break,
     Continue,
 
+    // quietly on / quietly off
+    QuietlyOn,
+    QuietlyOff,
+
     // try { ... } catch e { ... }
     TryCatch {
         try_body: Vec<Spanned>,
