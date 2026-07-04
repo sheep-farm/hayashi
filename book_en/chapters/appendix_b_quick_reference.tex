@@ -165,7 +165,7 @@ OLS               & \texttt{ols(y \textasciitilde{} x1 + x2, df)} \\
 IV/2SLS           & \texttt{iv(y \textasciitilde{} x, \textasciitilde{} z, df)} \\
 GMM               & \texttt{gmm(y \textasciitilde{} x, \textasciitilde{} z1 + z2, df)} \\
 WLS               & \texttt{wls(y \textasciitilde{} x, df, weights="w")} \\
-Rolling OLS       & \texttt{rols(y \textasciitilde{} x, df, window=50)} \\
+Rolling OLS       & \texttt{rolling(y \textasciitilde{} x, df, window=50 [, date=col])} \\
 \midrule
 LASSO             & \texttt{lasso(y \textasciitilde{} x1+...+xk, df, alpha=0.1)} \\
 Ridge             & \texttt{ridge\_reg(y \textasciitilde{} x1+...+xk, df, alpha=0.5)} \\
@@ -388,6 +388,8 @@ Linear combination  & \texttt{lincom(m, "x1 + x2")} \\
 \texttt{eststo(m, "name")}     & Store model for \texttt{esttab} \\
 \texttt{predict(m, df)}        & Adds column \texttt{yhat} to df \\
 \texttt{margins(m, df)}        & Average marginal effects (AME) \\
+\texttt{tidy(m)}               & Tidy DataFrame of coefficients \\
+\texttt{glance(m)}              & One-row model summary DataFrame \\
 \bottomrule
 \end{tabular}
 \end{center}

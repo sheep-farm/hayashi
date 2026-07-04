@@ -202,7 +202,7 @@ OLS               & \texttt{ols(y \textasciitilde{} x1 + x2, df)} \\
 IV/2SLS           & \texttt{iv(y \textasciitilde{} x, \textasciitilde{} z, df)} \\
 GMM               & \texttt{gmm(y \textasciitilde{} x, \textasciitilde{} z1 + z2, df)} \\
 WLS               & \texttt{wls(y \textasciitilde{} x, df, weights="w")} \\
-Rolling OLS       & \texttt{rols(y \textasciitilde{} x, df, window=50)} \\
+Rolling OLS       & \texttt{rolling(y \textasciitilde{} x, df, window=50 [, date=col])} \\
 \midrule
 LASSO             & \texttt{lasso(y \textasciitilde{} x1+...+xk, df, alpha=0.1)} \\
 Ridge             & \texttt{ridge\_reg(y \textasciitilde{} x1+...+xk, df, alpha=0.5)} \\
@@ -429,6 +429,8 @@ Combinação linear   & \texttt{lincom(m, "x1 + x2")} \\
 \texttt{estclear()}            & Limpa modelos armazenados \\
 \texttt{predict(m, df)}        & Adiciona coluna \texttt{yhat} ao df \\
 \texttt{margins(m, df)}        & Efeitos marginais médios (AME) \\
+\texttt{tidy(m)}               & DataFrame organizado de coeficientes \\
+\texttt{glance(m)}              & DataFrame de resumo do modelo (1 linha) \\
 \bottomrule
 \end{tabular}
 \end{center}

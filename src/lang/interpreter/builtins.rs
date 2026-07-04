@@ -331,6 +331,103 @@ impl Interpreter {
                 }
             }
 
+            // ── tidy: coefficient table from a model ───────────────────────────
+            "tidy" => {
+                if args.len() != 1 {
+                    return Err(HayashiError::Runtime("tidy(model) requires 1 argument".into()));
+                }
+                let val = self.eval_expr(&args[0])?;
+                let mut map = std::collections::HashMap::<String, Value>::new();
+
+                match val {
+                    Value::OlsResult(m) => {
+                        let r = &m.result;
+                        let names = r.variable_names.clone().unwrap_or_default();
+                        let n = r.params.len();
+                        let name_col: Vec<Value> = (0..n)
+                            .map(|i| Value::Str(names.get(i).cloned().unwrap_or_else(|| format!("x{i}"))))
+                            .collect();
+                        let coef_col: Vec<Value> = r.params.iter().map(|&v| Value::Float(v)).collect();
+                        let se_col: Vec<Value> = r.std_errors.iter().map(|&v| Value::Float(v)).collect();
+                        let t_col: Vec<Value> = r.t_values.iter().map(|&v| Value::Float(v)).collect();
+                        let p_col: Vec<Value> = r.p_values.iter().map(|&v| Value::Float(v)).collect();
+                        let cl_col: Vec<Value> = r.conf_lower.iter().map(|&v| Value::Float(v)).collect();
+                        let cu_col: Vec<Value> = r.conf_upper.iter().map(|&v| Value::Float(v)).collect();
+                        map.insert("variable".into(), Value::List(Rc::new(name_col)));
+                        map.insert("coef".into(), Value::List(Rc::new(coef_col)));
+                        map.insert("std_err".into(), Value::List(Rc::new(se_col)));
+                        map.insert("t".into(), Value::List(Rc::new(t_col)));
+                        map.insert("p_value".into(), Value::List(Rc::new(p_col)));
+                        map.insert("conf_low".into(), Value::List(Rc::new(cl_col)));
+                        map.insert("conf_high".into(), Value::List(Rc::new(cu_col)));
+                    }
+                    Value::RollingResult(r) => {
+                        let dates = r.dates.clone();
+                        let n = r.n_obs;
+                        let k = r.params_history.ncols();
+                        let names = r.variable_names.clone().unwrap_or_default();
+                        let mut date_col = Vec::new();
+                        let mut r2_col = Vec::new();
+                        let mut coef_cols: Vec<(String, Vec<Value>)> = (0..k)
+                            .map(|j| {
+                                let name = names.get(j).cloned().unwrap_or_else(|| {
+                                    if j == 0 { "const".into() } else { format!("x{j}") }
+                                });
+                                (name, Vec::new())
+                            })
+                            .collect();
+                        for t in (r.window - 1)..n {
+                            if r.params_history.row(t).iter().any(|v| v.is_nan()) {
+                                continue;
+                            }
+                            let d = dates.get(t).cloned().unwrap_or_else(|| format!("{t}"));
+                            date_col.push(Value::Str(d));
+                            r2_col.push(Value::Float(r.r_squared_history[t]));
+                            for j in 0..k {
+                                coef_cols[j].1.push(Value::Float(r.params_history[[t, j]]));
+                            }
+                        }
+                        map.insert("date".into(), Value::List(Rc::new(date_col)));
+                        map.insert("r2".into(), Value::List(Rc::new(r2_col)));
+                        for (name, vals) in coef_cols {
+                            map.insert(name, Value::List(Rc::new(vals)));
+                        }
+                    }
+                    _ => return Err(HayashiError::Type("tidy: unsupported model type".into())),
+                }
+
+                let df = self.dict_to_dataframe(&map)?;
+                Ok(Value::DataFrame(Rc::new(df)))
+            }
+
+            // ── glance: model fit summary ──────────────────────────────────────
+            "glance" => {
+                if args.len() != 1 {
+                    return Err(HayashiError::Runtime("glance(model) requires 1 argument".into()));
+                }
+                let val = self.eval_expr(&args[0])?;
+                let mut map = std::collections::HashMap::<String, Value>::new();
+
+                match val {
+                    Value::OlsResult(m) => {
+                        let r = &m.result;
+                        map.insert("r2".into(), Value::Float(r.r_squared));
+                        map.insert("adj_r2".into(), Value::Float(r.adj_r_squared));
+                        map.insert("n".into(), Value::Int(r.n_obs as i64));
+                        map.insert("f_stat".into(), Value::Float(r.f_statistic));
+                        map.insert("prob_f".into(), Value::Float(r.prob_f));
+                        map.insert("aic".into(), Value::Float(r.aic));
+                        map.insert("bic".into(), Value::Float(r.bic));
+                        map.insert("log_lik".into(), Value::Float(r.log_likelihood));
+                        map.insert("sigma".into(), Value::Float(r.sigma));
+                    }
+                    _ => return Err(HayashiError::Type("glance: unsupported model type".into())),
+                }
+
+                let df = self.dict_to_dataframe(&map)?;
+                Ok(Value::DataFrame(Rc::new(df)))
+            }
+
             // ── Funções de string ─────────────────────────────────────────────
             "upper" | "lower" | "trim" => {
                 let s =
