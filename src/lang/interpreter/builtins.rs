@@ -374,6 +374,34 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            "file_exists" => {
+                if args.len() != 1 {
+                    return Err(HayashiError::Runtime(
+                        "file_exists(path) requires 1 argument".into(),
+                    ));
+                }
+                let path = match self.eval_expr(&args[0])? {
+                    Value::Str(s) => s,
+                    v => return Err(self.type_err(format!("file_exists: path must be string, got {v}"))),
+                };
+                Ok(Value::Bool(std::path::Path::new(&path).exists()))
+            }
+
+            "ensure_dir" => {
+                if args.len() != 1 {
+                    return Err(HayashiError::Runtime(
+                        "ensure_dir(path) requires 1 argument".into(),
+                    ));
+                }
+                let path = match self.eval_expr(&args[0])? {
+                    Value::Str(s) => s,
+                    v => return Err(self.type_err(format!("ensure_dir: path must be string, got {v}"))),
+                };
+                std::fs::create_dir_all(&path)
+                    .map_err(|e| HayashiError::Io(format!("Failed to create directory '{path}': {e}")))?;
+                Ok(Value::Nil)
+            }
+
             "contains" => {
                 if args.len() != 2 {
                     return Err(HayashiError::Runtime(
