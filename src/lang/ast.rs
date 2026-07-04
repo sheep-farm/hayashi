@@ -151,6 +151,9 @@ pub enum Expr {
     // ranges como expressões: 1..5 → [1,2,3,4]  |  1..=5 → [1,2,3,4,5]
     Range(Box<Expr>, Box<Expr>),
     RangeInclusive(Box<Expr>, Box<Expr>),
+
+    // bloco expressão: { stmt; ...; expr }
+    Block(Vec<Stmt>, Option<Box<Expr>>),
 }
 
 pub type Spanned = (Stmt, usize);
@@ -262,6 +265,10 @@ pub enum Stmt {
     // break / continue
     Break,
     Continue,
+
+    // quietly on / quietly off
+    QuietlyOn,
+    QuietlyOff,
 
     // try { ... } catch e { ... }
     TryCatch {

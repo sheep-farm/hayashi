@@ -106,6 +106,10 @@ cases:
   notes: Ordered logit of looks (2, 3, 4) on female, educ, exper, black.
   dimension: numerical
   status: pass
+- id: ols_cluster_wagepan
+  notes: OLS wage equation with one-way cluster-robust standard errors by worker id.
+  dimension: numerical
+  status: pass
 - id: ols_wooldridge_wage1
   notes: First real-dataset validation case.
   dimension: numerical

@@ -351,7 +351,11 @@ fn run() {
             return;
         }
         Some("validate") => {
-            run_validation();
+            run_validation(&args_clean[2..]);
+            return;
+        }
+        Some("dist-update") => {
+            dist_update();
             return;
         }
         Some("remove") | Some("uninstall") => {
@@ -373,7 +377,7 @@ fn run() {
         Some(unknown) => {
             eprintln!("hay: unknown argument '{unknown}'");
             eprintln!(
-                "Usage: hay [script.hay | - | install | remove | list | update | check-plugin | validate]"
+                "Usage: hay [script.hay | - | install | remove | list | update | check-plugin | validate | dist-update]"
             );
             std::process::exit(1);
         }
@@ -400,7 +404,7 @@ fn run_script(path: &str, verbose: bool) {
 }
 
 /// Runs the empirical validation programme by invoking `validation/run.py`.
-fn run_validation() {
+fn run_validation(args: &[&str]) {
     // Prefer the validation directory relative to the current working directory
     // (typical for development and CI), then fall back to the executable's
     // directory (typical for a self-contained installation).
@@ -460,6 +464,7 @@ fn run_validation() {
 
     let mut cmd = std::process::Command::new(python);
     cmd.arg(&run_py);
+    cmd.args(args);
     if let Some(dir) = hay_dir {
         cmd.current_dir(dir);
     }
@@ -468,6 +473,232 @@ fn run_validation() {
         .expect("hay: failed to spawn validation runner");
 
     std::process::exit(status.code().unwrap_or(1));
+}
+
+/// Checks GitHub for a newer hay release and, if found, downloads and replaces
+/// the current binary in-place.
+fn dist_update() {
+    let current = VERSION;
+    println!("hay dist-update: current version {current}");
+
+    let release_url = "https://api.github.com/repos/sheep-farm/hayashi/releases/latest";
+    let release_resp = match ureq::get(release_url)
+        .set("User-Agent", "hay")
+        .set("Accept", "application/vnd.github.v3+json")
+        .call()
+    {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("hay dist-update: cannot fetch latest release: {e}");
+            std::process::exit(1);
+        }
+    };
+
+    let release_body: String = release_resp.into_string().unwrap_or_default();
+    let release: GhRelease = serde_json::from_str(&release_body).unwrap_or_else(|e| {
+        eprintln!("hay dist-update: cannot parse release payload: {e}");
+        std::process::exit(1);
+    });
+
+    let remote_version = release.tag_name.trim_start_matches('v');
+    if !is_newer_version(remote_version, current) {
+        println!("hay dist-update: already up to date (latest {remote_version})");
+        return;
+    }
+
+    println!("hay dist-update: newer release {remote_version} available");
+
+    let target = current_target_triple();
+    let (asset_ext, archive_cmd) = dist_asset_kind();
+    let asset_name = format!("hay-v{remote_version}-{target}.{asset_ext}");
+
+    let asset = release
+        .assets
+        .iter()
+        .find(|a| a.name == asset_name)
+        .unwrap_or_else(|| {
+            eprintln!("hay dist-update: no asset found for {asset_name}");
+            std::process::exit(1);
+        });
+
+    let exe_path = std::env::current_exe().unwrap_or_else(|e| {
+        eprintln!("hay dist-update: cannot locate current executable: {e}");
+        std::process::exit(1);
+    });
+
+    let tmp_dir = std::env::temp_dir().join(format!("hay-dist-update-{remote_version}"));
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+    std::fs::create_dir_all(&tmp_dir).unwrap_or_else(|e| {
+        eprintln!("hay dist-update: cannot create temp dir: {e}");
+        std::process::exit(1);
+    });
+
+    let archive_path = tmp_dir.join(&asset_name);
+    println!("hay dist-update: downloading {} ...", asset.name);
+    match ureq::get(&asset.browser_download_url).call() {
+        Ok(resp) => {
+            let mut reader = resp.into_reader();
+            let mut file = std::fs::File::create(&archive_path).unwrap();
+            std::io::copy(&mut reader, &mut file).unwrap_or_else(|e| {
+                eprintln!("hay dist-update: download failed: {e}");
+                std::process::exit(1);
+            });
+        }
+        Err(e) => {
+            eprintln!("hay dist-update: download failed: {e}");
+            std::process::exit(1);
+        }
+    }
+
+    let extract_dir = tmp_dir.join("extract");
+    std::fs::create_dir_all(&extract_dir).unwrap();
+    if let Err(e) = archive_cmd(&archive_path, &extract_dir) {
+        eprintln!("hay dist-update: cannot extract archive: {e}");
+        std::process::exit(1);
+    }
+
+    let new_bin = find_extracted_bin(&extract_dir).unwrap_or_else(|| {
+        eprintln!("hay dist-update: no hay binary found in downloaded archive");
+        std::process::exit(1);
+    });
+
+    println!("hay dist-update: replacing {} ...", exe_path.display());
+
+    let is_windows = std::env::consts::OS == "windows";
+    let backup_path = exe_path.with_extension(if is_windows { "exe.old" } else { "old" });
+    let _ = std::fs::remove_file(&backup_path);
+
+    std::fs::rename(&exe_path, &backup_path).unwrap_or_else(|e| {
+        eprintln!("hay dist-update: cannot backup current binary: {e}");
+        std::process::exit(1);
+    });
+
+    std::fs::copy(&new_bin, &exe_path).unwrap_or_else(|e| {
+        eprintln!("hay dist-update: cannot install new binary: {e}");
+        let _ = std::fs::rename(&backup_path, &exe_path);
+        std::process::exit(1);
+    });
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = std::fs::metadata(&exe_path).unwrap().permissions();
+        perms.set_mode(0o755);
+        let _ = std::fs::set_permissions(&exe_path, perms);
+    }
+
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+
+    if is_windows {
+        println!("hay dist-update: installed {remote_version}. Please restart hay.");
+    } else {
+        println!("hay dist-update: installed {remote_version}. Run `hay --version` to verify.");
+    }
+}
+
+type Extractor = fn(&std::path::Path, &std::path::Path) -> Result<(), String>;
+
+/// Returns the archive extension and an extractor closure for the current platform.
+fn dist_asset_kind() -> (&'static str, Extractor) {
+    match std::env::consts::OS {
+        "windows" => (
+            "zip",
+            |archive: &std::path::Path, dest: &std::path::Path| {
+                let status = std::process::Command::new("powershell")
+                    .args([
+                        "-Command",
+                        "Expand-Archive",
+                        "-Path",
+                        &archive.to_string_lossy(),
+                        "-DestinationPath",
+                        &dest.to_string_lossy(),
+                        "-Force",
+                    ])
+                    .status()
+                    .map_err(|e| e.to_string())?;
+                if status.success() {
+                    Ok(())
+                } else {
+                    Err("Expand-Archive failed".to_string())
+                }
+            },
+        ),
+        _ => (
+            "tar.gz",
+            |archive: &std::path::Path, dest: &std::path::Path| {
+                let status = std::process::Command::new("tar")
+                    .args([
+                        "xzf",
+                        &archive.to_string_lossy(),
+                        "-C",
+                        &dest.to_string_lossy(),
+                    ])
+                    .status()
+                    .map_err(|e| e.to_string())?;
+                if status.success() {
+                    Ok(())
+                } else {
+                    Err("tar extraction failed".to_string())
+                }
+            },
+        ),
+    }
+}
+
+/// Searches the extracted archive for the new hay binary.
+fn find_extracted_bin(dir: &std::path::Path) -> Option<std::path::PathBuf> {
+    let name = if std::env::consts::OS == "windows" { "hay.exe" } else { "hay" };
+    let mut queue = vec![dir.to_path_buf()];
+    while let Some(current) = queue.pop() {
+        if let Ok(entries) = std::fs::read_dir(&current) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    queue.push(path);
+                } else if path.file_name().map(|n| n == name).unwrap_or(false) {
+                    return Some(path);
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Compares two semantic versions, ignoring pre-release labels so that
+/// 0.2.7 > 0.2.7-dev and 0.2.7 > 0.2.6. Returns true if remote is newer.
+fn is_newer_version(remote: &str, current: &str) -> bool {
+    fn parse(v: &str) -> (Vec<u32>, Option<&str>) {
+        let v = v.trim_start_matches('v');
+        let (num, pre) = v.split_once('-').map(|(n, p)| (n, Some(p))).unwrap_or((v, None));
+        let nums: Vec<u32> = num
+            .split('.')
+            .filter_map(|s| s.parse::<u32>().ok())
+            .collect();
+        (nums, pre)
+    }
+
+    let (r_nums, r_pre) = parse(remote);
+    let (c_nums, c_pre) = parse(current);
+
+    for (a, b) in r_nums.iter().zip(c_nums.iter()) {
+        match a.cmp(b) {
+            std::cmp::Ordering::Greater => return true,
+            std::cmp::Ordering::Less => return false,
+            std::cmp::Ordering::Equal => {}
+        }
+    }
+
+    if r_nums.len() != c_nums.len() {
+        return r_nums.len() > c_nums.len();
+    }
+
+    // A release without a pre-release tag is newer than one with it.
+    match (r_pre, c_pre) {
+        (None, Some(_)) => true,
+        (Some(_), None) => false,
+        (None, None) => false,
+        (Some(a), Some(b)) => a > b,
+    }
 }
 
 /// Calcula a profundidade de delimitadores abertos numa linha para o REPL.
@@ -619,7 +850,8 @@ fn print_help() {
     println!("    hay list                 List installed packages");
     println!("    hay update [user/repo]   Update package(s) (-y to bypass prompt)");
     println!("    hay check-plugin [name]  Check integrity/version with remote repository");
-    println!("    hay validate             Run the empirical validation programme (R/Python)");
+    println!("    hay validate [options]   Run the empirical validation programme (R/Python)");
+    println!("    hay dist-update          Check and install the latest hay release from GitHub");
     println!();
     println!("In REPL, type help() for full command list or help(cmd) for details.");
 }

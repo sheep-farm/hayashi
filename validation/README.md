@@ -22,6 +22,24 @@ The orchestrator reads `validation/matrix.yml`, runs the Hayashi script and
 the reference scripts for each selected case, compares the declared quantities
 against tolerances, and updates `MATRIX.md`.
 
+For focused development or issue triage, run a single case without updating
+the generated matrix files:
+
+```bash
+python validation/run.py --case heckman_mroz --no-write
+```
+
+Useful runner options:
+
+```bash
+python validation/run.py --list
+python validation/run.py --case heckman_mroz
+python validation/run.py --case heckman_mroz --case ols_cluster_wagepan --no-write
+```
+
+The same options can be passed through `hay validate`, for example
+`hay validate --case heckman_mroz --no-write`.
+
 ## Requirements
 
 - Hayashi CLI (`hay`) built from the repository.

@@ -129,6 +129,8 @@ fn stmt_label(s: &ast::Stmt) -> &'static str {
         ast::Stmt::Return(_) => "return",
         ast::Stmt::Break => "break",
         ast::Stmt::Continue => "continue",
+        ast::Stmt::QuietlyOn => "quietly on",
+        ast::Stmt::QuietlyOff => "quietly off",
         ast::Stmt::TryCatch { .. } => "try/catch",
         ast::Stmt::Input { .. } => "input",
         ast::Stmt::Display(_) => "display",

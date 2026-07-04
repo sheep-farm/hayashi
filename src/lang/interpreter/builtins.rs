@@ -5,6 +5,46 @@ use super::*;
 /// escalares (mean/sum/min/max/std/...) com suporte a `if=`.
 /// Extraído de `eval_call` (ver src/lang/interpreter.rs).
 impl Interpreter {
+    /// Helper for `tidy`: build a tidy coefficient map from model result vectors.
+    fn build_tidy_coef_map(
+        &self,
+        names: Vec<String>,
+        params: &ndarray::Array1<f64>,
+        std_errors: &ndarray::Array1<f64>,
+        t_values: &ndarray::Array1<f64>,
+        p_values: &ndarray::Array1<f64>,
+        conf_lower: &ndarray::Array1<f64>,
+        conf_upper: &ndarray::Array1<f64>,
+    ) -> std::collections::HashMap<String, Value> {
+        let n = params.len();
+        let name_col: Vec<Value> = (0..n)
+            .map(|i| {
+                Value::Str(
+                    names
+                        .get(i)
+                        .cloned()
+                        .unwrap_or_else(|| format!("x{i}")),
+                )
+            })
+            .collect();
+        let coef_col: Vec<Value> = params.iter().map(|&v| Value::Float(v)).collect();
+        let se_col: Vec<Value> = std_errors.iter().map(|&v| Value::Float(v)).collect();
+        let t_col: Vec<Value> = t_values.iter().map(|&v| Value::Float(v)).collect();
+        let p_col: Vec<Value> = p_values.iter().map(|&v| Value::Float(v)).collect();
+        let cl_col: Vec<Value> = conf_lower.iter().map(|&v| Value::Float(v)).collect();
+        let cu_col: Vec<Value> = conf_upper.iter().map(|&v| Value::Float(v)).collect();
+
+        let mut map = std::collections::HashMap::new();
+        map.insert("variable".into(), Value::List(Rc::new(name_col)));
+        map.insert("coef".into(), Value::List(Rc::new(coef_col)));
+        map.insert("std_err".into(), Value::List(Rc::new(se_col)));
+        map.insert("t".into(), Value::List(Rc::new(t_col)));
+        map.insert("p_value".into(), Value::List(Rc::new(p_col)));
+        map.insert("conf_low".into(), Value::List(Rc::new(cl_col)));
+        map.insert("conf_high".into(), Value::List(Rc::new(cu_col)));
+        map
+    }
+
     pub(super) fn eval_call_builtins(
         &mut self,
         func: &str,
@@ -331,6 +371,95 @@ impl Interpreter {
                 }
             }
 
+            // ── tidy: coefficient table from a model ───────────────────────────
+            "tidy" => {
+                if args.len() != 1 {
+                    return Err(HayashiError::Runtime("tidy(model) requires 1 argument".into()));
+                }
+                let val = self.eval_expr(&args[0])?;
+                let mut map = std::collections::HashMap::<String, Value>::new();
+
+                match val {
+                    Value::OlsResult(m) => {
+                        let r = &m.result;
+                        map = self.build_tidy_coef_map(
+                            r.variable_names.clone().unwrap_or_default(),
+                            &r.params,
+                            &r.std_errors,
+                            &r.t_values,
+                            &r.p_values,
+                            &r.conf_lower,
+                            &r.conf_upper,
+                        );
+                    }
+                    Value::RollingResult(r) => {
+                        let dates = r.dates.clone();
+                        let n = r.n_obs;
+                        let k = r.params_history.ncols();
+                        let names = r.variable_names.clone().unwrap_or_default();
+                        let mut date_col = Vec::new();
+                        let mut r2_col = Vec::new();
+                        let mut coef_cols: Vec<(String, Vec<Value>)> = (0..k)
+                            .map(|j| {
+                                let name = names.get(j).cloned().unwrap_or_else(|| {
+                                    if j == 0 { "const".into() } else { format!("x{j}") }
+                                });
+                                (name, Vec::new())
+                            })
+                            .collect();
+                        for t in (r.window - 1)..n {
+                            if r.params_history.row(t).iter().any(|v| v.is_nan()) {
+                                continue;
+                            }
+                            let d = dates.get(t).cloned().unwrap_or_else(|| format!("{t}"));
+                            date_col.push(Value::Str(d));
+                            r2_col.push(Value::Float(r.r_squared_history[t]));
+                            for j in 0..k {
+                                coef_cols[j].1.push(Value::Float(r.params_history[[t, j]]));
+                            }
+                        }
+                        map.insert("date".into(), Value::List(Rc::new(date_col)));
+                        map.insert("r2".into(), Value::List(Rc::new(r2_col)));
+                        for (name, vals) in coef_cols {
+                            map.insert(name, Value::List(Rc::new(vals)));
+                        }
+                    }
+                    _ => return Err(HayashiError::Type("tidy: unsupported model type".into())),
+                }
+
+                let df = self.dict_to_dataframe(&map)?;
+                Ok(Value::DataFrame(Rc::new(df)))
+            }
+
+            // ── glance: model fit summary ──────────────────────────────────────
+            "glance" => {
+                if args.len() != 1 {
+                    return Err(HayashiError::Runtime("glance(model) requires 1 argument".into()));
+                }
+                let val = self.eval_expr(&args[0])?;
+                let mut map = std::collections::HashMap::<String, Value>::new();
+
+                match val {
+                    Value::OlsResult(m) => {
+                        let r = &m.result;
+                        let scalar = |v: f64| Value::List(Rc::new(vec![Value::Float(v)]));
+                        map.insert("r2".into(), scalar(r.r_squared));
+                        map.insert("adj_r2".into(), scalar(r.adj_r_squared));
+                        map.insert("n".into(), Value::List(Rc::new(vec![Value::Int(r.n_obs as i64)])));
+                        map.insert("f_stat".into(), scalar(r.f_statistic));
+                        map.insert("prob_f".into(), scalar(r.prob_f));
+                        map.insert("aic".into(), scalar(r.aic));
+                        map.insert("bic".into(), scalar(r.bic));
+                        map.insert("log_lik".into(), scalar(r.log_likelihood));
+                        map.insert("sigma".into(), scalar(r.sigma));
+                    }
+                    _ => return Err(HayashiError::Type("glance: unsupported model type".into())),
+                }
+
+                let df = self.dict_to_dataframe(&map)?;
+                Ok(Value::DataFrame(Rc::new(df)))
+            }
+
             // ── Funções de string ─────────────────────────────────────────────
             "upper" | "lower" | "trim" => {
                 let s =
@@ -371,6 +500,34 @@ impl Interpreter {
                 };
                 std::fs::write(&path, &content)
                     .map_err(|e| HayashiError::Io(format!("Failed to write file '{path}': {e}")))?;
+                Ok(Value::Nil)
+            }
+
+            "file_exists" => {
+                if args.len() != 1 {
+                    return Err(HayashiError::Runtime(
+                        "file_exists(path) requires 1 argument".into(),
+                    ));
+                }
+                let path = match self.eval_expr(&args[0])? {
+                    Value::Str(s) => s,
+                    v => return Err(self.type_err(format!("file_exists: path must be string, got {v}"))),
+                };
+                Ok(Value::Bool(std::path::Path::new(&path).exists()))
+            }
+
+            "ensure_dir" => {
+                if args.len() != 1 {
+                    return Err(HayashiError::Runtime(
+                        "ensure_dir(path) requires 1 argument".into(),
+                    ));
+                }
+                let path = match self.eval_expr(&args[0])? {
+                    Value::Str(s) => s,
+                    v => return Err(self.type_err(format!("ensure_dir: path must be string, got {v}"))),
+                };
+                std::fs::create_dir_all(&path)
+                    .map_err(|e| HayashiError::Io(format!("Failed to create directory '{path}': {e}")))?;
                 Ok(Value::Nil)
             }
 

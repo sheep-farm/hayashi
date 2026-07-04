@@ -79,6 +79,17 @@ dropna df                 // remove rows with any NaN
 dropna df income gini     // remove rows with NaN in income or gini
 \end{lstlisting}
 
+\section{\texttt{ffill}}
+
+Forward-fill replaces \texttt{NaN} with the most recent non-missing value.
+Useful when a monthly or quarterly series must be expanded to a daily
+frequency:
+
+\begin{lstlisting}[caption={Forward-filling a monthly rate into daily data}]
+let daily = merge(asset, rf, key=date, type=left)
+let daily = ffill(daily)
+\end{lstlisting}
+
 \section{\texttt{append}}
 
 Stacks two DataFrames vertically (equivalent to \texttt{rbind}):
@@ -142,4 +153,47 @@ Frequency table:
 \begin{lstlisting}
 tabulate df state
 tabulate df state year    // cross-tabulation
+\end{lstlisting}
+
+\section{File-system helpers}
+
+Small helpers for scripts that persist data or check for cached files:
+
+\begin{lstlisting}[caption={Cache helpers}]
+ensure_dir("cache")                    // create directory if missing
+if file_exists("cache/data.csv") {
+    load "cache/data.csv" as df
+} else {
+    let df = download(...)
+    export(df, "csv", "cache/data.csv")
+}
+
+write("raw text", "note.txt")        // write string to file
+\end{lstlisting}
+
+\section{\texttt{rolling}}
+
+\texttt{rolling} estimates OLS over a moving window. It is useful for
+visualizing time-varying coefficients or testing parameter stability. An
+optional \texttt{date} column stores the end-of-window label for each
+estimate.
+
+\begin{lstlisting}[caption={Rolling OLS with end-of-window labels}]
+let roll = rolling(y ~ x1 + x2, df, window=252, date=date)
+let betas = tidy(roll)
+print(betas)
+\end{lstlisting}
+
+\section{\texttt{tidy} and \texttt{glance}}
+
+These functions convert model objects into DataFrames. \texttt{tidy}
+returns a tidy DataFrame of coefficients, standard errors, and confidence
+intervals. For \texttt{rolling} models it returns one row per window
+with columns \texttt{date}, \texttt{r2}, and one coefficient column per
+variable. \texttt{glance} returns a one-row summary with fit statistics.
+
+\begin{lstlisting}[caption={Tidy and glance}]
+let m = ols(y ~ x1 + x2, df)
+let coefs = tidy(m)
+let summary = glance(m)
 \end{lstlisting}
