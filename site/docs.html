@@ -48,6 +48,7 @@
             <a href="#basics">Basics</a>
             <a href="#data">Data I/O</a>
             <a href="#blocks">Blocks &amp; Output</a>
+            <a href="#utilities">Utilities</a>
             <a href="#estimators">Estimators</a>
             <a href="#post">Post-estimation</a>
             <a href="#syntax">Syntax</a>
@@ -123,6 +124,22 @@ quietly off
 print("done")</code></pre>
             </div>
             <p><code class="language-hay">quietly on</code> suppresses automatic output from statements and estimators. <code class="language-hay">print(...)</code> and <code class="language-hay">display ...</code> still appear. The flag is scope-aware: toggling inside a block reverts when the block ends.</p>
+
+            <h2 id="utilities">Data &amp; I/O utilities</h2>
+            <p>Common helpers for missing values, file-system checks, and simple caching.</p>
+            <table class="docs-table">
+              <thead>
+                <tr><th>Command</th><th>Description</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><code class="language-hay">dropna(df, col1, col2)</code></td><td>Remove rows with NaN</td></tr>
+                <tr><td><code class="language-hay">ffill(df)</code></td><td>Forward-fill NaN in float columns</td></tr>
+                <tr><td><code class="language-hay">file_exists("path")</code></td><td>Check if path exists</td></tr>
+                <tr><td><code class="language-hay">ensure_dir("cache")</code></td><td>Create directory if missing</td></tr>
+                <tr><td><code class="language-hay">write("text", "file.txt")</code></td><td>Write string to file</td></tr>
+                <tr><td><code class="language-hay">export(df, "csv", "out.csv")</code></td><td>Save DataFrame</td></tr>
+              </tbody>
+            </table>
 
             <h2 id="estimators">Estimators</h2>
             <p>All estimators share a common formula syntax and return a model object with post-estimation methods.</p>
