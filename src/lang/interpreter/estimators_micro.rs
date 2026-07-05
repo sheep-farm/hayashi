@@ -2,13 +2,13 @@ use super::*;
 use super::helpers::*;
 use super::models::FactorModel;
 
-/// Finance (Fama-MacBeth, portsort, doublesort) e estimadores
-/// cross-section/microeconométricos: OLS/reg, IV/2SLS, teste de instrumento
-/// fraco, Logit, Probit, Heckman, Tobit, RD sharp/fuzzy, PSM, Controle
-/// Sintético, Poisson, NegBin, Ordered Logit/Probit, MNLogit, DID, Quantile
+/// Finance (Fama-MacBeth, portsort, doublesort) and
+/// cross-section/microeconometric estimators: OLS/reg, IV/2SLS, weak instrument
+/// test, Logit, Probit, Heckman, Tobit, RD sharp/fuzzy, PSM, Synthetic
+/// Control, Poisson, NegBin, Ordered Logit/Probit, MNLogit, DID, Quantile
 /// Regression, Kaplan-Meier, Cox, RLM, GEE, WLS, ZIP/ZINB, MixedLM, testparm,
 /// GLSAR, ANOVA, Beta Regression.
-/// Extraído de `eval_call` (ver src/lang/interpreter.rs).
+/// Extracted from `eval_call` (see src/lang/interpreter.rs).
 impl Interpreter {
     pub(super) fn eval_call_estimators_micro(
         &mut self,
@@ -22,7 +22,7 @@ impl Interpreter {
 
             // ── Fama-MacBeth (1973) ──────────────────────────────────────────
             // fmb(formula, df, time=col)
-            // Cross-sectional regressions por período, média dos coeficientes
+            // Cross-sectional regressions by period, average of coefficients
             // SE = σ(β̂_t) / √T  (Fama-MacBeth standard errors)
             "fmb" | "fama_macbeth" | "xtfmb" => {
                 if args.len() < 2 {
@@ -71,10 +71,10 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
-            // ── portsort: portfolio sorts por quantis ────────────────────────
+            // ── portsort: portfolio sorts by quantiles ────────────────────────
             // portsort(df, ret, sort_var, n=5)
-            // Ordena observações por sort_var, divide em n portfólios,
-            // reporta média, SE e t de ret por portfólio + spread H-L.
+            // Sorts observations by sort_var, divides into n portfolios,
+            // reports mean, SE and t of ret per portfolio + H-L spread.
             "portsort" | "portfolio_sort" | "psort" => {
                 if args.len() < 3 {
                     return Err(HayashiError::Runtime(
@@ -132,11 +132,11 @@ impl Interpreter {
 
                 if per_port < 1 {
                     return Err(HayashiError::Runtime(format!(
-                        "portsort: {n_valid} obs válidas insuficientes para {n_ports} portfólios"
+                        "portsort: {n_valid} valid obs insufficient for {n_ports} portfolios"
                     )));
                 }
 
-                // atribuir portfólios
+                // assign portfolios
                 struct PortStats {
                     mean: f64,
                     se: f64,
@@ -286,7 +286,7 @@ impl Interpreter {
                 let q1 = assign_quantile(&s1_vec, n1);
                 let q2 = assign_quantile(&s2_vec, n2);
 
-                // médias por célula (q1 x q2)
+                // means per cell (q1 x q2)
                 let mut cell_sum = vec![vec![0.0; n2]; n1];
                 let mut cell_n = vec![vec![0usize; n2]; n1];
                 for i in 0..ret_col.len() {
@@ -414,8 +414,8 @@ impl Interpreter {
 
                 let g_endog = GFormula::parse(&endog_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                // A fórmula dos instrumentos pode ter LHS vazio (sintaxe ~ z1 + z2).
-                // GFormula::parse rejeita LHS vazio; construímos diretamente.
+                // The instrument formula may have empty LHS (syntax ~ z1 + z2).
+                // GFormula::parse rejects empty LHS; we build it directly.
                 let g_instr = if instr_ast.lhs.is_empty() {
                     let independents: Vec<String> = instr_ast
                         .rhs
@@ -444,13 +444,13 @@ impl Interpreter {
 
             // ── Teste de instrumentos fracos (Cragg-Donald / Stock-Yogo) ──────
             // weak_iv(endog_formula, instrument_formula, df)
-            // Mesma sintaxe do iv(). Calcula F de 1ª etapa (por endog) e
-            // estatística de Cragg-Donald. Compara com valores críticos de
-            // Stock & Yogo (2005).
+            // Same syntax as iv(). Computes 1st stage F (per endog) and
+            // Cragg-Donald statistic. Compares with Stock & Yogo (2005)
+            // critical values.
             "weak_iv" => {
                 if args.len() < 3 {
                     return Err(HayashiError::Runtime(
-                        "weak_iv() requer (formula_estrutural, formula_instrumentos, df)".into(),
+                        "weak_iv() requires (structural_formula, instrument_formula, df)".into(),
                     ));
                 }
                 let endog_ast = self.resolve_formula(&args[0])?;
@@ -470,7 +470,7 @@ impl Interpreter {
                     }
                 };
 
-                // ── Identifica variáveis ──
+                // ── Identify variables ──
                 let endog_vars: std::collections::HashSet<String> = endog_ast
                     .rhs
                     .iter()
@@ -490,7 +490,7 @@ impl Interpreter {
                     .filter(|s| !s.is_empty())
                     .collect();
 
-                // endógenas = em endog mas NÃO em instr
+                // endogenous = in endog but NOT in instr
                 let x_endog_names: Vec<String> = endog_ast
                     .rhs
                     .iter()
@@ -503,7 +503,7 @@ impl Interpreter {
                     })
                     .filter(|v| !instr_vars.contains(v))
                     .collect();
-                // instrumentos excluídos = em instr mas NÃO em endog
+                // excluded instruments = in instr but NOT in endog
                 let z_excl_names: Vec<String> = instr_ast
                     .rhs
                     .iter()
@@ -516,7 +516,7 @@ impl Interpreter {
                     })
                     .filter(|v| !endog_vars.contains(v))
                     .collect();
-                // exógenos incluídos = em ambos
+                // included exogenous = in both
                 let x_exog_names: Vec<String> = instr_ast
                     .rhs
                     .iter()
@@ -532,22 +532,22 @@ impl Interpreter {
 
                 if x_endog_names.is_empty() {
                     return Err(HayashiError::Runtime(
-                        "weak_iv: nenhuma variável endógena identificada (vars em endog mas não em instr)".into()
+                        "weak_iv: no endogenous variable identified (vars in endog but not in instr)".into()
                     ));
                 }
                 if z_excl_names.is_empty() {
                     return Err(HayashiError::Runtime(
-                        "weak_iv: nenhum instrumento excluído identificado (vars em instr mas não em endog)".into()
+                        "weak_iv: no excluded instrument identified (vars in instr but not in endog)".into()
                     ));
                 }
 
                 let n = df.n_rows();
                 let k_endog = x_endog_names.len();
-                let l = z_excl_names.len(); // número de instrumentos excluídos
-                let k_exog = x_exog_names.len() + 1; // +1 intercepto
+                let l = z_excl_names.len(); // number of excluded instruments
+                let k_exog = x_exog_names.len() + 1; // +1 intercept
 
-                // ── Monta matrizes ──
-                // X_exog: intercepto + exógenos incluídos  (n × k_exog)
+                // ── Build matrices ──
+                // X_exog: intercept + included exogenous  (n × k_exog)
                 let mut x_exog = Array2::<f64>::ones((n, k_exog));
                 for (j, col) in x_exog_names.iter().enumerate() {
                     let v = df
@@ -558,7 +558,7 @@ impl Interpreter {
                     }
                 }
 
-                // Z_excl: instrumentos excluídos  (n × L)
+                // Z_excl: excluded instruments  (n × L)
                 let mut z_excl = Array2::<f64>::zeros((n, l));
                 for (j, col) in z_excl_names.iter().enumerate() {
                     let v = df
@@ -574,7 +574,7 @@ impl Interpreter {
                 w_full.slice_mut(ndarray::s![.., ..k_exog]).assign(&x_exog);
                 w_full.slice_mut(ndarray::s![.., k_exog..]).assign(&z_excl);
 
-                // X_endog: variáveis endógenas  (n × k_endog)
+                // X_endog: endogenous variables  (n × k_endog)
                 let mut x_endog_mat = Array2::<f64>::zeros((n, k_endog));
                 for (j, col) in x_endog_names.iter().enumerate() {
                     let v = df
@@ -586,7 +586,7 @@ impl Interpreter {
                 }
 
                 // ── M_exog = I - X_exog (X_exog'X_exog)⁻¹ X_exog' ──
-                // para partial out os exógenos incluídos
+                // to partial out included exogenous
                 let xtx_exog = x_exog.t().dot(&x_exog);
                 let xtx_exog_inv = xtx_exog
                     .inv()
@@ -595,21 +595,21 @@ impl Interpreter {
                 let proj_exog = |a: &Array2<f64>| -> Array2<f64> {
                     x_exog.dot(&xtx_exog_inv.dot(&x_exog.t().dot(a)))
                 };
-                // M_exog Z_excl (partialling out exog de Z_excl)
+                // M_exog Z_excl (partialling out exog from Z_excl)
                 let mz = &z_excl - &proj_exog(&z_excl); // n × L
                                                         // M_exog X_endog
                 let _mx = &x_endog_mat - &proj_exog(&x_endog_mat); // n × k_endog
 
-                // ── Primeira etapa: regride X_endog em W_full ──
+                // ── First stage: regress X_endog on W_full ──
                 let wtw = w_full.t().dot(&w_full);
                 let wtw_inv = wtw
                     .inv()
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let pi_hat = wtw_inv.dot(&w_full.t().dot(&x_endog_mat)); // (k_exog+L) × k_endog
                 let x_hat = w_full.dot(&pi_hat); // n × k_endog
-                let v_hat = &x_endog_mat - &x_hat; // resíduos 1ª etapa
+                let v_hat = &x_endog_mat - &x_hat; // 1st stage residuals
 
-                // ── Π̂_Z: linhas de pi_hat correspondentes a Z_excl ──
+                // ── Π̂_Z: rows of pi_hat corresponding to Z_excl ──
                 let pi_z = pi_hat.slice(ndarray::s![k_exog.., ..]).to_owned(); // L × k_endog
 
                 // ── Σ̂_v = v̂'v̂ / (n - k_exog - L) ──
@@ -621,7 +621,7 @@ impl Interpreter {
                 let zmz = mz.t().dot(&mz); // L × L  (= Z'M_exog Z)
                 let cd_mat = pi_z.t().dot(&zmz.dot(&pi_z)); // k_endog × k_endog
 
-                // ── F de 1ª etapa por variável endógena (partial F em Z_excl) ──
+                // ── 1st Stage F by endogenous variable (partial F on Z_excl) ──
                 let mut first_stage_lines = String::new();
                 for j in 0..k_endog {
                     // partial F = (Π̂_Zj' Z'M Z Π̂_Zj / L) / Σ̂_vj
@@ -653,14 +653,14 @@ impl Interpreter {
                 let cd_stat = if k_endog == 1 {
                     cd_core[[0, 0]] / l as f64
                 } else {
-                    // λ_min de cd_core / L
+                    // λ_min of cd_core / L
                     let (eigenvalues, _) = cd_core
                         .eigh(UPLO::Lower)
                         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                    eigenvalues[0] / l as f64 // eigenvalues em ordem crescente
+                    eigenvalues[0] / l as f64 // eigenvalues in ascending order
                 };
 
-                // ── Valores críticos de Stock & Yogo (2005) (k_endog=1, bias TSLS) ──
+                // ── Stock & Yogo (2005) critical values (k_endog=1, TSLS bias) ──
                 let sy_table: Vec<(usize, [f64; 4])> = vec![
                     (1, [16.38, 8.96, 6.66, 5.53]),
                     (2, [19.93, 11.59, 8.75, 7.25]),
@@ -676,32 +676,32 @@ impl Interpreter {
                 let sy_line = if k_endog == 1 {
                     if let Some((_, cvs)) = sy_table.iter().find(|(lv, _)| *lv == l) {
                         format!(
-                            "   Stock-Yogo (2005) — valores críticos para viés TSLS máximo (k_endog=1, L={}):\n   10%:{:.2}  15%:{:.2}  20%:{:.2}  25%:{:.2}\n",
+                            "   Stock-Yogo (2005) — critical values for maximum TSLS bias (k_endog=1, L={}):\n   10%:{:.2}  15%:{:.2}  20%:{:.2}  25%:{:.2}\n",
                             l, cvs[0], cvs[1], cvs[2], cvs[3]
                         )
                     } else {
-                        format!("   Stock-Yogo (2005): tabela disponível para L=1..10 (L={} out of range).\n   Regra de bolso (Staiger & Stock 1997): F > 10.\n", l)
+                        format!("   Stock-Yogo (2005): table available for L=1..10 (L={} out of range).\n   Rule of thumb (Staiger & Stock 1997): F > 10.\n", l)
                     }
                 } else {
-                    format!("   Stock-Yogo (2005): valores críticos para k_endog=1 apenas.\n   Para k_endog={}, consulte tabelas de Andrews, Stock & Sun (2019).\n", k_endog)
+                    format!("   Stock-Yogo (2005): critical values for k_endog=1 only.\n   Para k_endog={}, see tables in Andrews, Stock & Sun (2019).\n", k_endog)
                 };
 
                 let thick = "═".repeat(70);
                 let thin = "─".repeat(70);
                 let mut out = String::new();
                 out.push_str(&format!("\n{thick}\n"));
-                out.push_str(" Teste de Instrumentos Fracos\n");
+                out.push_str(" Weak Instrument Test\n");
                 out.push_str(&format!("{thick}\n"));
                 out.push_str(&format!(
-                    " n={n}  k_endog={k_endog}  L={l} (instrumentos excluídos)\n"
+                    " n={n}  k_endog={k_endog}  L={l} (excluded instruments)\n"
                 ));
-                out.push_str("\n── F de 1ª Etapa (partial F em instrumentos excluídos)\n");
+                out.push_str("\n── 1st Stage F (partial F on excluded instruments)\n");
                 out.push_str(&first_stage_lines);
                 out.push_str(&format!("\n── Cragg-Donald Wald F = {:.4}\n", cd_stat));
-                out.push_str("   (λ_min do núcleo de concentração / L)\n");
+                out.push_str("   (λ_min of concentration kernel / L)\n");
                 out.push_str(&format!("\n{sy_line}"));
                 out.push_str(&format!("{thin}\n"));
-                out.push_str(" Regra de bolso: F > 10 (Staiger & Stock 1997)\n");
+                out.push_str(" Rule of thumb: F > 10 (Staiger & Stock 1997)\n");
                 out.push_str(&format!("{thick}\n"));
                 Ok(diag(out))
             }
@@ -755,7 +755,7 @@ impl Interpreter {
             "heckman" | "heckit" => {
                 if args.len() < 3 {
                     return Err(HayashiError::Runtime(
-                        "heckman() requer (formula_resultado, formula_seleção, df)".into(),
+                        "heckman() requires (outcome_formula, selection_formula, df)".into(),
                     ));
                 }
                 let out_ast = self.resolve_formula(&args[0])?;
@@ -764,7 +764,7 @@ impl Interpreter {
                     Expr::Var(name) => name.clone(),
                     _ => {
                         return Err(HayashiError::Type(
-                            "heckman(): terceiro argumento deve ser nome do DataFrame".into(),
+                            "heckman(): third argument must be DataFrame name".into(),
                         ))
                     }
                 };
@@ -777,7 +777,7 @@ impl Interpreter {
                     }
                 };
 
-                // Equação de resultado
+                // Outcome equation
                 let out_str = Self::formula_to_string(&out_ast);
                 let g_out =
                     GFormula::parse(&out_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -788,7 +788,7 @@ impl Interpreter {
                     .formula_var_names(&g_out)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-                // Equação de seleção
+                // Selection equation
                 let sel_str = Self::formula_to_string(&sel_ast);
                 let g_sel =
                     GFormula::parse(&sel_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -799,8 +799,8 @@ impl Interpreter {
                     .formula_var_names(&g_sel)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-                // Heckman: y e x_out podem conter NaN para obs não-selecionadas (z=0).
-                // Substituir NaN/Inf por 0.0 nessas linhas (valores não são usados na equação de resultado).
+                // Heckman: y and x_out may contain NaN for unselected obs (z=0).
+                // Replace NaN/Inf with 0.0 in those rows (values are not used in outcome equation).
                 let y_vec = y_vec_raw.mapv(|v| if v.is_finite() { v } else { 0.0 });
                 let x_out = x_out.mapv(|v| if v.is_finite() { v } else { 0.0 });
 
@@ -817,7 +817,7 @@ impl Interpreter {
                 Ok(Value::HeckmanResult(Rc::new(result)))
             }
 
-            // ── Tobit — MLE com censura esquerda ──────────────────────────────
+            // ── Tobit — MLE with left censoring ──────────────────────────────
             // tobit(formula, df [, ll=0])
             "tobit" => {
                 let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
@@ -841,7 +841,7 @@ impl Interpreter {
                 Ok(Value::TobitResult(Rc::new(result)))
             }
 
-            // ── Regressão Descontínua — Sharp RD ─────────────────────────────
+            // ── Regression Discontinuity — Sharp RD ─────────────────────────────
             // rd(outcome ~ running_var, cutoff, df [, bw=h, poly=1, kernel="triangular"])
             "rd" => {
                 if args.len() < 3 {
@@ -855,7 +855,7 @@ impl Interpreter {
                     Value::Int(v) => v as f64,
                     _ => {
                         return Err(HayashiError::Type(
-                            "rd(): second argument must be o cutoff (número)".into(),
+                            "rd(): second argument must be cutoff (number)".into(),
                         ))
                     }
                 };
@@ -868,12 +868,12 @@ impl Interpreter {
                     }
                 };
 
-                // Extrair nomes diretamente do AST da fórmula Hayashi
+                // Extract names directly from Hayashi formula AST
                 let outcome_name = formula_ast.lhs.clone();
                 let running_name = formula_ast.rhs.first()
                     .and_then(|t| if let RhsTerm::Var(v) = t { Some(v.clone()) } else { None })
                     .ok_or_else(|| HayashiError::Runtime(
-                        "rd(): fórmula deve ter exatamente uma variável no lado direito (running var)".into()
+                        "rd(): formula must have exactly one variable on the right side (running var)".into()
                     ))?;
 
                 let y = df
@@ -912,7 +912,7 @@ impl Interpreter {
                 Ok(Value::RdResult(Rc::new(result)))
             }
 
-            // ── Regressão Descontínua — Fuzzy RD ─────────────────────────────
+            // ── Regression Discontinuity — Fuzzy RD ─────────────────────────────
             // fuzzy_rd(outcome ~ running_var, "treatment_col", cutoff, df [, bw=h, poly=1])
             "fuzzy_rd" => {
                 if args.len() < 4 {
@@ -924,7 +924,7 @@ impl Interpreter {
                 let treatment_name = match self.eval_expr(&args[1])? {
                     Value::Str(s) => s,
                     _ => return Err(HayashiError::Type(
-                        "fuzzy_rd(): second argument must be o nome da coluna de tratamento (string)".into()
+                        "fuzzy_rd(): second argument must be the treatment column name (string)".into()
                     )),
                 };
                 let cutoff = match self.eval_expr(&args[2])? {
@@ -932,7 +932,7 @@ impl Interpreter {
                     Value::Int(v) => v as f64,
                     _ => {
                         return Err(HayashiError::Type(
-                            "fuzzy_rd(): third argument must be cutoff (número)".into(),
+                            "fuzzy_rd(): third argument must be cutoff (number)".into(),
                         ))
                     }
                 };
@@ -949,7 +949,7 @@ impl Interpreter {
                 let running_name = formula_ast.rhs.first()
                     .and_then(|t| if let RhsTerm::Var(v) = t { Some(v.clone()) } else { None })
                     .ok_or_else(|| HayashiError::Runtime(
-                        "fuzzy_rd(): fórmula deve ter exatamente uma variável no lado direito (running var)".into()
+                        "fuzzy_rd(): formula must have exactly one variable on the right side (running var)".into()
                     ))?;
 
                 let y = df
@@ -999,7 +999,7 @@ impl Interpreter {
 
             // ── Propensity Score Matching (Rosenbaum & Rubin 1983) ───────────
             // psm(outcome ~ treatment + cov1 + cov2, df [, k=1, caliper=0.2, replace=false, boot=200])
-            // O 1º termo RHS é o tratamento; demais são covariáveis para o PS.
+            // The 1st RHS term is the treatment; remaining are covariates for PS.
             "psm" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
@@ -1018,7 +1018,7 @@ impl Interpreter {
                 };
 
                 let outcome_name = formula_ast.lhs.clone();
-                // Primeiro RHS = tratamento; demais = covariáveis
+                // First RHS = treatment; remaining = covariates
                 let mut rhs_names: Vec<String> = formula_ast
                     .rhs
                     .iter()
@@ -1032,7 +1032,7 @@ impl Interpreter {
                     .collect();
                 if rhs_names.is_empty() {
                     return Err(HayashiError::Runtime(
-                        "psm(): fórmula deve ter ao menos 'outcome ~ treatment'".into(),
+                        "psm(): formula must have at least 'outcome ~ treatment'".into(),
                     ));
                 }
                 let treatment_name = rhs_names.remove(0);
@@ -1040,7 +1040,7 @@ impl Interpreter {
 
                 if covariate_names.is_empty() {
                     return Err(HayashiError::Runtime(
-                        "psm(): forneça ao menos uma covariável: outcome ~ treatment + cov1 + ..."
+                        "psm(): provide at least one covariate: outcome ~ treatment + cov1 + ..."
                             .into(),
                     ));
                 }
@@ -1107,7 +1107,7 @@ impl Interpreter {
                 Ok(Value::PsmResult(Rc::new(result)))
             }
 
-            // ── Controle Sintético (ADH 2010) ────────────────────────────────
+            // ── Synthetic Control (ADH 2010) ────────────────────────────────
             // synth("outcome", "treated_id", t0, df, id="entity", time="year")
             // synth("outcome", "treated_id", t0, df, id="entity", time="year", covs=["x1","x2"])
             "synth" => {
@@ -1120,7 +1120,7 @@ impl Interpreter {
                     match self.eval_expr(&args[0])? {
                         Value::Str(s) => s,
                         _ => return Err(HayashiError::Type(
-                            "synth(): first argument must be nome da coluna de resultado (string)"
+                            "synth(): first argument must be outcome column name (string)"
                                 .into(),
                         )),
                     };
@@ -1130,7 +1130,7 @@ impl Interpreter {
                     Value::Float(v) => (v as i64).to_string(),
                     _ => {
                         return Err(HayashiError::Type(
-                            "synth(): second argument must be o ID da unidade tratada".into(),
+                            "synth(): second argument must be treated unit ID".into(),
                         ))
                     }
                 };
@@ -1138,7 +1138,7 @@ impl Interpreter {
                     Value::Float(v) => v,
                     Value::Int(v)   => v as f64,
                     _ => return Err(HayashiError::Type(
-                        "synth(): third argument must be o período de início do tratamento (número)".into()
+                        "synth(): third argument must be treatment start period (number)".into()
                     )),
                 };
                 let df = match self.eval_expr(&args[3])? {
@@ -1154,7 +1154,7 @@ impl Interpreter {
                     Some(Value::Str(s)) => s.clone(),
                     _ => {
                         return Err(HayashiError::Runtime(
-                            "synth(): opção id=coluna é obrigatória".into(),
+                            "synth(): id=coluna option is required".into(),
                         ))
                     }
                 };
@@ -1162,7 +1162,7 @@ impl Interpreter {
                     Some(Value::Str(s)) => s.clone(),
                     _ => {
                         return Err(HayashiError::Runtime(
-                            "synth(): opção time=coluna é obrigatória".into(),
+                            "synth(): time=coluna option is required".into(),
                         ))
                     }
                 };
@@ -1172,7 +1172,7 @@ impl Interpreter {
                             .map(|v| match v {
                                 Value::Str(s) => Ok(s.clone()),
                                 _ => Err(HayashiError::Type(
-                                    "synth(): covs must be a list de strings".into(),
+                                    "synth(): covs must be a list of strings".into(),
                                 )),
                             })
                             .collect::<Result<Vec<_>>>()?,
@@ -1275,7 +1275,7 @@ impl Interpreter {
             "did" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
-                        "did(outcome ~ tratado + pos, df) requer fórmula e DataFrame".into(),
+                        "did(outcome ~ treated + post, df) requires formula and DataFrame".into(),
                     ));
                 }
                 let formula_ast = self.resolve_formula(&args[0])?;
@@ -1301,7 +1301,7 @@ impl Interpreter {
                     .collect();
                 if rhs_vars.len() < 2 {
                     return Err(HayashiError::Runtime(
-                        "did(): fórmula deve ter exatamente 2 variáveis no RHS: treated + post"
+                        "did(): formula must have exactly 2 variables on RHS: treated + post"
                             .into(),
                     ));
                 }
@@ -1395,7 +1395,7 @@ impl Interpreter {
             "cox" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
-                        "cox(time ~ x1 + x2, df, event=col) requer fórmula e DataFrame".into(),
+                        "cox(time ~ x1 + x2, df, event=col) requires formula and DataFrame".into(),
                     ));
                 }
                 let formula_ast = self.resolve_formula(&args[0])?;
@@ -1411,7 +1411,7 @@ impl Interpreter {
                     Some(Value::Str(s)) => s.clone(),
                     None => {
                         return Err(HayashiError::Runtime(
-                            "cox() requer opção event=nome_coluna".into(),
+                            "cox() requires event=coluna option".into(),
                         ))
                     }
                     _ => return Err(HayashiError::Type("event= must be string".into())),
@@ -1433,7 +1433,7 @@ impl Interpreter {
                     .collect();
                 if rhs_vars.is_empty() {
                     return Err(HayashiError::Runtime(
-                        "cox(): fórmula precisa de ao menos uma covariável no RHS".into(),
+                        "cox(): formula needs at least one covariate on RHS".into(),
                     ));
                 }
                 let cols: Vec<ndarray::Array1<f64>> = rhs_vars
@@ -1454,7 +1454,7 @@ impl Interpreter {
 
             // ── Robust Linear Model (M-estimadores) ───────────────────────────
             // rlm(y ~ x1 + x2, df, norm=huber|tukey|andrews|hampel, cov=HC3)
-            // norm padrão: Huber (c=1.345)
+            // default norm: Huber (c=1.345)
             "rlm" => {
                 let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
@@ -1493,15 +1493,15 @@ impl Interpreter {
 
             // ── GEE (Generalized Estimating Equations) ────────────────────────
             // gee(y ~ x1 + x2, df, id=cluster_col, family=gaussian, corr=exchangeable)
-            // family: gaussian (padrão), binomial, poisson
-            // corr:   independence (padrão), exchangeable, ar1, unstructured
+            // family: gaussian (default), binomial, poisson
+            // corr:   independence (default), exchangeable, ar1, unstructured
             "gee" => {
                 let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
                 let id_col = match opt_map.get("id") {
                     Some(Value::Str(s)) => s.clone(),
                     None => {
                         return Err(HayashiError::Runtime(
-                            "gee() requer opção id=coluna_grupo".into(),
+                            "gee() requires id=group_column option".into(),
                         ))
                     }
                     _ => return Err(HayashiError::Type("id= must be string".into())),
@@ -1548,7 +1548,7 @@ impl Interpreter {
                 let var_names = df
                     .formula_var_names(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                // converter coluna de id para índices de grupo (usize)
+                // convert id column to group indices (usize)
                 let id_vals = get_col_f64(&df, &id_col)?;
                 let mut id_map: std::collections::HashMap<i64, usize> =
                     std::collections::HashMap::new();
@@ -1588,7 +1588,7 @@ impl Interpreter {
                     Some(Value::Str(s)) => s.clone(),
                     None => {
                         return Err(HayashiError::Runtime(
-                            "wls() requer opção weights=\"coluna_pesos\"".into(),
+                            "wls() requires weights=\"weights_column\"".into(),
                         ))
                     }
                     _ => return Err(HayashiError::Type("weights= must be string".into())),
@@ -1628,8 +1628,8 @@ impl Interpreter {
                     .formula_var_names(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-                // inflate= opcional: lista de nomes de colunas para a equação de inflação
-                // Se omitido, usa a mesma matriz X do modelo de contagem
+                // inflate= optional: list of column names for inflation equation
+                // If omitted, uses the same X matrix as the count model
                 let (x_inflate_opt, inflate_names_opt): (
                     Option<ndarray::Array2<f64>>,
                     Option<Vec<String>>,
@@ -1640,7 +1640,7 @@ impl Interpreter {
                             .map(|v| match v {
                                 Value::Str(s) => Ok(s.clone()),
                                 _ => Err(HayashiError::Type(
-                                    "inflate= must be a list de strings".into(),
+                                    "inflate= must be a list of strings".into(),
                                 )),
                             })
                             .collect::<Result<_>>()?;
@@ -1658,7 +1658,7 @@ impl Interpreter {
                     None => (None, None),
                     _ => {
                         return Err(HayashiError::Type(
-                            "inflate= must be a list de strings".into(),
+                            "inflate= must be a list of strings".into(),
                         ))
                     }
                 };
@@ -1686,38 +1686,38 @@ impl Interpreter {
                 Ok(Value::ZeroInflatedResult(Rc::new(result)))
             }
 
-            // ── MixedLM (Mixed Linear Models — efeitos mistos) ────────────────
-            // mixed(y ~ x1 + x2, df, id="group")           # intercept aleatório
-            // mixed(y ~ x1 + x2, df, id="group", re=["x1"]) # + slope aleatório
+            // ── MixedLM (Mixed Linear Models — mixed effects) ────────────────
+            // mixed(y ~ x1 + x2, df, id="group")           # random intercept
+            // mixed(y ~ x1 + x2, df, id="group", re=["x1"]) # + random slope
             "mixed" | "mixedlm" => {
                 let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-                // id= obrigatório: coluna de grupo
+                // id= required: group column
                 let id_col = match opt_map.get("id") {
                     Some(Value::Str(s)) => s.clone(),
                     None => {
                         return Err(HayashiError::Runtime(
-                            "mixed() requer opção id=\"coluna_grupo\"".into(),
+                            "mixed() requires id=\"group_column\"".into(),
                         ))
                     }
                     _ => return Err(HayashiError::Type("id= must be string".into())),
                 };
 
-                // re= opcional: lista de variáveis com efeito aleatório de slope
-                // Se omitido, modelo de intercept aleatório apenas (re = [1])
+                // re= optional: list of variables with random slope effect
+                // Se omitido, modelo de random intercept apenas (re = [1])
                 let re_vars: Vec<String> = match opt_map.get("re") {
                     Some(Value::List(lst)) => lst
                         .iter()
                         .map(|v| match v {
                             Value::Str(s) => Ok(s.clone()),
-                            _ => Err(HayashiError::Type("re= must be a list de strings".into())),
+                            _ => Err(HayashiError::Type("re= must be a list of strings".into())),
                         })
                         .collect::<Result<_>>()?,
                     None => vec![],
-                    _ => return Err(HayashiError::Type("re= must be a list de strings".into())),
+                    _ => return Err(HayashiError::Type("re= must be a list of strings".into())),
                 };
 
                 let (y_vec, x_fixed) = df
@@ -1727,7 +1727,7 @@ impl Interpreter {
                     .formula_var_names(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-                // Converter id para índices de grupo
+                // Convert id to group indices
                 let id_vals = get_col_f64(&df, &id_col)?;
                 let mut id_map: std::collections::HashMap<i64, usize> =
                     std::collections::HashMap::new();
@@ -1744,9 +1744,9 @@ impl Interpreter {
                     })
                     .collect();
 
-                // Construir x_random: intercept + slopes especificados
+                // Build x_random: intercept + specified slopes
                 let n = df.n_rows();
-                let q = re_vars.len() + 1; // +1 para intercept aleatório
+                let q = re_vars.len() + 1; // +1 para random intercept
                 let mut x_random = ndarray::Array2::<f64>::ones((n, q));
                 for (j, name) in re_vars.iter().enumerate() {
                     x_random
@@ -1765,13 +1765,13 @@ impl Interpreter {
                 Ok(Value::MixedResult(Rc::new(result)))
             }
 
-            // ── testparm — Wald F-test conjunto (OLS/WLS) ────────────────────
+            // ── testparm — Joint Wald F-test (OLS/WLS) ────────────────────
             // testparm(model, ["x1", "x2"])
-            // H0: β_x1 = β_x2 = 0 simultaneamente
+            // H0: β_x1 = β_x2 = 0 simultaneously
             "testparm" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
-                        "testparm(model, [\"x1\", \"x2\"]) requer modelo + lista de variáveis"
+                        "testparm(model, [\"x1\", \"x2\"]) requires model + list of variables"
                             .into(),
                     ));
                 }
@@ -1782,13 +1782,13 @@ impl Interpreter {
                         .map(|v| match v {
                             Value::Str(s) => Ok(s.clone()),
                             _ => Err(HayashiError::Type(
-                                "testparm: lista deve conter strings".into(),
+                                "testparm: list must contain strings".into(),
                             )),
                         })
                         .collect::<Result<_>>()?,
                     _ => {
                         return Err(HayashiError::Type(
-                            "testparm: second argument must be lista de strings".into(),
+                            "testparm: second argument must be list of strings".into(),
                         ))
                     }
                 };
@@ -1798,27 +1798,27 @@ impl Interpreter {
                         let indices: Vec<usize> = tested.iter().map(|v| {
                             vnames.iter().position(|n| n == v)
                                 .ok_or_else(|| HayashiError::Runtime(
-                                    format!("testparm: variável '{v}' not found no modelo")
+                                    format!("testparm: variable '{v}' not found in model")
                                 ))
                         }).collect::<Result<_>>()?;
                         let (f_stat, p_val) = m.result.f_test(&indices, &m.x)
                             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                         let df1 = indices.len();
                         let df2 = m.result.df_resid;
-                        println!("\n{:=^62}", " testparm — Teste F Conjunto ");
-                        println!(" H0: {} = 0 (simultâneamente)", tested.join(" = "));
+                        println!("\n{:=^62}", " testparm — Joint F Test ");
+                        println!(" H0: {} = 0 (simultaneously)", tested.join(" = "));
                         println!("{:-^62}", "");
                         println!(" F({df1}, {df2})  =  {f_stat:.4}");
                         println!(" Prob > F      =  {p_val:.4}");
-                        if p_val < 0.01       { println!(" Resultado: rejeita H0 a 1%"); }
-                        else if p_val < 0.05  { println!(" Resultado: rejeita H0 a 5%"); }
-                        else if p_val < 0.10  { println!(" Resultado: rejeita H0 a 10%"); }
-                        else                  { println!(" Resultado: não rejeita H0 a 10%"); }
+                        if p_val < 0.01       { println!(" Result: rejects H0 at 1%"); }
+                        else if p_val < 0.05  { println!(" Result: rejects H0 at 5%"); }
+                        else if p_val < 0.10  { println!(" Result: rejects H0 at 10%"); }
+                        else                  { println!(" Result: does not reject H0 at 10%"); }
                         println!("{:=^62}", "");
                         Ok(Value::Nil)
                     }
                     _ => Err(HayashiError::Runtime(
-                        "testparm: suporte atual apenas para OLS/WLS — outros modelos usam chi2; implemente via wald_test()".into()
+                        "testparm: current support only for OLS/WLS — other models use chi2; implement via wald_test()".into()
                     )),
                 }
             }
@@ -1915,10 +1915,10 @@ impl Interpreter {
             }
 
             // ── Beta Regression ───────────────────────────────────────────────
-            // betareg(y ~ x1 + x2, df)               # link=logit (padrão)
+            // betareg(y ~ x1 + x2, df)               # link=logit (default)
             // betareg(y ~ x1 + x2, df, link=probit)  # link alternativo
             // betareg(y ~ x1 + x2, df, link=cloglog)
-            // Requer y ∈ (0,1) estritamente (proporções, probabilidades)
+            // Requires y ∈ (0,1) strictly (proportions, probabilities)
             "betareg" | "beta" => {
                 let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
@@ -1952,9 +1952,9 @@ impl Interpreter {
 
             // glm — Modelos Lineares Generalizados (IRLS via Greeners)
             // glm(y ~ x1 + x2, df, family=poisson, link=log, cov=robust)
-            // Famílias: gaussian, binomial, poisson, gamma, inverse_gaussian, negbin, tweedie
+            // Families: gaussian, binomial, poisson, gamma, inverse_gaussian, negbin, tweedie
             // Links: identity, log, logit, probit, inverse, cloglog
-            // Se link omitido usa link canônico da família
+            // If link omitted uses canonical link of family
             "glm" => {
                 let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
@@ -2015,7 +2015,7 @@ impl Interpreter {
                                 format!("glm: link='{other}' unknown — use: identity, log, logit, probit, inverse, cloglog")
                             )),
                         };
-                        // fit_with_link não aceita var_names; setar após
+                        // fit_with_link does not accept var_names; set after
                         let mut r = greeners::GLM::fit_with_link(&y_vec, &x_mat, family, link, cov)
                             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                         r.variable_names = Some(var_names);
@@ -2029,10 +2029,10 @@ impl Interpreter {
                 Ok(Value::GlmResult(Rc::new(result)))
             }
 
-            // influence — Diagnósticos de influência para OLS
+            // influence — Influence diagnostics for OLS
             // influence(model, df)
-            // Calcula DFBetas, DFFITS, leverage, resíduos studentizados
-            // Imprime sumário e observações influentes
+            // Calculates DFBetas, DFFITS, leverage, studentized residuals
+            // Prints summary and influential observations
             "influence" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime("influence(model, df)".into()));
@@ -2047,15 +2047,15 @@ impl Interpreter {
                         Ok(Value::Nil)
                     }
                     _ => Err(HayashiError::Runtime(
-                        "influence(): só suportado para modelos OLS/WLS — use: influence(m_ols, df)".into()
+                        "influence(): only supported for OLS/WLS models — use: influence(m_ols, df)".into()
                     )),
                 }
             }
 
-            // lowess — Suavização não-paramétrica LOWESS
+            // lowess — Non-parametric LOWESS smoothing
             // lowess(df, y, x, frac=0.67, it=3)
-            // frac: fração dos dados usada em cada ajuste local (0 < frac ≤ 1)
-            // it: iterações de robustificação (0 = sem robustificação)
+            // frac: fraction of data used in each local fit (0 < frac ≤ 1)
+            // it: robustification iterations (0 = no robustification)
             "lowess" => {
                 if args.len() < 3 {
                     return Err(HayashiError::Runtime(
@@ -2078,7 +2078,7 @@ impl Interpreter {
                     Expr::Var(n) => n.clone(),
                     _ => {
                         return Err(HayashiError::Type(
-                            "lowess: second argument must be nome de coluna y".into(),
+                            "lowess: second argument must be y column name".into(),
                         ))
                     }
                 };
@@ -2086,7 +2086,7 @@ impl Interpreter {
                     Expr::Var(n) => n.clone(),
                     _ => {
                         return Err(HayashiError::Type(
-                            "lowess: third argument must be nome de coluna x".into(),
+                            "lowess: third argument must be x column name".into(),
                         ))
                     }
                 };
@@ -2109,9 +2109,9 @@ impl Interpreter {
                 Ok(Value::LowessResult(Rc::new(result)))
             }
 
-            // kde — Estimativa de densidade por kernel (univariada)
+            // kde — Kernel density estimation (univariate)
             // kde(df, var, bw=auto, kernel=gaussian)
-            // Imprime: n, bandwidth, suporte [min, max]
+            // Prints: n, bandwidth, support [min, max]
             "kde" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
@@ -2134,7 +2134,7 @@ impl Interpreter {
                     Expr::Var(n) => n.clone(),
                     _ => {
                         return Err(HayashiError::Type(
-                            "kde: second argument must be nome de coluna".into(),
+                            "kde: second argument must be column name".into(),
                         ))
                     }
                 };
@@ -2174,24 +2174,24 @@ impl Interpreter {
                 let peak_x = result.support[peak_idx];
                 let peak_d = result.density[peak_idx];
                 println!("\n{:=^50}", " KDE ");
-                println!("{:<20} {:>10}", "Variável:", var_name);
-                println!("{:<20} {:>10}", "Observações:", result.n_obs);
+                println!("{:<20} {:>10}", "Variable:", var_name);
+                println!("{:<20} {:>10}", "Observations:", result.n_obs);
                 println!("{:<20} {:>10.6}", "Bandwidth:", result.bandwidth);
-                println!("{:<20} {:>10.4}", "Suporte min:", support_min);
-                println!("{:<20} {:>10.4}", "Suporte max:", support_max);
+                println!("{:<20} {:>10.4}", "Support min:", support_min);
+                println!("{:<20} {:>10.4}", "Support max:", support_max);
                 println!(
                     "{:<20} {:>10.4} @ x = {:.4}",
-                    "Pico (densidade):", peak_d, peak_x
+                    "Peak (density):", peak_d, peak_x
                 );
                 println!("{:=^50}", "");
                 Ok(Value::Nil)
             }
 
-            // pca — Análise de Componentes Principais
+            // pca — Principal Component Analysis
             // pca(df, x1, x2, x3, n=2)
-            // n=: número de componentes (padrão: min(vars, obs-1))
-            // Baseado na decomposição de autovalores da matriz de correlação
-            // Variáveis são padronizadas automaticamente (equivalente a cor PCA)
+            // n=: number of components (default: min(vars, obs-1))
+            // Based on eigenvalue decomposition of correlation matrix
+            // Variables are standardized automatically (equivalent to PCA cor)
             "pca" | "princomp" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
@@ -2229,11 +2229,11 @@ impl Interpreter {
                 }))
             }
 
-            // factor — Análise Fatorial (eixo principal)
+            // factor — Factor Analysis (principal axis)
             // factor(df, x1, x2, x3, n=2, rotation=varimax)
-            // rotation=: none (padrão), varimax
-            // Diferença de PCA: PCA maximiza variância explicada;
-            //   FA estima fatores latentes com estrutura de covariância específica
+            // rotation=: none (default), varimax
+            // Difference from PCA: PCA maximizes explained variance;
+            //   FA estimates latent factors with specific covariance structure
             "factor" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
@@ -2283,10 +2283,10 @@ impl Interpreter {
                 }))
             }
 
-            // manova — Análise de Variância Multivariada (one-way)
+            // manova — Multivariate Analysis of Variance (one-way)
             // manova(df, y1, y2, ..., by="group")
-            // Testa H0: vetores de médias iguais entre grupos
-            // Estatísticas: Wilks' Λ, Pillai's trace, Hotelling-Lawley, Roy's root
+            // Tests H0: mean vectors equal across groups
+            // Statistics: Wilks' Λ, Pillai's trace, Hotelling-Lawley, Roy's root
             "manova" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
@@ -2343,7 +2343,7 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
-            // ── Função definida pelo usuário ──────────────────────────────────
+            // ── User-defined function ──────────────────────────────────
             _ => return Ok(None),
         };
         result.map(Some)

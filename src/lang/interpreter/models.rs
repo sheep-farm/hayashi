@@ -1,7 +1,7 @@
 use ndarray::{Array1, Array2};
 use std::rc::Rc;
 
-// ── Wrappers que preservam a matriz X para diagnósticos e predict ────────────
+// ── Wrappers that preserve the X matrix for diagnostics and predict ─────────
 
 #[derive(Clone)]
 pub struct OlsModel {
@@ -68,7 +68,7 @@ pub struct BinaryModel {
     pub y: Array1<f64>,
     pub x: Array2<f64>,
     pub kind: String,            // "logit" | "probit"
-    pub coef_names: Vec<String>, // nomes dos coeficientes para margins
+    pub coef_names: Vec<String>, // coefficient names for margins
 }
 
 impl std::fmt::Display for BinaryModel {
@@ -77,12 +77,12 @@ impl std::fmt::Display for BinaryModel {
     }
 }
 
-// ── SUR wrapper (preserva nomes de variáveis por equação) ────────────────────
+// ── SUR wrapper (preserves variable names per equation) ─────────────────────
 
 #[derive(Clone)]
 pub struct SurModel {
     pub result: Rc<greeners::sur::SurResult>,
-    pub eq_var_names: Vec<Vec<String>>, // nomes por equação
+    pub eq_var_names: Vec<Vec<String>>, // names per equation
 }
 
 impl std::fmt::Display for SurModel {
@@ -124,7 +124,7 @@ impl std::fmt::Display for SurModel {
     }
 }
 
-// ── PCA wrapper (adiciona nomes de variáveis ao PCAResult) ───────────────────
+// ── PCA wrapper (adds variable names to PCAResult) ───────────────────────────
 #[derive(Clone)]
 pub struct PcaModel {
     pub result: Rc<greeners::PCAResult>,
@@ -139,13 +139,13 @@ impl std::fmt::Display for PcaModel {
         writeln!(f, "\n{thick}")?;
         writeln!(f, "{:^62}", " Principal Component Analysis ")?;
         writeln!(f, "{thin}")?;
-        writeln!(f, " {:>20}  {:>10}", "Observações:", r.n_obs)?;
-        writeln!(f, " {:>20}  {:>10}", "Componentes:", r.n_components)?;
-        writeln!(f, " {:>20}  {:>10}", "Variáveis:", self.var_names.len())?;
+        writeln!(f, " {:>20}  {:>10}", "Observations:", r.n_obs)?;
+        writeln!(f, " {:>20}  {:>10}", "Components:", r.n_components)?;
+        writeln!(f, " {:>20}  {:>10}", "Variables:", self.var_names.len())?;
         writeln!(
             f,
             "\n{:^12} {:>12} {:>12} {:>10}",
-            "Componente", "Var Expl.", "% Acum.", "Eigenvalue"
+            "Component", "Var Expl.", "% Cum.", "Eigenvalue"
         )?;
         writeln!(f, "{thin}")?;
         let mut cum = 0.0;
@@ -165,7 +165,7 @@ impl std::fmt::Display for PcaModel {
         let hdr: String = (0..r.n_components)
             .map(|i| format!(" {:>8}", format!("PC{}", i + 1)))
             .collect();
-        writeln!(f, "{:<18}{hdr}", "Variável")?;
+        writeln!(f, "{:<18}{hdr}", "Variable")?;
         for (j, vname) in self.var_names.iter().enumerate() {
             let row: String = (0..r.n_components)
                 .map(|i| format!(" {:>8.4}", r.loadings[[j, i]]))
@@ -191,14 +191,14 @@ impl std::fmt::Display for FactorModel {
         writeln!(f, "\n{thick}")?;
         writeln!(f, "{:^62}", " Factor Analysis (Principal Axis) ")?;
         writeln!(f, "{thin}")?;
-        writeln!(f, " {:>20}  {:>10}", "Observações:", r.n_obs)?;
-        writeln!(f, " {:>20}  {:>10}", "Fatores:", r.n_factors)?;
-        writeln!(f, "\n{:^62}", " Cargas Fatoriais (Loadings) ")?;
+        writeln!(f, " {:>20}  {:>10}", "Observations:", r.n_obs)?;
+        writeln!(f, " {:>20}  {:>10}", "Factors:", r.n_factors)?;
+        writeln!(f, "\n{:^62}", " Factor Loadings ")?;
         writeln!(f, "{thin}")?;
         let hdr: String = (0..r.n_factors)
             .map(|i| format!(" {:>8}", format!("F{}", i + 1)))
             .collect();
-        writeln!(f, "{:<18}{hdr}  {:>10}", "Variável", "Comunalit.")?;
+        writeln!(f, "{:<18}{hdr}  {:>10}", "Variable", "Communality")?;
         for (j, vname) in self.var_names.iter().enumerate() {
             let row: String = (0..r.n_factors)
                 .map(|i| format!(" {:>8.4}", r.loadings[[j, i]]))
@@ -241,11 +241,11 @@ impl std::fmt::Display for ThreeSLSModel {
     }
 }
 
-// ── Resultado de testes de diagnóstico (print-on-demand) ─────────────────────
+// ── Diagnostic test result (print-on-demand) ───────────────────────────────
 
 #[derive(Debug, Clone)]
 pub struct DiagResult {
-    pub rendered: String, // output pré-renderizado pelo teste
+    pub rendered: String, // pre-rendered output by the test
 }
 
 impl std::fmt::Display for DiagResult {

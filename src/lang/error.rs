@@ -20,7 +20,7 @@ pub enum HayashiError {
     #[error("I/O error: {0}")]
     Io(String),
 
-    // Sentinelas de controle de fluxo — capturadas internamente, nunca expostas ao usuário
+    // Flow-control sentinels — caught internally, never exposed to the user
     #[error("return")]
     Return,
     #[error("break")]

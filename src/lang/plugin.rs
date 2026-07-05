@@ -173,7 +173,7 @@ pub fn column_to_value(col: &Column) -> Value {
     }
 }
 
-/// Converte uma lista de Hayashi em uma coluna do Greeners se for homogênea e primitiva.
+/// Converts a Hayashi list into a Greeners column if it is homogeneous and primitive.
 pub fn list_to_column(lst: &[Value]) -> Option<Column> {
     if lst.is_empty() {
         return None;

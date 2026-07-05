@@ -14,8 +14,8 @@ use statrs::distribution::{ContinuousCDF, Normal};
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-/// Saída automática da linguagem: respeita `quiet_mode` e `capturing`.
-/// Use para todo print que não seja uma saída explícita do usuário (print/display).
+/// Language automatic output: respects `quiet_mode` and `capturing`.
+/// Use for every print that is not explicit user output (print/display).
 #[macro_export]
 macro_rules! emit {
     ($self:expr, $($arg:tt)*) => {
@@ -39,9 +39,9 @@ macro_rules! emitln {
     };
 }
 
-// ── eval_call() dividido por categoria (ver src/lang/interpreter/) ──────────
-// Cada submódulo implementa `impl Interpreter { fn eval_call_X(...) -> Result<Option<Value>> }`
-// Retorna `Ok(None)` quando `func` não pertence à categoria, para o dispatcher tentar a próxima.
+// ── eval_call() split by category (see src/lang/interpreter/) ───────────────
+// Each submodule implements `impl Interpreter { fn eval_call_X(...) -> Result<Option<Value>> }`
+// Returns `Ok(None)` when `func` does not belong to the category, so the dispatcher can try the next.
 mod builtins;
 mod data_manipulation;
 mod descriptive_lang;
@@ -95,7 +95,7 @@ fn standard_normal_draw<R: rand::Rng + ?Sized>(rng: &mut R) -> f64 {
 }
 
 
-// ── Interpetador ──────────────────────────────────────────────────────────────
+// ── Interpreter ──────────────────────────────────────────────────────────────
 
 pub struct Interpreter {
     pub env: Env,
@@ -532,8 +532,8 @@ impl Interpreter {
                 || cand.ends_with(".dll")
                 || cand.ends_with(".dylib");
 
-            // No perfil de release (produção), restringimos plugins nativos/WASM
-            // a serem carregados exclusivamente de ~/.hay/packages/.
+            // In release builds, restrict native/WASM plugins
+            // to be loaded only from ~/.hay/packages/.
             let restrict_to_packages = is_native_or_wasm && !cfg!(debug_assertions);
 
             // 1. Current directory
@@ -600,7 +600,7 @@ impl Interpreter {
         Box::new(rand::rngs::StdRng::seed_from_u64(derived_seed))
     }
 
-    // ── Avalia expressão ──────────────────────────────────────────────────────
+    // ── Expression evaluation ───────────────────────────────────────────────
 
 
     pub(super) fn maybe_filter_df(&mut self, df: &Rc<DataFrame>, opts: &[Opt]) -> Result<Rc<DataFrame>> {
@@ -612,7 +612,7 @@ impl Interpreter {
         }
     }
 
-    // ── Funções built-in ──────────────────────────────────────────────────────
+    // ── Built-in functions ────────────────────────────────────────────────────
 
     pub(super) fn resolve_formula(&mut self, expr: &Expr) -> Result<Formula> {
         match expr {
@@ -674,12 +674,12 @@ impl Interpreter {
         Ok((formula_ast, df))
     }
 
-    // ── Métodos de objetos ────────────────────────────────────────────────────
+    // ── Object methods ──────────────────────────────────────────────────────
 
 
-    // ── Avalia expressão elemento-a-elemento sobre colunas de um DataFrame ───
+    // ── Element-wise expression evaluation over DataFrame columns ───────────
 
 
-    // ── Executa statement ─────────────────────────────────────────────────────
+    // ── Statement execution ─────────────────────────────────────────────────
 
 }

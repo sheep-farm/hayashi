@@ -755,7 +755,7 @@ fn run_repl() {
                     }
                 }
 
-                // input block: acumula até "end"
+                // input block: accumulate until "end"
                 let in_input = buf.lines().any(|l| {
                     let t = l.trim();
                     t.starts_with("input ") && !buf.contains("\nend")
@@ -777,12 +777,12 @@ fn run_repl() {
 
                 buf.push_str(trimmed);
                 buf.push('\n');
-                // depth rastreia delimitadores não fechados: {}, [], ()
+                // depth tracks unclosed delimiters: {}, [], ()
                 depth += open_depth(trimmed);
 
-                // Continua acumulando se:
-                // (a) há delimitadores abertos (depth > 0), OU
-                // (b) o buffer (sem espaços finais) termina com |>
+                // Keep accumulating if:
+                // (a) there are open delimiters (depth > 0), OR
+                // (b) the buffer (without trailing spaces) ends with |>
                 let buf_trimmed = buf.trim_end();
                 let trailing_pipe = buf_trimmed.ends_with("|>");
                 if depth > 0 || trailing_pipe {

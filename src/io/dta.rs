@@ -5,11 +5,11 @@ use dta::stata::dta::variable_type::VariableType;
 use greeners::DataFrame;
 use std::collections::HashMap;
 
-/// Lê um arquivo .dta e converte para DataFrame do Greeners.
+/// Reads a .dta file and converts it to a Greeners DataFrame.
 ///
-/// Colunas numéricas (byte, int, long, float, double) são importadas
-/// como Float. Colunas de string são importadas como String. Valores
-/// missing do Stata são convertidos para NaN.
+/// Numeric columns (byte, int, long, float, double) are imported
+/// as Float. String columns are imported as String. Stata missing
+/// values are converted to NaN.
 pub fn load_dta(path: &str) -> Result<(DataFrame, usize)> {
     let header_reader = DtaReader::default()
         .from_path(path)
@@ -36,10 +36,10 @@ pub fn load_dta(path: &str) -> Result<(DataFrame, usize)> {
 
     let _n_vars = variables.len();
 
-    // acumuladores por coluna
+    // column accumulators
     let mut float_cols: HashMap<String, Vec<f64>> = HashMap::new();
     let mut str_cols: HashMap<String, Vec<String>> = HashMap::new();
-    let mut col_order: Vec<(String, bool)> = Vec::new(); // (nome, is_numeric)
+    let mut col_order: Vec<(String, bool)> = Vec::new(); // (name, is_numeric)
 
     for (name, vtype) in &variables {
         match vtype {
@@ -99,7 +99,7 @@ pub fn load_dta(path: &str) -> Result<(DataFrame, usize)> {
         }
     }
 
-    // Monta o DataFrame na ordem original das colunas
+    // Build the DataFrame in the original column order
     let mut builder = DataFrame::builder();
     for (name, is_numeric) in &col_order {
         if *is_numeric {

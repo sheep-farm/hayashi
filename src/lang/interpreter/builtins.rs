@@ -179,10 +179,10 @@ pub const BUILTIN_NAMES: &[&str] = &[
     "write",
 ];
 
-/// Conversões de tipo (int/float/str/bool), date/time, builtins de lista e
-/// dict, funções de string, regex, agregações sobre List, e as agregações
-/// escalares (mean/sum/min/max/std/...) com suporte a `if=`.
-/// Extraído de `eval_call` (ver src/lang/interpreter.rs).
+/// Type conversions (int/float/str/bool), date/time, list and dict builtins,
+/// string functions, regex, aggregations over List, and scalar aggregations
+/// (mean/sum/min/max/std/...) with `if=` support.
+/// Extracted from `eval_call` (see src/lang/interpreter.rs).
 impl Interpreter {
     /// Helper for `tidy`: build a tidy coefficient map from model result vectors.
     fn build_tidy_coef_map(
@@ -412,7 +412,7 @@ impl Interpreter {
                 Ok(Value::Float(dt.and_utc().timestamp() as f64))
             }
 
-            // ── Builtins de lista ─────────────────────────────────────────────
+            // ── List builtins ─────────────────────────────────────────────────
             "len" => {
                 if args.len() != 1 {
                     return Err(HayashiError::Runtime(
@@ -640,7 +640,7 @@ impl Interpreter {
                 Ok(Value::DataFrame(Rc::new(df)))
             }
 
-            // ── Funções de string ─────────────────────────────────────────────
+            // ── String functions ────────────────────────────────────────────
             "upper" | "lower" | "trim" => {
                 let s =
                     match self
@@ -650,7 +650,7 @@ impl Interpreter {
                         Value::Str(s) => s,
                         v => {
                             return Err(HayashiError::Type(format!(
-                                "{func}() requires string, recebeu {v}"
+                                "{func}() requires string, got {v}"
                             )))
                         }
                     };
@@ -714,7 +714,7 @@ impl Interpreter {
             "contains" => {
                 if args.len() != 2 {
                     return Err(HayashiError::Runtime(
-                        "contains(s, padrão) requires 2 arguments".into(),
+                        "contains(s, pattern) requires 2 arguments".into(),
                     ));
                 }
                 let s = match self.eval_expr(&args[0])? {
@@ -734,7 +734,7 @@ impl Interpreter {
 
             "starts_with" | "ends_with" => {
                 if args.len() != 2 {
-                    return Err(self.rt_err(format!("{func}(s, padrão) requires 2 arguments")));
+                    return Err(self.rt_err(format!("{func}(s, pattern) requires 2 arguments")));
                 }
                 let s = match self.eval_expr(&args[0])? {
                     Value::Str(s) => s,
@@ -755,7 +755,7 @@ impl Interpreter {
                 }))
             }
 
-            // substr(s, início [, comprimento]) — índice 0-based em chars
+            // substr(s, start [, length]) — 0-based char index
             "substr" => {
                 if args.len() < 2 || args.len() > 3 {
                     return Err(HayashiError::Runtime(
@@ -794,11 +794,11 @@ impl Interpreter {
                 Ok(Value::Str(chars[real_start..end].iter().collect()))
             }
 
-            // split(s, delimitador) → List de Str
+            // split(s, delimiter) → List of Str
             "split" => {
                 if args.len() != 2 {
                     return Err(HayashiError::Runtime(
-                        "split(s, delimitador) requires 2 arguments".into(),
+                        "split(s, delimiter) requires 2 arguments".into(),
                     ));
                 }
                 let s = match self.eval_expr(&args[0])? {
@@ -820,11 +820,11 @@ impl Interpreter {
                 Ok(Value::List(Rc::new(parts)))
             }
 
-            // str_replace(s, de, para) — "replace" é palavra-chave
+            // str_replace(s, from, to) — "replace" is a keyword
             "str_replace" => {
                 if args.len() != 3 {
                     return Err(HayashiError::Runtime(
-                        "str_replace(s, de, para) requires 3 arguments".into(),
+                        "str_replace(s, from, to) requires 3 arguments".into(),
                     ));
                 }
                 let s = match self.eval_expr(&args[0])? {
@@ -853,10 +853,10 @@ impl Interpreter {
             }
 
             // ── Regex ─────────────────────────────────────────────────────────
-            // regexm(s, pattern)            → 1 se match, 0 se não
-            // regexr(s, pattern, replace)   → substitui primeira ocorrência
-            // regexra(s, pattern, replace)  → substitui todas
-            // regexs(s, pattern)            → extrai primeiro grupo de captura
+            // regexm(s, pattern)            → 1 if match, 0 otherwise
+            // regexr(s, pattern, replace)   → replace first occurrence
+            // regexra(s, pattern, replace)  → replace all
+            // regexs(s, pattern)            → extract first capture group
             "regexm" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime("regexm(string, pattern)".into()));
@@ -956,14 +956,14 @@ impl Interpreter {
                 }
             }
 
-            // ── Agregações sobre List ─────────────────────────────────────────
-            // "sum" fica para summarize(df) — Stata-style
-            // "total" é a soma de uma lista numérica
+            // ── Aggregations over List ────────────────────────────────────────
+            // "sum" is reserved for summarize(df) — Stata-style
+            // "total" is the sum of a numeric list
             "sum" | "mean" | "sd" | "std" | "min" | "max" | "total" => {
-                // Forma 1: mean(list)  /  sd(list)  /  std(list)  etc.
-                // Forma 2: mean(df, var)  ou  mean(df, var, if=cond)
+                // Form 1: mean(list)  /  sd(list)  /  std(list)  etc.
+                // Form 2: mean(df, var)  or  mean(df, var, if=cond)
                 let nums: Vec<f64> = if args.len() >= 2 {
-                    // forma DataFrame
+                    // DataFrame form
                     let df_name = match &args[0] {
                         Expr::Var(n) => n.clone(),
                         _ => {
@@ -984,7 +984,7 @@ impl Interpreter {
                         }
                     };
                     let col = get_col_f64(&df, &var_name)?;
-                    // filtro opcional: if=cond
+                    // optional filter: if=cond
                     if let Some(cond_opt) = opts.iter().find(|o| o.name == "if") {
                         let mask = self.eval_col_expr(&cond_opt.value, &df)?;
                         col.iter()
@@ -1031,7 +1031,7 @@ impl Interpreter {
                 };
                 if nums.is_empty() {
                     return Err(self.rt_err(format!(
-                        "{func}(): nenhum valor (empty list ou filtro excluiu tudo)"
+                        "{func}(): no values (empty list or filter excluded everything)"
                     )));
                 }
                 let result = match func {
@@ -1049,9 +1049,9 @@ impl Interpreter {
                 Ok(Value::Float(result))
             }
 
-            // ── Novas agregações escalares (todas suportam if = cond) ────────
+            // ── New scalar aggregations (all support if = cond) ─────────────
             "median" => {
-                // median(lista) | median(df, x) | median(df, x, if = cond)
+                // median(list) | median(df, x) | median(df, x, if = cond)
                 let nums: Vec<f64> = if args.len() >= 2 {
                     let df_name = match &args[0] {
                         Expr::Var(n) => n.clone(),
@@ -1108,7 +1108,7 @@ impl Interpreter {
             }
 
             "variance" => {
-                // variance(lista) | variance(df, x) | variance(df, x, if = cond) — amostral (/ n-1)
+                // variance(list) | variance(df, x) | variance(df, x, if = cond) — sample (/ n-1)
                 let nums: Vec<f64> = if args.len() >= 2 {
                     let df_name = match &args[0] {
                         Expr::Var(n) => n.clone(),
@@ -1219,7 +1219,7 @@ impl Interpreter {
             }
 
             "quantile" => {
-                // quantile(df, x, p) | quantile(lista, p) | quantile(df, x, p, if = cond) — p ∈ [0,1]
+                // quantile(df, x, p) | quantile(list, p) | quantile(df, x, p, if = cond) — p ∈ [0,1]
                 let (nums, p) = if args.len() >= 3 {
                     let df_name = match &args[0] {
                         Expr::Var(n) => n.clone(),
@@ -1275,14 +1275,14 @@ impl Interpreter {
                     };
                     (nums, p)
                 } else {
-                    return Err(self.rt_err("quantile(df, x, p) ou quantile(lista, p)"));
+                    return Err(self.rt_err("quantile(df, x, p) or quantile(list, p)"));
                 };
                 if !(0.0..=1.0).contains(&p) {
-                    return Err(self.rt_err("quantile(): p deve estar em [0, 1]"));
+                    return Err(self.rt_err("quantile(): p must be in [0, 1]"));
                 }
                 let mut sorted: Vec<f64> = nums.into_iter().filter(|x| x.is_finite()).collect();
                 if sorted.is_empty() {
-                    return Err(self.rt_err("quantile(): nenhum valor finito"));
+                    return Err(self.rt_err("quantile(): no finite value"));
                 }
                 sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
                 let idx = p * (sorted.len() - 1) as f64;
@@ -1298,7 +1298,7 @@ impl Interpreter {
             }
 
             "cov" => {
-                // cov(df, x, y) | cov(df, x, y, if = cond) — covariância amostral (/ n-1)
+                // cov(df, x, y) | cov(df, x, y, if = cond) — sample covariance (/ n-1)
                 if args.len() < 3 {
                     return Err(HayashiError::Runtime("cov(df, x, y)".into()));
                 }
@@ -1345,7 +1345,7 @@ impl Interpreter {
             }
 
             "corr_pair" => {
-                // corr_pair(df, x, y) | corr_pair(df, x, y, if = cond) — Pearson escalar
+                // corr_pair(df, x, y) | corr_pair(df, x, y, if = cond) — scalar Pearson
                 if args.len() < 3 {
                     return Err(HayashiError::Runtime("corr_pair(df, x, y)".into()));
                 }
@@ -1410,7 +1410,7 @@ impl Interpreter {
 
             "push" => {
                 if args.len() != 2 {
-                    return Err(HayashiError::Runtime("push(lista, item)".into()));
+                    return Err(HayashiError::Runtime("push(list, item)".into()));
                 }
                 let var_name = match &args[0] {
                     Expr::Var(n) => n.clone(),
@@ -1439,7 +1439,7 @@ impl Interpreter {
 
             "pop" => {
                 if args.len() != 1 {
-                    return Err(HayashiError::Runtime("pop(lista)".into()));
+                    return Err(HayashiError::Runtime("pop(list)".into()));
                 }
                 let var_name = match &args[0] {
                     Expr::Var(n) => n.clone(),
@@ -1470,7 +1470,7 @@ impl Interpreter {
 
             "insert" => {
                 if args.len() != 3 {
-                    return Err(HayashiError::Runtime("insert(lista, indice, item)".into()));
+                    return Err(HayashiError::Runtime("insert(list, index, item)".into()));
                 }
                 let lst = self.eval_expr(&args[0])?;
                 let idx = match self.eval_expr(&args[1])? {
@@ -1497,7 +1497,7 @@ impl Interpreter {
 
             "remove" => {
                 if args.len() != 2 {
-                    return Err(HayashiError::Runtime("remove(lista, indice)".into()));
+                    return Err(HayashiError::Runtime("remove(list, index)".into()));
                 }
                 let lst = self.eval_expr(&args[0])?;
                 let idx = match self.eval_expr(&args[1])? {
@@ -1523,7 +1523,7 @@ impl Interpreter {
 
             "clear" => {
                 if args.len() != 1 {
-                    return Err(HayashiError::Runtime("clear(lista)".into()));
+                    return Err(HayashiError::Runtime("clear(list)".into()));
                 }
                 match self.eval_expr(&args[0])? {
                     Value::List(_) => Ok(Value::List(Rc::new(Vec::new()))),
@@ -1533,7 +1533,7 @@ impl Interpreter {
 
             "reverse" => {
                 if args.len() != 1 {
-                    return Err(HayashiError::Runtime("reverse(lista)".into()));
+                    return Err(HayashiError::Runtime("reverse(list)".into()));
                 }
                 match self.eval_expr(&args[0])? {
                     Value::List(v) => {
@@ -1548,7 +1548,7 @@ impl Interpreter {
             "index" | "indexof" => {
                 if args.len() != 2 {
                     return Err(HayashiError::Runtime(
-                        "index(lista, item) → posição ou -1".into(),
+                        "index(list, item) → position or -1".into(),
                     ));
                 }
                 let lst = self.eval_expr(&args[0])?;
@@ -1564,7 +1564,7 @@ impl Interpreter {
 
             "slice" => {
                 if args.len() < 2 || args.len() > 3 {
-                    return Err(HayashiError::Runtime("slice(lista, inicio [, fim])".into()));
+                    return Err(HayashiError::Runtime("slice(list, start [, end])".into()));
                 }
                 let lst = self.eval_expr(&args[0])?;
                 let start = match self.eval_expr(&args[1])? {
@@ -1596,7 +1596,7 @@ impl Interpreter {
 
             "join" => {
                 if args.is_empty() || args.len() > 2 {
-                    return Err(HayashiError::Runtime("join(lista [, separador])".into()));
+                    return Err(HayashiError::Runtime("join(list [, separator])".into()));
                 }
                 let lst = self.eval_expr(&args[0])?;
                 let sep = if args.len() == 2 {
@@ -1639,7 +1639,7 @@ impl Interpreter {
 
             "unique" => {
                 if args.len() != 1 {
-                    return Err(HayashiError::Runtime("unique(lista)".into()));
+                    return Err(HayashiError::Runtime("unique(list)".into()));
                 }
                 match self.eval_expr(&args[0])? {
                     Value::List(v) => {
@@ -1660,7 +1660,7 @@ impl Interpreter {
 
             "flatten" => {
                 if args.len() != 1 {
-                    return Err(HayashiError::Runtime("flatten(lista)".into()));
+                    return Err(HayashiError::Runtime("flatten(list)".into()));
                 }
                 match self.eval_expr(&args[0])? {
                     Value::List(v) => {

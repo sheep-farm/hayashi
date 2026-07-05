@@ -39,11 +39,11 @@ impl Interpreter {
                     return Err(self.rt_err("input: no data rows"));
                 }
                 let k = headers.len();
-                // Verifica que todas as linhas têm o mesmo número de colunas
+                // Verify that all rows have the same number of columns
                 for (i, row) in rows.iter().enumerate() {
                     if row.len() != k {
                         return Err(HayashiError::Runtime(format!(
-                            "input: linha {} tem {} valores, esperado {} ({})",
+                            "input: row {} has {} values, expected {} ({})",
                             i + 1,
                             row.len(),
                             k,
@@ -52,7 +52,7 @@ impl Interpreter {
                     }
                 }
                 let n = rows.len();
-                // Transpõe: rows → columns
+                // Transpose: rows → columns
                 let mut col_map: std::collections::HashMap<String, ndarray::Array1<f64>> =
                     std::collections::HashMap::new();
                 for (j, name) in headers.iter().enumerate() {
@@ -150,7 +150,7 @@ impl Interpreter {
                         ));
                     }
                 } else {
-                    // ── Arquivo / URL ───────────────────────────────────────
+                    // ── File / URL ───────────────────────────────────────────
                     let _tmp;
                     let local_path: &str = if crate::io::fetch::is_url(&path_str) {
                         emitln!(self, "Downloading '{}'…", path_str);
@@ -204,7 +204,7 @@ impl Interpreter {
                     };
                     emitln!(self, "Loaded '{}' → {alias} ({} rows)", path_str, n_rows);
                     self.env.set(alias, Value::DataFrame(Rc::new(df)))?;
-                } // else (não-ODBC)
+                } // else (non-ODBC)
             }
 
             Stmt::Predict {
@@ -268,10 +268,10 @@ impl Interpreter {
                     )),
 
                     // ── Ordered Logit / Probit ────────────────────────────────
-                    // "pr"   → P(Y = J) — probabilidade da categoria mais alta
-                    // "xb"   → preditor linear Xβ
-                    // "yhat" → categoria predita (argmax)
-                    // "prN"  → P(Y = N) para categoria específica N (1-indexed)
+                    // "pr"   → P(Y = J) — probability of the highest category
+                    // "xb"   → linear predictor Xβ
+                    // "yhat" → predicted category (argmax)
+                    // "prN"  → P(Y = N) for a specific category N (1-indexed)
                     (Value::OrderedResult(r), kind_s) => {
                         let x = build_x_from_varnames(&df_val,
                             r.variable_names.as_deref().unwrap_or(&[]))?;
@@ -290,18 +290,18 @@ impl Interpreter {
                             s if s.starts_with("pr") && s.len() > 2 => {
                                 let cat: usize = s[2..].parse::<usize>()
                                     .map_err(|_| HayashiError::Runtime(
-                                        format!("predict Ordered: '{s}' — use prN onde N é a categoria (1-indexed)")
+                                        format!("predict Ordered: '{s}' — use prN where N is the category (1-indexed)")
                                     ))?;
                                 if cat == 0 || cat > r.n_categories {
                                     return Err(HayashiError::Runtime(
-                                        format!("predict Ordered: categoria {cat} out of range 1..{}", r.n_categories)
+                                        format!("predict Ordered: category {cat} out of range 1..{}", r.n_categories)
                                     ));
                                 }
                                 let probs = r.predict_proba(&x);
                                 (0..probs.nrows()).map(|i| probs[[i, cat - 1]]).collect()
                             }
                             "pr" => {
-                                // P(Y = última categoria)
+                                // P(Y = last category)
                                 let probs = r.predict_proba(&x);
                                 let last = r.n_categories - 1;
                                 (0..probs.nrows()).map(|i| probs[[i, last]]).collect()
@@ -448,7 +448,7 @@ impl Interpreter {
 
                     // ── ZIP / ZINB ────────────────────────────────────────────
                     (Value::ZeroInflatedResult(r), "count" | "mu" | "fitted") => {
-                        // E[y|x, w>0] × P(w=0): media incondicional da contagem
+                        // E[y|x, w>0] × P(w=0): unconditional mean of the count
                         let names = r.count_var_names.as_deref().unwrap_or(&[]);
                         let x_c = build_x_from_varnames(&df_val, names)?;
                         let inflate_names = r.inflate_var_names.as_deref().unwrap_or(names);
@@ -456,7 +456,7 @@ impl Interpreter {
                         r.predict_count(&x_c, &x_i).to_vec()
                     }
                     (Value::ZeroInflatedResult(r), "pr0") => {
-                        // P(y=0 | x) — probabilidade de zero
+                        // P(y=0 | x) — probability of zero
                         let names = r.count_var_names.as_deref().unwrap_or(&[]);
                         let x_c = build_x_from_varnames(&df_val, names)?;
                         let inflate_names = r.inflate_var_names.as_deref().unwrap_or(names);
@@ -490,11 +490,11 @@ impl Interpreter {
                     )),
 
                     // ── GLM ──────────────────────────────────────────────────────
-                    // pr/mu/fitted → μ̂ = g⁻¹(Xβ) — resposta média predita
-                    // xb → Xβ — preditor linear (escala do link)
-                    // residuals → resíduos de desvio (deviance residuals)
-                    // pearson → resíduos de Pearson (y-μ)/√V(μ)
-                    // working → resíduos de trabalho do IRLS
+                    // pr/mu/fitted → μ̂ = g⁻¹(Xβ) — predicted mean response
+                    // xb → Xβ — linear predictor (link scale)
+                    // residuals → deviance residuals
+                    // pearson → Pearson residuals (y-μ)/√V(μ)
+                    // working → IRLS working residuals
                     (Value::GlmResult(r), "pr" | "mu" | "fitted") => {
                         let names = r.variable_names.as_deref().unwrap_or(&[]);
                         let x = build_x_from_varnames(&df_val, names)?;
@@ -519,8 +519,8 @@ impl Interpreter {
                     )),
 
                     // ── LOWESS ───────────────────────────────────────────────────
-                    // smoothed/yhat → valores suavizados ŷ_i
-                    // residuals → resíduos y_i - ŷ_i
+                    // smoothed/yhat → smoothed values ŷ_i
+                    // residuals → residuals y_i - ŷ_i
                     (Value::LowessResult(r), "smoothed" | "yhat" | "fitted") => {
                         r.smoothed.to_vec()
                     }
@@ -532,17 +532,17 @@ impl Interpreter {
                     )),
 
                     // ── PCA ──────────────────────────────────────────────────────
-                    // pc1, pc2, ..., pcN → escores do N-ésimo componente principal
-                    // Os escores são calculados durante o ajuste (dados de treino)
+                    // pc1, pc2, ..., pcN → scores of the N-th principal component
+                    // Scores are computed during fitting (training data)
                     (Value::PcaResult(m), kind_s) => {
                         if kind_s.starts_with("pc") && kind_s.len() > 2 {
                             let comp: usize = kind_s[2..].parse::<usize>()
                                 .map_err(|_| HayashiError::Runtime(
-                                    format!("predict PCA: '{kind_s}' inválido — use pcN onde N=1..{}", m.result.n_components)
+                                    format!("predict PCA: '{kind_s}' invalid — use pcN where N=1..{}", m.result.n_components)
                                 ))?;
                             if comp == 0 || comp > m.result.n_components {
                                 return Err(HayashiError::Runtime(
-                                    format!("predict PCA: componente {comp} out of range 1..{}", m.result.n_components)
+                                    format!("predict PCA: component {comp} out of range 1..{}", m.result.n_components)
                                 ));
                             }
                             m.result.scores.column(comp - 1).to_vec()
@@ -554,17 +554,17 @@ impl Interpreter {
                     }
 
                     // ── Factor Analysis ───────────────────────────────────────────
-                    // Factor Analysis não produz escores diretamente (não há método de predict)
-                    // Use pca() para escores; factor() é apenas para análise das cargas/estrutura
+                    // Factor Analysis does not produce scores directly (no predict method)
+                    // Use pca() for scores; factor() is only for loadings/structure analysis
                     (Value::FactorResult(_), _) => return Err(HayashiError::Runtime(
-                        "predict Factor Analysis: escores não disponíveis via FA — use pca() para escores; FA é para análise de cargas".into()
+                        "predict Factor Analysis: scores not available via FA — use pca() for scores; FA is for loadings analysis".into()
                     )),
 
                     // ── Markov Switching ──────────────────────────────────────────
-                    // smoothed → probabilidades suavizadas do regime mais provável (argmax)
-                    // regime1, regime2, ..., regimeN → prob suavizada do regime N
+                    // smoothed → smoothed probabilities of the most likely regime (argmax)
+                    // regime1, regime2, ..., regimeN → smoothed probability of regime N
                     (Value::MarkovResult(r), "smoothed" | "regime" | "state") => {
-                        // regime mais provável em cada ponto (1-indexed)
+                        // most likely regime at each point (1-indexed)
                         (0..r.smoothed_probs.nrows()).map(|t| {
                             let row = r.smoothed_probs.row(t);
                             let (best, _) = row.iter().enumerate()
@@ -576,7 +576,7 @@ impl Interpreter {
                     (Value::MarkovResult(r), kind_s) if kind_s.starts_with("regime") && kind_s.len() > 6 => {
                         let idx: usize = kind_s[6..].parse::<usize>()
                             .map_err(|_| HayashiError::Runtime(
-                                format!("predict MarkovSwitching: '{kind_s}' inválido — use regimeN onde N=1..{}", r.n_regimes)
+                                format!("predict MarkovSwitching: '{kind_s}' invalid — use regimeN where N=1..{}", r.n_regimes)
                             ))?;
                         if idx == 0 || idx > r.n_regimes {
                             return Err(HayashiError::Runtime(
@@ -590,14 +590,14 @@ impl Interpreter {
                     )),
 
                     // ── Conditional Logit / Poisson ───────────────────────────────
-                    // FE é diferenciado; predição incondicional não disponível
+                    // FE is differenced; unconditional prediction is not available
                     (Value::ConditionalResult(_), _) => return Err(HayashiError::Runtime(
-                        "predict clogit/cpoisson: efeitos fixos absorvidos — predição incondicional não disponível; use os coeficientes β̂ para odds ratios ou efeitos marginais".into()
+                        "predict clogit/cpoisson: fixed effects absorbed — unconditional prediction not available; use β̂ coefficients for odds ratios or marginal effects".into()
                     )),
 
                     // ── VARMA ─────────────────────────────────────────────────────
                     (Value::VarmaResult(_), _) => return Err(HayashiError::Runtime(
-                        "predict varma: predição multivariada not supportada como coluna — use print() para diagnóstico".into()
+                        "predict varma: multivariate prediction not supported as a column — use print() for diagnostics".into()
                     )),
 
                     // ── UCM ───────────────────────────────────────────────────────
@@ -615,22 +615,22 @@ impl Interpreter {
 
                     // ── GAM ───────────────────────────────────────────────────────
                     (Value::GamResult(_), _) => return Err(HayashiError::Runtime(
-                        "predict gam: valores ajustados não estão armazenados — use gam() com df=dataset e calcule Xβ̂ manualmente".into()
+                        "predict gam: fitted values are not stored — use gam() with df=dataset and compute Xβ̂ manually".into()
                     )),
 
                     // ── MICE ──────────────────────────────────────────────────────
                     (Value::MiceResult(_), _) => return Err(HayashiError::Runtime(
-                        "predict mice: MICE retorna múltiplos datasets; acesse via pooling de modelos".into()
+                        "predict mice: MICE returns multiple datasets; access via model pooling".into()
                     )),
 
                     // ── SVAR ─────────────────────────────────────────────────────
                     (Value::SVarResult(_), _) => return Err(HayashiError::Runtime(
-                        "predict svar: sem valores ajustados — use sirf() e sfevd() para análise de impulso-resposta".into()
+                        "predict svar: no fitted values — use sirf() and sfevd() for impulse-response analysis".into()
                     )),
 
                     // ── 3SLS ─────────────────────────────────────────────────────
                     (Value::ThreeSLSResult(_), _) => return Err(HayashiError::Runtime(
-                        "predict 3sls: múltiplas equações — use print() para ver coeficientes por equação".into()
+                        "predict 3sls: multiple equations — use print() to see coefficients per equation".into()
                     )),
 
                     // ── DFM ───────────────────────────────────────────────────────
@@ -640,14 +640,14 @@ impl Interpreter {
                             .unwrap_or(0);
                         if idx >= m.result.n_factors {
                             return Err(HayashiError::Runtime(format!(
-                                "predict dfm: fator f{} não existe — modelo tem {} fatores",
+                                "predict dfm: factor f{} does not exist — model has {} factors",
                                 idx + 1, m.result.n_factors
                             )));
                         }
                         m.result.factors.column(idx).to_vec()
                     }
                     (Value::DFMResult(_), k) => return Err(HayashiError::Runtime(
-                        format!("predict dfm: kind '{k}' unknown — use: f1, f2, ... (índice 1-based do fator latente)")
+                        format!("predict dfm: kind '{k}' unknown — use: f1, f2, ... (1-based index of latent factor)")
                     )),
 
                     // ── MarkovAutoregression ───────────────────────────────────────
@@ -670,7 +670,7 @@ impl Interpreter {
                         format!("predict msauto: kind '{k}' unknown — use: regime, regime1, regime2, ...")
                     )),
 
-                    // ── Decomposição sazonal ──────────────────────────────────────
+                    // ── Seasonal decomposition ───────────────────────────────────
                     (Value::DecompResult(r), "trend")    => r.trend.to_vec(),
                     (Value::DecompResult(r), "seasonal") => r.seasonal.to_vec(),
                     (Value::DecompResult(r), "residual" | "resid" | "e") => r.residual.to_vec(),
@@ -683,7 +683,7 @@ impl Interpreter {
                     (Value::MstlResult(r), "trend") => r.trend.to_vec(),
                     (Value::MstlResult(r), "resid" | "residual" | "e") => r.resid.to_vec(),
                     (Value::MstlResult(r), kind_s) if kind_s.starts_with("seasonal") => {
-                        // "seasonal" → primeira componente; "seasonal1" → índice 1-based
+                        // "seasonal" → first component; "seasonal1" → 1-based index
                         let idx = if kind_s == "seasonal" {
                             0usize
                         } else {
@@ -693,7 +693,7 @@ impl Interpreter {
                         };
                         if idx >= r.seasonal.len() {
                             return Err(HayashiError::Runtime(format!(
-                                "predict mstl: componente seasonal{} não existe — modelo tem {} períodos",
+                                "predict mstl: seasonal{} component does not exist — model has {} periods",
                                 idx + 1, r.seasonal.len()
                             )));
                         }
@@ -703,7 +703,7 @@ impl Interpreter {
                         format!("predict mstl: kind '{k}' unknown — use: trend, resid, seasonal, seasonal1, seasonal2, ...")
                     )),
 
-                    // ── ETS (suavização exponencial) ──────────────────────────
+                    // ── ETS (exponential smoothing) ───────────────────────────
                     (Value::EtsResult(r), "fitted" | "yhat" | "xb") => r.fitted_values.to_vec(),
                     (Value::EtsResult(r), "residuals" | "resid" | "e") => r.residuals.to_vec(),
                     (Value::EtsResult(r), "level")    => r.level.to_vec(),
@@ -715,11 +715,11 @@ impl Interpreter {
 
                     // ── PanelThreshold ────────────────────────────────────────
                     (Value::ThresholdResult(_), k) => return Err(HayashiError::Runtime(
-                        format!("predict pthresh: kind '{k}' — use print() para ver limiares e coeficientes")
+                        format!("predict pthresh: kind '{k}' — use print() to see thresholds and coefficients")
                     )),
 
                     _ => return Err(HayashiError::Type(
-                        "predict: tipo de modelo not supportado".into()
+                        "predict: model type not supported".into()
                     )),
                 };
 
@@ -762,7 +762,7 @@ impl Interpreter {
 
                 let final_vals: Vec<f64> = if let Some(cond_expr) = cond {
                     let mask = self.eval_col_expr(cond_expr, &df_val)?;
-                    // lê coluna original para preservar onde mask == 0
+                    // read original column to preserve where mask == 0
                     use greeners::Column;
                     let old_vals: Vec<f64> = match df_val.get_column(varname) {
                         Ok(Column::Float(arr)) => arr.to_vec(),
@@ -900,7 +900,7 @@ impl Interpreter {
                         println!("Exported OLS → '{path_str}'");
                     }
 
-                    // ── Qualquer modelo → txt ─────────────────────────────────
+                    // ── Any model → txt ───────────────────────────────────
                     (Value::IvResult(r), "txt" | "text") => {
                         std::fs::write(&path_str, format!("{r}"))
                             .map_err(|e| HayashiError::Io(e.to_string()))?;
@@ -1002,10 +1002,10 @@ impl Interpreter {
                     _ => return Err(self.type_err(format!("'{df}' is not a DataFrame"))),
                 };
 
-                // ordena por t_var (sort_df_by reporta erro se coluna não existe)
+                // sort by t_var (sort_df_by reports error if column does not exist)
                 let sorted = sort_df_by(&frame, t_var)?;
 
-                // estatísticas da variável de tempo para o sumário
+                // time variable statistics for the summary
                 let t_vals = self.eval_col_expr(&Expr::Var(t_var.clone()), &sorted)?;
                 let t_min = t_vals.iter().cloned().fold(f64::INFINITY, f64::min);
                 let t_max = t_vals.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
@@ -1015,7 +1015,7 @@ impl Interpreter {
                 self.env.set(df, Value::DataFrame(Rc::new(sorted)))?;
 
                 println!("tsset {df}");
-                println!("  variável de tempo : {t_var}  ({t_min} a {t_max})");
+                println!("  time variable : {t_var}  ({t_min} to {t_max})");
                 println!("  n = {n}");
                 println!();
             }
@@ -1106,7 +1106,7 @@ impl Interpreter {
                             Value::Float(f) => f as i64,
                             v => {
                                 return Err(HayashiError::Type(format!(
-                                    "for: início do range must be integer, não {v}"
+                                    "for: range start must be integer, not {v}"
                                 )))
                             }
                         };
@@ -1115,7 +1115,7 @@ impl Interpreter {
                             Value::Float(f) => f as i64,
                             v => {
                                 return Err(HayashiError::Type(format!(
-                                    "for: fim do range must be integer, não {v}"
+                                    "for: range end must be integer, not {v}"
                                 )))
                             }
                         };
@@ -1135,7 +1135,7 @@ impl Interpreter {
                             Value::Float(f) => f as i64,
                             v => {
                                 return Err(HayashiError::Type(format!(
-                                    "for: início do range must be integer, não {v}"
+                                    "for: range start must be integer, not {v}"
                                 )))
                             }
                         };
@@ -1144,7 +1144,7 @@ impl Interpreter {
                             Value::Float(f) => f as i64,
                             v => {
                                 return Err(HayashiError::Type(format!(
-                                    "for: fim do range must be integer, não {v}"
+                                    "for: range end must be integer, not {v}"
                                 )))
                             }
                         };
@@ -1163,7 +1163,7 @@ impl Interpreter {
                             Value::List(v) => (*v).clone(),
                             other => {
                                 return Err(HayashiError::Type(format!(
-                                    "for: iterador must be a list, não {other}"
+                                    "for: iterator must be a list, not {other}"
                                 )))
                             }
                         };
@@ -1177,7 +1177,7 @@ impl Interpreter {
                 }
             }
 
-            // ── fn nome(params) { corpo } ────────────────────────────────────
+            // ── fn name(params) { body } ─────────────────────────────────────
             Stmt::Fn { name, params, defaults, doc, body } => {
                 self.env.set(
                     name,

@@ -1,8 +1,8 @@
 use super::*;
 use super::helpers::*;
 
-/// Visualização ASCII (acfplot/pacf/qqplot/corrplot/scatter/histogram/boxplot/kdensity)
-/// e coefplot. Extraído de `eval_call` (ver src/lang/interpreter.rs).
+/// ASCII visualization (acfplot/pacf/qqplot/corrplot/scatter/histogram/boxplot/kdensity)
+/// and coefplot. Extracted from `eval_call` (see src/lang/interpreter.rs).
 impl Interpreter {
     pub(super) fn eval_call_visualization(
         &mut self,
@@ -12,7 +12,7 @@ impl Interpreter {
         opt_map: &HashMap<String, Value>,
     ) -> Result<Option<Value>> {
         let result: Result<Value> = match func {
-            // ── Visualização ASCII — ACF / PACF / QQ-plot / heatmap ──────────
+            // ── ASCII visualization — ACF / PACF / QQ-plot / heatmap ──────────
 
             // acfplot(df, var, lags=20, width=50, title="")
             "acfplot" | "acf_plot" | "corrgram" => {
@@ -155,7 +155,7 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
-            // corrplot(df, var1, var2, ...) — matriz de correlação ASCII
+            // corrplot(df, var1, var2, ...) — ASCII correlation matrix
             "corrplot" | "corr_heatmap" | "pwcorr_plot" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
@@ -181,7 +181,7 @@ impl Interpreter {
                             Expr::Var(n) | Expr::Str(n) => v.push(n.clone()),
                             _ => {
                                 return Err(HayashiError::Type(
-                                    "args devem ser nomes de variáveis".into(),
+                                    "args must be variable names".into(),
                                 ))
                             }
                         }
@@ -190,7 +190,7 @@ impl Interpreter {
                 };
                 if var_names.len() < 2 {
                     return Err(HayashiError::Runtime(
-                        "corrplot: forneça ao menos 2 variáveis".into(),
+                        "corrplot: provide at least 2 variables".into(),
                     ));
                 }
                 let cols: Vec<Vec<f64>> = {
@@ -204,7 +204,7 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
-            // ── Visualização ASCII ────────────────────────────────────────────
+            // ── ASCII visualization ────────────────────────────────────────────
 
             // histogram(df, var, bins=20, width=50, title="")
             "histogram" | "hist" => {
@@ -246,7 +246,7 @@ impl Interpreter {
                 };
                 let title = match opt_map.get("title") {
                     Some(Value::Str(s)) => s.clone(),
-                    _ => format!("Histograma — {var_name}"),
+                    _ => format!("Histogram — {var_name}"),
                 };
                 let clean: Vec<f64> = data.iter().cloned().filter(|v| !v.is_nan()).collect();
                 ascii_histogram(&clean, bins, &title, &var_name, width);
@@ -331,7 +331,7 @@ impl Interpreter {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
                     _ => {
                         return Err(HayashiError::Type(
-                            "second argument must be a variable name (x/tempo)".into(),
+                            "second argument must be a variable name (x/time)".into(),
                         ))
                     }
                 };
@@ -357,7 +357,7 @@ impl Interpreter {
                 };
                 let title = match opt_map.get("title") {
                     Some(Value::Str(s)) => s.clone(),
-                    _ => format!("{yname} — série temporal"),
+                    _ => format!("{yname} — time series"),
                 };
                 ascii_lineplot(&xs.to_vec(), &ys.to_vec(), &title, &xname, &yname, w, h);
                 Ok(Value::Nil)
@@ -441,7 +441,7 @@ impl Interpreter {
                     Some(Value::Float(v)) => *v as usize,
                     _ => 20,
                 };
-                // bw= option ou Silverman
+                // bw= option or Silverman
                 let bw_opt = match opt_map.get("bw") {
                     Some(Value::Float(v)) => Some(*v),
                     Some(Value::Int(v)) => Some(*v as f64),
@@ -459,9 +459,9 @@ impl Interpreter {
                 let clean: Vec<f64> = data.iter().cloned().filter(|v| !v.is_nan()).collect();
                 let n = clean.len();
                 if n < 4 {
-                    return Err(HayashiError::Runtime("kdensity: poucos dados".into()));
+                    return Err(HayashiError::Runtime("kdensity: too few data".into()));
                 }
-                // Estimar KDE — usa support/density já calculados no fit (512 pontos)
+                // Estimate KDE — uses support/density already calculated in fit (512 points)
                 let result = greeners::KDEUnivariate::fit(
                     &ndarray::Array1::from(clean.clone()),
                     bw_opt,
@@ -474,11 +474,11 @@ impl Interpreter {
                     Some(Value::Str(s)) => s.clone(),
                     _ => format!("KDE — {var_name}  (bw={:.4})", result.bandwidth),
                 };
-                ascii_lineplot(&xs, &ys, &title, &var_name, "densidade", w, h);
+                ascii_lineplot(&xs, &ys, &title, &var_name, "density", w, h);
                 Ok(Value::Nil)
             }
 
-            // residplot(model, width=60, height=20) — resíduos vs ŷ
+            // residplot(model, width=60, height=20) — residuals vs ŷ
             "residplot" | "rvfplot" | "resid_plot" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
@@ -506,12 +506,12 @@ impl Interpreter {
                     Some(Value::Float(v)) => *v as usize,
                     _ => 20,
                 };
-                let title = format!("Resíduos vs Ŷ — {mname}");
-                ascii_scatter(&fitted, &resids, &title, "ŷ (fitted)", "e (resíduo)", w, h);
+                let title = format!("Residuals vs Ŷ — {mname}");
+                ascii_scatter(&fitted, &resids, &title, "ŷ (fitted)", "e (residual)", w, h);
                 Ok(Value::Nil)
             }
 
-            // ── coefplot: gráfico ASCII de coeficientes ──────────────────────
+            // ── coefplot: ASCII coefficient chart ──────────────────────
             "coefplot" | "coef_plot" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime("coefplot(model [, width=50])".into()));
@@ -524,12 +524,12 @@ impl Interpreter {
                 };
 
                 let params = extract_params(&model)
-                    .ok_or_else(|| HayashiError::Runtime("coefplot: modelo sem params".into()))?;
+                    .ok_or_else(|| HayashiError::Runtime("coefplot: model without params".into()))?;
                 let se = extract_se(&model).unwrap_or_default();
                 let names = extract_var_names(&model);
                 let z = 1.96_f64;
 
-                // coletar (nome, coef, ci_lo, ci_hi) excluindo constante
+                // collect (name, coef, ci_lo, ci_hi) excluding constant
                 let mut rows: Vec<(&str, f64, f64, f64)> = Vec::new();
                 for (i, p) in params.iter().enumerate() {
                     let name = names.get(i).map(|s| s.as_str()).unwrap_or("?");
@@ -560,7 +560,7 @@ impl Interpreter {
                     .map(|(_, _, _, hi)| *hi)
                     .fold(f64::NEG_INFINITY, f64::max);
                 let range = (all_hi - all_lo).max(1e-15);
-                // expandir para incluir zero se não está no range
+                // expand to include zero if not in range
                 let plot_lo = all_lo.min(0.0) - range * 0.05;
                 let plot_hi = all_hi.max(0.0) + range * 0.05;
                 let plot_range = (plot_hi - plot_lo).max(1e-15);
@@ -609,7 +609,7 @@ impl Interpreter {
             }
 
             // ══════════════════════════════════════════════════════════════════
-            // Gráficos SVG (publicáveis) — exporta para arquivo
+            // SVG charts (publication-ready) — export to file
             // ══════════════════════════════════════════════════════════════════
 
             // graph_scatter(df, X, Y, path="plot.svg" [, title="", width=800, height=600])

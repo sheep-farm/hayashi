@@ -1,13 +1,13 @@
 use super::*;
 
-/// Helpers puros e estáticos compartilhados pelo interpretador e seus submódulos.
+/// Pure static helpers shared by the interpreter and its submodules.
 
-/// Constrói um valor de diagnóstico renderizado.
+/// Builds a rendered diagnostic value.
 pub(super) fn diag(rendered: String) -> Value {
     Value::DiagResult(Rc::new(DiagResult { rendered }))
 }
 
-/// Converte `Value` para booleano de forma permissiva.
+/// Converts `Value` to boolean permissively.
 pub(super) fn value_as_bool(v: &Value) -> bool {
     match v {
         Value::Bool(b) => *b,
@@ -18,7 +18,7 @@ pub(super) fn value_as_bool(v: &Value) -> bool {
     }
 }
 
-/// Extrai coeficientes estimados de um resultado de modelo.
+/// Extracts estimated coefficients from a model result.
 pub(super) fn extract_params(v: &Value) -> Option<Vec<f64>> {
     match v {
         Value::OlsResult(m) => Some(m.result.params.to_vec()),
@@ -33,7 +33,7 @@ pub(super) fn extract_params(v: &Value) -> Option<Vec<f64>> {
     }
 }
 
-/// Extrai erros-padrão de um resultado de modelo.
+/// Extracts standard errors from a model result.
 pub(super) fn extract_se(v: &Value) -> Option<Vec<f64>> {
     match v {
         Value::OlsResult(m) => Some(m.result.std_errors.to_vec()),
@@ -48,7 +48,7 @@ pub(super) fn extract_se(v: &Value) -> Option<Vec<f64>> {
     }
 }
 
-/// Extrai nomes de coeficientes de um resultado de modelo.
+/// Extracts coefficient names from a model result.
 pub(super) fn extract_var_names(v: &Value) -> Vec<String> {
     match v {
         Value::OlsResult(m) => m.result.variable_names.clone().unwrap_or_default(),
@@ -63,7 +63,7 @@ pub(super) fn extract_var_names(v: &Value) -> Vec<String> {
     }
 }
 
-/// Converte `Value` para `f64`.
+/// Converts `Value` to `f64`.
 pub(super) fn value_as_f64(v: &Value) -> Result<f64> {
     match v {
         Value::Float(f) => Ok(*f),
@@ -73,9 +73,9 @@ pub(super) fn value_as_f64(v: &Value) -> Result<f64> {
     }
 }
 
-/// Avalia operador binário escalar.
+/// Evaluates a scalar binary operator.
 pub(super) fn eval_scalar_binop(op: &BinOp, l: Value, r: Value) -> Result<Value> {
-    // Comparações (funciona com qualquer tipo comparável)
+    // Comparisons (works with any comparable type)
     match op {
         BinOp::Eq => {
             let eq = match (&l, &r) {
@@ -108,9 +108,9 @@ pub(super) fn eval_scalar_binop(op: &BinOp, l: Value, r: Value) -> Result<Value>
         _ => {}
     }
 
-    // Aritmética e comparações numéricas
+    // Arithmetic and numeric comparisons
     match (&l, &r) {
-        // Int × Int → Int (para Add/Sub/Mul); Div/Pow → Float
+        // Int × Int → Int (for Add/Sub/Mul); Div/Pow → Float
         (Value::Int(a), Value::Int(b)) => match op {
             BinOp::Add => Ok(Value::Int(a + b)),
             BinOp::Sub => Ok(Value::Int(a - b)),
@@ -124,9 +124,9 @@ pub(super) fn eval_scalar_binop(op: &BinOp, l: Value, r: Value) -> Result<Value>
             BinOp::LtEq => Ok(Value::Bool(a <= b)),
             BinOp::And | BinOp::Or | BinOp::Eq | BinOp::Ne | BinOp::In => unreachable!(),
         },
-        // Qualquer Float → Float
+        // Any Float → Float
         _ => {
-            // Concatenação de strings
+            // String concatenation
             if let (BinOp::Add, Value::Str(a), Value::Str(b)) = (op, &l, &r) {
                 return Ok(Value::Str(format!("{a}{b}")));
             }
@@ -149,7 +149,7 @@ pub(super) fn eval_scalar_binop(op: &BinOp, l: Value, r: Value) -> Result<Value>
     }
 }
 
-/// Extrai coluna como Array1<f64>; aceita Float, Int, Bool, Categorical, etc.
+/// Extracts a column as Array1<f64>; accepts Float, Int, Bool, Categorical, etc.
 pub(super) fn get_col_f64(df: &DataFrame, name: &str) -> Result<ndarray::Array1<f64>> {
     let col = df
         .get_column(name)
@@ -157,8 +157,8 @@ pub(super) fn get_col_f64(df: &DataFrame, name: &str) -> Result<ndarray::Array1<
     Ok(col.to_float())
 }
 
-/// Reconstrói X a partir da lista de nomes de variáveis do modelo.
-/// `_cons`/`const`/`Intercept` → coluna de 1s; demais → colunas do df.
+/// Rebuilds X from the model's variable name list.
+/// `_cons`/`const`/`Intercept` → column of 1s; others → columns from df.
 pub(super) fn build_x_from_varnames(df: &DataFrame, names: &[String]) -> Result<ndarray::Array2<f64>> {
     let n = df.n_rows();
     let k = names.len();
@@ -171,7 +171,7 @@ pub(super) fn build_x_from_varnames(df: &DataFrame, names: &[String]) -> Result<
             other => {
                 let col = get_col_f64(df, other).map_err(|_| {
                     HayashiError::Runtime(format!(
-                        "predict: column '{other}' not found no DataFrame"
+                        "predict: column '{other}' not found in DataFrame"
                     ))
                 })?;
                 x.column_mut(j).assign(&col);
@@ -181,7 +181,7 @@ pub(super) fn build_x_from_varnames(df: &DataFrame, names: &[String]) -> Result<
     Ok(x)
 }
 
-/// Resolve opção de covariância simples.
+/// Resolves a simple covariance option.
 pub(super) fn resolve_cov(opt_val: Option<&Value>) -> Result<CovarianceType> {
     match opt_val {
         None => Ok(CovarianceType::NonRobust),
@@ -200,7 +200,7 @@ pub(super) fn resolve_cov(opt_val: Option<&Value>) -> Result<CovarianceType> {
     }
 }
 
-/// Converte coluna de IDs (int, float ou string) em IDs compactos.
+/// Converts an ID column (int, float, or string) into compact IDs.
 pub(super) fn col_to_cluster_ids(df: &DataFrame, col: &str) -> Result<Vec<usize>> {
     let mut map: HashMap<i64, usize> = HashMap::new();
     let mut next = 0usize;
@@ -246,7 +246,7 @@ pub(super) fn col_to_cluster_ids(df: &DataFrame, col: &str) -> Result<Vec<usize>
     }
 }
 
-/// Resolve covariância completa, incluindo cluster, Newey-West e robusta.
+/// Resolves the full covariance, including cluster, Newey-West, and robust.
 pub(super) fn resolve_cov_full(
     opt_map: &HashMap<String, Value>,
     df: &DataFrame,
@@ -271,7 +271,7 @@ pub(super) fn resolve_cov_full(
     }
 }
 
-/// Filtra DataFrame por máscara numérica (valores != 0 são mantidos).
+/// Filters DataFrame by numeric mask (values != 0 are kept).
 pub(super) fn filter_df_by_mask(df: &DataFrame, mask: &[f64]) -> Result<Rc<DataFrame>> {
     let keep: Vec<usize> = mask
         .iter()
@@ -284,7 +284,7 @@ pub(super) fn filter_df_by_mask(df: &DataFrame, mask: &[f64]) -> Result<Rc<DataF
         .map_err(|e| HayashiError::Runtime(e.to_string()))
 }
 
-/// Ordena um DataFrame por uma única coluna (ascendente).
+/// Sorts a DataFrame by a single column (ascending).
 pub(super) fn sort_df_by(df: &DataFrame, col: &str) -> Result<DataFrame> {
     use greeners::Column;
     let n = df.n_rows();
@@ -334,7 +334,7 @@ pub(super) fn sort_df_by(df: &DataFrame, col: &str) -> Result<DataFrame> {
         .map_err(|e| HayashiError::Runtime(e.to_string()))
 }
 
-/// Gera nomes de coeficientes a partir da fórmula e das categorias observadas.
+/// Generates coefficient names from the formula and observed categories.
 pub(super) fn coef_names_from_formula(
     formula_ast: &Formula,
     df: &DataFrame,
@@ -367,7 +367,7 @@ pub(super) fn coef_names_from_formula(
     names
 }
 
-/// Extrai coluna como Vec<String> (para tabulate, categorias etc.).
+/// Extracts a column as Vec<String> (for tabulate, categories, etc.).
 pub(super) fn col_to_strings(df: &DataFrame, name: &str) -> Result<Vec<String>> {
     use greeners::Column;
     match df.get_column(name) {
@@ -396,7 +396,7 @@ pub(super) fn col_to_strings(df: &DataFrame, name: &str) -> Result<Vec<String>> 
     }
 }
 
-/// Tabela de frequências (uni-variada).
+/// Frequency table (univariate).
 pub(super) fn tabulate_one(df: &DataFrame, var: &str) -> Result<()> {
     let vals = col_to_strings(df, var)?;
     let n = vals.len();
@@ -452,7 +452,7 @@ pub(super) fn tabulate_one(df: &DataFrame, var: &str) -> Result<()> {
     Ok(())
 }
 
-/// Tabela cruzada (bi-variada, opcional chi2).
+/// Cross-tabulation (bivariate, optional chi2).
 pub(super) fn tabulate_two(df: &DataFrame, row_var: &str, col_var: &str, do_chi2: bool) -> Result<()> {
     let rows = col_to_strings(df, row_var)?;
     let cols = col_to_strings(df, col_var)?;
@@ -573,12 +573,12 @@ pub(super) fn tabulate_two(df: &DataFrame, row_var: &str, col_var: &str, do_chi2
     Ok(())
 }
 
-/// Converte string numérica finita, se possível.
+/// Converts a finite numeric string, if possible.
 pub(super) fn finite_numeric_string(value: &str) -> Option<f64> {
     value.parse::<f64>().ok().filter(|v| v.is_finite())
 }
 
-/// Ordena strings numericamente se todas forem numéricas finitas; senão alfabeticamente.
+/// Sorts strings numerically if all are finite numeric; otherwise alphabetically.
 pub(super) fn sort_maybe_numeric_strings(values: &mut [String]) {
     if values
         .iter()
@@ -595,16 +595,16 @@ pub(super) fn sort_maybe_numeric_strings(values: &mut [String]) {
     }
 }
 
-/// Histograma ASCII.
+/// ASCII histogram.
 pub(super) fn ascii_histogram(data: &[f64], bins: usize, title: &str, var: &str, width: usize) {
     if data.is_empty() {
-        println!("  (sem dados)");
+        println!("  (no data)");
         return;
     }
     let min = data.iter().cloned().fold(f64::INFINITY, f64::min);
     let max = data.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
     if (max - min).abs() < 1e-15 {
-        println!("  (variância zero)");
+        println!("  (zero variance)");
         return;
     }
     let step = (max - min) / bins as f64;
@@ -621,7 +621,7 @@ pub(super) fn ascii_histogram(data: &[f64], bins: usize, title: &str, var: &str,
     let sd = (data.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / n as f64).sqrt();
     println!();
     println!("{:=^width$}", format!(" {title} "), width = bar_w + 34);
-    println!("  Variável: {var}   n={n}   μ={mean:.4}   σ={sd:.4}   [{min:.4}, {max:.4}]");
+    println!("  Variable: {var}   n={n}   μ={mean:.4}   σ={sd:.4}   [{min:.4}, {max:.4}]");
     println!("{:-^width$}", "", width = bar_w + 34);
     for (i, &cnt) in counts.iter().enumerate() {
         let lo = min + i as f64 * step;
@@ -655,7 +655,7 @@ pub(super) fn ascii_scatter(
     h: usize,
 ) {
     if xs.is_empty() {
-        println!("  (sem dados)");
+        println!("  (no data)");
         return;
     }
     let xmin = xs.iter().cloned().fold(f64::INFINITY, f64::min);
@@ -712,7 +712,7 @@ pub(super) fn ascii_lineplot(
     h: usize,
 ) {
     if xs.is_empty() {
-        println!("  (sem dados)");
+        println!("  (no data)");
         return;
     }
     let xmin = xs.iter().cloned().fold(f64::INFINITY, f64::min);
@@ -779,7 +779,7 @@ pub(super) fn ascii_lineplot(
 
 pub(super) fn ascii_boxplot(data: &[f64], title: &str, var: &str, w: usize) {
     if data.is_empty() {
-        println!("  (sem dados)");
+        println!("  (no data)");
         return;
     }
     let mut sorted = data.to_vec();
@@ -787,7 +787,7 @@ pub(super) fn ascii_boxplot(data: &[f64], title: &str, var: &str, w: usize) {
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
     let n = sorted.len();
     if n < 4 {
-        println!("  (poucos dados para boxplot)");
+        println!("  (too few data for boxplot)");
         return;
     }
     let q = |p: f64| -> f64 {
@@ -845,37 +845,37 @@ pub(super) fn ascii_boxplot(data: &[f64], title: &str, var: &str, w: usize) {
 
     println!();
     println!("{:=^width$}", format!(" {title} "), width = w + 18);
-    println!("  Variável: {var}   n={n}");
+    println!("  Variable: {var}   n={n}");
     println!();
     println!("             {}", line.iter().collect::<String>());
     println!();
     println!(
-        "  Min:    {:>12.4}   Q1:  {:>12.4}   Mediana: {:>12.4}",
+        "  Min:    {:>12.4}   Q1:  {:>12.4}   Median:  {:>12.4}",
         whisker_lo, q1, med
     );
     println!(
-        "  Média:  {:>12.4}   Q3:  {:>12.4}   Max:     {:>12.4}",
+        "  Mean:   {:>12.4}   Q3:  {:>12.4}   Max:     {:>12.4}",
         mean, q3, whisker_hi
     );
     println!("  IQR:    {:>12.4}   Outliers: {}", iqr, outliers.len());
     if !outliers.is_empty() && outliers.len() <= 10 {
         let out_str: Vec<String> = outliers.iter().map(|v| format!("{:.3}", v)).collect();
-        println!("  Valores: [{}]", out_str.join(", "));
+        println!("  Values: [{}]", out_str.join(", "));
     }
     println!();
 }
 
-/// ACF / PACF como barras ASCII.
+/// ACF / PACF as ASCII bars.
 pub(super) fn ascii_acf(data: &[f64], max_lag: usize, title: &str, width: usize, partial: bool) {
     let n = data.len();
     if n < 4 {
-        println!("(dados insuficientes para ACF)");
+        println!("(insufficient data for ACF)");
         return;
     }
     let mean = data.iter().sum::<f64>() / n as f64;
     let var = data.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / n as f64;
     if var < 1e-15 {
-        println!("(variância zero)");
+        println!("(zero variance)");
         return;
     }
 
@@ -931,17 +931,17 @@ pub(super) fn ascii_acf(data: &[f64], max_lag: usize, title: &str, width: usize,
         println!("{:3} |{}|{} {:6.3}", lag, left, right, v);
     }
     println!("{:=<width$}", "");
-    println!("  CI ±{:.3} (95%)  │ ── dentro  █ fora", ci);
+    println!("  CI ±{:.3} (95%)  │ ── inside  █ outside", ci);
     println!();
 }
 
-/// QQ-plot normal ASCII.
+/// Normal QQ-plot ASCII.
 pub(super) fn ascii_qqplot(data: &[f64], title: &str, var: &str, w: usize, h: usize) {
     let mut sorted = data.to_vec();
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     let n = sorted.len();
     if n < 4 {
-        println!("(dados insuficientes para QQ-plot)");
+        println!("(insufficient data for QQ-plot)");
         return;
     }
     let theoretical: Vec<f64> = (1..=n)
@@ -1018,21 +1018,21 @@ pub(super) fn ascii_qqplot(data: &[f64], title: &str, var: &str, w: usize, h: us
         .max(1e-15);
     let empirical: Vec<f64> = sorted.iter().map(|x| (x - mean_s) / std_s).collect();
     println!("\n{:=<w$}", "");
-    println!(" {title}  (normalizado)");
+    println!(" {title}  (normalized)");
     println!("{:=<w$}", "");
     ascii_scatter(
         &theoretical,
         &empirical,
         title,
-        "quantil teórico",
+        "theoretical quantile",
         var,
         w,
         h,
     );
-    println!("  (linha ideal: pontos ao longo da diagonal)");
+    println!("  (ideal line: points along the diagonal)");
 }
 
-/// Matriz de correlação como heatmap de texto.
+/// Correlation matrix as text heatmap.
 pub(super) fn ascii_corrplot(cols: &[Vec<f64>], names: &[String]) {
     let n = cols[0].len();
     let means: Vec<f64> = cols
@@ -1062,7 +1062,7 @@ pub(super) fn ascii_corrplot(cols: &[Vec<f64>], names: &[String]) {
         .collect();
     let nw = names.iter().map(|n| n.len()).max().unwrap_or(4).max(4);
     println!("\n{:=<80}", "");
-    println!(" Matriz de Correlação");
+    println!(" Correlation Matrix");
     println!("{:=<80}", "");
     print!("{:>nw$}", "");
     for n in names {
@@ -1094,11 +1094,11 @@ pub(super) fn ascii_corrplot(cols: &[Vec<f64>], names: &[String]) {
         println!();
     }
     println!("{:=<80}", "");
-    println!("  Escala: ████ |r|≥0.9  ▓▓▓▓ ≥0.7  ▒▒▒▒ ≥0.5  ░░░░ ≥0.3  (+neg=-)");
+    println!("  Scale: ████ |r|≥0.9  ▓▓▓▓ ≥0.7  ▒▒▒▒ ≥0.5  ░░░░ ≥0.3  (+neg=-)");
     println!();
 }
 
-/// Φ(x) normal CDF — Abramowitz & Stegun 26.2.17 (erro < 7.5e-8).
+/// Φ(x) normal CDF — Abramowitz & Stegun 26.2.17 (error < 7.5e-8).
 pub(super) fn norm_cdf(x: f64) -> f64 {
     let t = 1.0 / (1.0 + 0.2316419 * x.abs());
     let poly = t

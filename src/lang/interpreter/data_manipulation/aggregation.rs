@@ -1,14 +1,14 @@
 use super::*;
 
 impl Interpreter {
-    /// `count(df)` / `nrow(df)` — contagem de linhas como valor.
+    /// `count(df)` / `nrow(df)` — row count as a value.
     pub(super) fn eval_count(
         &mut self,
         args: &[Expr],
     ) -> Result<Value> {
         if args.is_empty() {
             return Err(HayashiError::Runtime(
-                "count(df) ou count(df, condição)".into(),
+                "count(df) or count(df, condition)".into(),
             ));
         }
         let df = match self.eval_expr(&args[0])? {
@@ -23,7 +23,7 @@ impl Interpreter {
         Ok(Value::Int(df.n_rows() as i64))
     }
 
-    /// `collapse(df, func, [vars...], by=col)` — agregação por grupo.
+    /// `collapse(df, func, [vars...], by=col)` — aggregation by group.
     pub(super) fn eval_collapse(
         &mut self,
         args: &[Expr],
@@ -57,7 +57,7 @@ impl Interpreter {
             }
         };
 
-        // validar função antes de qualquer cálculo
+        // validate function before any computation
         match func_name.as_str() {
             "mean" | "sum" | "min" | "max" | "count" | "sd" | "median" => {}
             other => return Err(HayashiError::Runtime(format!(
@@ -65,7 +65,7 @@ impl Interpreter {
             ))),
         }
 
-        // variáveis a agregar: args[2..] ou todas as numéricas exceto by
+        // variables to aggregate: args[2..] or all numeric except by
         let agg_vars: Vec<String> = if args.len() > 2 {
             self.resolve_var_list(&args[2..], &df)?
         } else {
@@ -82,7 +82,7 @@ impl Interpreter {
                 .collect()
         };
 
-        // dados das colunas numéricas a agregar
+        // numeric column data to aggregate
         let col_data: Vec<Vec<f64>> = agg_vars
             .iter()
             .map(|col| {
@@ -95,7 +95,7 @@ impl Interpreter {
             })
             .collect::<Result<_>>()?;
 
-        // agrupa índices de linha por valor de by
+        // group row indices by by value
         let by_strs = col_to_strings(&df, &by_col)?;
         let n_obs = df.n_rows();
         let mut groups: HashMap<String, Vec<usize>> = HashMap::new();
@@ -103,11 +103,11 @@ impl Interpreter {
             groups.entry(v.clone()).or_default().push(i);
         }
 
-        // ordena chaves de grupo
+        // sort group keys
         let mut keys: Vec<String> = groups.keys().cloned().collect();
         sort_maybe_numeric_strings(&mut keys);
 
-        // função de agregação: NaN nos dados propaga NaN no resultado (IEEE 754)
+        // aggregation function: NaN in input propagates to output (IEEE 754)
         let agg = |vals: &[f64]| -> f64 {
             let n = vals.len();
             if n == 0 {
@@ -143,10 +143,10 @@ impl Interpreter {
             }
         };
 
-        // constrói o DataFrame resultado
+        // build the result DataFrame
         let mut builder = DataFrame::builder();
 
-        // coluna by (numérica ou string)
+        // by column (numeric or string)
         use greeners::Column;
         if matches!(
             df.get_column(&by_col),
@@ -161,7 +161,7 @@ impl Interpreter {
             builder = builder.add_string(&by_col, keys.clone());
         }
 
-        // colunas agregadas
+        // aggregated columns
         for (ci, col_name) in agg_vars.iter().enumerate() {
             let vals: Vec<f64> = keys
                 .iter()
@@ -182,7 +182,7 @@ impl Interpreter {
         Ok(Value::DataFrame(Rc::new(new_df)))
     }
 
-    /// `group_by(df, by_col, stat, var1, var2, ...)` — como collapse, mas pipe-friendly.
+    /// `group_by(df, by_col, stat, var1, var2, ...)` — like collapse, but pipe-friendly.
     pub(super) fn eval_group_by(
         &mut self,
         args: &[Expr],

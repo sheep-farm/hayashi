@@ -169,9 +169,9 @@ impl Interpreter {
                 }
             }
 
-            // ── Aritmética / lógica escalar ───────────────────────────────────
+            // ── Scalar arithmetic / logic ─────────────────────────────────────
             Expr::BinOp { op, lhs, rhs } => {
-                // Short-circuit para And/Or
+                // Short-circuit for And/Or
                 match op {
                     BinOp::And => {
                         let l = self.eval_expr(lhs)?;
@@ -222,7 +222,7 @@ impl Interpreter {
             Expr::Neg(inner) => match self.eval_expr(inner)? {
                 Value::Int(v) => Ok(Value::Int(-v)),
                 Value::Float(v) => Ok(Value::Float(-v)),
-                _ => Err(HayashiError::Type("negação unária requires number".into())),
+                _ => Err(HayashiError::Type("unary negation requires number".into())),
             },
 
             Expr::Not(inner) => {
@@ -230,7 +230,7 @@ impl Interpreter {
                 Ok(Value::Bool(!value_as_bool(&v)))
             }
 
-            // ── Lista literal ─────────────────────────────────────────────────
+            // ── List literal ────────────────────────────────────────────────
             Expr::List(items) => {
                 let vals: Vec<Value> = items
                     .iter()
@@ -259,7 +259,7 @@ impl Interpreter {
                 Ok(Value::Dict(Rc::new(map)))
             }
 
-            // ── Indexação: lista[idx] ou dict["key"] ─────────────────────────
+            // ── Indexing: list[idx] or dict["key"] ───────────────────────────
             Expr::Index { obj, idx } => {
                 let obj_val = self.eval_expr(obj)?;
                 let idx_val = self.eval_expr(idx)?;
@@ -354,7 +354,7 @@ impl Interpreter {
                         }
                         Ok(v[real as usize].clone())
                     }
-                    _ => Err(HayashiError::Type("indexação requires list ou dict".into())),
+                    _ => Err(HayashiError::Type("indexing requires list or dict".into())),
                 }
             }
 
@@ -368,7 +368,7 @@ impl Interpreter {
             } => self.eval_field(obj, field, args, opts),
 
             Expr::TsOp { .. } => Err(HayashiError::Runtime(
-                "operadores L./F./D. só são válidos dentro de generate".into(),
+                "L./F./D. operators are only valid inside generate".into(),
             )),
 
             Expr::Range(start_expr, end_expr) => {
@@ -429,7 +429,7 @@ impl Interpreter {
         }
     }
 
-    // ── Converte fórmula AST → string Greeners ────────────────────────────────
+    // ── Convert AST formula → Greeners string ───────────────────────────────
 
     pub(super) fn formula_to_string(f: &Formula) -> String {
         let rhs_parts: Vec<String> = f
@@ -490,7 +490,7 @@ impl Interpreter {
         }
     }
 
-    // ── Avalia expressão elemento-a-elemento sobre colunas de um DataFrame ───
+    // ── Evaluate expression element-wise over DataFrame columns ────────────
 
     pub(super) fn eval_col_expr(&mut self, expr: &Expr, df: &DataFrame) -> Result<Vec<f64>> {
         match expr {
@@ -508,7 +508,7 @@ impl Interpreter {
             }
             Expr::Str(s) => {
                 Err(HayashiError::Type(format!(
-                    "string literal \"{s}\" cannot be used as numeric — se comparando com coluna string, use: col == \"{s}\""
+                    "string literal \"{s}\" cannot be used as numeric — when comparing to a string column, use: col == \"{s}\""
                 )))
             }
             Expr::Nil => {
@@ -612,7 +612,7 @@ impl Interpreter {
                 }).collect())
             }
             Expr::Call { func, args, .. } => {
-                // ── regex row-wise sobre colunas string ──
+                // ── regex row-wise over string columns ──
                 if func == "regexm" && args.len() >= 2 {
                     if let Expr::Var(col_name) = &args[0] {
                         if let Ok(str_col) = df.get_string(col_name) {
@@ -625,7 +625,7 @@ impl Interpreter {
                     }
                 }
 
-                // ── geradores aleatórios (tamanho = n_rows do df) ──
+                // ── random generators (size = df n_rows) ──
                 if matches!(func.as_str(), "uniform" | "runiform" | "rnormal" | "rbernoulli") {
                     let n = df.n_rows();
                     use rand::Rng;
@@ -649,7 +649,7 @@ impl Interpreter {
                     });
                 }
 
-                // ── funções multi-coluna (rowmean / rowsum / rowmin / rowmax / rowtotal / rowmiss) ──
+                // ── multi-column functions (rowmean / rowsum / rowmin / rowmax / rowtotal / rowmiss) ──
                 if matches!(func.as_str(), "rowmean" | "rowsum" | "rowmin" | "rowmax" | "rowtotal" | "rowmiss") {
                     if args.is_empty() {
                         return Err(HayashiError::Runtime(
@@ -671,7 +671,7 @@ impl Interpreter {
                 }
 
                 if args.len() == 1 {
-                    // ── funções que precisam de toda a coluna ──────────────────
+                    // ── functions that need the whole column ─────────────────
                     match func.as_str() {
                         "rank" => {
                             let vals = self.eval_col_expr(&args[0], df)?;
@@ -770,7 +770,7 @@ impl Interpreter {
                         _ => {}
                     }
 
-                    // ── funções escalares elemento-a-elemento (1-arg) ─────────
+                    // ── element-wise scalar functions (1-arg) ───────────────
                     let vals = self.eval_col_expr(&args[0], df)?;
                     match greeners::Transforms::apply(&vals, func) {
                         Ok(result) => Ok(result),
@@ -804,7 +804,7 @@ impl Interpreter {
                                 Ok(result)
                             } else {
                                 Err(HayashiError::Runtime(
-                                    format!("função de coluna desconhecida '{func}'")
+                                    format!("unknown column function '{func}'")
                                 ))
                             }
                         }
@@ -815,7 +815,7 @@ impl Interpreter {
                     match greeners::Transforms::apply2(&a, &b, func) {
                         Ok(result) => Ok(result),
                         Err(_) => Err(HayashiError::Runtime(
-                            format!("função '{func}' not supportada em generate")
+                            format!("function '{func}' not supported in generate")
                         )),
                     }
                 } else if args.len() == 3 {
@@ -825,17 +825,17 @@ impl Interpreter {
                     match greeners::Transforms::apply3(&a, &b, &c, func) {
                         Ok(result) => Ok(result),
                         Err(_) => Err(HayashiError::Runtime(
-                            format!("função '{func}' not supportada em generate")
+                            format!("function '{func}' not supported in generate")
                         )),
                     }
                 } else {
                     Err(HayashiError::Runtime(format!(
-                        "função '{func}' not supportada em generate"
+                        "function '{func}' not supported in generate"
                     )))
                 }
             }
-            // ── operadores de série temporal ─────────────────────────────────
-            // Requerem que o df já esteja ordenado por tsset.
+            // ── time-series operators ───────────────────────────────────────
+            // Requires the df to already be sorted by tsset.
             // L.x = x[i-n], F.x = x[i+n], D.x = x[i] - x[i-n]
             Expr::TsOp { op, var, n } => {
                 use greeners::Column;

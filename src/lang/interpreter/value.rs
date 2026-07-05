@@ -3,7 +3,7 @@ use crate::lang::error::HayashiError;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-// ── Função definida pelo usuário ─────────────────────────────────────────────
+// ── User-defined function ──────────────────────────────────────────────────
 
 #[derive(Debug, Clone)]
 pub struct UserFn {
@@ -13,10 +13,10 @@ pub struct UserFn {
     pub body: Vec<Spanned>,
 }
 
-// ── Erro estruturado ─────────────────────────────────────────────────────────
+// ── Structured error ─────────────────────────────────────────────────────────
 
-/// Erro estruturado exposto ao usuário em `try { ... } catch e { ... }`.
-/// `e.kind`, `e.msg` e `e.line` são acessíveis como campos de um dict.
+/// Structured error exposed to the user in `try { ... } catch e { ... }`.
+/// `e.kind`, `e.msg` and `e.line` are accessible as fields of a dict.
 #[derive(Debug, Clone)]
 pub struct ErrorValue {
     pub kind: String,
@@ -50,7 +50,7 @@ impl ErrorValue {
     }
 
     fn extract_line(msg: &str) -> i64 {
-        // formatos: "line N: ..." ou "Lexer error at line N: ..."
+        // formats: "line N: ..." or "Lexer error at line N: ..."
         if let Some(pos) = msg.find("line ") {
             let rest = &msg[pos + 5..];
             let num: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
@@ -80,7 +80,7 @@ impl ErrorValue {
 
 // ── Series ───────────────────────────────────────────────────────────────────
 
-/// Series: coluna de um DataFrame como cidadão de primeira classe.
+/// Series: DataFrame column as a first-class citizen.
 #[derive(Clone)]
 pub struct Series {
     pub name: String,

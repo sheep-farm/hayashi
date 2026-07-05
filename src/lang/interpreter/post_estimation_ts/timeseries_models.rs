@@ -1,7 +1,7 @@
 use super::*;
 
 impl Interpreter {
-    /// `vecm(df, y1, y2, ..., lags=2, rank=1)` — Vetor de Correção de Erros.
+    /// `vecm(df, y1, y2, ..., lags=2, rank=1)` — Vector Error Correction.
     pub(super) fn eval_vecm(
         &mut self,
         args: &[Expr],
@@ -35,7 +35,7 @@ impl Interpreter {
             _ => 1,
         };
 
-        // monta matriz T×k
+        // build T×k matrix
         let n = df.n_rows();
         let k = var_names.len();
         let mut data = ndarray::Array2::<f64>::zeros((n, k));
@@ -83,7 +83,7 @@ impl Interpreter {
             _ => 1,
         };
 
-        // monta matriz T×k
+        // build T×k matrix
         let n = df.n_rows();
         let k = var_names.len();
         let mut data = ndarray::Array2::<f64>::zeros((n, k));
@@ -100,7 +100,7 @@ impl Interpreter {
         Ok(Value::VarResult(Rc::new(result)))
     }
 
-    /// `irf(model, steps=10)` — Função de Resposta ao Impulso.
+    /// `irf(model, steps=10)` — Impulse Response Function.
     pub(super) fn eval_irf(
         &mut self,
         args: &[Expr],
@@ -154,7 +154,7 @@ impl Interpreter {
         Ok(Value::Nil)
     }
 
-    /// `fevd(model, steps=10)` — Decomposição da Variância do Erro de Previsão.
+    /// `fevd(model, steps=10)` — Forecast Error Variance Decomposition.
     pub(super) fn eval_fevd(
         &mut self,
         args: &[Expr],
@@ -184,12 +184,12 @@ impl Interpreter {
         let sep = "─".repeat(8 + k * col_w);
 
         println!(
-            "\nFEVD — VAR({}) — {} passos  (% da variância do erro de previsão)",
+            "\nFEVD — VAR({}) — {} steps  (% of forecast error variance)",
             model.lags, steps
         );
 
         for i in 0..k {
-            println!("\n  Variável: {}", names[i]);
+            println!("\n  Variable: {}", names[i]);
             println!("  {sep}");
             let header: String = names
                 .iter()
@@ -243,7 +243,7 @@ impl Interpreter {
             }
         };
 
-        // extrai série como Array1<f64>
+        // extract series as Array1<f64>
         let y = self.eval_col_expr(&Expr::Var(col_name.clone()), &df)?;
         let y = ndarray::Array1::from(y);
 

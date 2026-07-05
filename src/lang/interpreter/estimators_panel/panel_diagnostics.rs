@@ -1,7 +1,7 @@
 use super::*;
 
 impl Interpreter {
-    /// `wooldridge` / `xtserial` — teste de correlação serial de Wooldridge.
+    /// `wooldridge` / `xtserial` — Wooldridge serial correlation test.
     pub(super) fn eval_wooldridge(
         &mut self,
         args: &[Expr],
@@ -32,7 +32,7 @@ impl Interpreter {
                 .filter(|s| !s.is_empty())
                 .ok_or_else(|| {
                     self.rt_err(format!(
-                        "wooldridge requer id= ou xtset({df_name}, id, time)"
+                        "wooldridge requires id= or xtset({df_name}, id, time)"
                     ))
                 })?,
         };
@@ -45,7 +45,7 @@ impl Interpreter {
                 .filter(|s| !s.is_empty())
                 .ok_or_else(|| {
                     self.rt_err(format!(
-                        "wooldridge requer time= ou xtset({df_name}, id, time)"
+                        "wooldridge requires time= or xtset({df_name}, id, time)"
                     ))
                 })?,
         };
@@ -75,24 +75,24 @@ impl Interpreter {
         };
         println!(
             "\n{:=^62}",
-            " Wooldridge Test — Correlação Serial em Painel "
+            " Wooldridge Test — Panel Serial Correlation "
         );
-        println!(" H0: ρ = -0.5 (sem correlação serial)");
+        println!(" H0: ρ = -0.5 (no serial correlation)");
         println!("{:-^62}", "");
         println!(" ρ̂ = {rho:.4}    t = {t_stat:.4}    p = {p:.4}  {sig}");
-        println!(" Pares de resíduos: {n_pairs}");
+        println!(" Residual pairs: {n_pairs}");
         if p < 0.05 {
             println!(
-                " Conclusão: rejeita H0 → correlação serial presente → usar SE robustos"
+                " Conclusion: reject H0 → serial correlation present → use robust SE"
             );
         } else {
-            println!(" Conclusão: não rejeita H0 → sem evidência de correlação serial");
+            println!(" Conclusion: do not reject H0 → no evidence of serial correlation");
         }
         println!("{:=^62}", "");
         Ok(Value::Nil)
     }
 
-    /// `pesaran` / `xtcd` — teste de dependência cross-sectional de Pesaran.
+    /// `pesaran` / `xtcd` — Pesaran cross-sectional dependence test.
     pub(super) fn eval_pesaran(
         &mut self,
         args: &[Expr],
@@ -122,7 +122,7 @@ impl Interpreter {
                 .map(|(id, _)| id.clone())
                 .filter(|s| !s.is_empty())
                 .ok_or_else(|| {
-                    self.rt_err(format!("pesaran requer id= ou xtset({df_name}, id, time)"))
+                    self.rt_err(format!("pesaran requires id= or xtset({df_name}, id, time)"))
                 })?,
         };
         let formula_str = Self::formula_to_string(&formula_ast);
@@ -162,21 +162,21 @@ impl Interpreter {
         };
         println!(
             "\n{:=^62}",
-            " Pesaran CD Test — Dependência Cross-Sectional "
+            " Pesaran CD Test — Cross-Sectional Dependence "
         );
-        println!(" H0: sem dependência cross-sectional");
+        println!(" H0: no cross-sectional dependence");
         println!("{:-^62}", "");
-        println!(" CD = {cd:.4}    p-valor = {p:.4}  {sig}");
+        println!(" CD = {cd:.4}    p-value = {p:.4}  {sig}");
         if p < 0.05 {
-            println!(" Conclusão: rejeita H0 → dependência CS presente → usar SE robustos por cluster");
+            println!(" Conclusion: reject H0 → CS dependence present → use cluster-robust SE");
         } else {
-            println!(" Conclusão: não rejeita H0 → sem dependência CS detectada");
+            println!(" Conclusion: do not reject H0 → no CS dependence detected");
         }
         println!("{:=^62}", "");
         Ok(Value::Nil)
     }
 
-    /// `mundlak` — teste de adequação de RE vs FE.
+    /// `mundlak` — RE vs FE adequacy test.
     pub(super) fn eval_mundlak(
         &mut self,
         args: &[Expr],
@@ -206,7 +206,7 @@ impl Interpreter {
                 .map(|(id, _)| id.clone())
                 .filter(|s| !s.is_empty())
                 .ok_or_else(|| {
-                    self.rt_err(format!("mundlak requer id= ou xtset({df_name}, id, time)"))
+                    self.rt_err(format!("mundlak requires id= or xtset({df_name}, id, time)"))
                 })?,
         };
         let formula_str = Self::formula_to_string(&formula_ast);
@@ -236,19 +236,19 @@ impl Interpreter {
         };
         println!(
             "\n{:=^62}",
-            " Mundlak Test — RE vs FE (correlação das médias) "
+            " Mundlak Test — RE vs FE (correlation of means) "
         );
-        println!(" H0: γ = 0 (médias de grupo não correlacionadas com X → RE ok)");
+        println!(" H0: γ = 0 (group means uncorrelated with X → RE ok)");
         println!("{:-^62}", "");
         println!(" F({k}, .) = {f_stat:.4}    p = {p:.4}  {sig}");
         println!("{:-^62}", "");
-        // Nomes das variáveis variantes no tempo (não-constantes)
+        // Names of time-varying variables (non-constants)
         let slope_names: Vec<&str> = var_names
             .iter()
             .filter(|n| n.as_str() != "_cons" && n.as_str() != "const")
             .map(|s| s.as_str())
             .collect();
-        println!(" {:<20} {:>10}  {:>10}", "Variável (γ̂)", "Coef", "Std Err");
+        println!(" {:<20} {:>10}  {:>10}", "Variable (γ̂)", "Coef", "Std Err");
         for (i, g) in gamma.iter().enumerate().take(k.min(gamma.len())) {
             let nm = slope_names.get(i).copied().unwrap_or("?");
             println!(
@@ -259,15 +259,15 @@ impl Interpreter {
             );
         }
         if p < 0.05 {
-            println!("\n Conclusão: rejeita H0 → RE é inconsistente → usar FE ou Hausman");
+            println!("\n Conclusion: reject H0 → RE is inconsistent → use FE or Hausman");
         } else {
-            println!("\n Conclusão: não rejeita H0 → RE adequado");
+            println!("\n Conclusion: do not reject H0 → RE adequate");
         }
         println!("{:=^62}", "");
         Ok(Value::Nil)
     }
 
-    /// `abtest` / `arellano_bond` — testes m1/m2 de Arellano-Bond.
+    /// `abtest` / `arellano_bond` — Arellano-Bond m1/m2 tests.
     pub(super) fn eval_abtest(
         &mut self,
         args: &[Expr],
@@ -297,7 +297,7 @@ impl Interpreter {
                 .map(|(id, _)| id.clone())
                 .filter(|s| !s.is_empty())
                 .ok_or_else(|| {
-                    self.rt_err(format!("abtest requer id= ou xtset({df_name}, id, time)"))
+                    self.rt_err(format!("abtest requires id= or xtset({df_name}, id, time)"))
                 })?,
         };
         let time_col = match opt_map.get("time") {
@@ -309,7 +309,7 @@ impl Interpreter {
                 .filter(|s| !s.is_empty())
                 .ok_or_else(|| {
                     self.rt_err(format!(
-                        "abtest requer time= ou xtset({df_name}, id, time)"
+                        "abtest requires time= or xtset({df_name}, id, time)"
                     ))
                 })?,
         };
@@ -341,19 +341,19 @@ impl Interpreter {
         };
         println!(
             "\n{:=^62}",
-            " Arellano-Bond Test — Autocorrelação em 1ª Diferença "
+            " Arellano-Bond Test — First-Difference Autocorrelation "
         );
-        println!(" m1 DEVE rejeitar H0 (AR(1) induzido por FD)");
-        println!(" m2 NÃO deve rejeitar H0 (valida instrumentos y_{{t-2}})");
+        println!(" m1 SHOULD reject H0 (AR(1) induced by FD)");
+        println!(" m2 SHOULD NOT reject H0 (validates y_{{t-2}} instruments)");
         println!("{:-^62}", "");
         println!(" m1 = {m1:.4}    p(m1) = {p1:.4}  {}", sig(p1));
         println!(" m2 = {m2:.4}    p(m2) = {p2:.4}  {}", sig(p2));
         println!("{:-^62}", "");
         if p1 >= 0.05 {
-            println!(" [!] m1 não rejeita H0 — modelo pode estar mal especificado");
+            println!(" [!] m1 does not reject H0 — model may be misspecified");
         }
         if p2 < 0.05 {
-            println!(" [!] m2 rejeita H0 — instrumentos y_{{t-2}} podem ser inválidos");
+            println!(" [!] m2 rejects H0 — y_{{t-2}} instruments may be invalid");
         }
         println!("{:=^62}", "");
         Ok(Value::Nil)

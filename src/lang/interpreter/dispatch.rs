@@ -52,7 +52,7 @@ impl Interpreter {
         try_group!(eval_call_estimators_micro);
         try_group!(eval_call_builtins);
 
-        // ── Função definida pelo usuário ──────────────────────────────────
+        // ── User-defined function ───────────────────────────────────────
         let other = func;
         {
             // scalar math: sqrt(4), ln(2.7), abs(-3), etc.
@@ -103,13 +103,13 @@ impl Interpreter {
 
             if args.len() > user_fn.params.len() {
                 return Err(HayashiError::Runtime(format!(
-                    "fn '{other}': esperado no máximo {} argumento(s), recebido {}",
+                    "fn '{other}': expected at most {} argument(s), got {}",
                     user_fn.params.len(),
                     args.len()
                 )));
             }
 
-            // Avalia argumentos antes de modificar o env
+            // Evaluate arguments before mutating env
             let arg_vals: Vec<Value> = args
                 .iter()
                 .map(|e| self.eval_expr(e))
@@ -169,7 +169,7 @@ impl Interpreter {
         }
     }
 
-    // ── Helpers de painel (dependem de estado do interpretador) ─────────────
+    // ── Panel helpers (depend on interpreter state) ───────────────────────
 
     pub(super) fn extract_panel_args(
         &mut self,
@@ -226,7 +226,7 @@ impl Interpreter {
         }
     }
 
-    /// Extrai uma coluna como Vec<i64> — aceita colunas Int ou Float.
+    /// Extract a column as Vec<i64> — accepts Int or Float columns.
     pub(super) fn col_as_i64(
         df: &DataFrame,
         col: &str,
@@ -240,7 +240,7 @@ impl Interpreter {
         }
     }
 
-    // ── Helpers de visualização ASCII ────────────────────────────────────────
+    // ── ASCII visualization helpers ─────────────────────────────────────────
 
 
 

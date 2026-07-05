@@ -1,7 +1,7 @@
 use super::*;
 
 impl Interpreter {
-    /// `rolling` / `rols` — OLS com janela deslizante.
+    /// `rolling` / `rols` — OLS with rolling window.
     pub(super) fn eval_rolling(
         &mut self,
         args: &[Expr],
@@ -19,7 +19,7 @@ impl Interpreter {
             Some(Value::Int(n)) => *n as usize,
             None => {
                 return Err(HayashiError::Runtime(
-                    "rolling() requer window=N (ex: window=30)".into(),
+                    "rolling() requires window=N (e.g. window=30)".into(),
                 ))
             }
             _ => return Err(HayashiError::Type("window= must be integer".into())),
@@ -41,7 +41,7 @@ impl Interpreter {
         Ok(Value::RollingResult(Rc::new(result)))
     }
 
-    /// `recursive` / `recols` — OLS recursivo (Kalman).
+    /// `recursive` / `recols` — recursive OLS (Kalman).
     pub(super) fn eval_recursive(
         &mut self,
         args: &[Expr],

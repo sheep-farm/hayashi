@@ -6,7 +6,7 @@ mod aggregation;
 /// ttest, count/nrow, collapse, group_by, pivot_longer/pivot_wider, append,
 /// merge, reshape, sort, list, winsor, tabgen, ci, centile, recode, dropna,
 /// filter, encode/decode, rename, drop, drop_collinear, mutate/generate(),
-/// keep/select, tabulate. Extraído de `eval_call` (ver src/lang/interpreter.rs).
+/// keep/select, tabulate. Extracted from `eval_call` (see src/lang/interpreter.rs).
 impl Interpreter {
     pub(super) fn eval_call_data_manipulation(
         &mut self,
@@ -260,7 +260,7 @@ impl Interpreter {
                 let n1 = df1.n_rows();
                 let n2 = df2.n_rows();
 
-                // união de colunas: ordem de df1 primeiro, depois novas de df2
+                // union of columns: df1 order first, then new ones from df2
                 let mut all_names = names1.clone();
                 for n in &names2 {
                     if !set1.contains(n.as_str()) {
@@ -367,18 +367,18 @@ impl Interpreter {
                     _ => return Err(HayashiError::Runtime("type= must be a string".into())),
                 };
 
-                // índice de busca no df2: key_str → primeiro índice de linha
+                // lookup index in df2: key_str → first row index
                 let key2_strs = col_to_strings(&df2, &key_col)?;
                 let mut lookup: HashMap<String, usize> = HashMap::new();
                 for (j, v) in key2_strs.iter().enumerate().rev() {
-                    lookup.insert(v.clone(), j); // rev para ficar com o primeiro
+                    lookup.insert(v.clone(), j); // rev so we keep the first
                 }
 
                 let key1_strs = col_to_strings(&df1, &key_col)?;
                 let n1 = df1.n_rows();
                 let n2 = df2.n_rows();
 
-                // pares (idx_df1, idx_df2) para cada linha do resultado
+                // pairs (idx_df1, idx_df2) for each result row
                 type RowPair = (Option<usize>, Option<usize>);
                 let mut result_rows: Vec<RowPair> = (0..n1)
                     .map(|i| (Some(i), lookup.get(&key1_strs[i]).copied()))
@@ -408,7 +408,7 @@ impl Interpreter {
                 let set1: std::collections::HashSet<&str> =
                     names1.iter().map(String::as_str).collect();
 
-                // colunas extra de df2 (exclui key; sufixo _2 em colisão)
+                // extra columns from df2 (excludes key; suffix _2 on collision)
                 let extra: Vec<(String, String)> = names2
                     .iter()
                     .filter(|n| *n != &key_col)
@@ -438,7 +438,7 @@ impl Interpreter {
 
                 let mut builder = DataFrame::builder();
 
-                // colunas de df1
+                // columns from df1
                 for col in &names1 {
                     use greeners::Column;
                     if matches!(
@@ -465,7 +465,7 @@ impl Interpreter {
                     }
                 }
 
-                // colunas extras de df2
+                // extra columns from df2
                 for (src_col, out_col) in &extra {
                     use greeners::Column;
                     if matches!(
@@ -492,7 +492,7 @@ impl Interpreter {
                     }
                 }
 
-                // indicador _merge: 3=matched, 1=left only, 2=right only
+                // _merge indicator: 3=matched, 1=left only, 2=right only
                 builder = builder.add_column(
                     "_merge",
                     result_rows
@@ -524,14 +524,14 @@ impl Interpreter {
             "reshape" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
-                        "reshape(df, \"long\"|\"wide\", ...) requer pelo menos 2 argumentos".into(),
+                        "reshape(df, \"long\"|\"wide\", ...) requires at least 2 arguments".into(),
                     ));
                 }
                 let df = match self.eval_expr(&args[0])? {
                     Value::DataFrame(d) => d,
                     _ => {
                         return Err(HayashiError::Type(
-                            "reshape(): arg 1 deve ser DataFrame".into(),
+                            "reshape(): arg 1 must be a DataFrame".into(),
                         ))
                     }
                 };
@@ -539,7 +539,7 @@ impl Interpreter {
                     Value::Str(s) => s,
                     _ => {
                         return Err(HayashiError::Type(
-                            "reshape(): arg 2 deve ser \"long\" ou \"wide\"".into(),
+                            "reshape(): arg 2 must be \"long\" or \"wide\"".into(),
                         ))
                     }
                 };
@@ -547,7 +547,7 @@ impl Interpreter {
                     Some(Value::Str(s)) => s.clone(),
                     None => {
                         return Err(HayashiError::Runtime(
-                            "reshape() requer opção i=coluna_id".into(),
+                            "reshape() requires option i=id_col".into(),
                         ))
                     }
                     _ => return Err(HayashiError::Type("i= must be string".into())),
@@ -556,7 +556,7 @@ impl Interpreter {
                     Some(Value::Str(s)) => s.clone(),
                     None => {
                         return Err(HayashiError::Runtime(
-                            "reshape() requer opção j=coluna_tempo".into(),
+                            "reshape() requires option j=time_col".into(),
                         ))
                     }
                     _ => return Err(HayashiError::Type("j= must be string".into())),
@@ -571,20 +571,20 @@ impl Interpreter {
                                 .map(|v| match v {
                                     Value::Str(s) => Ok(s.clone()),
                                     _ => Err(HayashiError::Type(
-                                        "stubs= must be a list de strings".into(),
+                                        "stubs= must be a list of strings".into(),
                                     )),
                                 })
                                 .collect::<Result<_>>()?,
                             None => {
                                 return Err(HayashiError::Runtime(
-                                    "reshape long requer opção stubs=[\"var1\", \"var2\", ...]"
+                                    "reshape long requires option stubs=[\"var1\", \"var2\", ...]"
                                         .into(),
                                 ))
                             }
                             _ => return Err(HayashiError::Type("stubs= must be a list".into())),
                         };
 
-                        // Para cada stub, detectar colunas e extrair sufixos
+                        // For each stub, detect columns and extract suffixes
                         let col_names = df.column_names();
                         let mut stub_suffixes: Vec<Vec<String>> = Vec::new();
                         for stub in &stubs {
@@ -596,22 +596,22 @@ impl Interpreter {
                             suffs.sort();
                             if suffs.is_empty() {
                                 return Err(HayashiError::Runtime(format!(
-                                    "reshape long: nenhuma coluna com stub '{stub}' encontrada"
+                                    "reshape long: no column with stub '{stub}' found"
                                 )));
                             }
                             stub_suffixes.push(suffs);
                         }
-                        // Validar que todos os stubs têm os mesmos sufixos
+                        // Validate that all stubs have the same suffixes
                         let all_suf = stub_suffixes[0].clone();
                         for (stub, suf) in stubs.iter().zip(stub_suffixes.iter()) {
                             if suf != &all_suf {
                                 return Err(HayashiError::Runtime(format!(
-                                    "reshape long: stub '{stub}' tem sufixos diferentes dos demais"
+                                    "reshape long: stub '{stub}' has different suffixes from the others"
                                 )));
                             }
                         }
 
-                        // Coletar valores da coluna id
+                        // Collect id column values
                         use greeners::Column;
                         let n_rows = df.n_rows();
                         let id_vals: Vec<String> = match df.get_column(&i_col) {
@@ -622,7 +622,7 @@ impl Interpreter {
                                     arr.to_vec()
                                 } else {
                                     return Err(self.rt_err(format!(
-                                        "reshape: coluna id '{i_col}' not found"
+                                        "reshape: id column '{i_col}' not found"
                                     )));
                                 }
                             }
@@ -631,7 +631,7 @@ impl Interpreter {
                         let n_suf = all_suf.len();
                         let n_out = n_rows * n_suf;
 
-                        // Determinar colunas que não são stubs nem id (passam direto)
+                        // Determine columns that are not stubs nor id (pass through)
                         let stub_cols: std::collections::HashSet<String> = stubs
                             .iter()
                             .flat_map(|s| all_suf.iter().map(move |sf| format!("{s}{sf}")))
@@ -644,19 +644,19 @@ impl Interpreter {
 
                         let mut builder = DataFrame::builder();
 
-                        // coluna id: repete cada valor n_suf vezes
+                        // id column: repeat each value n_suf times
                         let id_out: Vec<String> = id_vals
                             .iter()
                             .flat_map(|v| std::iter::repeat_n(v.clone(), n_suf))
                             .collect();
                         builder = builder.add_string(&i_col, id_out);
 
-                        // coluna j: para cada obs, cicla pelos sufixos
+                        // j column: for each obs, cycle through suffixes
                         let j_out: Vec<String> =
                             (0..n_rows).flat_map(|_| all_suf.iter().cloned()).collect();
                         builder = builder.add_string(&j_col, j_out);
 
-                        // colunas passthrough
+                        // passthrough columns
                         for pc in &passthrough {
                             match df.get_column(pc) {
                                 Ok(Column::Float(arr)) => {
@@ -677,7 +677,7 @@ impl Interpreter {
                             }
                         }
 
-                        // colunas dos stubs
+                        // stub columns
                         for stub in &stubs {
                             let mut vals: Vec<f64> = Vec::with_capacity(n_out);
                             for row in 0..n_rows {
@@ -698,7 +698,7 @@ impl Interpreter {
                             .build()
                             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                         println!(
-                            "(reshape long: {} obs × {} variáveis → {} obs × {} variáveis)",
+                            "(reshape long: {} obs × {} variables → {} obs × {} variables)",
                             n_rows,
                             col_names.len(),
                             n_out,
@@ -715,13 +715,13 @@ impl Interpreter {
                                 .map(|v| match v {
                                     Value::Str(s) => Ok(s.clone()),
                                     _ => Err(HayashiError::Type(
-                                        "values= must be a list de strings".into(),
+                                        "values= must be a list of strings".into(),
                                     )),
                                 })
                                 .collect::<Result<_>>()?,
                             None => {
                                 return Err(HayashiError::Runtime(
-                                    "reshape wide requer opção values=[\"var1\", \"var2\", ...]"
+                                    "reshape wide requires option values=[\"var1\", \"var2\", ...]"
                                         .into(),
                                 ))
                             }
@@ -731,7 +731,7 @@ impl Interpreter {
                         use greeners::Column;
                         let n_rows = df.n_rows();
 
-                        // Coletar valores únicos de j (em ordem de aparição)
+                        // Collect unique j values (in order of appearance)
                         let j_vals: Vec<String> = {
                             let mut seen = std::collections::HashSet::new();
                             let mut out = Vec::new();
@@ -765,7 +765,7 @@ impl Interpreter {
                                         }
                                     } else {
                                         return Err(HayashiError::Runtime(format!(
-                                            "reshape wide: coluna j '{j_col}' not found"
+                                            "reshape wide: j column '{j_col}' not found"
                                         )));
                                     }
                                 }
@@ -773,7 +773,7 @@ impl Interpreter {
                             out
                         };
 
-                        // j label por linha
+                        // j label per row
                         let row_j: Vec<String> = match df.get_column(&j_col) {
                             Ok(Column::Float(arr)) => arr
                                 .iter()
@@ -789,24 +789,24 @@ impl Interpreter {
                             _ => df
                                 .get_string(&j_col)
                                 .map_err(|_| {
-                                    HayashiError::Runtime("reshape wide: j coluna inválida".into())
+                                    HayashiError::Runtime("reshape wide: invalid j column".into())
                                 })?
                                 .to_vec(),
                         };
 
-                        // id por linha
+                        // id per row
                         let row_id: Vec<String> = match df.get_column(&i_col) {
                             Ok(Column::Float(arr)) => arr.iter().map(|v| v.to_string()).collect(),
                             Ok(Column::Int(arr)) => arr.iter().map(|v| v.to_string()).collect(),
                             _ => df
                                 .get_string(&i_col)
                                 .map_err(|_| {
-                                    HayashiError::Runtime("reshape wide: i coluna inválida".into())
+                                    HayashiError::Runtime("reshape wide: invalid i column".into())
                                 })?
                                 .to_vec(),
                         };
 
-                        // Ordem única de ids
+                        // Unique id order
                         let mut seen_ids = std::collections::HashSet::new();
                         let unique_ids: Vec<String> = row_id
                             .iter()
@@ -815,7 +815,7 @@ impl Interpreter {
                             .collect();
                         let n_id = unique_ids.len();
 
-                        // id_idx[row] → índice no unique_ids
+                        // id_idx[row] → index in unique_ids
                         let id_pos: std::collections::HashMap<&str, usize> = unique_ids
                             .iter()
                             .enumerate()
@@ -827,7 +827,7 @@ impl Interpreter {
                             .map(|(i, s)| (s.as_str(), i))
                             .collect();
 
-                        // Para cada coluna value, construir matrix (n_id × n_j)
+                        // For each value column, build matrix (n_id × n_j)
                         let mut value_mats: Vec<Vec<f64>> = values
                             .iter()
                             .map(|_| vec![f64::NAN; n_id * j_vals.len()])
@@ -858,11 +858,11 @@ impl Interpreter {
                             .cloned()
                             .collect();
 
-                        // Pegar primeiro valor de passthrough por id
+                        // Take first passthrough value per id
                         let mut builder = DataFrame::builder();
                         // id column
                         builder = builder.add_string(&i_col, unique_ids.clone());
-                        // passthrough: valor da primeira linha com esse id
+                        // passthrough: value of first row with this id
                         for pc in &passthrough {
                             let mut vals = vec![f64::NAN; n_id];
                             for row in 0..n_rows {
@@ -892,7 +892,7 @@ impl Interpreter {
                             .build()
                             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                         println!(
-                            "(reshape wide: {} obs → {} obs × {} variáveis)",
+                            "(reshape wide: {} obs → {} obs × {} variables)",
                             n_rows,
                             n_id,
                             new_df.column_names().len()
@@ -901,7 +901,7 @@ impl Interpreter {
                     }
 
                     other => Err(HayashiError::Runtime(format!(
-                        "reshape: direção '{other}' desconhecida — use \"long\" ou \"wide\""
+                        "reshape: direction '{other}' unknown — use \"long\" or \"wide\""
                     ))),
                 }
             }
@@ -948,7 +948,7 @@ impl Interpreter {
                 let sort_vars = self.resolve_var_list(&args[1..], &df)?;
                 let desc = matches!(opt_map.get("desc"), Some(Value::Bool(true)));
 
-                // extrai chaves de ordenação
+                // extract sorting keys
                 enum SortKey {
                     Num(Vec<f64>),
                     Str(Vec<String>),
@@ -1041,7 +1041,7 @@ impl Interpreter {
                     }
                 };
 
-                // args[1..]: Int → nrows; Ident/Str → coluna
+                // args[1..]: Int → nrows; Ident/Str → column
                 let mut n_explicit: Option<usize> = None;
                 let mut col_names: Vec<String> = Vec::new();
 
@@ -1057,7 +1057,7 @@ impl Interpreter {
                     }
                 }
 
-                // vars=[A, B, C] — opção nomeada (somente se nenhuma coluna foi dada positionally)
+                // vars=[A, B, C] — named option (only if no column was given positionally)
                 if col_names.is_empty() {
                     if let Some(vars_opt) = opts.iter().find(|o| o.name == "vars") {
                         match &vars_opt.value {
@@ -1075,7 +1075,7 @@ impl Interpreter {
                     }
                 }
 
-                // n= opção (sobrepõe default 10; arg positional Int tem prioridade)
+                // n= option (overrides default 10; positional Int arg takes priority)
                 let n_show = if let Some(n) = n_explicit {
                     n
                 } else {
@@ -1092,7 +1092,7 @@ impl Interpreter {
 
                 let n_rows = n_show.min(df.n_rows());
 
-                // extrai dados das colunas
+                // extract column data
                 let cols_data: Vec<(String, Vec<String>)> = col_names
                     .iter()
                     .map(|name| {
@@ -1123,7 +1123,7 @@ impl Interpreter {
                     })
                     .collect();
 
-                // larguras de coluna
+                // column widths
                 let row_num_w = n_rows.to_string().len().max(1);
                 let widths: Vec<usize> = cols_data
                     .iter()
@@ -1137,7 +1137,7 @@ impl Interpreter {
                     })
                     .collect();
 
-                // cabeçalho
+                // header
                 print!("{:>rw$} |", "", rw = row_num_w);
                 for (i, (name, _)) in cols_data.iter().enumerate() {
                     print!(" {:>w$}", name, w = widths[i]);
@@ -1149,7 +1149,7 @@ impl Interpreter {
                     "-".repeat(widths.iter().sum::<usize>() + widths.len())
                 );
 
-                // linhas
+                // rows
                 for r in 0..n_rows {
                     print!("{:>rw$} |", r + 1, rw = row_num_w);
                     for (i, (_, vals)) in cols_data.iter().enumerate() {
@@ -1164,9 +1164,9 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
-            // ── winsor: winsoriza coluna no percentil p e 1-p ──────────────
-            // winsor(df, var, p=0.01)       → in-place, corta 1% em cada cauda
-            // winsor(df, var, p=0.05, gen=var_w)  → cria nova coluna
+            // ── winsor: winsorize column at percentile p and 1-p ─────────
+            // winsor(df, var, p=0.01)       → in-place, trims 1% in each tail
+            // winsor(df, var, p=0.05, gen=var_w)  → creates new column
             "winsor" | "winsorize" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
@@ -1223,13 +1223,13 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
-            // ── tabgen: gera dummies a partir de coluna categórica ────────────
-            // tabgen(df, var)              → cria var_0, var_1, ...
-            // tabgen(df, var, prefix=d)    → cria d_0, d_1, ...
+            // ── tabgen: generate dummies from a categorical column ───────────
+            // tabgen(df, var)              → creates var_0, var_1, ...
+            // tabgen(df, var, prefix=d)    → creates d_0, d_1, ...
             "tabgen" | "tab_gen" | "xi" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
-                        "tabgen(df, var [, prefix=nome])".into(),
+                        "tabgen(df, var [, prefix=name])".into(),
                     ));
                 }
                 let df_name = match &args[0] {
@@ -1268,14 +1268,14 @@ impl Interpreter {
                         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 }
                 self.env.set(&df_name, Value::DataFrame(df))?;
-                println!("tabgen {var_name}: {n_dummies} dummies geradas (prefix={prefix}_)");
+                println!("tabgen {var_name}: {n_dummies} dummies generated (prefix={prefix}_)");
                 for name in &dummy_names {
                     println!("  {name}");
                 }
                 Ok(Value::Nil)
             }
 
-            // ── ci: intervalo de confiança para a média ─────────────────────
+            // ── ci: confidence interval for the mean ──────────────────────
             "ci" | "ci_means" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime("ci(df, var [, level=0.95])".into()));
@@ -1309,7 +1309,7 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
-            // ── centile: percentis arbitrários ────────────────────────────────
+            // ── centile: arbitrary percentiles ─────────────────────────────
             "centile" | "pctile" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
@@ -1354,9 +1354,9 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
-            // ── recode: recodifica valores ───────────────────────────────────
+            // ── recode: recode values ─────────────────────────────────────
             // recode(df, var, rules=[[0, 1], [1, 2], [2, 3]])
-            // ou recode(df, var, from=[1,2,3], to=[10,20,30])
+            // or recode(df, var, from=[1,2,3], to=[10,20,30])
             "recode" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
@@ -1386,7 +1386,7 @@ impl Interpreter {
                         .collect(),
                     _ => {
                         return Err(HayashiError::Runtime(
-                            "recode requer from=[...] e to=[...]".into(),
+                            "recode requires from=[...] and to=[...]".into(),
                         ))
                     }
                 };
@@ -1399,7 +1399,7 @@ impl Interpreter {
                             _ => None,
                         })
                         .collect(),
-                    _ => return Err(HayashiError::Runtime("recode requer to=[...]".into())),
+                    _ => return Err(HayashiError::Runtime("recode requires to=[...]".into())),
                 };
                 let col = get_col_f64(&df, &var)?;
                 let recoded: Vec<f64> = col
@@ -1469,7 +1469,7 @@ impl Interpreter {
                 let n_drop = keep.iter().filter(|&&k| !k).count();
                 let n_kept = n - n_drop;
 
-                // reconstrói o DataFrame filtrando as linhas
+                // rebuild the DataFrame filtering rows
                 let all_names = df.column_names();
                 let mut builder = DataFrame::builder();
 
@@ -1518,7 +1518,7 @@ impl Interpreter {
             }
 
             // ── ffill ─────────────────────────────────────────────────────────
-            // ffill(df) -> forward-fill de NaN em todas as colunas float
+            // ffill(df) -> forward-fill NaN in all float columns
             "ffill" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
@@ -1538,7 +1538,7 @@ impl Interpreter {
             }
 
             // ── filter ───────────────────────────────────────────────────────
-            // filter(df, condition_expr) → DataFrame com linhas onde cond ≠ 0
+            // filter(df, condition_expr) → DataFrame with rows where cond ≠ 0
             "filter" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime("filter(list|df, fn|cond)".into()));
@@ -1611,9 +1611,9 @@ impl Interpreter {
                 Ok(Value::DataFrame(Rc::new(new_df)))
             }
 
-            // ── encode: string → numérico ─────────────────────────────────────
-            // encode(df, col)           → substitui coluna string por numérica (0, 1, 2...)
-            // encode(df, col, gen=new)  → cria nova coluna, mantém original
+            // ── encode: string → numeric ─────────────────────────────────────
+            // encode(df, col)           → replaces string column by numeric (0, 1, 2...)
+            // encode(df, col, gen=new)  → creates new column, keeps original
             "encode" | "destring" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
@@ -1636,7 +1636,7 @@ impl Interpreter {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
                     _ => {
                         return Err(HayashiError::Type(
-                            "second argument must be nome de coluna".into(),
+                            "second argument must be a column name".into(),
                         ))
                     }
                 };
@@ -1662,7 +1662,7 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
-            // ── decode: numérico → string (oposto de encode) ─────────────────
+            // ── decode: numeric → string (opposite of encode) ────────────────
             // decode(df, col, labels=["a", "b", "c"])
             "decode" | "tostring" => {
                 if args.len() < 2 {
@@ -1686,7 +1686,7 @@ impl Interpreter {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
                     _ => {
                         return Err(HayashiError::Type(
-                            "second argument must be nome de coluna".into(),
+                            "second argument must be a column name".into(),
                         ))
                     }
                 };
@@ -1700,7 +1700,7 @@ impl Interpreter {
                         .collect(),
                     _ => {
                         return Err(HayashiError::Runtime(
-                            "decode() requer labels=[\"a\", \"b\", ...]".into(),
+                            "decode() requires labels=[\"a\", \"b\", ...]".into(),
                         ))
                     }
                 };
@@ -1823,32 +1823,32 @@ impl Interpreter {
 
             // ── drop_collinear ────────────────────────────────────────────────
             // drop_collinear(df [, vars=[x1, x2, ...]])
-            // Detecta colunas perfeitamente colineares via QR e retorna novo df
-            // sem elas. O usuário vê exatamente o que foi removido antes de
-            // passar os dados para qualquer estimador.
+            // Detects perfectly collinear columns via QR and returns a new df
+            // without them. The user sees exactly what was removed before
+            // passing the data to any estimator.
             "drop_collinear" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
-                        "drop_collinear() requer ao menos um DataFrame".into(),
+                        "drop_collinear() requires at least one DataFrame".into(),
                     ));
                 }
                 let df = match self.eval_expr(&args[0])? {
                     Value::DataFrame(df) => df,
                     _ => {
                         return Err(HayashiError::Type(
-                            "drop_collinear(): primeiro argumento deve ser um DataFrame".into(),
+                            "drop_collinear(): first argument must be a DataFrame".into(),
                         ))
                     }
                 };
 
-                // Colunas a checar: vars=[...] ou todas as numéricas
+                // Columns to check: vars=[...] or all numeric columns
                 let check_cols: Vec<String> = match opt_map.get("vars") {
                     Some(Value::List(lst)) => lst
                         .iter()
                         .map(|v| match v {
                             Value::Str(s) => Ok(s.clone()),
                             _ => Err(HayashiError::Type(
-                                "drop_collinear(): vars must be a list de nomes de colunas".into(),
+                                "drop_collinear(): vars must be a list of column names".into(),
                             )),
                         })
                         .collect::<Result<_>>()?,
@@ -1859,13 +1859,13 @@ impl Interpreter {
                         .collect(),
                     _ => {
                         return Err(HayashiError::Type(
-                            "drop_collinear(): vars must be a list de strings".into(),
+                            "drop_collinear(): vars must be a list of strings".into(),
                         ))
                     }
                 };
 
                 if check_cols.is_empty() {
-                    println!("drop_collinear: nenhuma coluna numérica encontrada.");
+                    println!("drop_collinear: no numeric column found.");
                     return Ok(Some(Value::DataFrame(df)));
                 }
 
@@ -1875,7 +1875,7 @@ impl Interpreter {
                 for (j, col) in check_cols.iter().enumerate() {
                     let col_data = df.get(col).map_err(|_| {
                         HayashiError::Runtime(format!(
-                            "drop_collinear: column '{col}' not found ou não numérica"
+                            "drop_collinear: column '{col}' not found or not numeric"
                         ))
                     })?;
                     for (i, &v) in col_data.iter().enumerate() {
@@ -1886,7 +1886,7 @@ impl Interpreter {
                 let (_clean, keep_idx, omit_idx) = greeners::OLS::detect_collinearity(&mat, 1e-10);
 
                 if omit_idx.is_empty() {
-                    println!("drop_collinear: nenhuma colinearidade detectada entre as {} colunas verificadas.", k);
+                    println!("drop_collinear: no collinearity detected among the {} checked columns.", k);
                     return Ok(Some(Value::DataFrame(df)));
                 }
 
@@ -1896,14 +1896,14 @@ impl Interpreter {
                     keep_idx.iter().map(|&i| check_cols[i].as_str()).collect();
 
                 println!(
-                    "drop_collinear: {} coluna(s) removida(s) por colinearidade perfeita:",
+                    "drop_collinear: {} column(s) removed due to perfect collinearity:",
                     omit_names.len()
                 );
                 for name in &omit_names {
                     println!("  o.{name}");
                 }
                 println!(
-                    "  {} coluna(s) mantida(s): {}",
+                    "  {} column(s) kept: {}",
                     keep_names.len(),
                     keep_names.join(", ")
                 );
@@ -2080,7 +2080,7 @@ impl Interpreter {
         use greeners::Stats;
         use ndarray::Array1;
 
-        // Pareado
+        // Paired
         if args.len() >= 3 && matches!(opt_map.get("paired"), Some(Value::Bool(true))) {
             let var2 = match &args[2] {
                 Expr::Var(n) | Expr::Str(n) => n.clone(),
@@ -2121,7 +2121,7 @@ impl Interpreter {
             return Ok(Value::Nil);
         }
 
-        // Dois grupos
+        // Two groups
         if let Some(Value::Str(by_col)) = opt_map.get("by") {
             let by_col = by_col.clone();
             let vals = self.ttest_get_col_vals(&df, &var1)?;
@@ -2182,7 +2182,7 @@ impl Interpreter {
             return Ok(Value::Nil);
         }
 
-        // Uni-amostral
+        // One-sample
         let mu = match opt_map.get("mu") {
             Some(Value::Float(f)) => *f,
             Some(Value::Int(i)) => *i as f64,

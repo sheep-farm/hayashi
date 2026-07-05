@@ -4,7 +4,7 @@ use super::helpers::*;
 mod timeseries_models;
 
 /// margins, VECM/VAR/IRF/FEVD, ARIMA/SARIMA/AutoReg/ARDL/Kalman/forecast,
-/// lincom/nlcom. Extraído de `eval_call` (ver src/lang/interpreter.rs).
+/// lincom/nlcom. Extracted from `eval_call` (see src/lang/interpreter.rs).
 impl Interpreter {
     pub(super) fn eval_call_post_estimation_ts(
         &mut self,
@@ -23,7 +23,7 @@ impl Interpreter {
                 }
                 let model = self.eval_expr(&args[0])?;
 
-                // dydx=[X1, X2] — quais variáveis mostrar (lazy, nomes de coluna)
+                // dydx=[X1, X2] — which variables to show (lazy, column names)
                 let dydx_filter: Option<Vec<String>> =
                     opts.iter()
                         .find(|o| o.name == "dydx")
@@ -45,7 +45,7 @@ impl Interpreter {
                     }
                 };
 
-                // at_X=value — fixa variável X no valor dado para cálculo de margins
+                // at_X=value — fixes variable X at the given value for margins calculation
                 let at_vals: HashMap<String, f64> = opt_map
                     .iter()
                     .filter(|(k, _)| k.starts_with("at_"))
@@ -276,7 +276,7 @@ impl Interpreter {
                         };
                         let fb: Vec<String> = (0..beta.len()).map(|i| format!("x{i}")).collect();
                         let names = r.variable_names.as_ref().unwrap_or(&fb);
-                        // Xβ para cada observação
+                        // Xβ for each observation
                         let xb: Vec<f64> = (0..n).map(|i| x.row(i).dot(beta)).collect();
                         // AME[var_k, cat_j]
                         let k = beta.len();
@@ -379,7 +379,7 @@ impl Interpreter {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
                     _ => {
                         return Err(HayashiError::Type(
-                            "autoreg: segundo argumento deve ser o nome da variável".into(),
+                            "autoreg: second argument must be variable name".into(),
                         ))
                     }
                 };
@@ -449,12 +449,12 @@ impl Interpreter {
                     .to_design_matrix(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-                // ARDL::fit adiciona constante própria; remove a coluna de intercepto
+                // ARDL::fit adds its own constant; remove intercept column
                 let x_no_const = if x_with_const.ncols() > 1 {
                     x_with_const.slice(ndarray::s![.., 1..]).to_owned()
                 } else {
                     return Err(HayashiError::Runtime(
-                        "ardl: fórmula deve ter pelo menos um regressor além do intercepto".into(),
+                        "ardl: formula must have at least one regressor besides intercept".into(),
                     ));
                 };
 
@@ -469,7 +469,7 @@ impl Interpreter {
             // ── kalman ───────────────────────────────────────────────────────
             // kalman(df, var, model="ll"|"llt", sigma_obs=s, sigma_state=s)
             //
-            // Modelos pré-definidos (State Space Form):
+            // Predefined models (State Space Form):
             //   "ll"  — Local Level:        y_t = mu_t + e_t
             //                               mu_t = mu_{t-1} + eta_t
             //   "llt" — Local Linear Trend: y_t = mu_t + e_t
@@ -501,7 +501,7 @@ impl Interpreter {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
                     _ => {
                         return Err(HayashiError::Type(
-                            "kalman: segundo argumento deve ser o nome da variável".into(),
+                            "kalman: second argument must be variable name".into(),
                         ))
                     }
                 };
@@ -515,11 +515,11 @@ impl Interpreter {
                 let n = y_vec.len();
                 if n < 4 {
                     return Err(HayashiError::Runtime(
-                        "kalman: série muito curta (mínimo 4 observações)".into(),
+                        "kalman: series too short (minimum 4 observations)".into(),
                     ));
                 }
 
-                // Estima sigma_obs a partir de diff(y) se não fornecido
+                // Estimate sigma_obs from diff(y) if not provided
                 let diff_var: f64 = {
                     let diffs: Vec<f64> = y_vec.windows(2).map(|w| w[1] - w[0]).collect();
                     let mean = diffs.iter().sum::<f64>() / diffs.len() as f64;
@@ -543,7 +543,7 @@ impl Interpreter {
                     _ => sigma_state * 0.1,
                 };
 
-                // Observações como Vec<Array1<f64>> (escalares embalados)
+                // Observations as Vec<Array1<f64>> (scalar-wrapped)
                 let obs: Vec<ndarray::Array1<f64>> = y_vec
                     .iter()
                     .map(|&v| ndarray::Array1::from_vec(vec![v]))
@@ -601,7 +601,7 @@ impl Interpreter {
                     }
                 };
 
-                // Extrai nível filtrado e suavizado (estado 0 em ambos os modelos)
+                // Extract filtered and smoothed level (state 0 in both models)
                 let filtered: ndarray::Array1<f64> = ndarray::Array1::from_vec(
                     ss_result.filtered_states.iter().map(|s| s[0]).collect(),
                 );
@@ -619,7 +619,7 @@ impl Interpreter {
                     .insert(smooth_name.clone(), smoothed)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-                // Para LLT, adiciona também a tendência (slope = estado 1)
+                // For LLT, also add trend (slope = state 1)
                 if matches!(model_kind.as_str(), "llt" | "local_linear_trend") {
                     let slope_filt: ndarray::Array1<f64> = ndarray::Array1::from_vec(
                         ss_result.filtered_states.iter().map(|s| s[1]).collect(),
@@ -690,7 +690,7 @@ impl Interpreter {
 
                 let sep = "─".repeat(52);
                 println!(
-                    "\nForecast — {} passos à frente  (IC {}%)",
+                    "\nForecast — {} steps ahead  (CI {}%)",
                     steps,
                     ((1.0 - alpha) * 100.0) as usize
                 );
@@ -717,10 +717,10 @@ impl Interpreter {
 
             // ── lincom ───────────────────────────────────────────────────────
             // lincom(model, var1=mult1, var2=mult2, ...)
-            // Delega álgebra ao Greeners via OlsResult::t_test(r, q, x)
-            // ── nlcom: combinação não-linear de coefs (delta method) ────────
-            // nlcom(model, expr) — expr usa nomes de coeficientes como variáveis
-            // Exemplos: nlcom(m, X1 / X2)   nlcom(m, exp(_cons))   nlcom(m, X1 * X2)
+            // Delegates algebra to Greeners via OlsResult::t_test(r, q, x)
+            // ── nlcom: non-linear combination of coefs (delta method) ────────
+            // nlcom(model, expr) — expr uses coefficient names as variables
+            // Examples: nlcom(m, X1 / X2)   nlcom(m, exp(_cons))   nlcom(m, X1 * X2)
             "nlcom" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime("nlcom(model, expression)".into()));
@@ -737,7 +737,7 @@ impl Interpreter {
                 let k = params.len();
                 let expr = &args[1];
 
-                // salvar variáveis existentes e bind coeficientes
+                // save existing variables and bind coefficients
                 let mut saved: Vec<(String, Option<Value>)> = Vec::new();
                 for (i, name) in names.iter().enumerate() {
                     saved.push((name.clone(), self.env.get(name).cloned()));
@@ -765,7 +765,7 @@ impl Interpreter {
                     }
                 };
 
-                // gradiente numérico (diferenças centrais)
+                // numerical gradient (central differences)
                 let h = 1e-7;
                 let mut grad = ndarray::Array1::<f64>::zeros(k);
                 for j in 0..k {
@@ -786,7 +786,7 @@ impl Interpreter {
                     self.env.set(&names[j], Value::Float(orig))?;
                 }
 
-                // restaurar variáveis
+                // restore variables
                 for (name, old) in &saved {
                     match old {
                         Some(v) => {
@@ -887,7 +887,7 @@ impl Interpreter {
                         .map(|n| if n == "const" { "_cons" } else { n.as_str() })
                         .collect();
                     return Err(HayashiError::Runtime(format!(
-                        "nenhum coeficiente encontrado — disponíveis: {}",
+                        "no coefficients found — available: {}",
                         available.join(", ")
                     )));
                 }
@@ -895,7 +895,7 @@ impl Interpreter {
                 // estimativa pontual c'β
                 let estimate = c.dot(&ols.result.params);
 
-                // inferência delegada ao Greeners: t_test usa (X'X)⁻¹σ² internamente
+                // inference delegated to Greeners: t_test uses (X'X)⁻¹σ² internally
                 let (t, p) = ols
                     .result
                     .t_test(&c, 0.0, &ols.x)
@@ -905,7 +905,7 @@ impl Interpreter {
                 let df_t = ols.result.df_resid as f64;
                 let tc = t_critical_95(df_t);
 
-                // rótulo legível da combinação
+                // readable label for the combination
                 let display_name = |n: &str| {
                     if n == "const" {
                         "_cons".to_string()

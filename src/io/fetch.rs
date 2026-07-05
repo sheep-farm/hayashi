@@ -13,8 +13,8 @@ struct ValidatedDownloadUrl {
     socket_addrs: Vec<SocketAddr>,
 }
 
-/// Baixa `url` para um arquivo temporário e retorna o caminho.
-/// O arquivo temporário é mantido vivo enquanto o `TempPath` existir.
+/// Downloads `url` to a temporary file and returns the path.
+/// The temporary file is kept alive while the `TempPath` exists.
 pub fn download_to_temp(url: &str) -> Result<tempfile::TempPath> {
     let validated = validate_download_url(url)?;
     download_validated_to_temp(url, validated, MAX_DOWNLOAD_BYTES)

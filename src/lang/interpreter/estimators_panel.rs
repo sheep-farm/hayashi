@@ -4,12 +4,12 @@ use super::helpers::*;
 mod panel_diagnostics;
 mod rolling_recursive;
 
-/// bootstrap genérico/bootse, diagnósticos de painel, SUR, rolling/recursive
-/// OLS, tabela de critérios de informação, Fixed Effects, Random Effects,
-/// testes de painel (F-test, Pesaran CD, Breusch-Pagan LM, Chamberlain),
-/// Arellano-Bond, GMM genérico, System GMM, FE-2SLS, PCSE, Panel GLS,
-/// teste m1/m2, Hausman, especificação/Wald gerais.
-/// Extraído de `eval_call` (ver src/lang/interpreter.rs).
+/// Generic bootstrap/bootse, panel diagnostics, SUR, rolling/recursive
+/// OLS, information criteria table, Fixed Effects, Random Effects,
+/// panel tests (F-test, Pesaran CD, Breusch-Pagan LM, Chamberlain),
+/// Arellano-Bond, generic GMM, System GMM, FE-2SLS, PCSE, Panel GLS,
+/// m1/m2 test, Hausman, general specification/Wald tests.
+/// Extracted from `eval_call` (see src/lang/interpreter.rs).
 impl Interpreter {
     pub(super) fn eval_call_estimators_panel(
         &mut self,
@@ -19,15 +19,15 @@ impl Interpreter {
         opt_map: &HashMap<String, Value>,
     ) -> Result<Option<Value>> {
         let result: Result<Value> = match func {
-            // bootse — Bootstrap standard errors para modelos OLS
+            // bootse — Bootstrap standard errors for OLS models
             // bootse(model, n=1000)
-            // Reamostral pares (y, X) com reposição para estimar distribuição amostral
-            // Compara SE originais com bootstrap SE e IC percentil 95%
-            // ── bootstrap genérico ────────────────────────────────────────────
+            // Resample pairs (y, X) with replacement to estimate sampling distribution
+            // Compare original SE with bootstrap SE and 95% percentile CI
+            // ── generic bootstrap ────────────────────────────────────────────
             // bootstrap(estimator, formula, df, n=1000, alpha=0.05)
-            // Reamostra linhas do DataFrame com reposição e re-estima.
-            // Funciona com qualquer estimador: ols, logit, probit, iv, poisson, etc.
-            // bootse(model, n=1000) mantido como alias para OLS pairs bootstrap.
+            // Resample DataFrame rows with replacement and re-estimate.
+            // Works with any estimator: ols, logit, probit, iv, poisson, etc.
+            // bootse(model, n=1000) kept as alias for OLS pairs bootstrap.
             "bootstrap" | "boot" => {
                 let n_boot = Self::bootstrap_reps(opt_map);
                 let alpha = Self::bootstrap_alpha(opt_map);
@@ -44,10 +44,10 @@ impl Interpreter {
 
             // markov — Markov-Switching AR (Hamilton 1989)
             // markov(df, y, k=2, p=1)
-            // k=: número de regimes (padrão: 2)
-            // p=: ordem AR dentro de cada regime (padrão: 1)
-            // Algoritmo: EM via filtro de Hamilton (forward-backward)
-            // Parâmetros por regime: intercept + AR coefficients + variance
+            // k=: number of regimes (default: 2)
+            // p=: AR order within each regime (default: 1)
+            // Algorithm: EM via Hamilton filter (forward-backward)
+            // Parameters per regime: intercept + AR coefficients + variance
             "markov" | "msar" | "markovswitching" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime("markov(df, y_var, k=2, p=1)".into()));
@@ -86,16 +86,16 @@ impl Interpreter {
 
             // clogit — Conditional Logit (Chamberlain 1980, FE logit)
             // clogit(y ~ x1 + x2, df, group="id_col")
-            // Condiciona na soma de y por grupo → elimina efeitos fixos individuais
-            // Grupos sem variação em y são automaticamente excluídos
-            // Sem intercepto — absorvido pelo FE
+            // Conditions on the sum of y by group → eliminates individual fixed effects
+            // Groups with no variation in y are automatically dropped
+            // No intercept — absorbed by FE
             "clogit" | "xtlogit_fe" => {
                 let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
                 let group_col = match opt_map.get("group") {
                     Some(Value::Str(s)) => s.clone(),
                     None => {
                         return Err(HayashiError::Runtime(
-                            "clogit requer group=\"coluna_id\"".into(),
+                            "clogit requires group=\"id_col\"".into(),
                         ))
                     }
                     _ => return Err(HayashiError::Type("clogit: group= must be string".into())),
@@ -136,15 +136,15 @@ impl Interpreter {
 
             // cpoisson — Conditional Poisson (FE Poisson)
             // cpoisson(y ~ x1 + x2, df, group="id_col")
-            // Equivalente a FE Poisson; consistente sob heterogeidade não observada
-            // Só requer que E[y|x,c] = exp(c + xβ) — não requer y ~ Poisson (PPML)
+            // Equivalent to FE Poisson; consistent under unobserved heterogeneity
+            // Only requires E[y|x,c] = exp(c + xβ) — does not require y ~ Poisson (PPML)
             "cpoisson" | "xtpoisson_fe" | "ppml" => {
                 let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
                 let group_col = match opt_map.get("group") {
                     Some(Value::Str(s)) => s.clone(),
                     None => {
                         return Err(HayashiError::Runtime(
-                            "cpoisson requer group=\"coluna_id\"".into(),
+                            "cpoisson requires group=\"id_col\"".into(),
                         ))
                     }
                     _ => return Err(HayashiError::Type("cpoisson: group= must be string".into())),
@@ -241,13 +241,13 @@ impl Interpreter {
                 Ok(Value::ConditionalResult(Rc::new(result)))
             }
 
-            // gqtest — Goldfeld-Quandt test (heteroskedasticidade)
+            // gqtest — Goldfeld-Quandt test (heteroskedasticity)
             // gqtest(model, split=0.2)
-            // H0: homocedasticidade
-            // Divide os resíduos em dois grupos (descartando `split` do meio)
-            // e testa se as variâncias diferem via F
-            // split=: fração do meio a descartar (padrão: 0.2)
-            // Mais potente que White quando heterocedasticidade é monotônica
+            // H0: homoskedasticity
+            // Splits residuals into two groups (discarding `split` from the middle)
+            // and tests if variances differ via F
+            // split=: fraction of the middle to discard (default: 0.2)
+            // More powerful than White when heteroskedasticity is monotonic
             "gqtest" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime("gqtest(model, split=0.2)".into()));
@@ -282,11 +282,11 @@ impl Interpreter {
                 let sep = "─".repeat(56);
                 println!("\nGoldfeld-Quandt Test  —  split = {split:.2}");
                 println!("{sep}");
-                println!("H₀: homocedasticidade (σ²₁ = σ²₂)");
+                println!("H₀: homoskedasticity (σ²₁ = σ²₂)");
                 println!("{sep}");
                 println!(
                     "{:<26} {:>10} {:>10} {:>4}",
-                    "Teste", "Estatística", "p-value", ""
+                    "Test", "Statistic", "p-value", ""
                 );
                 println!("{sep}");
                 println!(
@@ -302,10 +302,10 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
-            // bphet — Breusch-Pagan test (heteroskedasticidade, OLS)
+            // bphet — Breusch-Pagan test (heteroskedasticity, OLS)
             // bphet(model)
-            // H0: homocedasticidade — LM = n·R² da regressão auxiliar de u² em X
-            // Diferente de bptest() que é o LM de efeitos aleatórios (painel)
+            // H0: homoskedasticity — LM = n·R² from auxiliary regression of u² on X
+            // Different from bptest() which is the random effects LM (panel)
             "bphet" | "hettest" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime("bphet(model)".into()));
@@ -335,11 +335,11 @@ impl Interpreter {
                 let sep = "─".repeat(56);
                 println!("\nBreusch-Pagan Heteroskedasticity Test");
                 println!("{sep}");
-                println!("H₀: homocedasticidade (variância constante)");
+                println!("H₀: homoskedasticity (constant variance)");
                 println!("{sep}");
                 println!(
                     "{:<26} {:>10} {:>10} {:>4}",
-                    "Teste", "Estatística", "p-value", ""
+                    "Test", "Statistic", "p-value", ""
                 );
                 println!("{sep}");
                 println!(
@@ -355,9 +355,9 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
-            // ── Testes de diagnóstico para dados em painel ────────────────────
+            // ── Diagnostic tests for panel data ─────────────────────────────
 
-            // bptest — Breusch-Pagan LM test (H0: pooled OLS adequado, σ²_u = 0)
+            // bptest — Breusch-Pagan LM test (H0: pooled OLS adequate, σ²_u = 0)
             // bptest(df, y ~ x1 + x2, id="entity_col")
             "bptest" | "xttest0" | "xtbp" => {
                 if args.len() < 2 {
@@ -386,7 +386,7 @@ impl Interpreter {
                         .map(|(id, _)| id.clone())
                         .filter(|s| !s.is_empty())
                         .ok_or_else(|| {
-                            self.rt_err(format!("bptest requer id= ou xtset({df_name}, id, time)"))
+                            self.rt_err(format!("bptest requires id= or xtset({df_name}, id, time)"))
                         })?,
                 };
                 let formula_str = Self::formula_to_string(&formula_ast);
@@ -395,11 +395,11 @@ impl Interpreter {
                 let (y_vec, x_mat) = df
                     .to_design_matrix(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                // OLS pooled para obter resíduos
+                // OLS pooled to obtain residuals
                 let ols_pooled = OLS::from_formula(&g_formula, &df, CovarianceType::NonRobust)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let resids = &y_vec - &x_mat.dot(&ols_pooled.params);
-                // Converter id para usize
+                // Convert id to usize
                 let id_vals = get_col_f64(&df, &id_col)?;
                 let mut id_map: std::collections::HashMap<i64, usize> =
                     std::collections::HashMap::new();
@@ -427,20 +427,20 @@ impl Interpreter {
                     ""
                 };
                 println!("\n{:=^62}", " Breusch-Pagan LM Test (RE) ");
-                println!(" H0: σ²_u = 0 — pooled OLS adequado");
+                println!(" H0: σ²_u = 0 — pooled OLS adequate");
                 println!("{:-^62}", "");
-                println!(" LM = {lm:.4}    p-valor = {p:.4}  {sig}");
+                println!(" LM = {lm:.4}    p-value = {p:.4}  {sig}");
                 if p < 0.05 {
-                    println!(" Conclusão: rejeita H0 → usar RE ou FE");
+                    println!(" Conclusion: reject H0 → use RE or FE");
                 } else {
-                    println!(" Conclusão: não rejeita H0 → pooled OLS adequado");
+                    println!(" Conclusion: do not reject H0 → pooled OLS adequate");
                 }
                 println!("{:=^62}", "");
                 Ok(Value::Nil)
             }
 
-            // wooldridge — Teste de Wooldridge para correlação serial em painel
-            // H0: sem correlação serial de 1ª ordem nos erros idiossincráticos
+            // wooldridge — Wooldridge test for panel serial correlation
+            // H0: no first-order serial correlation in idiosyncratic errors
             "wooldridge" | "xtserial" | "wooldridge_serial" | "xtwooldridge" => {
                 self.eval_wooldridge(args, opt_map)
             }
@@ -448,29 +448,29 @@ impl Interpreter {
             // pesaran — Pesaran CD test (cross-sectional dependence)
             "pesaran" | "xtcd" => self.eval_pesaran(args, opt_map),
 
-            // mundlak — Teste de Mundlak (adequação de RE vs FE)
+            // mundlak — Mundlak test (RE vs FE adequacy)
             "mundlak" => self.eval_mundlak(args, opt_map),
 
-            // abtest — Arellano-Bond m1/m2 test (validação de instrumentos GMM)
+            // abtest — Arellano-Bond m1/m2 test (GMM instrument validation)
             "abtest" | "abar" | "abond" | "xtabond_test" | "arellano_bond" => {
                 self.eval_abtest(args, opt_map)
             }
 
             // ── SUR (Seemingly Unrelated Regressions) ─────────────────────────
             // sur(df, y1 ~ x1 + x2, y2 ~ x3 + x4, ...)
-            // Estimador de Zellner (FGLS entre equações)
-            // Cada equação pode ter regressores diferentes
+            // Zellner estimator (FGLS across equations)
+            // Each equation may have different regressors
             "sur" | "sureg" => {
                 if args.len() < 3 {
                     return Err(HayashiError::Runtime(
-                        "sur(df, y1~x1+x2, y2~x3+x4, ...) requer df + ao menos 2 fórmulas".into(),
+                        "sur(df, y1~x1+x2, y2~x3+x4, ...) requires df + at least 2 formulas".into(),
                     ));
                 }
                 let df_name = match &args[0] {
                     Expr::Var(n) => n.clone(),
                     _ => {
                         return Err(HayashiError::Type(
-                            "primeiro argumento deve ser DataFrame".into(),
+                            "first argument must be a DataFrame".into(),
                         ))
                     }
                 };
@@ -507,19 +507,19 @@ impl Interpreter {
                 }))
             }
 
-            // ── Rolling OLS (janela deslizante) ───────────────────────────────
+            // ── Rolling OLS (rolling window) ────────────────────────────────
             "rolling" | "rols" => self.eval_rolling(args, opts, opt_map),
 
-            // ── Recursive OLS (Kalman, acumula observações) ───────────────────
+            // ── Recursive OLS (Kalman, accumulates observations) ───────────────
             "recursive" | "recols" => self.eval_recursive(args, opts),
 
-            // ── ic — tabela de critérios de informação (AIC/BIC) ──────────────
+            // ── ic — information criteria table (AIC/BIC) ─────────────────────
             // ic(m1, m2, m3, ...)
-            // Compara modelos pelo AIC e BIC; ordena do menor (melhor) para maior
+            // Compares models by AIC and BIC; sorts from smallest (best) to largest
             "ic" | "fitstat" | "estat" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
-                        "ic() requer ao menos um modelo".into(),
+                        "ic() requires at least one model".into(),
                     ));
                 }
                 struct IcRow {
@@ -548,11 +548,11 @@ impl Interpreter {
                         Value::ZeroInflatedResult(r) => (r.log_likelihood, r.count_params.len() + r.inflate_params.len(), r.n_obs),
                         Value::RollingResult(_) | Value::RecursiveLSResult(_) => {
                             return Err(HayashiError::Runtime(
-                                format!("ic(): '{label}' não tem log-verossimilhança — use print() para diagnósticos")
+                                format!("ic(): '{label}' has no log-likelihood — use print() for diagnostics")
                             ));
                         }
                         _ => return Err(HayashiError::Runtime(
-                            format!("ic(): modelo '{label}' não tem log-verossimilhança disponível para ic() — use print()")
+                            format!("ic(): model '{label}' has no log-likelihood available for ic() — use print()")
                         )),
                     };
                     let aic = -2.0 * ll + 2.0 * k as f64;
@@ -566,7 +566,7 @@ impl Interpreter {
                         bic,
                     });
                 }
-                // Ordenar por AIC
+                // Sort by AIC
                 rows.sort_by(|a, b| {
                     a.aic
                         .partial_cmp(&b.aic)
@@ -578,10 +578,10 @@ impl Interpreter {
                     .map(|r| r.bic)
                     .min_by(|a, b| a.partial_cmp(b).unwrap())
                     .unwrap_or(0.0);
-                println!("\n{:=^80}", " Critérios de Informação ");
+                println!("\n{:=^80}", " Information Criteria ");
                 println!(
                     "{:<20} {:>6} {:>6} {:>12} {:>12} {:>8} {:>8}",
-                    "Modelo", "N", "k", "Log-Lik", "AIC", "ΔAIC", "BIC"
+                    "Model", "N", "k", "Log-Lik", "AIC", "ΔAIC", "BIC"
                 );
                 println!("{:-^80}", "");
                 for row in &rows {
@@ -599,7 +599,7 @@ impl Interpreter {
                 if rows.len() > 1 {
                     println!("{:-^80}", "");
                     println!(
-                        " Melhor AIC: {}   Melhor BIC: {}",
+                        " Best AIC: {}   Best BIC: {}",
                         rows.iter()
                             .min_by(|a, b| a.aic.partial_cmp(&b.aic).unwrap())
                             .unwrap()
@@ -609,12 +609,12 @@ impl Interpreter {
                             .unwrap()
                             .label
                     );
-                    // Pesos de Akaike
+                    // Akaike weights
                     let delta_aics: Vec<f64> = rows.iter().map(|r| r.aic - min_aic).collect();
                     let rel: Vec<f64> = delta_aics.iter().map(|d| (-d / 2.0).exp()).collect();
                     let sum_rel: f64 = rel.iter().sum();
                     println!(
-                        " Pesos Akaike: {}",
+                        " Akaike weights: {}",
                         rows.iter()
                             .zip(rel.iter())
                             .map(|(r, w)| format!("{}={:.3}", r.label, w / sum_rel))
@@ -630,8 +630,8 @@ impl Interpreter {
             "fe" => {
                 let (formula_ast, df, _df_name, id_col) = self.extract_panel_args(args, opt_map)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
-                // FE elimina o intercepto via within-transform; forçamos - 1
-                // para evitar coluna de zeros pós-demeaning (singular matrix)
+                // FE removes the intercept via within-transform; we force - 1
+                // to avoid a zero column after demeaning (singular matrix)
                 let formula_no_const = if formula_str.contains("- 1") {
                     formula_str
                 } else {
@@ -640,7 +640,7 @@ impl Interpreter {
                 let g_formula = GFormula::parse(&formula_no_const)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-                // tenta int; cai para float→int; cai para string
+                // try int; fall back to float→int; then to string
                 let result = if let Ok(ids) = df.get_int(&id_col) {
                     let ids_vec: Vec<i64> = ids.to_vec();
                     FixedEffects::from_formula(&g_formula, &df, &ids_vec)
@@ -669,7 +669,7 @@ impl Interpreter {
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-                // aceita coluna float de valores inteiros (ex: idcode lido como f64)
+                // accepts float column of integer values (e.g. idcode read as f64)
                 let ids_owned: ndarray::Array1<i64>;
                 let ids = match df.get_int(&id_col) {
                     Ok(arr) => arr,
@@ -690,11 +690,11 @@ impl Interpreter {
                 Ok(Value::ReResult(Rc::new(result)))
             }
 
-            // ── F-test para Efeitos Fixos (FE vs pooled OLS) ─────────────────
+            // ── F-test for Fixed Effects (FE vs pooled OLS) ──────────────────
             "ftest_fe" => {
                 // ftest_fe(formula, df, id=col)
-                // H₀: todos os efeitos individuais são zero (pooled OLS adequado)
-                // H₁: efeitos individuais existem (use FE)
+                // H₀: all individual effects are zero (pooled OLS adequate)
+                // H₁: individual effects exist (use FE)
                 let (formula_ast, df, _df_name, id_col) = self.extract_panel_args(args, opt_map)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
 
@@ -720,7 +720,7 @@ impl Interpreter {
                 let fe = FixedEffects::from_formula(&g_formula_fe, &df, &entity_ids_fe)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-                // Pooled OLS (com intercepto)
+                // Pooled OLS (with intercept)
                 let g_formula_ols = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let (y_pool, x_pool) = df
@@ -752,27 +752,27 @@ impl Interpreter {
                     ""
                 };
                 let verdict = if p < 0.05 {
-                    "Rejeita H₀ → efeitos fixos individuais são significativos (use FE)"
+                    "Reject H₀ → individual fixed effects are significant (use FE)"
                 } else {
-                    "Não rejeita H₀ → pooled OLS adequado (efeitos individuais não significativos)"
+                    "Do not reject H₀ → pooled OLS adequate (individual effects not significant)"
                 };
 
                 let thick = "═".repeat(62);
                 let thin = "─".repeat(62);
                 let mut out = String::new();
                 out.push_str(&format!("\n{thick}\n"));
-                out.push_str(" F-test: Efeitos Fixos vs Pooled OLS\n");
-                out.push_str(" H₀: todos os efeitos individuais são zero\n");
+                out.push_str(" F-test: Fixed Effects vs Pooled OLS\n");
+                out.push_str(" H₀: all individual effects are zero\n");
                 out.push_str(&format!("{thick}\n"));
-                out.push_str("\n── Soma dos Quadrados dos Resíduos\n");
+                out.push_str("\n── Sum of Squared Residuals\n");
                 out.push_str(&format!("   SSR pooled = {:.6}\n", ssr_pooled));
                 out.push_str(&format!("   SSR FE     = {:.6}\n", ssr_fe));
-                out.push_str("\n── Estatística\n");
+                out.push_str("\n── Statistic\n");
                 out.push_str(&format!(
                     "   F({}, {}) = {:.4}   p = {:.4}  {}\n",
                     df_num, df_denom, f_stat, p, sig
                 ));
-                out.push_str("\n── Conclusão\n");
+                out.push_str("\n── Conclusion\n");
                 out.push_str(&format!("   {}\n", verdict));
                 out.push_str(&format!("\n{thin}\n"));
                 out.push_str("   *** p<0.01  ** p<0.05  * p<0.10\n");
@@ -780,17 +780,17 @@ impl Interpreter {
                 Ok(diag(out))
             }
 
-            // ── Pesaran CD: dependência cross-seccional ───────────────────────
+            // ── Pesaran CD: cross-sectional dependence ────────────────────────
             "pesaran_cd" | "cd_test" => {
                 // pesaran_cd(formula, df, id=col)
-                // H₀: resíduos independentes entre entidades (sem dependência cross-seccional)
-                // H₁: dependência cross-seccional presente
+                // H₀: residuals independent across entities (no cross-sectional dependence)
+                // H₁: cross-sectional dependence present
                 let (formula_ast, df, _df_name, id_col) = self.extract_panel_args(args, opt_map)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-                // OLS pooled para resíduos
+                // OLS pooled for residuals
                 let (y_vec, x_mat) = df
                     .to_design_matrix(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -798,7 +798,7 @@ impl Interpreter {
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let residuals = ols.residuals(&y_vec, &x_mat);
 
-                // IDs de entidade
+                // Entity IDs
                 let entity_ids: Vec<usize> = if let Ok(ids) = df.get_int(&id_col) {
                     ids.iter().map(|&v| v as usize).collect()
                 } else if let Ok(floats) = df.get(&id_col) {
@@ -831,28 +831,28 @@ impl Interpreter {
                     ""
                 };
                 let verdict = if p < 0.05 {
-                    "Rejeita H₀ → dependência cross-seccional presente"
+                    "Reject H₀ → cross-sectional dependence present"
                 } else {
-                    "Não rejeita H₀ → sem evidência de dependência cross-seccional"
+                    "Do not reject H₀ → no evidence of cross-sectional dependence"
                 };
 
                 let thick = "═".repeat(62);
                 let thin = "─".repeat(62);
                 let mut out = String::new();
                 out.push_str(&format!("\n{thick}\n"));
-                out.push_str(" Pesaran CD Test (dependência cross-seccional)\n");
-                out.push_str(" H₀: ρ_ij = 0 para todo i≠j  (resíduos independentes)\n");
+                out.push_str(" Pesaran CD Test (cross-sectional dependence)\n");
+                out.push_str(" H₀: ρ_ij = 0 for all i≠j  (residuals independent)\n");
                 out.push_str(&format!("{thick}\n"));
                 out.push_str(&format!(
-                    "\n── Painel: N={} entidades   T̄≈{:.1}\n",
+                    "\n── Panel: N={} entities   T̄≈{:.1}\n",
                     n_entities, t_bar
                 ));
-                out.push_str("\n── Estatística\n");
+                out.push_str("\n── Statistic\n");
                 out.push_str(&format!(
                     "   CD ~ N(0,1) = {:.4}   p = {:.4}  {}\n",
                     cd, p, sig
                 ));
-                out.push_str("\n── Conclusão\n");
+                out.push_str("\n── Conclusion\n");
                 out.push_str(&format!("   {}\n", verdict));
                 out.push_str(&format!("\n{thin}\n"));
                 out.push_str("   *** p<0.01  ** p<0.05  * p<0.10\n");
@@ -860,17 +860,17 @@ impl Interpreter {
                 Ok(diag(out))
             }
 
-            // ── Breusch-Pagan LM test (efeitos individuais em painel) ────────
+            // ── Breusch-Pagan LM test (individual effects in panel) ─────────
             "bplm" => {
                 // bplm(formula, df, id=col)
-                // H₀: sem efeitos individuais (σ²_u = 0) — pooled OLS adequado
-                // H₁: efeitos individuais existem — use FE ou RE
+                // H₀: no individual effects (σ²_u = 0) — pooled OLS adequate
+                // H₁: individual effects exist — use FE or RE
                 let (formula_ast, df, _df_name, id_col) = self.extract_panel_args(args, opt_map)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-                // OLS pooled para obter resíduos
+                // OLS pooled to obtain residuals
                 let (y_vec, x_mat) = df
                     .to_design_matrix(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -879,14 +879,14 @@ impl Interpreter {
 
                 let residuals = ols.residuals(&y_vec, &x_mat);
 
-                // IDs de entidade → usize
+                // Entity IDs → usize
                 let entity_ids: Vec<usize> = if let Ok(ids) = df.get_int(&id_col) {
                     ids.iter().map(|&v| v as usize).collect()
                 } else if let Ok(floats) = df.get(&id_col) {
                     floats.iter().map(|&v| v as usize).collect()
                 } else {
                     return Err(HayashiError::Runtime(format!(
-                        "bplm: column '{id_col}' not found ou não usável como ID"
+                        "bplm: column '{id_col}' not found or not usable as ID"
                     )));
                 };
 
@@ -913,29 +913,29 @@ impl Interpreter {
                     ""
                 };
                 let verdict = if p < 0.05 {
-                    "Rejeita H₀ → efeitos individuais presentes (use FE ou RE)"
+                    "Reject H₀ → individual effects present (use FE or RE)"
                 } else {
-                    "Não rejeita H₀ → pooled OLS adequado (sem efeitos individuais)"
+                    "Do not reject H₀ → pooled OLS adequate (no individual effects)"
                 };
 
                 let thick = "═".repeat(62);
                 let thin = "─".repeat(62);
                 let mut out = String::new();
                 out.push_str(&format!("\n{thick}\n"));
-                out.push_str(" Breusch-Pagan LM Test (efeitos individuais)\n");
-                out.push_str(" H₀: σ²_u = 0  (sem efeitos individuais)\n");
+                out.push_str(" Breusch-Pagan LM Test (individual effects)\n");
+                out.push_str(" H₀: σ²_u = 0  (no individual effects)\n");
                 out.push_str(&format!("{thick}\n"));
-                out.push_str("\n── Dados do Painel\n");
+                out.push_str("\n── Panel Data\n");
                 out.push_str(&format!(
                     "   n = {}   N = {}   T̄ ≈ {:.1}\n",
                     n, n_entities, t_bar
                 ));
-                out.push_str("\n── Estatística\n");
+                out.push_str("\n── Statistic\n");
                 out.push_str(&format!(
                     "   LM ~ χ²(1) = {:.4}   p = {:.4}  {}\n",
                     lm, p, sig
                 ));
-                out.push_str("\n── Conclusão\n");
+                out.push_str("\n── Conclusion\n");
                 out.push_str(&format!("   {}\n", verdict));
                 out.push_str(&format!("\n{thin}\n"));
                 out.push_str("   *** p<0.01  ** p<0.05  * p<0.10\n");
@@ -943,12 +943,12 @@ impl Interpreter {
                 Ok(diag(out))
             }
 
-            // ── Chamberlain: correlação period-específica com efeitos individuais
+            // ── Chamberlain: period-specific correlation with individual effects
             "chamberlain" => {
                 // chamberlain(formula, df, id=col, time=col)
-                // H₀: Π_s = 0 para todo s (RE consistente)
-                // H₁: pelo menos um Π_s ≠ 0 (efeitos correlacionados com X — use FE)
-                // Generalização do Mundlak: usa valores em TODOS os períodos, não só a média
+                // H₀: Π_s = 0 for all s (RE consistent)
+                // H₁: at least one Π_s ≠ 0 (effects correlated with X — use FE)
+                // Generalization of Mundlak: uses values in ALL periods, not just the mean
                 let (formula_ast, df, df_name, id_col) = self.extract_panel_args(args, opt_map)?;
                 let time_col = self.get_time_col(&df_name, opt_map)?;
 
@@ -966,7 +966,7 @@ impl Interpreter {
                     floats.iter().map(|&v| v as i64).collect()
                 } else {
                     return Err(HayashiError::Runtime(format!(
-                        "chamberlain: coluna id '{id_col}' not found"
+                        "chamberlain: id column '{id_col}' not found"
                     )));
                 };
 
@@ -976,7 +976,7 @@ impl Interpreter {
                     arr.iter().map(|&v| v as f64).collect()
                 } else {
                     return Err(HayashiError::Runtime(format!(
-                        "chamberlain: coluna time '{time_col}' not found"
+                        "chamberlain: time column '{time_col}' not found"
                     )));
                 };
 
@@ -1002,9 +1002,9 @@ impl Interpreter {
                     ""
                 };
                 let verdict = if p < 0.05 {
-                    "Rejeita H₀ → efeitos individuais correlacionados com X (prefira FE)"
+                    "Reject H₀ → individual effects correlated with X (prefer FE)"
                 } else {
-                    "Não rejeita H₀ → RE consistente (sem correlação period-específica)"
+                    "Do not reject H₀ → RE consistent (no period-specific correlation)"
                 };
 
                 let thick = "═".repeat(70);
@@ -1012,32 +1012,32 @@ impl Interpreter {
                 let mut out = String::new();
                 out.push_str(&format!("\n{thick}\n"));
                 out.push_str(
-                    " Chamberlain Test (correlação period-específica com efeitos individuais)\n",
+                    " Chamberlain Test (period-specific correlation with individual effects)\n",
                 );
-                out.push_str(" H₀: Π_s = 0 ∀s  (RE consistente)\n");
+                out.push_str(" H₀: Π_s = 0 ∀s  (RE consistent)\n");
                 out.push_str(&format!("{thick}\n"));
                 out.push_str(&format!(
-                    "\n── Painel: n={} obs   N={} entidades   T={} períodos\n",
+                    "\n── Panel: n={} obs   N={} entities   T={} periods\n",
                     n_obs, n_entities, t_count
                 ));
-                out.push_str(&format!("   Colunas de augmentação: {} de Chamberlain (k×T, após remover zero-variância)\n", k_active));
+                out.push_str(&format!("   Chamberlain augmentation columns: {} (k×T, after removing zero-variance)\n", k_active));
                 if t_count > 6 {
                     out.push_str(&format!(
-                        "   ⚠ T={} — com T grande o teste tem baixo poder em amostras finitas\n",
+                        "   ⚠ T={} — with large T the test has low power in finite samples\n",
                         t_count
                     ));
                 }
-                out.push_str("\n── Teste conjunto H₀: todos os Π_s = 0\n");
+                out.push_str("\n── Joint test H₀: all Π_s = 0\n");
                 out.push_str(&format!(
                     "   F({}, {}) = {:.4}   p = {:.4}  {}\n",
                     df1, df_denom, f_stat, p, sig
                 ));
-                out.push_str("\n── Conclusão\n");
+                out.push_str("\n── Conclusion\n");
                 out.push_str(&format!("   {}\n", verdict));
                 out.push_str(&format!("\n{thin}\n"));
                 out.push_str("   *** p<0.01  ** p<0.05  * p<0.10\n");
                 out.push_str(
-                    "   Teste mais geral que Mundlak — inclui valores em todos os T períodos\n",
+                    "   More general test than Mundlak — includes values in all T periods\n",
                 );
                 out.push_str(&format!("{thick}\n"));
                 Ok(diag(out))
@@ -1064,7 +1064,7 @@ impl Interpreter {
                     )));
                 };
 
-                // Nomes dos regressores variantes no tempo (excluindo "const")
+                // Names of time-varying regressors (excluding "const")
                 let var_names = df
                     .formula_var_names(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1100,9 +1100,9 @@ impl Interpreter {
                     ""
                 };
                 let verdict = if p < 0.05 {
-                    "Rejeita H₀ → efeitos individuais correlacionados com X (prefira FE)"
+                    "Reject H₀ → individual effects correlated with X (prefer FE)"
                 } else {
-                    "Não rejeita H₀ → RE consistente (sem evidência de correlação com efeitos)"
+                    "Do not reject H₀ → RE consistent (no evidence of correlation with effects)"
                 };
 
                 let thick = "═".repeat(70);
@@ -1110,18 +1110,18 @@ impl Interpreter {
                 let mut out = String::new();
                 out.push_str(&format!("\n{thick}\n"));
                 out.push_str(
-                    " Mundlak Test (correlação entre regressores e efeitos individuais)\n",
+                    " Mundlak Test (correlation between regressors and individual effects)\n",
                 );
-                out.push_str(" H₀: γ = 0  (RE consistente)\n");
+                out.push_str(" H₀: γ = 0  (RE consistent)\n");
                 out.push_str(&format!("{thick}\n"));
                 out.push_str(&format!(
-                    "\n── Painel: n={} obs   N={} entidades   k={} regressores variantes\n",
+                    "\n── Panel: n={} obs   N={} entities   k={} time-varying regressors\n",
                     n, n_entities, k
                 ));
-                out.push_str("\n── Coeficientes sobre médias individuais (X̄_i)\n");
+                out.push_str("\n── Coefficients on individual means (X̄_i)\n");
                 out.push_str(&format!(
                     "   {:<18} {:>10}  {:>10}  {:>8}\n",
-                    "Variável (X̄)", "γ̂", "SE", "t"
+                    "Variable (X̄)", "γ̂", "SE", "t"
                 ));
                 out.push_str(&format!("   {}\n", "─".repeat(52)));
                 for i in 0..k {
@@ -1139,12 +1139,12 @@ impl Interpreter {
                         t_i
                     ));
                 }
-                out.push_str("\n── Teste conjunto H₀: γ = 0\n");
+                out.push_str("\n── Joint test H₀: γ = 0\n");
                 out.push_str(&format!(
                     "   F({}, {}) = {:.4}   p = {:.4}  {}\n",
                     df1, df2_exact, f_stat, p, sig
                 ));
-                out.push_str("\n── Conclusão\n");
+                out.push_str("\n── Conclusion\n");
                 out.push_str(&format!("   {}\n", verdict));
                 out.push_str(&format!("\n{thin}\n"));
                 out.push_str("   *** p<0.01  ** p<0.05  * p<0.10\n");
@@ -1154,8 +1154,8 @@ impl Interpreter {
 
             // ── Arellano-Bond Diff-GMM ────────────────────────────────────────
             // ab(formula, df, id=col, time=col [, lags=2 [, step=1]])
-            // Estima y_it = ρ y_{i,t-1} + X_it'β + α_i + ε_it via Diff-GMM.
-            // Instrumenta Δy_{i,t-1} com y_{i,t-2},...,y_{i,t-lags-1} (collapsed).
+            // Estimates y_it = ρ y_{i,t-1} + X_it'β + α_i + ε_it via Diff-GMM.
+            // Instruments Δy_{i,t-1} with y_{i,t-2},...,y_{i,t-lags-1} (collapsed).
             "ab" => {
                 let (formula_ast, df, df_name, id_col) = self.extract_panel_args(args, opt_map)?;
                 let time_col = self.get_time_col(&df_name, opt_map)?;
@@ -1166,7 +1166,7 @@ impl Interpreter {
                     None => 2,
                     _ => {
                         return Err(HayashiError::Runtime(
-                            "ab(): lags must be integer positivo".into(),
+                            "ab(): lags must be positive integer".into(),
                         ))
                     }
                 };
@@ -1175,7 +1175,7 @@ impl Interpreter {
                     Some(Value::Int(2)) => true,
                     Some(Value::Float(v)) if *v as i64 == 2 => true,
                     Some(Value::Int(_)) | Some(Value::Float(_)) | None => false,
-                    _ => return Err(HayashiError::Runtime("ab(): step deve ser 1 ou 2".into())),
+                    _ => return Err(HayashiError::Runtime("ab(): step must be 1 or 2".into())),
                 };
 
                 let formula_str = Self::formula_to_string(&formula_ast);
@@ -1192,7 +1192,7 @@ impl Interpreter {
                     floats.iter().map(|&v| v as i64).collect()
                 } else {
                     return Err(HayashiError::Runtime(format!(
-                        "ab: coluna id '{id_col}' not found"
+                        "ab: id column '{id_col}' not found"
                     )));
                 };
 
@@ -1202,7 +1202,7 @@ impl Interpreter {
                     floats.iter().map(|&v| v as i64).collect()
                 } else {
                     return Err(HayashiError::Runtime(format!(
-                        "ab: coluna time '{time_col}' not found"
+                        "ab: time column '{time_col}' not found"
                     )));
                 };
 
@@ -1224,7 +1224,7 @@ impl Interpreter {
                 Ok(Value::AbResult(Rc::new(result)))
             }
 
-            // ── GMM genérico (Two-Step Efficient) ────────────────────────────
+            // ── Generic GMM (Two-Step Efficient) ────────────────────────────
             // gmm(endog_formula, instrument_formula, df)
             "gmm" => {
                 if args.len() < 3 {
@@ -1306,8 +1306,8 @@ impl Interpreter {
 
             // ── System GMM (Blundell-Bond 1998) ──────────────────────────────
             // sysgmm(formula, df, id=col, time=col [, lags=2 [, step=1]])
-            // Empilha eq. em 1ª diferença (instrumentadas com níveis defasados)
-            // + eq. em níveis (instrumentadas com Δy_{t-1} e ΔX_{t-1}).
+            // Stacks equations in 1st differences (instrumented with lagged levels)
+            // + equations in levels (instrumented with Δy_{t-1} and ΔX_{t-1}).
             "sysgmm" => {
                 let (formula_ast, df, df_name, id_col) = self.extract_panel_args(args, opt_map)?;
                 let time_col = self.get_time_col(&df_name, opt_map)?;
@@ -1318,7 +1318,7 @@ impl Interpreter {
                     None => 2,
                     _ => {
                         return Err(HayashiError::Runtime(
-                            "sysgmm(): lags must be integer positivo".into(),
+                            "sysgmm(): lags must be positive integer".into(),
                         ))
                     }
                 };
@@ -1329,7 +1329,7 @@ impl Interpreter {
                     Some(Value::Int(_)) | Some(Value::Float(_)) | None => false,
                     _ => {
                         return Err(HayashiError::Runtime(
-                            "sysgmm(): step deve ser 1 ou 2".into(),
+                            "sysgmm(): step must be 1 or 2".into(),
                         ))
                     }
                 };
@@ -1348,7 +1348,7 @@ impl Interpreter {
                     floats.iter().map(|&v| v as i64).collect()
                 } else {
                     return Err(HayashiError::Runtime(format!(
-                        "sysgmm: coluna id '{id_col}' not found"
+                        "sysgmm: id column '{id_col}' not found"
                     )));
                 };
 
@@ -1358,7 +1358,7 @@ impl Interpreter {
                     floats.iter().map(|&v| v as i64).collect()
                 } else {
                     return Err(HayashiError::Runtime(format!(
-                        "sysgmm: coluna time '{time_col}' not found"
+                        "sysgmm: time column '{time_col}' not found"
                     )));
                 };
 
@@ -1382,12 +1382,12 @@ impl Interpreter {
 
             // ── FE-2SLS (xtivreg, fe) — Hausman (1978) ───────────────────────
             // feiv(endog_formula, instrument_formula, df, id=col [, cov=...])
-            // endog_formula: y ~ x1 + x2   (x2 é endógena)
-            // instrument_formula: ~ x1 + z1 + z2  (exógenos incluídos + excluídos)
+            // endog_formula: y ~ x1 + x2   (x2 is endogenous)
+            // instrument_formula: ~ x1 + z1 + z2  (included exogenous + excluded)
             "feiv" => {
                 if args.len() < 3 {
                     return Err(HayashiError::Runtime(
-                        "feiv() requer (formula_estrutural, formula_instrumentos, df, id=col)"
+                        "feiv() requires (structural_formula, instrument_formula, df, id=col)"
                             .into(),
                     ));
                 }
@@ -1398,7 +1398,7 @@ impl Interpreter {
                     Expr::Var(name) => name.clone(),
                     _ => {
                         return Err(HayashiError::Type(
-                            "feiv(): terceiro argumento deve ser nome do DataFrame".into(),
+                            "feiv(): third argument must be the DataFrame name".into(),
                         ))
                     }
                 };
@@ -1415,12 +1415,12 @@ impl Interpreter {
                     Some(Value::Str(s)) => s.clone(),
                     _ => {
                         return Err(HayashiError::Runtime(
-                            "feiv(): opção id=col é obrigatória".into(),
+                            "feiv(): id=col option is required".into(),
                         ))
                     }
                 };
 
-                // fórmula estrutural → y e X (sem constante, FE a absorve)
+                // structural formula → y and X (no constant, FE absorbs it)
                 let endog_str = Self::formula_to_string(&endog_ast);
                 let g_endog = GFormula::parse(&endog_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1428,7 +1428,7 @@ impl Interpreter {
                     .to_design_matrix(&g_endog)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-                // fórmula de instrumentos → Z (sem constante)
+                // instrument formula → Z (no constant)
                 let instr_vars: Vec<String> = instr_ast
                     .rhs
                     .iter()
@@ -1444,14 +1444,14 @@ impl Interpreter {
                 let l = instr_vars.len();
                 if l == 0 {
                     return Err(HayashiError::Runtime(
-                        "feiv(): formula de instrumentos deve ter ao menos um instrumento".into(),
+                        "feiv(): instrument formula must have at least one instrument".into(),
                     ));
                 }
                 let mut z_mat = ndarray::Array2::<f64>::zeros((n, l));
                 for (j, col_name) in instr_vars.iter().enumerate() {
                     let col = df.get(col_name).map_err(|_| {
                         HayashiError::Runtime(format!(
-                            "feiv: instrumento '{col_name}' not found no DataFrame"
+                            "feiv: instrument '{col_name}' not found in DataFrame"
                         ))
                     })?;
                     for (i, &v) in col.iter().enumerate() {
@@ -1466,7 +1466,7 @@ impl Interpreter {
                     floats.iter().map(|&v| v as i64).collect()
                 } else {
                     return Err(HayashiError::Runtime(format!(
-                        "feiv: coluna id '{id_col}' not found"
+                        "feiv: id column '{id_col}' not found"
                     )));
                 };
 
@@ -1518,7 +1518,7 @@ impl Interpreter {
                     None => greeners::GlsPanels::Hetero,
                     _ => {
                         return Err(HayashiError::Runtime(
-                            "xtgls(): panels deve ser \"hetero\" ou \"corr\"".into(),
+                            "xtgls(): panels must be \"hetero\" or \"corr\"".into(),
                         ))
                     }
                 };
@@ -1547,12 +1547,12 @@ impl Interpreter {
                 Ok(Value::PanelGlsResult(Rc::new(result)))
             }
 
-            // ── Arellano-Bond: teste m1/m2 para autocorrelação serial ─────────
+            // ── Arellano-Bond: m1/m2 test for serial autocorrelation ─────────
             "ab_test" => {
                 // ab_test(formula, df, id=col, time=col)
-                // Testa autocorrelação serial nos resíduos da equação em 1ª diferença.
-                // m1: DEVE rejeitar H₀ (FD induz AR(1) por construção)
-                // m2: NÃO deve rejeitar H₀ (valida instrumentos y_{i,t-2} do GMM)
+                // Tests serial autocorrelation in residuals of the first-differenced equation.
+                // m1: MUST reject H₀ (FD induces AR(1) by construction)
+                // m2: MUST NOT reject H₀ (validates GMM instruments y_{i,t-2})
                 let (formula_ast, df, df_name, id_col) = self.extract_panel_args(args, opt_map)?;
                 let time_col = self.get_time_col(&df_name, opt_map)?;
 
@@ -1570,7 +1570,7 @@ impl Interpreter {
                     floats.iter().map(|&v| v as i64).collect()
                 } else {
                     return Err(HayashiError::Runtime(format!(
-                        "ab_test: coluna id '{id_col}' not found"
+                        "ab_test: id column '{id_col}' not found"
                     )));
                 };
 
@@ -1580,7 +1580,7 @@ impl Interpreter {
                     arr.iter().map(|&v| v as f64).collect()
                 } else {
                     return Err(HayashiError::Runtime(format!(
-                        "ab_test: coluna time '{time_col}' not found"
+                        "ab_test: time column '{time_col}' not found"
                     )));
                 };
 
@@ -1618,29 +1618,29 @@ impl Interpreter {
                 let mut out = String::new();
                 out.push_str(&format!("\n{thick}\n"));
                 out.push_str(
-                    " Arellano-Bond Test (autocorrelação serial — resíduos em 1ª diferença)\n",
+                    " Arellano-Bond Test (serial autocorrelation — first-differenced residuals)\n",
                 );
                 out.push_str(&format!("{thick}\n"));
                 out.push_str(&format!(
-                    "\n── Painel: n={} obs   N={} entidades\n",
+                    "\n── Panel: n={} obs   N={} entities\n",
                     n_obs, n_entities
                 ));
-                out.push_str("\n── Estatísticas  z ~ N(0,1)   H₀: sem autocorrelação de ordem p\n");
+                out.push_str("\n── Statistics  z ~ N(0,1)   H₀: no autocorrelation of order p\n");
                 out.push_str(&format!("   {:-^52}\n", ""));
                 out.push_str(&format!(
                     "   {:>4}  {:>10}  {:>10}  {:>6}  {}\n",
-                    "p", "z", "p-valor", "sig", "Interpretação"
+                    "p", "z", "p-value", "sig", "Interpretation"
                 ));
                 out.push_str(&format!("   {:-^52}\n", ""));
                 let interp1 = if p1 < 0.05 {
-                    "OK — FD induz AR(1) (esperado)"
+                    "OK — FD induces AR(1) (expected)"
                 } else {
-                    "Inesperado — verificar modelo"
+                    "Unexpected — check model"
                 };
                 let interp2 = if p2 >= 0.05 {
-                    "OK — instrumentos válidos"
+                    "OK — instruments valid"
                 } else {
-                    "Atenção — AR(2) detectado"
+                    "Warning — AR(2) detected"
                 };
                 out.push_str(&format!(
                     "   {:>4}  {:>10.4}  {:>10.4}  {:>6}  {}\n",
@@ -1659,31 +1659,31 @@ impl Interpreter {
                     interp2
                 ));
                 out.push_str(&format!("   {:-^52}\n", ""));
-                out.push_str("\n── Conclusão\n");
+                out.push_str("\n── Conclusion\n");
                 if p1 < 0.05 && p2 >= 0.05 {
                     out.push_str(
-                        "   m1 rejeita e m2 não rejeita → estrutura consistente com GMM válido\n",
+                        "   m1 rejects and m2 does not reject → structure consistent with valid GMM\n",
                     );
                 } else if p1 >= 0.05 {
                     out.push_str(
-                        "   m1 não rejeita H₀ → checar especificação (AR(1) esperado em FD)\n",
+                        "   m1 does not reject H₀ → check specification (AR(1) expected in FD)\n",
                     );
                 } else {
-                    out.push_str("   m2 rejeita H₀ → AR(2) nos resíduos; instrumentos y_{t-2} podem ser inválidos\n");
+                    out.push_str("   m2 rejects H₀ → AR(2) in residuals; y_{t-2} instruments may be invalid\n");
                     out.push_str(
-                        "   Considere usar lags mais distantes (y_{t-3}, ...) como instrumentos\n",
+                        "   Consider using more distant lags (y_{t-3}, ...) as instruments\n",
                     );
                 }
                 out.push_str(&format!("\n{thin}\n"));
                 out.push_str("   *** p<0.01  ** p<0.05  * p<0.10\n");
                 out.push_str(
-                    "   Variância estimada via sandwich (Σ_i dos produtos cruzados por entidade)\n",
+                    "   Variance estimated via sandwich (Σ_i of cross-products by entity)\n",
                 );
                 out.push_str(&format!("{thick}\n"));
                 Ok(diag(out))
             }
 
-            // ── wooldridge_OLD_REMOVED (substituído pelo novo acima) ──────────
+            // ── wooldridge_OLD_REMOVED (replaced by the new one above) ─────────
             "wooldridge_OLD_REMOVED" => {
                 let (formula_ast, df, df_name, id_col) = self.extract_panel_args(args, opt_map)?;
                 let time_col = self.get_time_col(&df_name, opt_map)?;
@@ -1702,7 +1702,7 @@ impl Interpreter {
                     floats.iter().map(|&v| v as i64).collect()
                 } else {
                     return Err(HayashiError::Runtime(format!(
-                        "wooldridge: coluna id '{id_col}' not found"
+                        "wooldridge: id column '{id_col}' not found"
                     )));
                 };
 
@@ -1712,7 +1712,7 @@ impl Interpreter {
                     arr.iter().map(|&v| v as f64).collect()
                 } else {
                     return Err(HayashiError::Runtime(format!(
-                        "wooldridge: coluna time '{time_col}' not found"
+                        "wooldridge: time column '{time_col}' not found"
                     )));
                 };
 
@@ -1743,35 +1743,35 @@ impl Interpreter {
                     ""
                 };
                 let verdict = if p < 0.05 {
-                    "Rejeita H₀ → autocorrelação serial de 1ª ordem presente"
+                    "Reject H₀ → first-order serial autocorrelation present"
                 } else {
-                    "Não rejeita H₀ → sem evidência de autocorrelação serial"
+                    "Do not reject H₀ → no evidence of serial autocorrelation"
                 };
 
                 let thick = "═".repeat(62);
                 let thin = "─".repeat(62);
                 let mut out = String::new();
                 out.push_str(&format!("\n{thick}\n"));
-                out.push_str(" Wooldridge Test (autocorrelação serial em painel)\n");
-                out.push_str(" H₀: ρ = -0.5  (sem autocorrelação nos erros idiossincráticos)\n");
+                out.push_str(" Wooldridge Test (panel serial autocorrelation)\n");
+                out.push_str(" H₀: ρ = -0.5  (no autocorrelation in idiosyncratic errors)\n");
                 out.push_str(&format!("{thick}\n"));
                 out.push_str(&format!(
-                    "\n── Painel: N={} entidades   pares usados={}   df={}\n",
+                    "\n── Panel: N={} entities   used pairs={}   df={}\n",
                     n_entities, n_pairs, df_t
                 ));
-                out.push_str("\n── Estimativa\n");
+                out.push_str("\n── Estimate\n");
                 out.push_str(&format!("   ρ̂ = {:.4}   (H₀: ρ = -0.500)\n", rho));
-                out.push_str("\n── Estatística\n");
+                out.push_str("\n── Statistic\n");
                 out.push_str(&format!(
                     "   t({}) = {:.4}   p = {:.4}  {}\n",
                     df_t, t_stat, p, sig
                 ));
-                out.push_str("\n── Conclusão\n");
+                out.push_str("\n── Conclusion\n");
                 out.push_str(&format!("   {}\n", verdict));
                 out.push_str(&format!("\n{thin}\n"));
                 out.push_str("   *** p<0.01  ** p<0.05  * p<0.10\n");
                 out.push_str(
-                    "   (SE padrão OLS — use SE robustos clusterizados para inferência formal)\n",
+                    "   (OLS standard SE — use cluster-robust SE for formal inference)\n",
                 );
                 out.push_str(&format!("{thick}\n"));
                 Ok(diag(out))
@@ -1787,7 +1787,7 @@ impl Interpreter {
                     Value::PanelResult(r) => r,
                     _ => {
                         return Err(HayashiError::Type(
-                            "hausman(): primeiro argumento deve ser um modelo FE".into(),
+                            "hausman(): first argument must be an FE model".into(),
                         ))
                     }
                 };
@@ -1795,13 +1795,13 @@ impl Interpreter {
                     Value::ReResult(r) => r,
                     _ => {
                         return Err(HayashiError::Type(
-                            "hausman(): second argument must be um modelo RE".into(),
+                            "hausman(): second argument must be an RE model".into(),
                         ))
                     }
                 };
 
-                // Variáveis comuns: FE não tem intercepto; RE tem.
-                // Alinha por nome quando disponível; senão assume mesma ordem.
+                // Common variables: FE has no intercept; RE has.
+                // Align by name when available; otherwise assume same order.
                 let fe_names: Vec<String> =
                     fe.variable_names.as_ref().cloned().unwrap_or_else(|| {
                         (0..fe.params.len()).map(|i| format!("x{}", i)).collect()
@@ -1812,7 +1812,7 @@ impl Interpreter {
                         (0..re.params.len()).map(|i| format!("x{}", i)).collect()
                     });
 
-                // Pares (β_FE, σ²_FE, β_RE, σ²_RE) para variáveis em comum (exclui intercepto)
+                // Pairs (β_FE, σ²_FE, β_RE, σ²_RE) for common variables (exclude intercept)
                 let mut pairs: Vec<(String, f64, f64, f64, f64)> = Vec::new();
                 for (i, fe_name) in fe_names.iter().enumerate() {
                     if fe_name == "const" {
@@ -1831,12 +1831,12 @@ impl Interpreter {
 
                 if pairs.is_empty() {
                     return Err(HayashiError::Runtime(
-                        "hausman: nenhuma variável comum entre FE e RE (verifique variable_names)"
+                        "hausman: no common variable between FE and RE (check variable_names)"
                             .into(),
                     ));
                 }
 
-                // H = Σ (β_FE - β_RE)² / (σ²_FE - σ²_RE)  para pares onde σ²_FE > σ²_RE
+                // H = Σ (β_FE - β_RE)² / (σ²_FE - σ²_RE)  for pairs where σ²_FE > σ²_RE
                 let mut chi2 = 0.0;
                 let mut df = 0usize;
                 let mut skipped = 0usize;
@@ -1847,12 +1847,12 @@ impl Interpreter {
 
                 out.push_str(&format!("\n{thick}\n"));
                 out.push_str(" Hausman Test: FE vs RE\n");
-                out.push_str(" H₀: efeitos individuais não correlacionados com regressores (RE consistente)\n");
+                out.push_str(" H₀: individual effects uncorrelated with regressors (RE consistent)\n");
                 out.push_str(&format!("{thick}\n"));
-                out.push_str("\n── Coeficientes Comuns\n");
+                out.push_str("\n── Common Coefficients\n");
                 out.push_str(&format!(
                     "   {:<20} {:>10} {:>10} {:>10}\n",
-                    "Variável", "β_FE", "β_RE", "Δβ"
+                    "Variable", "β_FE", "β_RE", "Δβ"
                 ));
                 out.push_str(&format!("   {thin}\n"));
 
@@ -1872,9 +1872,9 @@ impl Interpreter {
                 }
 
                 if df == 0 {
-                    out.push_str("\n   [!] Var(β_FE) ≤ Var(β_RE) em todos os coeficientes.\n");
+                    out.push_str("\n   [!] Var(β_FE) ≤ Var(β_RE) for all coefficients.\n");
                     out.push_str(
-                        "       Estatística indefinida — verifique especificação dos modelos.\n",
+                        "       Statistic undefined — check model specification.\n",
                     );
                     out.push_str(&format!("\n{thick}\n"));
                     return Ok(Some(diag(out)));
@@ -1892,23 +1892,23 @@ impl Interpreter {
                     ""
                 };
                 let verdict = if p < 0.05 {
-                    "Rejeita H₀ → use EFEITOS FIXOS (RE pode ser inconsistente)"
+                    "Reject H₀ → use FIXED EFFECTS (RE may be inconsistent)"
                 } else {
-                    "Não rejeita H₀ → EFEITOS ALEATÓRIOS é consistente e eficiente"
+                    "Do not reject H₀ → RANDOM EFFECTS is consistent and efficient"
                 };
 
-                out.push_str("\n── Estatística\n");
+                out.push_str("\n── Statistic\n");
                 out.push_str(&format!(
                     "   χ²({}) = {:.4}   p = {:.4}  {}\n",
                     df, chi2, p, sig
                 ));
                 if skipped > 0 {
                     out.push_str(&format!(
-                        "   ({} coeficiente(s) excluídos: Var(β_FE) ≤ Var(β_RE))\n",
+                        "   ({} coefficient(s) excluded: Var(β_FE) ≤ Var(β_RE))\n",
                         skipped
                     ));
                 }
-                out.push_str("\n── Conclusão\n");
+                out.push_str("\n── Conclusion\n");
                 out.push_str(&format!("   {}\n", verdict));
                 out.push_str(&format!("\n{thin}\n"));
                 out.push_str("   *** p<0.01  ** p<0.05  * p<0.10\n");
@@ -1916,7 +1916,7 @@ impl Interpreter {
                 Ok(diag(out))
             }
 
-            // ── Diagnósticos ──────────────────────────────────────────────────
+            // ── Diagnostics ──────────────────────────────────────────────────
             "test" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
@@ -1988,7 +1988,7 @@ impl Interpreter {
                         println!("  Conclusion   : {}", verdict);
                     }
 
-                    // ── Wald / F-test sobre coeficientes ─────────────────
+                    // ── Wald / F-test on coefficients ────────────────────
                     other => {
                         let names = ols.result.variable_names.as_ref().ok_or_else(|| {
                             HayashiError::Runtime("model has no variable names".into())
@@ -2013,7 +2013,7 @@ impl Interpreter {
                                 })
                         };
 
-                        // "X1 = X2" ou "X1 = 0.5"
+                        // "X1 = X2" or "X1 = 0.5"
                         if let Some((lhs_s, rhs_s)) = other.split_once('=') {
                             let lhs_name = lhs_s.trim();
                             let rhs_trimmed = rhs_s.trim();
@@ -2147,7 +2147,7 @@ impl Interpreter {
             Expr::Var(n) | Expr::Str(n) => n.clone(),
             _ => {
                 return Err(HayashiError::Type(
-                    "bootstrap: first argument must be nome do estimador (ols, logit, ...)"
+                    "bootstrap: first argument must be estimator name (ols, logit, ...)"
                         .into(),
                 ))
             }
@@ -2157,7 +2157,7 @@ impl Interpreter {
             Expr::Var(n) => n.clone(),
             _ => {
                 return Err(HayashiError::Type(
-                    "bootstrap: third argument must be nome do DataFrame".into(),
+                    "bootstrap: third argument must be DataFrame name".into(),
                 ))
             }
         };
@@ -2182,7 +2182,7 @@ impl Interpreter {
         )?;
         let full_params = extract_params(&full_result).ok_or_else(|| {
             HayashiError::Runtime(
-                "bootstrap: modelo not supportado (sem params extraíveis)".into(),
+                "bootstrap: model not supported (no extractable params)".into(),
             )
         })?;
         let full_se = extract_se(&full_result).unwrap_or_default();
@@ -2222,7 +2222,7 @@ impl Interpreter {
 
         if n_ok < 10 {
             return Err(HayashiError::Runtime(format!(
-                "bootstrap: apenas {n_ok}/{n_boot} replicações convergiram"
+                "bootstrap: only {n_ok}/{n_boot} replications converged"
             )));
         }
 
@@ -2239,7 +2239,7 @@ impl Interpreter {
         println!("{thin}");
         println!(
             "{:<18} {:>10} {:>10} {:>10} {:>12} {:>12}",
-            "Variável", "β̂", "SE orig.", "SE boot", "IC inf", "IC sup"
+            "Variable", "β̂", "Orig. SE", "Boot SE", "CI lower", "CI upper"
         );
         println!("{thin}");
         for i in 0..k {
@@ -2257,7 +2257,7 @@ impl Interpreter {
     fn bootstrap_pairs(&mut self, args: &[Expr], n_boot: usize, alpha: f64) -> Result<Value> {
         if args.is_empty() {
             return Err(HayashiError::Runtime(
-                "bootstrap(estimator, formula, df, n=1000) ou bootse(model, n=1000)".into(),
+                "bootstrap(estimator, formula, df, n=1000) or bootse(model, n=1000)".into(),
             ));
         }
         let model_val = self.eval_expr(&args[0])?;
@@ -2278,7 +2278,7 @@ impl Interpreter {
                 println!("{thin}");
                 println!(
                     "{:<18} {:>10} {:>10} {:>10} {:>12} {:>12}",
-                    "Variável", "β̂", "SE orig.", "SE boot", "IC inf 95%", "IC sup 95%"
+                    "Variable", "β̂", "Orig. SE", "Boot SE", "CI lower 95%", "CI upper 95%"
                 );
                 println!("{thin}");
                 for i in 0..k {
@@ -2297,7 +2297,7 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
             _ => Err(HayashiError::Runtime(
-                "bootse(model) suporta OLS. Para outros: bootstrap(estimator, formula, df, n=1000)"
+                "bootse(model) supports OLS. For others: bootstrap(estimator, formula, df, n=1000)"
                     .into(),
             )),
         }
