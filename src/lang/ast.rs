@@ -243,8 +243,10 @@ pub enum Stmt {
     },
 
     // for var in iter { ... }
+    // for k, v in dict { ... } | for i, v in list { ... }
     For {
         var: String,
+        var2: Option<String>,
         iter: ForIter,
         body: Vec<Spanned>,
     },

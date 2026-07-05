@@ -1074,7 +1074,13 @@ impl Interpreter {
             }
 
             // ── for var in iter { ... } ───────────────────────────────────────
-            Stmt::For { var, iter, body } => {
+            // Also supports: for k, v in dict { ... } and for i, v in list { ... }
+            Stmt::For {
+                var,
+                var2,
+                iter,
+                body,
+            } => {
                 macro_rules! run_body {
                     () => {{
                         let mut do_break = false;
@@ -1157,18 +1163,46 @@ impl Interpreter {
                         }
                     }
                     ForIter::Items(iter_expr) => {
-                        let items = match self.eval_expr(iter_expr)? {
-                            Value::List(v) => (*v).clone(),
+                        let value = self.eval_expr(iter_expr)?;
+                        match value {
+                            Value::List(v) => {
+                                let items = (*v).clone();
+                                if let Some(v2) = var2 {
+                                    for (i, item) in items.into_iter().enumerate() {
+                                        self.env.set(var, Value::Int(i as i64))?;
+                                        self.env.set(v2, item)?;
+                                        if run_body!() {
+                                            break;
+                                        }
+                                    }
+                                } else {
+                                    for item in items {
+                                        self.env.set(var, item)?;
+                                        if run_body!() {
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            Value::Dict(d) => {
+                                let Some(v2) = var2 else {
+                                    return Err(HayashiError::Type(
+                                        "for: dict iteration requires two variables (for k, v in dict)".into(),
+                                    ));
+                                };
+                                let items = (*d).clone();
+                                for (k, v) in items {
+                                    self.env.set(var, Value::Str(k))?;
+                                    self.env.set(v2, v)?;
+                                    if run_body!() {
+                                        break;
+                                    }
+                                }
+                            }
                             other => {
                                 return Err(HayashiError::Type(format!(
-                                    "for: iterator must be a list, not {other}"
+                                    "for: iterator must be a list or dict, not {other}"
                                 )))
-                            }
-                        };
-                        for item in items {
-                            self.env.set(var, item)?;
-                            if run_body!() {
-                                break;
                             }
                         }
                     }

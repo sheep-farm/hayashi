@@ -1299,6 +1299,50 @@ for x in [10, 20, 30] {
 }
 
 #[test]
+fn lang_for_list_indexed() {
+    let (ok, out) = run_inline(
+        r#"
+let s = ""
+for i, v in ["a", "b", "c"] {
+    s = s + str(i) + ":" + v + " "
+}
+print(s)
+"#,
+    );
+    assert!(ok);
+    assert!(out.contains("0:a 1:b 2:c"));
+}
+
+#[test]
+fn lang_for_dict_pairs() {
+    let (ok, out) = run_inline(
+        r#"
+let d = {"x": 10, "y": 20}
+let s = ""
+for k, v in d {
+    s = s + k + "=" + str(v) + " "
+}
+print(s)
+"#,
+    );
+    assert!(ok);
+    assert!(out.contains("x=10") && out.contains("y=20"));
+}
+
+#[test]
+fn lang_for_dict_requires_two_vars() {
+    let (ok, out) = run_inline(
+        r#"
+for v in {"x": 1} {
+    print(v)
+}
+"#,
+    );
+    assert!(!ok);
+    assert!(out.contains("dict iteration requires two variables"));
+}
+
+#[test]
 fn lang_while() {
     assert_ok_contains(
         "while",

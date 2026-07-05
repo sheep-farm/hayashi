@@ -1125,9 +1125,16 @@ impl Parser {
             }
 
             // ── for var in iter { ... } ───────────────────────────────────────
+            // Also supports: for k, v in dict { ... } and for i, v in list { ... }
             Token::For => {
                 self.advance();
                 let var = self.expect_ident()?;
+                let var2 = if self.peek() == &Token::Comma {
+                    self.advance();
+                    Some(self.expect_ident()?)
+                } else {
+                    None
+                };
                 // expects "in"
                 match self.advance().clone() {
                     Token::In => {}
@@ -1140,7 +1147,7 @@ impl Parser {
                 }
                 let iter = self.parse_for_iter()?;
                 let body = self.parse_block()?;
-                Ok(Some(Stmt::For { var, iter, body }))
+                Ok(Some(Stmt::For { var, var2, iter, body }))
             }
 
             // ── fn name(p1, p2) { body } ─────────────────────────────────────
