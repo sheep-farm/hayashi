@@ -1623,10 +1623,16 @@ fn pkg_list() {
                         println!("Installed packages (~/.hay/packages/):\n");
                         found = true;
                     }
+                    let user_s = user.to_string_lossy().to_string();
+                    let repo_s = repo.to_string_lossy().to_string();
+                    let version = read_pkg_metadata(&user_s, &repo_s)
+                        .map(|m| normalize_version(&m.version))
+                        .unwrap_or_else(|| "unknown".into());
                     println!(
-                        "  {}/{}  ({} script file{})",
-                        user.to_string_lossy(),
-                        repo.to_string_lossy(),
+                        "  {}/{}  v{}  ({} script file{})",
+                        user_s,
+                        repo_s,
+                        version,
                         n_hy,
                         if n_hy == 1 { "" } else { "s" }
                     );
@@ -1642,14 +1648,19 @@ fn pkg_list() {
                         println!("Installed packages (~/.hay/packages/):\n");
                         found = true;
                     }
+                    let user_s = user.to_string_lossy().to_string();
                     let clean_name = repo
                         .to_string_lossy()
                         .trim_end_matches(&format!(".{ext}"))
                         .to_string();
+                    let version = read_pkg_metadata(&user_s, &clean_name)
+                        .map(|m| normalize_version(&m.version))
+                        .unwrap_or_else(|| "unknown".into());
                     println!(
-                        "  {}/{}  (native {} plugin)",
-                        user.to_string_lossy(),
+                        "  {}/{}  v{}  (native {} plugin)",
+                        user_s,
                         clean_name,
+                        version,
                         ext
                     );
                 }
@@ -1684,6 +1695,11 @@ fn read_pkg_metadata(user: &str, repo: &str) -> Option<PkgMetadata> {
         }
     }
     None
+}
+
+/// Strip a leading 'v' from version strings so output is consistently `vX.Y.Z`.
+fn normalize_version(v: &str) -> String {
+    v.trim().trim_start_matches('v').to_string()
 }
 
 fn write_pkg_metadata(meta: &PkgMetadata) {
