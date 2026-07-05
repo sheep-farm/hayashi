@@ -355,7 +355,7 @@ fn run() {
             return;
         }
         Some("dist-update") => {
-            dist_update();
+            dist_update(&args_clean[2..]);
             return;
         }
         Some("remove") | Some("uninstall") => {
@@ -475,11 +475,42 @@ fn run_validation(args: &[&str]) {
     std::process::exit(status.code().unwrap_or(1));
 }
 
-/// Checks GitHub for a newer hay release and, if found, downloads and replaces
-/// the current binary in-place.
-fn dist_update() {
-    let current = VERSION;
-    println!("hay dist-update: current version {current}");
+/// Print dist-update subcommand help.
+fn dist_update_help() {
+    println!("Usage: hay dist-update [--help] [--check]");
+    println!();
+    println!("Options:");
+    println!("  --help, -h  Show this help message and exit");
+    println!("  --check     Report whether a newer release is available without");
+    println!("              downloading or replacing the current binary");
+}
+
+/// Check GitHub for the latest release and return the version string if it is
+/// newer than the current one. Returns Ok(None) when already up to date.
+fn check_latest_release() -> Result<Option<String>, String> {
+    let release_url = "https://api.github.com/repos/sheep-farm/hayashi/releases/latest";
+    let release_resp = ureq::get(release_url)
+        .set("User-Agent", "hay")
+        .set("Accept", "application/vnd.github.v3+json")
+        .call()
+        .map_err(|e| format!("cannot fetch latest release: {e}"))?;
+
+    let release_body: String = release_resp.into_string().unwrap_or_default();
+    let release: GhRelease = serde_json::from_str(&release_body)
+        .map_err(|e| format!("cannot parse release payload: {e}"))?;
+
+    let remote_version = release.tag_name.trim_start_matches('v').to_string();
+    if !is_newer_version(&remote_version, VERSION) {
+        return Ok(None);
+    }
+    Ok(Some(remote_version))
+}
+
+/// Download and replace the current binary with the given release version.
+fn dist_update_install(remote_version: &str) {
+    let target = current_target_triple();
+    let (asset_ext, archive_cmd) = dist_asset_kind();
+    let asset_name = format!("hay-v{remote_version}-{target}.{asset_ext}");
 
     let release_url = "https://api.github.com/repos/sheep-farm/hayashi/releases/latest";
     let release_resp = match ureq::get(release_url)
@@ -499,18 +530,6 @@ fn dist_update() {
         eprintln!("hay dist-update: cannot parse release payload: {e}");
         std::process::exit(1);
     });
-
-    let remote_version = release.tag_name.trim_start_matches('v');
-    if !is_newer_version(remote_version, current) {
-        println!("hay dist-update: already up to date (latest {remote_version})");
-        return;
-    }
-
-    println!("hay dist-update: newer release {remote_version} available");
-
-    let target = current_target_triple();
-    let (asset_ext, archive_cmd) = dist_asset_kind();
-    let asset_name = format!("hay-v{remote_version}-{target}.{asset_ext}");
 
     let asset = release
         .assets
@@ -569,7 +588,7 @@ fn dist_update() {
     let _ = std::fs::remove_file(&backup_path);
 
     std::fs::rename(&exe_path, &backup_path).unwrap_or_else(|e| {
-        eprintln!("hay dist-update: cannot backup current binary: {e}");
+        eprintln!("hay dist-update: cannot backup current executable: {e}");
         std::process::exit(1);
     });
 
@@ -595,6 +614,83 @@ fn dist_update() {
         println!("hay dist-update: installed {remote_version}. Run `hay --version` to verify.");
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum DistUpdateMode {
+    Help,
+    Check,
+    Install,
+}
+
+/// Parse dist-update arguments into a safe mode or fail on unknown flags.
+fn parse_dist_update_args(argv: &[&str]) -> Result<DistUpdateMode, String> {
+    if argv.iter().any(|a| *a == "--help" || *a == "-h") {
+        return Ok(DistUpdateMode::Help);
+    }
+
+    let mut check = false;
+    for arg in argv {
+        if *arg == "--check" {
+            check = true;
+        } else if arg.starts_with('-') {
+            return Err(format!("unknown flag '{arg}'"));
+        } else {
+            return Err(format!("unexpected positional argument '{arg}'"));
+        }
+    }
+
+    if check {
+        Ok(DistUpdateMode::Check)
+    } else {
+        Ok(DistUpdateMode::Install)
+    }
+}
+
+/// Parse dist-update arguments and dispatch to help, check, or install mode.
+fn dist_update(argv: &[&str]) {
+    match parse_dist_update_args(argv) {
+        Ok(DistUpdateMode::Help) => {
+            dist_update_help();
+        }
+        Ok(DistUpdateMode::Check) => {
+            println!("hay dist-update: current version {VERSION}");
+            match check_latest_release() {
+                Ok(Some(remote_version)) => {
+                    println!("hay dist-update: newer release {remote_version} available");
+                }
+                Ok(None) => {
+                    println!("hay dist-update: already up to date");
+                }
+                Err(e) => {
+                    eprintln!("hay dist-update: {e}");
+                    std::process::exit(1);
+                }
+            }
+        }
+        Ok(DistUpdateMode::Install) => {
+            println!("hay dist-update: current version {VERSION}");
+            match check_latest_release() {
+                Ok(Some(remote_version)) => {
+                    println!("hay dist-update: newer release {remote_version} available");
+                    dist_update_install(&remote_version);
+                }
+                Ok(None) => {
+                    println!("hay dist-update: already up to date");
+                }
+                Err(e) => {
+                    eprintln!("hay dist-update: {e}");
+                    std::process::exit(1);
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!("hay dist-update: {e}");
+            dist_update_help();
+            std::process::exit(1);
+        }
+    }
+}
+
 
 type Extractor = fn(&std::path::Path, &std::path::Path) -> Result<(), String>;
 
@@ -1637,5 +1733,57 @@ fn current_target_ext() -> &'static str {
         "macos" => "dylib",
         "windows" => "dll",
         _ => "so",
+    }
+}
+
+#[cfg(test)]
+mod dist_update_tests {
+    use super::{parse_dist_update_args, DistUpdateMode};
+
+    #[test]
+    fn parse_empty_returns_install() {
+        assert_eq!(parse_dist_update_args(&[]).unwrap(), DistUpdateMode::Install);
+    }
+
+    #[test]
+    fn parse_help_long() {
+        assert_eq!(
+            parse_dist_update_args(&["--help"]).unwrap(),
+            DistUpdateMode::Help
+        );
+    }
+
+    #[test]
+    fn parse_help_short() {
+        assert_eq!(
+            parse_dist_update_args(&["-h"]).unwrap(),
+            DistUpdateMode::Help
+        );
+    }
+
+    #[test]
+    fn parse_check() {
+        assert_eq!(
+            parse_dist_update_args(&["--check"]).unwrap(),
+            DistUpdateMode::Check
+        );
+    }
+
+    #[test]
+    fn parse_help_wins_over_check() {
+        assert_eq!(
+            parse_dist_update_args(&["--check", "--help"]).unwrap(),
+            DistUpdateMode::Help
+        );
+    }
+
+    #[test]
+    fn parse_unknown_flag_fails() {
+        assert!(parse_dist_update_args(&["--foo"]).is_err());
+    }
+
+    #[test]
+    fn parse_positional_fails() {
+        assert!(parse_dist_update_args(&["nightly"]).is_err());
     }
 }
