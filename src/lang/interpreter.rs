@@ -3935,6 +3935,9 @@ impl Interpreter {
 
             // ── display expr ─────────────────────────────────────────────────
             Stmt::Display(expr) => {
+                eprintln!(
+                    "warning: 'display' is deprecated; use 'print' instead"
+                );
                 let val = self.eval_expr(expr)?;
                 match &val {
                     Value::Float(v) => println!("{v}"),

@@ -127,7 +127,9 @@ let df = {
 
 ### Output control
 
-`quietly on` suppresses automatic output from statements and estimators. `print(...)` and `display ...` still appear. `quietly off` restores normal output. The flag is scope-aware: a toggle inside a block reverts when the block ends.
+`quietly on` suppresses automatic output from statements and estimators. `print(...)` still appears; `display ...` also appears but is deprecated. `quietly off` restores normal output. The flag is scope-aware: a toggle inside a block reverts when the block ends.
+
+> Note: `display` is deprecated. Prefer `print` for explicit output.
 
 ```
 quietly on

@@ -435,7 +435,7 @@ fn legacy_help_text(topic: &str) -> Option<&'static str> {
         "const" => "const name = expr\n  Declare an immutable variable. Cannot be reassigned or redeclared.\n\n  const PI = 3.14159\n  const N = 1000\n",
         "return" => "return [expr]\n  Exit current function and return a value (or Nil).\n  Only valid inside fn bodies.\n\n  fn add(a, b) { return a + b }\n  fn say_hi() { return }\n",
         "print" => "print(expr1 [, expr2, ...] [, sep=\" \"] [, end=\"\\n\"])\n  Print values with separator and line ending.\n\n  print(\"x =\", x, \"y =\", y)          // x = 3.14 y = 42\n  print(\"a\", \"b\", \"c\", sep=\", \")     // a, b, c\n  print(\"no newline\", end=\"\")         // no trailing newline\n  print()                             // empty line\n",
-        "display" | "di" => "display expr\n  Print a scalar value (no parentheses, Stata-style).\n\n  display mean(df, price)\n  display x + y\n",
+        "display" | "di" => "display expr\n  DEPRECATED. Use 'print' instead.\n  Still prints a scalar value (no parentheses, Stata-style), but will be removed.\n\n  print(mean(df, price))\n  print(x + y)\n  display mean(df, price)   // deprecated\n  display x + y             // deprecated\n",
         "scalar" => "scalar name = expr\n  Alias for 'let'.\n\n  scalar mu = mean(df, Y)\n",
         "input" => "input alias\ncol1 col2 col3\n1.0 2.0 3.0\nend\n  Create DataFrame from inline numeric data.\n\n  input df\n  Y X\n  4.0 1.0\n  5.0 2.0\n  end\n",
         "source" => "source(\"script.hay\")\n  Execute another Hayashi script (always re-runs).\n\n  source(\"utils.hay\")\n",

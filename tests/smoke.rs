@@ -8611,7 +8611,7 @@ fn math_integer_division_floor() {
 
 #[test]
 fn math_modulo_negative() {
-    let (ok, out) = run_inline("display -7 % 3");
+    let (ok, out) = run_inline("print(-7 % 3)");
     assert!(ok, "negative modulo failed:\n{out}");
     // resultado pode ser -1 ou 2 dependendo da convenção; só verifica que é determinístico
     assert!(
