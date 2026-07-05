@@ -252,10 +252,12 @@ pub enum Stmt {
         body: Vec<Spanned>,
     },
 
-    // fn nome(p1, p2) { corpo }
+    // fn nome(p1, p2, p3=default) { ## docstring ...; corpo }
     Fn {
         name: String,
         params: Vec<String>,
+        defaults: Vec<Option<Expr>>,
+        doc: Option<String>,
         body: Vec<Spanned>,
     },
 

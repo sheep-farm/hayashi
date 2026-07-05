@@ -6,6 +6,7 @@ pub enum Token {
     Ident(String),
     StringLit(String),
     FStringLit(String),
+    DocString(String),
     Float(f64),
     Int(i64),
     Bool(bool),
@@ -253,8 +254,17 @@ impl Lexer {
                     break;
                 }
                 Some('#') => {
-                    while !matches!(self.peek(), Some('\n') | None) {
-                        self.advance();
+                    if self.peek() == Some('#') {
+                        self.advance(); // segundo #
+                        let mut s = String::new();
+                        while !matches!(self.peek(), Some('\n') | None) {
+                            s.push(self.advance().unwrap());
+                        }
+                        tokens.push((Token::DocString(s.trim().to_string()), line));
+                    } else {
+                        while !matches!(self.peek(), Some('\n') | None) {
+                            self.advance();
+                        }
                     }
                 }
                 Some('\n') => tokens.push((Token::Newline, line)),

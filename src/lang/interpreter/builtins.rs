@@ -245,8 +245,9 @@ impl Interpreter {
                     Value::List(lst) => Ok(Value::Int(lst.len() as i64)),
                     Value::Dict(m) => Ok(Value::Int(m.len() as i64)),
                     Value::Str(s) => Ok(Value::Int(s.chars().count() as i64)),
+                    Value::Series(s) => Ok(Value::Int(s.len() as i64)),
                     _ => Err(HayashiError::Type(
-                        "len() requires list, dict, or string".into(),
+                        "len() requires list, dict, series, or string".into(),
                     )),
                 }
             }
@@ -821,9 +822,29 @@ impl Interpreter {
                         Value::List(lst) => {
                             lst.iter().map(Self::value_as_f64).collect::<Result<_>>()?
                         }
+                        Value::Series(s) => {
+                            if s.is_empty() {
+                                return Err(self.rt_err(format!("{func}(): empty series")));
+                            }
+                            let v = s.numeric_values();
+                            let val = match func {
+                                "sum" | "total" => v.iter().sum::<f64>(),
+                                "mean" => s.mean(),
+                                "min" => s.min(),
+                                "max" => s.max(),
+                                "sd" | "std" => {
+                                    if s.len() < 2 {
+                                        return Err(self.rt_err(format!("{func}(): series needs at least 2 observations")));
+                                    }
+                                    s.sd()
+                                }
+                                _ => unreachable!(),
+                            };
+                            return Ok(Some(Value::Float(val)));
+                        }
                         other => {
                             return Err(self
-                                .type_err(format!("{func}() requires numeric list, got {other}")))
+                                .type_err(format!("{func}() requires numeric list or series, got {other}")))
                         }
                     }
                 } else {
@@ -960,6 +981,62 @@ impl Interpreter {
                 let mean = nums.iter().sum::<f64>() / n as f64;
                 let v = nums.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n - 1) as f64;
                 Ok(Value::Float(v))
+            }
+
+            // ── Series methods (first-class column) ──────────────────────────
+            "first" => {
+                if args.len() != 1 {
+                    return Err(self.rt_err("first(series) requires 1 argument"));
+                }
+                let v = self.eval_expr(&args[0])?;
+                match v {
+                    Value::Series(s) => s.first().ok_or_else(|| self.rt_err("first(): empty series")),
+                    Value::List(lst) => lst.first().cloned().ok_or_else(|| self.rt_err("first(): empty list")),
+                    other => Err(self.type_err(format!("first() requires series or list, got {other}"))),
+                }
+            }
+
+            "last" => {
+                if args.len() != 1 {
+                    return Err(self.rt_err("last(series) requires 1 argument"));
+                }
+                let v = self.eval_expr(&args[0])?;
+                match v {
+                    Value::Series(s) => s.last().ok_or_else(|| self.rt_err("last(): empty series")),
+                    Value::List(lst) => lst.last().cloned().ok_or_else(|| self.rt_err("last(): empty list")),
+                    other => Err(self.type_err(format!("last() requires series or list, got {other}"))),
+                }
+            }
+
+            "shift" => {
+                if args.len() != 2 {
+                    return Err(self.rt_err("shift(series, n) requires 2 arguments"));
+                }
+                let v = self.eval_expr(&args[0])?;
+                let n = match self.eval_expr(&args[1])? {
+                    Value::Int(i) => i,
+                    Value::Float(f) => f as i64,
+                    other => return Err(self.type_err(format!("shift(): n must be integer, got {other}"))),
+                };
+                match v {
+                    Value::Series(s) => Ok(Value::Series(Rc::new(s.shift(n)))),
+                    Value::List(lst) => {
+                        let shifted = if n > 0 {
+                            let mut v = vec![Value::Nil; n as usize];
+                            v.extend_from_slice(&lst[..lst.len().saturating_sub(n as usize)]);
+                            v
+                        } else if n < 0 {
+                            let n_abs = (-n) as usize;
+                            let mut v = lst[n_abs.min(lst.len())..].to_vec();
+                            v.extend(vec![Value::Nil; n_abs.min(lst.len())]);
+                            v
+                        } else {
+                            lst.to_vec()
+                        };
+                        Ok(Value::List(Rc::new(shifted)))
+                    }
+                    other => Err(self.type_err(format!("shift() requires series or list, got {other}"))),
+                }
             }
 
             "quantile" => {

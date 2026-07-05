@@ -308,10 +308,20 @@ impl Interpreter {
                 } else {
                     match crate::lang::help::help_text(&topic) {
                         Some(h) => println!("{h}"),
-                        None => println!(
-                            "help: '{}' not documented. Type help() for full list.",
-                            topic
-                        ),
+                        None => {
+                            if let Some(Value::UserFn(uf)) = self.env.get(&topic) {
+                                if let Some(doc) = &uf.doc {
+                                    println!("fn {}({})\n{}", topic, uf.params.join(", "), doc);
+                                } else {
+                                    println!("fn {}({})\n  (no docstring)", topic, uf.params.join(", "));
+                                }
+                            } else {
+                                println!(
+                                    "help: '{}' not documented. Type help() for full list.",
+                                    topic
+                                );
+                            }
+                        }
                     }
                 }
                 Ok(Value::Nil)

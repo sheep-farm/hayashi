@@ -799,8 +799,23 @@ impl Parser {
     // ── Bloco { stmt* } ───────────────────────────────────────────────────────
 
     fn parse_block(&mut self) -> Result<Vec<Spanned>> {
+        let (_, stmts) = self.parse_block_with_doc()?;
+        Ok(stmts)
+    }
+
+    fn parse_block_with_doc(&mut self) -> Result<(Option<String>, Vec<Spanned>)> {
         self.expect(&Token::LBrace)?;
         self.skip_newlines();
+        let mut doc = None;
+        while let Token::DocString(s) = self.peek() {
+            let s = s.clone();
+            self.advance();
+            self.skip_newlines();
+            doc = Some(match doc {
+                Some(prev) => format!("{}\n{}", prev, s),
+                None => s,
+            });
+        }
         let mut stmts = Vec::new();
         while !matches!(self.peek(), Token::RBrace | Token::Eof) {
             let line = self.line();
@@ -810,7 +825,7 @@ impl Parser {
             self.skip_newlines();
         }
         self.expect(&Token::RBrace)?;
-        Ok(stmts)
+        Ok((doc, stmts))
     }
 
     // ── Bloco expressão: { stmt; ...; expr } ───────────────────────────────────
@@ -1093,15 +1108,24 @@ impl Parser {
                 let name = self.expect_ident()?;
                 self.expect(&Token::LParen)?;
                 let mut params = Vec::new();
+                let mut defaults = Vec::new();
                 while !matches!(self.peek(), Token::RParen | Token::Eof) {
-                    params.push(self.expect_ident()?);
+                    let param = self.expect_ident()?;
+                    let default = if self.peek() == &Token::Eq {
+                        self.advance();
+                        Some(self.parse_expr()?)
+                    } else {
+                        None
+                    };
+                    params.push(param);
+                    defaults.push(default);
                     if self.peek() == &Token::Comma {
                         self.advance();
                     }
                 }
                 self.expect(&Token::RParen)?;
-                let body = self.parse_block()?;
-                Ok(Some(Stmt::Fn { name, params, body }))
+                let (doc, body) = self.parse_block_with_doc()?;
+                Ok(Some(Stmt::Fn { name, params, defaults, doc, body }))
             }
 
             // ── return [expr] ─────────────────────────────────────────────────

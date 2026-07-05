@@ -294,7 +294,72 @@ impl std::fmt::Display for FactorModel {
 #[derive(Debug, Clone)]
 pub struct UserFn {
     pub params: Vec<String>,
+    pub defaults: Vec<Option<Expr>>,
+    pub doc: Option<String>,
     pub body: Vec<Spanned>,
+}
+
+/// Erro estruturado exposto ao usuário em `try { ... } catch e { ... }`.
+/// `e.kind`, `e.msg` e `e.line` são acessíveis como campos de um dict.
+#[derive(Debug, Clone)]
+pub struct ErrorValue {
+    pub kind: String,
+    pub msg: String,
+    pub line: i64,
+}
+
+impl ErrorValue {
+    fn from_hayashi_error(e: &HayashiError, current_line: usize) -> Self {
+        let (kind, msg) = match e {
+            HayashiError::Lex { msg, .. } => ("lex", msg.clone()),
+            HayashiError::Parse { msg, .. } => ("parse", msg.clone()),
+            HayashiError::Type(m) => ("type", m.clone()),
+            HayashiError::Runtime(m) => ("runtime", m.clone()),
+            HayashiError::Annotated(m) => ("annotated", m.clone()),
+            HayashiError::Io(m) => ("io", m.clone()),
+            HayashiError::Return | HayashiError::Break | HayashiError::Continue => {
+                ("control", e.to_string())
+            }
+        };
+        let line = match Self::extract_line(&msg) {
+            0 => current_line as i64,
+            n => n,
+        };
+        let msg = Self::strip_line_prefix(&msg);
+        Self {
+            kind: kind.into(),
+            msg,
+            line,
+        }
+    }
+
+    fn extract_line(msg: &str) -> i64 {
+        // formatos: "line N: ..." ou "Lexer error at line N: ..."
+        if let Some(pos) = msg.find("line ") {
+            let rest = &msg[pos + 5..];
+            let num: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+            if !num.is_empty() {
+                return num.parse().unwrap_or(0);
+            }
+        }
+        0
+    }
+
+    fn strip_line_prefix(msg: &str) -> String {
+        if let Some(pos) = msg.find("line ") {
+            let rest = &msg[pos + 5..];
+            if let Some(colon) = rest.find(": ") {
+                let line_num_len = rest[..colon]
+                    .chars()
+                    .take_while(|c| c.is_ascii_digit())
+                    .count();
+                if line_num_len == colon {
+                    return rest[colon + 2..].to_string();
+                }
+            }
+        }
+        msg.to_string()
+    }
 }
 
 // ── Resultado de testes de diagnóstico (print-on-demand) ─────────────────────
@@ -339,6 +404,104 @@ impl std::fmt::Display for ThreeSLSModel {
 }
 
 // ── Valores em runtime ────────────────────────────────────────────────────────
+
+/// Series: coluna de um DataFrame como cidadão de primeira classe.
+#[derive(Clone)]
+pub struct Series {
+    pub name: String,
+    pub values: Vec<Value>,
+}
+
+impl Series {
+    pub fn new(name: impl Into<String>, values: Vec<Value>) -> Self {
+        Self {
+            name: name.into(),
+            values,
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.values.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
+
+    pub fn first(&self) -> Option<Value> {
+        self.values.first().cloned()
+    }
+
+    pub fn last(&self) -> Option<Value> {
+        self.values.last().cloned()
+    }
+
+    pub fn numeric_values(&self) -> Vec<f64> {
+        self.values
+            .iter()
+            .filter_map(|v| match v {
+                Value::Float(x) => Some(*x),
+                Value::Int(x) => Some(*x as f64),
+                _ => None,
+            })
+            .collect()
+    }
+
+    pub fn mean(&self) -> f64 {
+        let v = self.numeric_values();
+        if v.is_empty() {
+            f64::NAN
+        } else {
+            v.iter().sum::<f64>() / v.len() as f64
+        }
+    }
+
+    pub fn sd(&self) -> f64 {
+        let v = self.numeric_values();
+        if v.len() < 2 {
+            f64::NAN
+        } else {
+            let m = v.iter().sum::<f64>() / v.len() as f64;
+            let ss = v.iter().map(|x| (x - m).powi(2)).sum::<f64>();
+            (ss / (v.len() - 1) as f64).sqrt()
+        }
+    }
+
+    pub fn min(&self) -> f64 {
+        let v = self.numeric_values();
+        if v.is_empty() {
+            f64::NAN
+        } else {
+            v.iter().fold(f64::INFINITY, |a, &b| a.min(b))
+        }
+    }
+
+    pub fn max(&self) -> f64 {
+        let v = self.numeric_values();
+        if v.is_empty() {
+            f64::NAN
+        } else {
+            v.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b))
+        }
+    }
+
+    pub fn shift(&self, n: i64) -> Series {
+        let len = self.values.len();
+        let n_abs = n.abs() as usize;
+        let fill = Value::Nil;
+        let mut shifted = Vec::with_capacity(len);
+        if n > 0 {
+            shifted.extend(std::iter::repeat(fill).take(n_abs));
+            shifted.extend(self.values[..len.saturating_sub(n_abs)].iter().cloned());
+        } else if n < 0 {
+            shifted.extend(self.values[n_abs.min(len)..].iter().cloned());
+            shifted.extend(std::iter::repeat(fill).take(n_abs.min(len)));
+        } else {
+            shifted = self.values.clone();
+        }
+        Series::new(self.name.clone(), shifted)
+    }
+}
 
 #[derive(Clone)]
 pub enum Value {
@@ -408,7 +571,9 @@ pub enum Value {
     ArdlResult(Rc<greeners::ARDLResult>),
     List(Rc<Vec<Value>>),
     Dict(Rc<std::collections::HashMap<String, Value>>),
+    Series(Rc<Series>),
     UserFn(Rc<UserFn>),
+    Error(Rc<ErrorValue>),
     Nil,
 }
 
@@ -501,7 +666,28 @@ impl std::fmt::Display for Value {
                 }
                 write!(f, "}}")
             }
+            Value::Series(s) => {
+                write!(f, "Series({}: [", s.name)?;
+                for (i, v) in s.values.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    if i >= 5 && s.values.len() > 10 {
+                        write!(f, "... ({} items)", s.values.len() - 10)?;
+                        break;
+                    }
+                    write!(f, "{v}")?;
+                }
+                write!(f, "])")
+            }
             Value::UserFn(f_) => write!(f, "<fn({})>", f_.params.join(", ")),
+            Value::Error(e) => {
+                write!(f, "Error({}: {}", e.kind, e.msg)?;
+                if e.line > 0 {
+                    write!(f, " at line {}", e.line)?;
+                }
+                write!(f, ")")
+            }
             Value::Nil => write!(f, "nil"),
         }
     }
@@ -681,6 +867,9 @@ const BUILTIN_NAMES: &[&str] = &[
     "str",
     "bool",
     "len",
+    "first",
+    "last",
+    "shift",
     "typeof",
     "ols",
     "iv",
@@ -928,6 +1117,7 @@ impl Interpreter {
             Value::Dict(_) => "Dict",
             Value::DataFrame(_) => "DataFrame",
             Value::UserFn(_) => "Function",
+            Value::Error(_) => "Error",
             Value::OlsResult(_) => "OlsResult",
             Value::IvResult(_) => "IvResult",
             Value::PenalizedResult(_) => "PenalizedResult",
@@ -1039,9 +1229,27 @@ impl Interpreter {
     fn call_value_fn(&mut self, f: &Value, args: &[Value]) -> Result<Value> {
         match f {
             Value::UserFn(uf) => {
+                if args.len() > uf.params.len() {
+                    return Err(self.rt_err(format!(
+                        "function expects at most {} arguments, got {}",
+                        uf.params.len(),
+                        args.len()
+                    )));
+                }
                 self.env.push_scope();
                 for (param, val) in uf.params.iter().zip(args.iter()) {
                     self.env.declare_const(param, val.clone());
+                }
+                for i in args.len()..uf.params.len() {
+                    let param = &uf.params[i];
+                    let val = if let Some(default_expr) = &uf.defaults[i] {
+                        self.eval_expr(default_expr)?
+                    } else {
+                        return Err(self.rt_err(format!(
+                            "missing required argument '{param}'"
+                        )));
+                    };
+                    self.env.declare_const(param, val);
                 }
                 let body = uf.body.clone();
                 let mut ret = Value::Nil;
@@ -1404,6 +1612,8 @@ impl Interpreter {
 
             Expr::Closure { params, body } => Ok(Value::UserFn(Rc::new(UserFn {
                 params: params.clone(),
+                defaults: vec![None; params.len()],
+                doc: None,
                 body: vec![(Stmt::Return(Some(*body.clone())), 0)],
             }))),
 
@@ -1574,6 +1784,23 @@ impl Interpreter {
                     (Value::Dict(_), _) => {
                         Err(HayashiError::Type("dict index must be a string".into()))
                     }
+                    (Value::Error(e), Value::Str(key)) => {
+                        let v = match key.as_str() {
+                            "kind" => Value::Str(e.kind.clone()),
+                            "msg" => Value::Str(e.msg.clone()),
+                            "message" => Value::Str(e.msg.clone()),
+                            "line" => Value::Int(e.line),
+                            _ => {
+                                return Err(HayashiError::Runtime(format!(
+                                    "error field '{key}' not found (available: kind, msg, line)"
+                                )))
+                            }
+                        };
+                        Ok(v)
+                    }
+                    (Value::Error(_), _) => {
+                        Err(HayashiError::Type("error index must be a string".into()))
+                    }
                     (Value::DataFrame(df), Value::Str(key)) => {
                         let col = df.get_column(key).map_err(|_| {
                             HayashiError::Runtime(format!("column '{key}' not found in DataFrame"))
@@ -1602,11 +1829,28 @@ impl Interpreter {
                                 arr.iter().map(|dt| Value::Str(dt.to_string())).collect()
                             }
                         };
-                        Ok(Value::List(Rc::new(vals)))
+                        Ok(Value::Series(Rc::new(Series::new(key.clone(), vals))))
                     }
                     (Value::DataFrame(_), _) => Err(HayashiError::Type(
                         "DataFrame column index must be a string".into(),
                     )),
+                    (Value::Series(s), _) => {
+                        let i = match idx_val {
+                            Value::Int(i) => i,
+                            Value::Float(f) => f as i64,
+                            _ => {
+                                return Err(HayashiError::Type("series index must be integer".into()))
+                            }
+                        };
+                        let len = s.len() as i64;
+                        let real = if i < 0 { len + i } else { i };
+                        if real < 0 || real >= len {
+                            return Err(HayashiError::Runtime(format!(
+                                "index out of range (len={len})"
+                            )));
+                        }
+                        Ok(s.values[real as usize].clone())
+                    }
                     (Value::List(v), _) => {
                         let i = match idx_val {
                             Value::Int(i) => i,
@@ -1956,9 +2200,9 @@ impl Interpreter {
                 }
             };
 
-            if args.len() != user_fn.params.len() {
+            if args.len() > user_fn.params.len() {
                 return Err(HayashiError::Runtime(format!(
-                    "fn '{other}': esperado {} argumento(s), recebido {}",
+                    "fn '{other}': esperado no máximo {} argumento(s), recebido {}",
                     user_fn.params.len(),
                     args.len()
                 )));
@@ -1972,7 +2216,18 @@ impl Interpreter {
 
             self.call_stack.push((other.to_string(), self.current_line));
             self.env.push_scope();
-            for (param, val) in user_fn.params.iter().zip(arg_vals) {
+            for (param, val) in user_fn.params.iter().zip(arg_vals.iter()) {
+                self.env.declare_const(param, val.clone());
+            }
+            for i in arg_vals.len()..user_fn.params.len() {
+                let param = &user_fn.params[i];
+                let val = if let Some(default_expr) = &user_fn.defaults[i] {
+                    self.eval_expr(default_expr)?
+                } else {
+                    return Err(HayashiError::Runtime(format!(
+                        "fn '{other}': missing required argument '{param}'"
+                    )));
+                };
                 self.env.declare_const(param, val);
             }
 
@@ -4652,15 +4907,15 @@ impl Interpreter {
                             return Err(HayashiError::Return);
                         }
                         Err(e) => {
-                            caught = Some(format!("{e}"));
+                            caught = Some(ErrorValue::from_hayashi_error(&e, self.current_line));
                             break;
                         }
                     }
                 }
                 self.env.pop_scope();
-                if let Some(err_msg) = caught {
+                if let Some(err) = caught {
                     self.env.push_scope();
-                    self.env.declare(error_var, Value::Str(err_msg))?;
+                    self.env.declare(error_var, Value::Error(Rc::new(err)))?;
                     for s in catch_body {
                         self.exec(s)?;
                     }
@@ -4771,11 +5026,13 @@ impl Interpreter {
             }
 
             // ── fn nome(params) { corpo } ────────────────────────────────────
-            Stmt::Fn { name, params, body } => {
+            Stmt::Fn { name, params, defaults, doc, body } => {
                 self.env.set(
                     name,
                     Value::UserFn(Rc::new(UserFn {
                         params: params.clone(),
+                        defaults: defaults.clone(),
+                        doc: doc.clone(),
                         body: body.clone(),
                     })),
                 )?;
