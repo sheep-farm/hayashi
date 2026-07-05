@@ -334,10 +334,11 @@ fn run() {
         }
         Some("install") => {
             let pkg = args_clean.get(2).unwrap_or_else(|| {
-                eprintln!("Usage: hay install user/repo [-y]");
+                eprintln!("Usage: hay install user/repo [version] [-y]");
                 std::process::exit(1);
             });
-            pkg_install_internal(pkg, yes);
+            let version = args_clean.get(3).copied();
+            pkg_install_internal(pkg, version, yes);
             return;
         }
         Some("update") => {
@@ -978,16 +979,27 @@ fn is_pkg_installed(user: &str, repo: &str) -> Option<std::path::PathBuf> {
 
 #[allow(dead_code)]
 fn pkg_install(spec: &str) {
-    pkg_install_internal(spec, false);
+    pkg_install_internal(spec, None, false);
 }
 
-fn pkg_install_internal(spec: &str, force_overwrite: bool) {
+fn pkg_install_internal(spec: &str, version: Option<&str>, force_overwrite: bool) {
     let (user, repo) = if let Some(pos) = spec.find('/') {
         (&spec[..pos], &spec[pos + 1..])
     } else {
         eprintln!("hay install: expected 'user/repo', got '{spec}'");
         std::process::exit(1);
     };
+
+    let version_tag = version.and_then(|v| {
+        let trimmed = v.trim();
+        if trimmed.is_empty() || trimmed == "latest" {
+            None
+        } else if trimmed.starts_with('v') {
+            Some(trimmed.to_string())
+        } else {
+            Some(format!("v{trimmed}"))
+        }
+    });
 
     if !force_overwrite {
         if let Some(installed_path) = is_pkg_installed(user, repo) {
@@ -1059,7 +1071,10 @@ fn pkg_install_internal(spec: &str, force_overwrite: bool) {
     let n_hy = files.iter().filter(|e| e.name.ends_with(".hay")).count();
     if n_hy == 0 {
         println!("No .hay scripts found. Checking for native/WASM releases...");
-        let release_url = format!("https://api.github.com/repos/{user}/{repo}/releases/latest");
+        let release_url = match &version_tag {
+            Some(tag) => format!("https://api.github.com/repos/{user}/{repo}/releases/tags/{tag}"),
+            None => format!("https://api.github.com/repos/{user}/{repo}/releases/latest"),
+        };
 
         let release_resp = match ureq::get(&release_url)
             .set("User-Agent", "hay")
@@ -1068,9 +1083,15 @@ fn pkg_install_internal(spec: &str, force_overwrite: bool) {
         {
             Ok(r) => r,
             Err(e) => {
-                eprintln!(
-                    "hay install: no scripts or native releases found for {user}/{repo}: {e}"
-                );
+                if let Some(tag) = &version_tag {
+                    eprintln!(
+                        "hay install: release {tag} not found for {user}/{repo}: {e}"
+                    );
+                } else {
+                    eprintln!(
+                        "hay install: no scripts or native releases found for {user}/{repo}: {e}"
+                    );
+                }
                 std::process::exit(1);
             }
         };
@@ -1480,7 +1501,7 @@ fn pkg_update(spec_opt: Option<&str>, auto_confirm: bool) {
                 };
 
                 if confirm {
-                    pkg_install_internal(spec, true);
+                    pkg_install_internal(spec, None, true);
                 } else {
                     println!("Update cancelled.");
                 }
@@ -1502,7 +1523,7 @@ fn pkg_update(spec_opt: Option<&str>, auto_confirm: bool) {
                     }
                 };
                 if confirm {
-                    pkg_install_internal(spec, true);
+                    pkg_install_internal(spec, None, true);
                 } else {
                     println!("Update cancelled.");
                 }
@@ -1541,7 +1562,7 @@ fn pkg_update(spec_opt: Option<&str>, auto_confirm: bool) {
                             }
                         };
                         if confirm {
-                            pkg_install_internal(&format!("{}/{}", meta.user, meta.repo), true);
+                            pkg_install_internal(&format!("{}/{}", meta.user, meta.repo), None, true);
                         }
                     }
                 }
@@ -1565,7 +1586,7 @@ fn pkg_update(spec_opt: Option<&str>, auto_confirm: bool) {
                         }
                     };
                     if confirm {
-                        pkg_install_internal(&format!("{}/{}", meta.user, meta.repo), true);
+                        pkg_install_internal(&format!("{}/{}", meta.user, meta.repo), None, true);
                     }
                 }
             }
@@ -1658,10 +1679,7 @@ fn pkg_list() {
                         .unwrap_or_else(|| "unknown".into());
                     println!(
                         "  {}/{}  v{}  (native {} plugin)",
-                        user_s,
-                        clean_name,
-                        version,
-                        ext
+                        user_s, clean_name, version, ext
                     );
                 }
             }

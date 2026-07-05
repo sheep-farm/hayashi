@@ -24,6 +24,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   - `interpreter.rs` reduced from ~4,800 lines to ~680 lines.
 - **`for` loop index/value binding**: `for i, v in list { ... }` binds the element index to `i` and the value to `v`. `for k, v in dict { ... }` binds each key/value pair. Dict iteration requires two variables.
 - **`try/catch/finally`**: `finally { ... }` block now runs regardless of whether the try succeeded, failed, or executed `return`/`break`/`continue`. Errors or control flow inside `finally` take precedence.
+- **`hay install` with version**: `hay install user/repo [version]` installs a specific release. `version` may be `latest`, `v1.2.3`, or `1.2.3`.
+- **`hay list` shows versions**: installed plugins now display their version from `.metadata.json`.
 
 ### Changed
 
