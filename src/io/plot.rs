@@ -1,7 +1,6 @@
-use plotters::prelude::*;
-
 pub struct Plot;
 
+#[cfg(feature = "plotters")]
 impl Plot {
     #[allow(clippy::too_many_arguments)]
     pub fn scatter(
@@ -14,6 +13,7 @@ impl Plot {
         width: u32,
         height: u32,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        use plotters::prelude::*;
         let root = SVGBackend::new(path, (width, height)).into_drawing_area();
         root.fill(&WHITE)?;
 
@@ -57,6 +57,7 @@ impl Plot {
         width: u32,
         height: u32,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        use plotters::prelude::*;
         let root = SVGBackend::new(path, (width, height)).into_drawing_area();
         root.fill(&WHITE)?;
 
@@ -100,6 +101,7 @@ impl Plot {
         height: u32,
         n_bins: usize,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        use plotters::prelude::*;
         let clean: Vec<f64> = vals.iter().filter(|v| v.is_finite()).copied().collect();
         if clean.is_empty() {
             return Ok(());
@@ -152,6 +154,7 @@ impl Plot {
         width: u32,
         height: u32,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        use plotters::prelude::*;
         let k = coefs.len();
         if k == 0 {
             return Ok(());
@@ -212,6 +215,68 @@ impl Plot {
     }
 }
 
+#[cfg(not(feature = "plotters"))]
+impl Plot {
+    fn disabled() -> Result<(), Box<dyn std::error::Error>> {
+        Err("plotters feature is not enabled".into())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn scatter(
+        _: &[f64],
+        _: &[f64],
+        _: &str,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: u32,
+        _: u32,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        Self::disabled()
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn line(
+        _: &[f64],
+        _: &[f64],
+        _: &str,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: u32,
+        _: u32,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        Self::disabled()
+    }
+
+    pub fn histogram(
+        _: &[f64],
+        _: &str,
+        _: &str,
+        _: &str,
+        _: u32,
+        _: u32,
+        _: usize,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        Self::disabled()
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn coefplot(
+        _: &[String],
+        _: &[f64],
+        _: &[f64],
+        _: &[f64],
+        _: &str,
+        _: &str,
+        _: u32,
+        _: u32,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        Self::disabled()
+    }
+}
+
+#[cfg(feature = "plotters")]
 fn min_max(v: &[f64]) -> (f64, f64) {
     let clean: Vec<f64> = v.iter().filter(|x| x.is_finite()).copied().collect();
     if clean.is_empty() {

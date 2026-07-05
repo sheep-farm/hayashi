@@ -210,13 +210,18 @@ impl Interpreter {
                     || resolved.ends_with(".dylib");
 
                 if is_wasm {
-                    use crate::lang::plugin::WasmPlugin;
-                    let plugin = WasmPlugin::new(&resolved, &ns).map_err(|e| {
-                        self.rt_err(format!("import: failed to load WASM plugin: {e}"))
-                    })?;
-                    self.plugins.insert(ns.clone(), Box::new(plugin));
-                    self.imported.insert(module.clone());
-                    return Ok(Some(Value::Nil));
+                    #[cfg(not(feature = "wasm"))]
+                    return Err(self.rt_err("import: WASM plugins require 'wasm' feature"));
+                    #[cfg(feature = "wasm")]
+                    {
+                        use crate::lang::plugin::WasmPlugin;
+                        let plugin = WasmPlugin::new(&resolved, &ns).map_err(|e| {
+                            self.rt_err(format!("import: failed to load WASM plugin: {e}"))
+                        })?;
+                        self.plugins.insert(ns.clone(), Box::new(plugin));
+                        self.imported.insert(module.clone());
+                        return Ok(Some(Value::Nil));
+                    }
                 } else if is_native {
                     use crate::lang::plugin::RustNativePlugin;
                     let plugin = RustNativePlugin::new(&resolved, &ns).map_err(|e| {

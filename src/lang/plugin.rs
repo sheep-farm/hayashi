@@ -515,6 +515,7 @@ impl HayashiPlugin for RustNativePlugin {
 // WebAssembly Plugin Implementation (using wasmi)
 // =============================================================================
 
+#[cfg(feature = "wasm")]
 pub struct WasmPlugin {
     #[allow(dead_code)]
     name: String,
@@ -522,6 +523,7 @@ pub struct WasmPlugin {
     instance: wasmi::Instance,
 }
 
+#[cfg(feature = "wasm")]
 impl WasmPlugin {
     pub fn new(path: &str, name: &str) -> Result<Self, String> {
         let wasm_bytes = std::fs::read(path).map_err(|e| e.to_string())?;
@@ -545,6 +547,7 @@ impl WasmPlugin {
     }
 }
 
+#[cfg(feature = "wasm")]
 impl HayashiPlugin for WasmPlugin {
     fn name(&self) -> &str {
         &self.name

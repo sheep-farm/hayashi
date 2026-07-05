@@ -478,10 +478,17 @@ impl Parser {
                     self.brace_depth += 1;
                     let mut pairs = Vec::new();
                     while !matches!(self.peek(), Token::RBrace | Token::Eof) {
+                        self.skip_newlines();
+                        if matches!(self.peek(), Token::RBrace | Token::Eof) {
+                            break;
+                        }
                         let key = self.parse_expr()?;
+                        self.skip_newlines();
                         self.expect(&Token::Colon)?;
+                        self.skip_newlines();
                         let val = self.parse_expr()?;
                         pairs.push((key, val));
+                        self.skip_newlines();
                         if self.peek() == &Token::Comma {
                             self.advance();
                         }
@@ -842,9 +849,32 @@ impl Parser {
     // ── Bloco expressão: { stmt; ...; expr } ───────────────────────────────────
 
     fn is_dict_literal(&mut self) -> bool {
-        // Olha à frente do LBrace atual: {"key": ...} começa com StringLit seguido de ':'.
-        matches!(self.tokens.get(self.pos + 1).map(|t| &t.0), Some(Token::StringLit(_)))
-            && self.tokens.get(self.pos + 2).map(|t| &t.0) == Some(&Token::Colon)
+        // Olha à frente do LBrace atual, pulando newlines e docstrings.
+        // {} é dict vazio. {"key": ...} ou {\n  "key": ...} é dict literal.
+        let mut i = self.pos + 1;
+        while let Some((tok, _)) = self.tokens.get(i) {
+            match tok {
+                Token::Newline | Token::DocString(_) => i += 1,
+                Token::RBrace => return true, // {} ou { /* docstrings */ }
+                Token::StringLit(_) => {
+                    if let Some((Token::Colon, _)) = self.tokens.get(i + 1) {
+                        return true;
+                    }
+                    // Se houver newline entre StringLit e Colon, avança mais.
+                    let mut j = i + 1;
+                    while let Some((tok_j, _)) = self.tokens.get(j) {
+                        match tok_j {
+                            Token::Newline => j += 1,
+                            Token::Colon => return true,
+                            _ => break,
+                        }
+                    }
+                    return false;
+                }
+                _ => return false,
+            }
+        }
+        false
     }
 
     fn parse_block_expr(&mut self) -> Result<Expr> {
