@@ -57,7 +57,7 @@ impl Interpreter {
                     _ => format!("ACF — {var_name}"),
                 };
                 let clean: Vec<f64> = data.iter().cloned().filter(|v| !v.is_nan()).collect();
-                Self::ascii_acf(&clean, max_lag, &title, width, false);
+                ascii_acf(&clean, max_lag, &title, width, false);
                 Ok(Value::Nil)
             }
 
@@ -104,7 +104,7 @@ impl Interpreter {
                     _ => format!("PACF — {var_name}"),
                 };
                 let clean: Vec<f64> = data.iter().cloned().filter(|v| !v.is_nan()).collect();
-                Self::ascii_acf(&clean, max_lag, &title, width, true);
+                ascii_acf(&clean, max_lag, &title, width, true);
                 Ok(Value::Nil)
             }
 
@@ -151,7 +151,7 @@ impl Interpreter {
                     _ => format!("QQ-plot normal — {var_name}"),
                 };
                 let clean: Vec<f64> = data.iter().cloned().filter(|v| !v.is_nan()).collect();
-                Self::ascii_qqplot(&clean, &title, &var_name, w, h);
+                ascii_qqplot(&clean, &title, &var_name, w, h);
                 Ok(Value::Nil)
             }
 
@@ -200,7 +200,7 @@ impl Interpreter {
                     }
                     v
                 };
-                Self::ascii_corrplot(&cols, &var_names);
+                ascii_corrplot(&cols, &var_names);
                 Ok(Value::Nil)
             }
 
@@ -249,7 +249,7 @@ impl Interpreter {
                     _ => format!("Histograma — {var_name}"),
                 };
                 let clean: Vec<f64> = data.iter().cloned().filter(|v| !v.is_nan()).collect();
-                Self::ascii_histogram(&clean, bins, &title, &var_name, width);
+                ascii_histogram(&clean, bins, &title, &var_name, width);
                 Ok(Value::Nil)
             }
 
@@ -304,7 +304,7 @@ impl Interpreter {
                     Some(Value::Str(s)) => s.clone(),
                     _ => format!("{yname} vs {xname}"),
                 };
-                Self::ascii_scatter(&xs.to_vec(), &ys.to_vec(), &title, &xname, &yname, w, h);
+                ascii_scatter(&xs.to_vec(), &ys.to_vec(), &title, &xname, &yname, w, h);
                 Ok(Value::Nil)
             }
 
@@ -359,7 +359,7 @@ impl Interpreter {
                     Some(Value::Str(s)) => s.clone(),
                     _ => format!("{yname} — série temporal"),
                 };
-                Self::ascii_lineplot(&xs.to_vec(), &ys.to_vec(), &title, &xname, &yname, w, h);
+                ascii_lineplot(&xs.to_vec(), &ys.to_vec(), &title, &xname, &yname, w, h);
                 Ok(Value::Nil)
             }
 
@@ -399,7 +399,7 @@ impl Interpreter {
                     _ => format!("Boxplot — {var_name}"),
                 };
                 let clean: Vec<f64> = data.iter().cloned().filter(|v| !v.is_nan()).collect();
-                Self::ascii_boxplot(&clean, &title, &var_name, w);
+                ascii_boxplot(&clean, &title, &var_name, w);
                 Ok(Value::Nil)
             }
 
@@ -474,7 +474,7 @@ impl Interpreter {
                     Some(Value::Str(s)) => s.clone(),
                     _ => format!("KDE — {var_name}  (bw={:.4})", result.bandwidth),
                 };
-                Self::ascii_lineplot(&xs, &ys, &title, &var_name, "densidade", w, h);
+                ascii_lineplot(&xs, &ys, &title, &var_name, "densidade", w, h);
                 Ok(Value::Nil)
             }
 
@@ -507,7 +507,7 @@ impl Interpreter {
                     _ => 20,
                 };
                 let title = format!("Resíduos vs Ŷ — {mname}");
-                Self::ascii_scatter(&fitted, &resids, &title, "ŷ (fitted)", "e (resíduo)", w, h);
+                ascii_scatter(&fitted, &resids, &title, "ŷ (fitted)", "e (resíduo)", w, h);
                 Ok(Value::Nil)
             }
 
