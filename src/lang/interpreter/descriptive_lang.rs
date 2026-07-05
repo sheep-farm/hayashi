@@ -1,5 +1,5 @@
-use super::*;
 use super::helpers::*;
+use super::*;
 
 /// set_seed, timer, quietly, capture, assert, preserve/restore, source, help,
 /// describe, codebook, format, duplicates, label, correlate, summarize,
@@ -16,9 +16,7 @@ impl Interpreter {
             // ── set_seed: reproducibility ────────────────────────────────
             "set_seed" | "seed" | "setseed" => {
                 if args.is_empty() {
-                    return Err(HayashiError::Runtime(
-                        "set_seed(N) — sets RNG seed".into(),
-                    ));
+                    return Err(HayashiError::Runtime("set_seed(N) — sets RNG seed".into()));
                 }
                 let s = match self.eval_expr(&args[0])? {
                     Value::Int(v) => v as u64,
@@ -319,7 +317,11 @@ impl Interpreter {
                                 if let Some(doc) = &uf.doc {
                                     println!("fn {}({})\n{}", topic, uf.params.join(", "), doc);
                                 } else {
-                                    println!("fn {}({})\n  (no docstring)", topic, uf.params.join(", "));
+                                    println!(
+                                        "fn {}({})\n  (no docstring)",
+                                        topic,
+                                        uf.params.join(", ")
+                                    );
                                 }
                             } else {
                                 println!(
@@ -1476,7 +1478,8 @@ impl Interpreter {
                         }
                         Value::DecompResult(_) | Value::MstlResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() does not support seasonal decomposition — use print()".into(),
+                                "esttab() does not support seasonal decomposition — use print()"
+                                    .into(),
                             ));
                         }
                         Value::UCResult(_) => {
@@ -1512,7 +1515,8 @@ impl Interpreter {
                         }
                         Value::DFMResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() does not support DFM (fatores latentes) — use print()".into(),
+                                "esttab() does not support DFM (fatores latentes) — use print()"
+                                    .into(),
                             ));
                         }
                         Value::EtsResult(_) => {

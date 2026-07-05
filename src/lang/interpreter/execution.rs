@@ -73,9 +73,7 @@ impl Interpreter {
 
             // ── display expr ─────────────────────────────────────────────────
             Stmt::Display(expr) => {
-                eprintln!(
-                    "warning: 'display' is deprecated; use 'print' instead"
-                );
+                eprintln!("warning: 'display' is deprecated; use 'print' instead");
                 let val = self.eval_expr(expr)?;
                 match &val {
                     Value::Float(v) => println!("{v}"),
@@ -1178,7 +1176,13 @@ impl Interpreter {
             }
 
             // ── fn name(params) { body } ─────────────────────────────────────
-            Stmt::Fn { name, params, defaults, doc, body } => {
+            Stmt::Fn {
+                name,
+                params,
+                defaults,
+                doc,
+                body,
+            } => {
                 self.env.set(
                     name,
                     Value::UserFn(Rc::new(UserFn {

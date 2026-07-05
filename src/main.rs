@@ -691,7 +691,6 @@ fn dist_update(argv: &[&str]) {
     }
 }
 
-
 type Extractor = fn(&std::path::Path, &std::path::Path) -> Result<(), String>;
 
 /// Returns the archive extension and an extractor closure for the current platform.
@@ -743,7 +742,11 @@ fn dist_asset_kind() -> (&'static str, Extractor) {
 
 /// Searches the extracted archive for the new hay binary.
 fn find_extracted_bin(dir: &std::path::Path) -> Option<std::path::PathBuf> {
-    let name = if std::env::consts::OS == "windows" { "hay.exe" } else { "hay" };
+    let name = if std::env::consts::OS == "windows" {
+        "hay.exe"
+    } else {
+        "hay"
+    };
     let mut queue = vec![dir.to_path_buf()];
     while let Some(current) = queue.pop() {
         if let Ok(entries) = std::fs::read_dir(&current) {
@@ -765,7 +768,10 @@ fn find_extracted_bin(dir: &std::path::Path) -> Option<std::path::PathBuf> {
 fn is_newer_version(remote: &str, current: &str) -> bool {
     fn parse(v: &str) -> (Vec<u32>, Option<&str>) {
         let v = v.trim_start_matches('v');
-        let (num, pre) = v.split_once('-').map(|(n, p)| (n, Some(p))).unwrap_or((v, None));
+        let (num, pre) = v
+            .split_once('-')
+            .map(|(n, p)| (n, Some(p)))
+            .unwrap_or((v, None));
         let nums: Vec<u32> = num
             .split('.')
             .filter_map(|s| s.parse::<u32>().ok())
@@ -1742,7 +1748,10 @@ mod dist_update_tests {
 
     #[test]
     fn parse_empty_returns_install() {
-        assert_eq!(parse_dist_update_args(&[]).unwrap(), DistUpdateMode::Install);
+        assert_eq!(
+            parse_dist_update_args(&[]).unwrap(),
+            DistUpdateMode::Install
+        );
     }
 
     #[test]

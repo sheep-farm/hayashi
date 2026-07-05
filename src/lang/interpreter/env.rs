@@ -1,5 +1,5 @@
-use crate::lang::error::{HayashiError, Result};
 use super::value::Value;
+use crate::lang::error::{HayashiError, Result};
 use std::collections::{HashMap, HashSet};
 
 struct Scope {

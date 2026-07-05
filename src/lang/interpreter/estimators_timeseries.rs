@@ -1,5 +1,5 @@
-use super::*;
 use super::helpers::*;
+use super::*;
 
 /// GARCH/EGARCH/GJR-GARCH, VARMA, seasonal decomposition, MSTL, proportion
 /// tests, multiple tests, UCM, GAM, MICE, Markov Switching, SVAR, 3SLS,
@@ -1135,7 +1135,9 @@ impl Interpreter {
                         }
 
                         println!("\n── Note");
-                        println!("   Residuals are not stored in VarResult — for LB/JB by equation,");
+                        println!(
+                            "   Residuals are not stored in VarResult — for LB/JB by equation,"
+                        );
                         println!("   extract the series and run ljungbox/jb directly.");
                         println!("\n{thin}");
                         println!("{thick}\n");
@@ -1751,9 +1753,7 @@ impl Interpreter {
                     match v {
                         Value::Int(i) => Ok(i as usize),
                         Value::Float(f) => Ok(f as usize),
-                        _ => Err(HayashiError::Type(
-                            "table cells must be integers".into(),
-                        )),
+                        _ => Err(HayashiError::Type("table cells must be integers".into())),
                     }
                 };
                 let a = to_usize(self.eval_expr(&args[0])?)?;
@@ -2117,7 +2117,8 @@ impl Interpreter {
                             self.resolve_var_list(&args[1..], &df)?
                         } else {
                             return Err(HayashiError::Runtime(
-                                "mice: specify vars=[\"x1\",\"x2\",...] or list variables after df".into()
+                                "mice: specify vars=[\"x1\",\"x2\",...] or list variables after df"
+                                    .into(),
                             ));
                         }
                     }

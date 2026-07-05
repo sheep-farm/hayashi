@@ -1166,7 +1166,13 @@ impl Parser {
                 }
                 self.expect(&Token::RParen)?;
                 let (doc, body) = self.parse_block_with_doc()?;
-                Ok(Some(Stmt::Fn { name, params, defaults, doc, body }))
+                Ok(Some(Stmt::Fn {
+                    name,
+                    params,
+                    defaults,
+                    doc,
+                    body,
+                }))
             }
 
             // ── return [expr] ─────────────────────────────────────────────────
@@ -1396,7 +1402,11 @@ impl Parser {
             }
 
             Token::Quietly => {
-                if self.tokens.get(self.pos + 1).map(|(t, _)| t == &Token::LParen).unwrap_or(false)
+                if self
+                    .tokens
+                    .get(self.pos + 1)
+                    .map(|(t, _)| t == &Token::LParen)
+                    .unwrap_or(false)
                 {
                     // Obsolete functional form at statement level: quietly(expr)
                     let expr = self.parse_expr()?;

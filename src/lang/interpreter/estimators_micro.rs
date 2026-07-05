@@ -1,6 +1,6 @@
-use super::*;
 use super::helpers::*;
 use super::models::FactorModel;
+use super::*;
 
 /// Finance (Fama-MacBeth, portsort, doublesort) and
 /// cross-section/microeconometric estimators: OLS/reg, IV/2SLS, weak instrument
@@ -924,7 +924,8 @@ impl Interpreter {
                 let treatment_name = match self.eval_expr(&args[1])? {
                     Value::Str(s) => s,
                     _ => return Err(HayashiError::Type(
-                        "fuzzy_rd(): second argument must be the treatment column name (string)".into()
+                        "fuzzy_rd(): second argument must be the treatment column name (string)"
+                            .into(),
                     )),
                 };
                 let cutoff = match self.eval_expr(&args[2])? {
@@ -1116,14 +1117,14 @@ impl Interpreter {
                         "synth() requer (outcome, treated_id, t0, df, id=col, time=col [, covs=[...]])".into()
                     ));
                 }
-                let outcome_col =
-                    match self.eval_expr(&args[0])? {
-                        Value::Str(s) => s,
-                        _ => return Err(HayashiError::Type(
-                            "synth(): first argument must be outcome column name (string)"
-                                .into(),
-                        )),
-                    };
+                let outcome_col = match self.eval_expr(&args[0])? {
+                    Value::Str(s) => s,
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "synth(): first argument must be outcome column name (string)".into(),
+                        ))
+                    }
+                };
                 let treated_unit = match self.eval_expr(&args[1])? {
                     Value::Str(s) => s,
                     Value::Int(v) => v.to_string(),
@@ -1136,10 +1137,13 @@ impl Interpreter {
                 };
                 let t0 = match self.eval_expr(&args[2])? {
                     Value::Float(v) => v,
-                    Value::Int(v)   => v as f64,
-                    _ => return Err(HayashiError::Type(
-                        "synth(): third argument must be treatment start period (number)".into()
-                    )),
+                    Value::Int(v) => v as f64,
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "synth(): third argument must be treatment start period (number)"
+                                .into(),
+                        ))
+                    }
                 };
                 let df = match self.eval_expr(&args[3])? {
                     Value::DataFrame(df) => df,
@@ -1749,9 +1753,7 @@ impl Interpreter {
                 let q = re_vars.len() + 1; // +1 para random intercept
                 let mut x_random = ndarray::Array2::<f64>::ones((n, q));
                 for (j, name) in re_vars.iter().enumerate() {
-                    x_random
-                        .column_mut(j + 1)
-                        .assign(&get_col_f64(&df, name)?);
+                    x_random.column_mut(j + 1).assign(&get_col_f64(&df, name)?);
                 }
 
                 let result = greeners::MixedLM::fit_with_names(

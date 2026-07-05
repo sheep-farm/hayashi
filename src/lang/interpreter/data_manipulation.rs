@@ -1,5 +1,5 @@
-use super::*;
 use super::helpers::*;
+use super::*;
 
 mod aggregation;
 
@@ -18,7 +18,6 @@ impl Interpreter {
         let result: Result<Value> = match func {
             // ── ttest ────────────────────────────────────────────────────────
             "count" | "nrow" => self.eval_count(args),
-
 
             "ttest" => self.eval_ttest(args, opt_map),
 
@@ -1533,7 +1532,9 @@ impl Interpreter {
                         ))
                     }
                 };
-                let new_df = df.fillna_ffill().map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let new_df = df
+                    .fillna_ffill()
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 Ok(Value::DataFrame(Rc::new(new_df)))
             }
 
@@ -1886,7 +1887,10 @@ impl Interpreter {
                 let (_clean, keep_idx, omit_idx) = greeners::OLS::detect_collinearity(&mat, 1e-10);
 
                 if omit_idx.is_empty() {
-                    println!("drop_collinear: no collinearity detected among the {} checked columns.", k);
+                    println!(
+                        "drop_collinear: no collinearity detected among the {} checked columns.",
+                        k
+                    );
                     return Ok(Some(Value::DataFrame(df)));
                 }
 
@@ -2191,8 +2195,8 @@ impl Interpreter {
         };
         let v_vec = self.ttest_get_col_vals(&df, &var1)?;
         let v = Array1::from(v_vec);
-        let res = Stats::ttest_1samp_full(&v, mu)
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let res =
+            Stats::ttest_1samp_full(&v, mu).map_err(|e| HayashiError::Runtime(e.to_string()))?;
         println!("\nOne-sample t-test: {var1}   H0: mean = {mu}");
         println!("{}", "─".repeat(62));
         println!(

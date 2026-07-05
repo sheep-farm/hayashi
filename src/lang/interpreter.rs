@@ -46,11 +46,11 @@ mod builtins;
 mod data_manipulation;
 mod descriptive_lang;
 mod dispatch;
+mod env;
 mod estimators_micro;
 mod estimators_misc;
 mod estimators_panel;
 mod estimators_timeseries;
-mod env;
 mod eval_expr;
 mod execution;
 mod helpers;
@@ -61,13 +61,12 @@ mod visualization;
 
 use self::helpers::*;
 
+pub use builtins::BUILTIN_NAMES;
 pub use env::Env;
 pub use models::{
-    BinaryModel, DFMModel, DiagResult, OlsModel, PcaModel, PenalizedModel, SurModel,
-    ThreeSLSModel,
+    BinaryModel, DFMModel, DiagResult, OlsModel, PcaModel, PenalizedModel, SurModel, ThreeSLSModel,
 };
 pub use value::{ErrorValue, Series, UserFn, Value};
-pub use builtins::BUILTIN_NAMES;
 
 fn t_critical_95(df: f64) -> f64 {
     t_quantile(0.975, df)
@@ -93,7 +92,6 @@ fn standard_normal_draw<R: rand::Rng + ?Sized>(rng: &mut R) -> f64 {
     let u2 = rng.gen::<f64>();
     (-2.0 * u1.ln()).sqrt() * (2.0 * std::f64::consts::PI * u2).cos()
 }
-
 
 // ── Interpreter ──────────────────────────────────────────────────────────────
 
@@ -272,7 +270,11 @@ impl Interpreter {
         }
     }
 
-    pub(super) fn resolve_var_list(&mut self, args: &[Expr], df: &greeners::DataFrame) -> Result<Vec<String>> {
+    pub(super) fn resolve_var_list(
+        &mut self,
+        args: &[Expr],
+        df: &greeners::DataFrame,
+    ) -> Result<Vec<String>> {
         let col_names = df.column_names();
         let mut names = Vec::new();
         for a in args {
@@ -332,9 +334,7 @@ impl Interpreter {
                     let val = if let Some(default_expr) = &uf.defaults[i] {
                         self.eval_expr(default_expr)?
                     } else {
-                        return Err(self.rt_err(format!(
-                            "missing required argument '{param}'"
-                        )));
+                        return Err(self.rt_err(format!("missing required argument '{param}'")));
                     };
                     self.env.declare_const(param, val);
                 }
@@ -602,8 +602,11 @@ impl Interpreter {
 
     // ── Expression evaluation ───────────────────────────────────────────────
 
-
-    pub(super) fn maybe_filter_df(&mut self, df: &Rc<DataFrame>, opts: &[Opt]) -> Result<Rc<DataFrame>> {
+    pub(super) fn maybe_filter_df(
+        &mut self,
+        df: &Rc<DataFrame>,
+        opts: &[Opt],
+    ) -> Result<Rc<DataFrame>> {
         if let Some(if_opt) = opts.iter().find(|o| o.name == "if") {
             let mask = self.eval_col_expr(&if_opt.value, df)?;
             filter_df_by_mask(df, &mask)
@@ -676,10 +679,7 @@ impl Interpreter {
 
     // ── Object methods ──────────────────────────────────────────────────────
 
-
     // ── Element-wise expression evaluation over DataFrame columns ───────────
 
-
     // ── Statement execution ─────────────────────────────────────────────────
-
 }

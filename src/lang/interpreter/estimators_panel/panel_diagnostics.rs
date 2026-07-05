@@ -50,8 +50,8 @@ impl Interpreter {
                 })?,
         };
         let formula_str = Self::formula_to_string(&formula_ast);
-        let g_formula = GFormula::parse(&formula_str)
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let g_formula =
+            GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
         let (y_vec, x_mat) = df
             .to_design_matrix(&g_formula)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -60,10 +60,9 @@ impl Interpreter {
             .map(|&v| v as i64)
             .collect();
         let time_vals: Vec<f64> = get_col_f64(&df, &time_col)?.to_vec();
-        let (rho, t_stat, p, n_pairs) = greeners::PanelDiagnostics::wooldridge_serial(
-            &y_vec, &x_mat, &id_vals, &time_vals,
-        )
-        .map_err(HayashiError::Runtime)?;
+        let (rho, t_stat, p, n_pairs) =
+            greeners::PanelDiagnostics::wooldridge_serial(&y_vec, &x_mat, &id_vals, &time_vals)
+                .map_err(HayashiError::Runtime)?;
         let sig = if p < 0.01 {
             "***"
         } else if p < 0.05 {
@@ -73,18 +72,13 @@ impl Interpreter {
         } else {
             ""
         };
-        println!(
-            "\n{:=^62}",
-            " Wooldridge Test — Panel Serial Correlation "
-        );
+        println!("\n{:=^62}", " Wooldridge Test — Panel Serial Correlation ");
         println!(" H0: ρ = -0.5 (no serial correlation)");
         println!("{:-^62}", "");
         println!(" ρ̂ = {rho:.4}    t = {t_stat:.4}    p = {p:.4}  {sig}");
         println!(" Residual pairs: {n_pairs}");
         if p < 0.05 {
-            println!(
-                " Conclusion: reject H0 → serial correlation present → use robust SE"
-            );
+            println!(" Conclusion: reject H0 → serial correlation present → use robust SE");
         } else {
             println!(" Conclusion: do not reject H0 → no evidence of serial correlation");
         }
@@ -122,12 +116,14 @@ impl Interpreter {
                 .map(|(id, _)| id.clone())
                 .filter(|s| !s.is_empty())
                 .ok_or_else(|| {
-                    self.rt_err(format!("pesaran requires id= or xtset({df_name}, id, time)"))
+                    self.rt_err(format!(
+                        "pesaran requires id= or xtset({df_name}, id, time)"
+                    ))
                 })?,
         };
         let formula_str = Self::formula_to_string(&formula_ast);
-        let g_formula = GFormula::parse(&formula_str)
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let g_formula =
+            GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
         let (y_vec, x_mat) = df
             .to_design_matrix(&g_formula)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -135,8 +131,7 @@ impl Interpreter {
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         let resids = &y_vec - &x_mat.dot(&ols_pooled.params);
         let id_vals = get_col_f64(&df, &id_col)?;
-        let mut id_map: std::collections::HashMap<i64, usize> =
-            std::collections::HashMap::new();
+        let mut id_map: std::collections::HashMap<i64, usize> = std::collections::HashMap::new();
         let mut next_id = 0usize;
         let entity_ids: Vec<usize> = id_vals
             .iter()
@@ -206,12 +201,14 @@ impl Interpreter {
                 .map(|(id, _)| id.clone())
                 .filter(|s| !s.is_empty())
                 .ok_or_else(|| {
-                    self.rt_err(format!("mundlak requires id= or xtset({df_name}, id, time)"))
+                    self.rt_err(format!(
+                        "mundlak requires id= or xtset({df_name}, id, time)"
+                    ))
                 })?,
         };
         let formula_str = Self::formula_to_string(&formula_ast);
-        let g_formula = GFormula::parse(&formula_str)
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let g_formula =
+            GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
         let (y_vec, x_mat) = df
             .to_design_matrix(&g_formula)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -314,8 +311,8 @@ impl Interpreter {
                 })?,
         };
         let formula_str = Self::formula_to_string(&formula_ast);
-        let g_formula = GFormula::parse(&formula_str)
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let g_formula =
+            GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
         let (y_vec, x_mat) = df
             .to_design_matrix(&g_formula)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -324,10 +321,9 @@ impl Interpreter {
             .map(|&v| v as i64)
             .collect();
         let time_vals: Vec<f64> = get_col_f64(&df, &time_col)?.to_vec();
-        let (m1, p1, m2, p2) = greeners::PanelDiagnostics::arellano_bond_test(
-            &y_vec, &x_mat, &id_vals, &time_vals,
-        )
-        .map_err(HayashiError::Runtime)?;
+        let (m1, p1, m2, p2) =
+            greeners::PanelDiagnostics::arellano_bond_test(&y_vec, &x_mat, &id_vals, &time_vals)
+                .map_err(HayashiError::Runtime)?;
         let sig = |p: f64| {
             if p < 0.01 {
                 "***"

@@ -1,5 +1,5 @@
-use super::*;
 use super::helpers::*;
+use super::*;
 
 /// ETS, panel threshold, canonical correlation, weighted statistics, tabstat,
 /// xtsum, non-parametric tests, unit-root tests, business-cycle filters,
@@ -183,9 +183,7 @@ impl Interpreter {
                         .iter()
                         .map(|a| match a {
                             Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
-                            _ => Err(HayashiError::Type(
-                                "args must be variable names".into(),
-                            )),
+                            _ => Err(HayashiError::Type("args must be variable names".into())),
                         })
                         .collect::<Result<_>>()?,
                     _ => {
@@ -981,9 +979,7 @@ impl Interpreter {
                     .collect();
                 let n = diffs.len();
                 if n == 0 {
-                    return Err(HayashiError::Runtime(
-                        "signrank: all diffs are zero".into(),
-                    ));
+                    return Err(HayashiError::Runtime("signrank: all diffs are zero".into()));
                 }
                 // Rank of |diffs|
                 let mut abs_indexed: Vec<(f64, usize, f64)> = diffs
@@ -1218,7 +1214,9 @@ impl Interpreter {
                 Rc::make_mut(&mut df)
                     .insert(cycle_name.clone(), cycle)
                     .map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
-                println!("bkfilter: periods [{low},{high}] k={k}  →  {cycle_name} added to {df_name}");
+                println!(
+                    "bkfilter: periods [{low},{high}] k={k}  →  {cycle_name} added to {df_name}"
+                );
                 self.env.set(&df_name, Value::DataFrame(df))?;
                 Ok(Value::Nil)
             }

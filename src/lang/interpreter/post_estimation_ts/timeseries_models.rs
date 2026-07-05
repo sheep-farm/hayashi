@@ -271,9 +271,9 @@ impl Interpreter {
             let sq = get_usize("Q", 0);
             let s = get_usize("s", 12);
             if method == "mle" && (sp > 0 || sd > 0 || sq > 0) {
-                return Err(self.rt_err(
-                    "SARIMA MLE is not supported; use method='hr' for seasonal models",
-                ));
+                return Err(
+                    self.rt_err("SARIMA MLE is not supported; use method='hr' for seasonal models")
+                );
             }
             if method == "mle" {
                 greeners::ARIMA::fit_mle(&y, (p, d, q))

@@ -2,10 +2,7 @@ use super::*;
 
 impl Interpreter {
     /// `count(df)` / `nrow(df)` — row count as a value.
-    pub(super) fn eval_count(
-        &mut self,
-        args: &[Expr],
-    ) -> Result<Value> {
+    pub(super) fn eval_count(&mut self, args: &[Expr]) -> Result<Value> {
         if args.is_empty() {
             return Err(HayashiError::Runtime(
                 "count(df) or count(df, condition)".into(),
@@ -45,7 +42,8 @@ impl Interpreter {
         let func_name = match &args[1] {
             Expr::Var(n) => n.clone(),
             _ => return Err(HayashiError::Type(
-                "second argument must be a function name (mean, sum, min, max, count, sd, median)".into(),
+                "second argument must be a function name (mean, sum, min, max, count, sd, median)"
+                    .into(),
             )),
         };
         let by_col = match opt_map.get("by") {
@@ -60,9 +58,11 @@ impl Interpreter {
         // validate function before any computation
         match func_name.as_str() {
             "mean" | "sum" | "min" | "max" | "count" | "sd" | "median" => {}
-            other => return Err(HayashiError::Runtime(format!(
-                "unknown aggregation '{other}' — use: mean, sum, min, max, count, sd, median"
-            ))),
+            other => {
+                return Err(HayashiError::Runtime(format!(
+                    "unknown aggregation '{other}' — use: mean, sum, min, max, count, sd, median"
+                )))
+            }
         }
 
         // variables to aggregate: args[2..] or all numeric except by
@@ -74,10 +74,7 @@ impl Interpreter {
                 .into_iter()
                 .filter(|n| {
                     n != &by_col
-                        && matches!(
-                            df.get_column(n),
-                            Ok(Column::Float(_)) | Ok(Column::Int(_))
-                        )
+                        && matches!(df.get_column(n), Ok(Column::Float(_)) | Ok(Column::Int(_)))
                 })
                 .collect()
         };
@@ -124,8 +121,7 @@ impl Interpreter {
                         return f64::NAN;
                     }
                     let m = vals.iter().sum::<f64>() / n as f64;
-                    (vals.iter().map(|x| (x - m).powi(2)).sum::<f64>() / (n - 1) as f64)
-                        .sqrt()
+                    (vals.iter().map(|x| (x - m).powi(2)).sum::<f64>() / (n - 1) as f64).sqrt()
                 }
                 "median" => {
                     if vals.iter().any(|v| !v.is_finite()) {
@@ -166,8 +162,7 @@ impl Interpreter {
             let vals: Vec<f64> = keys
                 .iter()
                 .map(|key| {
-                    let subset: Vec<f64> =
-                        groups[key].iter().map(|&i| col_data[ci][i]).collect();
+                    let subset: Vec<f64> = groups[key].iter().map(|&i| col_data[ci][i]).collect();
                     agg(&subset)
                 })
                 .collect();
@@ -183,10 +178,7 @@ impl Interpreter {
     }
 
     /// `group_by(df, by_col, stat, var1, var2, ...)` — like collapse, but pipe-friendly.
-    pub(super) fn eval_group_by(
-        &mut self,
-        args: &[Expr],
-    ) -> Result<Value> {
+    pub(super) fn eval_group_by(&mut self, args: &[Expr]) -> Result<Value> {
         if args.len() < 3 {
             return Err(HayashiError::Runtime(
                 "group_by(df, by_col, stat, var1, var2, ...)".into(),
@@ -207,17 +199,20 @@ impl Interpreter {
                 _ => return Err(self.type_err("by column must be a name or string")),
             },
         };
-        let func_name = match &args[2] {
-            Expr::Var(n) => n.clone(),
-            _ => return Err(self.type_err(
-                "third argument must be aggregation: mean, sum, min, max, count, sd, median",
-            )),
-        };
+        let func_name =
+            match &args[2] {
+                Expr::Var(n) => n.clone(),
+                _ => return Err(self.type_err(
+                    "third argument must be aggregation: mean, sum, min, max, count, sd, median",
+                )),
+            };
         match func_name.as_str() {
             "mean" | "sum" | "min" | "max" | "count" | "sd" | "median" => {}
-            other => return Err(HayashiError::Runtime(format!(
-                "unknown aggregation '{other}' — use: mean, sum, min, max, count, sd, median"
-            ))),
+            other => {
+                return Err(HayashiError::Runtime(format!(
+                    "unknown aggregation '{other}' — use: mean, sum, min, max, count, sd, median"
+                )))
+            }
         }
 
         let agg_vars: Vec<String> = if args.len() > 3 {
@@ -228,10 +223,7 @@ impl Interpreter {
                 .into_iter()
                 .filter(|n| {
                     n != &by_col
-                        && matches!(
-                            df.get_column(n),
-                            Ok(Column::Float(_)) | Ok(Column::Int(_))
-                        )
+                        && matches!(df.get_column(n), Ok(Column::Float(_)) | Ok(Column::Int(_)))
                 })
                 .collect()
         };
@@ -273,8 +265,7 @@ impl Interpreter {
                         return f64::NAN;
                     }
                     let m = vals.iter().sum::<f64>() / n as f64;
-                    (vals.iter().map(|x| (x - m).powi(2)).sum::<f64>() / (n - 1) as f64)
-                        .sqrt()
+                    (vals.iter().map(|x| (x - m).powi(2)).sum::<f64>() / (n - 1) as f64).sqrt()
                 }
                 "median" => {
                     if vals.iter().any(|v| !v.is_finite()) {
@@ -310,8 +301,7 @@ impl Interpreter {
             let vals: Vec<f64> = keys
                 .iter()
                 .map(|key| {
-                    let subset: Vec<f64> =
-                        groups[key].iter().map(|&i| col_data[ci][i]).collect();
+                    let subset: Vec<f64> = groups[key].iter().map(|&i| col_data[ci][i]).collect();
                     agg_fn(&subset)
                 })
                 .collect();

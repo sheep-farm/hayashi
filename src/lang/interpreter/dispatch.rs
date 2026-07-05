@@ -210,7 +210,11 @@ impl Interpreter {
         Ok((formula_ast, df, df_name, id_col))
     }
 
-    pub(super) fn get_time_col(&self, df_name: &str, opt_map: &HashMap<String, Value>) -> Result<String> {
+    pub(super) fn get_time_col(
+        &self,
+        df_name: &str,
+        opt_map: &HashMap<String, Value>,
+    ) -> Result<String> {
         match opt_map.get("time") {
             Some(Value::Str(s)) => Ok(s.clone()),
             _ => self
@@ -241,12 +245,4 @@ impl Interpreter {
     }
 
     // ── ASCII visualization helpers ─────────────────────────────────────────
-
-
-
-
-
-
-
-
 }

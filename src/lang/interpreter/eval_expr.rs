@@ -325,7 +325,9 @@ impl Interpreter {
                             Value::Int(i) => i,
                             Value::Float(f) => f as i64,
                             _ => {
-                                return Err(HayashiError::Type("series index must be integer".into()))
+                                return Err(HayashiError::Type(
+                                    "series index must be integer".into(),
+                                ))
                             }
                         };
                         let len = s.len() as i64;
@@ -454,8 +456,6 @@ impl Interpreter {
         }
         formula_str
     }
-
-
 
     pub(super) fn eval_field(
         &mut self,

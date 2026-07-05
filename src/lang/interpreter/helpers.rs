@@ -1,7 +1,5 @@
 use super::*;
 
-/// Pure static helpers shared by the interpreter and its submodules.
-
 /// Builds a rendered diagnostic value.
 pub(super) fn diag(rendered: String) -> Value {
     Value::DiagResult(Rc::new(DiagResult { rendered }))
@@ -159,7 +157,10 @@ pub(super) fn get_col_f64(df: &DataFrame, name: &str) -> Result<ndarray::Array1<
 
 /// Rebuilds X from the model's variable name list.
 /// `_cons`/`const`/`Intercept` → column of 1s; others → columns from df.
-pub(super) fn build_x_from_varnames(df: &DataFrame, names: &[String]) -> Result<ndarray::Array2<f64>> {
+pub(super) fn build_x_from_varnames(
+    df: &DataFrame,
+    names: &[String],
+) -> Result<ndarray::Array2<f64>> {
     let n = df.n_rows();
     let k = names.len();
     let mut x = ndarray::Array2::<f64>::zeros((n, k));
@@ -313,8 +314,7 @@ pub(super) fn sort_df_by(df: &DataFrame, col: &str) -> Result<DataFrame> {
     for name in &df.column_names() {
         match df.get_column(name) {
             Ok(Column::Float(arr)) => {
-                builder =
-                    builder.add_column(name, idx.iter().map(|&i| arr[i]).collect::<Vec<_>>());
+                builder = builder.add_column(name, idx.iter().map(|&i| arr[i]).collect::<Vec<_>>());
             }
             Ok(Column::Int(arr)) => {
                 builder = builder
@@ -323,8 +323,7 @@ pub(super) fn sort_df_by(df: &DataFrame, col: &str) -> Result<DataFrame> {
             _ => {
                 if let Ok(arr) = df.get_string(name) {
                     let v = arr.to_vec();
-                    builder =
-                        builder.add_string(name, idx.iter().map(|&i| v[i].clone()).collect());
+                    builder = builder.add_string(name, idx.iter().map(|&i| v[i].clone()).collect());
                 }
             }
         }
@@ -453,7 +452,12 @@ pub(super) fn tabulate_one(df: &DataFrame, var: &str) -> Result<()> {
 }
 
 /// Cross-tabulation (bivariate, optional chi2).
-pub(super) fn tabulate_two(df: &DataFrame, row_var: &str, col_var: &str, do_chi2: bool) -> Result<()> {
+pub(super) fn tabulate_two(
+    df: &DataFrame,
+    row_var: &str,
+    col_var: &str,
+    do_chi2: bool,
+) -> Result<()> {
     let rows = col_to_strings(df, row_var)?;
     let cols = col_to_strings(df, col_var)?;
 
@@ -584,12 +588,12 @@ pub(super) fn sort_maybe_numeric_strings(values: &mut [String]) {
         .iter()
         .all(|value| finite_numeric_string(value).is_some())
     {
-        values.sort_by(|a, b| {
-            match (finite_numeric_string(a), finite_numeric_string(b)) {
+        values.sort_by(
+            |a, b| match (finite_numeric_string(a), finite_numeric_string(b)) {
                 (Some(a), Some(b)) => a.partial_cmp(&b).unwrap_or(std::cmp::Ordering::Equal),
                 _ => a.cmp(b),
-            }
-        });
+            },
+        );
     } else {
         values.sort();
     }
@@ -739,8 +743,8 @@ pub(super) fn ascii_lineplot(
             if pc < col {
                 (pc..=col).for_each(|c| {
                     let t = (c - pc) as f64 / (col - pc).max(1) as f64;
-                    let r = ((pr as f64 + t * (row as f64 - pr as f64)).round() as usize)
-                        .min(h - 1);
+                    let r =
+                        ((pr as f64 + t * (row as f64 - pr as f64)).round() as usize).min(h - 1);
                     if grid[r][c] == ' ' {
                         grid[r][c] = '─';
                     }

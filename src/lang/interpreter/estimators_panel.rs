@@ -1,5 +1,5 @@
-use super::*;
 use super::helpers::*;
+use super::*;
 
 mod panel_diagnostics;
 mod rolling_recursive;
@@ -386,7 +386,9 @@ impl Interpreter {
                         .map(|(id, _)| id.clone())
                         .filter(|s| !s.is_empty())
                         .ok_or_else(|| {
-                            self.rt_err(format!("bptest requires id= or xtset({df_name}, id, time)"))
+                            self.rt_err(format!(
+                                "bptest requires id= or xtset({df_name}, id, time)"
+                            ))
                         })?,
                 };
                 let formula_str = Self::formula_to_string(&formula_ast);
@@ -1020,7 +1022,10 @@ impl Interpreter {
                     "\n── Panel: n={} obs   N={} entities   T={} periods\n",
                     n_obs, n_entities, t_count
                 ));
-                out.push_str(&format!("   Chamberlain augmentation columns: {} (k×T, after removing zero-variance)\n", k_active));
+                out.push_str(&format!(
+                    "   Chamberlain augmentation columns: {} (k×T, after removing zero-variance)\n",
+                    k_active
+                ));
                 if t_count > 6 {
                     out.push_str(&format!(
                         "   ⚠ T={} — with large T the test has low power in finite samples\n",
@@ -1770,9 +1775,7 @@ impl Interpreter {
                 out.push_str(&format!("   {}\n", verdict));
                 out.push_str(&format!("\n{thin}\n"));
                 out.push_str("   *** p<0.01  ** p<0.05  * p<0.10\n");
-                out.push_str(
-                    "   (OLS standard SE — use cluster-robust SE for formal inference)\n",
-                );
+                out.push_str("   (OLS standard SE — use cluster-robust SE for formal inference)\n");
                 out.push_str(&format!("{thick}\n"));
                 Ok(diag(out))
             }
@@ -1847,7 +1850,9 @@ impl Interpreter {
 
                 out.push_str(&format!("\n{thick}\n"));
                 out.push_str(" Hausman Test: FE vs RE\n");
-                out.push_str(" H₀: individual effects uncorrelated with regressors (RE consistent)\n");
+                out.push_str(
+                    " H₀: individual effects uncorrelated with regressors (RE consistent)\n",
+                );
                 out.push_str(&format!("{thick}\n"));
                 out.push_str("\n── Common Coefficients\n");
                 out.push_str(&format!(
@@ -1873,9 +1878,7 @@ impl Interpreter {
 
                 if df == 0 {
                     out.push_str("\n   [!] Var(β_FE) ≤ Var(β_RE) for all coefficients.\n");
-                    out.push_str(
-                        "       Statistic undefined — check model specification.\n",
-                    );
+                    out.push_str("       Statistic undefined — check model specification.\n");
                     out.push_str(&format!("\n{thick}\n"));
                     return Ok(Some(diag(out)));
                 }
@@ -2147,8 +2150,7 @@ impl Interpreter {
             Expr::Var(n) | Expr::Str(n) => n.clone(),
             _ => {
                 return Err(HayashiError::Type(
-                    "bootstrap: first argument must be estimator name (ols, logit, ...)"
-                        .into(),
+                    "bootstrap: first argument must be estimator name (ols, logit, ...)".into(),
                 ))
             }
         };
@@ -2181,9 +2183,7 @@ impl Interpreter {
             &extra_opts,
         )?;
         let full_params = extract_params(&full_result).ok_or_else(|| {
-            HayashiError::Runtime(
-                "bootstrap: model not supported (no extractable params)".into(),
-            )
+            HayashiError::Runtime("bootstrap: model not supported (no extractable params)".into())
         })?;
         let full_se = extract_se(&full_result).unwrap_or_default();
         let var_names = extract_var_names(&full_result);
@@ -2197,8 +2197,7 @@ impl Interpreter {
         let mut n_ok = 0usize;
 
         for b in 0..n_boot {
-            let boot_idx: Vec<usize> =
-                (0..n).map(|_| *indices.choose(&mut rng).unwrap()).collect();
+            let boot_idx: Vec<usize> = (0..n).map(|_| *indices.choose(&mut rng).unwrap()).collect();
             let boot_df = match df.iloc(Some(&boot_idx), None) {
                 Ok(d) => d,
                 Err(_) => continue,
@@ -2244,7 +2243,11 @@ impl Interpreter {
         println!("{thin}");
         for i in 0..k {
             let vname = var_names.get(i).map(|s| s.as_str()).unwrap_or("?");
-            let orig_se = if i < full_se.len() { full_se[i] } else { f64::NAN };
+            let orig_se = if i < full_se.len() {
+                full_se[i]
+            } else {
+                f64::NAN
+            };
             println!(
                 "{:<18} {:>10.4} {:>10.4} {:>10.4} {:>12.4} {:>12.4}",
                 vname, full_params[i], orig_se, boot_se[i], ci_lo[i], ci_hi[i]

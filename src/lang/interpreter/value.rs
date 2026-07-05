@@ -162,15 +162,15 @@ impl Series {
 
     pub fn shift(&self, n: i64) -> Series {
         let len = self.values.len();
-        let n_abs = n.abs() as usize;
+        let n_abs = n.unsigned_abs() as usize;
         let fill = Value::Nil;
         let mut shifted = Vec::with_capacity(len);
         if n > 0 {
-            shifted.extend(std::iter::repeat(fill).take(n_abs));
+            shifted.extend(std::iter::repeat_n(fill, n_abs));
             shifted.extend(self.values[..len.saturating_sub(n_abs)].iter().cloned());
         } else if n < 0 {
             shifted.extend(self.values[n_abs.min(len)..].iter().cloned());
-            shifted.extend(std::iter::repeat(fill).take(n_abs.min(len)));
+            shifted.extend(std::iter::repeat_n(fill, n_abs.min(len)));
         } else {
             shifted = self.values.clone();
         }

@@ -1,5 +1,5 @@
-use super::*;
 use super::helpers::*;
+use super::*;
 
 /// ASCII visualization (acfplot/pacf/qqplot/corrplot/scatter/histogram/boxplot/kdensity)
 /// and coefplot. Extracted from `eval_call` (see src/lang/interpreter.rs).
@@ -523,8 +523,9 @@ impl Interpreter {
                     _ => 50,
                 };
 
-                let params = extract_params(&model)
-                    .ok_or_else(|| HayashiError::Runtime("coefplot: model without params".into()))?;
+                let params = extract_params(&model).ok_or_else(|| {
+                    HayashiError::Runtime("coefplot: model without params".into())
+                })?;
                 let se = extract_se(&model).unwrap_or_default();
                 let names = extract_var_names(&model);
                 let z = 1.96_f64;
