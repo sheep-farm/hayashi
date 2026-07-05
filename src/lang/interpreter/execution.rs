@@ -1,7 +1,7 @@
 use super::*;
 
 impl Interpreter {
-    pub fn exec(&mut self, spanned: &Spanned) -> Result<()> {
+    pub(crate) fn exec(&mut self, spanned: &Spanned) -> Result<()> {
         let (stmt, line) = spanned;
         self.current_line = *line;
         match stmt {
