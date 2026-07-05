@@ -25,181 +25,12 @@ impl Interpreter {
             // Funciona com qualquer estimador: ols, logit, probit, iv, poisson, etc.
             // bootse(model, n=1000) mantido como alias para OLS pairs bootstrap.
             "bootstrap" | "boot" => {
-                // ── Forma 1: bootstrap(estimator, formula, df, n=...) — genérico
-                // ── Forma 2: bootse(model, n=...) — OLS pairs (legado, args[0] é Value)
-                let n_boot = match opt_map.get("n") {
-                    Some(Value::Int(v)) => *v as usize,
-                    Some(Value::Float(v)) => *v as usize,
-                    _ => match opt_map.get("reps") {
-                        Some(Value::Int(v)) => *v as usize,
-                        Some(Value::Float(v)) => *v as usize,
-                        _ => 1000,
-                    },
-                };
-                let alpha = match opt_map.get("alpha") {
-                    Some(Value::Float(v)) => *v,
-                    _ => 0.05,
-                };
-
+                let n_boot = Self::bootstrap_reps(opt_map);
+                let alpha = Self::bootstrap_alpha(opt_map);
                 if args.len() >= 3 {
-                    // ── Forma genérica: bootstrap(estimator, formula, df, ...)
-                    let estimator_name = match &args[0] {
-                        Expr::Var(n) | Expr::Str(n) => n.clone(),
-                        _ => return Err(HayashiError::Type(
-                            "bootstrap: first argument must be nome do estimador (ols, logit, ...)"
-                                .into(),
-                        )),
-                    };
-                    let formula_expr = args[1].clone();
-                    let df_name = match &args[2] {
-                        Expr::Var(n) => n.clone(),
-                        _ => {
-                            return Err(HayashiError::Type(
-                                "bootstrap: third argument must be nome do DataFrame".into(),
-                            ))
-                        }
-                    };
-                    let df = match self.env.get(&df_name) {
-                        Some(Value::DataFrame(d)) => d.clone(),
-                        _ => {
-                            return Err(HayashiError::Runtime(format!(
-                                "'{df_name}' is not a DataFrame"
-                            )))
-                        }
-                    };
-
-                    // estimar no sample completo para referência
-                    let extra_opts: Vec<Opt> = opts
-                        .iter()
-                        .filter(|o| !matches!(o.name.as_str(), "n" | "reps" | "alpha"))
-                        .cloned()
-                        .collect();
-                    let full_result = self.eval_call(
-                        &estimator_name,
-                        &[formula_expr.clone(), Expr::Var(df_name.clone())],
-                        &extra_opts,
-                    )?;
-                    let full_params = Self::extract_params(&full_result).ok_or_else(|| {
-                        HayashiError::Runtime(
-                            "bootstrap: modelo not supportado (sem params extraíveis)".into(),
-                        )
-                    })?;
-                    let full_se = Self::extract_se(&full_result).unwrap_or_default();
-                    let var_names = Self::extract_var_names(&full_result);
-                    let k = full_params.len();
-
-                    // bootstrap loop
-                    use rand::seq::SliceRandom;
-                    let mut rng = self.get_rng();
-                    let n = df.n_rows();
-                    let indices: Vec<usize> = (0..n).collect();
-                    let mut boot_coefs = ndarray::Array2::<f64>::zeros((n_boot, k));
-                    let mut n_ok = 0usize;
-
-                    for b in 0..n_boot {
-                        let boot_idx: Vec<usize> =
-                            (0..n).map(|_| *indices.choose(&mut rng).unwrap()).collect();
-                        let boot_df = match df.iloc(Some(&boot_idx), None) {
-                            Ok(d) => d,
-                            Err(_) => continue,
-                        };
-                        self.env
-                            .set("__boot_df__", Value::DataFrame(Rc::new(boot_df)))?;
-                        if let Ok(ref result) = self.eval_call(
-                            &estimator_name,
-                            &[formula_expr.clone(), Expr::Var("__boot_df__".into())],
-                            &extra_opts,
-                        ) {
-                            if let Some(params) = Self::extract_params(result) {
-                                for j in 0..k.min(params.len()) {
-                                    boot_coefs[[b, j]] = params[j];
-                                }
-                                n_ok += 1;
-                            }
-                        }
-                    }
-                    self.env.remove("__boot_df__");
-
-                    if n_ok < 10 {
-                        return Err(HayashiError::Runtime(format!(
-                            "bootstrap: apenas {n_ok}/{n_boot} replicações convergiram"
-                        )));
-                    }
-
-                    // truncar para replicações bem-sucedidas
-                    let boot_se = greeners::Bootstrap::bootstrap_se(&boot_coefs);
-                    let (ci_lo, ci_hi) = greeners::Bootstrap::percentile_ci(&boot_coefs, alpha);
-
-                    let thick = "═".repeat(76);
-                    let thin = "─".repeat(76);
-                    println!("\n{thick}");
-                    println!(
-                        "{:^76}",
-                        format!(" Bootstrap SE — {} (n={n_ok}/{n_boot}) ", estimator_name)
-                    );
-                    println!("{thin}");
-                    println!(
-                        "{:<18} {:>10} {:>10} {:>10} {:>12} {:>12}",
-                        "Variável", "β̂", "SE orig.", "SE boot", "IC inf", "IC sup"
-                    );
-                    println!("{thin}");
-                    for i in 0..k {
-                        let vname = var_names.get(i).map(|s| s.as_str()).unwrap_or("?");
-                        let orig_se = if i < full_se.len() {
-                            full_se[i]
-                        } else {
-                            f64::NAN
-                        };
-                        println!(
-                            "{:<18} {:>10.4} {:>10.4} {:>10.4} {:>12.4} {:>12.4}",
-                            vname, full_params[i], orig_se, boot_se[i], ci_lo[i], ci_hi[i]
-                        );
-                    }
-                    println!("{thick}");
-                    return Ok(Some(Value::Nil));
-                }
-
-                // ── Forma legado: bootse(model, n=...) — OLS pairs ──────────
-                if args.is_empty() {
-                    return Err(HayashiError::Runtime(
-                        "bootstrap(estimator, formula, df, n=1000) ou bootse(model, n=1000)".into(),
-                    ));
-                }
-                let model_val = self.eval_expr(&args[0])?;
-                match &model_val {
-                    Value::OlsResult(m) => {
-                        let y_hat = m.x.dot(&m.result.params);
-                        let y_vec = &y_hat + &m.residuals;
-                        let boot_coefs = greeners::Bootstrap::pairs_bootstrap(&y_vec, &m.x, n_boot)
-                            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                        let boot_se = greeners::Bootstrap::bootstrap_se(&boot_coefs);
-                        let (ci_lo, ci_hi) = greeners::Bootstrap::percentile_ci(&boot_coefs, alpha);
-                        let vnames = m.result.variable_names.as_deref().unwrap_or(&[]);
-                        let k = m.result.params.len();
-                        let thick = "═".repeat(76);
-                        let thin  = "─".repeat(76);
-                        println!("\n{thick}");
-                        println!("{:^76}", format!(" Bootstrap SE (n={n_boot}, pairs) "));
-                        println!("{thin}");
-                        println!("{:<18} {:>10} {:>10} {:>10} {:>12} {:>12}",
-                                 "Variável", "β̂", "SE orig.", "SE boot", "IC inf 95%", "IC sup 95%");
-                        println!("{thin}");
-                        for i in 0..k {
-                            let vname = vnames.get(i).map(|s| s.as_str()).unwrap_or("?");
-                            println!("{:<18} {:>10.4} {:>10.4} {:>10.4} {:>12.4} {:>12.4}",
-                                     vname,
-                                     m.result.params[i],
-                                     m.result.std_errors[i],
-                                     boot_se[i],
-                                     ci_lo[i],
-                                     ci_hi[i]);
-                        }
-                        println!("{thick}");
-                        Ok(Value::Nil)
-                    }
-                    _ => Err(HayashiError::Runtime(
-                        "bootse(model) suporta OLS. Para outros: bootstrap(estimator, formula, df, n=1000)".into()
-                    )),
+                    self.bootstrap_generic(args, opts, n_boot, alpha)
+                } else {
+                    self.bootstrap_pairs(args, n_boot, alpha)
                 }
             }
 
@@ -2660,5 +2491,193 @@ impl Interpreter {
             _ => return Ok(None),
         };
         result.map(Some)
+    }
+
+    // ── Bootstrap helpers ─────────────────────────────────────────────────────
+
+    fn bootstrap_reps(opt_map: &HashMap<String, Value>) -> usize {
+        match opt_map.get("n") {
+            Some(Value::Int(v)) => *v as usize,
+            Some(Value::Float(v)) => *v as usize,
+            _ => match opt_map.get("reps") {
+                Some(Value::Int(v)) => *v as usize,
+                Some(Value::Float(v)) => *v as usize,
+                _ => 1000,
+            },
+        }
+    }
+
+    fn bootstrap_alpha(opt_map: &HashMap<String, Value>) -> f64 {
+        match opt_map.get("alpha") {
+            Some(Value::Float(v)) => *v,
+            _ => 0.05,
+        }
+    }
+
+    fn bootstrap_generic(
+        &mut self,
+        args: &[Expr],
+        opts: &[Opt],
+        n_boot: usize,
+        alpha: f64,
+    ) -> Result<Value> {
+        let estimator_name = match &args[0] {
+            Expr::Var(n) | Expr::Str(n) => n.clone(),
+            _ => {
+                return Err(HayashiError::Type(
+                    "bootstrap: first argument must be nome do estimador (ols, logit, ...)"
+                        .into(),
+                ))
+            }
+        };
+        let formula_expr = args[1].clone();
+        let df_name = match &args[2] {
+            Expr::Var(n) => n.clone(),
+            _ => {
+                return Err(HayashiError::Type(
+                    "bootstrap: third argument must be nome do DataFrame".into(),
+                ))
+            }
+        };
+        let df = match self.env.get(&df_name) {
+            Some(Value::DataFrame(d)) => d.clone(),
+            _ => {
+                return Err(HayashiError::Runtime(format!(
+                    "'{df_name}' is not a DataFrame"
+                )))
+            }
+        };
+
+        let extra_opts: Vec<Opt> = opts
+            .iter()
+            .filter(|o| !matches!(o.name.as_str(), "n" | "reps" | "alpha"))
+            .cloned()
+            .collect();
+        let full_result = self.eval_call(
+            &estimator_name,
+            &[formula_expr.clone(), Expr::Var(df_name.clone())],
+            &extra_opts,
+        )?;
+        let full_params = Self::extract_params(&full_result).ok_or_else(|| {
+            HayashiError::Runtime(
+                "bootstrap: modelo not supportado (sem params extraíveis)".into(),
+            )
+        })?;
+        let full_se = Self::extract_se(&full_result).unwrap_or_default();
+        let var_names = Self::extract_var_names(&full_result);
+        let k = full_params.len();
+
+        use rand::seq::SliceRandom;
+        let mut rng = self.get_rng();
+        let n = df.n_rows();
+        let indices: Vec<usize> = (0..n).collect();
+        let mut boot_coefs = ndarray::Array2::<f64>::zeros((n_boot, k));
+        let mut n_ok = 0usize;
+
+        for b in 0..n_boot {
+            let boot_idx: Vec<usize> =
+                (0..n).map(|_| *indices.choose(&mut rng).unwrap()).collect();
+            let boot_df = match df.iloc(Some(&boot_idx), None) {
+                Ok(d) => d,
+                Err(_) => continue,
+            };
+            self.env
+                .set("__boot_df__", Value::DataFrame(Rc::new(boot_df)))?;
+            if let Ok(ref result) = self.eval_call(
+                &estimator_name,
+                &[formula_expr.clone(), Expr::Var("__boot_df__".into())],
+                &extra_opts,
+            ) {
+                if let Some(params) = Self::extract_params(result) {
+                    for j in 0..k.min(params.len()) {
+                        boot_coefs[[b, j]] = params[j];
+                    }
+                    n_ok += 1;
+                }
+            }
+        }
+        self.env.remove("__boot_df__");
+
+        if n_ok < 10 {
+            return Err(HayashiError::Runtime(format!(
+                "bootstrap: apenas {n_ok}/{n_boot} replicações convergiram"
+            )));
+        }
+
+        let boot_se = greeners::Bootstrap::bootstrap_se(&boot_coefs);
+        let (ci_lo, ci_hi) = greeners::Bootstrap::percentile_ci(&boot_coefs, alpha);
+
+        let thick = "═".repeat(76);
+        let thin = "─".repeat(76);
+        println!("\n{thick}");
+        println!(
+            "{:^76}",
+            format!(" Bootstrap SE — {} (n={n_ok}/{n_boot}) ", estimator_name)
+        );
+        println!("{thin}");
+        println!(
+            "{:<18} {:>10} {:>10} {:>10} {:>12} {:>12}",
+            "Variável", "β̂", "SE orig.", "SE boot", "IC inf", "IC sup"
+        );
+        println!("{thin}");
+        for i in 0..k {
+            let vname = var_names.get(i).map(|s| s.as_str()).unwrap_or("?");
+            let orig_se = if i < full_se.len() { full_se[i] } else { f64::NAN };
+            println!(
+                "{:<18} {:>10.4} {:>10.4} {:>10.4} {:>12.4} {:>12.4}",
+                vname, full_params[i], orig_se, boot_se[i], ci_lo[i], ci_hi[i]
+            );
+        }
+        println!("{thick}");
+        Ok(Value::Nil)
+    }
+
+    fn bootstrap_pairs(&mut self, args: &[Expr], n_boot: usize, alpha: f64) -> Result<Value> {
+        if args.is_empty() {
+            return Err(HayashiError::Runtime(
+                "bootstrap(estimator, formula, df, n=1000) ou bootse(model, n=1000)".into(),
+            ));
+        }
+        let model_val = self.eval_expr(&args[0])?;
+        match &model_val {
+            Value::OlsResult(m) => {
+                let y_hat = m.x.dot(&m.result.params);
+                let y_vec = &y_hat + &m.residuals;
+                let boot_coefs = greeners::Bootstrap::pairs_bootstrap(&y_vec, &m.x, n_boot)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let boot_se = greeners::Bootstrap::bootstrap_se(&boot_coefs);
+                let (ci_lo, ci_hi) = greeners::Bootstrap::percentile_ci(&boot_coefs, alpha);
+                let vnames = m.result.variable_names.as_deref().unwrap_or(&[]);
+                let k = m.result.params.len();
+                let thick = "═".repeat(76);
+                let thin = "─".repeat(76);
+                println!("\n{thick}");
+                println!("{:^76}", format!(" Bootstrap SE (n={n_boot}, pairs) "));
+                println!("{thin}");
+                println!(
+                    "{:<18} {:>10} {:>10} {:>10} {:>12} {:>12}",
+                    "Variável", "β̂", "SE orig.", "SE boot", "IC inf 95%", "IC sup 95%"
+                );
+                println!("{thin}");
+                for i in 0..k {
+                    let vname = vnames.get(i).map(|s| s.as_str()).unwrap_or("?");
+                    println!(
+                        "{:<18} {:>10.4} {:>10.4} {:>10.4} {:>12.4} {:>12.4}",
+                        vname,
+                        m.result.params[i],
+                        m.result.std_errors[i],
+                        boot_se[i],
+                        ci_lo[i],
+                        ci_hi[i]
+                    );
+                }
+                println!("{thick}");
+                Ok(Value::Nil)
+            }
+            _ => Err(HayashiError::Runtime(
+                "bootse(model) suporta OLS. Para outros: bootstrap(estimator, formula, df, n=1000)"
+                    .into(),
+            )),
+        }
     }
 }
