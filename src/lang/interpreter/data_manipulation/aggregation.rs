@@ -1,5 +1,4 @@
 use super::*;
-use super::helpers::*;
 
 impl Interpreter {
     /// `count(df)` / `nrow(df)` — contagem de linhas como valor.
