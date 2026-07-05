@@ -7,6 +7,7 @@ dimension: numerical
 dataset:
   name: simulated_var1
   source: DGP from book_pt_BR/codes/28_var.hay
+  data_source: dgp
   size: 300 observations
 
 references:

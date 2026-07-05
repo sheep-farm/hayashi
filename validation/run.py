@@ -628,6 +628,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         action="store_true",
         help="Do not rewrite validation/matrix.yml or validation/MATRIX.md.",
     )
+    parser.add_argument(
+        "--allow-blocked",
+        action="store_true",
+        help="Exit with status 0 when validation cases are blocked. By default blocked counts as failure.",
+    )
     return parser.parse_args(argv)
 
 
@@ -791,7 +796,12 @@ def main(argv: list[str] | None = None) -> int:
         write_matrix(matrix, cases)
 
     log(f"\nOverall status: {overall_status}")
-    return 0 if overall_status != "fail" else 1
+    if overall_status == "fail":
+        return 1
+    if overall_status == "blocked" and not args.allow_blocked:
+        log("ERROR: validation blocked (use --allow-blocked to tolerate)")
+        return 1
+    return 0
 
 
 if __name__ == "__main__":

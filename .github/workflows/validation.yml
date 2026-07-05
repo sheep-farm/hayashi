@@ -1,11 +1,6 @@
-:
 name: Validation
 
 on:
-  push:
-    branches: [dev]
-  pull_request:
-    branches: [dev]
   workflow_dispatch:
 
 jobs:
@@ -14,8 +9,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Checkout Greeners dependency
+        run: git clone --depth 1 --branch develop https://github.com/sheep-farm/Greeners.git ../Greeners
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
 
       - name: Install Python
         uses: actions/setup-python@v5
@@ -29,7 +29,10 @@ jobs:
         run: pip install -r validation/requirements.txt
 
       - name: Install R dependencies
-        run: Rscript -e 'install.packages(c("wooldridge", "jsonlite"), repos="https://cloud.r-project.org/")'
+        uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          packages: "deps::validation"
+          working-directory: ${{ github.workspace }}
 
       - name: Build Hayashi
         run: cargo build --release

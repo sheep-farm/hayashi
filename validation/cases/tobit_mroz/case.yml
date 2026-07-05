@@ -28,9 +28,10 @@ reference_scripts:
   R: cases/tobit_mroz/reference/run.R
   Python: cases/tobit_mroz/reference/run.py
 
-notes: Tobit regression of hours worked with left censoring at zero.
+notes: Tobit regression of hours worked with left censoring at zero. Intercept differs from reference; needs isolated investigation.
 
 result:
   summary: ""
-  known_differences: []
-  issues_opened: []
+  known_differences:
+    - intercept differs between Hayashi and AER::tobit/statsmodels
+  issues_opened: [42]
