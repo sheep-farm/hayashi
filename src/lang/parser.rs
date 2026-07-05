@@ -1147,7 +1147,12 @@ impl Parser {
                 }
                 let iter = self.parse_for_iter()?;
                 let body = self.parse_block()?;
-                Ok(Some(Stmt::For { var, var2, iter, body }))
+                Ok(Some(Stmt::For {
+                    var,
+                    var2,
+                    iter,
+                    body,
+                }))
             }
 
             // ── fn name(p1, p2) { body } ─────────────────────────────────────
