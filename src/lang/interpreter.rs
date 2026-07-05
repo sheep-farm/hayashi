@@ -1929,6 +1929,17 @@ impl Interpreter {
                 self.env.pop_scope();
                 Ok(result)
             }
+
+            Expr::Quietly(inner) => {
+                eprintln!(
+                    "warning: quietly() functional form is deprecated; use quietly on / quietly off"
+                );
+                let old = self.env.quiet_mode;
+                self.env.quiet_mode = true;
+                let result = self.eval_expr(inner);
+                self.env.quiet_mode = old;
+                result
+            }
         }
     }
 

@@ -500,6 +500,15 @@ impl Parser {
                 Ok(Expr::Formula(formula))
             }
 
+            // Forma funcional obsoleta: quietly(expr)
+            Token::Quietly => {
+                self.advance();
+                self.expect(&Token::LParen)?;
+                let inner = self.parse_expr()?;
+                self.expect(&Token::RParen)?;
+                Ok(Expr::Quietly(Box::new(inner)))
+            }
+
             // Match expression: match expr { pat => result, ... }
             Token::Ident(ref s) if s == "match" => {
                 self.advance();
@@ -692,6 +701,7 @@ impl Parser {
                 | Token::Fn
                 | Token::Let
                 | Token::Tsset
+                | Token::Quietly
         );
         let next_is_terminator = self
             .tokens
@@ -765,6 +775,7 @@ impl Parser {
                     Token::Fn => "fn",
                     Token::Let => "let",
                     Token::Tsset => "tsset",
+                    Token::Quietly => "quietly",
                     _ => "?",
                 }
                 .to_string();
@@ -1355,6 +1366,12 @@ impl Parser {
             }
 
             Token::Quietly => {
+                if self.tokens.get(self.pos + 1).map(|(t, _)| t == &Token::LParen).unwrap_or(false)
+                {
+                    // Forma funcional obsoleta no nível de statement: quietly(expr)
+                    let expr = self.parse_expr()?;
+                    return Ok(Some(Stmt::Expr(expr)));
+                }
                 self.advance(); // consome quietly
                 match self.peek() {
                     Token::Ident(s) if s == "on" => {

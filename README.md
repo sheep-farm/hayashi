@@ -146,7 +146,7 @@ ols(z ~ x, df)
 print("done")
 ```
 
-Both `quietly on` and `quietly()` (function form) share the same suppression mechanism, so new commands need no special handling — they just use the internal output channel.
+Both `quietly on` and `quietly off` share the same suppression mechanism, so new commands need no special handling — they just use the internal output channel. The `quietly(expr)` function form is deprecated and will be removed in a future release; use `quietly on` / `quietly off` instead.
 
 ### Functions and closures
 
@@ -595,7 +595,7 @@ fn f(n) {
 ```
 quietly on                    // suppress automatic output from here
 quietly off                   // restore automatic output
-quietly(ols(Y ~ X, df))       // suppress one expression
+quietly(ols(Y ~ X, df))       // (deprecated) suppress one expression
 capture(ols(Y ~ X, df))       // ignore errors
 assert(n > 0, "empty data")
 timer(ols(Y ~ X, df))         // time execution
