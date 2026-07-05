@@ -478,10 +478,17 @@ impl Parser {
                     self.brace_depth += 1;
                     let mut pairs = Vec::new();
                     while !matches!(self.peek(), Token::RBrace | Token::Eof) {
+                        self.skip_newlines();
+                        if matches!(self.peek(), Token::RBrace | Token::Eof) {
+                            break;
+                        }
                         let key = self.parse_expr()?;
+                        self.skip_newlines();
                         self.expect(&Token::Colon)?;
+                        self.skip_newlines();
                         let val = self.parse_expr()?;
                         pairs.push((key, val));
+                        self.skip_newlines();
                         if self.peek() == &Token::Comma {
                             self.advance();
                         }
@@ -498,6 +505,15 @@ impl Parser {
             Token::Tilde => {
                 let formula = self.parse_formula(String::new())?;
                 Ok(Expr::Formula(formula))
+            }
+
+            // Forma funcional obsoleta: quietly(expr)
+            Token::Quietly => {
+                self.advance();
+                self.expect(&Token::LParen)?;
+                let inner = self.parse_expr()?;
+                self.expect(&Token::RParen)?;
+                Ok(Expr::Quietly(Box::new(inner)))
             }
 
             // Match expression: match expr { pat => result, ... }
@@ -692,6 +708,7 @@ impl Parser {
                 | Token::Fn
                 | Token::Let
                 | Token::Tsset
+                | Token::Quietly
         );
         let next_is_terminator = self
             .tokens
@@ -765,6 +782,7 @@ impl Parser {
                     Token::Fn => "fn",
                     Token::Let => "let",
                     Token::Tsset => "tsset",
+                    Token::Quietly => "quietly",
                     _ => "?",
                 }
                 .to_string();
@@ -799,8 +817,23 @@ impl Parser {
     // ── Bloco { stmt* } ───────────────────────────────────────────────────────
 
     fn parse_block(&mut self) -> Result<Vec<Spanned>> {
+        let (_, stmts) = self.parse_block_with_doc()?;
+        Ok(stmts)
+    }
+
+    fn parse_block_with_doc(&mut self) -> Result<(Option<String>, Vec<Spanned>)> {
         self.expect(&Token::LBrace)?;
         self.skip_newlines();
+        let mut doc = None;
+        while let Token::DocString(s) = self.peek() {
+            let s = s.clone();
+            self.advance();
+            self.skip_newlines();
+            doc = Some(match doc {
+                Some(prev) => format!("{}\n{}", prev, s),
+                None => s,
+            });
+        }
         let mut stmts = Vec::new();
         while !matches!(self.peek(), Token::RBrace | Token::Eof) {
             let line = self.line();
@@ -810,15 +843,38 @@ impl Parser {
             self.skip_newlines();
         }
         self.expect(&Token::RBrace)?;
-        Ok(stmts)
+        Ok((doc, stmts))
     }
 
     // ── Bloco expressão: { stmt; ...; expr } ───────────────────────────────────
 
     fn is_dict_literal(&mut self) -> bool {
-        // Olha à frente do LBrace atual: {"key": ...} começa com StringLit seguido de ':'.
-        matches!(self.tokens.get(self.pos + 1).map(|t| &t.0), Some(Token::StringLit(_)))
-            && self.tokens.get(self.pos + 2).map(|t| &t.0) == Some(&Token::Colon)
+        // Olha à frente do LBrace atual, pulando newlines e docstrings.
+        // {} é dict vazio. {"key": ...} ou {\n  "key": ...} é dict literal.
+        let mut i = self.pos + 1;
+        while let Some((tok, _)) = self.tokens.get(i) {
+            match tok {
+                Token::Newline | Token::DocString(_) => i += 1,
+                Token::RBrace => return true, // {} ou { /* docstrings */ }
+                Token::StringLit(_) => {
+                    if let Some((Token::Colon, _)) = self.tokens.get(i + 1) {
+                        return true;
+                    }
+                    // Se houver newline entre StringLit e Colon, avança mais.
+                    let mut j = i + 1;
+                    while let Some((tok_j, _)) = self.tokens.get(j) {
+                        match tok_j {
+                            Token::Newline => j += 1,
+                            Token::Colon => return true,
+                            _ => break,
+                        }
+                    }
+                    return false;
+                }
+                _ => return false,
+            }
+        }
+        false
     }
 
     fn parse_block_expr(&mut self) -> Result<Expr> {
@@ -1093,15 +1149,24 @@ impl Parser {
                 let name = self.expect_ident()?;
                 self.expect(&Token::LParen)?;
                 let mut params = Vec::new();
+                let mut defaults = Vec::new();
                 while !matches!(self.peek(), Token::RParen | Token::Eof) {
-                    params.push(self.expect_ident()?);
+                    let param = self.expect_ident()?;
+                    let default = if self.peek() == &Token::Eq {
+                        self.advance();
+                        Some(self.parse_expr()?)
+                    } else {
+                        None
+                    };
+                    params.push(param);
+                    defaults.push(default);
                     if self.peek() == &Token::Comma {
                         self.advance();
                     }
                 }
                 self.expect(&Token::RParen)?;
-                let body = self.parse_block()?;
-                Ok(Some(Stmt::Fn { name, params, body }))
+                let (doc, body) = self.parse_block_with_doc()?;
+                Ok(Some(Stmt::Fn { name, params, defaults, doc, body }))
             }
 
             // ── return [expr] ─────────────────────────────────────────────────
@@ -1331,6 +1396,12 @@ impl Parser {
             }
 
             Token::Quietly => {
+                if self.tokens.get(self.pos + 1).map(|(t, _)| t == &Token::LParen).unwrap_or(false)
+                {
+                    // Forma funcional obsoleta no nível de statement: quietly(expr)
+                    let expr = self.parse_expr()?;
+                    return Ok(Some(Stmt::Expr(expr)));
+                }
                 self.advance(); // consome quietly
                 match self.peek() {
                     Token::Ident(s) if s == "on" => {

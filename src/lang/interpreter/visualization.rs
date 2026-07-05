@@ -1,4 +1,5 @@
 use super::*;
+use super::helpers::*;
 
 /// Visualização ASCII (acfplot/pacf/qqplot/corrplot/scatter/histogram/boxplot/kdensity)
 /// e coefplot. Extraído de `eval_call` (ver src/lang/interpreter.rs).
@@ -40,7 +41,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let data = Self::get_col_f64(&df, &var_name)?;
+                let data = get_col_f64(&df, &var_name)?;
                 let max_lag = match opt_map.get("lags") {
                     Some(Value::Int(v)) => *v as usize,
                     Some(Value::Float(v)) => *v as usize,
@@ -56,7 +57,7 @@ impl Interpreter {
                     _ => format!("ACF — {var_name}"),
                 };
                 let clean: Vec<f64> = data.iter().cloned().filter(|v| !v.is_nan()).collect();
-                Self::ascii_acf(&clean, max_lag, &title, width, false);
+                ascii_acf(&clean, max_lag, &title, width, false);
                 Ok(Value::Nil)
             }
 
@@ -87,7 +88,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let data = Self::get_col_f64(&df, &var_name)?;
+                let data = get_col_f64(&df, &var_name)?;
                 let max_lag = match opt_map.get("lags") {
                     Some(Value::Int(v)) => *v as usize,
                     Some(Value::Float(v)) => *v as usize,
@@ -103,7 +104,7 @@ impl Interpreter {
                     _ => format!("PACF — {var_name}"),
                 };
                 let clean: Vec<f64> = data.iter().cloned().filter(|v| !v.is_nan()).collect();
-                Self::ascii_acf(&clean, max_lag, &title, width, true);
+                ascii_acf(&clean, max_lag, &title, width, true);
                 Ok(Value::Nil)
             }
 
@@ -134,7 +135,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let data = Self::get_col_f64(&df, &var_name)?;
+                let data = get_col_f64(&df, &var_name)?;
                 let w = match opt_map.get("width") {
                     Some(Value::Int(v)) => *v as usize,
                     Some(Value::Float(v)) => *v as usize,
@@ -150,7 +151,7 @@ impl Interpreter {
                     _ => format!("QQ-plot normal — {var_name}"),
                 };
                 let clean: Vec<f64> = data.iter().cloned().filter(|v| !v.is_nan()).collect();
-                Self::ascii_qqplot(&clean, &title, &var_name, w, h);
+                ascii_qqplot(&clean, &title, &var_name, w, h);
                 Ok(Value::Nil)
             }
 
@@ -195,11 +196,11 @@ impl Interpreter {
                 let cols: Vec<Vec<f64>> = {
                     let mut v = Vec::new();
                     for n in &var_names {
-                        v.push(Self::get_col_f64(&df, n)?.to_vec());
+                        v.push(get_col_f64(&df, n)?.to_vec());
                     }
                     v
                 };
-                Self::ascii_corrplot(&cols, &var_names);
+                ascii_corrplot(&cols, &var_names);
                 Ok(Value::Nil)
             }
 
@@ -232,7 +233,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let data = Self::get_col_f64(&df, &var_name)?;
+                let data = get_col_f64(&df, &var_name)?;
                 let bins = match opt_map.get("bins") {
                     Some(Value::Int(v)) => *v as usize,
                     Some(Value::Float(v)) => *v as usize,
@@ -248,7 +249,7 @@ impl Interpreter {
                     _ => format!("Histograma — {var_name}"),
                 };
                 let clean: Vec<f64> = data.iter().cloned().filter(|v| !v.is_nan()).collect();
-                Self::ascii_histogram(&clean, bins, &title, &var_name, width);
+                ascii_histogram(&clean, bins, &title, &var_name, width);
                 Ok(Value::Nil)
             }
 
@@ -287,8 +288,8 @@ impl Interpreter {
                         ))
                     }
                 };
-                let xs = Self::get_col_f64(&df, &xname)?;
-                let ys = Self::get_col_f64(&df, &yname)?;
+                let xs = get_col_f64(&df, &xname)?;
+                let ys = get_col_f64(&df, &yname)?;
                 let w = match opt_map.get("width") {
                     Some(Value::Int(v)) => *v as usize,
                     Some(Value::Float(v)) => *v as usize,
@@ -303,7 +304,7 @@ impl Interpreter {
                     Some(Value::Str(s)) => s.clone(),
                     _ => format!("{yname} vs {xname}"),
                 };
-                Self::ascii_scatter(&xs.to_vec(), &ys.to_vec(), &title, &xname, &yname, w, h);
+                ascii_scatter(&xs.to_vec(), &ys.to_vec(), &title, &xname, &yname, w, h);
                 Ok(Value::Nil)
             }
 
@@ -342,8 +343,8 @@ impl Interpreter {
                         ))
                     }
                 };
-                let xs = Self::get_col_f64(&df, &xname)?;
-                let ys = Self::get_col_f64(&df, &yname)?;
+                let xs = get_col_f64(&df, &xname)?;
+                let ys = get_col_f64(&df, &yname)?;
                 let w = match opt_map.get("width") {
                     Some(Value::Int(v)) => *v as usize,
                     Some(Value::Float(v)) => *v as usize,
@@ -358,7 +359,7 @@ impl Interpreter {
                     Some(Value::Str(s)) => s.clone(),
                     _ => format!("{yname} — série temporal"),
                 };
-                Self::ascii_lineplot(&xs.to_vec(), &ys.to_vec(), &title, &xname, &yname, w, h);
+                ascii_lineplot(&xs.to_vec(), &ys.to_vec(), &title, &xname, &yname, w, h);
                 Ok(Value::Nil)
             }
 
@@ -387,7 +388,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let data = Self::get_col_f64(&df, &var_name)?;
+                let data = get_col_f64(&df, &var_name)?;
                 let w = match opt_map.get("width") {
                     Some(Value::Int(v)) => *v as usize,
                     Some(Value::Float(v)) => *v as usize,
@@ -398,7 +399,7 @@ impl Interpreter {
                     _ => format!("Boxplot — {var_name}"),
                 };
                 let clean: Vec<f64> = data.iter().cloned().filter(|v| !v.is_nan()).collect();
-                Self::ascii_boxplot(&clean, &title, &var_name, w);
+                ascii_boxplot(&clean, &title, &var_name, w);
                 Ok(Value::Nil)
             }
 
@@ -429,7 +430,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let data = Self::get_col_f64(&df, &var_name)?;
+                let data = get_col_f64(&df, &var_name)?;
                 let w = match opt_map.get("width") {
                     Some(Value::Int(v)) => *v as usize,
                     Some(Value::Float(v)) => *v as usize,
@@ -473,7 +474,7 @@ impl Interpreter {
                     Some(Value::Str(s)) => s.clone(),
                     _ => format!("KDE — {var_name}  (bw={:.4})", result.bandwidth),
                 };
-                Self::ascii_lineplot(&xs, &ys, &title, &var_name, "densidade", w, h);
+                ascii_lineplot(&xs, &ys, &title, &var_name, "densidade", w, h);
                 Ok(Value::Nil)
             }
 
@@ -506,7 +507,7 @@ impl Interpreter {
                     _ => 20,
                 };
                 let title = format!("Resíduos vs Ŷ — {mname}");
-                Self::ascii_scatter(&fitted, &resids, &title, "ŷ (fitted)", "e (resíduo)", w, h);
+                ascii_scatter(&fitted, &resids, &title, "ŷ (fitted)", "e (resíduo)", w, h);
                 Ok(Value::Nil)
             }
 
@@ -522,10 +523,10 @@ impl Interpreter {
                     _ => 50,
                 };
 
-                let params = Self::extract_params(&model)
+                let params = extract_params(&model)
                     .ok_or_else(|| HayashiError::Runtime("coefplot: modelo sem params".into()))?;
-                let se = Self::extract_se(&model).unwrap_or_default();
-                let names = Self::extract_var_names(&model);
+                let se = extract_se(&model).unwrap_or_default();
+                let names = extract_var_names(&model);
                 let z = 1.96_f64;
 
                 // coletar (nome, coef, ci_lo, ci_hi) excluindo constante
@@ -648,8 +649,8 @@ impl Interpreter {
                     Some(Value::Int(v)) => *v as u32,
                     _ => 600,
                 };
-                let x = Self::get_col_f64(&df, &x_name)?;
-                let y = Self::get_col_f64(&df, &y_name)?;
+                let x = get_col_f64(&df, &x_name)?;
+                let y = get_col_f64(&df, &y_name)?;
                 crate::io::plot::Plot::scatter(
                     &x.to_vec(),
                     &y.to_vec(),
@@ -702,8 +703,8 @@ impl Interpreter {
                     Some(Value::Int(v)) => *v as u32,
                     _ => 600,
                 };
-                let x = Self::get_col_f64(&df, &x_name)?;
-                let y = Self::get_col_f64(&df, &y_name)?;
+                let x = get_col_f64(&df, &x_name)?;
+                let y = get_col_f64(&df, &y_name)?;
                 crate::io::plot::Plot::line(
                     &x.to_vec(),
                     &y.to_vec(),
@@ -756,7 +757,7 @@ impl Interpreter {
                     Some(Value::Int(v)) => *v as u32,
                     _ => 600,
                 };
-                let vals = Self::get_col_f64(&df, &var_name)?;
+                let vals = get_col_f64(&df, &var_name)?;
                 crate::io::plot::Plot::histogram(
                     &vals.to_vec(),
                     &var_name,
@@ -793,10 +794,10 @@ impl Interpreter {
                     Some(Value::Int(v)) => *v as u32,
                     _ => 500,
                 };
-                let params = Self::extract_params(&model)
+                let params = extract_params(&model)
                     .ok_or_else(|| HayashiError::Runtime("model sem params".into()))?;
-                let se = Self::extract_se(&model).unwrap_or_default();
-                let names = Self::extract_var_names(&model);
+                let se = extract_se(&model).unwrap_or_default();
+                let names = extract_var_names(&model);
                 let z = 1.96_f64;
                 let mut plot_names = Vec::new();
                 let mut plot_coefs = Vec::new();

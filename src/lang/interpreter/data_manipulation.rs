@@ -1,4 +1,5 @@
 use super::*;
+use super::helpers::*;
 
 /// ttest, count/nrow, collapse, group_by, pivot_longer/pivot_wider, append,
 /// merge, reshape, sort, list, winsor, tabgen, ci, centile, recode, dropna,
@@ -33,210 +34,7 @@ impl Interpreter {
                 Ok(Value::Int(df.n_rows() as i64))
             }
 
-            "ttest" => {
-                if args.is_empty() {
-                    return Err(HayashiError::Runtime("ttest() requires a DataFrame".into()));
-                }
-                let df = match self.eval_expr(&args[0])? {
-                    Value::DataFrame(d) => d,
-                    _ => {
-                        return Err(HayashiError::Type(
-                            "first argument must be a DataFrame".into(),
-                        ))
-                    }
-                };
-
-                let get_col_vals = |df: &DataFrame, col: &str| -> Result<Vec<f64>> {
-                    use greeners::Column;
-                    match df.get_column(col) {
-                        Ok(Column::Float(a)) => {
-                            if a.iter().any(|v| !v.is_finite()) {
-                                return Err(HayashiError::Runtime(
-                                    format!("ttest: column '{col}' contains NaN or Inf. Use dropna() first.")
-                                ));
-                            }
-                            Ok(a.iter().copied().collect())
-                        }
-                        Ok(Column::Int(a)) => Ok(a.iter().map(|&x| x as f64).collect()),
-                        _ => Err(self.type_err(format!("'{col}' is not numeric"))),
-                    }
-                };
-
-                let _stats = |v: &[f64]| -> (f64, f64, f64) {
-                    // (mean, sd, n)
-                    let n = v.len() as f64;
-                    let m = v.iter().sum::<f64>() / n;
-                    let s = if n > 1.0 {
-                        (v.iter().map(|x| (x - m).powi(2)).sum::<f64>() / (n - 1.0)).sqrt()
-                    } else {
-                        f64::NAN
-                    };
-                    (m, s, n)
-                };
-
-                // ── um argumento variável → uni-amostral ou por grupo ─────────
-                if args.len() >= 2 {
-                    let var1 = match &args[1] {
-                        Expr::Var(n) | Expr::Str(n) => n.clone(),
-                        _ => {
-                            return Err(HayashiError::Type(
-                                "variable name must be an identifier".into(),
-                            ))
-                        }
-                    };
-
-                    use greeners::Stats;
-                    use ndarray::Array1;
-
-                    // ── PAREADO: ttest(df, v1, v2, paired=true) ──────────────
-                    if args.len() >= 3 && matches!(opt_map.get("paired"), Some(Value::Bool(true))) {
-                        let var2 = match &args[2] {
-                            Expr::Var(n) | Expr::Str(n) => n.clone(),
-                            _ => {
-                                return Err(HayashiError::Type(
-                                    "variable name must be an identifier".into(),
-                                ))
-                            }
-                        };
-                        let v1_vec = get_col_vals(&df, &var1)?;
-                        let v2_vec = get_col_vals(&df, &var2)?;
-                        let v1 = Array1::from(v1_vec);
-                        let v2 = Array1::from(v2_vec);
-
-                        let res = Stats::ttest_paired_full(&v1, &v2)
-                            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-
-                        let _tc = t_critical_95(res.df);
-                        println!("\nPaired t-test: {var1} - {var2}");
-                        println!("{}", "─".repeat(62));
-                        println!(
-                            "{:<14} {:>6}  {:>10}  {:>10}  {:>10}",
-                            "Variable", "Obs", "Mean", "Std. Err.", "[95% CI]"
-                        );
-                        println!("{}", "─".repeat(62));
-                        println!(
-                            "{:<14} {:>6.0}  {:>10.4}  {:>10.4}  [{:.4}, {:.4}]",
-                            format!("{var1}-{var2}"),
-                            res.n as f64,
-                            res.mean,
-                            res.std_err,
-                            res.ci_lower,
-                            res.ci_upper
-                        );
-                        println!("{}", "─".repeat(62));
-                        println!(
-                            "H0: mean(diff) = 0   t = {:.4}   df = {:.0}   p = {:.4}",
-                            res.t_statistic, res.df, res.p_value
-                        );
-                        println!();
-
-                    // ── DOIS GRUPOS: ttest(df, var, by=group) ────────────────
-                    } else if let Some(Value::Str(by_col)) = opt_map.get("by") {
-                        let by_col = by_col.clone();
-                        let vals = get_col_vals(&df, &var1)?;
-                        let groups = Self::col_to_strings(&df, &by_col)?;
-
-                        let mut group_data: HashMap<String, Vec<f64>> = HashMap::new();
-                        for (i, g) in groups.iter().enumerate() {
-                            group_data.entry(g.clone()).or_default().push(vals[i]);
-                        }
-                        let mut gkeys: Vec<String> = group_data.keys().cloned().collect();
-                        if gkeys.len() != 2 {
-                            return Err(HayashiError::Runtime(format!(
-                                "two-sample ttest requires exactly 2 groups, got {}",
-                                gkeys.len()
-                            )));
-                        }
-                        Self::sort_maybe_numeric_strings(&mut gkeys);
-
-                        let equal_var = matches!(opt_map.get("unequal"), Some(Value::Bool(false)));
-
-                        let v1 = Array1::from(group_data[&gkeys[0]].clone());
-                        let v2 = Array1::from(group_data[&gkeys[1]].clone());
-
-                        let res = Stats::compare_means(&v1, &v2, equal_var)
-                            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-
-                        let tc = t_critical_95(res.df);
-
-                        let title = if equal_var {
-                            format!("Two-sample t-test (Equal Variances): {var1} by {by_col}")
-                        } else {
-                            format!("Two-sample t-test (Welch): {var1} by {by_col}")
-                        };
-                        println!("\n{}", title);
-                        println!("{}", "─".repeat(68));
-                        println!(
-                            "{:<10} {:>6}  {:>10}  {:>10}  {:>10}  {:>10}",
-                            "Group", "Obs", "Mean", "Std. Err.", "Std. Dev.", "[95% CI]"
-                        );
-                        println!("{}", "─".repeat(68));
-                        for (g, m, s, n, se_g) in [
-                            (&gkeys[0], res.mean1, res.std_dev1, res.n1, res.std_err1),
-                            (&gkeys[1], res.mean2, res.std_dev2, res.n2, res.std_err2),
-                        ] {
-                            println!(
-                                "{:<10} {:>6.0}  {:>10.4}  {:>10.4}  {:>10.4}  [{:.4}, {:.4}]",
-                                g,
-                                n as f64,
-                                m,
-                                se_g,
-                                s,
-                                m - tc * se_g,
-                                m + tc * se_g
-                            );
-                        }
-                        println!("{}", "─".repeat(68));
-                        println!("diff = mean({}) - mean({})", gkeys[0], gkeys[1]);
-                        let t_label = if equal_var { "t" } else { "Welch's t" };
-                        println!(
-                            "H0: diff = 0   {} = {:.4}   df = {:.2}   p = {:.4}",
-                            t_label, res.t_statistic, res.df, res.p_value
-                        );
-                        println!();
-
-                    // ── UNI-AMOSTRAL: ttest(df, var, mu=0) ───────────────────
-                    } else {
-                        let mu = match opt_map.get("mu") {
-                            Some(Value::Float(f)) => *f,
-                            Some(Value::Int(i)) => *i as f64,
-                            None => 0.0,
-                            _ => return Err(HayashiError::Type("mu= must be numeric".into())),
-                        };
-                        let v_vec = get_col_vals(&df, &var1)?;
-                        let v = Array1::from(v_vec);
-
-                        let res = Stats::ttest_1samp_full(&v, mu)
-                            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-
-                        let _tc = t_critical_95(res.df);
-
-                        println!("\nOne-sample t-test: {var1}   H0: mean = {mu}");
-                        println!("{}", "─".repeat(62));
-                        println!(
-                            "{:<14} {:>6}  {:>10}  {:>10}  {:>10}",
-                            "Variable", "Obs", "Mean", "Std. Err.", "[95% CI]"
-                        );
-                        println!("{}", "─".repeat(62));
-                        println!(
-                            "{:<14} {:>6.0}  {:>10.4}  {:>10.4}  [{:.4}, {:.4}]",
-                            var1, res.n as f64, res.mean, res.std_err, res.ci_lower, res.ci_upper
-                        );
-                        println!("{}", "─".repeat(62));
-                        println!(
-                            "t = {:.4}   df = {:.0}   p = {:.4}",
-                            res.t_statistic, res.df, res.p_value
-                        );
-                        println!();
-                    }
-                } else {
-                    return Err(HayashiError::Runtime(
-                        "ttest() requires a variable name as second argument".into(),
-                    ));
-                }
-
-                Ok(Value::Nil)
-            }
+            "ttest" => self.eval_ttest(args, opt_map),
 
             // ── collapse ─────────────────────────────────────────────────────
             "collapse" => {
@@ -307,7 +105,7 @@ impl Interpreter {
                     .collect::<Result<_>>()?;
 
                 // agrupa índices de linha por valor de by
-                let by_strs = Self::col_to_strings(&df, &by_col)?;
+                let by_strs = col_to_strings(&df, &by_col)?;
                 let n_obs = df.n_rows();
                 let mut groups: HashMap<String, Vec<usize>> = HashMap::new();
                 for (i, v) in by_strs.iter().enumerate() {
@@ -316,7 +114,7 @@ impl Interpreter {
 
                 // ordena chaves de grupo
                 let mut keys: Vec<String> = groups.keys().cloned().collect();
-                Self::sort_maybe_numeric_strings(&mut keys);
+                sort_maybe_numeric_strings(&mut keys);
 
                 // função de agregação: NaN nos dados propaga NaN no resultado (IEEE 754)
                 let agg = |vals: &[f64]| -> f64 {
@@ -458,14 +256,14 @@ impl Interpreter {
                     })
                     .collect::<Result<_>>()?;
 
-                let by_strs = Self::col_to_strings(&df, &by_col)?;
+                let by_strs = col_to_strings(&df, &by_col)?;
                 let n_obs = df.n_rows();
                 let mut groups: HashMap<String, Vec<usize>> = HashMap::new();
                 for (i, v) in by_strs.iter().enumerate() {
                     groups.entry(v.clone()).or_default().push(i);
                 }
                 let mut keys: Vec<String> = groups.keys().cloned().collect();
-                Self::sort_maybe_numeric_strings(&mut keys);
+                sort_maybe_numeric_strings(&mut keys);
 
                 let agg_fn = |vals: &[f64]| -> f64 {
                     let n = vals.len();
@@ -608,7 +406,7 @@ impl Interpreter {
                 let n_long = n_i * n_t;
 
                 let mut builder = DataFrame::builder();
-                let id_data = Self::get_col_f64(&df, &i_col)?;
+                let id_data = get_col_f64(&df, &i_col)?;
                 let ids: Vec<f64> = (0..n_long).map(|idx| id_data[idx / n_t]).collect();
                 builder = builder.add_column(&i_col, ids);
 
@@ -631,7 +429,7 @@ impl Interpreter {
                     for i in 0..n_i {
                         for suf in suffs {
                             let col_name = format!("{stub}{suf}");
-                            let col = Self::get_col_f64(&df, &col_name)?;
+                            let col = get_col_f64(&df, &col_name)?;
                             vals.push(col[i]);
                         }
                     }
@@ -697,8 +495,8 @@ impl Interpreter {
                     }
                 };
 
-                let id_vals = Self::get_col_f64(&df, &i_col)?;
-                let j_strs = Self::col_to_strings(&df, &j_col)?;
+                let id_vals = get_col_f64(&df, &i_col)?;
+                let j_strs = col_to_strings(&df, &j_col)?;
 
                 let mut unique_ids: Vec<f64> = id_vals.to_vec();
                 unique_ids.sort_by(|a, b| a.partial_cmp(b).unwrap());
@@ -713,7 +511,7 @@ impl Interpreter {
                 builder = builder.add_column(&i_col, unique_ids.clone());
 
                 for var in &val_vars {
-                    let var_data = Self::get_col_f64(&df, var)?;
+                    let var_data = get_col_f64(&df, var)?;
                     for jv in &unique_j {
                         let col_name = format!("{var}{jv}");
                         let mut vals = vec![f64::NAN; n_wide];
@@ -876,13 +674,13 @@ impl Interpreter {
                 };
 
                 // índice de busca no df2: key_str → primeiro índice de linha
-                let key2_strs = Self::col_to_strings(&df2, &key_col)?;
+                let key2_strs = col_to_strings(&df2, &key_col)?;
                 let mut lookup: HashMap<String, usize> = HashMap::new();
                 for (j, v) in key2_strs.iter().enumerate().rev() {
                     lookup.insert(v.clone(), j); // rev para ficar com o primeiro
                 }
 
-                let key1_strs = Self::col_to_strings(&df1, &key_col)?;
+                let key1_strs = col_to_strings(&df1, &key_col)?;
                 let n1 = df1.n_rows();
                 let n2 = df2.n_rows();
 
@@ -1714,7 +1512,7 @@ impl Interpreter {
                 let winsorized = df
                     .winsorize(&var_name, p)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let orig = Self::get_col_f64(&df, &var_name)?;
+                let orig = get_col_f64(&df, &var_name)?;
                 let lo = winsorized.iter().cloned().fold(f64::INFINITY, f64::min);
                 let hi = winsorized.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
                 let n_clip = orig
@@ -1800,7 +1598,7 @@ impl Interpreter {
                     Some(Value::Float(v)) => *v,
                     _ => 0.95,
                 };
-                let col = Self::get_col_f64(&df, &var)?;
+                let col = get_col_f64(&df, &var)?;
                 let vals: Vec<f64> = col.iter().filter(|v| v.is_finite()).copied().collect();
                 let n = vals.len() as f64;
                 let mean = vals.iter().sum::<f64>() / n;
@@ -1832,7 +1630,7 @@ impl Interpreter {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
                     _ => return Err(HayashiError::Type("var".into())),
                 };
-                let col = Self::get_col_f64(&df, &var)?;
+                let col = get_col_f64(&df, &var)?;
                 let mut sorted: Vec<f64> = col.iter().filter(|v| v.is_finite()).copied().collect();
                 if sorted.is_empty() {
                     return Err(HayashiError::Runtime(format!(
@@ -1909,7 +1707,7 @@ impl Interpreter {
                         .collect(),
                     _ => return Err(HayashiError::Runtime("recode requer to=[...]".into())),
                 };
-                let col = Self::get_col_f64(&df, &var)?;
+                let col = get_col_f64(&df, &var)?;
                 let recoded: Vec<f64> = col
                     .iter()
                     .map(|&v| {
@@ -2056,7 +1854,7 @@ impl Interpreter {
                     let mut result = Vec::new();
                     for item in lst.iter() {
                         let pred = self.call_value_fn(&fn_val, std::slice::from_ref(item))?;
-                        if Self::value_as_bool(&pred) {
+                        if value_as_bool(&pred) {
                             result.push(item.clone());
                         }
                     }
@@ -2212,7 +2010,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let vals = Self::get_col_f64(&df, &col_name)?;
+                let vals = get_col_f64(&df, &col_name)?;
                 let str_vals: Vec<String> = vals
                     .iter()
                     .map(|&v| {
@@ -2517,7 +2315,7 @@ impl Interpreter {
                 };
 
                 if args.len() == 2 {
-                    Self::tabulate_one(&df, &var1)?;
+                    tabulate_one(&df, &var1)?;
                 } else {
                     let var2 = match &args[2] {
                         Expr::Var(n) | Expr::Str(n) => n.clone(),
@@ -2528,7 +2326,7 @@ impl Interpreter {
                         }
                     };
                     let do_chi2 = matches!(opt_map.get("chi2"), Some(Value::Bool(true)));
-                    Self::tabulate_two(&df, &var1, &var2, do_chi2)?;
+                    tabulate_two(&df, &var1, &var2, do_chi2)?;
                 }
 
                 Ok(Value::Nil)
@@ -2537,5 +2335,187 @@ impl Interpreter {
             _ => return Ok(None),
         };
         result.map(Some)
+    }
+
+    // ── t-test helpers ────────────────────────────────────────────────────────
+
+    fn ttest_get_col_vals(&self, df: &DataFrame, col: &str) -> Result<Vec<f64>> {
+        use greeners::Column;
+        match df.get_column(col) {
+            Ok(Column::Float(a)) => {
+                if a.iter().any(|v| !v.is_finite()) {
+                    return Err(HayashiError::Runtime(format!(
+                        "ttest: column '{col}' contains NaN or Inf. Use dropna() first."
+                    )));
+                }
+                Ok(a.iter().copied().collect())
+            }
+            Ok(Column::Int(a)) => Ok(a.iter().map(|&x| x as f64).collect()),
+            _ => Err(self.type_err(format!("'{col}' is not numeric"))),
+        }
+    }
+
+    fn eval_ttest(&mut self, args: &[Expr], opt_map: &HashMap<String, Value>) -> Result<Value> {
+        if args.is_empty() {
+            return Err(HayashiError::Runtime("ttest() requires a DataFrame".into()));
+        }
+        let df = match self.eval_expr(&args[0])? {
+            Value::DataFrame(d) => d,
+            _ => {
+                return Err(HayashiError::Type(
+                    "first argument must be a DataFrame".into(),
+                ))
+            }
+        };
+
+        if args.len() < 2 {
+            return Err(HayashiError::Runtime(
+                "ttest() requires a variable name as second argument".into(),
+            ));
+        }
+
+        let var1 = match &args[1] {
+            Expr::Var(n) | Expr::Str(n) => n.clone(),
+            _ => {
+                return Err(HayashiError::Type(
+                    "variable name must be an identifier".into(),
+                ))
+            }
+        };
+
+        use greeners::Stats;
+        use ndarray::Array1;
+
+        // Pareado
+        if args.len() >= 3 && matches!(opt_map.get("paired"), Some(Value::Bool(true))) {
+            let var2 = match &args[2] {
+                Expr::Var(n) | Expr::Str(n) => n.clone(),
+                _ => {
+                    return Err(HayashiError::Type(
+                        "variable name must be an identifier".into(),
+                    ))
+                }
+            };
+            let v1_vec = self.ttest_get_col_vals(&df, &var1)?;
+            let v2_vec = self.ttest_get_col_vals(&df, &var2)?;
+            let v1 = Array1::from(v1_vec);
+            let v2 = Array1::from(v2_vec);
+            let res = Stats::ttest_paired_full(&v1, &v2)
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+            println!("\nPaired t-test: {var1} - {var2}");
+            println!("{}", "─".repeat(62));
+            println!(
+                "{:<14} {:>6}  {:>10}  {:>10}  {:>10}",
+                "Variable", "Obs", "Mean", "Std. Err.", "[95% CI]"
+            );
+            println!("{}", "─".repeat(62));
+            println!(
+                "{:<14} {:>6.0}  {:>10.4}  {:>10.4}  [{:.4}, {:.4}]",
+                format!("{var1}-{var2}"),
+                res.n as f64,
+                res.mean,
+                res.std_err,
+                res.ci_lower,
+                res.ci_upper
+            );
+            println!("{}", "─".repeat(62));
+            println!(
+                "H0: mean(diff) = 0   t = {:.4}   df = {:.0}   p = {:.4}",
+                res.t_statistic, res.df, res.p_value
+            );
+            println!();
+            return Ok(Value::Nil);
+        }
+
+        // Dois grupos
+        if let Some(Value::Str(by_col)) = opt_map.get("by") {
+            let by_col = by_col.clone();
+            let vals = self.ttest_get_col_vals(&df, &var1)?;
+            let groups = col_to_strings(&df, &by_col)?;
+            let mut group_data: HashMap<String, Vec<f64>> = HashMap::new();
+            for (i, g) in groups.iter().enumerate() {
+                group_data.entry(g.clone()).or_default().push(vals[i]);
+            }
+            let mut gkeys: Vec<String> = group_data.keys().cloned().collect();
+            if gkeys.len() != 2 {
+                return Err(HayashiError::Runtime(format!(
+                    "two-sample ttest requires exactly 2 groups, got {}",
+                    gkeys.len()
+                )));
+            }
+            sort_maybe_numeric_strings(&mut gkeys);
+            let equal_var = matches!(opt_map.get("unequal"), Some(Value::Bool(false)));
+            let v1 = Array1::from(group_data[&gkeys[0]].clone());
+            let v2 = Array1::from(group_data[&gkeys[1]].clone());
+            let res = Stats::compare_means(&v1, &v2, equal_var)
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+            let tc = t_critical_95(res.df);
+            let title = if equal_var {
+                format!("Two-sample t-test (Equal Variances): {var1} by {by_col}")
+            } else {
+                format!("Two-sample t-test (Welch): {var1} by {by_col}")
+            };
+            println!("\n{}", title);
+            println!("{}", "─".repeat(68));
+            println!(
+                "{:<10} {:>6}  {:>10}  {:>10}  {:>10}  {:>10}",
+                "Group", "Obs", "Mean", "Std. Err.", "Std. Dev.", "[95% CI]"
+            );
+            println!("{}", "─".repeat(68));
+            for (g, m, s, n, se_g) in [
+                (&gkeys[0], res.mean1, res.std_dev1, res.n1, res.std_err1),
+                (&gkeys[1], res.mean2, res.std_dev2, res.n2, res.std_err2),
+            ] {
+                println!(
+                    "{:<10} {:>6.0}  {:>10.4}  {:>10.4}  {:>10.4}  [{:.4}, {:.4}]",
+                    g,
+                    n as f64,
+                    m,
+                    se_g,
+                    s,
+                    m - tc * se_g,
+                    m + tc * se_g
+                );
+            }
+            println!("{}", "─".repeat(68));
+            println!("diff = mean({}) - mean({})", gkeys[0], gkeys[1]);
+            let t_label = if equal_var { "t" } else { "Welch's t" };
+            println!(
+                "H0: diff = 0   {} = {:.4}   df = {:.2}   p = {:.4}",
+                t_label, res.t_statistic, res.df, res.p_value
+            );
+            println!();
+            return Ok(Value::Nil);
+        }
+
+        // Uni-amostral
+        let mu = match opt_map.get("mu") {
+            Some(Value::Float(f)) => *f,
+            Some(Value::Int(i)) => *i as f64,
+            None => 0.0,
+            _ => return Err(HayashiError::Type("mu= must be numeric".into())),
+        };
+        let v_vec = self.ttest_get_col_vals(&df, &var1)?;
+        let v = Array1::from(v_vec);
+        let res = Stats::ttest_1samp_full(&v, mu)
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        println!("\nOne-sample t-test: {var1}   H0: mean = {mu}");
+        println!("{}", "─".repeat(62));
+        println!(
+            "{:<14} {:>6}  {:>10}  {:>10}  {:>10}",
+            "Variable", "Obs", "Mean", "Std. Err.", "[95% CI]"
+        );
+        println!("{}", "─".repeat(62));
+        println!(
+            "{:<14} {:>6.0}  {:>10.4}  {:>10.4}  [{:.4}, {:.4}]",
+            var1, res.n as f64, res.mean, res.std_err, res.ci_lower, res.ci_upper
+        );
+        println!("{}", "─".repeat(62));
+        println!(
+            "t = {:.4}   df = {:.0}   p = {:.4}",
+            res.t_statistic, res.df, res.p_value
+        );
+        println!();
+        Ok(Value::Nil)
     }
 }

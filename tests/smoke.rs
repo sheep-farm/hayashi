@@ -8210,6 +8210,228 @@ display has_key(d2, "b")
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// SERIES — colunas como cidadãos de primeira classe
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn series_from_dataframe() {
+    assert_ok_contains(
+        "series_from_df",
+        r#"
+input df
+  y x
+  1 10
+  2 20
+  3 30
+  4 40
+  5 50
+end
+let s = df["y"]
+display len(s)
+display first(s)
+display last(s)
+"#,
+        "5",
+    );
+}
+
+#[test]
+fn series_aggregations() {
+    assert_ok_contains(
+        "series_agg",
+        r#"
+input df
+  y x
+  1 10
+  2 20
+  3 30
+  4 40
+  5 50
+end
+let s = df["y"]
+display mean(s)
+display sd(s)
+display min(s)
+display max(s)
+"#,
+        "3",
+    );
+}
+
+#[test]
+fn series_index() {
+    assert_ok_contains(
+        "series_index",
+        r#"
+input df
+  y x
+  1 10
+  2 20
+  3 30
+end
+let s = df["y"]
+display s[0]
+display s[-1]
+"#,
+        "3",
+    );
+}
+
+#[test]
+fn series_shift() {
+    assert_ok_contains(
+        "series_shift",
+        r#"
+input df
+  y x
+  1 10
+  2 20
+  3 30
+end
+let s = df["y"]
+let shifted = shift(s, 1)
+display first(shifted)
+"#,
+        "nil",
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DEFAULTS EM FN
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn fn_default_args() {
+    assert_ok_contains(
+        "fn_defaults",
+        r#"
+fn add(a, b=10) {
+    return a + b
+}
+display add(5)
+display add(5, 3)
+"#,
+        "15",
+    );
+}
+
+#[test]
+fn fn_default_string() {
+    assert_ok_contains(
+        "fn_default_str",
+        r#"
+fn greet(name, greeting="Oi") {
+    return greeting + " " + name
+}
+display greet("Ana")
+"#,
+        "Oi Ana",
+    );
+}
+
+#[test]
+fn fn_default_missing_required() {
+    let (ok, out) = run_inline(
+        r#"
+fn f(a, b=2) {
+    return a + b
+}
+display f()
+"#,
+    );
+    assert!(!ok, "missing required arg should fail");
+    assert!(out.contains("missing required argument"), "{out}");
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ERROS ESTRUTURADOS
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn structured_error_kind_and_msg() {
+    assert_ok_contains(
+        "structured_error",
+        r#"
+try {
+    let y = [1, 2]
+    print(y[10])
+} catch e {
+    display e["kind"]
+    display e["msg"]
+}
+"#,
+        "runtime",
+    );
+}
+
+#[test]
+fn structured_error_line() {
+    assert_ok_contains(
+        "structured_error_line",
+        r#"
+try {
+    let y = [1, 2]
+    print(y[10])
+} catch e {
+    display e["line"]
+}
+"#,
+        "4",
+    );
+}
+
+#[test]
+fn structured_error_undefined_var() {
+    assert_ok_contains(
+        "structured_error_undef",
+        r#"
+try {
+    let z = undefined
+} catch e {
+    display e["kind"]
+    display e["msg"]
+}
+"#,
+        "undefined variable",
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DOCSTRINGS EM FN
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn fn_docstring_help() {
+    assert_ok_contains(
+        "fn_docstring_help",
+        r#"
+fn sharpe(ret, rf=0.0) {
+    ## Compute Sharpe ratio
+    return (mean(ret) - rf) / sd(ret)
+}
+help(sharpe)
+"#,
+        "Compute Sharpe ratio",
+    );
+}
+
+#[test]
+fn fn_docstring_multiline() {
+    assert_ok_contains(
+        "fn_docstring_multi",
+        r#"
+fn sharpe(ret, rf=0.0) {
+    ## Compute Sharpe ratio
+    ## ret: Series of returns
+    return (mean(ret) - rf) / sd(ret)
+}
+help(sharpe)
+"#,
+        "ret: Series of returns",
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // MENSAGENS DE ERRO — cobertura de cenários específicos
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -8389,7 +8611,7 @@ fn math_integer_division_floor() {
 
 #[test]
 fn math_modulo_negative() {
-    let (ok, out) = run_inline("display -7 % 3");
+    let (ok, out) = run_inline("print(-7 % 3)");
     assert!(ok, "negative modulo failed:\n{out}");
     // resultado pode ser -1 ou 2 dependendo da convenção; só verifica que é determinístico
     assert!(

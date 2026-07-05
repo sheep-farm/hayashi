@@ -1,4 +1,5 @@
 use super::*;
+use super::helpers::*;
 
 /// set_seed, timer, quietly, capture, assert, preserve/restore, source, help,
 /// describe, codebook, format, duplicates, label, correlate, summarize,
@@ -80,7 +81,7 @@ impl Interpreter {
                     ));
                 }
                 let val = self.eval_expr(&args[0])?;
-                if !Self::value_as_bool(&val) {
+                if !value_as_bool(&val) {
                     let msg = if args.len() >= 2 {
                         match self.eval_expr(&args[1])? {
                             Value::Str(s) => s,
@@ -210,13 +211,18 @@ impl Interpreter {
                     || resolved.ends_with(".dylib");
 
                 if is_wasm {
-                    use crate::lang::plugin::WasmPlugin;
-                    let plugin = WasmPlugin::new(&resolved, &ns).map_err(|e| {
-                        self.rt_err(format!("import: failed to load WASM plugin: {e}"))
-                    })?;
-                    self.plugins.insert(ns.clone(), Box::new(plugin));
-                    self.imported.insert(module.clone());
-                    return Ok(Some(Value::Nil));
+                    #[cfg(not(feature = "wasm"))]
+                    return Err(self.rt_err("import: WASM plugins require 'wasm' feature"));
+                    #[cfg(feature = "wasm")]
+                    {
+                        use crate::lang::plugin::WasmPlugin;
+                        let plugin = WasmPlugin::new(&resolved, &ns).map_err(|e| {
+                            self.rt_err(format!("import: failed to load WASM plugin: {e}"))
+                        })?;
+                        self.plugins.insert(ns.clone(), Box::new(plugin));
+                        self.imported.insert(module.clone());
+                        return Ok(Some(Value::Nil));
+                    }
                 } else if is_native {
                     use crate::lang::plugin::RustNativePlugin;
                     let plugin = RustNativePlugin::new(&resolved, &ns).map_err(|e| {
@@ -308,10 +314,20 @@ impl Interpreter {
                 } else {
                     match crate::lang::help::help_text(&topic) {
                         Some(h) => println!("{h}"),
-                        None => println!(
-                            "help: '{}' not documented. Type help() for full list.",
-                            topic
-                        ),
+                        None => {
+                            if let Some(Value::UserFn(uf)) = self.env.get(&topic) {
+                                if let Some(doc) = &uf.doc {
+                                    println!("fn {}({})\n{}", topic, uf.params.join(", "), doc);
+                                } else {
+                                    println!("fn {}({})\n  (no docstring)", topic, uf.params.join(", "));
+                                }
+                            } else {
+                                println!(
+                                    "help: '{}' not documented. Type help() for full list.",
+                                    topic
+                                );
+                            }
+                        }
                     }
                 }
                 Ok(Value::Nil)
@@ -562,7 +578,7 @@ impl Interpreter {
                     _ => "report".into(),
                 };
 
-                let col = Self::get_col_f64(&df, &var_name)?;
+                let col = get_col_f64(&df, &var_name)?;
                 let n = col.len();
 
                 // contar ocorrências de cada valor

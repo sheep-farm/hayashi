@@ -1,4 +1,6 @@
 use super::*;
+use super::helpers::*;
+use super::models::FactorModel;
 
 /// Finance (Fama-MacBeth, portsort, doublesort) e estimadores
 /// cross-section/microeconométricos: OLS/reg, IV/2SLS, teste de instrumento
@@ -114,8 +116,8 @@ impl Interpreter {
                     _ => 5,
                 };
 
-                let ret_col = Self::get_col_f64(&df, &ret_name)?;
-                let sort_col = Self::get_col_f64(&df, &sort_name)?;
+                let ret_col = get_col_f64(&df, &ret_name)?;
+                let sort_col = get_col_f64(&df, &sort_name)?;
 
                 // pares (sort_val, ret_val) — excluir NaN
                 let mut pairs: Vec<(f64, f64)> = sort_col
@@ -258,9 +260,9 @@ impl Interpreter {
                     _ => 5,
                 };
 
-                let ret_col = Self::get_col_f64(&df, &ret_name)?;
-                let s1_col = Self::get_col_f64(&df, &s1_name)?;
-                let s2_col = Self::get_col_f64(&df, &s2_name)?;
+                let ret_col = get_col_f64(&df, &ret_name)?;
+                let s1_col = get_col_f64(&df, &s1_name)?;
+                let s2_col = get_col_f64(&df, &s2_name)?;
 
                 // atribuir quantis independentes
                 let assign_quantile = |vals: &[f64], n_q: usize| -> Vec<usize> {
@@ -361,7 +363,7 @@ impl Interpreter {
                 };
                 let df = self.maybe_filter_df(&df_raw, opts)?;
                 let formula_str = Self::formula_to_string(&formula_ast);
-                let cov = Self::resolve_cov_full(opt_map, &df)?;
+                let cov = resolve_cov_full(opt_map, &df)?;
 
                 let g_formula = GFormula::parse(&formula_str)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -405,7 +407,7 @@ impl Interpreter {
                     Some(Value::DataFrame(df)) => df.clone(),
                     _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
-                let cov = Self::resolve_cov_full(opt_map, &df)?;
+                let cov = resolve_cov_full(opt_map, &df)?;
 
                 let endog_str = Self::formula_to_string(&endog_ast);
                 let instr_str = Self::formula_to_string(&instr_ast);
@@ -701,7 +703,7 @@ impl Interpreter {
                 out.push_str(&format!("{thin}\n"));
                 out.push_str(" Regra de bolso: F > 10 (Staiger & Stock 1997)\n");
                 out.push_str(&format!("{thick}\n"));
-                Ok(Self::diag(out))
+                Ok(diag(out))
             }
 
             // ── Logit ─────────────────────────────────────────────────────────
@@ -715,7 +717,7 @@ impl Interpreter {
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let result = Logit::from_formula(&g_formula, &df)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let coef_names = Self::coef_names_from_formula(&formula_ast, &df, x.ncols());
+                let coef_names = coef_names_from_formula(&formula_ast, &df, x.ncols());
                 Ok(Value::BinaryResult(BinaryModel {
                     result: Rc::new(result),
                     y,
@@ -736,7 +738,7 @@ impl Interpreter {
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let result = Probit::from_formula(&g_formula, &df)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let coef_names = Self::coef_names_from_formula(&formula_ast, &df, x.ncols());
+                let coef_names = coef_names_from_formula(&formula_ast, &df, x.ncols());
                 Ok(Value::BinaryResult(BinaryModel {
                     result: Rc::new(result),
                     y,
@@ -1204,7 +1206,7 @@ impl Interpreter {
                 let var_names = df
                     .formula_var_names(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let cov = Self::resolve_cov_full(opt_map, &df)?;
+                let cov = resolve_cov_full(opt_map, &df)?;
                 let result =
                     greeners::Poisson::fit_with_names(&y_vec, &x_mat, cov, Some(var_names))
                         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1223,7 +1225,7 @@ impl Interpreter {
                 let var_names = df
                     .formula_var_names(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let cov = Self::resolve_cov_full(opt_map, &df)?;
+                let cov = resolve_cov_full(opt_map, &df)?;
                 let result = greeners::NegBin::fit_with_names(&y_vec, &x_mat, cov, Some(var_names))
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 Ok(Value::NegBinResult(Rc::new(result)))
@@ -1303,10 +1305,10 @@ impl Interpreter {
                             .into(),
                     ));
                 }
-                let y = Self::get_col_f64(&df, &formula_ast.lhs)?;
-                let treated = Self::get_col_f64(&df, rhs_vars[0])?;
-                let post = Self::get_col_f64(&df, rhs_vars[1])?;
-                let cov = Self::resolve_cov_full(opt_map, &df)?;
+                let y = get_col_f64(&df, &formula_ast.lhs)?;
+                let treated = get_col_f64(&df, rhs_vars[0])?;
+                let post = get_col_f64(&df, rhs_vars[1])?;
+                let cov = resolve_cov_full(opt_map, &df)?;
                 let result = greeners::DiffInDiff::fit(&y, &treated, &post, cov)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 Ok(Value::DidResult(Rc::new(result)))
@@ -1380,8 +1382,8 @@ impl Interpreter {
                         ))
                     }
                 };
-                let times = Self::get_col_f64(&df, &time_name)?;
-                let events_f = Self::get_col_f64(&df, &event_name)?;
+                let times = get_col_f64(&df, &time_name)?;
+                let events_f = get_col_f64(&df, &event_name)?;
                 let events: ndarray::Array1<u8> = events_f.iter().map(|&v| v as u8).collect();
                 let result = greeners::KaplanMeier::fit(&times, &events)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1414,8 +1416,8 @@ impl Interpreter {
                     }
                     _ => return Err(HayashiError::Type("event= must be string".into())),
                 };
-                let times = Self::get_col_f64(&df, &formula_ast.lhs)?;
-                let events_f = Self::get_col_f64(&df, &event_col)?;
+                let times = get_col_f64(&df, &formula_ast.lhs)?;
+                let events_f = get_col_f64(&df, &event_col)?;
                 let events: ndarray::Array1<u8> = events_f.iter().map(|&v| v as u8).collect();
                 // build covariate matrix from RHS variables
                 let rhs_vars: Vec<String> = formula_ast
@@ -1436,7 +1438,7 @@ impl Interpreter {
                 }
                 let cols: Vec<ndarray::Array1<f64>> = rhs_vars
                     .iter()
-                    .map(|v| Self::get_col_f64(&df, v))
+                    .map(|v| get_col_f64(&df, v))
                     .collect::<Result<_>>()?;
                 let n = times.len();
                 let k = cols.len();
@@ -1482,7 +1484,7 @@ impl Interpreter {
                     },
                     _ => return Err(HayashiError::Type("norm= must be string".into())),
                 };
-                let cov = Self::resolve_cov_full(opt_map, &df)?;
+                let cov = resolve_cov_full(opt_map, &df)?;
                 let result =
                     greeners::RLM::fit_with_names(&y_vec, &x_mat, &norm, cov, Some(var_names))
                         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1547,7 +1549,7 @@ impl Interpreter {
                     .formula_var_names(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 // converter coluna de id para índices de grupo (usize)
-                let id_vals = Self::get_col_f64(&df, &id_col)?;
+                let id_vals = get_col_f64(&df, &id_col)?;
                 let mut id_map: std::collections::HashMap<i64, usize> =
                     std::collections::HashMap::new();
                 let mut next_id = 0usize;
@@ -1591,8 +1593,8 @@ impl Interpreter {
                     }
                     _ => return Err(HayashiError::Type("weights= must be string".into())),
                 };
-                let weights = Self::get_col_f64(&df, &w_name)?;
-                let cov = Self::resolve_cov_full(opt_map, &df)?;
+                let weights = get_col_f64(&df, &w_name)?;
+                let cov = resolve_cov_full(opt_map, &df)?;
                 let var_names = df
                     .formula_var_names(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1647,7 +1649,7 @@ impl Interpreter {
                         let k = inames.len() + 1;
                         let mut xi = ndarray::Array2::<f64>::ones((n, k));
                         for (j, name) in inames.iter().enumerate() {
-                            xi.column_mut(j + 1).assign(&Self::get_col_f64(&df, name)?);
+                            xi.column_mut(j + 1).assign(&get_col_f64(&df, name)?);
                         }
                         let mut full_names = vec!["_cons".to_string()];
                         full_names.extend(inames);
@@ -1726,7 +1728,7 @@ impl Interpreter {
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
                 // Converter id para índices de grupo
-                let id_vals = Self::get_col_f64(&df, &id_col)?;
+                let id_vals = get_col_f64(&df, &id_col)?;
                 let mut id_map: std::collections::HashMap<i64, usize> =
                     std::collections::HashMap::new();
                 let mut next_id = 0usize;
@@ -1749,7 +1751,7 @@ impl Interpreter {
                 for (j, name) in re_vars.iter().enumerate() {
                     x_random
                         .column_mut(j + 1)
-                        .assign(&Self::get_col_f64(&df, name)?);
+                        .assign(&get_col_f64(&df, name)?);
                 }
 
                 let result = greeners::MixedLM::fit_with_names(
@@ -1881,7 +1883,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let outcome = Self::get_col_f64(&df, &outcome_name)?;
+                let outcome = get_col_f64(&df, &outcome_name)?;
                 let by_col = match opt_map.get("by") {
                     Some(Value::Str(s)) => s.clone(),
                     None => {
@@ -1891,7 +1893,7 @@ impl Interpreter {
                     }
                     _ => return Err(HayashiError::Type("by= must be string".into())),
                 };
-                let group_vals = Self::get_col_f64(&df, &by_col)?;
+                let group_vals = get_col_f64(&df, &by_col)?;
                 let mut gmap: std::collections::HashMap<i64, usize> =
                     std::collections::HashMap::new();
                 let mut next_g = 0usize;
@@ -1964,7 +1966,7 @@ impl Interpreter {
                 let var_names = df
                     .formula_var_names(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let cov = Self::resolve_cov_full(opt_map, &df)?;
+                let cov = resolve_cov_full(opt_map, &df)?;
 
                 let alpha_val = match opt_map.get("alpha") {
                     Some(Value::Float(v)) => *v,
@@ -2088,8 +2090,8 @@ impl Interpreter {
                         ))
                     }
                 };
-                let y_vec = ndarray::Array1::from(Self::get_col_f64(&df, &y_name)?);
-                let x_vec = ndarray::Array1::from(Self::get_col_f64(&df, &x_name)?);
+                let y_vec = ndarray::Array1::from(get_col_f64(&df, &y_name)?);
+                let x_vec = ndarray::Array1::from(get_col_f64(&df, &x_name)?);
                 let frac = match opt_map.get("frac") {
                     Some(Value::Float(v)) => *v,
                     Some(Value::Int(v)) => *v as f64,
@@ -2136,7 +2138,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let data = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?);
+                let data = ndarray::Array1::from(get_col_f64(&df, &var_name)?);
                 let bw_opt = match opt_map.get("bw") {
                     Some(Value::Float(v)) => Some(*v),
                     Some(Value::Int(v)) => Some(*v as f64),
@@ -2214,7 +2216,7 @@ impl Interpreter {
                 };
                 let mut data = ndarray::Array2::<f64>::zeros((n, k));
                 for (j, vname) in var_names.iter().enumerate() {
-                    let col = Self::get_col_f64(&df, vname)?;
+                    let col = get_col_f64(&df, vname)?;
                     for (i, &v) in col.iter().enumerate() {
                         data[[i, j]] = v;
                     }
@@ -2268,7 +2270,7 @@ impl Interpreter {
                 };
                 let mut data = ndarray::Array2::<f64>::zeros((n, k));
                 for (j, vname) in var_names.iter().enumerate() {
-                    let col = Self::get_col_f64(&df, vname)?;
+                    let col = get_col_f64(&df, vname)?;
                     for (i, &v) in col.iter().enumerate() {
                         data[[i, j]] = v;
                     }
@@ -2313,12 +2315,12 @@ impl Interpreter {
                 let q = outcome_names.len();
                 let mut y_mat = ndarray::Array2::<f64>::zeros((n, q));
                 for (j, vname) in outcome_names.iter().enumerate() {
-                    let col = Self::get_col_f64(&df, vname)?;
+                    let col = get_col_f64(&df, vname)?;
                     for (i, &v) in col.iter().enumerate() {
                         y_mat[[i, j]] = v;
                     }
                 }
-                let group_vals = Self::get_col_f64(&df, &group_col)?;
+                let group_vals = get_col_f64(&df, &group_col)?;
                 let mut gmap: std::collections::HashMap<i64, usize> =
                     std::collections::HashMap::new();
                 let mut gnext = 0usize;

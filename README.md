@@ -127,7 +127,9 @@ let df = {
 
 ### Output control
 
-`quietly on` suppresses automatic output from statements and estimators. `print(...)` and `display ...` still appear. `quietly off` restores normal output. The flag is scope-aware: a toggle inside a block reverts when the block ends.
+`quietly on` suppresses automatic output from statements and estimators. `print(...)` still appears; `display ...` also appears but is deprecated. `quietly off` restores normal output. The flag is scope-aware: a toggle inside a block reverts when the block ends.
+
+> Note: `display` is deprecated. Prefer `print` for explicit output.
 
 ```
 quietly on
@@ -146,7 +148,7 @@ ols(z ~ x, df)
 print("done")
 ```
 
-Both `quietly on` and `quietly()` (function form) share the same suppression mechanism, so new commands need no special handling — they just use the internal output channel.
+Both `quietly on` and `quietly off` share the same suppression mechanism, so new commands need no special handling — they just use the internal output channel. The `quietly(expr)` function form is deprecated and will be removed in a future release; use `quietly on` / `quietly off` instead.
 
 ### Functions and closures
 
@@ -595,7 +597,7 @@ fn f(n) {
 ```
 quietly on                    // suppress automatic output from here
 quietly off                   // restore automatic output
-quietly(ols(Y ~ X, df))       // suppress one expression
+quietly(ols(Y ~ X, df))       // (deprecated) suppress one expression
 capture(ols(Y ~ X, df))       // ignore errors
 assert(n > 0, "empty data")
 timer(ols(Y ~ X, df))         // time execution

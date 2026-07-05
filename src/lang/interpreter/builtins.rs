@@ -1,4 +1,183 @@
 use super::*;
+use super::helpers::*;
+
+pub const BUILTIN_NAMES: &[&str] = &[
+    "mean",
+    "sd",
+    "min",
+    "max",
+    "sum",
+    "total",
+    "median",
+    "variance",
+    "quantile",
+    "cov",
+    "corr_pair",
+    "abs",
+    "sqrt",
+    "ln",
+    "log",
+    "exp",
+    "sin",
+    "cos",
+    "tan",
+    "asin",
+    "acos",
+    "atan",
+    "atan2",
+    "ceil",
+    "floor",
+    "round",
+    "sign",
+    "factorial",
+    "comb",
+    "int",
+    "float",
+    "str",
+    "bool",
+    "len",
+    "first",
+    "last",
+    "shift",
+    "typeof",
+    "ols",
+    "iv",
+    "logit",
+    "probit",
+    "poisson",
+    "nbreg",
+    "tobit",
+    "heckman",
+    "fe",
+    "re",
+    "be",
+    "fe2sls",
+    "ab",
+    "sysgmm",
+    "pcse",
+    "xtgls",
+    "qreg",
+    "rlm",
+    "lasso",
+    "ridge",
+    "elasticnet",
+    "cox",
+    "arima",
+    "autoreg",
+    "ardl",
+    "kalman",
+    "var",
+    "vecm",
+    "varma",
+    "svar",
+    "garch",
+    "glm",
+    "gee",
+    "mixed",
+    "mlogit",
+    "ologit",
+    "oprobit",
+    "clogit",
+    "cpoisson",
+    "gmm",
+    "sur",
+    "three_sls",
+    "fmb",
+    "did",
+    "rd",
+    "psm",
+    "synth",
+    "summarize",
+    "tabulate",
+    "tabstat",
+    "correlate",
+    "corr",
+    "pwcorr",
+    "describe",
+    "codebook",
+    "ttest",
+    "ci",
+    "centile",
+    "count",
+    "nrow",
+    "filter",
+    "sort",
+    "drop",
+    "keep",
+    "select",
+    "dropna",
+    "rename",
+    "merge",
+    "append",
+    "collapse",
+    "group_by",
+    "reshape",
+    "mutate",
+    "generate",
+    "pivot_longer",
+    "pivot_wider",
+    "anova",
+    "pca",
+    "factor",
+    "manova",
+    "cancorr",
+    "kde",
+    "lowess",
+    "swilk",
+    "sfrancia",
+    "sktest",
+    "omnibus",
+    "dagostino",
+    "vif",
+    "predict",
+    "esttab",
+    "eststo",
+    "margins",
+    "test",
+    "lincom",
+    "nlcom",
+    "bootstrap",
+    "bootse",
+    "histogram",
+    "boxplot",
+    "kdensity",
+    "qqplot",
+    "scatter",
+    "recode",
+    "destring",
+    "winsor",
+    "label",
+    "format",
+    "print",
+    "display",
+    "source",
+    "import",
+    "assert",
+    "timer",
+    "push",
+    "pop",
+    "reverse",
+    "unique",
+    "flatten",
+    "chain",
+    "join",
+    "split",
+    "contains",
+    "starts_with",
+    "ends_with",
+    "lower",
+    "upper",
+    "trim",
+    "substr",
+    "replace",
+    "regexm",
+    "regexr",
+    "regexs",
+    "input",
+    "load",
+    "export",
+    "write",
+];
 
 /// Conversões de tipo (int/float/str/bool), date/time, builtins de lista e
 /// dict, funções de string, regex, agregações sobre List, e as agregações
@@ -114,7 +293,7 @@ impl Interpreter {
                     return Err(HayashiError::Runtime("bool(x)".into()));
                 }
                 let v = self.eval_expr(&args[0])?;
-                Ok(Value::Bool(Self::value_as_bool(&v)))
+                Ok(Value::Bool(value_as_bool(&v)))
             }
             "is_nil" => {
                 if args.len() != 1 {
@@ -245,8 +424,9 @@ impl Interpreter {
                     Value::List(lst) => Ok(Value::Int(lst.len() as i64)),
                     Value::Dict(m) => Ok(Value::Int(m.len() as i64)),
                     Value::Str(s) => Ok(Value::Int(s.chars().count() as i64)),
+                    Value::Series(s) => Ok(Value::Int(s.len() as i64)),
                     _ => Err(HayashiError::Type(
-                        "len() requires list, dict, or string".into(),
+                        "len() requires list, dict, series, or string".into(),
                     )),
                 }
             }
@@ -803,7 +983,7 @@ impl Interpreter {
                             )))
                         }
                     };
-                    let col = Self::get_col_f64(&df, &var_name)?;
+                    let col = get_col_f64(&df, &var_name)?;
                     // filtro opcional: if=cond
                     if let Some(cond_opt) = opts.iter().find(|o| o.name == "if") {
                         let mask = self.eval_col_expr(&cond_opt.value, &df)?;
@@ -819,11 +999,31 @@ impl Interpreter {
                     let v = self.eval_expr(&args[0])?;
                     match v {
                         Value::List(lst) => {
-                            lst.iter().map(Self::value_as_f64).collect::<Result<_>>()?
+                            lst.iter().map(value_as_f64).collect::<Result<_>>()?
+                        }
+                        Value::Series(s) => {
+                            if s.is_empty() {
+                                return Err(self.rt_err(format!("{func}(): empty series")));
+                            }
+                            let v = s.numeric_values();
+                            let val = match func {
+                                "sum" | "total" => v.iter().sum::<f64>(),
+                                "mean" => s.mean(),
+                                "min" => s.min(),
+                                "max" => s.max(),
+                                "sd" | "std" => {
+                                    if s.len() < 2 {
+                                        return Err(self.rt_err(format!("{func}(): series needs at least 2 observations")));
+                                    }
+                                    s.sd()
+                                }
+                                _ => unreachable!(),
+                            };
+                            return Ok(Some(Value::Float(val)));
                         }
                         other => {
                             return Err(self
-                                .type_err(format!("{func}() requires numeric list, got {other}")))
+                                .type_err(format!("{func}() requires numeric list or series, got {other}")))
                         }
                     }
                 } else {
@@ -869,7 +1069,7 @@ impl Interpreter {
                             )
                         }
                     };
-                    let col = Self::get_col_f64(&df, &var_name)?;
+                    let col = get_col_f64(&df, &var_name)?;
                     if let Some(cond_opt) = opts.iter().find(|o| o.name == "if") {
                         let mask = self.eval_col_expr(&cond_opt.value, &df)?;
                         col.iter()
@@ -883,7 +1083,7 @@ impl Interpreter {
                 } else if args.len() == 1 {
                     match self.eval_expr(&args[0])? {
                         Value::List(lst) => {
-                            lst.iter().map(Self::value_as_f64).collect::<Result<_>>()?
+                            lst.iter().map(value_as_f64).collect::<Result<_>>()?
                         }
                         other => {
                             return Err(self
@@ -928,7 +1128,7 @@ impl Interpreter {
                             )
                         }
                     };
-                    let col = Self::get_col_f64(&df, &var_name)?;
+                    let col = get_col_f64(&df, &var_name)?;
                     if let Some(cond_opt) = opts.iter().find(|o| o.name == "if") {
                         let mask = self.eval_col_expr(&cond_opt.value, &df)?;
                         col.iter()
@@ -942,7 +1142,7 @@ impl Interpreter {
                 } else if args.len() == 1 {
                     match self.eval_expr(&args[0])? {
                         Value::List(lst) => {
-                            lst.iter().map(Self::value_as_f64).collect::<Result<_>>()?
+                            lst.iter().map(value_as_f64).collect::<Result<_>>()?
                         }
                         other => {
                             return Err(self.type_err(format!(
@@ -960,6 +1160,62 @@ impl Interpreter {
                 let mean = nums.iter().sum::<f64>() / n as f64;
                 let v = nums.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n - 1) as f64;
                 Ok(Value::Float(v))
+            }
+
+            // ── Series methods (first-class column) ──────────────────────────
+            "first" => {
+                if args.len() != 1 {
+                    return Err(self.rt_err("first(series) requires 1 argument"));
+                }
+                let v = self.eval_expr(&args[0])?;
+                match v {
+                    Value::Series(s) => s.first().ok_or_else(|| self.rt_err("first(): empty series")),
+                    Value::List(lst) => lst.first().cloned().ok_or_else(|| self.rt_err("first(): empty list")),
+                    other => Err(self.type_err(format!("first() requires series or list, got {other}"))),
+                }
+            }
+
+            "last" => {
+                if args.len() != 1 {
+                    return Err(self.rt_err("last(series) requires 1 argument"));
+                }
+                let v = self.eval_expr(&args[0])?;
+                match v {
+                    Value::Series(s) => s.last().ok_or_else(|| self.rt_err("last(): empty series")),
+                    Value::List(lst) => lst.last().cloned().ok_or_else(|| self.rt_err("last(): empty list")),
+                    other => Err(self.type_err(format!("last() requires series or list, got {other}"))),
+                }
+            }
+
+            "shift" => {
+                if args.len() != 2 {
+                    return Err(self.rt_err("shift(series, n) requires 2 arguments"));
+                }
+                let v = self.eval_expr(&args[0])?;
+                let n = match self.eval_expr(&args[1])? {
+                    Value::Int(i) => i,
+                    Value::Float(f) => f as i64,
+                    other => return Err(self.type_err(format!("shift(): n must be integer, got {other}"))),
+                };
+                match v {
+                    Value::Series(s) => Ok(Value::Series(Rc::new(s.shift(n)))),
+                    Value::List(lst) => {
+                        let shifted = if n > 0 {
+                            let mut v = vec![Value::Nil; n as usize];
+                            v.extend_from_slice(&lst[..lst.len().saturating_sub(n as usize)]);
+                            v
+                        } else if n < 0 {
+                            let n_abs = (-n) as usize;
+                            let mut v = lst[n_abs.min(lst.len())..].to_vec();
+                            v.extend(vec![Value::Nil; n_abs.min(lst.len())]);
+                            v
+                        } else {
+                            lst.to_vec()
+                        };
+                        Ok(Value::List(Rc::new(shifted)))
+                    }
+                    other => Err(self.type_err(format!("shift() requires series or list, got {other}"))),
+                }
             }
 
             "quantile" => {
@@ -983,7 +1239,7 @@ impl Interpreter {
                             )
                         }
                     };
-                    let col = Self::get_col_f64(&df, &var_name)?;
+                    let col = get_col_f64(&df, &var_name)?;
                     let nums = if let Some(cond_opt) = opts.iter().find(|o| o.name == "if") {
                         let mask = self.eval_col_expr(&cond_opt.value, &df)?;
                         col.iter()
@@ -1004,7 +1260,7 @@ impl Interpreter {
                     let v = self.eval_expr(&args[0])?;
                     let nums = match v {
                         Value::List(lst) => {
-                            lst.iter().map(Self::value_as_f64).collect::<Result<_>>()?
+                            lst.iter().map(value_as_f64).collect::<Result<_>>()?
                         }
                         other => {
                             return Err(self.type_err(format!(
@@ -1058,8 +1314,8 @@ impl Interpreter {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
                     _ => return Err(self.rt_err("cov(): third argument must be a variable name")),
                 };
-                let x_col = Self::get_col_f64(&df, &x_name)?;
-                let y_col = Self::get_col_f64(&df, &y_name)?;
+                let x_col = get_col_f64(&df, &x_name)?;
+                let y_col = get_col_f64(&df, &y_name)?;
                 let (x_vals, y_vals): (Vec<f64>, Vec<f64>) =
                     if let Some(cond_opt) = opts.iter().find(|o| o.name == "if") {
                         let mask = self.eval_col_expr(&cond_opt.value, &df)?;
@@ -1113,8 +1369,8 @@ impl Interpreter {
                         )
                     }
                 };
-                let x_col = Self::get_col_f64(&df, &x_name)?;
-                let y_col = Self::get_col_f64(&df, &y_name)?;
+                let x_col = get_col_f64(&df, &x_name)?;
+                let y_col = get_col_f64(&df, &y_name)?;
                 let (x_vals, y_vals): (Vec<f64>, Vec<f64>) =
                     if let Some(cond_opt) = opts.iter().find(|o| o.name == "if") {
                         let mask = self.eval_col_expr(&cond_opt.value, &df)?;

@@ -148,6 +148,9 @@ pub enum Expr {
         n: usize,
     },
 
+    // forma funcional obsoleta: quietly(expr)
+    Quietly(Box<Expr>),
+
     // ranges como expressões: 1..5 → [1,2,3,4]  |  1..=5 → [1,2,3,4,5]
     Range(Box<Expr>, Box<Expr>),
     RangeInclusive(Box<Expr>, Box<Expr>),
@@ -252,10 +255,12 @@ pub enum Stmt {
         body: Vec<Spanned>,
     },
 
-    // fn nome(p1, p2) { corpo }
+    // fn nome(p1, p2, p3=default) { ## docstring ...; corpo }
     Fn {
         name: String,
         params: Vec<String>,
+        defaults: Vec<Option<Expr>>,
+        doc: Option<String>,
         body: Vec<Spanned>,
     },
 

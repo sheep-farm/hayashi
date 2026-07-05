@@ -1,4 +1,5 @@
 use super::*;
+use super::helpers::*;
 
 /// ETS, panel threshold, correlação canônica, estatísticas ponderadas, tabstat,
 /// xtsum, testes não-paramétricos, testes de raiz unitária, filtros de ciclo de
@@ -43,7 +44,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let y = Self::get_col_f64(&df, &var_name)?;
+                let y = get_col_f64(&df, &var_name)?;
                 // Regra para aliases:
                 //   ses         → trend=none, seasonal=none
                 //   hwes        → trend=add,  seasonal=add
@@ -137,8 +138,8 @@ impl Interpreter {
                 let (y_vec, x_mat) = df
                     .to_design_matrix(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let q_col = Self::get_col_f64(&df, &q_name)?;
-                let id_col = Self::get_col_f64(&df, &id_name)?;
+                let q_col = get_col_f64(&df, &q_name)?;
+                let id_col = get_col_f64(&df, &id_name)?;
                 let entity_ids: ndarray::Array1<i64> =
                     ndarray::Array1::from(id_col.iter().map(|&v| v as i64).collect::<Vec<_>>());
                 let q_arr = ndarray::Array1::from(q_col.to_vec());
@@ -219,13 +220,13 @@ impl Interpreter {
                 let mut x_mat = ndarray::Array2::<f64>::zeros((n, px));
                 let mut y_mat = ndarray::Array2::<f64>::zeros((n, py));
                 for (j, name) in x_names.iter().enumerate() {
-                    let c = Self::get_col_f64(&df, name)?;
+                    let c = get_col_f64(&df, name)?;
                     for (i, &v) in c.iter().enumerate() {
                         x_mat[[i, j]] = v;
                     }
                 }
                 for (j, name) in y_names.iter().enumerate() {
-                    let c = Self::get_col_f64(&df, name)?;
+                    let c = get_col_f64(&df, name)?;
                     for (i, &v) in c.iter().enumerate() {
                         y_mat[[i, j]] = v;
                     }
@@ -267,13 +268,13 @@ impl Interpreter {
                         ))
                     }
                 };
-                let data = Self::get_col_f64(&df, &var_name)?;
+                let data = get_col_f64(&df, &var_name)?;
                 let weights = match opt_map
                     .get("weight")
                     .or_else(|| opt_map.get("weights").or_else(|| opt_map.get("w")))
                 {
                     Some(Value::Str(wname)) => {
-                        let wc = Self::get_col_f64(&df, wname)?;
+                        let wc = get_col_f64(&df, wname)?;
                         Some(ndarray::Array1::from(wc.to_vec()))
                     }
                     _ => None,
@@ -383,7 +384,7 @@ impl Interpreter {
                     _ => default_stats,
                 };
                 let by_col: Option<Vec<f64>> = match opt_map.get("by") {
-                    Some(Value::Str(bname)) => Some(Self::get_col_f64(&df, bname)?.to_vec()),
+                    Some(Value::Str(bname)) => Some(get_col_f64(&df, bname)?.to_vec()),
                     _ => None,
                 };
                 // Coleta grupos únicos
@@ -412,7 +413,7 @@ impl Interpreter {
                         println!("  grupo = {g}");
                     }
                     for vname in &var_names {
-                        let col = Self::get_col_f64(&df, vname)?;
+                        let col = get_col_f64(&df, vname)?;
                         let data: Vec<f64> = if let Some(ref bv) = by_col {
                             let gval: f64 =
                                 grp.as_ref().unwrap().parse::<f64>().unwrap_or(f64::NAN);
@@ -525,7 +526,7 @@ impl Interpreter {
                         "xtsum: provide at least one variable".into(),
                     ));
                 }
-                let id_col = Self::get_col_f64(&df, &id_name)?;
+                let id_col = get_col_f64(&df, &id_name)?;
                 // Identifica entidades únicas
                 let mut ids_uniq: Vec<f64> = id_col.to_vec();
                 ids_uniq.sort_by(|a, b| a.partial_cmp(b).unwrap());
@@ -539,7 +540,7 @@ impl Interpreter {
                 );
                 println!("{}", "-".repeat(78));
                 for vname in &var_names {
-                    let col = Self::get_col_f64(&df, vname)?;
+                    let col = get_col_f64(&df, vname)?;
                     let vals: Vec<f64> = col.iter().cloned().collect();
                     // Overall
                     let n_total_f = n_total as f64;
@@ -661,8 +662,8 @@ impl Interpreter {
                         ))
                     }
                 };
-                let x = Self::get_col_f64(&df, &v1)?.to_vec();
-                let y = Self::get_col_f64(&df, &v2)?.to_vec();
+                let x = get_col_f64(&df, &v1)?.to_vec();
+                let y = get_col_f64(&df, &v2)?.to_vec();
                 let n = x.len().min(y.len());
                 if n < 3 {
                     return Err(HayashiError::Runtime("spearman: n < 3".into()));
@@ -753,8 +754,8 @@ impl Interpreter {
                         ))
                     }
                 };
-                let y_col = Self::get_col_f64(&df, &var_name)?;
-                let grp_col = Self::get_col_f64(&df, &by_name)?;
+                let y_col = get_col_f64(&df, &var_name)?;
+                let grp_col = get_col_f64(&df, &by_name)?;
                 let n_total = y_col.len();
                 // Separar em dois grupos pelo valor único
                 let mut gvals: Vec<f64> = grp_col.to_vec();
@@ -815,7 +816,7 @@ impl Interpreter {
                 let var_u = n1f * n2f * (nf + 1.0) / 12.0;
                 let z_stat = (u - mu_u) / var_u.sqrt();
                 // p-value via normal approximation
-                let p_normal = 2.0 * (1.0 - Self::norm_cdf(z_stat.abs()));
+                let p_normal = 2.0 * (1.0 - norm_cdf(z_stat.abs()));
                 println!("\n  Mann-Whitney U / Wilcoxon Rank-Sum");
                 println!("  {}: n₁={n1}  {}: n₂={n2}", var_name, by_name);
                 println!("  Grupo {}:  {var_name}", gvals[0] as i64);
@@ -862,8 +863,8 @@ impl Interpreter {
                         ))
                     }
                 };
-                let y_col = Self::get_col_f64(&df, &var_name)?;
-                let grp_col = Self::get_col_f64(&df, &by_name)?;
+                let y_col = get_col_f64(&df, &var_name)?;
+                let grp_col = get_col_f64(&df, &by_name)?;
                 let n = y_col.len();
                 let mut gvals: Vec<f64> = grp_col.to_vec();
                 gvals.sort_by(|a, b| a.partial_cmp(b).unwrap());
@@ -972,7 +973,7 @@ impl Interpreter {
                     Some(Value::Int(v)) => *v as f64,
                     _ => 0.0,
                 };
-                let data = Self::get_col_f64(&df, &var_name)?;
+                let data = get_col_f64(&df, &var_name)?;
                 let diffs: Vec<f64> = data
                     .iter()
                     .map(|&v| v - mu0)
@@ -1013,7 +1014,7 @@ impl Interpreter {
                 let mu_w = nf * (nf + 1.0) / 4.0;
                 let var_w = nf * (nf + 1.0) * (2.0 * nf + 1.0) / 24.0;
                 let z_stat = (w - mu_w) / var_w.sqrt();
-                let p_val = 2.0 * (1.0 - Self::norm_cdf(z_stat.abs()));
+                let p_val = 2.0 * (1.0 - norm_cdf(z_stat.abs()));
                 println!("\n  Wilcoxon Signed-Rank Test");
                 println!("  H₀: mediana({var_name}) = {mu0}");
                 println!("  n = {n}  (excluindo diffs ≈ 0)");
@@ -1052,7 +1053,7 @@ impl Interpreter {
                         let phat = k as f64 / nf;
                         let se = (mu * (1.0 - mu) / nf).sqrt();
                         let z = (phat - mu) / se;
-                        let p = 2.0 * (1.0 - Self::norm_cdf(z.abs()));
+                        let p = 2.0 * (1.0 - norm_cdf(z.abs()));
                         println!("\n  Binomial / Sign Test");
                         println!(
                             "  Sucessos: {k}   n: {n_trials}   p̂ = {:.4}   H₀: p = {mu}",
@@ -1087,7 +1088,7 @@ impl Interpreter {
                             Some(Value::Int(v)) => *v as f64,
                             _ => 0.0,
                         };
-                        let data = Self::get_col_f64(&df, &var_name)?;
+                        let data = get_col_f64(&df, &var_name)?;
                         let pos = data.iter().filter(|&&v| v > mu0).count();
                         let neg = data.iter().filter(|&&v| v < mu0).count();
                         let ties = data.len() - pos - neg;
@@ -1095,7 +1096,7 @@ impl Interpreter {
                         let phat = pos as f64 / n_eff as f64;
                         let nf = n_eff as f64;
                         let z = (phat - 0.5) * nf.sqrt() / 0.5;
-                        let p = 2.0 * (1.0 - Self::norm_cdf(z.abs()));
+                        let p = 2.0 * (1.0 - norm_cdf(z.abs()));
                         println!("\n  Sign Test  ({var_name} vs {mu0})");
                         println!("  + : {pos}   - : {neg}   empates: {ties}   n efetivo: {n_eff}");
                         println!("  p̂(+) = {phat:.4}   z = {z:.4}   p = {p:.4}");
@@ -1150,7 +1151,7 @@ impl Interpreter {
                     Some(Value::Int(v)) => *v as f64,
                     _ => 1600.0,
                 };
-                let series = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?.to_vec());
+                let series = ndarray::Array1::from(get_col_f64(&df, &var_name)?.to_vec());
                 let (trend, cycle) = greeners::TimeSeries::hp_filter(&series, lambda)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let trend_name = format!("{var_name}_trend");
@@ -1210,7 +1211,7 @@ impl Interpreter {
                     Some(Value::Float(v)) => *v as usize,
                     _ => 12,
                 };
-                let series = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?.to_vec());
+                let series = ndarray::Array1::from(get_col_f64(&df, &var_name)?.to_vec());
                 let cycle = greeners::TimeSeries::bk_filter(&series, low, high, k)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let cycle_name = format!("{var_name}_cycle");
@@ -1260,7 +1261,7 @@ impl Interpreter {
                     _ => 32,
                 };
                 let drift = matches!(opt_map.get("drift"), Some(Value::Bool(true)));
-                let series = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?.to_vec());
+                let series = ndarray::Array1::from(get_col_f64(&df, &var_name)?.to_vec());
                 let cycle = greeners::TimeSeries::cf_filter(&series, low, high, drift)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let cycle_name = format!("{var_name}_cycle");
@@ -1711,7 +1712,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let series = Self::get_col_f64(&df, &var_name)?;
+                let series = get_col_f64(&df, &var_name)?;
                 let max_lags = match opt_map.get("lags") {
                     Some(Value::Int(v)) => Some(*v as usize),
                     Some(Value::Float(v)) => Some(*v as usize),
@@ -1767,7 +1768,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let series = Self::get_col_f64(&df, &var_name)?;
+                let series = get_col_f64(&df, &var_name)?;
                 let regression = match opt_map.get("regression") {
                     Some(Value::Str(s)) => s.clone(),
                     _ => "c".to_string(),
@@ -1827,7 +1828,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let series = Self::get_col_f64(&df, &var_name)?;
+                let series = get_col_f64(&df, &var_name)?;
                 let max_lags = match opt_map.get("lags") {
                     Some(Value::Int(v)) => Some(*v as usize),
                     Some(Value::Float(v)) => Some(*v as usize),
@@ -1879,7 +1880,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let series = Self::get_col_f64(&df, &var_name)?;
+                let series = get_col_f64(&df, &var_name)?;
                 let trim = match opt_map.get("trim") {
                     Some(Value::Float(v)) => *v,
                     Some(Value::Int(v)) => *v as f64,
@@ -1946,8 +1947,8 @@ impl Interpreter {
                     Some(Value::Float(v)) => *v as usize,
                     _ => 4,
                 };
-                let y_arr = ndarray::Array1::from(Self::get_col_f64(&df, &y_name)?.to_vec());
-                let x_arr = ndarray::Array1::from(Self::get_col_f64(&df, &x_name)?.to_vec());
+                let y_arr = ndarray::Array1::from(get_col_f64(&df, &y_name)?.to_vec());
+                let x_arr = ndarray::Array1::from(get_col_f64(&df, &x_name)?.to_vec());
                 let r = greeners::TimeSeries::granger_causality(&y_arr, &x_arr, lags)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 println!("\n{:=^60}", " Granger Causality Test ");
@@ -2000,8 +2001,8 @@ impl Interpreter {
                         ))
                     }
                 };
-                let y1_arr = ndarray::Array1::from(Self::get_col_f64(&df, &y1_name)?.to_vec());
-                let y2_arr = ndarray::Array1::from(Self::get_col_f64(&df, &y2_name)?.to_vec());
+                let y1_arr = ndarray::Array1::from(get_col_f64(&df, &y1_name)?.to_vec());
+                let y2_arr = ndarray::Array1::from(get_col_f64(&df, &y2_name)?.to_vec());
                 let r = greeners::TimeSeries::engle_granger(&y1_arr, &y2_arr)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 println!("\n{:=^60}", " Engle-Granger Cointegration Test ");
@@ -2066,7 +2067,7 @@ impl Interpreter {
                 let k = var_names.len();
                 let mut data = ndarray::Array2::<f64>::zeros((n, k));
                 for (j, name) in var_names.iter().enumerate() {
-                    let col = Self::get_col_f64(&df, name)?;
+                    let col = get_col_f64(&df, name)?;
                     for i in 0..n {
                         data[[i, j]] = col[i];
                     }
