@@ -1,4 +1,5 @@
 use super::*;
+use super::models::FactorModel;
 
 /// Finance (Fama-MacBeth, portsort, doublesort) e estimadores
 /// cross-section/microeconométricos: OLS/reg, IV/2SLS, teste de instrumento
