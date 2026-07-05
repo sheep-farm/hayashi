@@ -1,4 +1,5 @@
 use super::*;
+use super::helpers::*;
 
 pub const BUILTIN_NAMES: &[&str] = &[
     "mean",
@@ -292,7 +293,7 @@ impl Interpreter {
                     return Err(HayashiError::Runtime("bool(x)".into()));
                 }
                 let v = self.eval_expr(&args[0])?;
-                Ok(Value::Bool(Self::value_as_bool(&v)))
+                Ok(Value::Bool(value_as_bool(&v)))
             }
             "is_nil" => {
                 if args.len() != 1 {
@@ -982,7 +983,7 @@ impl Interpreter {
                             )))
                         }
                     };
-                    let col = Self::get_col_f64(&df, &var_name)?;
+                    let col = get_col_f64(&df, &var_name)?;
                     // filtro opcional: if=cond
                     if let Some(cond_opt) = opts.iter().find(|o| o.name == "if") {
                         let mask = self.eval_col_expr(&cond_opt.value, &df)?;
@@ -998,7 +999,7 @@ impl Interpreter {
                     let v = self.eval_expr(&args[0])?;
                     match v {
                         Value::List(lst) => {
-                            lst.iter().map(Self::value_as_f64).collect::<Result<_>>()?
+                            lst.iter().map(value_as_f64).collect::<Result<_>>()?
                         }
                         Value::Series(s) => {
                             if s.is_empty() {
@@ -1068,7 +1069,7 @@ impl Interpreter {
                             )
                         }
                     };
-                    let col = Self::get_col_f64(&df, &var_name)?;
+                    let col = get_col_f64(&df, &var_name)?;
                     if let Some(cond_opt) = opts.iter().find(|o| o.name == "if") {
                         let mask = self.eval_col_expr(&cond_opt.value, &df)?;
                         col.iter()
@@ -1082,7 +1083,7 @@ impl Interpreter {
                 } else if args.len() == 1 {
                     match self.eval_expr(&args[0])? {
                         Value::List(lst) => {
-                            lst.iter().map(Self::value_as_f64).collect::<Result<_>>()?
+                            lst.iter().map(value_as_f64).collect::<Result<_>>()?
                         }
                         other => {
                             return Err(self
@@ -1127,7 +1128,7 @@ impl Interpreter {
                             )
                         }
                     };
-                    let col = Self::get_col_f64(&df, &var_name)?;
+                    let col = get_col_f64(&df, &var_name)?;
                     if let Some(cond_opt) = opts.iter().find(|o| o.name == "if") {
                         let mask = self.eval_col_expr(&cond_opt.value, &df)?;
                         col.iter()
@@ -1141,7 +1142,7 @@ impl Interpreter {
                 } else if args.len() == 1 {
                     match self.eval_expr(&args[0])? {
                         Value::List(lst) => {
-                            lst.iter().map(Self::value_as_f64).collect::<Result<_>>()?
+                            lst.iter().map(value_as_f64).collect::<Result<_>>()?
                         }
                         other => {
                             return Err(self.type_err(format!(
@@ -1238,7 +1239,7 @@ impl Interpreter {
                             )
                         }
                     };
-                    let col = Self::get_col_f64(&df, &var_name)?;
+                    let col = get_col_f64(&df, &var_name)?;
                     let nums = if let Some(cond_opt) = opts.iter().find(|o| o.name == "if") {
                         let mask = self.eval_col_expr(&cond_opt.value, &df)?;
                         col.iter()
@@ -1259,7 +1260,7 @@ impl Interpreter {
                     let v = self.eval_expr(&args[0])?;
                     let nums = match v {
                         Value::List(lst) => {
-                            lst.iter().map(Self::value_as_f64).collect::<Result<_>>()?
+                            lst.iter().map(value_as_f64).collect::<Result<_>>()?
                         }
                         other => {
                             return Err(self.type_err(format!(
@@ -1313,8 +1314,8 @@ impl Interpreter {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
                     _ => return Err(self.rt_err("cov(): third argument must be a variable name")),
                 };
-                let x_col = Self::get_col_f64(&df, &x_name)?;
-                let y_col = Self::get_col_f64(&df, &y_name)?;
+                let x_col = get_col_f64(&df, &x_name)?;
+                let y_col = get_col_f64(&df, &y_name)?;
                 let (x_vals, y_vals): (Vec<f64>, Vec<f64>) =
                     if let Some(cond_opt) = opts.iter().find(|o| o.name == "if") {
                         let mask = self.eval_col_expr(&cond_opt.value, &df)?;
@@ -1368,8 +1369,8 @@ impl Interpreter {
                         )
                     }
                 };
-                let x_col = Self::get_col_f64(&df, &x_name)?;
-                let y_col = Self::get_col_f64(&df, &y_name)?;
+                let x_col = get_col_f64(&df, &x_name)?;
+                let y_col = get_col_f64(&df, &y_name)?;
                 let (x_vals, y_vals): (Vec<f64>, Vec<f64>) =
                     if let Some(cond_opt) = opts.iter().find(|o| o.name == "if") {
                         let mask = self.eval_col_expr(&cond_opt.value, &df)?;

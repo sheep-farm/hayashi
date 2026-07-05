@@ -1,4 +1,5 @@
 use super::*;
+use super::helpers::*;
 
 /// GARCH/EGARCH/GJR-GARCH, VARMA, decomposição sazonal, MSTL, testes de
 /// proporção, testes múltiplos, UCM, GAM, MICE, Markov Switching, SVAR, 3SLS,
@@ -1443,7 +1444,7 @@ impl Interpreter {
                 let k = var_names.len();
                 let mut data = ndarray::Array2::<f64>::zeros((n, k));
                 for (j, vname) in var_names.iter().enumerate() {
-                    let col = Self::get_col_f64(&df, vname)?;
+                    let col = get_col_f64(&df, vname)?;
                     for (i, &v) in col.iter().enumerate() {
                         data[[i, j]] = v;
                     }
@@ -1481,7 +1482,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let series = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?);
+                let series = ndarray::Array1::from(get_col_f64(&df, &var_name)?);
                 let period = match opt_map.get("period") {
                     Some(Value::Int(v)) => *v as usize,
                     Some(Value::Float(v)) => *v as usize,
@@ -1524,7 +1525,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let series = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?);
+                let series = ndarray::Array1::from(get_col_f64(&df, &var_name)?);
                 let period = match opt_map.get("period") {
                     Some(Value::Int(v)) => *v as usize,
                     Some(Value::Float(v)) => *v as usize,
@@ -1573,7 +1574,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let series = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?);
+                let series = ndarray::Array1::from(get_col_f64(&df, &var_name)?);
                 let periods: Vec<usize> = match opt_map.get("periods") {
                     Some(Value::List(lst)) => lst
                         .iter()
@@ -1904,7 +1905,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let y = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?);
+                let y = ndarray::Array1::from(get_col_f64(&df, &var_name)?);
 
                 let level = match opt_map.get("level") {
                     Some(Value::Str(s)) => match s.to_lowercase().as_str() {
@@ -2006,7 +2007,7 @@ impl Interpreter {
                 let q_total = q_per * smooth_names.len().max(1);
                 let mut x_smooth = ndarray::Array2::<f64>::zeros((n, q_total));
                 for (k, sname) in smooth_names.iter().enumerate() {
-                    let col = ndarray::Array1::from(Self::get_col_f64(&df, sname)?);
+                    let col = ndarray::Array1::from(get_col_f64(&df, sname)?);
                     let basis = greeners::BSplineBasis::generate(&col, q_per, degree)
                         .map_err(|e| self.rt_err(format!("gam spline ({sname}): {e}")))?;
                     for i in 0..n {
@@ -2138,7 +2139,7 @@ impl Interpreter {
                 for vname in &var_names {
                     data.insert(
                         vname.clone(),
-                        ndarray::Array1::from(Self::get_col_f64(&df, vname)?),
+                        ndarray::Array1::from(get_col_f64(&df, vname)?),
                     );
                 }
 
@@ -2174,7 +2175,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let y = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?);
+                let y = ndarray::Array1::from(get_col_f64(&df, &var_name)?);
                 let k = match opt_map.get("k") {
                     Some(Value::Int(v)) => *v as usize,
                     Some(Value::Float(v)) => *v as usize,
@@ -2222,7 +2223,7 @@ impl Interpreter {
                 let k = var_names.len();
                 let mut data = ndarray::Array2::<f64>::zeros((n, k));
                 for (j, vname) in var_names.iter().enumerate() {
-                    let col = Self::get_col_f64(&df, vname)?;
+                    let col = get_col_f64(&df, vname)?;
                     for (i, &v) in col.iter().enumerate() {
                         data[[i, j]] = v;
                     }
@@ -2377,7 +2378,7 @@ impl Interpreter {
                 let n = df.n_rows();
                 let mut z_instr = ndarray::Array2::<f64>::zeros((n, instr_names.len()));
                 for (j, zname) in instr_names.iter().enumerate() {
-                    let col = Self::get_col_f64(&df, zname)?;
+                    let col = get_col_f64(&df, zname)?;
                     for (i, &v) in col.iter().enumerate() {
                         z_instr[[i, j]] = v;
                     }
@@ -2455,7 +2456,7 @@ impl Interpreter {
                 let k = var_names.len();
                 let mut data = ndarray::Array2::<f64>::zeros((n, k));
                 for (j, vname) in var_names.iter().enumerate() {
-                    let col = Self::get_col_f64(&df, vname)?;
+                    let col = get_col_f64(&df, vname)?;
                     for (i, &v) in col.iter().enumerate() {
                         data[[i, j]] = v;
                     }
@@ -2495,7 +2496,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let data = Self::get_col_f64(&df, &var_name)?;
+                let data = get_col_f64(&df, &var_name)?;
                 let r = greeners::Diagnostics::anderson_darling(&ndarray::Array1::from(data))
                     .map_err(|e| self.rt_err(format!("adtest: {e}")))?;
                 let sep = "─".repeat(56);
@@ -2541,7 +2542,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let data = Self::get_col_f64(&df, &var_name)?;
+                let data = get_col_f64(&df, &var_name)?;
                 let (stat, p) = greeners::Diagnostics::lilliefors(&ndarray::Array1::from(data))
                     .map_err(|e| self.rt_err(format!("lilliefors: {e}")))?;
                 let sig = if p < 0.01 {
@@ -2640,7 +2641,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let data = Self::get_col_f64(&df, &var_name)?;
+                let data = get_col_f64(&df, &var_name)?;
                 let res = greeners::Diagnostics::shapiro_wilk(&ndarray::Array1::from(data))
                     .map_err(|e| self.rt_err(format!("swilk: {e}")))?;
                 let sig = if res.p_value < 0.01 {
@@ -2695,7 +2696,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let data = Self::get_col_f64(&df, &var_name)?;
+                let data = get_col_f64(&df, &var_name)?;
                 let res = greeners::Diagnostics::shapiro_francia(&ndarray::Array1::from(data))
                     .map_err(|e| self.rt_err(format!("sfrancia: {e}")))?;
                 let sig = if res.p_value < 0.01 {
@@ -2750,7 +2751,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let data = Self::get_col_f64(&df, &var_name)?;
+                let data = get_col_f64(&df, &var_name)?;
                 let slice = data.as_slice().unwrap();
                 let skew = greeners::MomentHelpers::skewness(slice);
                 let kurt = greeners::MomentHelpers::kurtosis(slice);

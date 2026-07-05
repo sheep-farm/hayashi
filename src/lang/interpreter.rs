@@ -50,10 +50,13 @@ mod estimators_misc;
 mod estimators_panel;
 mod estimators_timeseries;
 mod env;
+mod helpers;
 mod models;
 mod post_estimation_ts;
 mod value;
 mod visualization;
+
+use self::helpers::*;
 
 pub use env::Env;
 pub use models::{
@@ -757,7 +760,7 @@ impl Interpreter {
                 else_expr,
             } => {
                 let cond_val = self.eval_expr(cond)?;
-                if Self::value_as_bool(&cond_val) {
+                if value_as_bool(&cond_val) {
                     self.eval_expr(then_expr)
                 } else {
                     self.eval_expr(else_expr)
@@ -770,19 +773,19 @@ impl Interpreter {
                 match op {
                     BinOp::And => {
                         let l = self.eval_expr(lhs)?;
-                        if !Self::value_as_bool(&l) {
+                        if !value_as_bool(&l) {
                             return Ok(Value::Bool(false));
                         }
                         let r = self.eval_expr(rhs)?;
-                        return Ok(Value::Bool(Self::value_as_bool(&r)));
+                        return Ok(Value::Bool(value_as_bool(&r)));
                     }
                     BinOp::Or => {
                         let l = self.eval_expr(lhs)?;
-                        if Self::value_as_bool(&l) {
+                        if value_as_bool(&l) {
                             return Ok(Value::Bool(true));
                         }
                         let r = self.eval_expr(rhs)?;
-                        return Ok(Value::Bool(Self::value_as_bool(&r)));
+                        return Ok(Value::Bool(value_as_bool(&r)));
                     }
                     BinOp::In => {
                         let l = self.eval_expr(lhs)?;
@@ -811,7 +814,7 @@ impl Interpreter {
                 }
                 let l = self.eval_expr(lhs)?;
                 let r = self.eval_expr(rhs)?;
-                Self::eval_scalar_binop(op, l, r)
+                eval_scalar_binop(op, l, r)
             }
 
             Expr::Neg(inner) => match self.eval_expr(inner)? {
@@ -822,7 +825,7 @@ impl Interpreter {
 
             Expr::Not(inner) => {
                 let v = self.eval_expr(inner)?;
-                Ok(Value::Bool(!Self::value_as_bool(&v)))
+                Ok(Value::Bool(!value_as_bool(&v)))
             }
 
             // ── Lista literal ─────────────────────────────────────────────────
@@ -1050,141 +1053,12 @@ impl Interpreter {
         formula_str
     }
 
-    /// Extrai coluna como Array1<f64>; aceita Float, Int, Bool, Categorical, etc. convertendo dinamicamente.
-    fn get_col_f64(df: &DataFrame, name: &str) -> Result<ndarray::Array1<f64>> {
-        let col = df
-            .get_column(name)
-            .map_err(|_| HayashiError::Runtime(format!("column '{name}' not found")))?;
-        Ok(col.to_float())
-    }
 
-    /// Reconstrói X a partir da lista de nomes de variáveis do modelo.
-    /// `_cons`/`const`/`Intercept` → coluna de 1s; demais → colunas do df.
-    fn build_x_from_varnames(df: &DataFrame, names: &[String]) -> Result<ndarray::Array2<f64>> {
-        let n = df.n_rows();
-        let k = names.len();
-        let mut x = ndarray::Array2::<f64>::zeros((n, k));
-        for (j, name) in names.iter().enumerate() {
-            match name.as_str() {
-                "_cons" | "const" | "Intercept" | "(Intercept)" => {
-                    x.column_mut(j).fill(1.0);
-                }
-                other => {
-                    let col = Self::get_col_f64(df, other).map_err(|_| {
-                        HayashiError::Runtime(format!(
-                            "predict: column '{other}' not found no DataFrame"
-                        ))
-                    })?;
-                    x.column_mut(j).assign(&col);
-                }
-            }
-        }
-        Ok(x)
-    }
-
-    fn resolve_cov(opt_val: Option<&Value>) -> Result<CovarianceType> {
-        match opt_val {
-            None => Ok(CovarianceType::NonRobust),
-            Some(Value::Str(s)) => match s.as_str() {
-                "nonrobust" | "ols" => Ok(CovarianceType::NonRobust),
-                "robust" => Ok(CovarianceType::HC1),
-                "HC1" => Ok(CovarianceType::HC1),
-                "HC2" => Ok(CovarianceType::HC2),
-                "HC3" => Ok(CovarianceType::HC3),
-                "HC4" => Ok(CovarianceType::HC4),
-                other => Err(HayashiError::Type(format!(
-                    "unknown covariance type '{other}'"
-                ))),
-            },
-            _ => Err(HayashiError::Type("cov= must be a string".into())),
-        }
-    }
-
-    fn col_to_cluster_ids(df: &DataFrame, col: &str) -> Result<Vec<usize>> {
-        let mut map: HashMap<i64, usize> = HashMap::new();
-        let mut next = 0usize;
-        if let Ok(arr) = df.get_int(col) {
-            Ok(arr
-                .iter()
-                .map(|&v| {
-                    *map.entry(v).or_insert_with(|| {
-                        let id = next;
-                        next += 1;
-                        id
-                    })
-                })
-                .collect())
-        } else if let Ok(arr) = df.get(col) {
-            Ok(arr
-                .iter()
-                .map(|&v| {
-                    let key = v as i64;
-                    *map.entry(key).or_insert_with(|| {
-                        let id = next;
-                        next += 1;
-                        id
-                    })
-                })
-                .collect())
-        } else if let Ok(arr) = df.get_string(col) {
-            let mut smap: HashMap<String, usize> = HashMap::new();
-            Ok(arr
-                .iter()
-                .map(|v| {
-                    *smap.entry(v.clone()).or_insert_with(|| {
-                        let id = next;
-                        next += 1;
-                        id
-                    })
-                })
-                .collect())
-        } else {
-            Err(HayashiError::Runtime(format!(
-                "cluster column '{col}' not found"
-            )))
-        }
-    }
-
-    fn resolve_cov_full(
-        opt_map: &HashMap<String, Value>,
-        df: &DataFrame,
-    ) -> Result<CovarianceType> {
-        if let Some(Value::Str(cluster_col)) = opt_map.get("cluster") {
-            let ids = Self::col_to_cluster_ids(df, cluster_col)?;
-            if let Some(Value::Str(cluster2_col)) = opt_map.get("cluster2") {
-                let ids2 = Self::col_to_cluster_ids(df, cluster2_col)?;
-                Ok(CovarianceType::ClusteredTwoWay(ids, ids2))
-            } else {
-                Ok(CovarianceType::Clustered(ids))
-            }
-        } else if let Some(Value::Str(nw)) = opt_map.get("nw") {
-            let lags: usize = nw
-                .parse()
-                .unwrap_or_else(|_| (df.n_rows() as f64).powf(0.25) as usize);
-            Ok(CovarianceType::NeweyWest(lags))
-        } else if let Some(Value::Int(nw)) = opt_map.get("nw") {
-            Ok(CovarianceType::NeweyWest(*nw as usize))
-        } else {
-            Self::resolve_cov(opt_map.get("cov"))
-        }
-    }
-
-    fn filter_df_by_mask(df: &DataFrame, mask: &[f64]) -> Result<Rc<DataFrame>> {
-        let keep: Vec<usize> = mask
-            .iter()
-            .enumerate()
-            .filter(|(_, &m)| m != 0.0)
-            .map(|(i, _)| i)
-            .collect();
-        df.iloc(Some(&keep), None)
-            .map(Rc::new)
-            .map_err(|e| HayashiError::Runtime(e.to_string()))
-    }
 
     fn maybe_filter_df(&mut self, df: &Rc<DataFrame>, opts: &[Opt]) -> Result<Rc<DataFrame>> {
         if let Some(if_opt) = opts.iter().find(|o| o.name == "if") {
             let mask = self.eval_col_expr(&if_opt.value, df)?;
-            Self::filter_df_by_mask(df, &mask)
+            filter_df_by_mask(df, &mask)
         } else {
             Ok(df.clone())
         }
@@ -1360,149 +1234,7 @@ impl Interpreter {
         }
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    fn diag(rendered: String) -> Value {
-        Value::DiagResult(Rc::new(DiagResult { rendered }))
-    }
-
-    // ── Helpers para aritmética / lógica escalar ──────────────────────────────
-
-    fn value_as_bool(v: &Value) -> bool {
-        match v {
-            Value::Bool(b) => *b,
-            Value::Int(i) => *i != 0,
-            Value::Float(f) => *f != 0.0 && !f.is_nan(),
-            Value::Nil => false,
-            _ => true,
-        }
-    }
-
-    fn extract_params(v: &Value) -> Option<Vec<f64>> {
-        match v {
-            Value::OlsResult(m) => Some(m.result.params.to_vec()),
-            Value::BinaryResult(m) => Some(m.result.params.to_vec()),
-            Value::PenalizedResult(m) => Some(m.params.to_vec()),
-            Value::PoissonResult(r) => Some(r.params.to_vec()),
-            Value::NegBinResult(r) => Some(r.params.to_vec()),
-            Value::QuantileResult(r) => Some(r.params.to_vec()),
-            Value::PanelResult(r) => Some(r.params.to_vec()),
-            Value::TobitResult(r) => Some(r.params.to_vec()),
-            _ => None,
-        }
-    }
-
-    fn extract_se(v: &Value) -> Option<Vec<f64>> {
-        match v {
-            Value::OlsResult(m) => Some(m.result.std_errors.to_vec()),
-            Value::BinaryResult(m) => Some(m.result.std_errors.to_vec()),
-            Value::PenalizedResult(m) => Some(m.std_errors.to_vec()),
-            Value::PoissonResult(r) => Some(r.std_errors.to_vec()),
-            Value::NegBinResult(r) => Some(r.std_errors.to_vec()),
-            Value::QuantileResult(r) => Some(r.std_errors.to_vec()),
-            Value::PanelResult(r) => Some(r.std_errors.to_vec()),
-            Value::TobitResult(r) => Some(r.std_errors.to_vec()),
-            _ => None,
-        }
-    }
-
-    fn extract_var_names(v: &Value) -> Vec<String> {
-        match v {
-            Value::OlsResult(m) => m.result.variable_names.clone().unwrap_or_default(),
-            Value::BinaryResult(m) => m.coef_names.clone(),
-            Value::PenalizedResult(m) => m.variable_names.clone(),
-            Value::PoissonResult(r) => r.variable_names.clone().unwrap_or_default(),
-            Value::NegBinResult(r) => r.variable_names.clone().unwrap_or_default(),
-            Value::QuantileResult(r) => r.variable_names.clone().unwrap_or_default(),
-            Value::PanelResult(r) => r.variable_names.clone().unwrap_or_default(),
-            Value::TobitResult(r) => r.variable_names.clone().unwrap_or_default(),
-            _ => vec![],
-        }
-    }
-
-    fn value_as_f64(v: &Value) -> Result<f64> {
-        match v {
-            Value::Float(f) => Ok(*f),
-            Value::Int(i) => Ok(*i as f64),
-            Value::Bool(b) => Ok(if *b { 1.0 } else { 0.0 }),
-            _ => Err(HayashiError::Type("expected numeric value".into())),
-        }
-    }
-
-    fn eval_scalar_binop(op: &BinOp, l: Value, r: Value) -> Result<Value> {
-        // Comparações (funciona com qualquer tipo comparável)
-        match op {
-            BinOp::Eq => {
-                let eq = match (&l, &r) {
-                    (Value::Nil, Value::Nil) => true,
-                    (Value::Nil, _) | (_, Value::Nil) => false,
-                    (Value::Str(a), Value::Str(b)) => a == b,
-                    (Value::Bool(a), Value::Bool(b)) => a == b,
-                    _ => {
-                        let a = Self::value_as_f64(&l)?;
-                        let b = Self::value_as_f64(&r)?;
-                        (a - b).abs() < f64::EPSILON
-                    }
-                };
-                return Ok(Value::Bool(eq));
-            }
-            BinOp::Ne => {
-                let ne = match (&l, &r) {
-                    (Value::Nil, Value::Nil) => false,
-                    (Value::Nil, _) | (_, Value::Nil) => true,
-                    (Value::Str(a), Value::Str(b)) => a != b,
-                    (Value::Bool(a), Value::Bool(b)) => a != b,
-                    _ => {
-                        let a = Self::value_as_f64(&l)?;
-                        let b = Self::value_as_f64(&r)?;
-                        (a - b).abs() >= f64::EPSILON
-                    }
-                };
-                return Ok(Value::Bool(ne));
-            }
-            _ => {}
-        }
-
-        // Aritmética e comparações numéricas
-        match (&l, &r) {
-            // Int × Int → Int (para Add/Sub/Mul); Div/Pow → Float
-            (Value::Int(a), Value::Int(b)) => match op {
-                BinOp::Add => Ok(Value::Int(a + b)),
-                BinOp::Sub => Ok(Value::Int(a - b)),
-                BinOp::Mul => Ok(Value::Int(a * b)),
-                BinOp::Div => Ok(Value::Float(*a as f64 / *b as f64)),
-                BinOp::Mod => Ok(Value::Int(a % b)),
-                BinOp::Pow => Ok(Value::Float((*a as f64).powf(*b as f64))),
-                BinOp::Gt => Ok(Value::Bool(a > b)),
-                BinOp::Lt => Ok(Value::Bool(a < b)),
-                BinOp::GtEq => Ok(Value::Bool(a >= b)),
-                BinOp::LtEq => Ok(Value::Bool(a <= b)),
-                BinOp::And | BinOp::Or | BinOp::Eq | BinOp::Ne | BinOp::In => unreachable!(),
-            },
-            // Qualquer Float → Float
-            _ => {
-                // Concatenação de strings
-                if let (BinOp::Add, Value::Str(a), Value::Str(b)) = (op, &l, &r) {
-                    return Ok(Value::Str(format!("{a}{b}")));
-                }
-                let a = Self::value_as_f64(&l)?;
-                let b = Self::value_as_f64(&r)?;
-                match op {
-                    BinOp::Add => Ok(Value::Float(a + b)),
-                    BinOp::Sub => Ok(Value::Float(a - b)),
-                    BinOp::Mul => Ok(Value::Float(a * b)),
-                    BinOp::Div => Ok(Value::Float(a / b)),
-                    BinOp::Mod => Ok(Value::Float(a % b)),
-                    BinOp::Pow => Ok(Value::Float(a.powf(b))),
-                    BinOp::Gt => Ok(Value::Bool(a > b)),
-                    BinOp::Lt => Ok(Value::Bool(a < b)),
-                    BinOp::GtEq => Ok(Value::Bool(a >= b)),
-                    BinOp::LtEq => Ok(Value::Bool(a <= b)),
-                    BinOp::And | BinOp::Or | BinOp::Eq | BinOp::Ne | BinOp::In => unreachable!(),
-                }
-            }
-        }
-    }
+    // ── Helpers de painel (dependem de estado do interpretador) ─────────────
 
     fn extract_panel_args(
         &mut self,
@@ -1573,207 +1305,18 @@ impl Interpreter {
         }
     }
 
-    fn finite_numeric_string(value: &str) -> Option<f64> {
-        value.parse::<f64>().ok().filter(|v| v.is_finite())
-    }
-
-    fn sort_maybe_numeric_strings(values: &mut [String]) {
-        if values
-            .iter()
-            .all(|value| Self::finite_numeric_string(value).is_some())
-        {
-            values.sort_by(|a, b| {
-                match (
-                    Self::finite_numeric_string(a),
-                    Self::finite_numeric_string(b),
-                ) {
-                    (Some(a), Some(b)) => a.partial_cmp(&b).unwrap_or(std::cmp::Ordering::Equal),
-                    _ => a.cmp(b),
-                }
-            });
-        } else {
-            values.sort();
-        }
-    }
-
     // ── Nomes dos coeficientes a partir da fórmula ────────────────────────────
 
-    // Ordena um DataFrame por uma única coluna (ascendente).
-    // Usado por tsset para garantir ordem temporal.
-    fn sort_df_by(df: &DataFrame, col: &str) -> Result<DataFrame> {
-        use greeners::Column;
-        let n = df.n_rows();
 
-        // índice de ordenação pela coluna t_var
-        let mut idx: Vec<usize> = (0..n).collect();
-        match df.get_column(col) {
-            Ok(Column::Float(arr)) => {
-                let v = arr.to_vec();
-                idx.sort_by(|&a, &b| v[a].partial_cmp(&v[b]).unwrap_or(std::cmp::Ordering::Equal));
-            }
-            Ok(Column::Int(arr)) => {
-                let v: Vec<f64> = arr.iter().map(|&x| x as f64).collect();
-                idx.sort_by(|&a, &b| v[a].partial_cmp(&v[b]).unwrap());
-            }
-            _ => {
-                if let Ok(arr) = df.get_string(col) {
-                    let v = arr.to_vec();
-                    idx.sort_by(|&a, &b| v[a].cmp(&v[b]));
-                } else {
-                    return Err(HayashiError::Runtime(format!("column '{col}' not found")));
-                }
-            }
-        }
-
-        let mut builder = DataFrame::builder();
-        for name in &df.column_names() {
-            match df.get_column(name) {
-                Ok(Column::Float(arr)) => {
-                    builder =
-                        builder.add_column(name, idx.iter().map(|&i| arr[i]).collect::<Vec<_>>());
-                }
-                Ok(Column::Int(arr)) => {
-                    builder = builder
-                        .add_column(name, idx.iter().map(|&i| arr[i] as f64).collect::<Vec<_>>());
-                }
-                _ => {
-                    if let Ok(arr) = df.get_string(name) {
-                        let v = arr.to_vec();
-                        builder =
-                            builder.add_string(name, idx.iter().map(|&i| v[i].clone()).collect());
-                    }
-                }
-            }
-        }
-        builder
-            .build()
-            .map_err(|e| HayashiError::Runtime(e.to_string()))
-    }
-
-    fn coef_names_from_formula(
-        formula_ast: &Formula,
-        df: &DataFrame,
-        n_cols: usize,
-    ) -> Vec<String> {
-        let mut names: Vec<String> = vec!["_cons".into()];
-        for term in &formula_ast.rhs {
-            match term {
-                RhsTerm::Var(v) => names.push(v.clone()),
-                RhsTerm::Transform(fn_, v) => names.push(format!("{fn_}({v})")),
-                RhsTerm::Interaction(a, b) => names.push(format!("{a}:{b}")),
-                RhsTerm::Categorical(v) => {
-                    let raw = Self::col_to_strings(df, v).unwrap_or_default();
-                    let mut unique: Vec<String> = raw
-                        .into_iter()
-                        .collect::<std::collections::HashSet<_>>()
-                        .into_iter()
-                        .collect();
-                    Self::sort_maybe_numeric_strings(&mut unique);
-                    for val in unique.into_iter().skip(1) {
-                        names.push(format!("{v}={val}"));
-                    }
-                }
-            }
-        }
-        names.truncate(n_cols);
-        while names.len() < n_cols {
-            names.push(format!("x{}", names.len() + 1));
-        }
-        names
-    }
 
     // ── Extrai coluna como Vec<String> (para tabulate) ────────────────────────
 
-    fn col_to_strings(df: &DataFrame, name: &str) -> Result<Vec<String>> {
-        use greeners::Column;
-        match df.get_column(name) {
-            Ok(Column::Int(arr)) => Ok(arr.iter().map(|x| x.to_string()).collect()),
-            Ok(Column::Float(arr)) => Ok(arr
-                .iter()
-                .map(|x| {
-                    if x.is_nan() {
-                        ".".to_string()
-                    } else if x.fract() == 0.0 && x.abs() < 1e14 {
-                        format!("{}", *x as i64)
-                    } else {
-                        format!("{:.4}", x)
-                    }
-                })
-                .collect()),
-            Ok(Column::String(arr)) => Ok(arr.to_vec()),
-            Ok(Column::Categorical(cat)) => Ok((0..df.n_rows())
-                .map(|row| cat.get_string(row).unwrap_or("").to_string())
-                .collect()),
-            _ => df.get_string(name).map(|arr| arr.to_vec()).map_err(|_| {
-                HayashiError::Runtime(format!(
-                    "column '{name}' not found or has unsupported type for tabulate"
-                ))
-            }),
-        }
-    }
-
-    // ── Tabela de frequências (uni-variada) ───────────────────────────────────
-
-    fn tabulate_one(df: &DataFrame, var: &str) -> Result<()> {
-        let vals = Self::col_to_strings(df, var)?;
-        let n = vals.len();
-
-        let mut counts: HashMap<String, usize> = HashMap::new();
-        for v in &vals {
-            *counts.entry(v.clone()).or_insert(0) += 1;
-        }
-
-        let mut unique: Vec<String> = counts.keys().cloned().collect();
-        Self::sort_maybe_numeric_strings(&mut unique);
-
-        let label_w = var
-            .len()
-            .max(12)
-            .max(unique.iter().map(|s| s.len()).max().unwrap_or(0))
-            + 2;
-        let sep = format!("{}-+{}", "-".repeat(label_w), "-".repeat(36));
-
-        println!(
-            "\n{:>lw$} | {:>10}  {:>10}  {:>10}",
-            var,
-            "Freq.",
-            "Percent",
-            "Cum.",
-            lw = label_w
-        );
-        println!("{sep}");
-
-        let mut cum = 0.0_f64;
-        for key in &unique {
-            let freq = counts[key];
-            let pct = freq as f64 / n as f64 * 100.0;
-            cum += pct;
-            println!(
-                "{:>lw$} | {:>10}  {:>10.2}  {:>10.2}",
-                key,
-                freq,
-                pct,
-                cum,
-                lw = label_w
-            );
-        }
-        println!("{sep}");
-        println!(
-            "{:>lw$} | {:>10}  {:>10.2}",
-            "Total",
-            n,
-            100.0_f64,
-            lw = label_w
-        );
-        println!();
-        Ok(())
-    }
 
     // ── Tabela cruzada (bi-variada, opcional chi2) ────────────────────────────
 
-    fn tabulate_two(df: &DataFrame, row_var: &str, col_var: &str, do_chi2: bool) -> Result<()> {
-        let rows = Self::col_to_strings(df, row_var)?;
-        let cols = Self::col_to_strings(df, col_var)?;
+    fn __removed_tabulate_two(df: &DataFrame, row_var: &str, col_var: &str, do_chi2: bool) -> Result<()> {
+        let rows = col_to_strings(df, row_var)?;
+        let cols = col_to_strings(df, col_var)?;
 
         if rows.len() != cols.len() {
             return Err(HayashiError::Runtime(
@@ -1783,7 +1326,7 @@ impl Interpreter {
 
         // valores únicos, ordenados
         let sort_strs = |mut v: Vec<String>| -> Vec<String> {
-            Self::sort_maybe_numeric_strings(&mut v);
+            sort_maybe_numeric_strings(&mut v);
             v
         };
 
@@ -2735,7 +2278,7 @@ impl Interpreter {
                                     "group() requires a column name".into()
                                 )),
                             };
-                            let strs = Self::col_to_strings(df, &col_name)?;
+                            let strs = col_to_strings(df, &col_name)?;
                             return Ok(greeners::Transforms::group(&strs));
                         }
                         "date" => {
@@ -2745,7 +2288,7 @@ impl Interpreter {
                                     "date() requires a column name".into()
                                 )),
                             };
-                            let strs = Self::col_to_strings(df, &col_name)?;
+                            let strs = col_to_strings(df, &col_name)?;
                             let result: Vec<f64> = strs
                                 .iter()
                                 .map(|s| {
@@ -3216,7 +2759,7 @@ impl Interpreter {
                     // "yhat" → categoria predita (argmax)
                     // "prN"  → P(Y = N) para categoria específica N (1-indexed)
                     (Value::OrderedResult(r), kind_s) => {
-                        let x = Self::build_x_from_varnames(&df_val,
+                        let x = build_x_from_varnames(&df_val,
                             r.variable_names.as_deref().unwrap_or(&[]))?;
                         match kind_s {
                             "xb" => x.dot(&r.params).to_vec(),
@@ -3258,7 +2801,7 @@ impl Interpreter {
                     // ── IV / 2SLS ─────────────────────────────────────────────
                     (Value::IvResult(r), "xb" | "fitted") => {
                         let names = r.variable_names.as_deref().unwrap_or(&[]);
-                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        let x = build_x_from_varnames(&df_val, names)?;
                         x.dot(&r.params).to_vec()
                     }
                     (Value::IvResult(_), k) => return Err(HayashiError::Runtime(
@@ -3268,7 +2811,7 @@ impl Interpreter {
                     // ── Panel FE / RE ─────────────────────────────────────────
                     (Value::PanelResult(r), "xb" | "fitted") => {
                         let names = r.variable_names.as_deref().unwrap_or(&[]);
-                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        let x = build_x_from_varnames(&df_val, names)?;
                         x.dot(&r.params).to_vec()
                     }
                     (Value::PanelResult(_), k) => return Err(HayashiError::Runtime(
@@ -3276,7 +2819,7 @@ impl Interpreter {
                     )),
                     (Value::ReResult(r), "xb" | "fitted") => {
                         let names = r.variable_names.as_deref().unwrap_or(&[]);
-                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        let x = build_x_from_varnames(&df_val, names)?;
                         x.dot(&r.params).to_vec()
                     }
                     (Value::ReResult(_), k) => return Err(HayashiError::Runtime(
@@ -3286,7 +2829,7 @@ impl Interpreter {
                     // ── Tobit ─────────────────────────────────────────────────
                     (Value::TobitResult(r), "xb" | "fitted") => {
                         let names = r.variable_names.as_deref().unwrap_or(&[]);
-                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        let x = build_x_from_varnames(&df_val, names)?;
                         x.dot(&r.params).to_vec()
                     }
                     (Value::TobitResult(_), k) => return Err(HayashiError::Runtime(
@@ -3296,7 +2839,7 @@ impl Interpreter {
                     // ── Heckman ───────────────────────────────────────────────
                     (Value::HeckmanResult(r), "xb" | "fitted") => {
                         let names = r.variable_names.as_deref().unwrap_or(&[]);
-                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        let x = build_x_from_varnames(&df_val, names)?;
                         x.dot(&r.params).to_vec()
                     }
                     (Value::HeckmanResult(_), k) => return Err(HayashiError::Runtime(
@@ -3306,12 +2849,12 @@ impl Interpreter {
                     // ── Cox PH ────────────────────────────────────────────────
                     (Value::CoxResult(r), "loghr" | "xb") => {
                         let names = r.variable_names.as_deref().unwrap_or(&[]);
-                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        let x = build_x_from_varnames(&df_val, names)?;
                         r.predict_log_hazard(&x).to_vec()
                     }
                     (Value::CoxResult(r), "hr" | "hazard") => {
                         let names = r.variable_names.as_deref().unwrap_or(&[]);
-                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        let x = build_x_from_varnames(&df_val, names)?;
                         r.predict_hazard_ratio(&x).to_vec()
                     }
                     (Value::CoxResult(_), k) => return Err(HayashiError::Runtime(
@@ -3321,7 +2864,7 @@ impl Interpreter {
                     // ── Quantile Regression ───────────────────────────────────
                     (Value::QuantileResult(r), "xb" | "fitted") => {
                         let names = r.variable_names.as_deref().unwrap_or(&[]);
-                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        let x = build_x_from_varnames(&df_val, names)?;
                         x.dot(&r.params).to_vec()
                     }
                     (Value::QuantileResult(_), k) => return Err(HayashiError::Runtime(
@@ -3331,7 +2874,7 @@ impl Interpreter {
                     // ── RLM ──────────────────────────────────────────────────
                     (Value::RlmResult(r), "xb" | "fitted") => {
                         let names = r.variable_names.as_deref().unwrap_or(&[]);
-                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        let x = build_x_from_varnames(&df_val, names)?;
                         x.dot(&r.params).to_vec()
                     }
                     (Value::RlmResult(_), k) => return Err(HayashiError::Runtime(
@@ -3341,7 +2884,7 @@ impl Interpreter {
                     // ── GEE ──────────────────────────────────────────────────
                     (Value::GeeResult(r), "xb" | "fitted") => {
                         let names = r.variable_names.as_deref().unwrap_or(&[]);
-                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        let x = build_x_from_varnames(&df_val, names)?;
                         x.dot(&r.params).to_vec()
                     }
                     (Value::GeeResult(_), k) => return Err(HayashiError::Runtime(
@@ -3351,12 +2894,12 @@ impl Interpreter {
                     // ── Beta Regression ───────────────────────────────────────
                     (Value::BetaResult(r), "pr" | "mu" | "fitted") => {
                         let names = r.variable_names.as_deref().unwrap_or(&[]);
-                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        let x = build_x_from_varnames(&df_val, names)?;
                         r.predict(&x, &greeners::BetaLink::Logit).to_vec()
                     }
                     (Value::BetaResult(r), "xb") => {
                         let names = r.variable_names.as_deref().unwrap_or(&[]);
-                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        let x = build_x_from_varnames(&df_val, names)?;
                         x.dot(&r.params).to_vec()
                     }
                     (Value::BetaResult(_), k) => return Err(HayashiError::Runtime(
@@ -3366,13 +2909,13 @@ impl Interpreter {
                     // ── GLSAR ────────────────────────────────────────────────
                     (Value::GlsarResult(r), "xb" | "fitted") => {
                         let names = r.variable_names.as_deref().unwrap_or(&[]);
-                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        let x = build_x_from_varnames(&df_val, names)?;
                         r.fitted_values(&x).to_vec()
                     }
                     (Value::GlsarResult(r), "residuals" | "resid" | "e") => {
                         let names = r.variable_names.as_deref().unwrap_or(&[]);
-                        let x = Self::build_x_from_varnames(&df_val, names)?;
-                        let y = Self::get_col_f64(&df_val, varname)?;
+                        let x = build_x_from_varnames(&df_val, names)?;
+                        let y = get_col_f64(&df_val, varname)?;
                         r.residuals(&y, &x).to_vec()
                     }
                     (Value::GlsarResult(_), k) => return Err(HayashiError::Runtime(
@@ -3382,7 +2925,7 @@ impl Interpreter {
                     // ── MixedLM ───────────────────────────────────────────────
                     (Value::MixedResult(r), "xb" | "fitted") => {
                         let names = r.variable_names.as_deref().unwrap_or(&[]);
-                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        let x = build_x_from_varnames(&df_val, names)?;
                         x.dot(&r.fixed_effects).to_vec()
                     }
                     (Value::MixedResult(_), k) => return Err(HayashiError::Runtime(
@@ -3393,17 +2936,17 @@ impl Interpreter {
                     (Value::ZeroInflatedResult(r), "count" | "mu" | "fitted") => {
                         // E[y|x, w>0] × P(w=0): media incondicional da contagem
                         let names = r.count_var_names.as_deref().unwrap_or(&[]);
-                        let x_c = Self::build_x_from_varnames(&df_val, names)?;
+                        let x_c = build_x_from_varnames(&df_val, names)?;
                         let inflate_names = r.inflate_var_names.as_deref().unwrap_or(names);
-                        let x_i = Self::build_x_from_varnames(&df_val, inflate_names)?;
+                        let x_i = build_x_from_varnames(&df_val, inflate_names)?;
                         r.predict_count(&x_c, &x_i).to_vec()
                     }
                     (Value::ZeroInflatedResult(r), "pr0") => {
                         // P(y=0 | x) — probabilidade de zero
                         let names = r.count_var_names.as_deref().unwrap_or(&[]);
-                        let x_c = Self::build_x_from_varnames(&df_val, names)?;
+                        let x_c = build_x_from_varnames(&df_val, names)?;
                         let inflate_names = r.inflate_var_names.as_deref().unwrap_or(names);
-                        let x_i = Self::build_x_from_varnames(&df_val, inflate_names)?;
+                        let x_i = build_x_from_varnames(&df_val, inflate_names)?;
                         r.predict_proba_zero(&x_c, &x_i).to_vec()
                     }
                     (Value::ZeroInflatedResult(_), k) => return Err(HayashiError::Runtime(
@@ -3440,12 +2983,12 @@ impl Interpreter {
                     // working → resíduos de trabalho do IRLS
                     (Value::GlmResult(r), "pr" | "mu" | "fitted") => {
                         let names = r.variable_names.as_deref().unwrap_or(&[]);
-                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        let x = build_x_from_varnames(&df_val, names)?;
                         r.predict_mean(&x).to_vec()
                     }
                     (Value::GlmResult(r), "xb") => {
                         let names = r.variable_names.as_deref().unwrap_or(&[]);
-                        let x = Self::build_x_from_varnames(&df_val, names)?;
+                        let x = build_x_from_varnames(&df_val, names)?;
                         r.predict(&x).to_vec()
                     }
                     (Value::GlmResult(r), "residuals" | "resid" | "e" | "deviance") => {
@@ -3946,7 +3489,7 @@ impl Interpreter {
                 };
 
                 // ordena por t_var (sort_df_by reporta erro se coluna não existe)
-                let sorted = Self::sort_df_by(&frame, t_var)?;
+                let sorted = sort_df_by(&frame, t_var)?;
 
                 // estatísticas da variável de tempo para o sumário
                 let t_vals = self.eval_col_expr(&Expr::Var(t_var.clone()), &sorted)?;
@@ -3970,7 +3513,7 @@ impl Interpreter {
                 else_body,
             } => {
                 let cond_val = self.eval_expr(cond)?;
-                if Self::value_as_bool(&cond_val) {
+                if value_as_bool(&cond_val) {
                     self.env.push_scope();
                     for s in then_body {
                         self.exec(s)?;
@@ -4149,7 +3692,7 @@ impl Interpreter {
             // ── while cond { ... } ───────────────────────────────────────────
             Stmt::While { cond, body } => 'outer: loop {
                 let cond_val = self.eval_expr(cond)?;
-                if !Self::value_as_bool(&cond_val) {
+                if !value_as_bool(&cond_val) {
                     break;
                 }
                 self.env.push_scope();

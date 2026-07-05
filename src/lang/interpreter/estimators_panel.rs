@@ -1,4 +1,5 @@
 use super::*;
+use super::helpers::*;
 
 /// bootstrap genérico/bootse, diagnósticos de painel, SUR, rolling/recursive
 /// OLS, tabela de critérios de informação, Fixed Effects, Random Effects,
@@ -64,7 +65,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let y_vec = ndarray::Array1::from(Self::get_col_f64(&df, &y_name)?);
+                let y_vec = ndarray::Array1::from(get_col_f64(&df, &y_name)?);
                 let k = match opt_map.get("k") {
                     Some(Value::Int(v)) => (*v as usize).max(2),
                     Some(Value::Float(v)) => (*v as usize).max(2),
@@ -105,7 +106,7 @@ impl Interpreter {
                 let var_names = df
                     .formula_var_names(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let group_vals = Self::get_col_f64(&df, &group_col)?;
+                let group_vals = get_col_f64(&df, &group_col)?;
                 let mut gmap: std::collections::HashMap<i64, usize> =
                     std::collections::HashMap::new();
                 let mut gnext = 0usize;
@@ -154,7 +155,7 @@ impl Interpreter {
                 let var_names = df
                     .formula_var_names(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let group_vals = Self::get_col_f64(&df, &group_col)?;
+                let group_vals = get_col_f64(&df, &group_col)?;
                 let mut gmap: std::collections::HashMap<i64, usize> =
                     std::collections::HashMap::new();
                 let mut gnext = 0usize;
@@ -211,7 +212,7 @@ impl Interpreter {
                 let var_names = df
                     .formula_var_names(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let group_vals = Self::get_col_f64(&df, &group_col)?;
+                let group_vals = get_col_f64(&df, &group_col)?;
                 let mut gmap: std::collections::HashMap<i64, usize> =
                     std::collections::HashMap::new();
                 let mut gnext = 0usize;
@@ -396,7 +397,7 @@ impl Interpreter {
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let resids = &y_vec - &x_mat.dot(&ols_pooled.params);
                 // Converter id para usize
-                let id_vals = Self::get_col_f64(&df, &id_col)?;
+                let id_vals = get_col_f64(&df, &id_col)?;
                 let mut id_map: std::collections::HashMap<i64, usize> =
                     std::collections::HashMap::new();
                 let mut next_id = 0usize;
@@ -487,11 +488,11 @@ impl Interpreter {
                 let (y_vec, x_mat) = df
                     .to_design_matrix(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let id_vals: Vec<i64> = Self::get_col_f64(&df, &id_col)?
+                let id_vals: Vec<i64> = get_col_f64(&df, &id_col)?
                     .iter()
                     .map(|&v| v as i64)
                     .collect();
-                let time_vals: Vec<f64> = Self::get_col_f64(&df, &time_col)?.to_vec();
+                let time_vals: Vec<f64> = get_col_f64(&df, &time_col)?.to_vec();
                 let (rho, t_stat, p, n_pairs) = greeners::PanelDiagnostics::wooldridge_serial(
                     &y_vec, &x_mat, &id_vals, &time_vals,
                 )
@@ -564,7 +565,7 @@ impl Interpreter {
                 let ols_pooled = OLS::from_formula(&g_formula, &df, CovarianceType::NonRobust)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let resids = &y_vec - &x_mat.dot(&ols_pooled.params);
-                let id_vals = Self::get_col_f64(&df, &id_col)?;
+                let id_vals = get_col_f64(&df, &id_col)?;
                 let mut id_map: std::collections::HashMap<i64, usize> =
                     std::collections::HashMap::new();
                 let mut next_id = 0usize;
@@ -646,7 +647,7 @@ impl Interpreter {
                 let var_names = df
                     .formula_var_names(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let id_vals: Vec<i64> = Self::get_col_f64(&df, &id_col)?
+                let id_vals: Vec<i64> = get_col_f64(&df, &id_col)?
                     .iter()
                     .map(|&v| v as i64)
                     .collect();
@@ -746,11 +747,11 @@ impl Interpreter {
                 let (y_vec, x_mat) = df
                     .to_design_matrix(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let id_vals: Vec<i64> = Self::get_col_f64(&df, &id_col)?
+                let id_vals: Vec<i64> = get_col_f64(&df, &id_col)?
                     .iter()
                     .map(|&v| v as i64)
                     .collect();
-                let time_vals: Vec<f64> = Self::get_col_f64(&df, &time_col)?.to_vec();
+                let time_vals: Vec<f64> = get_col_f64(&df, &time_col)?.to_vec();
                 let (m1, p1, m2, p2) = greeners::PanelDiagnostics::arellano_bond_test(
                     &y_vec, &x_mat, &id_vals, &time_vals,
                 )
@@ -1155,7 +1156,7 @@ impl Interpreter {
                 out.push_str(&format!("\n{thin}\n"));
                 out.push_str("   *** p<0.01  ** p<0.05  * p<0.10\n");
                 out.push_str(&format!("{thick}\n"));
-                Ok(Self::diag(out))
+                Ok(diag(out))
             }
 
             // ── Pesaran CD: dependência cross-seccional ───────────────────────
@@ -1235,7 +1236,7 @@ impl Interpreter {
                 out.push_str(&format!("\n{thin}\n"));
                 out.push_str("   *** p<0.01  ** p<0.05  * p<0.10\n");
                 out.push_str(&format!("{thick}\n"));
-                Ok(Self::diag(out))
+                Ok(diag(out))
             }
 
             // ── Breusch-Pagan LM test (efeitos individuais em painel) ────────
@@ -1318,7 +1319,7 @@ impl Interpreter {
                 out.push_str(&format!("\n{thin}\n"));
                 out.push_str("   *** p<0.01  ** p<0.05  * p<0.10\n");
                 out.push_str(&format!("{thick}\n"));
-                Ok(Self::diag(out))
+                Ok(diag(out))
             }
 
             // ── Chamberlain: correlação period-específica com efeitos individuais
@@ -1418,7 +1419,7 @@ impl Interpreter {
                     "   Teste mais geral que Mundlak — inclui valores em todos os T períodos\n",
                 );
                 out.push_str(&format!("{thick}\n"));
-                Ok(Self::diag(out))
+                Ok(diag(out))
             }
 
             // ── Arellano-Bond Diff-GMM (OLD mundlak removed — use new mundlak above) ─
@@ -1527,7 +1528,7 @@ impl Interpreter {
                 out.push_str(&format!("\n{thin}\n"));
                 out.push_str("   *** p<0.01  ** p<0.05  * p<0.10\n");
                 out.push_str(&format!("{thick}\n"));
-                Ok(Self::diag(out))
+                Ok(diag(out))
             }
 
             // ── Arellano-Bond Diff-GMM ────────────────────────────────────────
@@ -2058,7 +2059,7 @@ impl Interpreter {
                     "   Variância estimada via sandwich (Σ_i dos produtos cruzados por entidade)\n",
                 );
                 out.push_str(&format!("{thick}\n"));
-                Ok(Self::diag(out))
+                Ok(diag(out))
             }
 
             // ── wooldridge_OLD_REMOVED (substituído pelo novo acima) ──────────
@@ -2152,7 +2153,7 @@ impl Interpreter {
                     "   (SE padrão OLS — use SE robustos clusterizados para inferência formal)\n",
                 );
                 out.push_str(&format!("{thick}\n"));
-                Ok(Self::diag(out))
+                Ok(diag(out))
             }
 
             // ── Hausman FE vs RE ──────────────────────────────────────────────
@@ -2255,7 +2256,7 @@ impl Interpreter {
                         "       Estatística indefinida — verifique especificação dos modelos.\n",
                     );
                     out.push_str(&format!("\n{thick}\n"));
-                    return Ok(Some(Self::diag(out)));
+                    return Ok(Some(diag(out)));
                 }
 
                 let p = greeners::chi2_pvalue(chi2, df as f64);
@@ -2291,7 +2292,7 @@ impl Interpreter {
                 out.push_str(&format!("\n{thin}\n"));
                 out.push_str("   *** p<0.01  ** p<0.05  * p<0.10\n");
                 out.push_str(&format!("{thick}\n"));
-                Ok(Self::diag(out))
+                Ok(diag(out))
             }
 
             // ── Diagnósticos ──────────────────────────────────────────────────
@@ -2558,13 +2559,13 @@ impl Interpreter {
             &[formula_expr.clone(), Expr::Var(df_name.clone())],
             &extra_opts,
         )?;
-        let full_params = Self::extract_params(&full_result).ok_or_else(|| {
+        let full_params = extract_params(&full_result).ok_or_else(|| {
             HayashiError::Runtime(
                 "bootstrap: modelo not supportado (sem params extraíveis)".into(),
             )
         })?;
-        let full_se = Self::extract_se(&full_result).unwrap_or_default();
-        let var_names = Self::extract_var_names(&full_result);
+        let full_se = extract_se(&full_result).unwrap_or_default();
+        let var_names = extract_var_names(&full_result);
         let k = full_params.len();
 
         use rand::seq::SliceRandom;
@@ -2588,7 +2589,7 @@ impl Interpreter {
                 &[formula_expr.clone(), Expr::Var("__boot_df__".into())],
                 &extra_opts,
             ) {
-                if let Some(params) = Self::extract_params(result) {
+                if let Some(params) = extract_params(result) {
                     for j in 0..k.min(params.len()) {
                         boot_coefs[[b, j]] = params[j];
                     }

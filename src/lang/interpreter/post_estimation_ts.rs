@@ -1,4 +1,5 @@
 use super::*;
+use super::helpers::*;
 
 /// margins, VECM/VAR/IRF/FEVD, ARIMA/SARIMA/AutoReg/ARDL/Kalman/forecast,
 /// lincom/nlcom. Extraído de `eval_call` (ver src/lang/interpreter.rs).
@@ -774,7 +775,7 @@ impl Interpreter {
                     _ => "ll".to_string(),
                 };
 
-                let y_vec: Vec<f64> = Self::get_col_f64(&df, &var_name)?.to_vec();
+                let y_vec: Vec<f64> = get_col_f64(&df, &var_name)?.to_vec();
                 let n = y_vec.len();
                 if n < 4 {
                     return Err(HayashiError::Runtime(

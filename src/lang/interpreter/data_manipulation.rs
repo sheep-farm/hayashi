@@ -1,4 +1,5 @@
 use super::*;
+use super::helpers::*;
 
 /// ttest, count/nrow, collapse, group_by, pivot_longer/pivot_wider, append,
 /// merge, reshape, sort, list, winsor, tabgen, ci, centile, recode, dropna,
@@ -104,7 +105,7 @@ impl Interpreter {
                     .collect::<Result<_>>()?;
 
                 // agrupa índices de linha por valor de by
-                let by_strs = Self::col_to_strings(&df, &by_col)?;
+                let by_strs = col_to_strings(&df, &by_col)?;
                 let n_obs = df.n_rows();
                 let mut groups: HashMap<String, Vec<usize>> = HashMap::new();
                 for (i, v) in by_strs.iter().enumerate() {
@@ -113,7 +114,7 @@ impl Interpreter {
 
                 // ordena chaves de grupo
                 let mut keys: Vec<String> = groups.keys().cloned().collect();
-                Self::sort_maybe_numeric_strings(&mut keys);
+                sort_maybe_numeric_strings(&mut keys);
 
                 // função de agregação: NaN nos dados propaga NaN no resultado (IEEE 754)
                 let agg = |vals: &[f64]| -> f64 {
@@ -255,14 +256,14 @@ impl Interpreter {
                     })
                     .collect::<Result<_>>()?;
 
-                let by_strs = Self::col_to_strings(&df, &by_col)?;
+                let by_strs = col_to_strings(&df, &by_col)?;
                 let n_obs = df.n_rows();
                 let mut groups: HashMap<String, Vec<usize>> = HashMap::new();
                 for (i, v) in by_strs.iter().enumerate() {
                     groups.entry(v.clone()).or_default().push(i);
                 }
                 let mut keys: Vec<String> = groups.keys().cloned().collect();
-                Self::sort_maybe_numeric_strings(&mut keys);
+                sort_maybe_numeric_strings(&mut keys);
 
                 let agg_fn = |vals: &[f64]| -> f64 {
                     let n = vals.len();
@@ -405,7 +406,7 @@ impl Interpreter {
                 let n_long = n_i * n_t;
 
                 let mut builder = DataFrame::builder();
-                let id_data = Self::get_col_f64(&df, &i_col)?;
+                let id_data = get_col_f64(&df, &i_col)?;
                 let ids: Vec<f64> = (0..n_long).map(|idx| id_data[idx / n_t]).collect();
                 builder = builder.add_column(&i_col, ids);
 
@@ -428,7 +429,7 @@ impl Interpreter {
                     for i in 0..n_i {
                         for suf in suffs {
                             let col_name = format!("{stub}{suf}");
-                            let col = Self::get_col_f64(&df, &col_name)?;
+                            let col = get_col_f64(&df, &col_name)?;
                             vals.push(col[i]);
                         }
                     }
@@ -494,8 +495,8 @@ impl Interpreter {
                     }
                 };
 
-                let id_vals = Self::get_col_f64(&df, &i_col)?;
-                let j_strs = Self::col_to_strings(&df, &j_col)?;
+                let id_vals = get_col_f64(&df, &i_col)?;
+                let j_strs = col_to_strings(&df, &j_col)?;
 
                 let mut unique_ids: Vec<f64> = id_vals.to_vec();
                 unique_ids.sort_by(|a, b| a.partial_cmp(b).unwrap());
@@ -510,7 +511,7 @@ impl Interpreter {
                 builder = builder.add_column(&i_col, unique_ids.clone());
 
                 for var in &val_vars {
-                    let var_data = Self::get_col_f64(&df, var)?;
+                    let var_data = get_col_f64(&df, var)?;
                     for jv in &unique_j {
                         let col_name = format!("{var}{jv}");
                         let mut vals = vec![f64::NAN; n_wide];
@@ -673,13 +674,13 @@ impl Interpreter {
                 };
 
                 // índice de busca no df2: key_str → primeiro índice de linha
-                let key2_strs = Self::col_to_strings(&df2, &key_col)?;
+                let key2_strs = col_to_strings(&df2, &key_col)?;
                 let mut lookup: HashMap<String, usize> = HashMap::new();
                 for (j, v) in key2_strs.iter().enumerate().rev() {
                     lookup.insert(v.clone(), j); // rev para ficar com o primeiro
                 }
 
-                let key1_strs = Self::col_to_strings(&df1, &key_col)?;
+                let key1_strs = col_to_strings(&df1, &key_col)?;
                 let n1 = df1.n_rows();
                 let n2 = df2.n_rows();
 
@@ -1511,7 +1512,7 @@ impl Interpreter {
                 let winsorized = df
                     .winsorize(&var_name, p)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let orig = Self::get_col_f64(&df, &var_name)?;
+                let orig = get_col_f64(&df, &var_name)?;
                 let lo = winsorized.iter().cloned().fold(f64::INFINITY, f64::min);
                 let hi = winsorized.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
                 let n_clip = orig
@@ -1597,7 +1598,7 @@ impl Interpreter {
                     Some(Value::Float(v)) => *v,
                     _ => 0.95,
                 };
-                let col = Self::get_col_f64(&df, &var)?;
+                let col = get_col_f64(&df, &var)?;
                 let vals: Vec<f64> = col.iter().filter(|v| v.is_finite()).copied().collect();
                 let n = vals.len() as f64;
                 let mean = vals.iter().sum::<f64>() / n;
@@ -1629,7 +1630,7 @@ impl Interpreter {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
                     _ => return Err(HayashiError::Type("var".into())),
                 };
-                let col = Self::get_col_f64(&df, &var)?;
+                let col = get_col_f64(&df, &var)?;
                 let mut sorted: Vec<f64> = col.iter().filter(|v| v.is_finite()).copied().collect();
                 if sorted.is_empty() {
                     return Err(HayashiError::Runtime(format!(
@@ -1706,7 +1707,7 @@ impl Interpreter {
                         .collect(),
                     _ => return Err(HayashiError::Runtime("recode requer to=[...]".into())),
                 };
-                let col = Self::get_col_f64(&df, &var)?;
+                let col = get_col_f64(&df, &var)?;
                 let recoded: Vec<f64> = col
                     .iter()
                     .map(|&v| {
@@ -1853,7 +1854,7 @@ impl Interpreter {
                     let mut result = Vec::new();
                     for item in lst.iter() {
                         let pred = self.call_value_fn(&fn_val, std::slice::from_ref(item))?;
-                        if Self::value_as_bool(&pred) {
+                        if value_as_bool(&pred) {
                             result.push(item.clone());
                         }
                     }
@@ -2009,7 +2010,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let vals = Self::get_col_f64(&df, &col_name)?;
+                let vals = get_col_f64(&df, &col_name)?;
                 let str_vals: Vec<String> = vals
                     .iter()
                     .map(|&v| {
@@ -2314,7 +2315,7 @@ impl Interpreter {
                 };
 
                 if args.len() == 2 {
-                    Self::tabulate_one(&df, &var1)?;
+                    tabulate_one(&df, &var1)?;
                 } else {
                     let var2 = match &args[2] {
                         Expr::Var(n) | Expr::Str(n) => n.clone(),
@@ -2325,7 +2326,7 @@ impl Interpreter {
                         }
                     };
                     let do_chi2 = matches!(opt_map.get("chi2"), Some(Value::Bool(true)));
-                    Self::tabulate_two(&df, &var1, &var2, do_chi2)?;
+                    tabulate_two(&df, &var1, &var2, do_chi2)?;
                 }
 
                 Ok(Value::Nil)
@@ -2430,7 +2431,7 @@ impl Interpreter {
         if let Some(Value::Str(by_col)) = opt_map.get("by") {
             let by_col = by_col.clone();
             let vals = self.ttest_get_col_vals(&df, &var1)?;
-            let groups = Self::col_to_strings(&df, &by_col)?;
+            let groups = col_to_strings(&df, &by_col)?;
             let mut group_data: HashMap<String, Vec<f64>> = HashMap::new();
             for (i, g) in groups.iter().enumerate() {
                 group_data.entry(g.clone()).or_default().push(vals[i]);
@@ -2442,7 +2443,7 @@ impl Interpreter {
                     gkeys.len()
                 )));
             }
-            Self::sort_maybe_numeric_strings(&mut gkeys);
+            sort_maybe_numeric_strings(&mut gkeys);
             let equal_var = matches!(opt_map.get("unequal"), Some(Value::Bool(false)));
             let v1 = Array1::from(group_data[&gkeys[0]].clone());
             let v2 = Array1::from(group_data[&gkeys[1]].clone());

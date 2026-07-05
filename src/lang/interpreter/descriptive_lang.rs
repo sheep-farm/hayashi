@@ -1,4 +1,5 @@
 use super::*;
+use super::helpers::*;
 
 /// set_seed, timer, quietly, capture, assert, preserve/restore, source, help,
 /// describe, codebook, format, duplicates, label, correlate, summarize,
@@ -80,7 +81,7 @@ impl Interpreter {
                     ));
                 }
                 let val = self.eval_expr(&args[0])?;
-                if !Self::value_as_bool(&val) {
+                if !value_as_bool(&val) {
                     let msg = if args.len() >= 2 {
                         match self.eval_expr(&args[1])? {
                             Value::Str(s) => s,
@@ -577,7 +578,7 @@ impl Interpreter {
                     _ => "report".into(),
                 };
 
-                let col = Self::get_col_f64(&df, &var_name)?;
+                let col = get_col_f64(&df, &var_name)?;
                 let n = col.len();
 
                 // contar ocorrências de cada valor
