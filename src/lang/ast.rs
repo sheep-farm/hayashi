@@ -277,11 +277,12 @@ pub enum Stmt {
     QuietlyOn,
     QuietlyOff,
 
-    // try { ... } catch e { ... }
+    // try { ... } catch e { ... } [finally { ... }]
     TryCatch {
         try_body: Vec<Spanned>,
         error_var: String,
         catch_body: Vec<Spanned>,
+        finally_body: Vec<Spanned>,
     },
 
     // input df

@@ -1044,17 +1044,31 @@ impl Interpreter {
                 try_body,
                 error_var,
                 catch_body,
+                finally_body,
             } => {
+                // Helper that runs a block and returns either Ok(()) or the first
+                // control-flow / error outcome. Used for try, catch and finally.
+                let run_block = |this: &mut Self, body: &Vec<Spanned>| -> Result<()> {
+                    for s in body {
+                        match this.exec(s) {
+                            Ok(()) => {}
+                            Err(e) => return Err(e),
+                        }
+                    }
+                    Ok(())
+                };
+
                 self.env.push_scope();
-                let mut caught = None;
+                let mut try_result = Ok(());
+                let mut caught: Option<ErrorValue> = None;
                 for s in try_body {
                     match self.exec(s) {
                         Ok(()) => {}
                         Err(
                             HayashiError::Return | HayashiError::Break | HayashiError::Continue,
                         ) => {
-                            self.env.pop_scope();
-                            return Err(HayashiError::Return);
+                            try_result = Err(HayashiError::Return);
+                            break;
                         }
                         Err(e) => {
                             caught = Some(ErrorValue::from_hayashi_error(&e, self.current_line));
@@ -1063,14 +1077,34 @@ impl Interpreter {
                     }
                 }
                 self.env.pop_scope();
+
+                // Run catch if an error was caught (not for control flow).
                 if let Some(err) = caught {
                     self.env.push_scope();
-                    self.env.declare(error_var, Value::Error(Rc::new(err)))?;
-                    for s in catch_body {
-                        self.exec(s)?;
-                    }
+                    let catch_result = (|| -> Result<()> {
+                        self.env.declare(error_var, Value::Error(Rc::new(err)))?;
+                        run_block(self, catch_body)
+                    })();
                     self.env.pop_scope();
+                    // If catch succeeds, preserve the original try outcome (usually Ok).
+                    // If catch raises an error or control flow, that becomes the new result.
+                    if catch_result.is_err() {
+                        try_result = catch_result;
+                    }
                 }
+
+                // Run finally if present. This always executes, and its own
+                // errors/control flow take precedence over the try/catch result.
+                if !finally_body.is_empty() {
+                    self.env.push_scope();
+                    let finally_result = run_block(self, finally_body);
+                    self.env.pop_scope();
+                    if finally_result.is_err() {
+                        try_result = finally_result;
+                    }
+                }
+
+                try_result?;
             }
 
             // ── for var in iter { ... } ───────────────────────────────────────

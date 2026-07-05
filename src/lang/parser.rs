@@ -1314,7 +1314,7 @@ impl Parser {
                 }))
             }
 
-            // ── try { ... } catch e { ... } ──────────────────────────────────
+            // ── try { ... } catch e { ... } [finally { ... }] ────────────────
             Token::Ident(ref s) if s == "try" => {
                 self.advance();
                 let try_body = self.parse_block()?;
@@ -1333,10 +1333,17 @@ impl Parser {
                 }
                 let error_var = self.expect_ident()?;
                 let catch_body = self.parse_block()?;
+                let finally_body = if matches!(self.peek(), Token::Ident(ref s) if s == "finally") {
+                    self.advance();
+                    self.parse_block()?
+                } else {
+                    Vec::new()
+                };
                 Ok(Some(Stmt::TryCatch {
                     try_body,
                     error_var,
                     catch_body,
+                    finally_body,
                 }))
             }
 

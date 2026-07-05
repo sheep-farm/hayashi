@@ -5593,6 +5593,80 @@ display "alive""#,
     );
 }
 
+#[test]
+fn try_catch_finally_runs_on_success() {
+    assert_ok_contains(
+        "try_finally_success",
+        r#"let x = 0
+try {
+    x = 1
+} catch e {
+    x = 99
+} finally {
+    x = x + 10
+}
+display x"#,
+        "11",
+    );
+}
+
+#[test]
+fn try_catch_finally_runs_on_error() {
+    assert_ok_contains(
+        "try_finally_error",
+        r#"let x = 0
+try {
+    x = 1
+    load "nonexistent.csv" as df
+} catch e {
+    x = x + 1
+} finally {
+    x = x + 100
+}
+display x"#,
+        "102",
+    );
+}
+
+#[test]
+fn try_catch_finally_runs_on_return() {
+    assert_ok_contains(
+        "try_finally_return",
+        r#"fn f() {
+    let x = 0
+    try {
+        x = 1
+        return x
+    } catch e {
+        x = 99
+    } finally {
+        x = x + 10
+        print("finally: " + str(x))
+    }
+}
+let r = f()
+display r"#,
+        "finally: 11",
+    );
+}
+
+#[test]
+fn try_catch_finally_error_overrides() {
+    let (ok, out) = run_inline(
+        r#"try {
+    load "nonexistent.csv" as df
+} catch e {
+    print("caught")
+} finally {
+    print("finally")
+    let bad = undefined_var
+}"#,
+    );
+    assert!(!ok);
+    assert!(out.contains("finally"));
+    assert!(out.contains("undefined_var"));
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // PIPE — |> operator
 // ══════════════════════════════════════════════════════════════════════════════
