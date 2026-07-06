@@ -1084,9 +1084,7 @@ fn pkg_install_internal(spec: &str, version: Option<&str>, force_overwrite: bool
             Ok(r) => r,
             Err(e) => {
                 if let Some(tag) = &version_tag {
-                    eprintln!(
-                        "hay install: release {tag} not found for {user}/{repo}: {e}"
-                    );
+                    eprintln!("hay install: release {tag} not found for {user}/{repo}: {e}");
                 } else {
                     eprintln!(
                         "hay install: no scripts or native releases found for {user}/{repo}: {e}"
@@ -1562,7 +1560,11 @@ fn pkg_update(spec_opt: Option<&str>, auto_confirm: bool) {
                             }
                         };
                         if confirm {
-                            pkg_install_internal(&format!("{}/{}", meta.user, meta.repo), None, true);
+                            pkg_install_internal(
+                                &format!("{}/{}", meta.user, meta.repo),
+                                None,
+                                true,
+                            );
                         }
                     }
                 }
