@@ -41,7 +41,10 @@ pub fn print_output(text: &str) {
     {
         unsafe {
             if let Some(ref cb) = PRINT_FN {
-                let _ = cb.call1(&wasm_bindgen::JsValue::NULL, &wasm_bindgen::JsValue::from_str(text));
+                let _ = cb.call1(
+                    &wasm_bindgen::JsValue::NULL,
+                    &wasm_bindgen::JsValue::from_str(text),
+                );
             }
         }
     }
@@ -58,7 +61,9 @@ mod wasm {
     /// Must be called before `run_hayashi`.
     #[wasm_bindgen]
     pub fn set_print_callback(cb: js_sys::Function) {
-        unsafe { super::PRINT_FN = Some(cb); }
+        unsafe {
+            super::PRINT_FN = Some(cb);
+        }
     }
 
     #[wasm_bindgen]

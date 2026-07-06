@@ -800,9 +800,11 @@ impl Interpreter {
                 };
                 let col_name = match self.eval_expr(varname)? {
                     Value::Str(s) => s,
-                    other => return Err(self.type_err(format!(
-                        "generate: column name must evaluate to a string, got {other}"
-                    ))),
+                    other => {
+                        return Err(self.type_err(format!(
+                            "generate: column name must evaluate to a string, got {other}"
+                        )))
+                    }
                 };
                 let vals = self.eval_col_expr(expr, &df_val)?;
                 let arr = ndarray::Array1::from(vals);
