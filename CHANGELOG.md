@@ -28,6 +28,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - **`hay list` shows versions**: installed plugins now display their version from `.metadata.json`.
 - **`match` as contextual keyword**: `match` now works as a regular identifier (`let match = 1`) and still starts a match expression when followed by a scrutinee and brace (`let r = match x { ... }`).
 - **README smoke test**: `scripts/readme_smoke.hay` exercises the main features documented in `README.md` and is run by the test suite.
+- **`list_files()` builtin**: `list_files(dir)` and `list_files(dir, pattern)` return a sorted list of file paths, enabling dynamic batch processing of datasets.
 
 ### Changed
 

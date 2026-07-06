@@ -5527,6 +5527,37 @@ fn readme_smoke_script() {
 }
 
 #[test]
+fn list_files_basic() {
+    let tmp = std::env::temp_dir();
+    let test_dir = tmp.join("hay_list_files_test");
+    let _ = std::fs::remove_dir_all(&test_dir);
+    std::fs::create_dir_all(&test_dir).unwrap();
+    std::fs::write(test_dir.join("a.csv"), "1\n").unwrap();
+    std::fs::write(test_dir.join("b.txt"), "x\n").unwrap();
+    std::fs::write(test_dir.join("c.csv"), "2\n").unwrap();
+
+    let dir = test_dir.to_string_lossy().to_string();
+    assert_ok_contains(
+        "list_files_all",
+        &format!(
+            r#"let files = list_files("{dir}")
+print(len(files))"#,
+        ),
+        "3",
+    );
+    assert_ok_contains(
+        "list_files_pattern",
+        &format!(
+            r#"let files = list_files("{dir}", ".csv")
+print(len(files))"#,
+        ),
+        "2",
+    );
+
+    let _ = std::fs::remove_dir_all(&test_dir);
+}
+
+#[test]
 fn match_wildcard() {
     assert_ok_contains(
         "match_wild",
