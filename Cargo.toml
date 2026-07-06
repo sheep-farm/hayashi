@@ -57,6 +57,7 @@ getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] 
 
 # WebAssembly bindings (only needed for wasm32 target)
 wasm-bindgen = { version = "0.2", optional = true }
+js-sys = { version = "0.3", optional = true }
 
 [features]
 default = ["plotters", "wasm", "native"]
@@ -64,7 +65,7 @@ odbc = ["dep:odbc-api"]
 plotters = ["dep:plotters"]
 wasm = ["dep:wasmi"]
 native = ["dep:rustyline", "dep:dta", "dep:ureq", "dep:url", "dep:tempfile", "dep:rusqlite", "dep:libloading"]
-wasm-bindings = ["dep:wasm-bindgen"]
+wasm-bindings = ["dep:wasm-bindgen", "dep:js-sys"]
 
 [profile.release]
 opt-level = 3

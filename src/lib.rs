@@ -5,7 +5,7 @@
 
 // On wasm32, shadow the standard `print!` and `println!` macros BEFORE
 // any module declarations so that all downstream code uses our versions
-// that route output through `print_output` → `__hayashi_print` (JS callback).
+// that route output through `print_output` → JS callback.
 #[cfg(target_arch = "wasm32")]
 macro_rules! print {
     ($($arg:tt)*) => {{
@@ -30,8 +30,7 @@ pub use lang::interpreter::Interpreter;
 pub use lang::run_source;
 
 /// Print a string to the output stream. On native targets this calls `print!`.
-/// On wasm32, this calls a JavaScript function `__hayashi_print` that
-/// the playground page defines to capture output.
+/// On wasm32, this calls a JavaScript callback stored via `set_print_callback`.
 #[inline]
 pub fn print_output(text: &str) {
     #[cfg(not(target_arch = "wasm32"))]
@@ -40,19 +39,31 @@ pub fn print_output(text: &str) {
     }
     #[cfg(target_arch = "wasm32")]
     {
-        self::wasm::__hayashi_print(text);
+        PRINT_FN.with(|f| {
+            if let Some(ref cb) = *f.borrow() {
+                let _ = cb.call1(&wasm_bindgen::JsValue::NULL, &wasm_bindgen::JsValue::from_str(text));
+            }
+        });
     }
+}
+
+#[cfg(target_arch = "wasm32")]
+use std::cell::RefCell;
+
+#[cfg(target_arch = "wasm32")]
+thread_local! {
+    static PRINT_FN: RefCell<Option<js_sys::Function>> = const { RefCell::new(None) };
 }
 
 #[cfg(target_arch = "wasm32")]
 mod wasm {
     use wasm_bindgen::prelude::*;
 
-    /// JavaScript callback that receives each line of output.
-    /// The JS side sets `window.__hayashi_print` to capture text.
+    /// Set the JavaScript callback that receives all interpreter output.
+    /// Must be called before `run_hayashi`.
     #[wasm_bindgen]
-    extern "C" {
-        pub fn __hayashi_print(text: &str);
+    pub fn set_print_callback(cb: js_sys::Function) {
+        super::PRINT_FN.with(|f| *f.borrow_mut() = Some(cb));
     }
 
     #[wasm_bindgen]
