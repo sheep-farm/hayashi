@@ -1286,6 +1286,43 @@ display s
 }
 
 #[test]
+fn lang_increment_decrement() {
+    let (ok, out) = run_inline(
+        r#"
+let x = 5
+x++
+display x
+x--
+x--
+display x
+let y = 10
+y++
+y++
+display y
+"#,
+    );
+    assert!(ok);
+    assert!(out.contains("6"));
+    assert!(out.contains("4"));
+    assert!(out.contains("12"));
+}
+
+#[test]
+fn lang_increment_in_loop() {
+    let (ok, out) = run_inline(
+        r#"
+let n = 0
+for i in 1..=5 {
+    n++
+}
+display n
+"#,
+    );
+    assert!(ok);
+    assert!(out.contains("5"));
+}
+
+#[test]
 fn lang_for_list() {
     let (ok, out) = run_inline(
         r#"

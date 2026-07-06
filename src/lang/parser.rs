@@ -1457,6 +1457,30 @@ impl Parser {
                 Ok(Some(Stmt::Assign { name, value }))
             }
 
+            // increment/decrement: x++  x--
+            Token::Ident(ref name)
+                if self
+                    .tokens
+                    .get(self.pos + 1)
+                    .map(|(t, _)| matches!(t, Token::PlusPlus | Token::MinusMinus))
+                    .unwrap_or(false) =>
+            {
+                let name = name.clone();
+                self.advance(); // ident
+                let op = match self.peek() {
+                    Token::PlusPlus => BinOp::Add,
+                    Token::MinusMinus => BinOp::Sub,
+                    _ => unreachable!(),
+                };
+                self.advance(); // ++ or --
+                let value = Expr::BinOp {
+                    op,
+                    lhs: Box::new(Expr::Var(name.clone())),
+                    rhs: Box::new(Expr::Int(1)),
+                };
+                Ok(Some(Stmt::Assign { name, value }))
+            }
+
             // compound assignment: +=  -=  *=  /=  %=
             Token::Ident(ref name)
                 if self

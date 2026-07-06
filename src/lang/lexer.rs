@@ -71,6 +71,8 @@ pub enum Token {
     StarEq,     // *=
     SlashEq,    // /=
     PercentEq,  // %=
+    PlusPlus,   // ++
+    MinusMinus, // --
 
     // Delimitadores
     LParen,
@@ -352,6 +354,9 @@ impl Lexer {
                     if self.peek() == Some('=') {
                         self.advance();
                         tokens.push((Token::PlusEq, line));
+                    } else if self.peek() == Some('+') {
+                        self.advance();
+                        tokens.push((Token::PlusPlus, line));
                     } else {
                         tokens.push((Token::Plus, line));
                     }
@@ -360,6 +365,9 @@ impl Lexer {
                     if self.peek() == Some('=') {
                         self.advance();
                         tokens.push((Token::MinusEq, line));
+                    } else if self.peek() == Some('-') {
+                        self.advance();
+                        tokens.push((Token::MinusMinus, line));
                     } else {
                         tokens.push((Token::Minus, line));
                     }
