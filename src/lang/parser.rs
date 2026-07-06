@@ -1084,9 +1084,26 @@ impl Parser {
                     Ok(Some(Stmt::Expr(expr)))
                 } else {
                     // generate df var = expr — Stata statement form
+                    // var may be an identifier or an f-string (dynamic column name)
                     self.advance();
                     let df = self.expect_ident()?;
-                    let varname = self.expect_ident()?;
+                    let varname = match self.peek().clone() {
+                        Token::Ident(n) => {
+                            self.advance();
+                            Expr::Str(n)
+                        }
+                        Token::FStringLit(s) => {
+                            self.advance();
+                            Expr::FString(s)
+                        }
+                        _ => {
+                            return Err(HayashiError::Parse {
+                                line: self.line(),
+                                msg: "generate: expected column name (identifier or f-string)"
+                                    .into(),
+                            })
+                        }
+                    };
                     self.expect(&Token::Eq)?;
                     let expr = self.parse_expr()?;
                     Ok(Some(Stmt::Generate { df, varname, expr }))

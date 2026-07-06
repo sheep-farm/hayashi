@@ -792,12 +792,18 @@ impl Interpreter {
                     Some(Value::DataFrame(d)) => d.clone(),
                     _ => return Err(self.rt_err(format!("'{df}' is not a DataFrame"))),
                 };
+                let col_name = match self.eval_expr(varname)? {
+                    Value::Str(s) => s,
+                    other => return Err(self.type_err(format!(
+                        "generate: column name must evaluate to a string, got {other}"
+                    ))),
+                };
                 let vals = self.eval_col_expr(expr, &df_val)?;
                 let arr = ndarray::Array1::from(vals);
                 Rc::make_mut(&mut df_val)
-                    .insert(varname.clone(), arr)
+                    .insert(col_name.clone(), arr)
                     .map_err(|e: greeners::GreenersError| self.rt_err(e.to_string()))?;
-                emitln!(self, "({} obs)  {df}.{varname} generated", df_val.n_rows());
+                emitln!(self, "({} obs)  {df}.{col_name} generated", df_val.n_rows());
                 self.env.set(df, Value::DataFrame(df_val))?;
             }
 

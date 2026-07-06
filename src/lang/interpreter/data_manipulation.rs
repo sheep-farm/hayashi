@@ -432,7 +432,17 @@ impl Interpreter {
                     }
                 };
                 let get_str_col = |df: &DataFrame, col: &str| -> Vec<String> {
-                    df.get_string(col).map(|a| a.to_vec()).unwrap_or_default()
+                    use greeners::Column;
+                    match df.get_column(col) {
+                        Ok(Column::String(a)) => a.to_vec(),
+                        Ok(Column::DateTime(a)) => a
+                            .iter()
+                            .map(|dt| dt.format("%Y-%m-%d").to_string())
+                            .collect(),
+                        Ok(Column::Categorical(cat)) => cat.to_strings(),
+                        Ok(Column::Bool(a)) => a.iter().map(|v| v.to_string()).collect(),
+                        _ => df.get_string(col).map(|a| a.to_vec()).unwrap_or_default(),
+                    }
                 };
 
                 let mut builder = DataFrame::builder();

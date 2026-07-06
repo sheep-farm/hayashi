@@ -190,9 +190,10 @@ pub enum Stmt {
     },
 
     // generate df newvar = expr
+    // newvar may be an identifier or a dynamic string expression (e.g. f"ret_{t}")
     Generate {
         df: String,
-        varname: String,
+        varname: Expr,
         expr: Expr,
     },
 
