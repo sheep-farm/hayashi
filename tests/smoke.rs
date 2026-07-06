@@ -5536,7 +5536,7 @@ fn list_files_basic() {
     std::fs::write(test_dir.join("b.txt"), "x\n").unwrap();
     std::fs::write(test_dir.join("c.csv"), "2\n").unwrap();
 
-    let dir = test_dir.to_string_lossy().to_string();
+    let dir = test_dir.to_string_lossy().replace('\\', "/");
     assert_ok_contains(
         "list_files_all",
         &format!(
