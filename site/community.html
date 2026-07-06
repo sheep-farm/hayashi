@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Community — Hayashi</title>
+  <meta name="description" content="Get involved with Hayashi: contribute code, report issues, validate estimators, and help build the open-source econometrics ecosystem.">
+  <meta name="keywords" content="Hayashi community, open source contribution, econometrics validation, GitHub, plugins, econometrics software">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+JP:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="index.html" class="logo">
+        <span class="logo-mark" aria-label="Hayashi" title="林 (Hayashi, forest)">林</span>
+        <span class="logo-text">Hayashi Language</span>
+      </a>
+      <nav class="main-nav">
+        <a href="index.html">Home</a>
+        <a href="docs.html">Docs</a>
+        <a href="playground.html">Playground</a>
+        <a href="plugins.html">Plugins</a>
+        <a href="community.html">Community</a>
+        <a href="about.html">About</a>
+        <a href="https://github.com/sheep-farm/hayashi" target="_blank" rel="noopener">GitHub</a>
+      </nav>
+      <button class="menu-toggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <section class="page-hero">
+      <div class="container">
+        <h1>Community</h1>
+        <p class="page-subtitle">Hayashi is open source. Contributions, validation cases, and plugins are welcome.</p>
+      </div>
+    </section>
+
+    <section class="content">
+      <div class="container">
+        <div class="features-grid">
+          <article class="feature-card">
+            <div class="feature-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+            </div>
+            <h3>GitHub</h3>
+            <p>Source code, issues, pull requests, and releases. The center of development.</p>
+            <a href="https://github.com/sheep-farm/hayashi" class="book-link" target="_blank" rel="noopener">github.com/sheep-farm/hayashi</a>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            </div>
+            <h3>Issues</h3>
+            <p>Report bugs, request estimators, or suggest improvements. Each issue is a potential validation case.</p>
+            <a href="https://github.com/sheep-farm/hayashi/issues" class="book-link" target="_blank" rel="noopener">Open issues</a>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            </div>
+            <h3>Discussions</h3>
+            <p>Ask questions, share scripts, and discuss econometric methodology with other users.</p>
+            <a href="https://github.com/sheep-farm/hayashi/discussions" class="book-link" target="_blank" rel="noopener">Join discussions</a>
+          </article>
+        </div>
+
+        <h2 class="section-title" style="margin-top: 4rem;">Ways to contribute</h2>
+        <div class="docs-body">
+          <h3>1. Validate an estimator</h3>
+          <p>The validation programme is the backbone of Hayashi. Add a new case under <code>validation/cases/</code> with a Hayashi script, a reference implementation (R or Python), and a <code>case.yml</code> descriptor.</p>
+
+          <h3>2. Build a plugin</h3>
+          <p>Plugins extend Hayashi without touching the core. Start with a Hayashi script, then move to native Rust or WebAssembly if you need performance or sandboxing.</p>
+
+          <h3>3. Improve documentation</h3>
+          <p>Books, examples, and the online reference are always evolving. Contributions in English and Portuguese are welcome.</p>
+
+          <h3>4. Fix bugs and harden the core</h3>
+          <p>Security, robustness, and error handling are high priority. If you find a user-reachable panic or a numeric edge case, open an issue.</p>
+
+          <h3>5. Spread the word</h3>
+          <p>Use Hayashi in your research, teaching, or blog posts. Cite the release version and link back to the project.</p>
+        </div>
+
+        <h2 class="section-title" style="margin-top: 4rem;">Development workflow</h2>
+        <div class="code-window wide">
+          <div class="code-header">
+            <span class="dot red"></span>
+            <span class="dot yellow"></span>
+            <span class="dot green"></span>
+            <span class="code-title">contributing</span>
+          </div>
+          <pre><code class="language-hay"># Fork and clone
+git clone https://github.com/YOU/hayashi.git
+cd hayashi
+
+# Build and test
+cargo fmt
+cargo clippy -- -D warnings
+cargo test
+
+# Run the validation suite for your case
+hay validate --case my_case --no-write
+
+# Open a pull request against dev</code></pre>
+        </div>
+
+        <div class="cta" style="margin-top: 4rem;">
+          <h2>Ready to contribute?</h2>
+          <p>Start by reading the source, running the tests, or opening a discussion.</p>
+          <div class="hero-actions" style="justify-content: center;">
+            <a href="https://github.com/sheep-farm/hayashi" class="btn btn-primary" target="_blank" rel="noopener">Go to GitHub</a>
+            <a href="docs.html" class="btn btn-secondary">Read docs</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <span class="logo-mark" aria-label="Hayashi" title="林 (Hayashi, forest)">林</span>
+        <span>Hayashi Language</span>
+      </div>
+      <div class="footer-links">
+        <a href="https://github.com/sheep-farm/hayashi">GitHub</a>
+        <a href="https://github.com/sheep-farm/Greeners">Greeners</a>
+      </div>
+      <div class="footer-copy">
+        Hayashi: GPL-3.0-only · Greeners: MIT · Books & docs: CC BY-SA 4.0
+        No cookies. No tracking. Your privacy is respected.
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

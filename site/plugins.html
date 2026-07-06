@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plugins — Hayashi</title>
+  <meta name="description" content="Extend Hayashi with native Rust, WebAssembly, and Hayashi-script plugins.">
+  <meta name="keywords" content="Hayashi plugins, Rust plugins, WebAssembly, WASM, package manager, econometrics extensions, open source">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+JP:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="index.html" class="logo">
+        <span class="logo-mark" aria-label="Hayashi" title="林 (Hayashi, forest)">林</span>
+        <span class="logo-text">Hayashi Language</span>
+      </a>
+      <nav class="main-nav">
+        <a href="index.html">Home</a>
+        <a href="docs.html">Docs</a>
+        <a href="playground.html">Playground</a>
+        <a href="plugins.html">Plugins</a>
+        <a href="community.html">Community</a>
+        <a href="about.html">About</a>
+        <a href="https://github.com/sheep-farm/hayashi" target="_blank" rel="noopener">GitHub</a>
+      </nav>
+      <button class="menu-toggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <section class="page-hero">
+      <div class="container">
+        <h1>Plugins</h1>
+        <p class="page-subtitle">Extend Hayashi without changing the core. Three tiers: native Rust, WebAssembly, and Hayashi scripts.</p>
+      </div>
+    </section>
+
+    <section class="content">
+      <div class="container">
+        <h2 class="section-title">How plugins work</h2>
+        <p class="section-subtitle">Plugins are installed from GitHub, loaded automatically, and exposed through a single namespace.</p>
+
+        <div class="features-grid">
+          <article class="feature-card">
+            <div class="feature-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+            </div>
+            <h3>Native Rust</h3>
+            <p>Maximum performance and full access to the Hayashi ABI. Compiled as <code>.so</code>, <code>.dylib</code>, or <code>.dll</code> for each release target.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            </div>
+            <h3>WebAssembly</h3>
+            <p>Sandboxed, portable, and safe. One binary runs on every platform. Ideal for untrusted or third-party code.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
+            </div>
+            <h3>Hayashi scripts</h3>
+            <p>Pure Hayashi code shared as a repository. No compilation required. Good for estimators, transformations, and reusable workflows.</p>
+          </article>
+        </div>
+
+        <h2 class="section-title" style="margin-top: 4rem;">Install a plugin</h2>
+        <div class="code-window wide">
+          <div class="code-header">
+            <span class="dot red"></span>
+            <span class="dot yellow"></span>
+            <span class="dot green"></span>
+            <span class="code-title">terminal</span>
+          </div>
+          <pre><code class="language-hay">hay install user/repo
+
+# Update one or all plugins
+hay update user/repo
+hay update
+
+# Remove
+hay remove user/repo</code></pre>
+        </div>
+
+        <h2 class="section-title" style="margin-top: 4rem;">Use a plugin</h2>
+        <div class="code-window wide">
+          <div class="code-header">
+            <span class="dot red"></span>
+            <span class="dot yellow"></span>
+            <span class="dot green"></span>
+            <span class="code-title">plugin.hay</span>
+          </div>
+          <pre><code class="language-hay">import("user/myplugin", as=mp)
+
+let m = ols(lwage ~ educ + exper, df)
+let fitted = predict(m, df)
+
+let result = mp::transform(fitted)
+print(result)</code></pre>
+        </div>
+
+        <h2 class="section-title" style="margin-top: 4rem;">Featured plugins</h2>
+        <div class="books-grid">
+          <a href="https://github.com/sheep-farm/hayplot" class="book-card" target="_blank" rel="noopener">
+            <span class="book-lang">NATIVE</span>
+            <h3>hayplot</h3>
+            <p>Plotting and visualization with SVG output.</p>
+            <span class="book-link">View on GitHub</span>
+          </a>
+          <a href="https://github.com/sheep-farm/hayfred" class="book-card" target="_blank" rel="noopener">
+            <span class="book-lang">NATIVE</span>
+            <h3>hayfred</h3>
+            <p>FRED macroeconomic data: GDP, CPI, unemployment, interest rates.</p>
+            <span class="book-link">View on GitHub</span>
+          </a>
+          <a href="https://github.com/sheep-farm/hayahoo" class="book-card" target="_blank" rel="noopener">
+            <span class="book-lang">NATIVE</span>
+            <h3>hayahoo</h3>
+            <p>Yahoo Finance market data: historical prices, quotes, search.</p>
+            <span class="book-link">View on GitHub</span>
+          </a>
+        </div>
+
+        <h2 class="section-title" style="margin-top: 4rem;">Create a plugin</h2>
+        <p class="section-subtitle">A plugin is a GitHub repository with a specific layout.</p>
+        <div class="code-window wide">
+          <div class="code-header">
+            <span class="dot red"></span>
+            <span class="dot yellow"></span>
+            <span class="dot green"></span>
+            <span class="code-title">plugin-layout</span>
+          </div>
+          <pre><code class="language-hay">my-plugin/
+├── Cargo.toml              # for native Rust plugins
+├── src/
+│   └── lib.rs              # exports `hayashi_init()`
+├── plugin.hay              # for script plugins
+└── README.md</code></pre>
+        </div>
+        <p style="margin-top: 1.5rem; color: var(--text-muted);">
+          Native plugins expose functions through the Hayashi ABI. The package manager downloads the correct release asset for the user's platform. For a full SDK reference, see the books.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <span class="logo-mark" aria-label="Hayashi" title="林 (Hayashi, forest)">林</span>
+        <span>Hayashi Language</span>
+      </div>
+      <div class="footer-links">
+        <a href="https://github.com/sheep-farm/hayashi">GitHub</a>
+        <a href="https://github.com/sheep-farm/Greeners">Greeners</a>
+      </div>
+      <div class="footer-copy">
+        Hayashi: GPL-3.0-only · Greeners: MIT · Books & docs: CC BY-SA 4.0
+        No cookies. No tracking. Your privacy is respected.
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>
