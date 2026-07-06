@@ -149,7 +149,9 @@ impl Interpreter {
                     }
                 } else {
                     // ── File / URL ───────────────────────────────────────────
+                    #[cfg(feature = "native")]
                     let _tmp;
+                    #[cfg(feature = "native")]
                     let local_path: &str = if crate::io::fetch::is_url(&path_str) {
                         emitln!(self, "Downloading '{}'…", path_str);
                         _tmp = crate::io::fetch::download_to_temp(&path_str)?;
@@ -158,14 +160,18 @@ impl Interpreter {
                     } else {
                         &path_str
                     };
+                    #[cfg(not(feature = "native"))]
+                    let local_path: &str = &path_str;
 
                     let ext = local_path.rsplit('.').next().unwrap_or("").to_lowercase();
 
                     let (df, n_rows) = match ext.as_str() {
+                        #[cfg(feature = "native")]
                         "dta" => crate::io::dta::load_dta(local_path)?,
                         "xlsx" | "xls" | "ods" => {
                             crate::io::excel::load_excel(local_path, opt_sheet.as_deref())?
                         }
+                        #[cfg(feature = "native")]
                         "sqlite" | "sqlite3" | "db" => crate::io::sqlite::load_sqlite(
                             local_path,
                             opt_table.as_deref(),
@@ -876,8 +882,13 @@ impl Interpreter {
                         println!("Exported DataFrame → '{path_str}' ({} rows)", df.n_rows());
                     }
                     (Value::DataFrame(df), "sqlite" | "sqlite3" | "db") => {
-                        crate::io::sqlite::write_sqlite(&df, &path_str, "data")?;
-                        println!("Exported DataFrame → '{path_str}' ({} rows)", df.n_rows());
+                        #[cfg(feature = "native")]
+                        {
+                            crate::io::sqlite::write_sqlite(&df, &path_str, "data")?;
+                            println!("Exported DataFrame → '{path_str}' ({} rows)", df.n_rows());
+                        }
+                        #[cfg(not(feature = "native"))]
+                        return Err(self.rt_err("SQLite export requires 'native' feature"));
                     }
                     (Value::DataFrame(df), "parquet" | "pq") => {
                         crate::io::parquet::write_parquet(&df, &path_str)?;

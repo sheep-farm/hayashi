@@ -405,12 +405,14 @@ pub fn json_to_value(
 // Rust Native Plugin Implementation (using libloading)
 // =============================================================================
 
+#[cfg(feature = "native")]
 pub struct RustNativePlugin {
     #[allow(dead_code)]
     name: String,
     lib: libloading::Library,
 }
 
+#[cfg(feature = "native")]
 impl RustNativePlugin {
     pub fn new(path: &str, name: &str) -> Result<Self, String> {
         let lib = unsafe { libloading::Library::new(path).map_err(|e| e.to_string())? };
@@ -421,6 +423,7 @@ impl RustNativePlugin {
     }
 }
 
+#[cfg(feature = "native")]
 impl HayashiPlugin for RustNativePlugin {
     fn name(&self) -> &str {
         &self.name

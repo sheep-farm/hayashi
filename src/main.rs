@@ -1,5 +1,4 @@
-mod io;
-mod lang;
+use hayashi_lang::lang;
 
 use lang::interpreter::Interpreter;
 use rustyline::completion::Completer;

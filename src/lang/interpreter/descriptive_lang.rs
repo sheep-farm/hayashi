@@ -170,11 +170,20 @@ impl Interpreter {
                     return Ok(Some(Value::Nil));
                 }
 
-                let resolved = if crate::io::fetch::is_url(&module) {
-                    let tmp = crate::io::fetch::download_to_temp(&module)?;
-                    tmp.to_string_lossy().to_string()
-                } else {
-                    self.resolve_import(&module)?
+                let resolved = {
+                    #[cfg(feature = "native")]
+                    {
+                        if crate::io::fetch::is_url(&module) {
+                            let tmp = crate::io::fetch::download_to_temp(&module)?;
+                            tmp.to_string_lossy().to_string()
+                        } else {
+                            self.resolve_import(&module)?
+                        }
+                    }
+                    #[cfg(not(feature = "native"))]
+                    {
+                        self.resolve_import(&module)?
+                    }
                 };
 
                 let alias = match opt_map.get("as") {
@@ -222,13 +231,18 @@ impl Interpreter {
                         return Ok(Some(Value::Nil));
                     }
                 } else if is_native {
-                    use crate::lang::plugin::RustNativePlugin;
-                    let plugin = RustNativePlugin::new(&resolved, &ns).map_err(|e| {
-                        self.rt_err(format!("import: failed to load native plugin: {e}"))
-                    })?;
-                    self.plugins.insert(ns.clone(), Box::new(plugin));
-                    self.imported.insert(module.clone());
-                    return Ok(Some(Value::Nil));
+                    #[cfg(not(feature = "native"))]
+                    return Err(self.rt_err("import: native plugins require 'native' feature"));
+                    #[cfg(feature = "native")]
+                    {
+                        use crate::lang::plugin::RustNativePlugin;
+                        let plugin = RustNativePlugin::new(&resolved, &ns).map_err(|e| {
+                            self.rt_err(format!("import: failed to load native plugin: {e}"))
+                        })?;
+                        self.plugins.insert(ns.clone(), Box::new(plugin));
+                        self.imported.insert(module.clone());
+                        return Ok(Some(Value::Nil));
+                    }
                 }
 
                 // Default script plugin (.hay) loading

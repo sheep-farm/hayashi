@@ -10,9 +10,17 @@ homepage = "https://github.com/sheep-farm/hayashi"
 keywords = ["econometrics", "statistics", "stata", "repl", "language"]
 categories = ["science", "command-line-utilities"]
 
+[lib]
+name = "hayashi_lang"
+path = "src/lib.rs"
+crate-type = ["rlib", "cdylib"]
+
+# Binary target is native-only (uses rustyline, ureq, etc.)
+# On wasm32, only the library crate is compiled.
 [[bin]]
 name = "hay"
 path = "src/main.rs"
+required-features = ["native"]
 
 [dependencies]
 greeners = { path = "../Greeners" }
@@ -20,30 +28,43 @@ ndarray = "0.17"
 chrono = "0.4"
 statrs = "0.18"
 thiserror = "2"
-rustyline = "14"
-dta = "0.6.0"
-ureq = "2"
-url = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tempfile = "3"
+csv = "1"
 rand = "0.8"
 plotters = { version = "0.3", default-features = false, features = ["svg_backend", "line_series"], optional = true }
 calamine = "0.35"
 parquet = { version = "59", default-features = false, features = ["arrow", "snap"] }
 arrow = { version = "59", default-features = false, features = ["csv", "json", "ffi"] }
 rust_xlsxwriter = "0.95"
-csv = "1"
-rusqlite = { version = "0.33", features = ["bundled"] }
+
+# Native-only dependencies (not available on wasm32-unknown-unknown)
+rustyline = { version = "14", optional = true }
+dta = { version = "0.6.0", optional = true }
+ureq = { version = "2", optional = true }
+url = { version = "2", optional = true }
+tempfile = { version = "3", optional = true }
+rusqlite = { version = "0.33", features = ["bundled"], optional = true }
 odbc-api = { version = "28", optional = true }
-libloading = "0.8"
+libloading = { version = "0.8", optional = true }
 wasmi = { version = "0.31", optional = true }
 
+# Enable getrandom js backend for wasm
+getrandom = { version = "0.2", features = ["js"] }
+
+# Pin getrandom 0.3 with wasm-js backend (pulled transitively by ahash/arrow)
+getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
+
+# WebAssembly bindings (only needed for wasm32 target)
+wasm-bindgen = { version = "0.2", optional = true }
+
 [features]
-default = ["plotters", "wasm"]
+default = ["plotters", "wasm", "native"]
 odbc = ["dep:odbc-api"]
 plotters = ["dep:plotters"]
 wasm = ["dep:wasmi"]
+native = ["dep:rustyline", "dep:dta", "dep:ureq", "dep:url", "dep:tempfile", "dep:rusqlite", "dep:libloading"]
+wasm-bindings = ["dep:wasm-bindgen"]
 
 [profile.release]
 opt-level = 3

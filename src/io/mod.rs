@@ -1,9 +1,12 @@
 pub mod dsv;
+#[cfg(feature = "native")]
 pub mod dta;
 pub mod excel;
+#[cfg(feature = "native")]
 pub mod fetch;
 #[cfg(feature = "odbc")]
 pub mod odbc;
 pub mod parquet;
 pub mod plot;
+#[cfg(feature = "native")]
 pub mod sqlite;
