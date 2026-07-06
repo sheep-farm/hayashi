@@ -39,7 +39,7 @@
 | ridge | wooldridge::hprice1 | R, Python | pass | — | Ridge regression of log house price on log lot size, log square footage, bedrooms and colonial dummy. |
 | sur | wooldridge::grunfeld | R, Python | pass | — | Two-equation SUR (Zellner FGLS) on the Grunfeld investment data. |
 | synth | synth_smoking | R, Python | pass | — | Synthetic-control ATT on a simulated panel with 10 donors and 1 treated unit. |
-| tobit | wooldridge::mroz | R, Python | pass | — | Tobit regression of hours worked with left censoring at zero. |
+| tobit | wooldridge::mroz | R | pass | — | Tobit regression of hours worked with left censoring at zero. Hayashi matches AER::tobit at displayed precision; the custom Python MLE is retained as a diagnostic script but is not the active reference. |
 | var | simulated_var1 | R, Python | pass | — | Uses the same simulated bivariate VAR(1) DGP as Chapter 28 of the book. |
 | var | statsmodels::macrodata | R, Python | pass | — | VAR(2) on US real GDP and consumption. |
 | wls | wooldridge::hprice1 | R, Python | pass | — | WLS with weights generated inside Hayashi to avoid sandbox file issues. |

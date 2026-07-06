@@ -70,6 +70,15 @@ std_errors = {name: float(val) for name, val in zip(names, se[:-1])}
 result_dict = {
     "coefficients": coefs,
     "standard_errors": std_errors,
+    "diagnostics": {
+        "success": bool(result.success),
+        "message": str(result.message),
+        "log_likelihood": float(-result.fun),
+        "sigma": float(np.exp(result.x[-1])),
+        "nobs": int(len(y)),
+        "censored": int((y <= 0).sum()),
+        "uncensored": int((y > 0).sum()),
+    },
 }
 
 out_dir = CASE_DIR / "reference"

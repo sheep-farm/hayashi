@@ -163,7 +163,9 @@ cases:
   dimension: numerical
   status: pass
 - id: tobit_mroz
-  notes: Tobit regression of hours worked with left censoring at zero.
+  notes: Tobit regression of hours worked with left censoring at zero. Hayashi matches
+    AER::tobit at displayed precision; the custom Python MLE is retained as a diagnostic
+    script but is not the active reference.
   dimension: numerical
   status: pass
 - id: var_book

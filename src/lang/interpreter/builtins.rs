@@ -1794,7 +1794,9 @@ impl Interpreter {
                     }
                 }
                 files.sort();
-                Ok(Value::List(Rc::new(files.into_iter().map(Value::Str).collect())))
+                Ok(Value::List(Rc::new(
+                    files.into_iter().map(Value::Str).collect(),
+                )))
             }
 
             _ => return Ok(None),

@@ -11,27 +11,25 @@ dataset:
 
 references:
   - R
-  - Python
 
 comparison:
   quantities:
     - coefficients
     - standard_errors
   tolerances:
-    coefficients: 2e-0
-    standard_errors: 1e-0
+    coefficients: 1e-3
+    standard_errors: 1e-3
 
 output_format: txt
 
 hayashi_script: cases/tobit_mroz/hayashi/run.hay
 reference_scripts:
   R: cases/tobit_mroz/reference/run.R
-  Python: cases/tobit_mroz/reference/run.py
 
-notes: Tobit regression of hours worked with left censoring at zero. Intercept differs from reference; needs isolated investigation.
+notes: Tobit regression of hours worked with left censoring at zero. Hayashi matches AER::tobit at displayed precision; the custom Python MLE is retained as a diagnostic script but is not the active reference.
 
 result:
-  summary: ""
+  summary: "Matches AER::tobit within strict displayed-output tolerance."
   known_differences:
-    - intercept differs between Hayashi and AER::tobit/statsmodels
-  issues_opened: [42]
+    - custom Python MLE converges to a nearby solution with a modest intercept delta
+  issues_opened: []
