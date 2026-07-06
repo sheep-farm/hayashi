@@ -39,21 +39,16 @@ pub fn print_output(text: &str) {
     }
     #[cfg(target_arch = "wasm32")]
     {
-        PRINT_FN.with(|f| {
-            if let Some(ref cb) = *f.borrow() {
+        unsafe {
+            if let Some(ref cb) = PRINT_FN {
                 let _ = cb.call1(&wasm_bindgen::JsValue::NULL, &wasm_bindgen::JsValue::from_str(text));
             }
-        });
+        }
     }
 }
 
 #[cfg(target_arch = "wasm32")]
-use std::cell::RefCell;
-
-#[cfg(target_arch = "wasm32")]
-thread_local! {
-    static PRINT_FN: RefCell<Option<js_sys::Function>> = const { RefCell::new(None) };
-}
+static mut PRINT_FN: Option<js_sys::Function> = None;
 
 #[cfg(target_arch = "wasm32")]
 mod wasm {
@@ -63,7 +58,7 @@ mod wasm {
     /// Must be called before `run_hayashi`.
     #[wasm_bindgen]
     pub fn set_print_callback(cb: js_sys::Function) {
-        super::PRINT_FN.with(|f| *f.borrow_mut() = Some(cb));
+        unsafe { super::PRINT_FN = Some(cb); }
     }
 
     #[wasm_bindgen]

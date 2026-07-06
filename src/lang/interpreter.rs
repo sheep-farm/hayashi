@@ -122,7 +122,11 @@ impl Interpreter {
             rng_seed: None,
             rng: {
                 use rand::SeedableRng;
-                rand::rngs::StdRng::from_entropy()
+                #[cfg(not(target_arch = "wasm32"))]
+                let r = rand::rngs::StdRng::from_entropy();
+                #[cfg(target_arch = "wasm32")]
+                let r = rand::rngs::StdRng::seed_from_u64(0x4841_5951);
+                r
             },
             preserved: HashMap::new(),
             stored_models: Vec::new(),
