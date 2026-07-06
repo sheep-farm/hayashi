@@ -54,6 +54,6 @@ print("pipe = " + str(sorted))
 let m = ols(Y ~ X + Z, df)
 print("ols ok")
 
-// Export (CSV, small, to temp-like location)
-export(df, "csv", "/tmp/readme_smoke_df.csv")
+// Export (CSV, small, to relative path for cross-platform smoke test)
+export(df, "csv", "readme_smoke_export.csv")
 print("export ok")

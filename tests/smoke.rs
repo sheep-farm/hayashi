@@ -5519,6 +5519,8 @@ fn readme_smoke_script() {
     let ok = output.status.success();
     let out = String::from_utf8_lossy(&output.stdout).to_string()
         + &String::from_utf8_lossy(&output.stderr);
+    // Cleanup cross-platform export artifact if created.
+    let _ = std::fs::remove_file("readme_smoke_export.csv");
     assert!(ok, "README smoke script failed:\n{out}");
     assert!(out.contains("ols ok"));
     assert!(out.contains("export ok"));
