@@ -1,0 +1,59 @@
+// README smoke test — exercises the main features documented in README.md
+
+input df
+Y X Z
+1.0 1.0 1.0
+2.0 2.0 0.0
+3.0 3.0 1.0
+4.0 4.0 0.0
+5.0 5.0 1.0
+end
+
+// Scalars and mutable variables
+let n = nrow(df)
+let x = 10
+if true {
+    let temp = 42
+    x = x + temp
+}
+print("x = " + str(x))
+
+// Lists and dicts
+let nums = [5, 3, 1, 4, 2]
+let squared = map(nums, |v| v * v)
+print("squared = " + str(squared))
+
+let d = {"a": 1, "b": 2}
+for k, v in d {
+    print(k + " = " + str(v))
+}
+
+// Match expression
+let code = 2
+let name = match code {
+    1 => "one",
+    2 => "two",
+    _ => "other"
+}
+print("match = " + name)
+
+// Try/catch
+let result = ""
+try {
+    let bad = undefined_variable
+} catch e {
+    result = "caught"
+}
+print("try = " + result)
+
+// Pipes
+let sorted = nums |> sort |> reverse
+print("pipe = " + str(sorted))
+
+// OLS and diagnostics
+let m = ols(Y ~ X + Z, df)
+print("ols ok")
+
+// Export (CSV, small, to temp-like location)
+export(df, "csv", "/tmp/readme_smoke_df.csv")
+print("export ok")

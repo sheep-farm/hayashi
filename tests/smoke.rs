@@ -5494,6 +5494,37 @@ display r"#,
 }
 
 #[test]
+fn match_as_variable_name() {
+    assert_ok_contains(
+        "match_var",
+        r#"let match = 1
+let matched = match + 1
+print(matched)"#,
+        "2",
+    );
+}
+
+#[test]
+fn readme_smoke_script() {
+    let path = std::path::Path::new(file!())
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("scripts/readme_smoke.hay");
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_hay"))
+        .arg(&path)
+        .output()
+        .expect("failed to execute hay");
+    let ok = output.status.success();
+    let out = String::from_utf8_lossy(&output.stdout).to_string()
+        + &String::from_utf8_lossy(&output.stderr);
+    assert!(ok, "README smoke script failed:\n{out}");
+    assert!(out.contains("ols ok"));
+    assert!(out.contains("export ok"));
+}
+
+#[test]
 fn match_wildcard() {
     assert_ok_contains(
         "match_wild",

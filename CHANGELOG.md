@@ -26,6 +26,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - **`try/catch/finally`**: `finally { ... }` block now runs regardless of whether the try succeeded, failed, or executed `return`/`break`/`continue`. Errors or control flow inside `finally` take precedence.
 - **`hay install` with version**: `hay install user/repo [version]` installs a specific release. `version` may be `latest`, `v1.2.3`, or `1.2.3`.
 - **`hay list` shows versions**: installed plugins now display their version from `.metadata.json`.
+- **`match` as contextual keyword**: `match` now works as a regular identifier (`let match = 1`) and still starts a match expression when followed by a scrutinee and brace (`let r = match x { ... }`).
+- **README smoke test**: `scripts/readme_smoke.hay` exercises the main features documented in `README.md` and is run by the test suite.
 
 ### Changed
 

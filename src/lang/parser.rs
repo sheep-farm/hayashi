@@ -37,6 +37,61 @@ impl Parser {
         self.tokens.get(self.pos + offset).map(|(t, _)| t)
     }
 
+    /// Detects whether `match` at the current position starts a match expression.
+    /// `match` is a contextual keyword: it is only a match expression when followed
+    /// by a scrutinee and an opening brace at the top level.
+    fn is_match_expr(&self) -> bool {
+        let Some((Token::Ident(s), _)) = self.tokens.get(self.pos) else {
+            return false;
+        };
+        if s != "match" {
+            return false;
+        }
+        let mut i = self.pos + 1;
+        let mut parens = 0;
+        let mut brackets = 0;
+        let mut braces = 0;
+        while let Some((t, _)) = self.tokens.get(i) {
+            match t {
+                Token::LParen => parens += 1,
+                Token::RParen => {
+                    if parens > 0 {
+                        parens -= 1;
+                    } else if parens == 0 && braces == 0 && brackets == 0 {
+                        return false;
+                    }
+                }
+                Token::LBracket => brackets += 1,
+                Token::RBracket => {
+                    if brackets > 0 {
+                        brackets -= 1;
+                    } else if parens == 0 && braces == 0 && brackets == 0 {
+                        return false;
+                    }
+                }
+                Token::LBrace => {
+                    if braces == 0 && parens == 0 && brackets == 0 {
+                        return true;
+                    }
+                    braces += 1;
+                }
+                Token::RBrace => {
+                    if braces > 0 {
+                        braces -= 1;
+                    }
+                }
+                Token::Newline | Token::Eof | Token::Comma
+                    if parens == 0 && brackets == 0 && braces == 0 =>
+                {
+                    return false;
+                }
+                _ => {}
+            }
+            i += 1;
+        }
+        false
+    }
+
     fn line(&self) -> usize {
         self.tokens.get(self.pos).map(|(_, l)| *l).unwrap_or(0)
     }
@@ -517,7 +572,9 @@ impl Parser {
             }
 
             // Match expression: match expr { pat => result, ... }
-            Token::Ident(ref s) if s == "match" => {
+            // `match` is a contextual keyword: it starts a match expression only
+            // when followed by a scrutinee expression and an opening brace.
+            Token::Ident(ref s) if s == "match" && self.is_match_expr() => {
                 self.advance();
                 let scrutinee = self.parse_expr()?;
                 self.expect(&Token::LBrace)?;
