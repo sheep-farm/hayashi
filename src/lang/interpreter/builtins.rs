@@ -1,11 +1,192 @@
+use super::helpers::*;
 use super::*;
 
-/// Conversões de tipo (int/float/str/bool), date/time, builtins de lista e
-/// dict, funções de string, regex, agregações sobre List, e as agregações
-/// escalares (mean/sum/min/max/std/...) com suporte a `if=`.
-/// Extraído de `eval_call` (ver src/lang/interpreter.rs).
+pub const BUILTIN_NAMES: &[&str] = &[
+    "mean",
+    "sd",
+    "min",
+    "max",
+    "sum",
+    "total",
+    "median",
+    "variance",
+    "quantile",
+    "cov",
+    "corr_pair",
+    "abs",
+    "sqrt",
+    "ln",
+    "log",
+    "exp",
+    "list_files",
+    "sin",
+    "cos",
+    "tan",
+    "asin",
+    "acos",
+    "atan",
+    "atan2",
+    "ceil",
+    "floor",
+    "round",
+    "sign",
+    "factorial",
+    "comb",
+    "int",
+    "float",
+    "str",
+    "bool",
+    "len",
+    "first",
+    "last",
+    "shift",
+    "typeof",
+    "ols",
+    "iv",
+    "logit",
+    "probit",
+    "poisson",
+    "nbreg",
+    "tobit",
+    "heckman",
+    "fe",
+    "re",
+    "be",
+    "fe2sls",
+    "ab",
+    "sysgmm",
+    "pcse",
+    "xtgls",
+    "qreg",
+    "rlm",
+    "lasso",
+    "ridge",
+    "elasticnet",
+    "cox",
+    "arima",
+    "autoreg",
+    "ardl",
+    "kalman",
+    "var",
+    "vecm",
+    "varma",
+    "svar",
+    "garch",
+    "glm",
+    "gee",
+    "mixed",
+    "mlogit",
+    "ologit",
+    "oprobit",
+    "clogit",
+    "cpoisson",
+    "gmm",
+    "sur",
+    "three_sls",
+    "fmb",
+    "did",
+    "rd",
+    "psm",
+    "synth",
+    "summarize",
+    "tabulate",
+    "tabstat",
+    "correlate",
+    "corr",
+    "pwcorr",
+    "describe",
+    "codebook",
+    "ttest",
+    "ci",
+    "centile",
+    "count",
+    "nrow",
+    "filter",
+    "sort",
+    "drop",
+    "keep",
+    "select",
+    "dropna",
+    "rename",
+    "merge",
+    "append",
+    "collapse",
+    "group_by",
+    "reshape",
+    "mutate",
+    "generate",
+    "pivot_longer",
+    "pivot_wider",
+    "anova",
+    "pca",
+    "factor",
+    "manova",
+    "cancorr",
+    "kde",
+    "lowess",
+    "swilk",
+    "sfrancia",
+    "sktest",
+    "omnibus",
+    "dagostino",
+    "vif",
+    "predict",
+    "esttab",
+    "eststo",
+    "margins",
+    "test",
+    "lincom",
+    "nlcom",
+    "bootstrap",
+    "bootse",
+    "histogram",
+    "boxplot",
+    "kdensity",
+    "qqplot",
+    "scatter",
+    "recode",
+    "destring",
+    "winsor",
+    "label",
+    "format",
+    "print",
+    "display",
+    "source",
+    "import",
+    "assert",
+    "timer",
+    "push",
+    "pop",
+    "reverse",
+    "unique",
+    "flatten",
+    "chain",
+    "join",
+    "split",
+    "contains",
+    "starts_with",
+    "ends_with",
+    "lower",
+    "upper",
+    "trim",
+    "substr",
+    "replace",
+    "regexm",
+    "regexr",
+    "regexs",
+    "input",
+    "load",
+    "export",
+    "write",
+];
+
+/// Type conversions (int/float/str/bool), date/time, list and dict builtins,
+/// string functions, regex, aggregations over List, and scalar aggregations
+/// (mean/sum/min/max/std/...) with `if=` support.
+/// Extracted from `eval_call` (see src/lang/interpreter.rs).
 impl Interpreter {
     /// Helper for `tidy`: build a tidy coefficient map from model result vectors.
+    #[allow(clippy::too_many_arguments)]
     fn build_tidy_coef_map(
         &self,
         names: Vec<String>,
@@ -18,14 +199,7 @@ impl Interpreter {
     ) -> std::collections::HashMap<String, Value> {
         let n = params.len();
         let name_col: Vec<Value> = (0..n)
-            .map(|i| {
-                Value::Str(
-                    names
-                        .get(i)
-                        .cloned()
-                        .unwrap_or_else(|| format!("x{i}")),
-                )
-            })
+            .map(|i| Value::Str(names.get(i).cloned().unwrap_or_else(|| format!("x{i}"))))
             .collect();
         let coef_col: Vec<Value> = params.iter().map(|&v| Value::Float(v)).collect();
         let se_col: Vec<Value> = std_errors.iter().map(|&v| Value::Float(v)).collect();
@@ -114,7 +288,7 @@ impl Interpreter {
                     return Err(HayashiError::Runtime("bool(x)".into()));
                 }
                 let v = self.eval_expr(&args[0])?;
-                Ok(Value::Bool(Self::value_as_bool(&v)))
+                Ok(Value::Bool(value_as_bool(&v)))
             }
             "is_nil" => {
                 if args.len() != 1 {
@@ -233,7 +407,7 @@ impl Interpreter {
                 Ok(Value::Float(dt.and_utc().timestamp() as f64))
             }
 
-            // ── Builtins de lista ─────────────────────────────────────────────
+            // ── List builtins ─────────────────────────────────────────────────
             "len" => {
                 if args.len() != 1 {
                     return Err(HayashiError::Runtime(
@@ -245,8 +419,9 @@ impl Interpreter {
                     Value::List(lst) => Ok(Value::Int(lst.len() as i64)),
                     Value::Dict(m) => Ok(Value::Int(m.len() as i64)),
                     Value::Str(s) => Ok(Value::Int(s.chars().count() as i64)),
+                    Value::Series(s) => Ok(Value::Int(s.len() as i64)),
                     _ => Err(HayashiError::Type(
-                        "len() requires list, dict, or string".into(),
+                        "len() requires list, dict, series, or string".into(),
                     )),
                 }
             }
@@ -374,7 +549,9 @@ impl Interpreter {
             // ── tidy: coefficient table from a model ───────────────────────────
             "tidy" => {
                 if args.len() != 1 {
-                    return Err(HayashiError::Runtime("tidy(model) requires 1 argument".into()));
+                    return Err(HayashiError::Runtime(
+                        "tidy(model) requires 1 argument".into(),
+                    ));
                 }
                 let val = self.eval_expr(&args[0])?;
                 let mut map = std::collections::HashMap::<String, Value>::new();
@@ -402,7 +579,11 @@ impl Interpreter {
                         let mut coef_cols: Vec<(String, Vec<Value>)> = (0..k)
                             .map(|j| {
                                 let name = names.get(j).cloned().unwrap_or_else(|| {
-                                    if j == 0 { "const".into() } else { format!("x{j}") }
+                                    if j == 0 {
+                                        "const".into()
+                                    } else {
+                                        format!("x{j}")
+                                    }
                                 });
                                 (name, Vec::new())
                             })
@@ -414,8 +595,8 @@ impl Interpreter {
                             let d = dates.get(t).cloned().unwrap_or_else(|| format!("{t}"));
                             date_col.push(Value::Str(d));
                             r2_col.push(Value::Float(r.r_squared_history[t]));
-                            for j in 0..k {
-                                coef_cols[j].1.push(Value::Float(r.params_history[[t, j]]));
+                            for (j, col) in coef_cols.iter_mut().enumerate().take(k) {
+                                col.1.push(Value::Float(r.params_history[[t, j]]));
                             }
                         }
                         map.insert("date".into(), Value::List(Rc::new(date_col)));
@@ -434,7 +615,9 @@ impl Interpreter {
             // ── glance: model fit summary ──────────────────────────────────────
             "glance" => {
                 if args.len() != 1 {
-                    return Err(HayashiError::Runtime("glance(model) requires 1 argument".into()));
+                    return Err(HayashiError::Runtime(
+                        "glance(model) requires 1 argument".into(),
+                    ));
                 }
                 let val = self.eval_expr(&args[0])?;
                 let mut map = std::collections::HashMap::<String, Value>::new();
@@ -445,7 +628,10 @@ impl Interpreter {
                         let scalar = |v: f64| Value::List(Rc::new(vec![Value::Float(v)]));
                         map.insert("r2".into(), scalar(r.r_squared));
                         map.insert("adj_r2".into(), scalar(r.adj_r_squared));
-                        map.insert("n".into(), Value::List(Rc::new(vec![Value::Int(r.n_obs as i64)])));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Rc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
                         map.insert("f_stat".into(), scalar(r.f_statistic));
                         map.insert("prob_f".into(), scalar(r.prob_f));
                         map.insert("aic".into(), scalar(r.aic));
@@ -460,7 +646,7 @@ impl Interpreter {
                 Ok(Value::DataFrame(Rc::new(df)))
             }
 
-            // ── Funções de string ─────────────────────────────────────────────
+            // ── String functions ────────────────────────────────────────────
             "upper" | "lower" | "trim" => {
                 let s =
                     match self
@@ -470,7 +656,7 @@ impl Interpreter {
                         Value::Str(s) => s,
                         v => {
                             return Err(HayashiError::Type(format!(
-                                "{func}() requires string, recebeu {v}"
+                                "{func}() requires string, got {v}"
                             )))
                         }
                     };
@@ -511,7 +697,11 @@ impl Interpreter {
                 }
                 let path = match self.eval_expr(&args[0])? {
                     Value::Str(s) => s,
-                    v => return Err(self.type_err(format!("file_exists: path must be string, got {v}"))),
+                    v => {
+                        return Err(
+                            self.type_err(format!("file_exists: path must be string, got {v}"))
+                        )
+                    }
                 };
                 Ok(Value::Bool(std::path::Path::new(&path).exists()))
             }
@@ -524,17 +714,22 @@ impl Interpreter {
                 }
                 let path = match self.eval_expr(&args[0])? {
                     Value::Str(s) => s,
-                    v => return Err(self.type_err(format!("ensure_dir: path must be string, got {v}"))),
+                    v => {
+                        return Err(
+                            self.type_err(format!("ensure_dir: path must be string, got {v}"))
+                        )
+                    }
                 };
-                std::fs::create_dir_all(&path)
-                    .map_err(|e| HayashiError::Io(format!("Failed to create directory '{path}': {e}")))?;
+                std::fs::create_dir_all(&path).map_err(|e| {
+                    HayashiError::Io(format!("Failed to create directory '{path}': {e}"))
+                })?;
                 Ok(Value::Nil)
             }
 
             "contains" => {
                 if args.len() != 2 {
                     return Err(HayashiError::Runtime(
-                        "contains(s, padrão) requires 2 arguments".into(),
+                        "contains(s, pattern) requires 2 arguments".into(),
                     ));
                 }
                 let s = match self.eval_expr(&args[0])? {
@@ -554,7 +749,7 @@ impl Interpreter {
 
             "starts_with" | "ends_with" => {
                 if args.len() != 2 {
-                    return Err(self.rt_err(format!("{func}(s, padrão) requires 2 arguments")));
+                    return Err(self.rt_err(format!("{func}(s, pattern) requires 2 arguments")));
                 }
                 let s = match self.eval_expr(&args[0])? {
                     Value::Str(s) => s,
@@ -575,7 +770,7 @@ impl Interpreter {
                 }))
             }
 
-            // substr(s, início [, comprimento]) — índice 0-based em chars
+            // substr(s, start [, length]) — 0-based char index
             "substr" => {
                 if args.len() < 2 || args.len() > 3 {
                     return Err(HayashiError::Runtime(
@@ -614,11 +809,11 @@ impl Interpreter {
                 Ok(Value::Str(chars[real_start..end].iter().collect()))
             }
 
-            // split(s, delimitador) → List de Str
+            // split(s, delimiter) → List of Str
             "split" => {
                 if args.len() != 2 {
                     return Err(HayashiError::Runtime(
-                        "split(s, delimitador) requires 2 arguments".into(),
+                        "split(s, delimiter) requires 2 arguments".into(),
                     ));
                 }
                 let s = match self.eval_expr(&args[0])? {
@@ -640,11 +835,11 @@ impl Interpreter {
                 Ok(Value::List(Rc::new(parts)))
             }
 
-            // str_replace(s, de, para) — "replace" é palavra-chave
+            // str_replace(s, from, to) — "replace" is a keyword
             "str_replace" => {
                 if args.len() != 3 {
                     return Err(HayashiError::Runtime(
-                        "str_replace(s, de, para) requires 3 arguments".into(),
+                        "str_replace(s, from, to) requires 3 arguments".into(),
                     ));
                 }
                 let s = match self.eval_expr(&args[0])? {
@@ -673,10 +868,10 @@ impl Interpreter {
             }
 
             // ── Regex ─────────────────────────────────────────────────────────
-            // regexm(s, pattern)            → 1 se match, 0 se não
-            // regexr(s, pattern, replace)   → substitui primeira ocorrência
-            // regexra(s, pattern, replace)  → substitui todas
-            // regexs(s, pattern)            → extrai primeiro grupo de captura
+            // regexm(s, pattern)            → 1 if match, 0 otherwise
+            // regexr(s, pattern, replace)   → replace first occurrence
+            // regexra(s, pattern, replace)  → replace all
+            // regexs(s, pattern)            → extract first capture group
             "regexm" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime("regexm(string, pattern)".into()));
@@ -776,14 +971,14 @@ impl Interpreter {
                 }
             }
 
-            // ── Agregações sobre List ─────────────────────────────────────────
-            // "sum" fica para summarize(df) — Stata-style
-            // "total" é a soma de uma lista numérica
+            // ── Aggregations over List ────────────────────────────────────────
+            // "sum" is reserved for summarize(df) — Stata-style
+            // "total" is the sum of a numeric list
             "sum" | "mean" | "sd" | "std" | "min" | "max" | "total" => {
-                // Forma 1: mean(list)  /  sd(list)  /  std(list)  etc.
-                // Forma 2: mean(df, var)  ou  mean(df, var, if=cond)
+                // Form 1: mean(list)  /  sd(list)  /  std(list)  etc.
+                // Form 2: mean(df, var)  or  mean(df, var, if=cond)
                 let nums: Vec<f64> = if args.len() >= 2 {
-                    // forma DataFrame
+                    // DataFrame form
                     let df_name = match &args[0] {
                         Expr::Var(n) => n.clone(),
                         _ => {
@@ -803,8 +998,8 @@ impl Interpreter {
                             )))
                         }
                     };
-                    let col = Self::get_col_f64(&df, &var_name)?;
-                    // filtro opcional: if=cond
+                    let col = get_col_f64(&df, &var_name)?;
+                    // optional filter: if=cond
                     if let Some(cond_opt) = opts.iter().find(|o| o.name == "if") {
                         let mask = self.eval_col_expr(&cond_opt.value, &df)?;
                         col.iter()
@@ -818,12 +1013,33 @@ impl Interpreter {
                 } else if args.len() == 1 {
                     let v = self.eval_expr(&args[0])?;
                     match v {
-                        Value::List(lst) => {
-                            lst.iter().map(Self::value_as_f64).collect::<Result<_>>()?
+                        Value::List(lst) => lst.iter().map(value_as_f64).collect::<Result<_>>()?,
+                        Value::Series(s) => {
+                            if s.is_empty() {
+                                return Err(self.rt_err(format!("{func}(): empty series")));
+                            }
+                            let v = s.numeric_values();
+                            let val = match func {
+                                "sum" | "total" => v.iter().sum::<f64>(),
+                                "mean" => s.mean(),
+                                "min" => s.min(),
+                                "max" => s.max(),
+                                "sd" | "std" => {
+                                    if s.len() < 2 {
+                                        return Err(self.rt_err(format!(
+                                            "{func}(): series needs at least 2 observations"
+                                        )));
+                                    }
+                                    s.sd()
+                                }
+                                _ => unreachable!(),
+                            };
+                            return Ok(Some(Value::Float(val)));
                         }
                         other => {
-                            return Err(self
-                                .type_err(format!("{func}() requires numeric list, got {other}")))
+                            return Err(self.type_err(format!(
+                                "{func}() requires numeric list or series, got {other}"
+                            )))
                         }
                     }
                 } else {
@@ -831,7 +1047,7 @@ impl Interpreter {
                 };
                 if nums.is_empty() {
                     return Err(self.rt_err(format!(
-                        "{func}(): nenhum valor (empty list ou filtro excluiu tudo)"
+                        "{func}(): no values (empty list or filter excluded everything)"
                     )));
                 }
                 let result = match func {
@@ -849,9 +1065,9 @@ impl Interpreter {
                 Ok(Value::Float(result))
             }
 
-            // ── Novas agregações escalares (todas suportam if = cond) ────────
+            // ── New scalar aggregations (all support if = cond) ─────────────
             "median" => {
-                // median(lista) | median(df, x) | median(df, x, if = cond)
+                // median(list) | median(df, x) | median(df, x, if = cond)
                 let nums: Vec<f64> = if args.len() >= 2 {
                     let df_name = match &args[0] {
                         Expr::Var(n) => n.clone(),
@@ -869,7 +1085,7 @@ impl Interpreter {
                             )
                         }
                     };
-                    let col = Self::get_col_f64(&df, &var_name)?;
+                    let col = get_col_f64(&df, &var_name)?;
                     if let Some(cond_opt) = opts.iter().find(|o| o.name == "if") {
                         let mask = self.eval_col_expr(&cond_opt.value, &df)?;
                         col.iter()
@@ -882,9 +1098,7 @@ impl Interpreter {
                     }
                 } else if args.len() == 1 {
                     match self.eval_expr(&args[0])? {
-                        Value::List(lst) => {
-                            lst.iter().map(Self::value_as_f64).collect::<Result<_>>()?
-                        }
+                        Value::List(lst) => lst.iter().map(value_as_f64).collect::<Result<_>>()?,
                         other => {
                             return Err(self
                                 .type_err(format!("median() requires numeric list, got {other}")))
@@ -908,7 +1122,7 @@ impl Interpreter {
             }
 
             "variance" => {
-                // variance(lista) | variance(df, x) | variance(df, x, if = cond) — amostral (/ n-1)
+                // variance(list) | variance(df, x) | variance(df, x, if = cond) — sample (/ n-1)
                 let nums: Vec<f64> = if args.len() >= 2 {
                     let df_name = match &args[0] {
                         Expr::Var(n) => n.clone(),
@@ -928,7 +1142,7 @@ impl Interpreter {
                             )
                         }
                     };
-                    let col = Self::get_col_f64(&df, &var_name)?;
+                    let col = get_col_f64(&df, &var_name)?;
                     if let Some(cond_opt) = opts.iter().find(|o| o.name == "if") {
                         let mask = self.eval_col_expr(&cond_opt.value, &df)?;
                         col.iter()
@@ -941,9 +1155,7 @@ impl Interpreter {
                     }
                 } else if args.len() == 1 {
                     match self.eval_expr(&args[0])? {
-                        Value::List(lst) => {
-                            lst.iter().map(Self::value_as_f64).collect::<Result<_>>()?
-                        }
+                        Value::List(lst) => lst.iter().map(value_as_f64).collect::<Result<_>>()?,
                         other => {
                             return Err(self.type_err(format!(
                                 "variance() requires numeric list, got {other}"
@@ -962,8 +1174,82 @@ impl Interpreter {
                 Ok(Value::Float(v))
             }
 
+            // ── Series methods (first-class column) ──────────────────────────
+            "first" => {
+                if args.len() != 1 {
+                    return Err(self.rt_err("first(series) requires 1 argument"));
+                }
+                let v = self.eval_expr(&args[0])?;
+                match v {
+                    Value::Series(s) => s
+                        .first()
+                        .ok_or_else(|| self.rt_err("first(): empty series")),
+                    Value::List(lst) => lst
+                        .first()
+                        .cloned()
+                        .ok_or_else(|| self.rt_err("first(): empty list")),
+                    other => {
+                        Err(self.type_err(format!("first() requires series or list, got {other}")))
+                    }
+                }
+            }
+
+            "last" => {
+                if args.len() != 1 {
+                    return Err(self.rt_err("last(series) requires 1 argument"));
+                }
+                let v = self.eval_expr(&args[0])?;
+                match v {
+                    Value::Series(s) => s.last().ok_or_else(|| self.rt_err("last(): empty series")),
+                    Value::List(lst) => lst
+                        .last()
+                        .cloned()
+                        .ok_or_else(|| self.rt_err("last(): empty list")),
+                    other => {
+                        Err(self.type_err(format!("last() requires series or list, got {other}")))
+                    }
+                }
+            }
+
+            "shift" => {
+                if args.len() != 2 {
+                    return Err(self.rt_err("shift(series, n) requires 2 arguments"));
+                }
+                let v = self.eval_expr(&args[0])?;
+                let n = match self.eval_expr(&args[1])? {
+                    Value::Int(i) => i,
+                    Value::Float(f) => f as i64,
+                    other => {
+                        return Err(
+                            self.type_err(format!("shift(): n must be integer, got {other}"))
+                        )
+                    }
+                };
+                match v {
+                    Value::Series(s) => Ok(Value::Series(Rc::new(s.shift(n)))),
+                    Value::List(lst) => {
+                        let shifted = if n > 0 {
+                            let mut v = vec![Value::Nil; n as usize];
+                            v.extend_from_slice(&lst[..lst.len().saturating_sub(n as usize)]);
+                            v
+                        } else if n < 0 {
+                            let n_abs = (-n) as usize;
+                            let mut v = lst[n_abs.min(lst.len())..].to_vec();
+                            v.extend(vec![Value::Nil; n_abs.min(lst.len())]);
+                            v
+                        } else {
+                            lst.to_vec()
+                        };
+                        Ok(Value::List(Rc::new(shifted)))
+                    }
+                    other => {
+                        Err(self.type_err(format!("shift() requires series or list, got {other}")))
+                    }
+                }
+            }
+
             "quantile" => {
-                // quantile(df, x, p) | quantile(lista, p) | quantile(df, x, p, if = cond) — p ∈ [0,1]
+                // quantile(df, x, p) | quantile(list, p) | quantile(df, x, p, if = cond) — p ∈ [0,1]
                 let (nums, p) = if args.len() >= 3 {
                     let df_name = match &args[0] {
                         Expr::Var(n) => n.clone(),
@@ -983,7 +1269,7 @@ impl Interpreter {
                             )
                         }
                     };
-                    let col = Self::get_col_f64(&df, &var_name)?;
+                    let col = get_col_f64(&df, &var_name)?;
                     let nums = if let Some(cond_opt) = opts.iter().find(|o| o.name == "if") {
                         let mask = self.eval_col_expr(&cond_opt.value, &df)?;
                         col.iter()
@@ -1003,9 +1289,7 @@ impl Interpreter {
                 } else if args.len() == 2 {
                     let v = self.eval_expr(&args[0])?;
                     let nums = match v {
-                        Value::List(lst) => {
-                            lst.iter().map(Self::value_as_f64).collect::<Result<_>>()?
-                        }
+                        Value::List(lst) => lst.iter().map(value_as_f64).collect::<Result<_>>()?,
                         other => {
                             return Err(self.type_err(format!(
                                 "quantile() requires numeric list, got {other}"
@@ -1019,14 +1303,14 @@ impl Interpreter {
                     };
                     (nums, p)
                 } else {
-                    return Err(self.rt_err("quantile(df, x, p) ou quantile(lista, p)"));
+                    return Err(self.rt_err("quantile(df, x, p) or quantile(list, p)"));
                 };
                 if !(0.0..=1.0).contains(&p) {
-                    return Err(self.rt_err("quantile(): p deve estar em [0, 1]"));
+                    return Err(self.rt_err("quantile(): p must be in [0, 1]"));
                 }
                 let mut sorted: Vec<f64> = nums.into_iter().filter(|x| x.is_finite()).collect();
                 if sorted.is_empty() {
-                    return Err(self.rt_err("quantile(): nenhum valor finito"));
+                    return Err(self.rt_err("quantile(): no finite value"));
                 }
                 sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
                 let idx = p * (sorted.len() - 1) as f64;
@@ -1042,7 +1326,7 @@ impl Interpreter {
             }
 
             "cov" => {
-                // cov(df, x, y) | cov(df, x, y, if = cond) — covariância amostral (/ n-1)
+                // cov(df, x, y) | cov(df, x, y, if = cond) — sample covariance (/ n-1)
                 if args.len() < 3 {
                     return Err(HayashiError::Runtime("cov(df, x, y)".into()));
                 }
@@ -1058,8 +1342,8 @@ impl Interpreter {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
                     _ => return Err(self.rt_err("cov(): third argument must be a variable name")),
                 };
-                let x_col = Self::get_col_f64(&df, &x_name)?;
-                let y_col = Self::get_col_f64(&df, &y_name)?;
+                let x_col = get_col_f64(&df, &x_name)?;
+                let y_col = get_col_f64(&df, &y_name)?;
                 let (x_vals, y_vals): (Vec<f64>, Vec<f64>) =
                     if let Some(cond_opt) = opts.iter().find(|o| o.name == "if") {
                         let mask = self.eval_col_expr(&cond_opt.value, &df)?;
@@ -1089,7 +1373,7 @@ impl Interpreter {
             }
 
             "corr_pair" => {
-                // corr_pair(df, x, y) | corr_pair(df, x, y, if = cond) — Pearson escalar
+                // corr_pair(df, x, y) | corr_pair(df, x, y, if = cond) — scalar Pearson
                 if args.len() < 3 {
                     return Err(HayashiError::Runtime("corr_pair(df, x, y)".into()));
                 }
@@ -1113,8 +1397,8 @@ impl Interpreter {
                         )
                     }
                 };
-                let x_col = Self::get_col_f64(&df, &x_name)?;
-                let y_col = Self::get_col_f64(&df, &y_name)?;
+                let x_col = get_col_f64(&df, &x_name)?;
+                let y_col = get_col_f64(&df, &y_name)?;
                 let (x_vals, y_vals): (Vec<f64>, Vec<f64>) =
                     if let Some(cond_opt) = opts.iter().find(|o| o.name == "if") {
                         let mask = self.eval_col_expr(&cond_opt.value, &df)?;
@@ -1154,7 +1438,7 @@ impl Interpreter {
 
             "push" => {
                 if args.len() != 2 {
-                    return Err(HayashiError::Runtime("push(lista, item)".into()));
+                    return Err(HayashiError::Runtime("push(list, item)".into()));
                 }
                 let var_name = match &args[0] {
                     Expr::Var(n) => n.clone(),
@@ -1183,7 +1467,7 @@ impl Interpreter {
 
             "pop" => {
                 if args.len() != 1 {
-                    return Err(HayashiError::Runtime("pop(lista)".into()));
+                    return Err(HayashiError::Runtime("pop(list)".into()));
                 }
                 let var_name = match &args[0] {
                     Expr::Var(n) => n.clone(),
@@ -1214,7 +1498,7 @@ impl Interpreter {
 
             "insert" => {
                 if args.len() != 3 {
-                    return Err(HayashiError::Runtime("insert(lista, indice, item)".into()));
+                    return Err(HayashiError::Runtime("insert(list, index, item)".into()));
                 }
                 let lst = self.eval_expr(&args[0])?;
                 let idx = match self.eval_expr(&args[1])? {
@@ -1241,7 +1525,7 @@ impl Interpreter {
 
             "remove" => {
                 if args.len() != 2 {
-                    return Err(HayashiError::Runtime("remove(lista, indice)".into()));
+                    return Err(HayashiError::Runtime("remove(list, index)".into()));
                 }
                 let lst = self.eval_expr(&args[0])?;
                 let idx = match self.eval_expr(&args[1])? {
@@ -1267,7 +1551,7 @@ impl Interpreter {
 
             "clear" => {
                 if args.len() != 1 {
-                    return Err(HayashiError::Runtime("clear(lista)".into()));
+                    return Err(HayashiError::Runtime("clear(list)".into()));
                 }
                 match self.eval_expr(&args[0])? {
                     Value::List(_) => Ok(Value::List(Rc::new(Vec::new()))),
@@ -1277,7 +1561,7 @@ impl Interpreter {
 
             "reverse" => {
                 if args.len() != 1 {
-                    return Err(HayashiError::Runtime("reverse(lista)".into()));
+                    return Err(HayashiError::Runtime("reverse(list)".into()));
                 }
                 match self.eval_expr(&args[0])? {
                     Value::List(v) => {
@@ -1292,7 +1576,7 @@ impl Interpreter {
             "index" | "indexof" => {
                 if args.len() != 2 {
                     return Err(HayashiError::Runtime(
-                        "index(lista, item) → posição ou -1".into(),
+                        "index(list, item) → position or -1".into(),
                     ));
                 }
                 let lst = self.eval_expr(&args[0])?;
@@ -1308,7 +1592,7 @@ impl Interpreter {
 
             "slice" => {
                 if args.len() < 2 || args.len() > 3 {
-                    return Err(HayashiError::Runtime("slice(lista, inicio [, fim])".into()));
+                    return Err(HayashiError::Runtime("slice(list, start [, end])".into()));
                 }
                 let lst = self.eval_expr(&args[0])?;
                 let start = match self.eval_expr(&args[1])? {
@@ -1340,7 +1624,7 @@ impl Interpreter {
 
             "join" => {
                 if args.is_empty() || args.len() > 2 {
-                    return Err(HayashiError::Runtime("join(lista [, separador])".into()));
+                    return Err(HayashiError::Runtime("join(list [, separator])".into()));
                 }
                 let lst = self.eval_expr(&args[0])?;
                 let sep = if args.len() == 2 {
@@ -1383,7 +1667,7 @@ impl Interpreter {
 
             "unique" => {
                 if args.len() != 1 {
-                    return Err(HayashiError::Runtime("unique(lista)".into()));
+                    return Err(HayashiError::Runtime("unique(list)".into()));
                 }
                 match self.eval_expr(&args[0])? {
                     Value::List(v) => {
@@ -1404,7 +1688,7 @@ impl Interpreter {
 
             "flatten" => {
                 if args.len() != 1 {
-                    return Err(HayashiError::Runtime("flatten(lista)".into()));
+                    return Err(HayashiError::Runtime("flatten(list)".into()));
                 }
                 match self.eval_expr(&args[0])? {
                     Value::List(v) => {
@@ -1473,6 +1757,48 @@ impl Interpreter {
                 }
                 Ok(Value::List(Rc::new(v)))
             }
+
+            // ── list_files(dir, [pattern]) ─────────────────────────────────────
+            "list_files" => {
+                let dir = if args.is_empty() {
+                    ".".to_string()
+                } else {
+                    match self.eval_expr(&args[0])? {
+                        Value::Str(s) => s,
+                        _ => return Err(self.type_err("list_files: directory must be a string")),
+                    }
+                };
+                let pattern = if args.len() > 1 {
+                    match self.eval_expr(&args[1])? {
+                        Value::Str(s) => Some(s),
+                        _ => return Err(self.type_err("list_files: pattern must be a string")),
+                    }
+                } else {
+                    None
+                };
+
+                let entries = std::fs::read_dir(&dir)
+                    .map_err(|e| self.rt_err(format!("list_files: cannot read '{dir}': {e}")))?;
+
+                let mut files: Vec<String> = Vec::new();
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_file() {
+                        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                        if let Some(ref pat) = pattern {
+                            if !name.contains(pat) {
+                                continue;
+                            }
+                        }
+                        files.push(path.to_string_lossy().to_string());
+                    }
+                }
+                files.sort();
+                Ok(Value::List(Rc::new(
+                    files.into_iter().map(Value::Str).collect(),
+                )))
+            }
+
             _ => return Ok(None),
         };
         result.map(Some)

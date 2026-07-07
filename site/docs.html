@@ -21,6 +21,7 @@
       <nav class="main-nav">
         <a href="index.html">Home</a>
         <a href="docs.html">Docs</a>
+        <a href="playground.html">Playground</a>
         <a href="plugins.html">Plugins</a>
         <a href="community.html">Community</a>
         <a href="about.html">About</a>
@@ -210,17 +211,11 @@ let sign = match coef > 0 { true => "+", false => "-" }
 // Functions
 fn my_mean(x) {
   return sum(x) / len(x)
-}
-
-// Import a plugin
-import("sheep-farm/hayplot", as=gg)
-let p = gg::hayplot(df, {"x": "educ", "y": "lwage"})
-    |> gg::geom_point("blue", 5.0)
-    |> gg::save_svg("scatter.svg")</code></pre>
+}</code></pre>
             </div>
 
             <h2 id="recipe">Recipe: rolling CAPM</h2>
-            <p>A complete daily CAPM pipeline with rolling betas and an SVG chart.</p>
+            <p>A complete daily CAPM pipeline with rolling betas.</p>
             <div class="code-window">
               <div class="code-header">
                 <span class="dot red"></span>
@@ -229,10 +224,6 @@ let p = gg::hayplot(df, {"x": "educ", "y": "lwage"})
                 <span class="code-title">capm.hay</span>
               </div>
               <pre><code class="language-hay">import("sheep-farm/hayahoo", as=yahoo)
-import("sheep-farm/hayfred", as=fred)
-import("sheep-farm/hayplot", as=gg)
-
-fred::set_apikey("sua-chave")
 
 let asset = yahoo::history("AAPL", {"range": "50y", "interval": "1d"})
 generate asset asset_ret = log(close / L.close)
@@ -243,15 +234,11 @@ generate market market_ret = log(close / L.close)
 market |> keep(["date", "market_ret"])
 
 let merged = merge(asset, market, key=date, type=inner)
-let rf = fred::fred("TB3MS", {"start": merged["date"][0], "end": merged["date"][len(merged["date"])-1]})
-generate rf rf_period = (value / 100.0) / 365
-rf |> keep(["date", "rf_period"])
 
-let with_rf = merge(merged, rf, key=date, type=left)
-let filled = ffill(with_rf)
-generate filled excess_asset = asset_ret - rf_period
-generate filled excess_market = market_ret - rf_period
-let df = dropna(filled, excess_asset, excess_market)
+let with_rf = merged
+generate with_rf excess_asset = asset_ret
+generate with_rf excess_market = market_ret
+let df = dropna(with_rf, excess_asset, excess_market)
 
 let model = df |> ols(excess_asset ~ excess_market, _)
 print(model)
@@ -263,15 +250,7 @@ let coefs = betas["excess_market"]
 print("mean =", mean(coefs))
 print("sd   =", sd(coefs))
 print("min  =", min(coefs))
-print("max  =", max(coefs))
-
-generate betas idx = _n
-let plot = gg::hayplot(betas, {"x": "idx", "y": "excess_market"})
-    |> gg::geom_line("#1f77b4", 1.5)
-    |> gg::geom_hline("red", 1.0, mean(coefs))
-    |> gg::labs("Rolling beta: AAPL vs SPY", "observation", "beta")
-    |> gg::set_dimensions(1200, 600)
-    |> gg::save_svg("rolling_beta.svg")</code></pre>
+print("max  =", max(coefs))</code></pre>
             </div>
 
             <h2 id="cli">CLI commands</h2>
@@ -304,11 +283,11 @@ let plot = gg::hayplot(betas, {"x": "idx", "y": "excess_market"})
       </div>
       <div class="footer-links">
         <a href="https://github.com/sheep-farm/hayashi">GitHub</a>
-        <a href="https://crates.io/crates/hayashi-lang">crates.io</a>
         <a href="https://github.com/sheep-farm/Greeners">Greeners</a>
       </div>
       <div class="footer-copy">
         Hayashi: GPL-3.0-only · Greeners: MIT · Books & docs: CC BY-SA 4.0
+        No cookies. No tracking. Your privacy is respected.
       </div>
     </div>
   </footer>

@@ -1,9 +1,9 @@
-/// Fórmula econométrica: y ~ x1 + x2 + C(region) | id + t
+/// Econometric formula: y ~ x1 + x2 + C(region) | id + t
 #[derive(Debug, Clone)]
 pub struct Formula {
     pub lhs: String,
     pub rhs: Vec<RhsTerm>,
-    pub fe: Vec<String>, // após |
+    pub fe: Vec<String>, // after |
 }
 
 #[derive(Debug, Clone)]
@@ -14,14 +14,14 @@ pub enum RhsTerm {
     Interaction(String, String),
 }
 
-/// Opções nomeadas passadas para estimadores: cov=HC3, lags=4, ...
+/// Named options passed to estimators: cov=HC3, lags=4, ...
 #[derive(Debug, Clone)]
 pub struct Opt {
     pub name: String,
     pub value: Expr,
 }
 
-/// Operadores binários para expressões aritméticas/comparação/lógica
+/// Binary operators for arithmetic/comparison/logical expressions
 #[derive(Debug, Clone)]
 pub enum BinOp {
     Add,
@@ -41,7 +41,7 @@ pub enum BinOp {
     In,
 }
 
-/// Operador de série temporal
+/// Time-series operator
 #[derive(Debug, Clone)]
 pub enum TsOpKind {
     Lag,
@@ -49,15 +49,15 @@ pub enum TsOpKind {
     Diff,
 }
 
-/// Iterador de loop for
+/// for loop iterator
 #[derive(Debug, Clone)]
 pub enum ForIter {
-    Range(Expr, Expr),          // start..end   (exclusivo, como Rust)
-    RangeInclusive(Expr, Expr), // start..=end  (inclusivo, como Rust)
-    Items(Expr),                // lista ou variável
+    Range(Expr, Expr),          // start..end   (exclusive, like Rust)
+    RangeInclusive(Expr, Expr), // start..=end  (inclusive, like Rust)
+    Items(Expr),                // list or variable
 }
 
-/// Expressões da linguagem
+/// Language expressions
 #[derive(Debug, Clone)]
 pub enum Expr {
     Float(f64),
@@ -69,39 +69,39 @@ pub enum Expr {
     Formula(Formula),
     Nil,
 
-    // aritmética / comparação / lógica: price * 1.5, mpg > 20, a && b
+    // arithmetic / comparison / logic: price * 1.5, mpg > 20, a && b
     BinOp {
         op: BinOp,
         lhs: Box<Expr>,
         rhs: Box<Expr>,
     },
 
-    // negação unária: -price
+    // unary negation: -price
     Neg(Box<Expr>),
 
-    // negação booleana: !flag
+    // boolean negation: !flag
     Not(Box<Expr>),
 
-    // lista literal: [1, 2, 3]  ou  [ols(...), fe(...)]
+    // list literal: [1, 2, 3]  or  [ols(...), fe(...)]
     List(Vec<Expr>),
 
     // dict literal: {"key": value, "k2": v2}
     Dict(Vec<(Expr, Expr)>),
 
-    // indexação: lista[0] ou dict["key"]
+    // indexing: list[0] or dict["key"]
     Index {
         obj: Box<Expr>,
         idx: Box<Expr>,
     },
 
-    // chamada de função/estimador: ols(fórmula, df, cov=HC3)
+    // function/estimator call: ols(formula, df, cov=HC3)
     Call {
         func: String,
         args: Vec<Expr>,
         opts: Vec<Opt>,
     },
 
-    // acesso a campo: model.summary()
+    // field access: model.summary()
     Field {
         obj: Box<Expr>,
         field: String,
@@ -141,45 +141,48 @@ pub enum Expr {
         else_expr: Box<Expr>,
     },
 
-    // operadores de série temporal: L.price, L2.price, F.gdp, D.wage
+    // time-series operators: L.price, L2.price, F.gdp, D.wage
     TsOp {
         op: TsOpKind,
         var: String,
         n: usize,
     },
 
-    // ranges como expressões: 1..5 → [1,2,3,4]  |  1..=5 → [1,2,3,4,5]
+    // obsolete functional form: quietly(expr)
+    Quietly(Box<Expr>),
+
+    // ranges as expressions: 1..5 → [1,2,3,4]  |  1..=5 → [1,2,3,4,5]
     Range(Box<Expr>, Box<Expr>),
     RangeInclusive(Box<Expr>, Box<Expr>),
 
-    // bloco expressão: { stmt; ...; expr }
+    // expression block: { stmt; ...; expr }
     Block(Vec<Stmt>, Option<Box<Expr>>),
 }
 
 pub type Spanned = (Stmt, usize);
 
-/// Comandos (statements) da linguagem
+/// Language commands (statements)
 #[derive(Debug, Clone)]
 pub enum Stmt {
-    // let nome = expr (declara no escopo atual)
+    // let name = expr (declares in current scope)
     Let {
         name: String,
         value: Expr,
     },
 
-    // const nome = expr (declara imutável no escopo atual)
+    // const name = expr (declares immutable in current scope)
     Const {
         name: String,
         value: Expr,
     },
 
-    // nome = expr (modifica variável existente no escopo mais próximo)
+    // name = expr (modifies existing variable in nearest scope)
     Assign {
         name: String,
         value: Expr,
     },
 
-    // load "arquivo.csv" as nome [, sheet=Plan1, table=t, query="..."]
+    // load "file.csv" as name [, sheet=Sheet1, table=t, query="..."]
     Load {
         path: Expr,
         alias: String,
@@ -187,9 +190,10 @@ pub enum Stmt {
     },
 
     // generate df newvar = expr
+    // newvar may be an identifier or a dynamic string expression (e.g. f"ret_{t}")
     Generate {
         df: String,
-        varname: String,
+        varname: Expr,
         expr: Expr,
     },
 
@@ -205,7 +209,7 @@ pub enum Stmt {
     // print(expr, expr, ..., sep=" ", end="\n")
     Print(Vec<Expr>, Vec<Opt>),
 
-    // export(expr, formato, "arquivo")
+    // export(expr, format, "file")
     Export {
         value: Expr,
         fmt: Expr,
@@ -240,8 +244,10 @@ pub enum Stmt {
     },
 
     // for var in iter { ... }
+    // for k, v in dict { ... } | for i, v in list { ... }
     For {
         var: String,
+        var2: Option<String>,
         iter: ForIter,
         body: Vec<Spanned>,
     },
@@ -252,10 +258,12 @@ pub enum Stmt {
         body: Vec<Spanned>,
     },
 
-    // fn nome(p1, p2) { corpo }
+    // fn name(p1, p2, p3=default) { ## docstring ...; body }
     Fn {
         name: String,
         params: Vec<String>,
+        defaults: Vec<Option<Expr>>,
+        doc: Option<String>,
         body: Vec<Spanned>,
     },
 
@@ -270,11 +278,12 @@ pub enum Stmt {
     QuietlyOn,
     QuietlyOff,
 
-    // try { ... } catch e { ... }
+    // try { ... } catch e { ... } [finally { ... }]
     TryCatch {
         try_body: Vec<Spanned>,
         error_var: String,
         catch_body: Vec<Spanned>,
+        finally_body: Vec<Spanned>,
     },
 
     // input df
@@ -288,12 +297,12 @@ pub enum Stmt {
         rows: Vec<Vec<f64>>,
     },
 
-    // display expr   (sem parênteses, como Stata)
+    // display expr   (without parentheses, like Stata)
     Display(Expr),
 
-    // expr standalone (ex: test(model, white))
+    // expr standalone (e.g. test(model, white))
     Expr(Expr),
 
-    // Bloco autônomo { stmt* }
+    // Standalone block { stmt* }
     Block(Vec<Spanned>),
 }

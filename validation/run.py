@@ -417,7 +417,12 @@ def compare_quantities(
     return "pass", []
 
 
-def run_case(case: dict[str, Any]) -> tuple[str, list[str]]:
+def run_case(case: dict[str, Any]) -> tuple[str, list[str], dict[str, dict]]:
+    """Run a single validation case.
+
+    Returns (status, failures, ref_report) where ref_report maps each declared
+    reference name to ``{"status": ..., "detail": ..., "used": bool}``.
+    """
     case_id = case["id"]
     case_dir = VALIDATION_DIR / "cases" / case_id
     hayashi_dir = case_dir / "hayashi"
@@ -432,53 +437,80 @@ def run_case(case: dict[str, Any]) -> tuple[str, list[str]]:
     # Resolve script paths relative to the validation directory.
     reference_scripts = case.get("reference_scripts", {})
     references = case.get("references", [])
-    available_refs: list[str] = []
-    reference_errors: list[str] = []
-    r_res: subprocess.CompletedProcess[str] | None = None
-    py_res: subprocess.CompletedProcess[str] | None = None
+    ref_report: dict[str, dict] = {}
+    ref_results: dict[str, subprocess.CompletedProcess[str]] = {}
 
-    if "R" in references and "R" in reference_scripts:
-        if not check_executable("Rscript"):
-            log("  Rscript not found; skipping R reference")
-        else:
+    # ── Run each declared reference ──────────────────────────────────
+    for ref_name in references:
+        if ref_name not in reference_scripts:
+            ref_report[ref_name] = {"status": "missing", "detail": "no script declared", "used": False}
+            continue
+
+        if ref_name == "R":
+            if not check_executable("Rscript"):
+                ref_report[ref_name] = {"status": "missing", "detail": "Rscript not found", "used": False}
+                continue
             r_script = str(VALIDATION_DIR / reference_scripts["R"])
-            r_res = run_command(["Rscript", r_script])
-            if r_res.returncode == 0:
-                available_refs.append("R")
+            res = run_command(["Rscript", r_script])
+            ref_results["R"] = res
+            if res.returncode == 0:
+                ref_report[ref_name] = {"status": "passed", "detail": "", "used": False}
             else:
-                reference_errors.append(f"R script failed:\n{r_res.stderr}")
+                detail = res.stderr.strip().splitlines()[-1] if res.stderr.strip() else "non-zero exit"
+                ref_report[ref_name] = {"status": "failed", "detail": detail, "used": False}
 
-    if "Python" in references and "Python" in reference_scripts:
-        py_exe = python_executable()
-        if not Path(py_exe).exists() and not check_executable(py_exe):
-            log("  python/python3 not found; skipping Python reference")
-        else:
+        elif ref_name == "Python":
+            py_exe = python_executable()
+            if not Path(py_exe).exists() and not check_executable(py_exe):
+                ref_report[ref_name] = {"status": "missing", "detail": "python not found", "used": False}
+                continue
             py_script = str(VALIDATION_DIR / reference_scripts["Python"])
-            py_res = run_command([py_exe, py_script])
-            if py_res.returncode == 0:
-                available_refs.append("Python")
+            res = run_command([py_exe, py_script])
+            ref_results["Python"] = res
+            if res.returncode == 0:
+                ref_report[ref_name] = {"status": "passed", "detail": "", "used": False}
             else:
-                log(f"  Python script failed:\n{py_res.stderr}")
-                reference_errors.append(f"Python script failed:\n{py_res.stderr}")
+                detail = res.stderr.strip().splitlines()[-1] if res.stderr.strip() else "non-zero exit"
+                ref_report[ref_name] = {"status": "failed", "detail": detail, "used": False}
 
-    if "Stata" in references and "Stata" in reference_scripts:
-        if not check_executable("stata"):
-            log("  Stata not found; skipping Stata reference")
-        else:
+        elif ref_name == "Stata":
+            if not check_executable("stata"):
+                ref_report[ref_name] = {"status": "missing", "detail": "stata not found", "used": False}
+                continue
             st_script = str(VALIDATION_DIR / reference_scripts["Stata"])
-            st_res = run_command(["stata", "-b", "do", st_script])
-            if st_res.returncode == 0:
-                available_refs.append("Stata")
+            res = run_command(["stata", "-b", "do", st_script])
+            ref_results["Stata"] = res
+            if res.returncode == 0:
+                ref_report[ref_name] = {"status": "passed", "detail": "", "used": False}
             else:
-                log(f"  Stata script failed:\n{st_res.stderr}")
+                detail = res.stderr.strip().splitlines()[-1] if res.stderr.strip() else "non-zero exit"
+                ref_report[ref_name] = {"status": "failed", "detail": detail, "used": False}
+        else:
+            ref_report[ref_name] = {"status": "missing", "detail": f"unknown reference '{ref_name}'", "used": False}
+
+    # ── Print per-reference status ───────────────────────────────────
+    log("  References:")
+    for name in references:
+        info = ref_report.get(name, {"status": "unknown", "detail": ""})
+        detail = f" ({info['detail']})" if info.get("detail") else ""
+        log(f"    {name}: {info['status']}{detail}")
+
+    # ── Strict policy: every declared reference must pass ────────────
+    available_refs = [name for name, info in ref_report.items() if info["status"] == "passed"]
+    failed_refs = [name for name, info in ref_report.items() if info["status"] in ("failed", "missing")]
+
+    if failed_refs:
+        msgs = []
+        for name in failed_refs:
+            info = ref_report[name]
+            msgs.append(f"{name}: {info['status']} ({info['detail']})")
+        return "blocked", msgs, ref_report
 
     if not available_refs:
-        msg = ["No reference implementation could run."] + reference_errors
-        return "blocked", msg
+        return "blocked", ["No reference implementation could run."], ref_report
 
     # Run Hayashi script.
     if not check_executable("hay"):
-        # Fall back to the local release binary.
         hay_exe = str(ROOT_DIR / "target" / "release" / "hay")
     else:
         hay_exe = "hay"
@@ -486,27 +518,32 @@ def run_case(case: dict[str, Any]) -> tuple[str, list[str]]:
     hay_script = str(VALIDATION_DIR / case.get("hayashi_script", f"cases/{case_id}/hayashi/run.hay"))
     hay_res = run_command([hay_exe, hay_script])
     if hay_res.returncode != 0:
-        return "blocked", [f"Hayashi script failed:\n{hay_res.stderr}"]
+        return "blocked", [f"Hayashi script failed:\n{hay_res.stderr}"], ref_report
 
-    # Parse outputs.
-    # Prefer the stdout emitted by the reference/Python scripts; fall back to
-    # the written JSON file if stdout is empty (e.g., when run directly).
+    # ── Parse reference output (prefer Python, then R, then file) ────
     reference: dict[str, Any] | None = None
-    if py_res and py_res.stdout.strip():
+    used_ref: str | None = None
+
+    if "Python" in ref_results and ref_results["Python"].stdout.strip():
         try:
-            reference = normalise_intercept(json.loads(py_res.stdout.strip().splitlines()[-1]))
+            reference = normalise_intercept(json.loads(ref_results["Python"].stdout.strip().splitlines()[-1]))
+            used_ref = "Python"
         except json.JSONDecodeError as e:
-            return "blocked", [f"Could not parse reference stdout as JSON: {e}"]
-    if reference is None and r_res and r_res.stdout.strip():
+            return "blocked", [f"Could not parse Python reference stdout as JSON: {e}"], ref_report
+
+    if reference is None and "R" in ref_results and ref_results["R"].stdout.strip():
         try:
-            reference = normalise_intercept(json.loads(r_res.stdout.strip().splitlines()[-1]))
+            reference = normalise_intercept(json.loads(ref_results["R"].stdout.strip().splitlines()[-1]))
+            used_ref = "R"
         except json.JSONDecodeError as e:
-            return "blocked", [f"Could not parse reference stdout as JSON: {e}"]
+            return "blocked", [f"Could not parse R reference stdout as JSON: {e}"], ref_report
+
     if reference is None:
         expected_json = reference_dir / "expected.json"
         if not expected_json.exists():
-            return "blocked", [f"Reference output not found: {expected_json}"]
+            return "blocked", [f"Reference output not found: {expected_json}"], ref_report
         reference = parse_reference_json(expected_json)
+        used_ref = "expected.json"
 
     # Prefer the stdout emitted by Hayashi; fall back to the written file.
     hayashi: dict[str, dict[str, float]] | None = None
@@ -534,22 +571,26 @@ def run_case(case: dict[str, Any]) -> tuple[str, list[str]]:
                 else:
                     raise
             except Exception:
-                return "blocked", [f"Could not parse Hayashi stdout ({output_format}): {e}"]
+                return "blocked", [f"Could not parse Hayashi stdout ({output_format}): {e}"], ref_report
     if hayashi is None:
         if output_format == "txt":
             hayashi_txt = hayashi_dir / "output.txt"
             if not hayashi_txt.exists():
-                return "blocked", [f"Hayashi output not found: {hayashi_txt}"]
+                return "blocked", [f"Hayashi output not found: {hayashi_txt}"], ref_report
             hayashi = normalise_intercept(parse_hayashi_txt_table(hayashi_txt.read_text()))
         else:
             hayashi_csv = hayashi_dir / "output.csv"
             if not hayashi_csv.exists():
-                return "blocked", [f"Hayashi output not found: {hayashi_csv}"]
+                return "blocked", [f"Hayashi output not found: {hayashi_csv}"], ref_report
             hayashi = normalise_intercept(parse_hayashi_csv(hayashi_csv))
 
     # Compare declared quantities.
     tolerances = case.get("comparison", {}).get("tolerances", {})
     status, failures = compare_quantities(hayashi, reference, tolerances)
+
+    # Mark the reference that was actually used for comparison.
+    if used_ref and used_ref in ref_report:
+        ref_report[used_ref]["used"] = True
 
     if status == "blocked":
         for f in failures:
@@ -560,9 +601,9 @@ def run_case(case: dict[str, Any]) -> tuple[str, list[str]]:
         for f in failures:
             log(f"  FAIL: {f}")
     else:
-        log("  PASS")
+        log(f"  PASS (compared against {used_ref})")
 
-    return status, failures
+    return status, failures, ref_report
 
 
 def update_matrix_md(cases: list[dict[str, Any]]) -> None:
@@ -575,7 +616,18 @@ def update_matrix_md(cases: list[dict[str, Any]]) -> None:
     for case in cases:
         family = case.get("estimator_family", "")
         dataset = case.get("dataset", {}).get("name", "")
-        refs = ", ".join(case.get("references", []))
+        declared_refs = case.get("references", [])
+        ref_info = case.get("result", {}).get("references", {})
+        if ref_info:
+            ref_parts = []
+            for name in declared_refs:
+                info = ref_info.get(name, {})
+                st = info.get("status", "?")
+                used = " *" if info.get("used") else ""
+                ref_parts.append(f"{name}:{st}{used}")
+            refs = ", ".join(ref_parts)
+        else:
+            refs = ", ".join(declared_refs)
         status = case.get("status", "not-started")
         issue = case.get("result", {}).get("issues_opened", [])
         issue_str = ", ".join(str(i) for i in issue) if issue else "—"
@@ -591,6 +643,10 @@ def update_matrix_md(cases: list[dict[str, Any]]) -> None:
         "- `blocked` — cannot run because of a missing feature or bug.",
         "- `not-supported` — estimator/workflow not supported yet.",
         "- `not-started` — registered but not implemented.",
+        "",
+        "The Reference column shows per-reference status as `name:status`,",
+        "where `*` marks the reference used for comparison. A declared",
+        "reference that fails or is missing blocks the case.",
         "",
         "This matrix is generated from `validation/matrix.yml` by `validation/run.py`.",
         "",
@@ -627,6 +683,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--no-write",
         action="store_true",
         help="Do not rewrite validation/matrix.yml or validation/MATRIX.md.",
+    )
+    parser.add_argument(
+        "--allow-blocked",
+        action="store_true",
+        help="Exit with status 0 when validation cases are blocked. By default blocked counts as failure.",
     )
     return parser.parse_args(argv)
 
@@ -715,12 +776,15 @@ def run_cases(cases: list[dict[str, Any]]) -> str:
             log(f"\n[case] {case['id']}: {case.get('title', '')}")
             log(f"  {declared_status.upper()}: {summary}")
         else:
-            status, failures = run_case(case)
+            status, failures, ref_report = run_case(case)
             if status == "blocked":
                 for f in failures:
                     log(f"  BLOCKED: {f}")
                 if not failures:
                     log(f"  BLOCKED")
+            # Store per-reference report in the case result for audit trail.
+            if ref_report:
+                case.setdefault("result", {})["references"] = ref_report
         case["status"] = status
         if status == "fail":
             overall_status = "fail"
@@ -791,7 +855,12 @@ def main(argv: list[str] | None = None) -> int:
         write_matrix(matrix, cases)
 
     log(f"\nOverall status: {overall_status}")
-    return 0 if overall_status != "fail" else 1
+    if overall_status == "fail":
+        return 1
+    if overall_status == "blocked" and not args.allow_blocked:
+        log("ERROR: validation blocked (use --allow-blocked to tolerate)")
+        return 1
+    return 0
 
 
 if __name__ == "__main__":

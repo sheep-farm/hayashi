@@ -1,9 +1,10 @@
+use super::helpers::*;
 use super::*;
 
-/// GARCH/EGARCH/GJR-GARCH, VARMA, decomposição sazonal, MSTL, testes de
-/// proporção, testes múltiplos, UCM, GAM, MICE, Markov Switching, SVAR, 3SLS,
-/// DFM e diagnósticos menores de normalidade / forma funcional.
-/// Extraído de `eval_call` (ver src/lang/interpreter.rs).
+/// GARCH/EGARCH/GJR-GARCH, VARMA, seasonal decomposition, MSTL, proportion
+/// tests, multiple tests, UCM, GAM, MICE, Markov Switching, SVAR, 3SLS,
+/// DFM and minor normality / functional-form diagnostics.
+/// Extracted from `eval_call` (see src/lang/interpreter.rs).
 impl Interpreter {
     pub(super) fn eval_call_estimators_timeseries(
         &mut self,
@@ -21,7 +22,7 @@ impl Interpreter {
             "garch" | "egarch" | "gjrgarch" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(format!(
-                        "{func}() requer df e variable name"
+                        "{func}() requires df and variable name"
                     )));
                 }
 
@@ -29,7 +30,7 @@ impl Interpreter {
                     Value::DataFrame(d) => d,
                     _ => {
                         return Err(HayashiError::Type(format!(
-                            "{func}(): primeiro argumento deve ser um DataFrame"
+                            "{func}(): first argument must be a DataFrame"
                         )))
                     }
                 };
@@ -38,7 +39,7 @@ impl Interpreter {
                     Expr::Var(n) => n.clone(),
                     _ => {
                         return Err(HayashiError::Type(format!(
-                            "{func}(): second argument must be o nome de uma coluna"
+                            "{func}(): second argument must be a column name"
                         )))
                     }
                 };
@@ -77,7 +78,7 @@ impl Interpreter {
 
             // ljungbox(df, varname, lags=10)
             // ljungbox(model, lags=10)   — aceita GARCH, ARIMA, OLS
-            // H₀: as primeiras `lags` autocorrelações são conjuntamente zero
+            // H₀: the first `lags` autocorrelations are jointly zero
             "ljungbox" | "ljung_box" | "portmanteau" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
@@ -97,11 +98,11 @@ impl Interpreter {
                             };
                         Array1::from(self.eval_col_expr(&Expr::Var(col_name), &df)?)
                     }
-                    // resíduos padronizados de GARCH
+                    // GARCH standardized residuals
                     Value::GarchResult(m) => m.standardized_residuals.clone(),
-                    // resíduos de ARIMA
+                    // ARIMA residuals
                     Value::ArimaResult(m) => Array1::from_vec(m.residuals().to_vec()),
-                    // resíduos de OLS
+                    // OLS residuals
                     Value::OlsResult(m) => m.residuals.clone(),
                     _ => {
                         return Err(HayashiError::Type(
@@ -136,7 +137,7 @@ impl Interpreter {
                     res.lags, res.n_obs
                 );
                 println!("{sep}");
-                println!("H₀: sem autocorrelação até lag {}", res.lags);
+                println!("H₀: no autocorrelation up to lag {}", res.lags);
                 println!("{sep}");
                 println!("{:<6} {:>10} {:>10} {:>8}", "lag", "ACF", "Q", "p-value");
                 println!("{sep}");
@@ -145,7 +146,7 @@ impl Interpreter {
                 for (i, &rho) in res.acf.iter().enumerate() {
                     let k = i + 1;
                     q_accum += nf * (nf + 2.0) * rho * rho / (nf - k as f64);
-                    // p-value cumulativo para o Q até lag k
+                    // cumulative p-value for Q up to lag k
                     let p_k = greeners::chi2_pvalue(q_accum, k as f64);
                     println!(
                         "{:<6} {:>10.4} {:>10.4} {:>8.4} {:>3}",
@@ -169,9 +170,9 @@ impl Interpreter {
             }
 
             // leverage(model)
-            // leverage(model, threshold=2)   — múltiplo de k/n; padrão 2
+            // leverage(model, threshold=2)   — multiple of k/n; default 2
             // Diagonal da hat matrix: h_i = x_i'(X'X)⁻¹x_i
-            // Observações com h_i > threshold*k/n merecem atenção
+            // Observations with h_i > threshold*k/n deserve attention
             "leverage" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
@@ -201,7 +202,7 @@ impl Interpreter {
                 let cutoff = threshold * k as f64 / n as f64;
                 let h_mean = k as f64 / n as f64;
 
-                // mostra apenas observações acima do cutoff (ou todas se poucas)
+                // shows only observations above cutoff (or all if few)
                 let flagged: Vec<(usize, f64)> = h
                     .iter()
                     .enumerate()
@@ -216,7 +217,7 @@ impl Interpreter {
                 );
                 println!("{sep}");
                 if flagged.is_empty() {
-                    println!("Nenhuma observação acima do cutoff.");
+                    println!("No observations above cutoff.");
                 } else {
                     println!("{:<8} {:>10}  ", "obs", "h_i");
                     println!("{sep}");
@@ -224,7 +225,7 @@ impl Interpreter {
                         println!("{:<8} {:>10.4}  high leverage", i, hi);
                     }
                     println!("{sep}");
-                    println!("{} observação(ões) com h_i > {:.4}", flagged.len(), cutoff);
+                    println!("{} observation(s) with h_i > {:.4}", flagged.len(), cutoff);
                 }
                 println!();
 
@@ -232,7 +233,7 @@ impl Interpreter {
             }
 
             // cooks(model)
-            // cooks(model, threshold=1)   — limiar absoluto padrão; ou usa 4/n
+            // cooks(model, threshold=1)   — default absolute threshold; or use 4/n
             // D_i = (e_i²·h_i) / (k·MSE·(1−h_i)²)
             "cooks" => {
                 if args.is_empty() {
@@ -255,7 +256,7 @@ impl Interpreter {
 
                 let n = d.len();
                 let k = ols.x.ncols();
-                // cutoff configurável; padrão 4/n (regra de bolso mais comum)
+                // configurable cutoff; default 4/n (most common rule of thumb)
                 let cutoff = match opt_map.get("threshold") {
                     Some(Value::Float(v)) => *v,
                     Some(Value::Int(v)) => *v as f64,
@@ -273,20 +274,20 @@ impl Interpreter {
                 println!("\nCook's Distance  —  n={n}  k={k}  cutoff={cutoff:.4} (4/n)");
                 println!("{sep}");
                 if flagged.is_empty() {
-                    println!("Nenhuma observação influente acima do cutoff.");
+                    println!("No influential observations above cutoff.");
                 } else {
                     println!("{:<8} {:>10}  ", "obs", "D_i");
                     println!("{sep}");
                     for (i, di) in &flagged {
                         let label = if *di > 1.0 {
-                            "muito influente"
+                            "very influential"
                         } else {
-                            "influente"
+                            "influential"
                         };
                         println!("{:<8} {:>10.4}  {}", i, di, label);
                     }
                     println!("{sep}");
-                    println!("{} observação(ões) com D_i > {:.4}", flagged.len(), cutoff);
+                    println!("{} observation(s) with D_i > {:.4}", flagged.len(), cutoff);
                 }
                 println!();
 
@@ -294,8 +295,8 @@ impl Interpreter {
             }
 
             // vif(model)
-            // Variance Inflation Factor — detecta multicolinearidade por variável
-            // VIF_j = 1/(1−R²_j); VIF>10 indica multicolinearidade grave
+            // Variance Inflation Factor — detects multicollinearity by variable
+            // VIF_j = 1/(1−R²_j); VIF>10 indica severe multicollinearity
             "vif" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime("vif() requires an OLS model".into()));
@@ -313,16 +314,16 @@ impl Interpreter {
                 let sep = "─".repeat(40);
                 println!("\nVariance Inflation Factor (VIF)");
                 println!("{sep}");
-                println!("{:<20} {:>8}  Diagnóstico", "Variável", "VIF");
+                println!("{:<20} {:>8}  Diagnostic", "Variable", "VIF");
                 println!("{sep}");
                 for (i, &v) in vifs.iter().enumerate() {
                     let name = names.get(i).map(|s| s.as_str()).unwrap_or("?");
                     let diag = if v.is_nan() {
-                        "constante"
+                        "constant"
                     } else if v.is_infinite() || v > 10.0 {
-                        "multicolinearidade grave"
+                        "severe multicollinearity"
                     } else if v > 5.0 {
-                        "moderada"
+                        "moderate"
                     } else {
                         "ok"
                     };
@@ -335,15 +336,15 @@ impl Interpreter {
                     }
                 }
                 println!("{sep}");
-                println!("Referência: VIF<5 ok  |  5-10 moderado  |  >10 grave");
+                println!("Reference: VIF<5 ok  |  5-10 moderate  |  >10 severe");
                 println!();
 
                 Ok(Value::Nil)
             }
 
             // condnum(model)
-            // Condition number da matriz X — diagnóstico global de multicolinearidade
-            // κ = σ_max/σ_min; κ>30 indica problema sério
+            // Condition number of matrix X — global multicollinearity diagnostic
+            // κ = σ_max/σ_min; κ>30 indicates serious problem
             "condnum" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
@@ -363,11 +364,11 @@ impl Interpreter {
                     .map_err(|e| self.rt_err(format!("condnum: {e}")))?;
 
                 let diag = if kappa.is_infinite() || kappa > 100.0 {
-                    "multicolinearidade severa"
+                    "severe multicollinearity"
                 } else if kappa > 30.0 {
-                    "multicolinearidade moderada"
+                    "moderate multicollinearity"
                 } else if kappa > 10.0 {
-                    "atenção"
+                    "attention"
                 } else {
                     "ok"
                 };
@@ -382,7 +383,7 @@ impl Interpreter {
                 }
                 println!("{sep}");
                 println!(
-                    "Referência: κ<10 ok  |  10-30 atenção  |  30-100 moderado  |  >100 severo"
+                    "Reference: κ<10 ok  |  10-30 attention  |  30-100 moderate  |  >100 severe"
                 );
                 println!();
 
@@ -390,8 +391,8 @@ impl Interpreter {
             }
 
             // durbinwatson(model)
-            // Durbin-Watson: detecta autocorrelação de primeira ordem nos resíduos OLS
-            // DW ≈ 2 → sem autocorrelação; DW < 2 → positiva; DW > 2 → negativa
+            // Durbin-Watson: detects first-order autocorrelation in OLS residuals
+            // DW ≈ 2 → no autocorrelation; DW < 2 → positive; DW > 2 → negative
             "durbinwatson" | "dw" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
@@ -410,22 +411,22 @@ impl Interpreter {
                 let dw = greeners::Diagnostics::durbin_watson(&ols.residuals);
 
                 let interpretation = if dw < 1.5 {
-                    "autocorrelação positiva provável"
+                    "likely positive autocorrelation"
                 } else if dw > 2.5 {
-                    "autocorrelação negativa provável"
+                    "likely negative autocorrelation"
                 } else {
-                    "sem autocorrelação evidente"
+                    "no evident autocorrelation"
                 };
 
                 let sep = "─".repeat(50);
                 println!("\nDurbin-Watson Test");
                 println!("{sep}");
-                println!("H₀: sem autocorrelação de primeira ordem");
+                println!("H₀: no first-order autocorrelation");
                 println!("{sep}");
                 println!("{:<18} {:>10}", "DW statistic", format!("{dw:.4}"));
-                println!("{:<18} {:>10}", "Interpretação", interpretation);
+                println!("{:<18} {:>10}", "Interpretation", interpretation);
                 println!("{sep}");
-                println!("Referência: DW ≈ 2 (sem autocorr.) | <1.5 (positiva) | >2.5 (negativa)");
+                println!("Reference: DW ≈ 2 (no autocorr.) | <1.5 (positive) | >2.5 (negative)");
                 println!();
 
                 Ok(Value::Nil)
@@ -470,7 +471,7 @@ impl Interpreter {
                 println!("{sep}");
                 println!(
                     "{:<24} {:>10} {:>10} {:>4}",
-                    "Teste", "Estatística", "p-value", ""
+                    "Test", "Statistic", "p-value", ""
                 );
                 println!("{sep}");
                 println!(
@@ -489,8 +490,8 @@ impl Interpreter {
 
             // reset(model)
             // reset(model, power=3)
-            // Ramsey RESET: H₀: especificação linear correta
-            // Requer modelo OLS — adiciona ŷ², ..., ŷ^power como regressores
+            // Ramsey RESET: H₀: correct linear specification
+            // Requires an OLS model — adds ŷ², ..., ŷ^power as regressors
             "reset" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
@@ -513,7 +514,7 @@ impl Interpreter {
                 };
 
                 let fitted = ols.result.fitted_values(&ols.x);
-                // y = resíduos + valores ajustados
+                // y = residuals + fitted values
                 let y = &ols.residuals + &fitted;
 
                 let (f, p, df1, df2) =
@@ -534,11 +535,11 @@ impl Interpreter {
                 let sep = "─".repeat(54);
                 println!("\nRamsey RESET Test  —  power = {power}");
                 println!("{sep}");
-                println!("H₀: especificação linear correta");
+                println!("H₀: correct linear specification");
                 println!("{sep}");
                 println!(
                     "{:<24} {:>10} {:>10} {:>4}",
-                    "Teste", "Estatística", "p-value", ""
+                    "Test", "Statistic", "p-value", ""
                 );
                 println!("{sep}");
                 println!(
@@ -556,8 +557,8 @@ impl Interpreter {
             }
 
             // jb(df, varname) | jb(model)
-            // Jarque-Bera: H₀: resíduos normalmente distribuídos
-            // Aceita série bruta, OLS, ARIMA, GARCH (resíduos padronizados)
+            // Jarque-Bera: H₀: residuals normally distributed
+            // Accepts raw series, OLS, ARIMA, GARCH (standardized residuals)
             "jb" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
@@ -604,7 +605,7 @@ impl Interpreter {
                 let sep = "─".repeat(50);
                 println!("\nJarque-Bera Test  —  n = {}", series.len());
                 println!("{sep}");
-                println!("H₀: resíduos normalmente distribuídos");
+                println!("H₀: residuals normally distributed");
                 println!("{sep}");
                 println!("{:<18} {:>10} {:>10} {:>4}", "Teste", "JB", "p-value", "");
                 println!("{sep}");
@@ -623,8 +624,8 @@ impl Interpreter {
             }
 
             // bgodfrey(model, lags=4)
-            // Breusch-Godfrey: H₀: sem autocorrelação serial nos resíduos OLS
-            // Requer modelo OLS (precisa da matriz X para a regressão auxiliar)
+            // Breusch-Godfrey: H₀: no serial autocorrelation in OLS residuals
+            // Requires OLS model (needs X matrix for auxiliary regression)
             "bgodfrey" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
@@ -668,11 +669,11 @@ impl Interpreter {
                 let sep = "─".repeat(54);
                 println!("\nBreusch-Godfrey LM Test  —  lags = {lags}");
                 println!("{sep}");
-                println!("H₀: sem autocorrelação serial de ordem {lags}");
+                println!("H₀: no serial autocorrelation of order {lags}");
                 println!("{sep}");
                 println!(
                     "{:<24} {:>10} {:>10} {:>4}",
-                    "Teste", "Estatística", "p-value", ""
+                    "Test", "Statistic", "p-value", ""
                 );
                 println!("{sep}");
                 println!(
@@ -695,8 +696,8 @@ impl Interpreter {
             }
 
             // archtest(df, varname, lags=5)
-            // Engle (1982) LM test — H₀: sem efeitos ARCH de ordem `lags`
-            // Também aceita resíduos de modelo GARCH: archtest(model, lags=5)
+            // Engle (1982) LM test — H₀: no ARCH effects of order `lags`
+            // Also accepts GARCH model residuals: archtest(model, lags=5)
             "archtest" | "arch_test" | "engle_arch" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
@@ -705,7 +706,7 @@ impl Interpreter {
                 }
 
                 let series = match self.eval_expr(&args[0])? {
-                    // série bruta: archtest(df, varname, lags=5)
+                    // raw series: archtest(df, varname, lags=5)
                     Value::DataFrame(df) => {
                         let col_name =
                             match args.get(1) {
@@ -717,9 +718,9 @@ impl Interpreter {
                             };
                         Array1::from(self.eval_col_expr(&Expr::Var(col_name), &df)?)
                     }
-                    // resíduos de GARCH: archtest(model, lags=5)
-                    // usa resíduos padronizados z_t = ε_t/√h_t — sob H₀ de
-                    // especificação correta, z_t² não deve ter autocorrelação
+                    // GARCH residuals: archtest(model, lags=5)
+                    // uses standardized residuals z_t = ε_t/√h_t — under H₀ of
+                    // correct specification, z_t² should have no autocorrelation
                     Value::GarchResult(m) => m.standardized_residuals.clone(),
                     _ => {
                         return Err(HayashiError::Type(
@@ -758,7 +759,7 @@ impl Interpreter {
                 println!("{sep}");
                 println!(
                     "{:<22} {:>10} {:>10} {:>8}",
-                    "Teste", "Estatística", "p-value", ""
+                    "Test", "Statistic", "p-value", ""
                 );
                 println!("{sep}");
                 println!(
@@ -842,10 +843,10 @@ impl Interpreter {
             }
 
             // diagnostics(model)
-            // Roda todos os testes aplicáveis ao tipo de modelo e imprime relatório unificado.
+            // Runs all applicable tests for the model type and prints a unified report.
             // OLS:  JB, DW, Breusch-Godfrey, White, RESET, VIF, Cook's D
-            // GARCH: Ljung-Box, ARCH LM, JB nos resíduos padronizados
-            // ARIMA: Ljung-Box, JB nos resíduos
+            // GARCH: Ljung-Box, ARCH LM, JB on standardized residuals
+            // ARIMA: Ljung-Box, JB on residuals
             "diagnostics" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
@@ -871,35 +872,35 @@ impl Interpreter {
                     Value::OlsResult(ols) => {
                         println!("\n{thick}");
                         println!(
-                            " DIAGNÓSTICOS — OLS  (n={}  k={})",
+                            " DIAGNOSTICS — OLS  (n={}  k={})",
                             ols.residuals.len(),
                             ols.x.ncols()
                         );
                         println!("{thick}");
 
                         // ── Normalidade
-                        println!("\n── Normalidade dos Resíduos (Jarque-Bera)");
+                        println!("\n── Residual Normality (Jarque-Bera)");
                         match greeners::Diagnostics::jarque_bera(&ols.residuals) {
                             Ok((jb, p)) => {
                                 println!("   JB ~ χ²(2)  = {:>9.4}   p = {:.4}  {}", jb, p, sig(p))
                             }
-                            Err(e) => println!("   erro: {e}"),
+                            Err(e) => println!("   error: {e}"),
                         }
 
-                        // ── Autocorrelação 1ª ordem
+                        // ── First-order autocorrelation
                         let dw = greeners::Diagnostics::durbin_watson(&ols.residuals);
                         let dw_label = if dw < 1.5 {
-                            "autocorr. positiva"
+                            "positive autocorr."
                         } else if dw > 2.5 {
-                            "autocorr. negativa"
+                            "negative autocorr."
                         } else {
-                            "sem autocorr. evidente"
+                            "no evident autocorr."
                         };
-                        println!("\n── Autocorrelação 1ª Ordem (Durbin-Watson)");
+                        println!("\n── First-Order Autocorrelation (Durbin-Watson)");
                         println!("   DW = {:.4}  [{}]", dw, dw_label);
 
                         // ── Breusch-Godfrey
-                        println!("\n── Autocorrelação Serial (Breusch-Godfrey, lags=4)");
+                        println!("\n── Serial Autocorrelation (Breusch-Godfrey, lags=4)");
                         match greeners::SpecificationTests::breusch_godfrey_test(
                             &ols.residuals,
                             &ols.x,
@@ -912,7 +913,7 @@ impl Interpreter {
                                 p,
                                 sig(p)
                             ),
-                            Err(e) => println!("   erro: {e}"),
+                            Err(e) => println!("   error: {e}"),
                         }
 
                         // ── White
@@ -925,11 +926,11 @@ impl Interpreter {
                                 p,
                                 sig(p)
                             ),
-                            Err(e) => println!("   erro: {e}"),
+                            Err(e) => println!("   error: {e}"),
                         }
 
                         // ── RESET
-                        println!("\n── Especificação Funcional (RESET, power=3)");
+                        println!("\n── Functional Specification (RESET, power=3)");
                         let fitted = ols.result.fitted_values(&ols.x);
                         let y = &ols.residuals + &fitted;
                         match greeners::SpecificationTests::reset_test(&y, &ols.x, &fitted, 3) {
@@ -941,7 +942,7 @@ impl Interpreter {
                                 p,
                                 sig(p)
                             ),
-                            Err(e) => println!("   erro: {e}"),
+                            Err(e) => println!("   error: {e}"),
                         }
 
                         // ── VIF
@@ -964,14 +965,14 @@ impl Interpreter {
                                     println!("   {:<20} VIF = {:>7.3}  [{}]", name, v, diag);
                                 }
                             }
-                            Err(e) => println!("   erro: {e}"),
+                            Err(e) => println!("   error: {e}"),
                         }
 
                         // ── Cook's D
                         let n = ols.residuals.len();
                         let mse = ols.result.sigma * ols.result.sigma;
                         let cutoff = 4.0 / n as f64;
-                        println!("\n── Observações Influentes (Cook's D > {:.4})", cutoff);
+                        println!("\n── Influential Observations (Cook's D > {:.4})", cutoff);
                         match greeners::Diagnostics::cooks_distance(&ols.residuals, &ols.x, mse) {
                             Ok(d) => {
                                 let flagged: Vec<(usize, f64)> = d
@@ -981,19 +982,19 @@ impl Interpreter {
                                     .map(|(i, &di)| (i + 1, di))
                                     .collect();
                                 if flagged.is_empty() {
-                                    println!("   Nenhuma observação influente.");
+                                    println!("   No influential observations.");
                                 } else {
                                     for (i, di) in &flagged {
                                         let label = if *di > 1.0 {
-                                            "muito influente"
+                                            "very influential"
                                         } else {
-                                            "influente"
+                                            "influential"
                                         };
                                         println!("   obs {:>4}  D = {:.4}  [{}]", i, di, label);
                                     }
                                 }
                             }
-                            Err(e) => println!("   erro: {e}"),
+                            Err(e) => println!("   error: {e}"),
                         }
 
                         println!("\n{thin}");
@@ -1009,7 +1010,7 @@ impl Interpreter {
                         };
                         println!("\n{thick}");
                         println!(
-                            " DIAGNÓSTICOS — {model_label}({}, {})  (n={})",
+                            " DIAGNOSTICS — {model_label}({}, {})  (n={})",
                             m.p, m.q, m.n_obs
                         );
                         println!("{thick}");
@@ -1017,7 +1018,7 @@ impl Interpreter {
                         let std_res = &m.standardized_residuals;
 
                         println!(
-                            "\n── Autocorrelação nos Resíduos Padronizados (Ljung-Box, lags=10)"
+                            "\n── Autocorrelation in Standardized Residuals (Ljung-Box, lags=10)"
                         );
                         match greeners::Diagnostics::ljung_box(std_res, 10) {
                             Ok(r) => println!(
@@ -1026,7 +1027,7 @@ impl Interpreter {
                                 r.p_value,
                                 sig(r.p_value)
                             ),
-                            Err(e) => println!("   erro: {e}"),
+                            Err(e) => println!("   error: {e}"),
                         }
 
                         println!("\n── Efeitos ARCH Residuais (Engle LM, lags=5)");
@@ -1038,15 +1039,15 @@ impl Interpreter {
                                 r.lm_pvalue,
                                 sig(r.lm_pvalue)
                             ),
-                            Err(e) => println!("   erro: {e}"),
+                            Err(e) => println!("   error: {e}"),
                         }
 
-                        println!("\n── Normalidade dos Resíduos Padronizados (Jarque-Bera)");
+                        println!("\n── Standardized Residual Normality (Jarque-Bera)");
                         match greeners::Diagnostics::jarque_bera(std_res) {
                             Ok((jb, p)) => {
                                 println!("   JB ~ χ²(2)  = {:>9.4}   p = {:.4}  {}", jb, p, sig(p))
                             }
-                            Err(e) => println!("   erro: {e}"),
+                            Err(e) => println!("   error: {e}"),
                         }
 
                         println!("\n{thin}");
@@ -1056,12 +1057,12 @@ impl Interpreter {
 
                     Value::ArimaResult(m) => {
                         println!("\n{thick}");
-                        println!(" DIAGNÓSTICOS — ARIMA");
+                        println!(" DIAGNOSTICS — ARIMA");
                         println!("{thick}");
 
                         let resid = Array1::from_vec(m.residuals().to_vec());
 
-                        println!("\n── Autocorrelação nos Resíduos (Ljung-Box, lags=10)");
+                        println!("\n── Autocorrelation in Residuals (Ljung-Box, lags=10)");
                         match greeners::Diagnostics::ljung_box(&resid, 10) {
                             Ok(r) => println!(
                                 "   Q(10) = {:>9.4}   p = {:.4}  {}",
@@ -1069,15 +1070,15 @@ impl Interpreter {
                                 r.p_value,
                                 sig(r.p_value)
                             ),
-                            Err(e) => println!("   erro: {e}"),
+                            Err(e) => println!("   error: {e}"),
                         }
 
-                        println!("\n── Normalidade dos Resíduos (Jarque-Bera)");
+                        println!("\n── Residual Normality (Jarque-Bera)");
                         match greeners::Diagnostics::jarque_bera(&resid) {
                             Ok((jb, p)) => {
                                 println!("   JB ~ χ²(2)  = {:>9.4}   p = {:.4}  {}", jb, p, sig(p))
                             }
-                            Err(e) => println!("   erro: {e}"),
+                            Err(e) => println!("   error: {e}"),
                         }
 
                         println!("\n{thin}");
@@ -1088,22 +1089,22 @@ impl Interpreter {
                     Value::VarResult(m) => {
                         let k = m.n_vars;
                         println!("\n{thick}");
-                        println!(" DIAGNÓSTICOS — VAR({})  (n={}  k={})", m.lags, m.n_obs, k);
+                        println!(" DIAGNOSTICS — VAR({})  (n={}  k={})", m.lags, m.n_obs, k);
                         println!("{thick}");
 
-                        // ── Critérios de informação
-                        println!("\n── Critérios de Informação");
+                        // ── Information criteria
+                        println!("\n── Information Criteria");
                         println!("   AIC = {:.4}   BIC = {:.4}", m.aic, m.bic);
 
-                        // ── Desvio-padrão residual por equação (diagonal de Σ_u)
-                        println!("\n── Desvio-Padrão Residual por Equação");
+                        // ── Residual standard deviation by equation (diagonal of Σ_u)
+                        println!("\n── Residual Standard Deviation by Equation");
                         for (i, name) in m.var_names.iter().enumerate() {
                             println!("   {:<22} σ = {:.6}", name, m.sigma_u[[i, i]].sqrt());
                         }
 
-                        // ── Matriz de correlação dos resíduos (Σ_u normalizada)
+                        // ── Residual correlation matrix (normalized Σ_u)
                         if k > 1 {
-                            println!("\n── Correlação Contemporânea dos Resíduos");
+                            println!("\n── Contemporaneous Residual Correlation");
                             // header
                             let col_w = m
                                 .var_names
@@ -1133,9 +1134,11 @@ impl Interpreter {
                             }
                         }
 
-                        println!("\n── Nota");
-                        println!("   Resíduos não são armazenados em VarResult — para LB/JB por equação,");
-                        println!("   extraia a série e rode ljungbox/jb diretamente.");
+                        println!("\n── Note");
+                        println!(
+                            "   Residuals are not stored in VarResult — for LB/JB by equation,"
+                        );
+                        println!("   extract the series and run ljungbox/jb directly.");
                         println!("\n{thin}");
                         println!("{thick}\n");
                     }
@@ -1147,14 +1150,14 @@ impl Interpreter {
                         let eig = &m.eigenvalues; // ordenados decrescente
 
                         println!("\n{thick}");
-                        println!(" DIAGNÓSTICOS — VECM  (n={}  k={}  rank={})", m.n_obs, k, r);
+                        println!(" DIAGNOSTICS — VECM  (n={}  k={}  rank={})", m.n_obs, k, r);
                         println!("{thick}");
 
                         // ── Johansen trace test
                         // λ_trace(r₀) = -n Σ_{i=r₀}^{k-1} ln(1 - λ_i)  H₀: rank ≤ r₀
-                        // CVs 5%: Osterwald-Lenum (1992) Tabela 1 — constante restrita
+                        // CVs 5%: Osterwald-Lenum (1992) Tabela 1 — constant restrita
                         let cv_5pct: &[f64] = &[9.24, 19.96, 34.91, 53.12, 76.07, 102.56, 131.70];
-                        println!("\n── Teste de Johansen (Trace)");
+                        println!("\n── Johansen Test (Trace)");
                         println!("   H₀: rank ≤ r   CVs 5%: Osterwald-Lenum (1992) Tabela 1");
                         println!(
                             "   {:<6} {:>10} {:>12} {:>10} {:>6}",
@@ -1177,23 +1180,23 @@ impl Interpreter {
                                 r0, lam_max, trace_stat, cv, reject
                             );
                         }
-                        println!("   (* rejeita H₀ a 5%)");
+                        println!("   (* rejects H₀ at 5%)");
 
-                        // ── Velocidades de ajuste (alpha): k×rank
-                        println!("\n── Velocidades de Ajuste (Alpha)  [sinal negativo = correção ao equilíbrio]");
+                        // ── Adjustment speeds (alpha): k×rank
+                        println!("\n── Adjustment Speeds (Alpha)  [negative sign = correction to equilibrium]");
                         for ec in 0..r {
-                            println!("   Vetor EC{}", ec + 1);
+                            println!("   EC Vector {}", ec + 1);
                             for eq in 0..k {
                                 println!(
-                                    "     equação {:>2}   α = {:>9.4}",
+                                    "     equation {:>2}   α = {:>9.4}",
                                     eq + 1,
                                     m.alpha[[eq, ec]]
                                 );
                             }
                         }
 
-                        // ── Vetores de cointegração (beta): k×rank
-                        println!("\n── Vetores de Cointegração (Beta)");
+                        // ── Cointegration vectors (beta): k×rank
+                        println!("\n── Cointegration Vectors (Beta)");
                         for ec in 0..r {
                             println!("   EC{}:", ec + 1);
                             for var in 0..k {
@@ -1205,9 +1208,9 @@ impl Interpreter {
                             }
                         }
 
-                        println!("\n── Nota");
-                        println!("   VecmResult não armazena nomes de variáveis nem resíduos.");
-                        println!("   Para nomes, veja a ordem passada em vecm().");
+                        println!("\n── Note");
+                        println!("   VecmResult does not store variable names or residuals.");
+                        println!("   For names, see the order passed to vecm().");
                         println!("\n{thin}");
                         println!("{thick}\n");
                     }
@@ -1220,16 +1223,16 @@ impl Interpreter {
                         let names = iv.variable_names.as_deref().unwrap_or(&[]);
 
                         println!("\n{thick}");
-                        println!(" DIAGNÓSTICOS — IV/2SLS  (n={}  k={}  df={})", n, k, df);
+                        println!(" DIAGNOSTICS — IV/2SLS  (n={}  k={}  df={})", n, k, df);
                         println!("{thick}");
 
-                        println!("\n── Ajuste");
+                        println!("\n── Fit");
                         println!(
                             "   R²  = {:.4}   σ = {:.6}   MSE = {:.6}",
                             iv.r_squared, iv.sigma, mse
                         );
 
-                        println!("\n── Significância dos Coeficientes");
+                        println!("\n── Coefficient Significance");
                         let sig = |p: f64| -> &'static str {
                             if p < 0.01 {
                                 "***"
@@ -1241,7 +1244,7 @@ impl Interpreter {
                                 ""
                             }
                         };
-                        println!("   {:<22} {:>8} {:>8}", "Variável", "p-value", "");
+                        println!("   {:<22} {:>8} {:>8}", "Variable", "p-value", "");
                         println!("   {}", "─".repeat(40));
                         for i in 0..k {
                             let name = names.get(i).map(|s| s.as_str()).unwrap_or("?");
@@ -1253,11 +1256,11 @@ impl Interpreter {
                             );
                         }
 
-                        println!("\n── Testes Não Disponíveis");
-                        println!("   Resíduos e matriz Z não armazenados em IvResult.");
-                        println!("   • Sargan (sobreidentificação): precisa da matriz Z");
-                        println!("   • Endogeneidade (Wu-Hausman): compare IV vs OLS manualmente");
-                        println!("   • Instrumento fraco: verifique F da 1ª etapa (regra: F > 10)");
+                        println!("\n── Tests Not Available");
+                        println!("   Residuals and Z matrix not stored in IvResult.");
+                        println!("   • Sargan (overidentification): needs Z matrix");
+                        println!("   • Endogeneity (Wu-Hausman): compare IV vs OLS manually");
+                        println!("   • Weak instrument: check first-stage F (rule: F > 10)");
                         println!("\n{thin}");
                         println!("   *** p<0.01  ** p<0.05  * p<0.10");
                         println!("{thick}\n");
@@ -1280,7 +1283,7 @@ impl Interpreter {
 
                         println!("\n{thick}");
                         println!(
-                            " DIAGNÓSTICOS — Efeitos Fixos  (n={}  N={}  T≈{:.1}  k={})",
+                            " DIAGNOSTICS — Fixed Effects  (n={}  N={}  T≈{:.1}  k={})",
                             fe.n_obs,
                             fe.n_entities,
                             fe.n_obs as f64 / fe.n_entities.max(1) as f64,
@@ -1288,16 +1291,16 @@ impl Interpreter {
                         );
                         println!("{thick}");
 
-                        println!("\n── Ajuste (Within)");
+                        println!("\n── Fit (Within)");
                         println!(
                             "   R² within = {:.4}   σ = {:.6}   df = {}",
                             fe.r_squared, fe.sigma, fe.df_resid
                         );
 
-                        println!("\n── Significância dos Coeficientes");
+                        println!("\n── Coefficient Significance");
                         println!(
                             "   {:<22} {:>10} {:>8} {:>4}",
-                            "Variável", "coef", "p-value", ""
+                            "Variable", "coef", "p-value", ""
                         );
                         println!("   {}", "─".repeat(48));
                         for i in 0..k {
@@ -1311,10 +1314,10 @@ impl Interpreter {
                             );
                         }
 
-                        println!("\n── Testes Não Disponíveis");
-                        println!("   Resíduos não armazenados em PanelResult.");
+                        println!("\n── Tests Not Available");
+                        println!("   Residuals not stored in PanelResult.");
                         println!("   • Hausman FE vs RE: use hausman(fe_model, re_model)");
-                        println!("   • JB / Ljung-Box: rode sobre resíduos extraídos manualmente");
+                        println!("   • JB / Ljung-Box: run on manually extracted residuals");
                         println!("\n{thin}");
                         println!("   *** p<0.01  ** p<0.05  * p<0.10");
                         println!("{thick}\n");
@@ -1334,9 +1337,9 @@ impl Interpreter {
                             }
                         };
 
-                        // Decomposição de variância
-                        let var_e = re.sigma_e * re.sigma_e; // variância dos efeitos individuais
-                        let var_u = re.sigma_u * re.sigma_u; // variância idiossincrática
+                        // Variance decomposition
+                        let var_e = re.sigma_e * re.sigma_e; // variance of individual effects
+                        let var_u = re.sigma_u * re.sigma_u; // idiosyncratic variance
                         let var_tot = var_e + var_u;
                         let icc = if var_tot > 1e-15 {
                             var_e / var_tot
@@ -1345,32 +1348,32 @@ impl Interpreter {
                         };
 
                         println!("\n{thick}");
-                        println!(" DIAGNÓSTICOS — Efeitos Aleatórios  (k={})", k);
+                        println!(" DIAGNOSTICS — Random Effects  (k={})", k);
                         println!("{thick}");
 
-                        println!("\n── Ajuste");
-                        println!("   R² geral = {:.4}", re.r_squared_overall);
+                        println!("\n── Fit");
+                        println!("   Overall R² = {:.4}", re.r_squared_overall);
 
-                        println!("\n── Decomposição de Variância");
+                        println!("\n── Variance Decomposition");
                         println!(
-                            "   σ_e  (efeitos individuais) = {:.6}   σ_e² = {:.6}",
+                            "   σ_e  (individual effects) = {:.6}   σ_e² = {:.6}",
                             re.sigma_e, var_e
                         );
                         println!(
-                            "   σ_u  (idiossincrático)     = {:.6}   σ_u² = {:.6}",
+                            "   σ_u  (idiosyncratic)     = {:.6}   σ_u² = {:.6}",
                             re.sigma_u, var_u
                         );
-                        println!("   ICC  = σ_e²/(σ_e²+σ_u²)   = {:.4}   ({:.1}% da variância é entre entidades)",
+                        println!("   ICC  = σ_e²/(σ_e²+σ_u²)   = {:.4}   ({:.1}% of variance is between entities)",
                             icc, icc * 100.0);
                         println!(
-                            "   θ    (peso GLS)            = {:.4}   (0→OLS  1→FE)",
+                            "   θ    (GLS weight)            = {:.4}   (0→OLS  1→FE)",
                             re.theta
                         );
 
-                        println!("\n── Significância dos Coeficientes");
+                        println!("\n── Coefficient Significance");
                         println!(
                             "   {:<22} {:>10} {:>8} {:>4}",
-                            "Variável", "coef", "p-value", ""
+                            "Variable", "coef", "p-value", ""
                         );
                         println!("   {}", "─".repeat(48));
                         for i in 0..k {
@@ -1389,9 +1392,9 @@ impl Interpreter {
                             );
                         }
 
-                        println!("\n── Testes Não Disponíveis");
+                        println!("\n── Tests Not Available");
                         println!("   • Hausman FE vs RE: use hausman(fe_model, re_model)");
-                        println!("   • BP LM test (H₀: sem efeitos individuais): σ_e²/σ_u² acima sugere efeitos");
+                        println!("   • BP LM test (H₀: sem individual effects): σ_e²/σ_u² acima sugere efeitos");
                         println!("\n{thin}");
                         println!("   *** p<0.01  ** p<0.05  * p<0.10");
                         println!("{thick}\n");
@@ -1443,7 +1446,7 @@ impl Interpreter {
                 let k = var_names.len();
                 let mut data = ndarray::Array2::<f64>::zeros((n, k));
                 for (j, vname) in var_names.iter().enumerate() {
-                    let col = Self::get_col_f64(&df, vname)?;
+                    let col = get_col_f64(&df, vname)?;
                     for (i, &v) in col.iter().enumerate() {
                         data[[i, j]] = v;
                     }
@@ -1453,7 +1456,7 @@ impl Interpreter {
                 Ok(Value::VarmaResult(Rc::new(result)))
             }
 
-            // ── Decomposição sazonal ──────────────────────────────────────────
+            // ── Seasonal decomposition ──────────────────────────────────────────
             // decompose(df, var, period=12, model=additive)
             "decompose" | "seasonal_decompose" => {
                 if args.len() < 2 {
@@ -1481,7 +1484,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let series = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?);
+                let series = ndarray::Array1::from(get_col_f64(&df, &var_name)?);
                 let period = match opt_map.get("period") {
                     Some(Value::Int(v)) => *v as usize,
                     Some(Value::Float(v)) => *v as usize,
@@ -1524,7 +1527,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let series = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?);
+                let series = ndarray::Array1::from(get_col_f64(&df, &var_name)?);
                 let period = match opt_map.get("period") {
                     Some(Value::Int(v)) => *v as usize,
                     Some(Value::Float(v)) => *v as usize,
@@ -1573,7 +1576,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let series = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?);
+                let series = ndarray::Array1::from(get_col_f64(&df, &var_name)?);
                 let periods: Vec<usize> = match opt_map.get("periods") {
                     Some(Value::List(lst)) => lst
                         .iter()
@@ -1594,7 +1597,7 @@ impl Interpreter {
                 Ok(Value::MstlResult(Rc::new(result)))
             }
 
-            // ── Testes de proporção ───────────────────────────────────────────
+            // ── Proportion tests ───────────────────────────────────────────
             // proptest(count, n, mu=0.5)
             "proptest" | "prtest" => {
                 if args.len() < 2 {
@@ -1630,14 +1633,14 @@ impl Interpreter {
                     }
                 };
                 let sep = "─".repeat(56);
-                println!("\nTeste de Proporção (1 amostra)");
+                println!("\nProportion Test (1 sample)");
                 println!("{sep}");
                 println!("  H₀: p = {mu:.4}");
                 println!("  p̂ = {p_hat:.4}  (count={count}, n={n})");
                 println!("{sep}");
                 println!(
                     "{:<26} {:>10} {:>10} {:>4}",
-                    "Teste", "Estatística", "p-value", ""
+                    "Test", "Statistic", "p-value", ""
                 );
                 println!("{sep}");
                 println!("{:<26} {:>10.4} {:>10.4} {:>4}", "z", z, p, sig(p));
@@ -1683,7 +1686,7 @@ impl Interpreter {
                     }
                 };
                 let sep = "─".repeat(56);
-                println!("\nTeste de Proporção (2 amostras)");
+                println!("\nProportion Test (2 samples)");
                 println!("{sep}");
                 println!("  H₀: p₁ = p₂");
                 println!("  p̂₁ = {p1:.4}  (count={c1}, n={n1})");
@@ -1691,7 +1694,7 @@ impl Interpreter {
                 println!("{sep}");
                 println!(
                     "{:<26} {:>10} {:>10} {:>4}",
-                    "Teste", "Estatística", "p-value", ""
+                    "Test", "Statistic", "p-value", ""
                 );
                 println!("{sep}");
                 println!(
@@ -1732,16 +1735,16 @@ impl Interpreter {
                 let p_hat = count as f64 / n as f64;
                 let pct = (1.0 - alpha) * 100.0;
                 let sep = "─".repeat(56);
-                println!("\nIC de Proporção — Wilson Score ({pct:.0}%)");
+                println!("\nProportion CI — Wilson Score ({pct:.0}%)");
                 println!("{sep}");
                 println!("  p̂ = {p_hat:.4}  (count={count}, n={n})");
-                println!("  IC [{pct:.0}%]: [{lo:.4}, {hi:.4}]");
+                println!("  CI [{pct:.0}%]: [{lo:.4}, {hi:.4}]");
                 println!("{sep}");
                 println!();
                 Ok(Value::Nil)
             }
 
-            // chisq2x2(a, b, c, d)  — tabela 2×2
+            // chisq2x2(a, b, c, d)  — 2×2 table
             "chisq2x2" | "chi2_2x2" => {
                 if args.len() < 4 {
                     return Err(HayashiError::Runtime("chisq2x2(a, b, c, d)".into()));
@@ -1750,9 +1753,7 @@ impl Interpreter {
                     match v {
                         Value::Int(i) => Ok(i as usize),
                         Value::Float(f) => Ok(f as usize),
-                        _ => Err(HayashiError::Type(
-                            "células da tabela devem ser inteiros".into(),
-                        )),
+                        _ => Err(HayashiError::Type("table cells must be integers".into())),
                     }
                 };
                 let a = to_usize(self.eval_expr(&args[0])?)?;
@@ -1774,7 +1775,7 @@ impl Interpreter {
                     }
                 };
                 let sep = "─".repeat(56);
-                println!("\nTeste Qui-Quadrado — Tabela 2×2");
+                println!("\nChi-Square Test — 2×2 Table");
                 println!("{sep}");
                 println!("       | Col 0 | Col 1 |  Total");
                 println!("  Row 0|  {:>5} |  {:>5} |  {:>5}", a, b, a + b);
@@ -1788,7 +1789,7 @@ impl Interpreter {
                 println!("{sep}");
                 println!(
                     "{:<26} {:>10} {:>10} {:>4}",
-                    "Teste", "Estatística", "p-value", ""
+                    "Test", "Statistic", "p-value", ""
                 );
                 println!("{sep}");
                 println!("{:<26} {:>10.4} {:>10.4} {:>4}", "χ²(1)", chi2, p, sig(p));
@@ -1798,7 +1799,7 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
-            // ── Múltiplos testes ──────────────────────────────────────────────
+            // ── Multiple tests ──────────────────────────────────────────────
             // multipletests(pvalues, method=bonferroni, alpha=0.05)
             "multipletests" | "multtest" => {
                 if args.is_empty() {
@@ -1844,7 +1845,7 @@ impl Interpreter {
                         }
                         other => {
                             return Err(HayashiError::Runtime(format!(
-                                "método unknown: '{other}' — use bonferroni, sidak, holm, bh, by"
+                                "unknown method: '{other}' — use bonferroni, sidak, holm, bh, by"
                             )))
                         }
                     },
@@ -1855,7 +1856,7 @@ impl Interpreter {
                     greeners::MultipleTests::multipletests(&pvals, alpha, method)
                         .map_err(|e| self.rt_err(format!("multipletests: {e}")))?;
                 let sep = "─".repeat(64);
-                println!("\nMúltiplos Testes — {method_name}  (α={alpha})");
+                println!("\nMultiple Tests — {method_name}  (α={alpha})");
                 println!("{sep}");
                 println!(
                     "{:>5}  {:>12}  {:>12}  {:>8}",
@@ -1868,7 +1869,7 @@ impl Interpreter {
                     .zip(rejects.iter())
                     .enumerate()
                 {
-                    let mark = if *rej { "  SIM ***" } else { "  não" };
+                    let mark = if *rej { "  YES ***" } else { "  no" };
                     println!("{:>5}  {:>12.6}  {:>12.6}  {}", i + 1, p_orig, p_adj, mark);
                 }
                 println!("{sep}");
@@ -1904,7 +1905,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let y = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?);
+                let y = ndarray::Array1::from(get_col_f64(&df, &var_name)?);
 
                 let level = match opt_map.get("level") {
                     Some(Value::Str(s)) => match s.to_lowercase().as_str() {
@@ -1981,7 +1982,7 @@ impl Interpreter {
 
                 if smooth_names.is_empty() && x_linear.ncols() == 0 {
                     return Err(HayashiError::Runtime(
-                        "gam: especifique termos lineares (fórmula) e/ou smooth=".into(),
+                        "gam: specify linear terms (formula) and/or smooth=".into(),
                     ));
                 }
 
@@ -2006,7 +2007,7 @@ impl Interpreter {
                 let q_total = q_per * smooth_names.len().max(1);
                 let mut x_smooth = ndarray::Array2::<f64>::zeros((n, q_total));
                 for (k, sname) in smooth_names.iter().enumerate() {
-                    let col = ndarray::Array1::from(Self::get_col_f64(&df, sname)?);
+                    let col = ndarray::Array1::from(get_col_f64(&df, sname)?);
                     let basis = greeners::BSplineBasis::generate(&col, q_per, degree)
                         .map_err(|e| self.rt_err(format!("gam spline ({sname}): {e}")))?;
                     for i in 0..n {
@@ -2107,7 +2108,7 @@ impl Interpreter {
                         .iter()
                         .map(|v| match v {
                             Value::Str(s) => Ok(s.clone()),
-                            _ => Err(HayashiError::Type("vars= must be a list de strings".into())),
+                            _ => Err(HayashiError::Type("vars= must be a list of strings".into())),
                         })
                         .collect::<Result<_>>()?,
                     Some(Value::Str(s)) => vec![s.clone()],
@@ -2116,11 +2117,12 @@ impl Interpreter {
                             self.resolve_var_list(&args[1..], &df)?
                         } else {
                             return Err(HayashiError::Runtime(
-                                "mice: especifique vars=[\"x1\",\"x2\",...] ou liste variáveis após df".into()
+                                "mice: specify vars=[\"x1\",\"x2\",...] or list variables after df"
+                                    .into(),
                             ));
                         }
                     }
-                    _ => return Err(HayashiError::Type("vars= must be a list de strings".into())),
+                    _ => return Err(HayashiError::Type("vars= must be a list of strings".into())),
                 };
                 let m = match opt_map.get("m") {
                     Some(Value::Int(v)) => *v as usize,
@@ -2138,7 +2140,7 @@ impl Interpreter {
                 for vname in &var_names {
                     data.insert(
                         vname.clone(),
-                        ndarray::Array1::from(Self::get_col_f64(&df, vname)?),
+                        ndarray::Array1::from(get_col_f64(&df, vname)?),
                     );
                 }
 
@@ -2174,7 +2176,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let y = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?);
+                let y = ndarray::Array1::from(get_col_f64(&df, &var_name)?);
                 let k = match opt_map.get("k") {
                     Some(Value::Int(v)) => *v as usize,
                     Some(Value::Float(v)) => *v as usize,
@@ -2192,8 +2194,8 @@ impl Interpreter {
 
             // ── SVAR — Structural VAR ─────────────────────────────────────────
             // svar(df, y1, y2, ..., lags=1, id=cholesky)
-            // id=cholesky  : identificação recursiva (Cholesky)
-            // id=longrun   : restrições de longo prazo (Blanchard-Quah)
+            // id=cholesky  : recursive identification (Cholesky)
+            // id=longrun   : long-run restrictions (Blanchard-Quah)
             "svar" | "svec" => {
                 if args.len() < 3 {
                     return Err(HayashiError::Runtime(
@@ -2222,7 +2224,7 @@ impl Interpreter {
                 let k = var_names.len();
                 let mut data = ndarray::Array2::<f64>::zeros((n, k));
                 for (j, vname) in var_names.iter().enumerate() {
-                    let col = Self::get_col_f64(&df, vname)?;
+                    let col = get_col_f64(&df, vname)?;
                     for (i, &v) in col.iter().enumerate() {
                         data[[i, j]] = v;
                     }
@@ -2364,20 +2366,20 @@ impl Interpreter {
                 let instr_names: Vec<String> = match opt_map.get("instruments") {
                     Some(Value::List(lst)) => lst.iter().map(|v| match v {
                         Value::Str(s) => Ok(s.clone()),
-                        _ => Err(HayashiError::Type("instruments= must be a list de strings".into())),
+                        _ => Err(HayashiError::Type("instruments= must be a list of strings".into())),
                     }).collect::<Result<_>>()?,
                     Some(Value::Str(s)) => vec![s.clone()],
                     None => return Err(HayashiError::Runtime(
-                        "threesl requer instruments=[\"z1\",\"z2\",...] — lista de variáveis exógenas".into()
+                        "threesl requires instruments=[\"z1\",\"z2\",...] — list of exogenous variables".into()
                     )),
-                    _ => return Err(HayashiError::Type("instruments= must be a list de strings".into())),
+                    _ => return Err(HayashiError::Type("instruments= must be a list of strings".into())),
                 };
 
                 // Build global instrument matrix Z (n × q)
                 let n = df.n_rows();
                 let mut z_instr = ndarray::Array2::<f64>::zeros((n, instr_names.len()));
                 for (j, zname) in instr_names.iter().enumerate() {
-                    let col = Self::get_col_f64(&df, zname)?;
+                    let col = get_col_f64(&df, zname)?;
                     for (i, &v) in col.iter().enumerate() {
                         z_instr[[i, j]] = v;
                     }
@@ -2437,7 +2439,7 @@ impl Interpreter {
                     .map(|a| match a {
                         Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
                         _ => Err(HayashiError::Type(
-                            "variáveis de dfm() devem ser identificadores".into(),
+                            "dfm() variables must be identifiers".into(),
                         )),
                     })
                     .collect::<Result<_>>()?;
@@ -2455,7 +2457,7 @@ impl Interpreter {
                 let k = var_names.len();
                 let mut data = ndarray::Array2::<f64>::zeros((n, k));
                 for (j, vname) in var_names.iter().enumerate() {
-                    let col = Self::get_col_f64(&df, vname)?;
+                    let col = get_col_f64(&df, vname)?;
                     for (i, &v) in col.iter().enumerate() {
                         data[[i, j]] = v;
                     }
@@ -2468,9 +2470,9 @@ impl Interpreter {
                 }))
             }
 
-            // ── Diagnósticos menores de normalidade / forma funcional ─────────
+            // ── Diagnostics menores de normality / forma funcional ─────────
 
-            // adtest(df, var) — Anderson-Darling test para normalidade
+            // adtest(df, var) — Anderson-Darling test para normality
             "adtest" | "anderson_darling" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime("adtest(df, var)".into()));
@@ -2495,28 +2497,28 @@ impl Interpreter {
                         ))
                     }
                 };
-                let data = Self::get_col_f64(&df, &var_name)?;
+                let data = get_col_f64(&df, &var_name)?;
                 let r = greeners::Diagnostics::anderson_darling(&ndarray::Array1::from(data))
                     .map_err(|e| self.rt_err(format!("adtest: {e}")))?;
                 let sep = "─".repeat(56);
-                println!("\nAnderson-Darling Test (normalidade)");
+                println!("\nAnderson-Darling Test (normality)");
                 println!("{sep}");
-                println!("  H₀: dados provêm de distribuição normal");
-                println!("  A² (ajustado) = {:.4}  (n={})", r.statistic, r.n_obs);
+                println!("  H₀: data come from normal distribution");
+                println!("  A² (adjusted) = {:.4}  (n={})", r.statistic, r.n_obs);
                 println!("{sep}");
-                println!("{:<12} {:>10}", "α", "A²*_crítico");
+                println!("{:<12} {:>10}", "α", "A²*_critical");
                 println!("{sep}");
                 for (&sig, &cv) in r.significance_levels.iter().zip(r.critical_values.iter()) {
-                    let mark = if r.statistic > cv { " ← REJEITA" } else { "" };
+                    let mark = if r.statistic > cv { " ← REJECT" } else { "" };
                     println!("{:<12.3} {:>10.3}{mark}", sig, cv);
                 }
                 println!("{sep}");
-                println!("(Rejeita H₀ quando A²* > valor crítico)");
+                println!("(Reject H₀ when A²* > critical value)");
                 println!();
                 Ok(Value::Nil)
             }
 
-            // lilliefors(df, var) — KS com parâmetros estimados
+            // lilliefors(df, var) — KS with estimated parameters
             "lilliefors" | "lillie" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime("lilliefors(df, var)".into()));
@@ -2541,7 +2543,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let data = Self::get_col_f64(&df, &var_name)?;
+                let data = get_col_f64(&df, &var_name)?;
                 let (stat, p) = greeners::Diagnostics::lilliefors(&ndarray::Array1::from(data))
                     .map_err(|e| self.rt_err(format!("lilliefors: {e}")))?;
                 let sig = if p < 0.01 {
@@ -2554,13 +2556,13 @@ impl Interpreter {
                     ""
                 };
                 let sep = "─".repeat(56);
-                println!("\nLilliefors Test (normalidade — KS com parâmetros estimados)");
+                println!("\nLilliefors Test (normality — KS with estimated parameters)");
                 println!("{sep}");
-                println!("  H₀: dados provêm de distribuição normal");
+                println!("  H₀: data come from normal distribution");
                 println!("{sep}");
                 println!(
                     "{:<26} {:>10} {:>10} {:>4}",
-                    "Teste", "Estatística", "p-value", ""
+                    "Test", "Statistic", "p-value", ""
                 );
                 println!("{sep}");
                 println!(
@@ -2573,7 +2575,7 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
-            // omnibus(model) — D'Agostino-Pearson nos resíduos
+            // omnibus(model) — D'Agostino-Pearson on residuals
             "omnibus" | "dagostino" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime("omnibus(model)".into()));
@@ -2598,14 +2600,14 @@ impl Interpreter {
                     ""
                 };
                 let sep = "─".repeat(56);
-                println!("\nD'Agostino-Pearson Omnibus Test (normalidade dos resíduos)");
+                println!("\nD'Agostino-Pearson Omnibus Test (normality of residuals)");
                 println!("{sep}");
-                println!("  H₀: resíduos são normalmente distribuídos");
-                println!("  (combina assimetria e curtose via K² ~ χ²(2))");
+                println!("  H₀: residuals are normally distributed");
+                println!("  (combines skewness and kurtosis via K² ~ χ²(2))");
                 println!("{sep}");
                 println!(
                     "{:<26} {:>10} {:>10} {:>4}",
-                    "Teste", "Estatística", "p-value", ""
+                    "Test", "Statistic", "p-value", ""
                 );
                 println!("{sep}");
                 println!("{:<26} {:>10.4} {:>10.4} {:>4}", "K² ~ χ²(2)", k2, p, sig);
@@ -2640,7 +2642,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let data = Self::get_col_f64(&df, &var_name)?;
+                let data = get_col_f64(&df, &var_name)?;
                 let res = greeners::Diagnostics::shapiro_wilk(&ndarray::Array1::from(data))
                     .map_err(|e| self.rt_err(format!("swilk: {e}")))?;
                 let sig = if res.p_value < 0.01 {
@@ -2695,7 +2697,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let data = Self::get_col_f64(&df, &var_name)?;
+                let data = get_col_f64(&df, &var_name)?;
                 let res = greeners::Diagnostics::shapiro_francia(&ndarray::Array1::from(data))
                     .map_err(|e| self.rt_err(format!("sfrancia: {e}")))?;
                 let sig = if res.p_value < 0.01 {
@@ -2750,7 +2752,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let data = Self::get_col_f64(&df, &var_name)?;
+                let data = get_col_f64(&df, &var_name)?;
                 let slice = data.as_slice().unwrap();
                 let skew = greeners::MomentHelpers::skewness(slice);
                 let kurt = greeners::MomentHelpers::kurtosis(slice);
@@ -2803,7 +2805,7 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
-            // harveycollier(model) — teste de linearidade via resíduos recursivos
+            // harveycollier(model) — linearity test via recursive residuals
             "harveycollier" | "harvey_collier" | "hctest" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime("harveycollier(model)".into()));
@@ -2816,7 +2818,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                // reconstruir y = ŷ + resíduos (OlsModel não armazena y diretamente)
+                // reconstruct y = ŷ + residuals (OlsModel does not store y directly)
                 let y_hat = ols.x.dot(&ols.result.params);
                 let y_obs = y_hat + &ols.residuals;
                 let (t, p) = greeners::Diagnostics::harvey_collier(&y_obs, &ols.x)
@@ -2831,14 +2833,14 @@ impl Interpreter {
                     ""
                 };
                 let sep = "─".repeat(56);
-                println!("\nHarvey-Collier Test (linearidade da especificação)");
+                println!("\nHarvey-Collier Test (linearity of specification)");
                 println!("{sep}");
-                println!("  H₀: especificação funcional está correta (linear)");
-                println!("  (testa se média dos resíduos recursivos é zero)");
+                println!("  H₀: functional specification is correct (linear)");
+                println!("  (tests whether mean of recursive residuals is zero)");
                 println!("{sep}");
                 println!(
                     "{:<26} {:>10} {:>10} {:>4}",
-                    "Teste", "Estatística", "p-value", ""
+                    "Test", "Statistic", "p-value", ""
                 );
                 println!("{sep}");
                 println!("{:<26} {:>10.4} {:>10.4} {:>4}", "t (HC)", t, p, sig);

@@ -11,6 +11,8 @@ validation/cases/**/data/
 validation/cases/**/hayashi/output.csv
 validation/cases/**/reference/expected.*
 planning.md
-site/
+avaliacao.md
+avaliacao_projeto.md
+avaliacao_capm_hay.md
 
 

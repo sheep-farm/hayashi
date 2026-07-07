@@ -173,7 +173,7 @@ pub fn column_to_value(col: &Column) -> Value {
     }
 }
 
-/// Converte uma lista de Hayashi em uma coluna do Greeners se for homogênea e primitiva.
+/// Converts a Hayashi list into a Greeners column if it is homogeneous and primitive.
 pub fn list_to_column(lst: &[Value]) -> Option<Column> {
     if lst.is_empty() {
         return None;
@@ -405,12 +405,14 @@ pub fn json_to_value(
 // Rust Native Plugin Implementation (using libloading)
 // =============================================================================
 
+#[cfg(feature = "native")]
 pub struct RustNativePlugin {
     #[allow(dead_code)]
     name: String,
     lib: libloading::Library,
 }
 
+#[cfg(feature = "native")]
 impl RustNativePlugin {
     pub fn new(path: &str, name: &str) -> Result<Self, String> {
         let lib = unsafe { libloading::Library::new(path).map_err(|e| e.to_string())? };
@@ -421,6 +423,7 @@ impl RustNativePlugin {
     }
 }
 
+#[cfg(feature = "native")]
 impl HayashiPlugin for RustNativePlugin {
     fn name(&self) -> &str {
         &self.name
@@ -515,6 +518,7 @@ impl HayashiPlugin for RustNativePlugin {
 // WebAssembly Plugin Implementation (using wasmi)
 // =============================================================================
 
+#[cfg(feature = "wasm")]
 pub struct WasmPlugin {
     #[allow(dead_code)]
     name: String,
@@ -522,6 +526,7 @@ pub struct WasmPlugin {
     instance: wasmi::Instance,
 }
 
+#[cfg(feature = "wasm")]
 impl WasmPlugin {
     pub fn new(path: &str, name: &str) -> Result<Self, String> {
         let wasm_bytes = std::fs::read(path).map_err(|e| e.to_string())?;
@@ -545,6 +550,7 @@ impl WasmPlugin {
     }
 }
 
+#[cfg(feature = "wasm")]
 impl HayashiPlugin for WasmPlugin {
     fn name(&self) -> &str {
         &self.name

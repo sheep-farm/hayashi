@@ -3,7 +3,7 @@
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
 [![Docs: CC BY-SA 4.0](https://img.shields.io/badge/Docs-CC%20BY--SA%204.0-lightgrey.svg)](LICENSE-BOOKS.md)
 [![Rust](https://img.shields.io/badge/Rust-2021-orange.svg)](https://www.rust-lang.org)
-[![Version](https://img.shields.io/badge/version-0.2.7-blue.svg)](Cargo.toml)
+[![Version](https://img.shields.io/badge/version-0.2.8-blue.svg)](Cargo.toml)
 [![crates.io](https://img.shields.io/crates/v/hayashi-lang.svg)](https://crates.io/crates/hayashi-lang)
 [![CI](https://github.com/sheep-farm/hayashi/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/sheep-farm/hayashi/actions/workflows/ci.yml?query=branch%3Amaster)
 
@@ -127,7 +127,9 @@ let df = {
 
 ### Output control
 
-`quietly on` suppresses automatic output from statements and estimators. `print(...)` and `display ...` still appear. `quietly off` restores normal output. The flag is scope-aware: a toggle inside a block reverts when the block ends.
+`quietly on` suppresses automatic output from statements and estimators. `print(...)` still appears; `display ...` also appears but is deprecated. `quietly off` restores normal output. The flag is scope-aware: a toggle inside a block reverts when the block ends.
+
+> Note: `display` is deprecated. Prefer `print` for explicit output.
 
 ```
 quietly on
@@ -146,7 +148,7 @@ ols(z ~ x, df)
 print("done")
 ```
 
-Both `quietly on` and `quietly()` (function form) share the same suppression mechanism, so new commands need no special handling — they just use the internal output channel.
+Both `quietly on` and `quietly off` share the same suppression mechanism, so new commands need no special handling — they just use the internal output channel. The `quietly(expr)` function form is deprecated and will be removed in a future release; use `quietly on` / `quietly off` instead.
 
 ### Functions and closures
 
@@ -595,7 +597,7 @@ fn f(n) {
 ```
 quietly on                    // suppress automatic output from here
 quietly off                   // restore automatic output
-quietly(ols(Y ~ X, df))       // suppress one expression
+quietly(ols(Y ~ X, df))       // (deprecated) suppress one expression
 capture(ols(Y ~ X, df))       // ignore errors
 assert(n > 0, "empty data")
 timer(ols(Y ~ X, df))         // time execution

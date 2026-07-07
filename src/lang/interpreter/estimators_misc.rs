@@ -1,9 +1,10 @@
+use super::helpers::*;
 use super::*;
 
-/// ETS, panel threshold, correlação canônica, estatísticas ponderadas, tabstat,
-/// xtsum, testes não-paramétricos, testes de raiz unitária, filtros de ciclo de
-/// negócios, regressão penalizada (lasso/ridge/elasticnet), cointegração, xtset.
-/// Extraído de `eval_call` (ver src/lang/interpreter.rs).
+/// ETS, panel threshold, canonical correlation, weighted statistics, tabstat,
+/// xtsum, non-parametric tests, unit-root tests, business-cycle filters,
+/// penalized regression (lasso/ridge/elasticnet), cointegration, xtset.
+/// Extracted from `eval_call` (see src/lang/interpreter.rs).
 impl Interpreter {
     pub(super) fn eval_call_estimators_misc(
         &mut self,
@@ -13,7 +14,7 @@ impl Interpreter {
         opt_map: &HashMap<String, Value>,
     ) -> Result<Option<Value>> {
         let result: Result<Value> = match func {
-            // ── ETS — Suavização Exponencial (Holt-Winters) ───────────────────
+            // ── ETS — Exponential Smoothing (Holt-Winters) ───────────────────
 
             // ets(df, var, trend=add, seasonal=add, period=12, damped=false)
             // Alias: ses (simple), hwes (Holt-Winters)
@@ -43,11 +44,11 @@ impl Interpreter {
                         ))
                     }
                 };
-                let y = Self::get_col_f64(&df, &var_name)?;
-                // Regra para aliases:
+                let y = get_col_f64(&df, &var_name)?;
+                // Rule for aliases:
                 //   ses         → trend=none, seasonal=none
                 //   hwes        → trend=add,  seasonal=add
-                //   ets         → usa opções explícitas (padrão: add, add)
+                //   ets         → uses explicit options (default: add, add)
                 let (trend_def, seas_def) = match func {
                     "ses" => ("none", "none"),
                     "hwes" | "holtwinters" => ("add", "add"),
@@ -119,7 +120,7 @@ impl Interpreter {
                     Some(Value::Str(s)) => s.clone(),
                     _ => {
                         return Err(HayashiError::Runtime(
-                            "pthresh requer q=variavel_threshold".into(),
+                            "pthresh requires q=threshold_variable".into(),
                         ))
                     }
                 };
@@ -127,7 +128,7 @@ impl Interpreter {
                     Some(Value::Str(s)) => s.clone(),
                     _ => {
                         return Err(HayashiError::Runtime(
-                            "pthresh requer id=coluna_entidade".into(),
+                            "pthresh requires id=entity_column".into(),
                         ))
                     }
                 };
@@ -137,8 +138,8 @@ impl Interpreter {
                 let (y_vec, x_mat) = df
                     .to_design_matrix(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let q_col = Self::get_col_f64(&df, &q_name)?;
-                let id_col = Self::get_col_f64(&df, &id_name)?;
+                let q_col = get_col_f64(&df, &q_name)?;
+                let id_col = get_col_f64(&df, &id_name)?;
                 let entity_ids: ndarray::Array1<i64> =
                     ndarray::Array1::from(id_col.iter().map(|&v| v as i64).collect::<Vec<_>>());
                 let q_arr = ndarray::Array1::from(q_col.to_vec());
@@ -174,7 +175,7 @@ impl Interpreter {
                         .iter()
                         .map(|v| match v {
                             Value::Str(s) => Ok(s.clone()),
-                            _ => Err(HayashiError::Type("xvars must be a list de strings".into())),
+                            _ => Err(HayashiError::Type("xvars must be a list of strings".into())),
                         })
                         .collect::<Result<_>>()?,
                     Some(Value::Str(s)) => vec![s.clone()],
@@ -182,9 +183,7 @@ impl Interpreter {
                         .iter()
                         .map(|a| match a {
                             Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
-                            _ => Err(HayashiError::Type(
-                                "args devem ser nomes de variáveis".into(),
-                            )),
+                            _ => Err(HayashiError::Type("args must be variable names".into())),
                         })
                         .collect::<Result<_>>()?,
                     _ => {
@@ -198,7 +197,7 @@ impl Interpreter {
                         .iter()
                         .map(|v| match v {
                             Value::Str(s) => Ok(s.clone()),
-                            _ => Err(HayashiError::Type("yvars must be a list de strings".into())),
+                            _ => Err(HayashiError::Type("yvars must be a list of strings".into())),
                         })
                         .collect::<Result<_>>()?,
                     Some(Value::Str(s)) => vec![s.clone()],
@@ -210,7 +209,7 @@ impl Interpreter {
                 };
                 if x_names.is_empty() || y_names.is_empty() {
                     return Err(HayashiError::Runtime(
-                        "cancorr: xvars e yvars não podem ser vazios".into(),
+                        "cancorr: xvars and yvars cannot be empty".into(),
                     ));
                 }
                 let n = df.n_rows();
@@ -219,13 +218,13 @@ impl Interpreter {
                 let mut x_mat = ndarray::Array2::<f64>::zeros((n, px));
                 let mut y_mat = ndarray::Array2::<f64>::zeros((n, py));
                 for (j, name) in x_names.iter().enumerate() {
-                    let c = Self::get_col_f64(&df, name)?;
+                    let c = get_col_f64(&df, name)?;
                     for (i, &v) in c.iter().enumerate() {
                         x_mat[[i, j]] = v;
                     }
                 }
                 for (j, name) in y_names.iter().enumerate() {
-                    let c = Self::get_col_f64(&df, name)?;
+                    let c = get_col_f64(&df, name)?;
                     for (i, &v) in c.iter().enumerate() {
                         y_mat[[i, j]] = v;
                     }
@@ -238,7 +237,7 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
-            // ── Estatísticas ponderadas ───────────────────────────────────────
+            // ── Weighted statistics ───────────────────────────────────────
 
             // summarize_w(df, var, weight=wvar, mu0=0, alpha=0.05)
             "summarize_w" | "dstats_w" | "svymean" | "wtsum" => {
@@ -267,13 +266,13 @@ impl Interpreter {
                         ))
                     }
                 };
-                let data = Self::get_col_f64(&df, &var_name)?;
+                let data = get_col_f64(&df, &var_name)?;
                 let weights = match opt_map
                     .get("weight")
                     .or_else(|| opt_map.get("weights").or_else(|| opt_map.get("w")))
                 {
                     Some(Value::Str(wname)) => {
-                        let wc = Self::get_col_f64(&df, wname)?;
+                        let wc = get_col_f64(&df, wname)?;
                         Some(ndarray::Array1::from(wc.to_vec()))
                     }
                     _ => None,
@@ -298,34 +297,34 @@ impl Interpreter {
                     .conf_int_mean(alpha)
                     .map_err(|e| self.rt_err(format!("summarize_w CI: {e}")))?;
                 let label =
-                    w_ref.map_or("(pesos iguais)".to_string(), |_| "(ponderado)".to_string());
+                    w_ref.map_or("(equal weights)".to_string(), |_| "(weighted)".to_string());
                 println!("\n{:=^60}", format!(" DescrStats {label} — {var_name} "));
                 println!(
                     "{:<20} {:>12}   {:<20} {:>12}",
                     "N",
                     ds.nobs as usize,
-                    "Σ pesos",
+                    "Σ weights",
                     format!("{:.2}", ds.sum_weights)
                 );
                 println!(
                     "{:<20} {:>12.6}   {:<20} {:>12.6}",
-                    "Média", ds.mean, "Desvio padrão", ds.std
+                    "Mean", ds.mean, "Std Dev", ds.std
                 );
                 println!(
                     "{:<20} {:>12.6}   {:<20} {:>12.6}",
-                    "Mín", ds.min, "Máx", ds.max
+                    "Min", ds.min, "Max", ds.max
                 );
                 println!(
                     "{:<20} {:>12.6}   {:<20} {:>12.6}",
-                    "P25", ds.q25, "Mediana", ds.median
+                    "P25", ds.q25, "Median", ds.median
                 );
                 println!(
                     "{:<20} {:>12.6}   {:<20} {:>12.6}",
-                    "P75", ds.q75, "Variância", ds.var
+                    "P75", ds.q75, "Variance", ds.var
                 );
                 println!(
                     "{:<20} {:>12.6}   {:<20} {:>12.6}",
-                    "Assimetria", ds.skewness, "Curtose", ds.kurtosis
+                    "Skewness", ds.skewness, "Kurtosis", ds.kurtosis
                 );
                 println!("{:-^60}", "");
                 println!(
@@ -333,7 +332,7 @@ impl Interpreter {
                     mu0, t_stat, t_p
                 );
                 println!(
-                    "  IC {}%: [{:.6}, {:.6}]",
+                    "  CI {}%: [{:.6}, {:.6}]",
                     ((1.0 - alpha) * 100.0) as usize,
                     ci_lo,
                     ci_hi
@@ -342,13 +341,13 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
-            // ── Tabstat — tabela de estatísticas por grupo ────────────────────
+            // ── Tabstat — statistics table by group ────────────────────
 
             // tabstat(df, var1, var2, ..., by=grupo, stats=[mean,sd,n,p25,p75,min,max,sum])
             "tabstat" | "tabstats" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
-                        "tabstat(df, var1, ..., by=grupo, stats=[mean,sd,n])".into(),
+                        "tabstat(df, var1, ..., by=group, stats=[mean,sd,n])".into(),
                     ));
                 }
                 let df_name = match &args[0] {
@@ -369,7 +368,7 @@ impl Interpreter {
                         "tabstat: provide at least one variable".into(),
                     ));
                 }
-                // stats= lista de estatísticas a mostrar
+                // stats= list of statistics to show
                 let default_stats = vec!["mean".to_string(), "sd".to_string(), "n".to_string()];
                 let stat_list: Vec<String> = match opt_map.get("stats") {
                     Some(Value::List(lst)) => lst
@@ -383,10 +382,10 @@ impl Interpreter {
                     _ => default_stats,
                 };
                 let by_col: Option<Vec<f64>> = match opt_map.get("by") {
-                    Some(Value::Str(bname)) => Some(Self::get_col_f64(&df, bname)?.to_vec()),
+                    Some(Value::Str(bname)) => Some(get_col_f64(&df, bname)?.to_vec()),
                     _ => None,
                 };
-                // Coleta grupos únicos
+                // Collect unique groups
                 let groups: Vec<Option<String>> = if let Some(ref bv) = by_col {
                     let mut uniq: Vec<f64> = bv.clone();
                     uniq.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
@@ -397,7 +396,7 @@ impl Interpreter {
                 } else {
                     vec![None]
                 };
-                // Cabeçalho
+                // Header
                 let stat_w = 10usize;
                 let var_w = var_names.iter().map(|n| n.len()).max().unwrap_or(6).max(6);
                 println!("\n{:=^70}", " tabstat ");
@@ -412,7 +411,7 @@ impl Interpreter {
                         println!("  grupo = {g}");
                     }
                     for vname in &var_names {
-                        let col = Self::get_col_f64(&df, vname)?;
+                        let col = get_col_f64(&df, vname)?;
                         let data: Vec<f64> = if let Some(ref bv) = by_col {
                             let gval: f64 =
                                 grp.as_ref().unwrap().parse::<f64>().unwrap_or(f64::NAN);
@@ -481,7 +480,7 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
-            // ── xtsum — decomposição within/between ───────────────────────────
+            // ── xtsum — within/between decomposition ───────────────────────────
 
             // xtsum(df, var, id=entity_col)
             "xtsum" | "xt_summary" => {
@@ -525,21 +524,21 @@ impl Interpreter {
                         "xtsum: provide at least one variable".into(),
                     ));
                 }
-                let id_col = Self::get_col_f64(&df, &id_name)?;
-                // Identifica entidades únicas
+                let id_col = get_col_f64(&df, &id_name)?;
+                // Identify unique entities
                 let mut ids_uniq: Vec<f64> = id_col.to_vec();
                 ids_uniq.sort_by(|a, b| a.partial_cmp(b).unwrap());
                 ids_uniq.dedup();
                 let n_total = df.n_rows();
                 let n_entities = ids_uniq.len();
-                println!("\n{:=^78}", " xtsum — decomposição within/between ");
+                println!("\n{:=^78}", " xtsum — within/between decomposition ");
                 println!(
                     "{:<20} | {:>7} | {:>8} | {:>8} | {:>8} | {:>8} | {:>8}",
-                    "Variável", "Tipo", "Média", "DP", "Mín", "Máx", "N"
+                    "Variable", "Type", "Mean", "SD", "Min", "Max", "N"
                 );
                 println!("{}", "-".repeat(78));
                 for vname in &var_names {
-                    let col = Self::get_col_f64(&df, vname)?;
+                    let col = get_col_f64(&df, vname)?;
                     let vals: Vec<f64> = col.iter().cloned().collect();
                     // Overall
                     let n_total_f = n_total as f64;
@@ -553,7 +552,7 @@ impl Interpreter {
                         "{:<20} | {:>7} | {:>8.4} | {:>8.4} | {:>8.4} | {:>8.4} | {:>8}",
                         vname, "overall", mean_ov, sd_ov, min_ov, max_ov, n_total
                     );
-                    // Between: média por entidade
+                    // Between: mean by entity
                     let group_means: Vec<f64> = ids_uniq
                         .iter()
                         .map(|&gid| {
@@ -588,7 +587,7 @@ impl Interpreter {
                         "{:<20} | {:>7} | {:>8} | {:>8.4} | {:>8.4} | {:>8.4} | {:>8}",
                         "", "between", "", sd_b, min_b, max_b, n_entities
                     );
-                    // Within: desvio de cada obs. em relação à média do seu grupo
+                    // Within: deviation of each obs from its group mean
                     let within_vals: Vec<f64> = id_col
                         .iter()
                         .zip(vals.iter())
@@ -619,16 +618,16 @@ impl Interpreter {
                 }
                 println!("{:=^78}", "");
                 println!(
-                    "  Entidades: {}   Períodos médios: {:.1}",
+                    "  Entities: {}   Avg periods: {:.1}",
                     n_entities,
                     n_total as f64 / n_entities as f64
                 );
                 Ok(Value::Nil)
             }
 
-            // ── Testes não-paramétricos ───────────────────────────────────────
+            // ── Non-parametric tests ───────────────────────────────────────
 
-            // spearman(df, var1, var2) — correlação de Spearman
+            // spearman(df, var1, var2) — Spearman correlation
             "spearman" | "spearman_rho" => {
                 if args.len() < 3 {
                     return Err(HayashiError::Runtime("spearman(df, var1, var2)".into()));
@@ -661,13 +660,13 @@ impl Interpreter {
                         ))
                     }
                 };
-                let x = Self::get_col_f64(&df, &v1)?.to_vec();
-                let y = Self::get_col_f64(&df, &v2)?.to_vec();
+                let x = get_col_f64(&df, &v1)?.to_vec();
+                let y = get_col_f64(&df, &v2)?.to_vec();
                 let n = x.len().min(y.len());
                 if n < 3 {
                     return Err(HayashiError::Runtime("spearman: n < 3".into()));
                 }
-                // Ranking com ties (média dos ranks)
+                // Ranking with ties (average ranks)
                 let rank = |vals: &[f64]| -> Vec<f64> {
                     let mut idx: Vec<usize> = (0..vals.len()).collect();
                     idx.sort_by(|&a, &b| {
@@ -714,7 +713,7 @@ impl Interpreter {
                     "  ρ = {rho:.6}   t = {t_stat:.4}   df = {}   p = {p_val:.4}",
                     n - 2
                 );
-                println!("  H₀: ρₛ = 0 (não correlacionadas em ranking)");
+                println!("  H₀: ρₛ = 0 (uncorrelated in ranks)");
                 Ok(Value::Nil)
             }
 
@@ -753,16 +752,16 @@ impl Interpreter {
                         ))
                     }
                 };
-                let y_col = Self::get_col_f64(&df, &var_name)?;
-                let grp_col = Self::get_col_f64(&df, &by_name)?;
+                let y_col = get_col_f64(&df, &var_name)?;
+                let grp_col = get_col_f64(&df, &by_name)?;
                 let n_total = y_col.len();
-                // Separar em dois grupos pelo valor único
+                // Split into two groups by unique value
                 let mut gvals: Vec<f64> = grp_col.to_vec();
                 gvals.sort_by(|a, b| a.partial_cmp(b).unwrap());
                 gvals.dedup();
                 if gvals.len() != 2 {
                     return Err(self.rt_err(format!(
-                        "ranksum: by= deve ter exatamente 2 grupos únicos; encontrou {}",
+                        "ranksum: by= must have exactly 2 unique groups; found {}",
                         gvals.len()
                     )));
                 }
@@ -778,10 +777,10 @@ impl Interpreter {
                 let n2 = g1.len();
                 if n1 < 1 || n2 < 1 {
                     return Err(HayashiError::Runtime(
-                        "ranksum: um dos grupos está vazio".into(),
+                        "ranksum: one of the groups is empty".into(),
                     ));
                 }
-                // Rank combinado com ties
+                // Combined rank with ties
                 let mut combined: Vec<(f64, usize)> = g0
                     .iter()
                     .map(|&v| (v, 0))
@@ -815,15 +814,15 @@ impl Interpreter {
                 let var_u = n1f * n2f * (nf + 1.0) / 12.0;
                 let z_stat = (u - mu_u) / var_u.sqrt();
                 // p-value via normal approximation
-                let p_normal = 2.0 * (1.0 - Self::norm_cdf(z_stat.abs()));
+                let p_normal = 2.0 * (1.0 - norm_cdf(z_stat.abs()));
                 println!("\n  Mann-Whitney U / Wilcoxon Rank-Sum");
                 println!("  {}: n₁={n1}  {}: n₂={n2}", var_name, by_name);
-                println!("  Grupo {}:  {var_name}", gvals[0] as i64);
-                println!("  Grupo {}:  {var_name}", gvals[1] as i64);
-                println!("  W (rank-sum grupo 0) = {w1:.1}");
+                println!("  Group {}:  {var_name}", gvals[0] as i64);
+                println!("  Group {}:  {var_name}", gvals[1] as i64);
+                println!("  W (rank-sum group 0) = {w1:.1}");
                 println!("  U₁ = {u1:.1}   U₂ = {u2:.1}   U = {u:.1}");
-                println!("  z = {z_stat:.4}   p = {p_normal:.4}   (aprox. normal)");
-                println!("  H₀: distribuição de {var_name} igual nos dois grupos");
+                println!("  z = {z_stat:.4}   p = {p_normal:.4}   (normal approx)");
+                println!("  H₀: distribution of {var_name} equal in both groups");
                 Ok(Value::Nil)
             }
 
@@ -862,8 +861,8 @@ impl Interpreter {
                         ))
                     }
                 };
-                let y_col = Self::get_col_f64(&df, &var_name)?;
-                let grp_col = Self::get_col_f64(&df, &by_name)?;
+                let y_col = get_col_f64(&df, &var_name)?;
+                let grp_col = get_col_f64(&df, &by_name)?;
                 let n = y_col.len();
                 let mut gvals: Vec<f64> = grp_col.to_vec();
                 gvals.sort_by(|a, b| a.partial_cmp(b).unwrap());
@@ -931,20 +930,20 @@ impl Interpreter {
                         .sum::<f64>()
                         / gn as f64;
                     println!(
-                        "    grupo {:>4}: n={gn:>4}  média={gm:>8.4}  rank_médio={rbar:>8.2}",
+                        "    group {:>4}: n={gn:>4}  mean={gm:>8.4}  avg_rank={rbar:>8.2}",
                         *gid as i64
                     );
                 }
                 println!("  H = {h:.4}   df = {df_kw}   p = {p_val:.4}   χ² approx.");
-                println!("  H₀: mesma distribuição em todos os grupos");
+                println!("  H₀: same distribution across all groups");
                 Ok(Value::Nil)
             }
 
-            // signrank(df, var, mu0=0) — Wilcoxon signed-rank (uma amostra ou pares)
+            // signrank(df, var, mu0=0) — Wilcoxon signed-rank (one sample or pairs)
             "signrank" | "wilcoxon_sr" | "wilcoxon_signed_rank" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
-                        "signrank(df, var, mu0=0)  ou  signrank(df, d)  onde d = x - y".into(),
+                        "signrank(df, var, mu0=0)  or  signrank(df, d)  where d = x - y".into(),
                     ));
                 }
                 let df_name = match &args[0] {
@@ -972,7 +971,7 @@ impl Interpreter {
                     Some(Value::Int(v)) => *v as f64,
                     _ => 0.0,
                 };
-                let data = Self::get_col_f64(&df, &var_name)?;
+                let data = get_col_f64(&df, &var_name)?;
                 let diffs: Vec<f64> = data
                     .iter()
                     .map(|&v| v - mu0)
@@ -980,11 +979,9 @@ impl Interpreter {
                     .collect();
                 let n = diffs.len();
                 if n == 0 {
-                    return Err(HayashiError::Runtime(
-                        "signrank: todos os diffs são zero".into(),
-                    ));
+                    return Err(HayashiError::Runtime("signrank: all diffs are zero".into()));
                 }
-                // Rank dos |diffs|
+                // Rank of |diffs|
                 let mut abs_indexed: Vec<(f64, usize, f64)> = diffs
                     .iter()
                     .enumerate()
@@ -1013,12 +1010,12 @@ impl Interpreter {
                 let mu_w = nf * (nf + 1.0) / 4.0;
                 let var_w = nf * (nf + 1.0) * (2.0 * nf + 1.0) / 24.0;
                 let z_stat = (w - mu_w) / var_w.sqrt();
-                let p_val = 2.0 * (1.0 - Self::norm_cdf(z_stat.abs()));
+                let p_val = 2.0 * (1.0 - norm_cdf(z_stat.abs()));
                 println!("\n  Wilcoxon Signed-Rank Test");
                 println!("  H₀: mediana({var_name}) = {mu0}");
                 println!("  n = {n}  (excluindo diffs ≈ 0)");
                 println!("  W+ = {w_plus:.1}   W- = {w_minus:.1}   W = {w:.1}");
-                println!("  z = {z_stat:.4}   p = {p_val:.4}   (aprox. normal)");
+                println!("  z = {z_stat:.4}   p = {p_val:.4}   (normal approx)");
                 Ok(Value::Nil)
             }
 
@@ -1052,7 +1049,7 @@ impl Interpreter {
                         let phat = k as f64 / nf;
                         let se = (mu * (1.0 - mu) / nf).sqrt();
                         let z = (phat - mu) / se;
-                        let p = 2.0 * (1.0 - Self::norm_cdf(z.abs()));
+                        let p = 2.0 * (1.0 - norm_cdf(z.abs()));
                         println!("\n  Binomial / Sign Test");
                         println!(
                             "  Sucessos: {k}   n: {n_trials}   p̂ = {:.4}   H₀: p = {mu}",
@@ -1087,7 +1084,7 @@ impl Interpreter {
                             Some(Value::Int(v)) => *v as f64,
                             _ => 0.0,
                         };
-                        let data = Self::get_col_f64(&df, &var_name)?;
+                        let data = get_col_f64(&df, &var_name)?;
                         let pos = data.iter().filter(|&&v| v > mu0).count();
                         let neg = data.iter().filter(|&&v| v < mu0).count();
                         let ties = data.len() - pos - neg;
@@ -1095,7 +1092,7 @@ impl Interpreter {
                         let phat = pos as f64 / n_eff as f64;
                         let nf = n_eff as f64;
                         let z = (phat - 0.5) * nf.sqrt() / 0.5;
-                        let p = 2.0 * (1.0 - Self::norm_cdf(z.abs()));
+                        let p = 2.0 * (1.0 - norm_cdf(z.abs()));
                         println!("\n  Sign Test  ({var_name} vs {mu0})");
                         println!("  + : {pos}   - : {neg}   empates: {ties}   n efetivo: {n_eff}");
                         println!("  p̂(+) = {phat:.4}   z = {z:.4}   p = {p:.4}");
@@ -1111,11 +1108,11 @@ impl Interpreter {
             }
 
             // ══════════════════════════════════════════════════════════════════
-            // ── Testes de raiz unitária ────────────────────────────────────────
+            // ── Unit-root tests ────────────────────────────────────────
             // ══════════════════════════════════════════════════════════════════
 
             // ══════════════════════════════════════════════════════════════════
-            // ── Filtros de ciclo de negócios ──────────────────────────────────
+            // ── Business-cycle filters ──────────────────────────────────
             // ══════════════════════════════════════════════════════════════════
 
             // hpfilter(df, var, lambda=1600)  →  cria df.var_trend e df.var_cycle
@@ -1150,7 +1147,7 @@ impl Interpreter {
                     Some(Value::Int(v)) => *v as f64,
                     _ => 1600.0,
                 };
-                let series = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?.to_vec());
+                let series = ndarray::Array1::from(get_col_f64(&df, &var_name)?.to_vec());
                 let (trend, cycle) = greeners::TimeSeries::hp_filter(&series, lambda)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let trend_name = format!("{var_name}_trend");
@@ -1210,14 +1207,16 @@ impl Interpreter {
                     Some(Value::Float(v)) => *v as usize,
                     _ => 12,
                 };
-                let series = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?.to_vec());
+                let series = ndarray::Array1::from(get_col_f64(&df, &var_name)?.to_vec());
                 let cycle = greeners::TimeSeries::bk_filter(&series, low, high, k)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let cycle_name = format!("{var_name}_cycle");
                 Rc::make_mut(&mut df)
                     .insert(cycle_name.clone(), cycle)
                     .map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
-                println!("bkfilter: períodos [{low},{high}] k={k}  →  {cycle_name} adicionada a {df_name}");
+                println!(
+                    "bkfilter: periods [{low},{high}] k={k}  →  {cycle_name} added to {df_name}"
+                );
                 self.env.set(&df_name, Value::DataFrame(df))?;
                 Ok(Value::Nil)
             }
@@ -1260,20 +1259,20 @@ impl Interpreter {
                     _ => 32,
                 };
                 let drift = matches!(opt_map.get("drift"), Some(Value::Bool(true)));
-                let series = ndarray::Array1::from(Self::get_col_f64(&df, &var_name)?.to_vec());
+                let series = ndarray::Array1::from(get_col_f64(&df, &var_name)?.to_vec());
                 let cycle = greeners::TimeSeries::cf_filter(&series, low, high, drift)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let cycle_name = format!("{var_name}_cycle");
                 Rc::make_mut(&mut df)
                     .insert(cycle_name.clone(), cycle)
                     .map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
-                println!("cffilter: períodos [{low},{high}] drift={drift}  →  {cycle_name} adicionada a {df_name}");
+                println!("cffilter: periods [{low},{high}] drift={drift}  →  {cycle_name} added to {df_name}");
                 self.env.set(&df_name, Value::DataFrame(df))?;
                 Ok(Value::Nil)
             }
 
             // ══════════════════════════════════════════════════════════════════
-            // ── Regressão penalizada — Lasso / Ridge / ElasticNet ─────────────
+            // ── Penalized regression — Lasso / Ridge / ElasticNet ─────────────
             // ══════════════════════════════════════════════════════════════════
 
             // ridge(formula, df, alpha=1.0)
@@ -1358,7 +1357,7 @@ impl Interpreter {
             }
 
             // lasso(formula, df, alpha=1.0, tol=1e-6, max_iter=10000)
-            // Coordinate descent para Lasso (L1), com intercept não penalizado
+            // Coordinate descent for Lasso (L1), with unpenalized intercept
             "lasso" | "lasso_reg" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
@@ -1402,7 +1401,7 @@ impl Interpreter {
                 let k = x.ncols();
                 let has_intercept = gformula.intercept;
                 let start_col = if has_intercept { 1 } else { 0 };
-                // Centrar y; padronizar X (colunas covariáveis)
+                // Center y; standardize X (covariate columns)
                 let y_mean = y.sum() / n_obs as f64;
                 let y_c: ndarray::Array1<f64> = y.mapv(|v| v - y_mean);
                 let mut x_std = x.clone();
@@ -1433,7 +1432,7 @@ impl Interpreter {
                 let xx_diag: Vec<f64> = (start_col..k)
                     .map(|j| x_std.column(j).dot(&x_std.column(j)))
                     .collect();
-                // coordinate descent sem intercept (y já centralizado)
+                // coordinate descent without intercept (y already centered)
                 let mut beta = ndarray::Array1::<f64>::zeros(k - start_col);
                 for _iter in 0..max_iter {
                     let mut max_delta = 0.0_f64;
@@ -1711,7 +1710,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let series = Self::get_col_f64(&df, &var_name)?;
+                let series = get_col_f64(&df, &var_name)?;
                 let max_lags = match opt_map.get("lags") {
                     Some(Value::Int(v)) => Some(*v as usize),
                     Some(Value::Float(v)) => Some(*v as usize),
@@ -1732,9 +1731,9 @@ impl Interpreter {
                 println!(
                     "  Conclusion: {}",
                     if r.is_stationary {
-                        "REJEITA H₀ — estacionária"
+                        "REJECT H₀ — stationary"
                     } else {
-                        "Não rejeita H₀ — raiz unitária presente"
+                        "Does not reject H₀ — unit root present"
                     }
                 );
                 Ok(Value::Nil)
@@ -1767,7 +1766,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let series = Self::get_col_f64(&df, &var_name)?;
+                let series = get_col_f64(&df, &var_name)?;
                 let regression = match opt_map.get("regression") {
                     Some(Value::Str(s)) => s.clone(),
                     _ => "c".to_string(),
@@ -1794,9 +1793,9 @@ impl Interpreter {
                 println!(
                     "  Conclusion: {}",
                     if r.is_stationary {
-                        "Não rejeita H₀ — estacionária"
+                        "Does not reject H₀ — stationary"
                     } else {
-                        "REJEITA H₀ — não estacionária"
+                        "REJECT H₀ — non-stationary"
                     }
                 );
                 Ok(Value::Nil)
@@ -1827,7 +1826,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let series = Self::get_col_f64(&df, &var_name)?;
+                let series = get_col_f64(&df, &var_name)?;
                 let max_lags = match opt_map.get("lags") {
                     Some(Value::Int(v)) => Some(*v as usize),
                     Some(Value::Float(v)) => Some(*v as usize),
@@ -1846,9 +1845,9 @@ impl Interpreter {
                 println!(
                     "  Conclusion: {}",
                     if r.is_stationary {
-                        "REJEITA H₀ — estacionária"
+                        "REJECT H₀ — stationary"
                     } else {
-                        "Não rejeita H₀ — raiz unitária presente"
+                        "Does not reject H₀ — unit root present"
                     }
                 );
                 Ok(Value::Nil)
@@ -1879,7 +1878,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let series = Self::get_col_f64(&df, &var_name)?;
+                let series = get_col_f64(&df, &var_name)?;
                 let trim = match opt_map.get("trim") {
                     Some(Value::Float(v)) => *v,
                     Some(Value::Int(v)) => *v as f64,
@@ -1898,15 +1897,15 @@ impl Interpreter {
                 println!(
                     "  Conclusion: {}",
                     if r.is_stationary {
-                        "REJEITA H₀ — estacionária com quebra"
+                        "REJECT H₀ — stationary with break"
                     } else {
-                        "Não rejeita H₀ — raiz unitária"
+                        "Does not reject H₀ — unit root"
                     }
                 );
                 Ok(Value::Nil)
             }
 
-            // ── Cointegração ──────────────────────────────────────────────────
+            // ── Cointegration ──────────────────────────────────────────────────
 
             // granger(df, y, x, lags=N)
             "granger" | "granger_causality" => {
@@ -1946,12 +1945,12 @@ impl Interpreter {
                     Some(Value::Float(v)) => *v as usize,
                     _ => 4,
                 };
-                let y_arr = ndarray::Array1::from(Self::get_col_f64(&df, &y_name)?.to_vec());
-                let x_arr = ndarray::Array1::from(Self::get_col_f64(&df, &x_name)?.to_vec());
+                let y_arr = ndarray::Array1::from(get_col_f64(&df, &y_name)?.to_vec());
+                let x_arr = ndarray::Array1::from(get_col_f64(&df, &x_name)?.to_vec());
                 let r = greeners::TimeSeries::granger_causality(&y_arr, &x_arr, lags)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 println!("\n{:=^60}", " Granger Causality Test ");
-                println!("  H₀: {x_name} não causa Granger {y_name}   (lags={lags})");
+                println!("  H₀: {x_name} does not Granger-cause {y_name}   (lags={lags})");
                 println!(
                     "  F({}, {}) = {:.4}   p = {:.4}",
                     r.df_num, r.df_denom, r.f_statistic, r.p_value
@@ -1959,9 +1958,9 @@ impl Interpreter {
                 println!(
                     "  Conclusion: {}",
                     if r.p_value < 0.05 {
-                        format!("REJEITA H₀ — {x_name} causa Granger {y_name}")
+                        format!("REJECT H₀ — {x_name} Granger-causes {y_name}")
                     } else {
-                        "Não rejeita H₀".to_string()
+                        "Does not reject H₀".to_string()
                     }
                 );
                 Ok(Value::Nil)
@@ -2000,13 +1999,13 @@ impl Interpreter {
                         ))
                     }
                 };
-                let y1_arr = ndarray::Array1::from(Self::get_col_f64(&df, &y1_name)?.to_vec());
-                let y2_arr = ndarray::Array1::from(Self::get_col_f64(&df, &y2_name)?.to_vec());
+                let y1_arr = ndarray::Array1::from(get_col_f64(&df, &y1_name)?.to_vec());
+                let y2_arr = ndarray::Array1::from(get_col_f64(&df, &y2_name)?.to_vec());
                 let r = greeners::TimeSeries::engle_granger(&y1_arr, &y2_arr)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 println!("\n{:=^60}", " Engle-Granger Cointegration Test ");
                 println!("  Variables: {y1_name}, {y2_name}");
-                println!("  H₀: sem cointegração");
+                println!("  H₀: no cointegration");
                 println!("  ADF statistic: {:>10.4}", r.adf_statistic);
                 let (cv1, cv5, cv10) = r.critical_values;
                 println!("  Critical values:  1%={cv1:.3}  5%={cv5:.3}  10%={cv10:.3}");
@@ -2017,9 +2016,9 @@ impl Interpreter {
                 println!(
                     "  Conclusion: {}",
                     if r.is_cointegrated {
-                        "REJEITA H₀ — séries cointegradas"
+                        "REJECT H₀ — cointegrated series"
                     } else {
-                        "Não rejeita H₀ — sem cointegração"
+                        "Does not reject H₀ — no cointegration"
                     }
                 );
                 Ok(Value::Nil)
@@ -2048,7 +2047,7 @@ impl Interpreter {
                     Value::List(lst) => lst.iter().map(|v| format!("{v}")).collect(),
                     _ => {
                         return Err(HayashiError::Type(
-                            "johansen: second argument must be lista de variáveis".into(),
+                            "johansen: second argument must be list of variables".into(),
                         ))
                     }
                 };
@@ -2066,7 +2065,7 @@ impl Interpreter {
                 let k = var_names.len();
                 let mut data = ndarray::Array2::<f64>::zeros((n, k));
                 for (j, name) in var_names.iter().enumerate() {
-                    let col = Self::get_col_f64(&df, name)?;
+                    let col = get_col_f64(&df, name)?;
                     for i in 0..n {
                         data[[i, j]] = col[i];
                     }
@@ -2109,13 +2108,13 @@ impl Interpreter {
             }
 
             // ══════════════════════════════════════════════════════════════════
-            // ── xtset: declara estrutura de painel ────────────────────────────
-            // xtset(df, id_col, time_col)  — armazena em panel_info
-            // Após xtset, fe/re/ab/etc. não precisam de id= e time=
+            // ── xtset: declare panel structure ────────────────────────────
+            // xtset(df, id_col, time_col)  — stores in panel_info
+            // After xtset, fe/re/ab/etc. do not need id= and time=
             "xtset" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
-                        "xtset(df, id_col, time_col)  ou  xtset(df, time_col) para série temporal"
+                        "xtset(df, id_col, time_col)  or  xtset(df, time_col) for time series"
                             .into(),
                     ));
                 }
@@ -2154,7 +2153,7 @@ impl Interpreter {
                 self.panel_info
                     .insert(df_name.clone(), (id_col.clone(), time_col.clone()));
                 if time_col.is_empty() {
-                    println!("xtset {df_name}  (série temporal: t={id_col})");
+                    println!("xtset {df_name}  (time series: t={id_col})");
                 } else {
                     println!("xtset {df_name}  id={id_col}  time={time_col}");
                 }

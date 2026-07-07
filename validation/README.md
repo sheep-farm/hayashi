@@ -37,6 +37,12 @@ python validation/run.py --case heckman_mroz
 python validation/run.py --case heckman_mroz --case ols_cluster_wagepan --no-write
 ```
 
+Exit codes:
+
+- `0` — all selected cases passed.
+- `0` — validation blocked, but `--allow-blocked` was passed.
+- `1` — at least one case failed, or a case is blocked without `--allow-blocked`.
+
 The same options can be passed through `hay validate`, for example
 `hay validate --case heckman_mroz --no-write`.
 

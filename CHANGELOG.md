@@ -7,13 +7,47 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- **Safe modes for `hay dist-update`**:
+  - `hay dist-update --help` prints subcommand-specific help without network access.
+  - `hay dist-update --check` reports whether a newer release is available without downloading or replacing the binary.
+  - Unknown flags and unexpected positional arguments fail fast.
+  - Argument parser covered by focused unit tests.
+- **English-only user-facing output**: all comments, error messages, and printed strings in the Rust source tree translated to English. Mathematical notation (`×`, `ŷ`, `Ŷ`, `H₀`, `κ`, etc.) is preserved.
+- **Interpreter decomposition**: `src/lang/interpreter.rs` split into focused submodules:
+  - `execution.rs` — statement execution
+  - `eval_expr.rs` — expression evaluation
+  - `dispatch.rs` — function-call dispatcher
+  - `helpers.rs` — shared static utilities
+  - `value.rs` — `Value` type
+  - `models.rs` — model wrappers
+  - `panel_diagnostics.rs`, `rolling_recursive.rs`, `aggregation.rs`, `timeseries_models.rs` — grouped estimator logic
+  - `interpreter.rs` reduced from ~4,800 lines to ~680 lines.
+- **`for` loop index/value binding**: `for i, v in list { ... }` binds the element index to `i` and the value to `v`. `for k, v in dict { ... }` binds each key/value pair. Dict iteration requires two variables.
+- **`try/catch/finally`**: `finally { ... }` block now runs regardless of whether the try succeeded, failed, or executed `return`/`break`/`continue`. Errors or control flow inside `finally` take precedence.
+- **`hay install` with version**: `hay install user/repo [version]` installs a specific release. `version` may be `latest`, `v1.2.3`, or `1.2.3`.
+- **`hay list` shows versions**: installed plugins now display their version from `.metadata.json`.
+- **`match` as contextual keyword**: `match` now works as a regular identifier (`let match = 1`) and still starts a match expression when followed by a scrutinee and brace (`let r = match x { ... }`).
+- **README smoke test**: `scripts/readme_smoke.hay` exercises the main features documented in `README.md` and is run by the test suite.
+- **`list_files()` builtin**: `list_files(dir)` and `list_files(dir, pattern)` return a sorted list of file paths, enabling dynamic batch processing of datasets.
+
 ### Changed
 
+- **`quietly(expr)` deprecated**: the functional form is marked deprecated and will be removed in a future release. Use `quietly on` / `quietly off` instead. README and `help(quietly)` updated to reflect this.
+- **Validation runner exit semantics**: `validation/run.py` now returns a non-zero exit code when cases are `blocked`, unless `--allow-blocked` is passed.
+- **`data_source` field added to validation cases**: book-based simulated cases (e.g. `var_book`) are explicitly tagged as `dgp`.
+
 ### Fixed
+
+- **Validation workflow**: repaired malformed `.github/workflows/validation.yml`, added `../Greeners` checkout, and switched R dependency installation to use `validation/DESCRIPTION`.
+- **Clippy warnings**: fixed `empty_line_after_doc_comments`, `too_many_arguments`, and `needless_range_loop` warnings.
+- **`tobit_mroz` tracking**: marked as needing isolated intercept-difference investigation and linked to issue #42.
 
 ### Removed
 
 ### Internal / CI
+
+- `cargo fmt` run across the Rust source tree.
+- Validation workflow temporarily set to `workflow_dispatch` only until the baseline is clean.
 
 ## [0.2.6] — 2026-08-25
 

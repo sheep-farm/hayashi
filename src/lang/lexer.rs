@@ -6,6 +6,7 @@ pub enum Token {
     Ident(String),
     StringLit(String),
     FStringLit(String),
+    DocString(String),
     Float(f64),
     Int(i64),
     Bool(bool),
@@ -32,12 +33,12 @@ pub enum Token {
     Quietly,
     Nil,
 
-    // Operadores de série temporal: L.x  L2.x  F.x  D.x
+    // Time-series operators: L.x  L2.x  F.x  D.x
     TsLag(usize),
     TsLead(usize),
     TsDiff(usize),
 
-    // Operadores
+    // Operators
     Eq,         // =
     EqEq,       // ==
     BangEq,     // !=
@@ -70,6 +71,8 @@ pub enum Token {
     StarEq,     // *=
     SlashEq,    // /=
     PercentEq,  // %=
+    PlusPlus,   // ++
+    MinusMinus, // --
 
     // Delimitadores
     LParen,
@@ -154,7 +157,7 @@ impl Lexer {
                 s.push(c);
                 self.advance();
             } else if c == '.' && !is_float && self.peek2() != Some('.') {
-                // só consome o ponto se não for ".." (range)
+                // only consume the dot if it is not ".." (range)
                 is_float = true;
                 s.push(c);
                 self.advance();
@@ -207,8 +210,8 @@ impl Lexer {
         }
     }
 
-    // Converte Token::Ident("L"/"L2"/"F"/"D" etc.) em TsLag/TsLead/TsDiff
-    // se o próximo char for '.'.  Consome o ponto.
+    // Converts Token::Ident("L"/"L2"/"F"/"D" etc.) into TsLag/TsLead/TsDiff
+    // if the next char is '.'.  Consumes the dot.
     fn maybe_ts_op(&mut self, tok: Token) -> Token {
         let Token::Ident(ref s) = tok else { return tok };
         let mut chars = s.chars();
@@ -218,17 +221,17 @@ impl Lexer {
         };
         let rest = chars.as_str();
         if !rest.is_empty() && !rest.chars().all(|c| c.is_ascii_digit()) {
-            return tok; // ex: "LEVEL" não é operador ts
+            return tok; // e.g. "LEVEL" is not a ts operator
         }
         if self.peek() != Some('.') {
             return tok;
         }
-        // não consome se for ".." (range) — ts op precisa de nome após "."
-        // verifica se o char depois de "." é letra ou underscore
+        // do not consume if it is ".." (range) — ts op needs a name after "."
+        // check if the char after "." is a letter or underscore
         if self.peek2().map(|c| c == '.').unwrap_or(false) {
             return tok;
         }
-        self.advance(); // consome '.'
+        self.advance(); // consume '.'
         let n: usize = if rest.is_empty() {
             1
         } else {
@@ -253,8 +256,17 @@ impl Lexer {
                     break;
                 }
                 Some('#') => {
-                    while !matches!(self.peek(), Some('\n') | None) {
-                        self.advance();
+                    if self.peek() == Some('#') {
+                        self.advance(); // segundo #
+                        let mut s = String::new();
+                        while !matches!(self.peek(), Some('\n') | None) {
+                            s.push(self.advance().unwrap());
+                        }
+                        tokens.push((Token::DocString(s.trim().to_string()), line));
+                    } else {
+                        while !matches!(self.peek(), Some('\n') | None) {
+                            self.advance();
+                        }
                     }
                 }
                 Some('\n') => tokens.push((Token::Newline, line)),
@@ -342,6 +354,9 @@ impl Lexer {
                     if self.peek() == Some('=') {
                         self.advance();
                         tokens.push((Token::PlusEq, line));
+                    } else if self.peek() == Some('+') {
+                        self.advance();
+                        tokens.push((Token::PlusPlus, line));
                     } else {
                         tokens.push((Token::Plus, line));
                     }
@@ -350,6 +365,9 @@ impl Lexer {
                     if self.peek() == Some('=') {
                         self.advance();
                         tokens.push((Token::MinusEq, line));
+                    } else if self.peek() == Some('-') {
+                        self.advance();
+                        tokens.push((Token::MinusMinus, line));
                     } else {
                         tokens.push((Token::Minus, line));
                     }

@@ -1,5 +1,4 @@
-mod io;
-mod lang;
+use hayashi_lang::lang;
 
 use lang::interpreter::Interpreter;
 use rustyline::completion::Completer;
@@ -334,10 +333,11 @@ fn run() {
         }
         Some("install") => {
             let pkg = args_clean.get(2).unwrap_or_else(|| {
-                eprintln!("Usage: hay install user/repo [-y]");
+                eprintln!("Usage: hay install user/repo [version] [-y]");
                 std::process::exit(1);
             });
-            pkg_install_internal(pkg, yes);
+            let version = args_clean.get(3).copied();
+            pkg_install_internal(pkg, version, yes);
             return;
         }
         Some("update") => {
@@ -355,7 +355,7 @@ fn run() {
             return;
         }
         Some("dist-update") => {
-            dist_update();
+            dist_update(&args_clean[2..]);
             return;
         }
         Some("remove") | Some("uninstall") => {
@@ -475,11 +475,42 @@ fn run_validation(args: &[&str]) {
     std::process::exit(status.code().unwrap_or(1));
 }
 
-/// Checks GitHub for a newer hay release and, if found, downloads and replaces
-/// the current binary in-place.
-fn dist_update() {
-    let current = VERSION;
-    println!("hay dist-update: current version {current}");
+/// Print dist-update subcommand help.
+fn dist_update_help() {
+    println!("Usage: hay dist-update [--help] [--check]");
+    println!();
+    println!("Options:");
+    println!("  --help, -h  Show this help message and exit");
+    println!("  --check     Report whether a newer release is available without");
+    println!("              downloading or replacing the current binary");
+}
+
+/// Check GitHub for the latest release and return the version string if it is
+/// newer than the current one. Returns Ok(None) when already up to date.
+fn check_latest_release() -> Result<Option<String>, String> {
+    let release_url = "https://api.github.com/repos/sheep-farm/hayashi/releases/latest";
+    let release_resp = ureq::get(release_url)
+        .set("User-Agent", "hay")
+        .set("Accept", "application/vnd.github.v3+json")
+        .call()
+        .map_err(|e| format!("cannot fetch latest release: {e}"))?;
+
+    let release_body: String = release_resp.into_string().unwrap_or_default();
+    let release: GhRelease = serde_json::from_str(&release_body)
+        .map_err(|e| format!("cannot parse release payload: {e}"))?;
+
+    let remote_version = release.tag_name.trim_start_matches('v').to_string();
+    if !is_newer_version(&remote_version, VERSION) {
+        return Ok(None);
+    }
+    Ok(Some(remote_version))
+}
+
+/// Download and replace the current binary with the given release version.
+fn dist_update_install(remote_version: &str) {
+    let target = current_target_triple();
+    let (asset_ext, archive_cmd) = dist_asset_kind();
+    let asset_name = format!("hay-v{remote_version}-{target}.{asset_ext}");
 
     let release_url = "https://api.github.com/repos/sheep-farm/hayashi/releases/latest";
     let release_resp = match ureq::get(release_url)
@@ -499,18 +530,6 @@ fn dist_update() {
         eprintln!("hay dist-update: cannot parse release payload: {e}");
         std::process::exit(1);
     });
-
-    let remote_version = release.tag_name.trim_start_matches('v');
-    if !is_newer_version(remote_version, current) {
-        println!("hay dist-update: already up to date (latest {remote_version})");
-        return;
-    }
-
-    println!("hay dist-update: newer release {remote_version} available");
-
-    let target = current_target_triple();
-    let (asset_ext, archive_cmd) = dist_asset_kind();
-    let asset_name = format!("hay-v{remote_version}-{target}.{asset_ext}");
 
     let asset = release
         .assets
@@ -569,7 +588,7 @@ fn dist_update() {
     let _ = std::fs::remove_file(&backup_path);
 
     std::fs::rename(&exe_path, &backup_path).unwrap_or_else(|e| {
-        eprintln!("hay dist-update: cannot backup current binary: {e}");
+        eprintln!("hay dist-update: cannot backup current executable: {e}");
         std::process::exit(1);
     });
 
@@ -593,6 +612,82 @@ fn dist_update() {
         println!("hay dist-update: installed {remote_version}. Please restart hay.");
     } else {
         println!("hay dist-update: installed {remote_version}. Run `hay --version` to verify.");
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum DistUpdateMode {
+    Help,
+    Check,
+    Install,
+}
+
+/// Parse dist-update arguments into a safe mode or fail on unknown flags.
+fn parse_dist_update_args(argv: &[&str]) -> Result<DistUpdateMode, String> {
+    if argv.iter().any(|a| *a == "--help" || *a == "-h") {
+        return Ok(DistUpdateMode::Help);
+    }
+
+    let mut check = false;
+    for arg in argv {
+        if *arg == "--check" {
+            check = true;
+        } else if arg.starts_with('-') {
+            return Err(format!("unknown flag '{arg}'"));
+        } else {
+            return Err(format!("unexpected positional argument '{arg}'"));
+        }
+    }
+
+    if check {
+        Ok(DistUpdateMode::Check)
+    } else {
+        Ok(DistUpdateMode::Install)
+    }
+}
+
+/// Parse dist-update arguments and dispatch to help, check, or install mode.
+fn dist_update(argv: &[&str]) {
+    match parse_dist_update_args(argv) {
+        Ok(DistUpdateMode::Help) => {
+            dist_update_help();
+        }
+        Ok(DistUpdateMode::Check) => {
+            println!("hay dist-update: current version {VERSION}");
+            match check_latest_release() {
+                Ok(Some(remote_version)) => {
+                    println!("hay dist-update: newer release {remote_version} available");
+                }
+                Ok(None) => {
+                    println!("hay dist-update: already up to date");
+                }
+                Err(e) => {
+                    eprintln!("hay dist-update: {e}");
+                    std::process::exit(1);
+                }
+            }
+        }
+        Ok(DistUpdateMode::Install) => {
+            println!("hay dist-update: current version {VERSION}");
+            match check_latest_release() {
+                Ok(Some(remote_version)) => {
+                    println!("hay dist-update: newer release {remote_version} available");
+                    dist_update_install(&remote_version);
+                }
+                Ok(None) => {
+                    println!("hay dist-update: already up to date");
+                }
+                Err(e) => {
+                    eprintln!("hay dist-update: {e}");
+                    std::process::exit(1);
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!("hay dist-update: {e}");
+            dist_update_help();
+            std::process::exit(1);
+        }
     }
 }
 
@@ -647,7 +742,11 @@ fn dist_asset_kind() -> (&'static str, Extractor) {
 
 /// Searches the extracted archive for the new hay binary.
 fn find_extracted_bin(dir: &std::path::Path) -> Option<std::path::PathBuf> {
-    let name = if std::env::consts::OS == "windows" { "hay.exe" } else { "hay" };
+    let name = if std::env::consts::OS == "windows" {
+        "hay.exe"
+    } else {
+        "hay"
+    };
     let mut queue = vec![dir.to_path_buf()];
     while let Some(current) = queue.pop() {
         if let Ok(entries) = std::fs::read_dir(&current) {
@@ -669,7 +768,10 @@ fn find_extracted_bin(dir: &std::path::Path) -> Option<std::path::PathBuf> {
 fn is_newer_version(remote: &str, current: &str) -> bool {
     fn parse(v: &str) -> (Vec<u32>, Option<&str>) {
         let v = v.trim_start_matches('v');
-        let (num, pre) = v.split_once('-').map(|(n, p)| (n, Some(p))).unwrap_or((v, None));
+        let (num, pre) = v
+            .split_once('-')
+            .map(|(n, p)| (n, Some(p)))
+            .unwrap_or((v, None));
         let nums: Vec<u32> = num
             .split('.')
             .filter_map(|s| s.parse::<u32>().ok())
@@ -755,7 +857,7 @@ fn run_repl() {
                     }
                 }
 
-                // input block: acumula até "end"
+                // input block: accumulate until "end"
                 let in_input = buf.lines().any(|l| {
                     let t = l.trim();
                     t.starts_with("input ") && !buf.contains("\nend")
@@ -777,12 +879,12 @@ fn run_repl() {
 
                 buf.push_str(trimmed);
                 buf.push('\n');
-                // depth rastreia delimitadores não fechados: {}, [], ()
+                // depth tracks unclosed delimiters: {}, [], ()
                 depth += open_depth(trimmed);
 
-                // Continua acumulando se:
-                // (a) há delimitadores abertos (depth > 0), OU
-                // (b) o buffer (sem espaços finais) termina com |>
+                // Keep accumulating if:
+                // (a) there are open delimiters (depth > 0), OR
+                // (b) the buffer (without trailing spaces) ends with |>
                 let buf_trimmed = buf.trim_end();
                 let trailing_pipe = buf_trimmed.ends_with("|>");
                 if depth > 0 || trailing_pipe {
@@ -876,16 +978,27 @@ fn is_pkg_installed(user: &str, repo: &str) -> Option<std::path::PathBuf> {
 
 #[allow(dead_code)]
 fn pkg_install(spec: &str) {
-    pkg_install_internal(spec, false);
+    pkg_install_internal(spec, None, false);
 }
 
-fn pkg_install_internal(spec: &str, force_overwrite: bool) {
+fn pkg_install_internal(spec: &str, version: Option<&str>, force_overwrite: bool) {
     let (user, repo) = if let Some(pos) = spec.find('/') {
         (&spec[..pos], &spec[pos + 1..])
     } else {
         eprintln!("hay install: expected 'user/repo', got '{spec}'");
         std::process::exit(1);
     };
+
+    let version_tag = version.and_then(|v| {
+        let trimmed = v.trim();
+        if trimmed.is_empty() || trimmed == "latest" {
+            None
+        } else if trimmed.starts_with('v') {
+            Some(trimmed.to_string())
+        } else {
+            Some(format!("v{trimmed}"))
+        }
+    });
 
     if !force_overwrite {
         if let Some(installed_path) = is_pkg_installed(user, repo) {
@@ -957,7 +1070,10 @@ fn pkg_install_internal(spec: &str, force_overwrite: bool) {
     let n_hy = files.iter().filter(|e| e.name.ends_with(".hay")).count();
     if n_hy == 0 {
         println!("No .hay scripts found. Checking for native/WASM releases...");
-        let release_url = format!("https://api.github.com/repos/{user}/{repo}/releases/latest");
+        let release_url = match &version_tag {
+            Some(tag) => format!("https://api.github.com/repos/{user}/{repo}/releases/tags/{tag}"),
+            None => format!("https://api.github.com/repos/{user}/{repo}/releases/latest"),
+        };
 
         let release_resp = match ureq::get(&release_url)
             .set("User-Agent", "hay")
@@ -966,9 +1082,13 @@ fn pkg_install_internal(spec: &str, force_overwrite: bool) {
         {
             Ok(r) => r,
             Err(e) => {
-                eprintln!(
-                    "hay install: no scripts or native releases found for {user}/{repo}: {e}"
-                );
+                if let Some(tag) = &version_tag {
+                    eprintln!("hay install: release {tag} not found for {user}/{repo}: {e}");
+                } else {
+                    eprintln!(
+                        "hay install: no scripts or native releases found for {user}/{repo}: {e}"
+                    );
+                }
                 std::process::exit(1);
             }
         };
@@ -1378,7 +1498,7 @@ fn pkg_update(spec_opt: Option<&str>, auto_confirm: bool) {
                 };
 
                 if confirm {
-                    pkg_install_internal(spec, true);
+                    pkg_install_internal(spec, None, true);
                 } else {
                     println!("Update cancelled.");
                 }
@@ -1400,7 +1520,7 @@ fn pkg_update(spec_opt: Option<&str>, auto_confirm: bool) {
                     }
                 };
                 if confirm {
-                    pkg_install_internal(spec, true);
+                    pkg_install_internal(spec, None, true);
                 } else {
                     println!("Update cancelled.");
                 }
@@ -1439,7 +1559,11 @@ fn pkg_update(spec_opt: Option<&str>, auto_confirm: bool) {
                             }
                         };
                         if confirm {
-                            pkg_install_internal(&format!("{}/{}", meta.user, meta.repo), true);
+                            pkg_install_internal(
+                                &format!("{}/{}", meta.user, meta.repo),
+                                None,
+                                true,
+                            );
                         }
                     }
                 }
@@ -1463,7 +1587,7 @@ fn pkg_update(spec_opt: Option<&str>, auto_confirm: bool) {
                         }
                     };
                     if confirm {
-                        pkg_install_internal(&format!("{}/{}", meta.user, meta.repo), true);
+                        pkg_install_internal(&format!("{}/{}", meta.user, meta.repo), None, true);
                     }
                 }
             }
@@ -1521,10 +1645,16 @@ fn pkg_list() {
                         println!("Installed packages (~/.hay/packages/):\n");
                         found = true;
                     }
+                    let user_s = user.to_string_lossy().to_string();
+                    let repo_s = repo.to_string_lossy().to_string();
+                    let version = read_pkg_metadata(&user_s, &repo_s)
+                        .map(|m| normalize_version(&m.version))
+                        .unwrap_or_else(|| "unknown".into());
                     println!(
-                        "  {}/{}  ({} script file{})",
-                        user.to_string_lossy(),
-                        repo.to_string_lossy(),
+                        "  {}/{}  v{}  ({} script file{})",
+                        user_s,
+                        repo_s,
+                        version,
                         n_hy,
                         if n_hy == 1 { "" } else { "s" }
                     );
@@ -1540,15 +1670,17 @@ fn pkg_list() {
                         println!("Installed packages (~/.hay/packages/):\n");
                         found = true;
                     }
+                    let user_s = user.to_string_lossy().to_string();
                     let clean_name = repo
                         .to_string_lossy()
                         .trim_end_matches(&format!(".{ext}"))
                         .to_string();
+                    let version = read_pkg_metadata(&user_s, &clean_name)
+                        .map(|m| normalize_version(&m.version))
+                        .unwrap_or_else(|| "unknown".into());
                     println!(
-                        "  {}/{}  (native {} plugin)",
-                        user.to_string_lossy(),
-                        clean_name,
-                        ext
+                        "  {}/{}  v{}  (native {} plugin)",
+                        user_s, clean_name, version, ext
                     );
                 }
             }
@@ -1582,6 +1714,11 @@ fn read_pkg_metadata(user: &str, repo: &str) -> Option<PkgMetadata> {
         }
     }
     None
+}
+
+/// Strip a leading 'v' from version strings so output is consistently `vX.Y.Z`.
+fn normalize_version(v: &str) -> String {
+    v.trim().trim_start_matches('v').to_string()
 }
 
 fn write_pkg_metadata(meta: &PkgMetadata) {
@@ -1637,5 +1774,60 @@ fn current_target_ext() -> &'static str {
         "macos" => "dylib",
         "windows" => "dll",
         _ => "so",
+    }
+}
+
+#[cfg(test)]
+mod dist_update_tests {
+    use super::{parse_dist_update_args, DistUpdateMode};
+
+    #[test]
+    fn parse_empty_returns_install() {
+        assert_eq!(
+            parse_dist_update_args(&[]).unwrap(),
+            DistUpdateMode::Install
+        );
+    }
+
+    #[test]
+    fn parse_help_long() {
+        assert_eq!(
+            parse_dist_update_args(&["--help"]).unwrap(),
+            DistUpdateMode::Help
+        );
+    }
+
+    #[test]
+    fn parse_help_short() {
+        assert_eq!(
+            parse_dist_update_args(&["-h"]).unwrap(),
+            DistUpdateMode::Help
+        );
+    }
+
+    #[test]
+    fn parse_check() {
+        assert_eq!(
+            parse_dist_update_args(&["--check"]).unwrap(),
+            DistUpdateMode::Check
+        );
+    }
+
+    #[test]
+    fn parse_help_wins_over_check() {
+        assert_eq!(
+            parse_dist_update_args(&["--check", "--help"]).unwrap(),
+            DistUpdateMode::Help
+        );
+    }
+
+    #[test]
+    fn parse_unknown_flag_fails() {
+        assert!(parse_dist_update_args(&["--foo"]).is_err());
+    }
+
+    #[test]
+    fn parse_positional_fails() {
+        assert!(parse_dist_update_args(&["nightly"]).is_err());
     }
 }

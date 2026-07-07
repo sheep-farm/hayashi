@@ -1,8 +1,9 @@
+use super::helpers::*;
 use super::*;
 
 /// set_seed, timer, quietly, capture, assert, preserve/restore, source, help,
 /// describe, codebook, format, duplicates, label, correlate, summarize,
-/// esttab/eststo. Extraído de `eval_call` (ver src/lang/interpreter.rs).
+/// esttab/eststo. Extracted from `eval_call` (see src/lang/interpreter.rs).
 impl Interpreter {
     pub(super) fn eval_call_descriptive_lang(
         &mut self,
@@ -12,12 +13,10 @@ impl Interpreter {
         opt_map: &HashMap<String, Value>,
     ) -> Result<Option<Value>> {
         let result: Result<Value> = match func {
-            // ── set_seed: reprodutibilidade ────────────────────────────────
+            // ── set_seed: reproducibility ────────────────────────────────
             "set_seed" | "seed" | "setseed" => {
                 if args.is_empty() {
-                    return Err(HayashiError::Runtime(
-                        "set_seed(N) — define semente do RNG".into(),
-                    ));
+                    return Err(HayashiError::Runtime("set_seed(N) — sets RNG seed".into()));
                 }
                 let s = match self.eval_expr(&args[0])? {
                     Value::Int(v) => v as u64,
@@ -31,11 +30,11 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
-            // ── timer: mede tempo de execução ─────────────────────────────
+            // ── timer: measures execution time ─────────────────────────────
             "timer" | "time" | "bench" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
-                        "timer(expr) — mede tempo de avaliação".into(),
+                        "timer(expr) — measures evaluation time".into(),
                     ));
                 }
                 let start = std::time::Instant::now();
@@ -45,22 +44,22 @@ impl Interpreter {
                 Ok(result)
             }
 
-            // ── quietly: avalia expressão, suprime saída ──────────────────
+            // ── quietly: evaluates expression, suppresses output ──────────────────
             "quietly" | "quiet" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
-                        "quietly(expr) — avalia sem imprimir".into(),
+                        "quietly(expr) — evaluates without printing".into(),
                     ));
                 }
                 self.eval_expr(&args[0])?;
                 Ok(Value::Nil)
             }
 
-            // ── capture: avalia expressão, ignora erros ───────────────────
+            // ── capture: evaluates expression, ignores errors ───────────────────
             "capture" | "cap" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
-                        "capture(expr) — avalia ignorando erros".into(),
+                        "capture(expr) — evaluates ignoring errors".into(),
                     ));
                 }
                 match self.eval_expr(&args[0]) {
@@ -72,15 +71,15 @@ impl Interpreter {
                 }
             }
 
-            // ── assert: erro se condição é falsa ──────────────────────────
+            // ── assert: error if condition is false ──────────────────────────
             "assert" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
-                        "assert(cond [, msg]) — erro se condição falsa".into(),
+                        "assert(cond [, msg]) — error if condition is false".into(),
                     ));
                 }
                 let val = self.eval_expr(&args[0])?;
-                if !Self::value_as_bool(&val) {
+                if !value_as_bool(&val) {
                     let msg = if args.len() >= 2 {
                         match self.eval_expr(&args[1])? {
                             Value::Str(s) => s,
@@ -94,11 +93,11 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
-            // ── preserve/restore: salvar e restaurar estado de variáveis ───
+            // ── preserve/restore: save and restore variable state ───
             "preserve" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
-                        "preserve(df) — salva cópia do DataFrame".into(),
+                        "preserve(df) — saves a copy of the DataFrame".into(),
                     ));
                 }
                 let name = match &args[0] {
@@ -171,11 +170,20 @@ impl Interpreter {
                     return Ok(Some(Value::Nil));
                 }
 
-                let resolved = if crate::io::fetch::is_url(&module) {
-                    let tmp = crate::io::fetch::download_to_temp(&module)?;
-                    tmp.to_string_lossy().to_string()
-                } else {
-                    self.resolve_import(&module)?
+                let resolved = {
+                    #[cfg(feature = "native")]
+                    {
+                        if crate::io::fetch::is_url(&module) {
+                            let tmp = crate::io::fetch::download_to_temp(&module)?;
+                            tmp.to_string_lossy().to_string()
+                        } else {
+                            self.resolve_import(&module)?
+                        }
+                    }
+                    #[cfg(not(feature = "native"))]
+                    {
+                        self.resolve_import(&module)?
+                    }
                 };
 
                 let alias = match opt_map.get("as") {
@@ -210,21 +218,31 @@ impl Interpreter {
                     || resolved.ends_with(".dylib");
 
                 if is_wasm {
-                    use crate::lang::plugin::WasmPlugin;
-                    let plugin = WasmPlugin::new(&resolved, &ns).map_err(|e| {
-                        self.rt_err(format!("import: failed to load WASM plugin: {e}"))
-                    })?;
-                    self.plugins.insert(ns.clone(), Box::new(plugin));
-                    self.imported.insert(module.clone());
-                    return Ok(Some(Value::Nil));
+                    #[cfg(not(feature = "wasm"))]
+                    return Err(self.rt_err("import: WASM plugins require 'wasm' feature"));
+                    #[cfg(feature = "wasm")]
+                    {
+                        use crate::lang::plugin::WasmPlugin;
+                        let plugin = WasmPlugin::new(&resolved, &ns).map_err(|e| {
+                            self.rt_err(format!("import: failed to load WASM plugin: {e}"))
+                        })?;
+                        self.plugins.insert(ns.clone(), Box::new(plugin));
+                        self.imported.insert(module.clone());
+                        return Ok(Some(Value::Nil));
+                    }
                 } else if is_native {
-                    use crate::lang::plugin::RustNativePlugin;
-                    let plugin = RustNativePlugin::new(&resolved, &ns).map_err(|e| {
-                        self.rt_err(format!("import: failed to load native plugin: {e}"))
-                    })?;
-                    self.plugins.insert(ns.clone(), Box::new(plugin));
-                    self.imported.insert(module.clone());
-                    return Ok(Some(Value::Nil));
+                    #[cfg(not(feature = "native"))]
+                    return Err(self.rt_err("import: native plugins require 'native' feature"));
+                    #[cfg(feature = "native")]
+                    {
+                        use crate::lang::plugin::RustNativePlugin;
+                        let plugin = RustNativePlugin::new(&resolved, &ns).map_err(|e| {
+                            self.rt_err(format!("import: failed to load native plugin: {e}"))
+                        })?;
+                        self.plugins.insert(ns.clone(), Box::new(plugin));
+                        self.imported.insert(module.clone());
+                        return Ok(Some(Value::Nil));
+                    }
                 }
 
                 // Default script plugin (.hay) loading
@@ -308,10 +326,24 @@ impl Interpreter {
                 } else {
                     match crate::lang::help::help_text(&topic) {
                         Some(h) => println!("{h}"),
-                        None => println!(
-                            "help: '{}' not documented. Type help() for full list.",
-                            topic
-                        ),
+                        None => {
+                            if let Some(Value::UserFn(uf)) = self.env.get(&topic) {
+                                if let Some(doc) = &uf.doc {
+                                    println!("fn {}({})\n{}", topic, uf.params.join(", "), doc);
+                                } else {
+                                    println!(
+                                        "fn {}({})\n  (no docstring)",
+                                        topic,
+                                        uf.params.join(", ")
+                                    );
+                                }
+                            } else {
+                                println!(
+                                    "help: '{}' not documented. Type help() for full list.",
+                                    topic
+                                );
+                            }
+                        }
                     }
                 }
                 Ok(Value::Nil)
@@ -487,11 +519,11 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
-            // ── format: formata valor numérico ──────────────────────────────
+            // ── format: formats numeric value ──────────────────────────────
             "format" | "fmt" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
-                        "format(value, fmt_str) — Ex: format(3.14, \"%.2f\")".into(),
+                        "format(value, fmt_str) — e.g. format(3.14, \"%.2f\")".into(),
                     ));
                 }
                 let val = match self.eval_expr(&args[0])? {
@@ -499,7 +531,7 @@ impl Interpreter {
                     Value::Int(i) => i as f64,
                     other => {
                         return Err(HayashiError::Type(format!(
-                            "format(): primeiro argumento must be numeric, não {other}"
+                            "format(): first argument must be numeric, not {other}"
                         )))
                     }
                 };
@@ -507,7 +539,7 @@ impl Interpreter {
                     Value::Str(s) => s,
                     _ => {
                         return Err(HayashiError::Type(
-                            "format(): second argument must be string (ex: \"%.2f\")".into(),
+                            "format(): second argument must be string (e.g. \"%.2f\")".into(),
                         ))
                     }
                 };
@@ -515,17 +547,17 @@ impl Interpreter {
                 let decimals: usize = if fmt_s.starts_with("%.") && fmt_s.ends_with('f') {
                     fmt_s[2..fmt_s.len() - 1].parse().unwrap_or(4)
                 } else if fmt_s.starts_with('%') && fmt_s.ends_with('f') {
-                    // "%f" sem especificar decimais
+                    // "%f" without specifying decimals
                     6
                 } else {
                     return Err(HayashiError::Runtime(format!(
-                        "format(): string de formato '{fmt_s}' não reconhecida (use \"%.Nf\")"
+                        "format(): format string '{fmt_s}' not recognized (use \"%.Nf\")"
                     )));
                 };
                 Ok(Value::Str(format!("{:.prec$}", val, prec = decimals)))
             }
 
-            // ── duplicates: reportar/dropar/marcar duplicatas ────────────────
+            // ── duplicates: report/drop/tag duplicates ────────────────
             "duplicates" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
@@ -536,7 +568,7 @@ impl Interpreter {
                     Expr::Var(n) => n.clone(),
                     _ => {
                         return Err(HayashiError::Type(
-                            "duplicates(): primeiro argumento deve ser variable name".into(),
+                            "duplicates(): first argument must be variable name".into(),
                         ))
                     }
                 };
@@ -552,7 +584,7 @@ impl Interpreter {
                     Expr::Var(n) | Expr::Str(n) => n.clone(),
                     _ => {
                         return Err(HayashiError::Type(
-                            "duplicates(): second argument must be nome de coluna".into(),
+                            "duplicates(): second argument must be column name".into(),
                         ))
                     }
                 };
@@ -562,10 +594,10 @@ impl Interpreter {
                     _ => "report".into(),
                 };
 
-                let col = Self::get_col_f64(&df, &var_name)?;
+                let col = get_col_f64(&df, &var_name)?;
                 let n = col.len();
 
-                // contar ocorrências de cada valor
+                // count occurrences of each value
                 let mut counts: HashMap<i64, usize> = HashMap::new();
                 for &v in col.iter() {
                     let key = v.to_bits() as i64;
@@ -578,9 +610,9 @@ impl Interpreter {
                 match action.as_str() {
                     "report" => {
                         println!("duplicates report: {var_name}");
-                        println!("  observações:    {n}");
-                        println!("  valores únicos: {n_unique}");
-                        println!("  duplicatas:     {n_dup}");
+                        println!("  observations:    {n}");
+                        println!("  unique values: {n_unique}");
+                        println!("  duplicates:    {n_dup}");
                         Ok(Value::Int(n_dup as i64))
                     }
                     "drop" => {
@@ -596,7 +628,7 @@ impl Interpreter {
                             .iloc(Some(&keep), None)
                             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                         println!(
-                            "duplicates drop: {n_dup} obs removidas, {} restantes",
+                            "duplicates drop: {n_dup} obs removed, {} remaining",
                             new_df.n_rows()
                         );
                         self.env.set(&df_name, Value::DataFrame(Rc::new(new_df)))?;
@@ -614,28 +646,28 @@ impl Interpreter {
                         Rc::make_mut(&mut df_mut)
                             .insert("_dup".to_string(), arr)
                             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                        println!("duplicates tag: coluna _dup gerada ({n_dup} duplicatas)");
+                        println!("duplicates tag: _dup column generated ({n_dup} duplicates)");
                         self.env.set(&df_name, Value::DataFrame(df_mut))?;
                         Ok(Value::Nil)
                     }
                     other => Err(HayashiError::Runtime(format!(
-                        "duplicates(): action '{other}' desconhecida (report|drop|tag)"
+                        "duplicates(): action '{other}' unknown (report|drop|tag)"
                     ))),
                 }
             }
 
-            // ── label: armazena rótulos de variáveis ─────────────────────────
+            // ── label: stores variable labels ─────────────────────────
             "label" => {
                 if args.len() < 3 {
                     return Err(HayashiError::Runtime(
-                        "label(df, var, \"descrição\")".into(),
+                        "label(df, var, \"description\")".into(),
                     ));
                 }
                 let df_name = match &args[0] {
                     Expr::Var(n) => n.clone(),
                     _ => {
                         return Err(HayashiError::Type(
-                            "label(): primeiro argumento deve ser nome do DataFrame".into(),
+                            "label(): first argument must be DataFrame name".into(),
                         ))
                     }
                 };
@@ -651,7 +683,7 @@ impl Interpreter {
                     Value::Str(s) => s,
                     _ => {
                         return Err(HayashiError::Type(
-                            "label(): terceiro argumento must be string".into(),
+                            "label(): third argument must be string".into(),
                         ))
                     }
                 };
@@ -675,7 +707,7 @@ impl Interpreter {
                     other => return Err(self.type_mismatch("DataFrame", &other)),
                 };
 
-                // variáveis pedidas ou todas as numéricas
+                // requested variables or all numeric
                 let names: Vec<String> = if args.len() > 1 {
                     self.resolve_var_list(&args[1..], &df)?
                 } else {
@@ -705,7 +737,7 @@ impl Interpreter {
                     .corr()
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-                // corr() ordena colunas alfabeticamente — sincronizar com a matriz
+                // corr() sorts columns alphabetically — synchronize with the matrix
                 let mut sorted_names = names.clone();
                 sorted_names.sort();
 
@@ -719,7 +751,7 @@ impl Interpreter {
                     }
                 };
 
-                // cabeçalho
+                // header
                 print!("{:>width$} |", "", width = row_label_w);
                 for name in &sorted_names {
                     print!(" {:>width$}", trunc(name, col_w), width = col_w);
@@ -995,7 +1027,7 @@ impl Interpreter {
                     _ => return Err(HayashiError::Type("path= must be a string".into())),
                 };
 
-                // (nome_variável, coef, se_opt, pval_opt)
+                // (variable_name, coef, se_opt, pval_opt)
                 type CoefRow = (String, f64, Option<f64>, Option<f64>);
                 // (label, coefs, n_obs, fit_stats)
                 struct ModelInfo {
@@ -1020,7 +1052,7 @@ impl Interpreter {
                         if first {
                             first = false;
                             continue;
-                        } // cabeçalho
+                        } // header
                         let f: Vec<&str> = line.splitn(6, ',').collect();
                         if f.len() >= 5 {
                             let raw = f[0].trim().trim_matches('"');
@@ -1343,7 +1375,7 @@ impl Interpreter {
                             ));
                         }
                         Value::GeeResult(r) => {
-                            // GEE usa SE robusto (sandwich) por padrão
+                            // GEE uses robust SE (sandwich) by default
                             models.push(extract_std(
                                 "GEE",
                                 &r.variable_names,
@@ -1376,12 +1408,12 @@ impl Interpreter {
                         }
                         Value::LowessResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() not supporta lowess — use predict para extrair valores suavizados".into()
+                                "esttab() does not support lowess — use predict to extract smoothed values".into()
                             ));
                         }
                         Value::PcaResult(_) | Value::FactorResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() not supporta PCA/Factor — use print() para ver cargas e variância explicada".into()
+                                "esttab() does not support PCA/Factor — use print() to see loadings and explained variance".into()
                             ));
                         }
                         Value::ConditionalResult(r) => {
@@ -1396,7 +1428,7 @@ impl Interpreter {
                         }
                         Value::MarkovResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() not supporta Markov Switching — use print() para ver parâmetros por regime".into()
+                                "esttab() does not support Markov Switching — use print() to see regime parameters".into()
                             ));
                         }
                         Value::GlsarResult(r) => {
@@ -1410,7 +1442,7 @@ impl Interpreter {
                             ));
                         }
                         Value::MixedResult(r) => {
-                            // esttab exibe apenas efeitos fixos do MixedLM
+                            // esttab only displays fixed effects of MixedLM
                             models.push(extract_std(
                                 "MixedLM",
                                 &r.variable_names,
@@ -1422,102 +1454,104 @@ impl Interpreter {
                         }
                         Value::ZeroInflatedResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() not supporta zip/zinb (duas equações) — use print()"
+                                "esttab() does not support zip/zinb (two equations) — use print()"
                                     .into(),
                             ));
                         }
                         Value::SurResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() not supporta sur (múltiplas equações) — use print()"
+                                "esttab() does not support sur (multiple equations) — use print()"
                                     .into(),
                             ));
                         }
                         Value::RollingResult(_) | Value::RecursiveLSResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() not supporta rolling/recursive — coeficientes variam ao longo do tempo; use print()".into()
+                                "esttab() does not support rolling/recursive — coefficients vary over time; use print()".into()
                             ));
                         }
                         Value::MNLogitResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() not supporta mlogit (múltiplas equações) — use print()"
+                                "esttab() does not support mlogit (multiple equations) — use print()"
                                     .into(),
                             ));
                         }
                         Value::DidResult(_) | Value::KMResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() not supporta did/km — resultado tem formato próprio; use print()".into()
+                                "esttab() does not support did/km — result has its own format; use print()".into()
                             ));
                         }
                         Value::RdResult(_) | Value::SynthResult(_) | Value::PsmResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() not supporta estimadores causais (rd, psm, synth) — use print()".into()
+                                "esttab() does not support causal estimators (rd, psm, synth) — use print()".into()
                             ));
                         }
                         Value::VarmaResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() not supporta VARMA (coeficientes matriciais) — use print()".into()
+                                "esttab() does not support VARMA (matrix coefficients) — use print()".into()
                             ));
                         }
                         Value::DecompResult(_) | Value::MstlResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() not supporta decomposição sazonal — use print()".into(),
+                                "esttab() does not support seasonal decomposition — use print()"
+                                    .into(),
                             ));
                         }
                         Value::UCResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() not supporta UCM (parâmetros de variância, não β) — use print()".into()
+                                "esttab() does not support UCM (variance parameters, not β) — use print()".into()
                             ));
                         }
                         Value::GamResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() not supporta GAM (termos smooth não têm tabela β padrão) — use print()".into()
+                                "esttab() does not support GAM (smooth terms do not have a standard β table) — use print()".into()
                             ));
                         }
                         Value::MiceResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() not supporta MICE (múltiplos datasets) — estime modelo em cada dataset e use Rubin's rules".into()
+                                "esttab() does not support MICE (multiple datasets) — estimate model in each dataset and use Rubin's rules".into()
                             ));
                         }
                         Value::MSARResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() not supporta Markov-AR (parâmetros por regime) — use print()".into()
+                                "esttab() does not support Markov-AR (regime parameters) — use print()".into()
                             ));
                         }
                         Value::SVarResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() not supporta SVAR (matrizes A/B estruturais) — use print()".into()
+                                "esttab() does not support SVAR (structural A/B matrices) — use print()".into()
                             ));
                         }
                         Value::ThreeSLSResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() not supporta 3SLS (múltiplas equações) — use print()"
+                                "esttab() does not support 3SLS (multiple equations) — use print()"
                                     .into(),
                             ));
                         }
                         Value::DFMResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() not supporta DFM (fatores latentes) — use print()".into(),
+                                "esttab() does not support DFM (fatores latentes) — use print()"
+                                    .into(),
                             ));
                         }
                         Value::EtsResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() not supporta ETS (parâmetros de suavização) — use print()".into()
+                                "esttab() does not support ETS (smoothing parameters) — use print()".into()
                             ));
                         }
                         Value::ThresholdResult(_) => {
                             return Err(HayashiError::Runtime(
-                                "esttab() not supporta panel threshold (dois regimes) — use print()".into()
+                                "esttab() does not support panel threshold (two regimes) — use print()".into()
                             ));
                         }
                         _ => {
                             return Err(HayashiError::Type(
-                                "esttab(): tipo de modelo not supportado — use print()".into(),
+                                "esttab(): model type not supported — use print()".into(),
                             ))
                         }
                     }
                 }
 
-                // união dos nomes de variáveis na ordem de primeira ocorrência
+                // union of variable names in order of first occurrence
                 let mut all_vars: Vec<String> = Vec::new();
                 let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
                 for mi in &models {
@@ -1534,7 +1568,7 @@ impl Interpreter {
                 let label_w = all_vars.iter().map(|s| s.len()).max().unwrap_or(8).max(12) + 2;
                 let total_w = label_w + n_models * (col_w + 1);
 
-                // monta conteúdo (txt ou latex)
+                // build content (txt or latex)
                 let mut buf = String::new();
 
                 if fmt == "latex" || fmt == "tex" {
@@ -1543,7 +1577,7 @@ impl Interpreter {
                         buf.push('r');
                     }
                     buf.push_str("}\n\\hline\\hline\n");
-                    // cabeçalho
+                    // header
                     buf.push_str(" &");
                     for (i, mi) in models.iter().enumerate() {
                         let label = &mi.label;
@@ -1591,7 +1625,7 @@ impl Interpreter {
                             buf.push_str(" \\\\\n");
                         }
                     }
-                    // _cons no final
+                    // _cons at the end
                     if all_vars.iter().any(|v| v == "_cons") {
                         buf.push_str("Constant");
                         for mi in &models {
@@ -1656,14 +1690,14 @@ impl Interpreter {
                     // ── ASCII txt ─────────────────────────────────────────────
                     let sep = "─".repeat(total_w);
 
-                    // cabeçalho: numeração
+                    // header: numbering
                     let mut line = format!("{:<lw$}", "", lw = label_w);
                     for i in 0..n_models {
                         line.push_str(&format!(" {:>cw$}", format!("({})", i + 1), cw = col_w));
                     }
                     buf.push_str(&format!("{line}\n"));
 
-                    // cabeçalho: labels
+                    // header: labels
                     let mut line = format!("{:<lw$}", "", lw = label_w);
                     for mi in &models {
                         line.push_str(&format!(" {:>cw$}", mi.label, cw = col_w));
@@ -1689,7 +1723,7 @@ impl Interpreter {
                         }
                         buf.push_str(&format!("{line}\n"));
 
-                        // linha de erros padrão
+                        // standard error row
                         let has_se = models.iter().any(|mi| {
                             mi.coefs
                                 .iter()

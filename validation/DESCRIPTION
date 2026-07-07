@@ -9,8 +9,9 @@ Description: Records the R packages required to run the reference scripts
 License: MIT
 Encoding: UTF-8
 Imports:
-    wooldridge,
+    AER,
+    glmnet,
     jsonlite,
     MASS,
-    glmnet,
-    systemfit
+    systemfit,
+    wooldridge

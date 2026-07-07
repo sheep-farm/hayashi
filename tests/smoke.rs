@@ -297,7 +297,7 @@ smoke!(smoke_count_models, "examples/count_models.hay", "Poisson");
 smoke!(smoke_panel, "examples/panel.hay", "FE");
 
 // ══════════════════════════════════════════════════════════════════════════════
-// SCOPING — block scoping com destruição determinística
+// SCOPING — block scoping with deterministic destruction
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -409,7 +409,7 @@ display factorial(5)
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// PARSER — lexer, parser, expressões
+// PARSER — lexer, parser, expressions
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -417,8 +417,8 @@ fn parser_comments() {
     assert_ok_contains(
         "comments",
         r#"
-// isto é um comentário
-# isto também
+// this is a comment
+# this too
 display 42
 "#,
         "42",
@@ -490,7 +490,7 @@ if !x {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// EXPRESSÕES — aritmética, comparação, funções
+// EXPRESSIONS — arithmetic, comparison, functions
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -710,7 +710,7 @@ summarize(df)
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// ESTIMAÇÃO — OLS, fórmulas, opções
+// ESTIMATION — OLS, formulas, options
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -856,7 +856,7 @@ ols(Y ~ X, df, cluster=firm)
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// PÓS-ESTIMAÇÃO — test, esttab, coefplot, nlcom, predict
+// POST-ESTIMATION — test, esttab, coefplot, nlcom, predict
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -1134,7 +1134,7 @@ print(t)
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// FINANÇAS — portsort, doublesort, fmb
+// FINANCE — portsort, doublesort, fmb
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -1286,6 +1286,43 @@ display s
 }
 
 #[test]
+fn lang_increment_decrement() {
+    let (ok, out) = run_inline(
+        r#"
+let x = 5
+x++
+display x
+x--
+x--
+display x
+let y = 10
+y++
+y++
+display y
+"#,
+    );
+    assert!(ok);
+    assert!(out.contains("6"));
+    assert!(out.contains("4"));
+    assert!(out.contains("12"));
+}
+
+#[test]
+fn lang_increment_in_loop() {
+    let (ok, out) = run_inline(
+        r#"
+let n = 0
+for i in 1..=5 {
+    n++
+}
+display n
+"#,
+    );
+    assert!(ok);
+    assert!(out.contains("5"));
+}
+
+#[test]
 fn lang_for_list() {
     let (ok, out) = run_inline(
         r#"
@@ -1296,6 +1333,50 @@ for x in [10, 20, 30] {
     );
     assert!(ok);
     assert!(out.contains("10") && out.contains("20") && out.contains("30"));
+}
+
+#[test]
+fn lang_for_list_indexed() {
+    let (ok, out) = run_inline(
+        r#"
+let s = ""
+for i, v in ["a", "b", "c"] {
+    s = s + str(i) + ":" + v + " "
+}
+print(s)
+"#,
+    );
+    assert!(ok);
+    assert!(out.contains("0:a 1:b 2:c"));
+}
+
+#[test]
+fn lang_for_dict_pairs() {
+    let (ok, out) = run_inline(
+        r#"
+let d = {"x": 10, "y": 20}
+let s = ""
+for k, v in d {
+    s = s + k + "=" + str(v) + " "
+}
+print(s)
+"#,
+    );
+    assert!(ok);
+    assert!(out.contains("x=10") && out.contains("y=20"));
+}
+
+#[test]
+fn lang_for_dict_requires_two_vars() {
+    let (ok, out) = run_inline(
+        r#"
+for v in {"x": 1} {
+    print(v)
+}
+"#,
+    );
+    assert!(!ok);
+    assert!(out.contains("dict iteration requires two variables"));
 }
 
 #[test]
@@ -1569,7 +1650,7 @@ restore(df)
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// EDGE CASES — comportamento em condições limítrofes
+// EDGE CASES — behavior in boundary conditions
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -3998,7 +4079,7 @@ display len(s)
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// GRÁFICOS SVG — plotters backend
+// SVG PLOTS — plotters backend
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -4219,7 +4300,7 @@ fn smoke_graphs_svg() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// FUNÇÕES MATEMÁTICAS — paridade com Stata
+// MATHEMATICAL FUNCTIONS — parity with Stata
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -4551,7 +4632,7 @@ fn smoke_math_functions() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// PARIDADE STATA — distribuições, _n/_N, ci, centile, recode, egen
+// STATA PARITY — distributions, _n/_N, ci, centile, recode, egen
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -4888,7 +4969,7 @@ X
 end
 duplicates(df, X)
 "#,
-        "duplicatas",
+        "duplicates",
     );
 }
 
@@ -4908,7 +4989,7 @@ X Y
 end
 duplicates(df, X, action=drop)
 "#,
-        "3 obs removidas",
+        "3 obs removed",
     );
 }
 
@@ -4942,11 +5023,11 @@ Y X
 1 2
 3 4
 end
-label(df, Y, "Variável dependente")
-label(df, X, "Variável independente")
+label(df, Y, "Dependent variable")
+label(df, X, "Independent variable")
 describe(df)
 "#,
-        "Variável dependente",
+        "Dependent variable",
     );
 }
 
@@ -5205,7 +5286,7 @@ display mean(df, preco2)"#,
 fn load_odbc_without_feature_gives_clear_error() {
     let (ok, out) = run_inline(r#"load "odbc://DSN=test" as df, query="SELECT 1""#);
     if cfg!(feature = "odbc") {
-        // com feature ativa, vai falhar por falta de driver — mas não por "not enabled"
+        // with the feature enabled, it will fail due to missing driver — but not for "not enabled"
         assert!(
             !out.contains("not enabled"),
             "should not say 'not enabled' with feature on:\n{out}"
@@ -5450,6 +5531,70 @@ display r"#,
 }
 
 #[test]
+fn match_as_variable_name() {
+    assert_ok_contains(
+        "match_var",
+        r#"let match = 1
+let matched = match + 1
+print(matched)"#,
+        "2",
+    );
+}
+
+#[test]
+fn readme_smoke_script() {
+    let path = std::path::Path::new(file!())
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("scripts/readme_smoke.hay");
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_hay"))
+        .arg(&path)
+        .output()
+        .expect("failed to execute hay");
+    let ok = output.status.success();
+    let out = String::from_utf8_lossy(&output.stdout).to_string()
+        + &String::from_utf8_lossy(&output.stderr);
+    // Cleanup cross-platform export artifact if created.
+    let _ = std::fs::remove_file("readme_smoke_export.csv");
+    assert!(ok, "README smoke script failed:\n{out}");
+    assert!(out.contains("ols ok"));
+    assert!(out.contains("export ok"));
+}
+
+#[test]
+fn list_files_basic() {
+    let tmp = std::env::temp_dir();
+    let test_dir = tmp.join("hay_list_files_test");
+    let _ = std::fs::remove_dir_all(&test_dir);
+    std::fs::create_dir_all(&test_dir).unwrap();
+    std::fs::write(test_dir.join("a.csv"), "1\n").unwrap();
+    std::fs::write(test_dir.join("b.txt"), "x\n").unwrap();
+    std::fs::write(test_dir.join("c.csv"), "2\n").unwrap();
+
+    let dir = test_dir.to_string_lossy().replace('\\', "/");
+    assert_ok_contains(
+        "list_files_all",
+        &format!(
+            r#"let files = list_files("{dir}")
+print(len(files))"#,
+        ),
+        "3",
+    );
+    assert_ok_contains(
+        "list_files_pattern",
+        &format!(
+            r#"let files = list_files("{dir}", ".csv")
+print(len(files))"#,
+        ),
+        "2",
+    );
+
+    let _ = std::fs::remove_dir_all(&test_dir);
+}
+
+#[test]
 fn match_wildcard() {
     assert_ok_contains(
         "match_wild",
@@ -5547,6 +5692,80 @@ fn try_catch_continues() {
 display "alive""#,
         "alive",
     );
+}
+
+#[test]
+fn try_catch_finally_runs_on_success() {
+    assert_ok_contains(
+        "try_finally_success",
+        r#"let x = 0
+try {
+    x = 1
+} catch e {
+    x = 99
+} finally {
+    x = x + 10
+}
+display x"#,
+        "11",
+    );
+}
+
+#[test]
+fn try_catch_finally_runs_on_error() {
+    assert_ok_contains(
+        "try_finally_error",
+        r#"let x = 0
+try {
+    x = 1
+    load "nonexistent.csv" as df
+} catch e {
+    x = x + 1
+} finally {
+    x = x + 100
+}
+display x"#,
+        "102",
+    );
+}
+
+#[test]
+fn try_catch_finally_runs_on_return() {
+    assert_ok_contains(
+        "try_finally_return",
+        r#"fn f() {
+    let x = 0
+    try {
+        x = 1
+        return x
+    } catch e {
+        x = 99
+    } finally {
+        x = x + 10
+        print("finally: " + str(x))
+    }
+}
+let r = f()
+display r"#,
+        "finally: 11",
+    );
+}
+
+#[test]
+fn try_catch_finally_error_overrides() {
+    let (ok, out) = run_inline(
+        r#"try {
+    load "nonexistent.csv" as df
+} catch e {
+    print("caught")
+} finally {
+    print("finally")
+    let bad = undefined_var
+}"#,
+    );
+    assert!(!ok);
+    assert!(out.contains("finally"));
+    assert!(out.contains("undefined_var"));
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -5935,7 +6154,7 @@ print(df2)"#,
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// LIST — operações de lista
+// LIST — list operations
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -6160,7 +6379,7 @@ fn list_remove_out_of_bounds() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// DICT — dicionário/mapa
+// DICT — dictionary/map
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -6340,7 +6559,7 @@ display len(d)"#,
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// CONST — variáveis imutáveis
+// CONST — immutable variables
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -6972,7 +7191,7 @@ display other
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// GENERATE DUAL MODE — instrução Stata vs chamada de função
+// GENERATE DUAL MODE — Stata statement vs function call
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -7017,7 +7236,7 @@ display s["mean"]
 
 #[test]
 fn generate_fn_call_does_not_modify_original() {
-    // generate() como função é puro: df original NÃO deve ter a coluna z
+    // generate() as a function is pure: original df must NOT have column z
     let (ok, out) = run_inline(
         r#"
 input df
@@ -7039,7 +7258,7 @@ describe(df)
 
 #[test]
 fn generate_fn_baseline_preserved() {
-    // cenário real: baseline e derivado coexistem independentes
+    // real scenario: baseline and derivative coexist independently
     assert_ok_contains(
         "generate_fn_baseline",
         r#"
@@ -7078,12 +7297,12 @@ display s["mean"]
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// OPERADORES DE SÉRIE TEMPORAL — L., F., D. dentro de generate
+// TIME-SERIES OPERATORS — L., F., D. inside generate
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
 fn tsop_lag_basic() {
-    // L.x em [10,20,30,40] → [NaN,10,20,30]; mean dos não-NaN = 20
+    // L.x on [10,20,30,40] → [NaN,10,20,30]; mean of non-NaN = 20
     assert_ok_contains(
         "tsop_lag",
         r#"
@@ -7104,7 +7323,7 @@ display s["mean"]
 
 #[test]
 fn tsop_lag_reduces_n() {
-    // L.x em 4 obs tem 1 NaN → N não-NaN = 3
+    // L.x on 4 obs has 1 NaN → N non-NaN = 3
     assert_ok_contains(
         "tsop_lag_n",
         r#"
@@ -7125,7 +7344,7 @@ display s["N"]
 
 #[test]
 fn tsop_lead_basic() {
-    // F.x em [10,20,30,40] → [20,30,40,NaN]; mean dos não-NaN = 30
+    // F.x on [10,20,30,40] → [20,30,40,NaN]; mean of non-NaN = 30
     assert_ok_contains(
         "tsop_lead",
         r#"
@@ -7146,7 +7365,7 @@ display s["mean"]
 
 #[test]
 fn tsop_diff_basic() {
-    // D.x em [10,13,18,24] → [NaN,3,5,6]; min dos não-NaN = 3
+    // D.x on [10,13,18,24] → [NaN,3,5,6]; min of non-NaN = 3
     assert_ok_contains(
         "tsop_diff",
         r#"
@@ -7167,7 +7386,7 @@ display s["min"]
 
 #[test]
 fn tsop_lag2_basic() {
-    // L2.x em [10,20,30,40] → [NaN,NaN,10,20]; mean dos não-NaN = 15
+    // L2.x on [10,20,30,40] → [NaN,NaN,10,20]; mean of non-NaN = 15
     assert_ok_contains(
         "tsop_lag2",
         r#"
@@ -7310,7 +7529,7 @@ describe(df2)
 
 #[test]
 fn sort_string_literal_arg() {
-    // sort com string literal — verifica que min continua sendo o mesmo após sort
+    // sort with string literal — checks that min remains the same after sort
     assert_ok_contains(
         "sort_string_literal",
         r#"
@@ -7347,7 +7566,7 @@ display count(df2)
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// CLOSURES — captura de variáveis do escopo externo
+// CLOSURES — capture variables from outer scope
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -7391,7 +7610,7 @@ display r[2]
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// TRY/CATCH — casos de borda e propagação de erros
+// TRY/CATCH — edge cases and error propagation
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -7492,7 +7711,7 @@ try {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// PRINT — opções sep= e end=
+// PRINT — sep= and end= options
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -7515,7 +7734,7 @@ fn print_sep_and_end() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// FSTRING — expressões complexas
+// FSTRING — complex expressions
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -7606,7 +7825,7 @@ display f()
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// FUNÇÕES — múltiplos caminhos de retorno e recursão com acumulador
+// FUNCTIONS — multiple return paths and recursion with accumulator
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -7680,7 +7899,7 @@ display greet("World", "Hello")
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// GENERATE / MUTATE — _n e _N como variáveis especiais
+// GENERATE / MUTATE — _n and _N as special variables
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -7744,7 +7963,7 @@ display s["mean"]
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// GROUP_BY — múltiplas funções de agregação
+// GROUP_BY — multiple aggregation functions
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -7849,7 +8068,7 @@ codebook(df, x)
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// FOR — iteração sobre lista de strings e dicts
+// FOR — iteration over list of strings and dicts
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -7886,7 +8105,7 @@ display total
 
 #[test]
 fn for_builds_list() {
-    // push() muta a lista no lugar; não atribuir o resultado
+    // push() mutates the list in place; do not assign the result
     assert_ok_contains(
         "for_builds_list",
         r#"
@@ -7901,7 +8120,7 @@ display len(squares)
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// MATCH — casos com tipos e expressões nas arms
+// MATCH — cases with types and expressions in arms
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -7972,7 +8191,7 @@ display r
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// IF-EXPR — expressão ternária em contextos variados
+// IF-EXPR — ternary expression in varied contexts
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -8046,7 +8265,7 @@ display inner
 
 #[test]
 fn scope_for_iter_var_survives() {
-    // em Hayashi, a variável de iteração do for persiste após o loop (por design)
+    // in Hayashi, the for loop iteration variable persists after the loop (by design)
     assert_ok_contains(
         "scope_for_survives",
         r#"
@@ -8073,7 +8292,7 @@ display circle_area(1)
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// WHILE — condição baseada em variável e break antecipado
+// WHILE — variable-based condition and early break
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -8148,7 +8367,7 @@ display x
 
 #[test]
 fn compound_assignments_multiple() {
-    // testa vários operadores compostos em sequência
+    // tests several compound operators in sequence
     assert_ok_contains(
         "compound_multi",
         r#"
@@ -8165,7 +8384,7 @@ display x
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// DICT — acesso, set, remove e merge em cenários compostos
+// DICT — access, set, remove and merge in composite scenarios
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -8210,7 +8429,229 @@ display has_key(d2, "b")
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// MENSAGENS DE ERRO — cobertura de cenários específicos
+// SERIES — columns as first-class citizens
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn series_from_dataframe() {
+    assert_ok_contains(
+        "series_from_df",
+        r#"
+input df
+  y x
+  1 10
+  2 20
+  3 30
+  4 40
+  5 50
+end
+let s = df["y"]
+display len(s)
+display first(s)
+display last(s)
+"#,
+        "5",
+    );
+}
+
+#[test]
+fn series_aggregations() {
+    assert_ok_contains(
+        "series_agg",
+        r#"
+input df
+  y x
+  1 10
+  2 20
+  3 30
+  4 40
+  5 50
+end
+let s = df["y"]
+display mean(s)
+display sd(s)
+display min(s)
+display max(s)
+"#,
+        "3",
+    );
+}
+
+#[test]
+fn series_index() {
+    assert_ok_contains(
+        "series_index",
+        r#"
+input df
+  y x
+  1 10
+  2 20
+  3 30
+end
+let s = df["y"]
+display s[0]
+display s[-1]
+"#,
+        "3",
+    );
+}
+
+#[test]
+fn series_shift() {
+    assert_ok_contains(
+        "series_shift",
+        r#"
+input df
+  y x
+  1 10
+  2 20
+  3 30
+end
+let s = df["y"]
+let shifted = shift(s, 1)
+display first(shifted)
+"#,
+        "nil",
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DEFAULTS EM FN
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn fn_default_args() {
+    assert_ok_contains(
+        "fn_defaults",
+        r#"
+fn add(a, b=10) {
+    return a + b
+}
+display add(5)
+display add(5, 3)
+"#,
+        "15",
+    );
+}
+
+#[test]
+fn fn_default_string() {
+    assert_ok_contains(
+        "fn_default_str",
+        r#"
+fn greet(name, greeting="Oi") {
+    return greeting + " " + name
+}
+display greet("Ana")
+"#,
+        "Oi Ana",
+    );
+}
+
+#[test]
+fn fn_default_missing_required() {
+    let (ok, out) = run_inline(
+        r#"
+fn f(a, b=2) {
+    return a + b
+}
+display f()
+"#,
+    );
+    assert!(!ok, "missing required arg should fail");
+    assert!(out.contains("missing required argument"), "{out}");
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ERROS ESTRUTURADOS
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn structured_error_kind_and_msg() {
+    assert_ok_contains(
+        "structured_error",
+        r#"
+try {
+    let y = [1, 2]
+    print(y[10])
+} catch e {
+    display e["kind"]
+    display e["msg"]
+}
+"#,
+        "runtime",
+    );
+}
+
+#[test]
+fn structured_error_line() {
+    assert_ok_contains(
+        "structured_error_line",
+        r#"
+try {
+    let y = [1, 2]
+    print(y[10])
+} catch e {
+    display e["line"]
+}
+"#,
+        "4",
+    );
+}
+
+#[test]
+fn structured_error_undefined_var() {
+    assert_ok_contains(
+        "structured_error_undef",
+        r#"
+try {
+    let z = undefined
+} catch e {
+    display e["kind"]
+    display e["msg"]
+}
+"#,
+        "undefined variable",
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DOCSTRINGS EM FN
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn fn_docstring_help() {
+    assert_ok_contains(
+        "fn_docstring_help",
+        r#"
+fn sharpe(ret, rf=0.0) {
+    ## Compute Sharpe ratio
+    return (mean(ret) - rf) / sd(ret)
+}
+help(sharpe)
+"#,
+        "Compute Sharpe ratio",
+    );
+}
+
+#[test]
+fn fn_docstring_multiline() {
+    assert_ok_contains(
+        "fn_docstring_multi",
+        r#"
+fn sharpe(ret, rf=0.0) {
+    ## Compute Sharpe ratio
+    ## ret: Series of returns
+    return (mean(ret) - rf) / sd(ret)
+}
+help(sharpe)
+"#,
+        "ret: Series of returns",
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ERROR MESSAGES — coverage of specific scenarios
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -8226,7 +8667,7 @@ summarize(df, prce)
 "#,
     );
     assert!(!ok, "bad column should fail");
-    // não exigimos did-you-mean para nomes de coluna (depende da implementação),
+    // we do not require did-you-mean for column names (depends on implementation),
     // mas deve falhar com mensagem clara
     assert!(
         out.contains("prce") || out.contains("price") || out.contains("not found"),
@@ -8262,7 +8703,7 @@ display lst[10]
 
 #[test]
 fn error_type_mismatch_string_plus_int() {
-    // "hello" + 42 deve falhar pois 42 não é string
+    // "hello" + 42 must fail because 42 is not a string
     let (ok, out) = run_inline(r#"display "hello" + 42"#);
     if !ok {
         // mensagem deve mencionar o problema de tipo
@@ -8274,7 +8715,7 @@ fn error_type_mismatch_string_plus_int() {
             "type error should be informative:\n{out}"
         );
     }
-    // se ok, auto-conversão é aceitável; apenas garantir determinismo
+    // if ok, auto-conversion is acceptable; just ensure determinism
 }
 
 #[test]
@@ -8336,7 +8777,7 @@ describe(wide)
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// MUTATE — múltiplas colunas, incluindo condicionais
+// MUTATE — multiple columns, including conditionals
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -8379,7 +8820,7 @@ display s["max"]
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// OPERAÇÕES MATEMÁTICAS — precisão e casos extremos
+// MATHEMATICAL OPERATIONS — precision and extreme cases
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -8389,9 +8830,9 @@ fn math_integer_division_floor() {
 
 #[test]
 fn math_modulo_negative() {
-    let (ok, out) = run_inline("display -7 % 3");
+    let (ok, out) = run_inline("print(-7 % 3)");
     assert!(ok, "negative modulo failed:\n{out}");
-    // resultado pode ser -1 ou 2 dependendo da convenção; só verifica que é determinístico
+    // result can be -1 or 2 depending on convention; just checks that it is deterministic
     assert!(
         out.trim() == "-1" || out.trim() == "2",
         "unexpected modulo result:\n{out}"
@@ -8433,7 +8874,7 @@ fn in_operator_not_in_list() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// BOOLEAN — short-circuit e combinações
+// BOOLEAN — short-circuit and combinations
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -8477,7 +8918,7 @@ display (a < b) && (c < a) && (b > c)
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// STRINGS — operações em cadeia e comportamento com caracteres especiais
+// STRINGS — chained operations and behavior with special characters
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -8530,7 +8971,7 @@ display substr(s, 0, 5)
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// LISTAS — operações funcionais
+// LISTS — functional operations
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -8702,7 +9143,7 @@ display count(df2)
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// INPUT BLOCK — erro claro ao receber dados não-numéricos
+// INPUT BLOCK — clear error when receiving non-numeric data
 // ══════════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -8718,7 +9159,7 @@ end
     );
     assert!(!ok, "input with string data should fail");
     assert!(
-        out.contains("Alice") || out.contains("não é um número") || out.contains("numérico"),
+        out.contains("Alice") || out.contains("not a number"),
         "error should mention the non-numeric token:\n{out}"
     );
 }
@@ -8736,14 +9177,14 @@ end
     );
     assert!(!ok, "input with quoted string should fail");
     assert!(
-        out.contains("hello") || out.contains("não é um número") || out.contains("numérico"),
+        out.contains("hello") || out.contains("not a number"),
         "error should mention the invalid token:\n{out}"
     );
 }
 
 #[test]
 fn input_accepts_dot_as_missing() {
-    // '.' é missing válido; não deve ser confundido com string
+    // '.' is a valid missing value; must not be confused with string
     assert_ok_contains(
         "input_dot_missing",
         r#"
@@ -8798,7 +9239,7 @@ fn test_all_type_checkers() {
 
 #[test]
 fn pipe_multiline() {
-    // |> no início de linha continuando a pipe chain
+    // |> at the start of a line continuing the pipe chain
     assert_ok_contains(
         "pipe_multiline",
         r#"let r = [3, 1, 2]
@@ -8811,7 +9252,7 @@ display r[0]"#,
 
 #[test]
 fn pipe_multiline_with_args() {
-    // pipe multi-linha com chamadas de funções com argumentos
+    // multi-line pipe with function calls and arguments
     assert_ok_contains(
         "pipe_multiline_args",
         r#"let r = [1, 2, 3, 4, 5]
@@ -8824,7 +9265,7 @@ display r[0]"#,
 
 #[test]
 fn list_multiline() {
-    // lista literal com elementos em múltiplas linhas
+    // list literal with elements across multiple lines
     assert_ok_contains(
         "list_multiline",
         r#"let xs = [
@@ -8839,7 +9280,7 @@ display xs[1]"#,
 
 #[test]
 fn list_multiline_strings() {
-    // lista de strings em múltiplas linhas
+    // list of strings across multiple lines
     assert_ok_contains(
         "list_multiline_strings",
         r#"let names = [
@@ -8854,7 +9295,7 @@ display names[2]"#,
 
 #[test]
 fn list_multiline_map() {
-    // map sobre lista definida em múltiplas linhas
+    // map over list defined across multiple lines
     assert_ok_contains(
         "list_multiline_map",
         r#"let xs = [
@@ -8867,11 +9308,11 @@ display xs[0]"#,
     );
 }
 
-// ── Testes de regressão: dict literal multi-linha ─────────────────────────
+// ── Regression tests: multi-line dict literal ─────────────────────────
 
 #[test]
 fn dict_multiline_basic() {
-    // dict literal com pares em múltiplas linhas
+    // dict literal with pairs across multiple lines
     assert_ok_contains(
         "dict_multiline_basic",
         r#"let d = {
@@ -8885,7 +9326,7 @@ display d["x"]"#,
 
 #[test]
 fn dict_multiline_string_values() {
-    // dict com strings em múltiplas linhas
+    // dict with strings across multiple lines
     assert_ok_contains(
         "dict_multiline_string_values",
         r#"let d = {
@@ -8899,7 +9340,7 @@ display d["name"]"#,
 
 #[test]
 fn dict_multiline_trailing_comma() {
-    // dict com vírgula trailing na última linha (deve ser tolerado)
+    // dict with trailing comma on the last line (must be tolerated)
     assert_ok_contains(
         "dict_multiline_trailing_comma",
         r#"let d = {
@@ -8913,7 +9354,7 @@ display d["b"]"#,
 
 #[test]
 fn dict_multiline_nested_list() {
-    // dict com lista como valor, tudo em múltiplas linhas
+    // dict with list as value, all across multiple lines
     assert_ok_contains(
         "dict_multiline_nested_list",
         r#"let d = {
@@ -8927,7 +9368,7 @@ display d["xs"][0]"#,
 
 #[test]
 fn dict_multiline_in_call() {
-    // dict multi-linha como argumento de função
+    // multi-line dict as function argument
     assert_ok_contains(
         "dict_multiline_in_call",
         r#"let df = dataframe({
