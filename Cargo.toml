@@ -1,6 +1,6 @@
 [package]
 name = "hayashi-lang"
-version = "0.2.9-dev"
+version = "0.2.9-beta.1"
 authors = ["Flávio de Vasconcellos Corrêa <flavio.vcorrea@ufpel.edu.br>"]
 edition = "2021"
 description = "An interpreted language for applied econometrics — Stata-like syntax, modern features, zero cost"
@@ -23,7 +23,7 @@ path = "src/main.rs"
 required-features = ["native"]
 
 [dependencies]
-greeners = { path = "../Greeners" }
+greeners = { version = "1.5.3" }
 ndarray = "0.17"
 chrono = "0.4"
 statrs = "0.18"
