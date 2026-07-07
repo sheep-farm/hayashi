@@ -959,7 +959,8 @@ fn print_help() {
 }
 
 fn packages_dir() -> std::path::PathBuf {
-    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+    let home = std::env::var("HOME")
+        .unwrap_or_else(|_| std::env::var("USERPROFILE").unwrap_or_else(|_| ".".into()));
     std::path::Path::new(&home).join(".hay").join("packages")
 }
 

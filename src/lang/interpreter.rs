@@ -478,7 +478,7 @@ impl Interpreter {
     }
 
     pub fn load_plugins(&mut self) {
-        let home = match std::env::var_os("HOME") {
+        let home = match std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")) {
             Some(h) => h,
             None => return,
         };
@@ -537,7 +537,7 @@ impl Interpreter {
                 || cand.ends_with(".dylib");
 
             // In release builds, restrict native/WASM plugins
-            // to be loaded only from ~/.hay/packages/.
+            // to be loaded only from ~/.hay/packages/ or exe dir.
             let restrict_to_packages = is_native_or_wasm && !cfg!(debug_assertions);
 
             // 1. Current directory
@@ -545,9 +545,26 @@ impl Interpreter {
                 return Ok(cand.to_string());
             }
 
-            // 2. ~/.hay/plugins/
+            // 2. Directory of the running executable (e.g. portable Windows installs)
+            if let Ok(exe) = std::env::current_exe() {
+                if let Some(exe_dir) = exe.parent() {
+                    let p = exe_dir.join(cand);
+                    if p.exists() {
+                        return Ok(p.to_string_lossy().to_string());
+                    }
+                    // Also check exe_dir/plugins/ and exe_dir/.hay/plugins/
+                    for sub in &["plugins", ".hay/plugins"] {
+                        let p = exe_dir.join(sub).join(cand);
+                        if p.exists() {
+                            return Ok(p.to_string_lossy().to_string());
+                        }
+                    }
+                }
+            }
+
+            // 3. ~/.hay/plugins/ (or %USERPROFILE%\.hay\plugins\ on Windows)
             if !restrict_to_packages {
-                if let Some(home) = std::env::var_os("HOME") {
+                if let Some(home) = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")) {
                     let plugin_path = std::path::Path::new(&home)
                         .join(".hay")
                         .join("plugins")
@@ -558,8 +575,8 @@ impl Interpreter {
                 }
             }
 
-            // 3. ~/.hay/packages/ (installed packages)
-            if let Some(home) = std::env::var_os("HOME") {
+            // 4. ~/.hay/packages/ (installed packages)
+            if let Some(home) = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")) {
                 let pkg_path = std::path::Path::new(&home)
                     .join(".hay")
                     .join("packages")
@@ -569,7 +586,7 @@ impl Interpreter {
                 }
             }
 
-            // 4. User-declared plugin_paths
+            // 5. User-declared plugin_paths
             if !restrict_to_packages {
                 for dir in &self.plugin_paths {
                     let p = std::path::Path::new(dir).join(cand);
@@ -579,10 +596,11 @@ impl Interpreter {
                 }
             }
 
-            // 5. HAYASHI_PATH env var (colon-separated)
+            // 6. HAYASHI_PATH env var (colon or semicolon separated)
             if !restrict_to_packages {
                 if let Ok(paths) = std::env::var("HAYASHI_PATH") {
-                    for dir in paths.split(':') {
+                    let sep = if cfg!(windows) { ';' } else { ':' };
+                    for dir in paths.split(sep) {
                         let p = std::path::Path::new(dir).join(cand);
                         if p.exists() {
                             return Ok(p.to_string_lossy().to_string());
@@ -593,7 +611,7 @@ impl Interpreter {
         }
 
         Err(HayashiError::Runtime(format!(
-            "import: module '{}' not found (searched: ./, ~/.hay/plugins/, plugin_path, $HAYASHI_PATH)",
+            "import: module '{}' not found (searched: ./, exe dir, ~/.hay/plugins/, ~/.hay/packages/, plugin_path, $HAYASHI_PATH)",
             name
         )))
     }
