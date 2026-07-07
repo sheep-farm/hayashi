@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Changelog — Hayashi</title>
+  <meta name="description" content="Release history and changelog for the Hayashi econometrics language.">
+  <meta name="keywords" content="Hayashi changelog, release notes, version history, econometrics">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+JP:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .changelog {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 3rem 0 5rem;
+    }
+    .changelog intro {
+      color: var(--text-muted);
+      margin-bottom: 2rem;
+      font-size: 1.05rem;
+    }
+    .release {
+      margin-bottom: 2.5rem;
+      padding-bottom: 2.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .release:last-child {
+      border-bottom: none;
+    }
+    .release-version {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+    }
+    .release-version a {
+      color: var(--text);
+      text-decoration: none;
+    }
+    .release-version a:hover {
+      text-decoration: underline;
+    }
+    .release-date {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 1.25rem;
+    }
+    .release-section {
+      margin-top: 1.25rem;
+    }
+    .release-section h3 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 0.6rem;
+    }
+    .release-section h3.added { color: #22c55e; }
+    .release-section h3.changed { color: #eab308; }
+    .release-section h3.fixed { color: #3b82f6; }
+    .release-section h3.removed { color: #ef4444; }
+    .release-section h3.internal { color: var(--text-muted); }
+    .release-section h3.breaking { color: #ef4444; }
+    .release-section ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .release-section li {
+      padding: 0.4rem 0 0.4rem 1.25rem;
+      position: relative;
+      line-height: 1.6;
+      font-size: 0.95rem;
+    }
+    .release-section li::before {
+      content: "—";
+      position: absolute;
+      left: 0;
+      color: var(--text-muted);
+    }
+    .release-section li code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85em;
+      background: var(--code-bg);
+      padding: 0.1rem 0.35rem;
+      border-radius: 4px;
+    }
+    .release-section li ul {
+      margin-top: 0.4rem;
+      padding-left: 1rem;
+    }
+    .release-section li ul li::before {
+      content: "·";
+    }
+    .badge-dev {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      background: rgba(234, 179, 8, 0.15);
+      color: #eab308;
+      margin-left: 0.5rem;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="index.html" class="logo">
+        <span class="logo-mark" aria-label="Hayashi" title="林 (Hayashi, forest)">林</span>
+        <span class="logo-text">Hayashi Language</span>
+      </a>
+      <nav class="main-nav">
+        <a href="index.html">Home</a>
+        <a href="docs.html">Docs</a>
+        <a href="playground.html">Playground</a>
+        <a href="plugins.html">Plugins</a>
+        <a href="community.html">Community</a>
+        <a href="about.html">About</a>
+        <a href="changelog.html">Changelog</a>
+        <a href="https://github.com/sheep-farm/hayashi" target="_blank" rel="noopener">GitHub</a>
+      </nav>
+      <button class="menu-toggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <section class="page-hero">
+      <div class="container">
+        <h1>Changelog</h1>
+        <p class="page-subtitle">All notable changes to Hayashi, following <a href="https://keepachangelog.com/" target="_blank" rel="noopener">Keep a Changelog</a>.</p>
+      </div>
+    </section>
+
+    <div class="container">
+      <div class="changelog">
+        <p class="changelog-intro">
+          Full source changelog available on
+          <a href="https://github.com/sheep-farm/hayashi/blob/master/CHANGELOG.md" target="_blank" rel="noopener">GitHub</a>.
+        </p>
+
+        <!-- Unreleased -->
+        <div class="release" id="unreleased">
+          <div class="release-version">Unreleased <span class="badge-dev">dev</span></div>
+          <div class="release-date">In development</div>
+
+          <div class="release-section">
+            <h3 class="added">Added</h3>
+            <ul>
+              <li><strong>Safe modes for <code>hay dist-update</code></strong>: <code>--help</code> and <code>--check</code> subcommands, argument validation with unit tests.</li>
+              <li><strong>English-only user-facing output</strong>: all error messages and printed strings translated to English. Mathematical notation preserved.</li>
+              <li><strong>Interpreter decomposition</strong>: <code>interpreter.rs</code> split into focused submodules (execution, eval_expr, dispatch, helpers, value, models). Reduced from ~4,800 to ~680 lines.</li>
+              <li><strong><code>for</code> loop index/value binding</strong>: <code>for i, v in list</code> and <code>for k, v in dict</code>.</li>
+              <li><strong><code>try/catch/finally</code></strong>: <code>finally</code> block runs regardless of try outcome.</li>
+              <li><strong><code>hay install</code> with version</strong>: install specific release tags.</li>
+              <li><strong><code>hay list</code> shows versions</strong> from plugin metadata.</li>
+              <li><strong><code>match</code> as contextual keyword</strong>: works as identifier and match expression.</li>
+              <li><strong><code>list_files()</code> builtin</strong>: <code>list_files(dir)</code> and <code>list_files(dir, pattern)</code>.</li>
+              <li><strong><code>++</code> and <code>--</code> operators</strong>: increment and decrement with desugaring to <code>x = x + 1</code>.</li>
+            </ul>
+          </div>
+
+          <div class="release-section">
+            <h3 class="changed">Changed</h3>
+            <ul>
+              <li><strong><code>quietly(expr)</code> deprecated</strong>: use <code>quietly on</code> / <code>quietly off</code> instead.</li>
+              <li><strong>Validation runner exit semantics</strong>: non-zero exit on blocked cases unless <code>--allow-blocked</code>.</li>
+              <li><strong><code>data_source</code> field</strong> added to validation cases.</li>
+            </ul>
+          </div>
+
+          <div class="release-section">
+            <h3 class="fixed">Fixed</h3>
+            <ul>
+              <li><strong>CSV export column order</strong>: <code>to_csv</code> no longer sorts columns alphabetically. Insertion order preserved via <code>IndexMap</code>.</li>
+              <li><strong><code>append()</code> losing string columns</strong>: <code>get_string()</code> now handles <code>Categorical</code> columns. Previously, <code>append()</code> produced empty strings for columns with repeated values (dates, tickers, sectors).</li>
+              <li><strong>Plugin resolution on Windows</strong>: <code>HOME</code> falls back to <code>USERPROFILE</code>. Searches executable directory. <code>HAYASHI_PATH</code> uses <code>;</code> separator on Windows.</li>
+              <li><strong>Validation workflow</strong>: repaired <code>validation.yml</code>, added Greeners checkout.</li>
+              <li><strong>Clippy warnings</strong>: fixed <code>empty_line_after_doc_comments</code>, <code>too_many_arguments</code>, <code>needless_range_loop</code>.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 0.2.8 -->
+        <div class="release" id="0.2.8">
+          <div class="release-version"><a href="https://github.com/sheep-farm/hayashi/releases/tag/v0.2.8" target="_blank" rel="noopener">0.2.8</a></div>
+          <div class="release-date">2026-09-17</div>
+          <div class="release-section">
+            <h3 class="added">Added</h3>
+            <ul>
+              <li><strong><code>++</code> and <code>--</code> operators</strong>: increment/decrement with desugaring to <code>x = x + 1</code>.</li>
+              <li><strong>Greeners 1.5.1</strong> dependency (crates.io, no path dependency).</li>
+            </ul>
+          </div>
+          <div class="release-section">
+            <h3 class="fixed">Fixed</h3>
+            <ul>
+              <li><strong>Greeners dependency</strong>: uses <code>greeners = "1.5.1"</code> from crates.io in release builds.</li>
+              <li><strong>crossbeam-epoch advisory</strong>: updated to fix RUSTSEC advisory.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 0.2.6 -->
+        <div class="release" id="0.2.6">
+          <div class="release-version"><a href="https://github.com/sheep-farm/hayashi/releases/tag/v0.2.6" target="_blank" rel="noopener">0.2.6</a></div>
+          <div class="release-date">2026-08-25</div>
+
+          <div class="release-section">
+            <h3 class="added">Added</h3>
+            <ul>
+              <li><strong>Hybrid plugin system</strong>: Native Rust (<code>.so</code>/<code>.dll</code>), WebAssembly (<code>.wasm</code>), and Script (<code>.hay</code>) tiers via unified <code>HayashiPlugin</code> trait.</li>
+              <li><strong>Pipe placeholder <code>_</code></strong>: <code>df |> ols(lw ~ yos, _)</code> passes piped value to any argument position.</li>
+              <li><strong><code>ttest</code> option <code>unequal=false</code></strong>: pooled (equal-variance) t-test.</li>
+              <li><strong>Validation programme expanded to 40 cases</strong>: ridge, elasticnet, nbreg, oprobit, mlogit, SUR.</li>
+              <li><strong>Parametric-bootstrap SE for VECM</strong> with inference enabled.</li>
+            </ul>
+          </div>
+
+          <div class="release-section">
+            <h3 class="fixed">Fixed</h3>
+            <ul>
+              <li><strong>Non-numeric columns in <code>generate</code> and estimators</strong>: <code>to_float()</code> instead of hard-failing on Boolean/Categorical columns.</li>
+              <li><strong>Hardened URL downloads</strong> (security, contributed by Charles Shaw): SSRF prevention, DNS rebinding protection, timeout and size limits.</li>
+              <li><strong>Clippy warnings</strong> fixed in Hayashi and Greeners.</li>
+              <li><strong><code>argmin</code> updated</strong> to resolve RUSTSEC-2024-0384.</li>
+            </ul>
+          </div>
+
+          <div class="release-section">
+            <h3 class="changed">Changed</h3>
+            <ul>
+              <li><strong><code>ttest</code> delegated to Greeners</strong>: interpreter is now a thin dispatcher.</li>
+            </ul>
+          </div>
+
+          <div class="release-section">
+            <h3 class="removed">Removed</h3>
+            <ul>
+              <li><strong>Unused <code>anyhow</code> dependency</strong> (contributed by Charles Shaw).</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 0.2.3 -->
+        <div class="release" id="0.2.3">
+          <div class="release-version"><a href="https://github.com/sheep-farm/hayashi/releases/tag/v0.2.3" target="_blank" rel="noopener">0.2.3</a></div>
+          <div class="release-date">2026-06-25</div>
+
+          <div class="release-section">
+            <h3 class="added">Added</h3>
+            <ul>
+              <li><strong><code>codebook(df)</code></strong>: detailed variable description.</li>
+              <li><strong>Normality tests</strong>: <code>swilk</code>, <code>sfrancia</code>, <code>sktest</code>.</li>
+              <li><strong><code>mutate</code>, <code>group_by</code>, <code>pivot_longer</code>, <code>pivot_wider</code>, <code>select</code></strong>: pipe-friendly data manipulation.</li>
+              <li><strong><code>print()</code> multi-arg</strong>: <code>print(a, b, sep=", ")</code>.</li>
+              <li><strong>Improved error messages</strong>: source line preview, Levenshtein suggestions, stack traces.</li>
+            </ul>
+          </div>
+
+          <div class="release-section">
+            <h3 class="fixed">Fixed</h3>
+            <ul>
+              <li>Keywords followed by <code>(</code> now parse as function calls.</li>
+              <li>Parser line numbers correctly tracked after newlines.</li>
+              <li><code>MomentHelpers</code> exported from Greeners.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 0.2.2 -->
+        <div class="release" id="0.2.2">
+          <div class="release-version"><a href="https://github.com/sheep-farm/hayashi/releases/tag/v0.2.2" target="_blank" rel="noopener">0.2.2</a></div>
+          <div class="release-date">2026-06-24</div>
+
+          <div class="release-section">
+            <h3 class="added">Added</h3>
+            <ul>
+              <li><strong>Operators</strong>: <code>%</code> (modulo), <code>**</code> (power alias), compound assignment (<code>+=</code>, <code>-=</code>, <code>*=</code>, <code>/=</code>, <code>%=</code>).</li>
+              <li><strong><code>gmm()</code></strong>: two-step efficient GMM with Hansen J-test.</li>
+              <li><strong><code>cmnlogit()</code></strong>: conditional multinomial logit.</li>
+              <li><strong><code>help(about)</code> and <code>help(license)</code></strong>.</li>
+            </ul>
+          </div>
+
+          <div class="release-section">
+            <h3 class="fixed">Fixed</h3>
+            <ul>
+              <li><strong>Formula parsing unified</strong>: all 53 estimators accept bare and string formulas.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 0.2.1 -->
+        <div class="release" id="0.2.1">
+          <div class="release-version"><a href="https://github.com/sheep-farm/hayashi/releases/tag/v0.2.1" target="_blank" rel="noopener">0.2.1</a></div>
+          <div class="release-date">2026-06-24</div>
+
+          <div class="release-section">
+            <h3 class="fixed">Fixed</h3>
+            <ul>
+              <li><strong>Scalar math functions</strong>: <code>sqrt()</code>, <code>abs()</code>, <code>ln()</code>, <code>exp()</code>, <code>pow()</code>, <code>sin()</code>, <code>cos()</code>, <code>tan()</code>, <code>ceil()</code>, <code>floor()</code>, <code>round()</code>, <code>sign()</code>, <code>factorial()</code>, <code>normalden()</code>, <code>invnormal()</code>, <code>max()</code>, <code>min()</code> now work as standalone expressions.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 0.2.0 -->
+        <div class="release" id="0.2.0">
+          <div class="release-version"><a href="https://github.com/sheep-farm/hayashi/releases/tag/v0.2.0" target="_blank" rel="noopener">0.2.0</a></div>
+          <div class="release-date">2026-06-24</div>
+
+          <div class="release-section">
+            <h3 class="breaking">Breaking Changes</h3>
+            <ul>
+              <li><strong>Extension</strong>: <code>.hy</code> → <code>.hay</code></li>
+              <li><strong>Binary</strong>: <code>hayashi</code> → <code>hay</code></li>
+              <li><strong>Namespaced imports</strong>: <code>import("mod")</code> → <code>mod::func()</code></li>
+            </ul>
+          </div>
+
+          <div class="release-section">
+            <h3 class="added">Added</h3>
+            <ul>
+              <li><strong>CI/CD</strong>: GitHub Actions with fmt, clippy, test on Linux/macOS/Windows; release workflow for 4 targets.</li>
+              <li><strong>Namespaces</strong>: <code>import("mod", as=alias)</code>, <code>import("mod", only=["f"])</code>.</li>
+              <li><strong>REPL</strong>: tab completion, syntax highlighting, colored prompt, fish-style history hints.</li>
+              <li><strong>Date/time</strong>: <code>date()</code>, <code>datetime()</code>, <code>year()</code>, <code>month()</code>, <code>day()</code>, <code>hour()</code>, <code>dow()</code>.</li>
+              <li><strong>Collinearity detection</strong>: QR-based across 9 estimators with Stata-style <code>(omitted)</code> display.</li>
+              <li><strong>VS Code extension 0.2.0</strong>.</li>
+            </ul>
+          </div>
+
+          <div class="release-section">
+            <h3 class="fixed">Fixed</h3>
+            <ul>
+              <li><strong>Stack overflow on Windows/macOS</strong>: 32 MB stack for main thread.</li>
+              <li><strong>Cross-platform tests</strong>: <code>std::env::temp_dir()</code> replaces hardcoded paths.</li>
+              <li><strong>Package manager</strong>: correct <code>user/repo/</code> directory structure.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 0.1.0 -->
+        <div class="release" id="0.1.0">
+          <div class="release-version"><a href="https://github.com/sheep-farm/hayashi/releases/tag/v0.1.0" target="_blank" rel="noopener">0.1.0</a></div>
+          <div class="release-date">2026-06-15</div>
+          <div class="release-section">
+            <h3 class="added">Initial Release</h3>
+            <ul>
+              <li>46 estimators: OLS, IV, Logit, Probit, Poisson, NegBin, Tobit, Heckman, FE, RE, Arellano-Bond, System GMM, ARIMA, GARCH, VAR, VECM, Lasso, Ridge, DID, RD, Cox, Fama-MacBeth, and more.</li>
+              <li>Stata-like syntax with closures, pipe, match, f-strings, try/catch.</li>
+              <li>8 I/O formats: CSV, TSV, JSON, DTA, Excel, Parquet, SQLite, ODBC.</li>
+              <li>Plugin system with package manager (<code>hay install</code>).</li>
+              <li>Post-estimation: test, nlcom, margins, bootstrap, esttab, vif, hausman, predict.</li>
+              <li>387 tests, 59 examples, ~110 help topics.</li>
+              <li>100% Rust — no C, no Fortran, no system BLAS/LAPACK.</li>
+            </ul>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <span class="logo-mark" aria-label="Hayashi" title="林 (Hayashi, forest)">林</span>
+        <span>Hayashi Language</span>
+      </div>
+      <div class="footer-links">
+        <a href="https://github.com/sheep-farm/hayashi">GitHub</a>
+        <a href="https://github.com/sheep-farm/Greeners">Greeners</a>
+      </div>
+      <div class="footer-copy">
+        Hayashi: GPL-3.0-only · Greeners: MIT · Books & docs: CC BY-SA 4.0
+        No cookies. No tracking. Your privacy is respected.
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>
