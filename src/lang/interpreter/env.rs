@@ -22,6 +22,12 @@ pub struct Env {
     quiet_stack: Vec<bool>,
 }
 
+impl Default for Env {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Env {
     pub fn new() -> Self {
         Self {

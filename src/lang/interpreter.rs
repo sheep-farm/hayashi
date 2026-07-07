@@ -113,6 +113,12 @@ pub struct Interpreter {
     call_stack: Vec<(String, usize)>,
 }
 
+impl Default for Interpreter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Interpreter {
     pub fn new() -> Self {
         Self {
@@ -564,7 +570,9 @@ impl Interpreter {
 
             // 3. ~/.hay/plugins/ (or %USERPROFILE%\.hay\plugins\ on Windows)
             if !restrict_to_packages {
-                if let Some(home) = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")) {
+                if let Some(home) =
+                    std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE"))
+                {
                     let plugin_path = std::path::Path::new(&home)
                         .join(".hay")
                         .join("plugins")
@@ -576,7 +584,8 @@ impl Interpreter {
             }
 
             // 4. ~/.hay/packages/ (installed packages)
-            if let Some(home) = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")) {
+            if let Some(home) = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE"))
+            {
                 let pkg_path = std::path::Path::new(&home)
                     .join(".hay")
                     .join("packages")
