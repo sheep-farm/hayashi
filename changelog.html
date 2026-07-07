@@ -105,6 +105,64 @@
       margin-left: 0.5rem;
       vertical-align: middle;
     }
+    .badge-beta {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      background: rgba(59, 130, 246, 0.15);
+      color: #3b82f6;
+      margin-left: 0.5rem;
+      vertical-align: middle;
+    }
+    .prerelease-notice {
+      background: rgba(59, 130, 246, 0.08);
+      border: 1px solid rgba(59, 130, 246, 0.25);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 2rem;
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+    .prerelease-notice strong {
+      color: #3b82f6;
+    }
+    .prerelease-notice ul {
+      list-style: none;
+      padding: 0;
+      margin: 0.5rem 0 0;
+    }
+    .prerelease-notice li {
+      padding: 0.2rem 0 0.2rem 1.25rem;
+      position: relative;
+    }
+    .prerelease-notice li::before {
+      content: "→";
+      position: absolute;
+      left: 0;
+      color: #3b82f6;
+    }
+    .download-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+    .download-links a {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      padding: 0.3rem 0.7rem;
+      border-radius: 4px;
+      background: var(--code-bg);
+      text-decoration: none;
+      color: var(--text);
+      border: 1px solid var(--border);
+      transition: border-color 0.15s;
+    }
+    .download-links a:hover {
+      border-color: #3b82f6;
+    }
   </style>
 </head>
 <body>
@@ -184,6 +242,64 @@
               <li><strong>Validation workflow</strong>: repaired <code>validation.yml</code>, added Greeners checkout.</li>
               <li><strong>Clippy warnings</strong>: fixed <code>empty_line_after_doc_comments</code>, <code>too_many_arguments</code>, <code>needless_range_loop</code>.</li>
             </ul>
+          </div>
+        </div>
+
+        <!-- Pre-releases -->
+        <div class="prerelease-notice">
+          <strong>Pre-release builds</strong> — beta versions are for testing only.
+          <ul>
+            <li>Not published to <code>crates.io</code> — binary-only GitHub releases</li>
+            <li>May contain known or unknown bugs — <strong>do not use in production</strong></li>
+            <li>API may change before the stable release</li>
+            <li>Report issues on <a href="https://github.com/sheep-farm/hayashi/issues" target="_blank" rel="noopener">GitHub Issues</a></li>
+          </ul>
+        </div>
+
+        <!-- 0.2.9-beta.1 -->
+        <div class="release" id="0.2.9-beta.1">
+          <div class="release-version"><a href="https://github.com/sheep-farm/hayashi/releases/tag/v0.2.9-beta.1" target="_blank" rel="noopener">0.2.9-beta.1</a> <span class="badge-beta">beta</span></div>
+          <div class="release-date">2026-07-07</div>
+
+          <div class="release-section">
+            <h3 class="fixed">Fixed</h3>
+            <ul>
+              <li><strong>CSV export column order</strong>: <code>to_csv</code> no longer sorts columns alphabetically. Insertion order preserved via <code>IndexMap</code> (replacing <code>HashMap</code> in Greeners).</li>
+              <li><strong><code>append()</code> losing string columns</strong>: <code>get_string()</code> now handles <code>Categorical</code> columns. Previously, <code>append()</code> produced empty strings for any column with repeated values (dates, tickers, sectors).</li>
+              <li><strong>Plugin resolution on Windows</strong>: <code>HOME</code> falls back to <code>USERPROFILE</code>. Searches executable directory (<code>exe_dir/</code>, <code>exe_dir/plugins/</code>). <code>HAYASHI_PATH</code> uses <code>;</code> as separator on Windows.</li>
+            </ul>
+          </div>
+
+          <div class="release-section">
+            <h3 class="added">Added</h3>
+            <ul>
+              <li><strong><code>++</code> and <code>--</code> operators</strong>: increment and decrement.</li>
+              <li><strong><code>for i, v in list</code></strong> and <strong><code>for k, v in dict</code></strong>: index/value and key/value bindings.</li>
+              <li><strong><code>try/catch/finally</code></strong>: <code>finally</code> block runs regardless of try outcome.</li>
+              <li><strong><code>hay install</code> with version</strong>: install specific release tags.</li>
+              <li><strong><code>hay list</code> shows versions</strong> from plugin metadata.</li>
+              <li><strong><code>match</code> as contextual keyword</strong>: works as identifier and match expression.</li>
+              <li><strong><code>list_files()</code> builtin</strong>: <code>list_files(dir)</code> and <code>list_files(dir, pattern)</code>.</li>
+              <li><strong>Interpreter decomposition</strong>: <code>interpreter.rs</code> reduced from ~4,800 to ~680 lines.</li>
+              <li><strong>English-only user-facing output</strong>: all error messages and printed strings in English.</li>
+            </ul>
+          </div>
+
+          <div class="release-section">
+            <h3 class="changed">Changed</h3>
+            <ul>
+              <li><strong><code>quietly(expr)</code> deprecated</strong>: use <code>quietly on</code> / <code>quietly off</code> instead.</li>
+              <li><strong>Greeners 1.5.3</strong>: <code>IndexMap</code> for column order preservation, <code>get_string</code> handles <code>Categorical</code>.</li>
+            </ul>
+          </div>
+
+          <div class="release-section">
+            <h3>Downloads</h3>
+            <div class="download-links">
+              <a href="https://github.com/sheep-farm/hayashi/releases/download/v0.2.9-beta.1/hay-v0.2.9-beta.1-x86_64-unknown-linux-gnu.tar.gz" target="_blank" rel="noopener">Linux x86_64</a>
+              <a href="https://github.com/sheep-farm/hayashi/releases/download/v0.2.9-beta.1/hay-v0.2.9-beta.1-aarch64-apple-darwin.tar.gz" target="_blank" rel="noopener">macOS ARM64</a>
+              <a href="https://github.com/sheep-farm/hayashi/releases/download/v0.2.9-beta.1/hay-v0.2.9-beta.1-x86_64-pc-windows-msvc.zip" target="_blank" rel="noopener">Windows x86_64</a>
+            </div>
           </div>
         </div>
 
