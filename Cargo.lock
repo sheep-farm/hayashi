@@ -1319,7 +1319,7 @@ dependencies = [
 
 [[package]]
 name = "greeners"
-version = "1.5.1-dev"
+version = "1.5.1"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1377,7 +1377,7 @@ dependencies = [
 
 [[package]]
 name = "hayashi-lang"
-version = "0.2.8-dev"
+version = "0.2.9-dev"
 dependencies = [
  "arrow",
  "calamine",
