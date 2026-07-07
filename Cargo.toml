@@ -23,7 +23,7 @@ path = "src/main.rs"
 required-features = ["native"]
 
 [dependencies]
-greeners = "1.5.1"
+greeners = "1.5.2"
 ndarray = "0.17"
 chrono = "0.4"
 statrs = "0.18"
