@@ -67,7 +67,13 @@ Rscript -e 'install.packages(c("wooldridge", "jsonlite", "MASS", "glmnet", "syst
 
 ## Reference implementation coverage
 
-Most cases provide both an R and a Python reference implementation. The validation runner runs both references when they are available and compares Hayashi against each independently. A few cases implement the estimator manually in base R/Python because no suitable packaged reference is available; each case's `README.md` documents the exact packages and implementation choices.
+Most cases provide both an R and a Python reference implementation. The
+validation runner runs every declared reference and blocks the case if any
+declared reference fails or is missing. Hayashi is then compared against one
+selected reference implementation, and the generated matrix marks that
+reference with `*`. A few cases implement the estimator manually in base
+R/Python because no suitable packaged reference is available; each case's
+`README.md` documents the exact packages and implementation choices.
 
 ## Directory layout
 
