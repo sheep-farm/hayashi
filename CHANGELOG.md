@@ -38,6 +38,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Fixed
 
+- **CSV export column order**: `DataFrame::to_csv` no longer sorts columns alphabetically. Column insertion order is preserved via `IndexMap` (replacing `HashMap`). Affects all CSV/JSON exports and display functions.
+- **`append()` losing string columns**: `get_string()` now handles `Categorical` columns (previously returned error, causing `append()` to produce empty strings for any column with repeated values — e.g. dates, tickers, sectors).
+- **Plugin resolution on Windows**: `HOME` now falls back to `USERPROFILE`. `resolve_import` also searches the executable's directory (`exe_dir/`, `exe_dir/plugins/`, `exe_dir/.hay/plugins/`). `HAYASHI_PATH` uses `;` as separator on Windows.
 - **Validation workflow**: repaired malformed `.github/workflows/validation.yml`, added `../Greeners` checkout, and switched R dependency installation to use `validation/DESCRIPTION`.
 - **Clippy warnings**: fixed `empty_line_after_doc_comments`, `too_many_arguments`, and `needless_range_loop` warnings.
 - **`tobit_mroz` tracking**: marked as needing isolated intercept-difference investigation and linked to issue #42.
