@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Documentation — Hayashi</title>
+  <meta name="description" content="Hayashi command reference, language syntax, and practical examples for applied econometrics.">
+  <meta name="keywords" content="Hayashi docs, econometrics commands, OLS, IV, Logit, Probit, GMM, VAR, GARCH, Heckman, panel data, time series, REPL, CLI">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+JP:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="index.html" class="logo">
+        <span class="logo-mark" aria-label="Hayashi" title="林 (Hayashi, forest)">林</span>
+        <span class="logo-text">Hayashi Language</span>
+      </a>
+      <nav class="main-nav">
+        <a href="index.html">Home</a>
+        <a href="docs.html">Docs</a>
+        <a href="playground.html">Playground</a>
+        <a href="plugins.html">Plugins</a>
+        <a href="community.html">Community</a>
+        <a href="about.html">About</a>
+        <a href="https://github.com/sheep-farm/hayashi" target="_blank" rel="noopener">GitHub</a>
+      </nav>
+      <button class="menu-toggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <section class="page-hero">
+      <div class="container">
+        <h1>Documentation</h1>
+        <p class="page-subtitle">Command reference, language syntax, and practical recipes for econometric work.</p>
+      </div>
+    </section>
+
+    <section class="content">
+      <div class="container">
+        <div class="docs-grid">
+          <aside class="toc">
+            <h3>On this page</h3>
+            <a href="#basics">Basics</a>
+            <a href="#data">Data I/O</a>
+            <a href="#blocks">Blocks &amp; Output</a>
+            <a href="#utilities">Utilities</a>
+            <a href="#estimators">Estimators</a>
+            <a href="#post">Post-estimation</a>
+            <a href="#syntax">Syntax</a>
+            <a href="#recipe">Recipe</a>
+            <a href="#cli">CLI</a>
+          </aside>
+
+          <div class="docs-body">
+            <h2 id="basics">Language basics</h2>
+            <p>Hayashi uses a Stata-like command grammar with modern expression support. Statements are separated by newlines or semicolons. Results are printed unless suppressed with a trailing semicolon.</p>
+
+            <div class="code-window">
+              <div class="code-header">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+                <span class="code-title">basics.hay</span>
+              </div>
+              <pre><code class="language-hay">// Load data
+load "wage1.csv" as df
+
+// Variables and assignment
+let x = 10
+let y = x + 5
+
+// Conditional
+if y > 10 {
+  print("large")
+}
+
+// Loop
+for i in 1..5 {
+  print(i)
+}</code></pre>
+            </div>
+
+            <h2 id="data">Data I/O</h2>
+            <p>Hayashi reads and writes several tabular formats. ODBC is available as an optional feature.</p>
+            <table class="docs-table">
+              <thead>
+                <tr><th>Command</th><th>Description</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><code class="language-hay">load "file.csv" as df</code></td><td>Load CSV/TSV</td></tr>
+                <tr><td><code class="language-hay">load "file.json" as df</code></td><td>Load JSON array</td></tr>
+                <tr><td><code class="language-hay">load "file.dta" as df</code></td><td>Load Stata .dta</td></tr>
+                <tr><td><code class="language-hay">load "file.xlsx" as df</code></td><td>Load Excel sheet</td></tr>
+                <tr><td><code class="language-hay">load "file.parquet" as df</code></td><td>Load Parquet</td></tr>
+                <tr><td><code class="language-hay">load "sqlite://path.db" as df</code></td><td>SQL query to DataFrame</td></tr>
+                <tr><td><code class="language-hay">save df, "csv", "out.csv"</code></td><td>Save DataFrame</td></tr>
+              </tbody>
+            </table>
+
+            <h2 id="blocks">Block expressions &amp; output control</h2>
+            <p>A block can be used as an expression: it runs statements and returns the last expression. Variables declared inside are local to the block.</p>
+            <div class="code-window">
+              <div class="code-header">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+                <span class="code-title">blocks.hay</span>
+              </div>
+              <pre><code class="language-hay">let df = {
+  let raw = load("data.csv")
+  generate raw y = log(x)
+  keep(raw, ["date", "y"])
+  raw
+}
+
+quietly on
+let m = merge(df2, df3, key=id, type=inner)
+quietly off
+
+print("done")</code></pre>
+            </div>
+            <p><code class="language-hay">quietly on</code> suppresses automatic output from statements and estimators. <code class="language-hay">print(...)</code> and <code class="language-hay">display ...</code> still appear. The flag is scope-aware: toggling inside a block reverts when the block ends.</p>
+
+            <h2 id="utilities">Data &amp; I/O utilities</h2>
+            <p>Common helpers for missing values, file-system checks, and simple caching.</p>
+            <table class="docs-table">
+              <thead>
+                <tr><th>Command</th><th>Description</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><code class="language-hay">dropna(df, col1, col2)</code></td><td>Remove rows with NaN</td></tr>
+                <tr><td><code class="language-hay">ffill(df)</code></td><td>Forward-fill NaN in float columns</td></tr>
+                <tr><td><code class="language-hay">file_exists("path")</code></td><td>Check if path exists</td></tr>
+                <tr><td><code class="language-hay">ensure_dir("cache")</code></td><td>Create directory if missing</td></tr>
+                <tr><td><code class="language-hay">write("text", "file.txt")</code></td><td>Write string to file</td></tr>
+                <tr><td><code class="language-hay">export(df, "csv", "out.csv")</code></td><td>Save DataFrame</td></tr>
+              </tbody>
+            </table>
+
+            <h2 id="estimators">Estimators</h2>
+            <p>All estimators share a common formula syntax and return a model object with post-estimation methods.</p>
+            <table class="docs-table">
+              <thead>
+                <tr><th>Command</th><th>Family</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><code class="language-hay">ols(y ~ x1 + x2, df)</code></td><td>Ordinary least squares</td></tr>
+                <tr><td><code class="language-hay">iv(y ~ x1 + x2, ~ z1 + z2, df)</code></td><td>Instrumental variables / 2SLS</td></tr>
+                <tr><td><code class="language-hay">logit(y ~ x1 + x2, df)</code></td><td>Binary logistic regression</td></tr>
+                <tr><td><code class="language-hay">probit(y ~ x1 + x2, df)</code></td><td>Binary probit regression</td></tr>
+                <tr><td><code class="language-hay">poisson(y ~ x1 + x2, df)</code></td><td>Poisson regression</td></tr>
+                <tr><td><code class="language-hay">nbreg(y ~ x1 + x2, df)</code></td><td>Negative binomial</td></tr>
+                <tr><td><code class="language-hay">tobit(y ~ x1 + x2, df)</code></td><td>Censored regression</td></tr>
+                <tr><td><code class="language-hay">qreg(y ~ x1 + x2, df, tau=0.5)</code></td><td>Quantile regression</td></tr>
+                <tr><td><code class="language-hay">fe(y ~ x1 + x2 | id, df)</code></td><td>Panel fixed effects</td></tr>
+                <tr><td><code class="language-hay">re(y ~ x1 + x2 | id, df)</code></td><td>Panel random effects</td></tr>
+                <tr><td><code class="language-hay">ab(y ~ x1 + x2 | id + year, df)</code></td><td>Arellano-Bond dynamic panel</td></tr>
+                <tr><td><code class="language-hay">heckman(y ~ x1 + x2, s ~ z1 + z2, df)</code></td><td>Heckman two-step</td></tr>
+                <tr><td><code class="language-hay">garch(y ~ 1, df, p=1, q=1)</code></td><td>GARCH volatility</td></tr>
+                <tr><td><code class="language-hay">var(df, lags=2)</code></td><td>Vector autoregression</td></tr>
+                <tr><td><code class="language-hay">vecm(df, lags=2, rank=1)</code></td><td>Vector error correction</td></tr>
+                <tr><td><code class="language-hay">did(y ~ treat + post, df)</code></td><td>Difference-in-differences</td></tr>
+                <tr><td><code class="language-hay">gmm(y ~ x1, df, instruments=z1)</code></td><td>Generalized method of moments</td></tr>
+                <tr><td><code class="language-hay">rolling(y ~ x1 + x2, df, window=30)</code></td><td>Rolling OLS with optional <code class="language-hay">date=date_col</code></td></tr>
+              </tbody>
+            </table>
+
+            <h2 id="post">Post-estimation</h2>
+            <p>After fitting a model, use these verbs for inference, prediction, and diagnostics.</p>
+            <table class="docs-table">
+              <thead>
+                <tr><th>Command</th><th>Description</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><code class="language-hay">test(model, "x1 = 0")</code></td><td>Wald test</td></tr>
+                <tr><td><code class="language-hay">predict(model, df)</code></td><td>Generate predictions</td></tr>
+                <tr><td><code class="language-hay">margins(model, dydx(x1))</code></td><td>Marginal effects</td></tr>
+                <tr><td><code class="language-hay">bootstrap(model, reps=1000)</code></td><td>Bootstrap inference</td></tr>
+                <tr><td><code class="language-hay">estat(model, "vif")</code></td><td>Diagnostic statistics</td></tr>
+                <tr><td><code class="language-hay">nlcom(model, "x1/x2")</code></td><td>Nonlinear combination</td></tr>
+                <tr><td><code class="language-hay">esttab(model)</code></td><td>Regression table output</td></tr>
+                <tr><td><code class="language-hay">tidy(model)</code></td><td>Convert model to a tidy DataFrame of coefficients</td></tr>
+                <tr><td><code class="language-hay">glance(model)</code></td><td>Convert model to a one-row summary DataFrame</td></tr>
+              </tbody>
+            </table>
+
+            <h2 id="syntax">Modern syntax</h2>
+            <p>Hayashi adds modern conveniences to the Stata-like grammar without breaking the REPL workflow.</p>
+            <div class="code-window">
+              <div class="code-header">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+                <span class="code-title">modern.hay</span>
+              </div>
+              <pre><code class="language-hay">// Pipes
+let df2 = df |> filter(educ > 12) |> mutate(lwage = log(wage))
+
+// F-strings
+print("R² = {model.r2}")
+
+// Match expression
+let sign = match coef > 0 { true => "+", false => "-" }
+
+// Functions
+fn my_mean(x) {
+  return sum(x) / len(x)
+}</code></pre>
+            </div>
+
+            <h2 id="recipe">Recipe: rolling CAPM</h2>
+            <p>A complete daily CAPM pipeline with rolling betas.</p>
+            <div class="code-window">
+              <div class="code-header">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+                <span class="code-title">capm.hay</span>
+              </div>
+              <pre><code class="language-hay">import("sheep-farm/hayahoo", as=yahoo)
+
+let asset = yahoo::history("AAPL", {"range": "50y", "interval": "1d"})
+generate asset asset_ret = log(close / L.close)
+asset |> keep(["date", "asset_ret"])
+
+let market = yahoo::history("SPY", {"range": "50y", "interval": "1d"})
+generate market market_ret = log(close / L.close)
+market |> keep(["date", "market_ret"])
+
+let merged = merge(asset, market, key=date, type=inner)
+
+let with_rf = merged
+generate with_rf excess_asset = asset_ret
+generate with_rf excess_market = market_ret
+let df = dropna(with_rf, excess_asset, excess_market)
+
+let model = df |> ols(excess_asset ~ excess_market, _)
+print(model)
+
+let roll = rolling(excess_asset ~ excess_market, df, window=252, date=date)
+let betas = tidy(roll)
+let coefs = betas["excess_market"]
+
+print("mean =", mean(coefs))
+print("sd   =", sd(coefs))
+print("min  =", min(coefs))
+print("max  =", max(coefs))</code></pre>
+            </div>
+
+            <h2 id="cli">CLI commands</h2>
+            <table class="docs-table">
+              <thead>
+                <tr><th>Command</th><th>Description</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><code class="language-hay">hay script.hay</code></td><td>Run a script</td></tr>
+                <tr><td><code class="language-hay">hay</code></td><td>Start REPL</td></tr>
+                <tr><td><code class="language-hay">hay install user/repo</code></td><td>Install plugin</td></tr>
+                <tr><td><code class="language-hay">hay update [user/repo]</code></td><td>Update plugin(s)</td></tr>
+                <tr><td><code class="language-hay">hay remove user/repo</code></td><td>Remove plugin</td></tr>
+                <tr><td><code class="language-hay">hay list</code></td><td>List installed plugins</td></tr>
+                <tr><td><code class="language-hay">hay validate</code></td><td>Run empirical validation suite</td></tr>
+                <tr><td><code class="language-hay">hay dist-update</code></td><td>Update Hayashi binary to latest release</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <span class="logo-mark" aria-label="Hayashi" title="林 (Hayashi, forest)">林</span>
+        <span>Hayashi Language</span>
+      </div>
+      <div class="footer-links">
+        <a href="https://github.com/sheep-farm/hayashi">GitHub</a>
+        <a href="https://github.com/sheep-farm/Greeners">Greeners</a>
+      </div>
+      <div class="footer-copy">
+        Hayashi: GPL-3.0-only · Greeners: MIT · Books & docs: CC BY-SA 4.0
+        No cookies. No tracking. Your privacy is respected.
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>
