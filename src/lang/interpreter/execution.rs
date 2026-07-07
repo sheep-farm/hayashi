@@ -53,8 +53,8 @@ impl Interpreter {
                 }
                 let n = rows.len();
                 // Transpose: rows → columns
-                let mut col_map: std::collections::HashMap<String, ndarray::Array1<f64>> =
-                    std::collections::HashMap::new();
+                let mut col_map: indexmap::IndexMap<String, ndarray::Array1<f64>> =
+                    indexmap::IndexMap::new();
                 for (j, name) in headers.iter().enumerate() {
                     let col: ndarray::Array1<f64> =
                         ndarray::Array1::from(rows.iter().map(|r| r[j]).collect::<Vec<_>>());

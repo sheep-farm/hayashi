@@ -2135,8 +2135,8 @@ impl Interpreter {
                     _ => 10,
                 };
 
-                let mut data: std::collections::HashMap<String, ndarray::Array1<f64>> =
-                    std::collections::HashMap::new();
+                let mut data: indexmap::IndexMap<String, ndarray::Array1<f64>> =
+                    indexmap::IndexMap::new();
                 for vname in &var_names {
                     data.insert(
                         vname.clone(),

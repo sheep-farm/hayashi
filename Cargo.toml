@@ -58,6 +58,7 @@ getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] 
 # WebAssembly bindings (only needed for wasm32 target)
 wasm-bindgen = { version = "0.2", optional = true }
 js-sys = { version = "0.3", optional = true }
+indexmap = { version = "2", features = ["serde"] }
 
 [features]
 default = ["plotters", "wasm", "native"]

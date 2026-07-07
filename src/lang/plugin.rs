@@ -78,7 +78,7 @@ pub fn arrow_to_dataframe(array: &ArrayRef) -> Result<greeners::DataFrame, Strin
                 .downcast_ref::<StructArray>()
                 .ok_or_else(|| "failed to downcast StructArray".to_string())?;
 
-            let mut columns = HashMap::new();
+            let mut columns: indexmap::IndexMap<String, greeners::Column> = indexmap::IndexMap::new();
             for (i, field) in fields.iter().enumerate() {
                 let col_name = field.name().clone();
                 let col_array = struct_array.column(i);

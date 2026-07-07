@@ -365,7 +365,7 @@ impl Interpreter {
     }
 
     fn dict_to_dataframe(&self, map: &HashMap<String, Value>) -> Result<greeners::DataFrame> {
-        let mut columns = HashMap::new();
+        let mut columns: indexmap::IndexMap<String, greeners::Column> = indexmap::IndexMap::new();
         let mut expected_len: Option<usize> = None;
 
         for (col_name, val) in map {
