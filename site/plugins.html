@@ -105,27 +105,80 @@ let result = mp::transform(fitted)
 print(result)</code></pre>
         </div>
 
-        <h2 class="section-title" style="margin-top: 4rem;">Featured plugins</h2>
-        <div class="books-grid">
-          <a href="https://github.com/sheep-farm/hayplot" class="book-card" target="_blank" rel="noopener">
-            <span class="book-lang">NATIVE</span>
-            <h3>hayplot</h3>
-            <p>Plotting and visualization with SVG output.</p>
-            <span class="book-link">View on GitHub</span>
-          </a>
-          <a href="https://github.com/sheep-farm/hayfred" class="book-card" target="_blank" rel="noopener">
-            <span class="book-lang">NATIVE</span>
-            <h3>hayfred</h3>
-            <p>FRED macroeconomic data: GDP, CPI, unemployment, interest rates.</p>
-            <span class="book-link">View on GitHub</span>
-          </a>
-          <a href="https://github.com/sheep-farm/hayahoo" class="book-card" target="_blank" rel="noopener">
-            <span class="book-lang">NATIVE</span>
-            <h3>hayahoo</h3>
-            <p>Yahoo Finance market data: historical prices, quotes, search.</p>
-            <span class="book-link">View on GitHub</span>
-          </a>
+        <h2 class="section-title" style="margin-top: 4rem;">Approved plugins</h2>
+        <p class="section-subtitle">Officially endorsed plugins maintained by the Hayashi team. Each is reviewed for correctness, cross-platform support, and long-term maintenance.</p>
+
+        <div class="plugin-grid">
+
+          <article class="plugin-card">
+            <div class="plugin-card-head">
+              <h3>hayplot</h3>
+              <span class="plugin-badge native">NATIVE</span>
+              <span class="plugin-category">Visualization</span>
+            </div>
+            <p class="desc">Plotting and visualization with SVG and PNG output. Scatter, line, bar, histogram, box, and area plots. Multi-series support with configurable axes, legends, and themes. Uses Arrow FFI for zero-copy data transfer.</p>
+            <div class="plugin-fns">
+              <span class="plugin-fn">scatter</span>
+              <span class="plugin-fn">line</span>
+              <span class="plugin-fn">bar</span>
+              <span class="plugin-fn">histogram</span>
+              <span class="plugin-fn">box</span>
+              <span class="plugin-fn">area</span>
+            </div>
+            <div class="plugin-install">hay install sheep-farm/hayplot</div>
+            <div class="plugin-card-foot">
+              <span class="plugin-version">v1.4.0</span>
+              <a href="https://github.com/sheep-farm/hayplot" class="plugin-link" target="_blank" rel="noopener">GitHub &rarr;</a>
+            </div>
+          </article>
+
+          <article class="plugin-card">
+            <div class="plugin-card-head">
+              <h3>hayahoo</h3>
+              <span class="plugin-badge native">NATIVE</span>
+              <span class="plugin-category">Finance</span>
+            </div>
+            <p class="desc">Yahoo Finance market data connector. Historical OHLCV prices, real-time quotes, ticker search, and instrument metadata. Caches responses and handles rate limits gracefully.</p>
+            <div class="plugin-fns">
+              <span class="plugin-fn">quote</span>
+              <span class="plugin-fn">history</span>
+              <span class="plugin-fn">search</span>
+              <span class="plugin-fn">info</span>
+            </div>
+            <div class="plugin-install">hay install sheep-farm/hayahoo</div>
+            <div class="plugin-card-foot">
+              <span class="plugin-version">v1.0.0</span>
+              <a href="https://github.com/sheep-farm/hayahoo" class="plugin-link" target="_blank" rel="noopener">GitHub &rarr;</a>
+            </div>
+          </article>
+
+          <article class="plugin-card">
+            <div class="plugin-card-head">
+              <h3>hayfred</h3>
+              <span class="plugin-badge native">NATIVE</span>
+              <span class="plugin-category">Macro data</span>
+            </div>
+            <p class="desc">FRED (Federal Reserve Economic Data) connector. Fetch GDP, CPI, unemployment, interest rates, and 800+ other US economic time series directly into Hayashi DataFrames.</p>
+            <div class="plugin-fns">
+              <span class="plugin-fn">fetch</span>
+              <span class="plugin-fn">search</span>
+              <span class="plugin-fn">categories</span>
+              <span class="plugin-fn">releases</span>
+            </div>
+            <div class="plugin-install">hay install sheep-farm/hayfred</div>
+            <div class="plugin-card-foot">
+              <span class="plugin-version">v1.0.0</span>
+              <a href="https://github.com/sheep-farm/hayfred" class="plugin-link" target="_blank" rel="noopener">GitHub &rarr;</a>
+            </div>
+          </article>
+
         </div>
+
+        <p style="margin-top: 2rem; color: var(--text-muted); font-size: 0.9rem;">
+          Want your plugin listed here? Open an issue on the
+          <a href="https://github.com/sheep-farm/hayashi/issues" target="_blank" rel="noopener" style="color: var(--accent-2);">Hayashi repo</a>
+          with a link to your plugin, a brief description, and the category it fits. Approved plugins must be open source, cross-platform, and pass a code review.
+        </p>
 
         <h2 class="section-title" style="margin-top: 4rem;">Create a plugin</h2>
         <p class="section-subtitle">A plugin is a GitHub repository with a specific layout.</p>
