@@ -803,6 +803,32 @@ fn is_newer_version(remote: &str, current: &str) -> bool {
     }
 }
 
+/// Check if current Hayashi version meets the minimum required by a plugin.
+/// Compares only the numeric part (ignores -dev, -rc, etc. pre-release suffixes),
+/// so 0.2.9-dev is considered compatible with min_version "0.2.9".
+fn meets_min_version(current: &str, required: &str) -> bool {
+    fn parse_nums(v: &str) -> Vec<u32> {
+        let v = v.trim_start_matches('v');
+        let num = v.split('-').next().unwrap_or(v);
+        num.split('.')
+            .filter_map(|s| s.parse::<u32>().ok())
+            .collect()
+    }
+    let c = parse_nums(current);
+    let r = parse_nums(required);
+    let n = c.len().max(r.len());
+    for i in 0..n {
+        let cv = c.get(i).copied().unwrap_or(0);
+        let rv = r.get(i).copied().unwrap_or(0);
+        match cv.cmp(&rv) {
+            std::cmp::Ordering::Less => return false,
+            std::cmp::Ordering::Greater => return true,
+            std::cmp::Ordering::Equal => {}
+        }
+    }
+    true // equal
+}
+
 /// Calcula a profundidade de delimitadores abertos numa linha para o REPL.
 /// Conta {, [, ( como +1 e }, ], ) como -1, ignorando o interior de strings.
 fn open_depth(s: &str) -> i32 {
@@ -1049,6 +1075,27 @@ fn pkg_install_internal(spec: &str, version: Option<&str>, force_overwrite: bool
             std::process::exit(1);
         }
     };
+
+    // Check plugin compatibility: look for hayashi.toml in repo root
+    if let Some(toml_entry) = entries.iter().find(|e| e.name == "hayashi.toml") {
+        if let Some(url) = &toml_entry.download_url {
+            if let Ok(resp) = ureq::get(url).set("User-Agent", "hay").call() {
+                let toml_body = resp.into_string().unwrap_or_default();
+                // Parse min_version = "x.y.z" (simple TOML, no crate needed)
+                if let Some(line) = toml_body.lines().find(|l| l.trim_start().starts_with("min_version")) {
+                    if let Some(val) = line.split('=').nth(1) {
+                        let min_ver = val.trim().trim_matches('"').trim_matches('\'');
+                        if !meets_min_version(VERSION, min_ver) {
+                            eprintln!(
+                                "hay install: {user}/{repo} requires Hayashi >= {min_ver} (you have {VERSION})"
+                            );
+                            std::process::exit(1);
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     let dominated = |name: &str| -> bool {
         let lower = name.to_lowercase();
