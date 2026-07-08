@@ -10,8 +10,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Copy buttons for install snippets
-  document.querySelectorAll('.install-copy-btn').forEach((btn) => {
+  // Copy buttons for code windows (index.html)
+  document.querySelectorAll('.copy-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       const text = btn.getAttribute('data-copy') || '';
       navigator.clipboard.writeText(text).then(() => {
@@ -20,6 +20,24 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.classList.add('copied');
         setTimeout(() => {
           btn.textContent = original;
+          btn.classList.remove('copied');
+        }, 1500);
+      });
+    });
+  });
+
+  // Copy buttons for plugin install snippets
+  document.querySelectorAll('.install-copy-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const installBox = btn.closest('.plugin-install');
+      const codeEl = installBox ? installBox.querySelector('code') : null;
+      const text = codeEl ? codeEl.textContent : '';
+      navigator.clipboard.writeText(text).then(() => {
+        btn.classList.add('copied');
+        const svg = btn.innerHTML;
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+        setTimeout(() => {
+          btn.innerHTML = svg;
           btn.classList.remove('copied');
         }, 1500);
       });
