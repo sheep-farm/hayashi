@@ -638,6 +638,35 @@ a {
   text-overflow: ellipsis;
 }
 
+.install-copy-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  min-height: 36px;
+  border: none;
+  border-left: 1px solid var(--border);
+  border-radius: 0 6px 6px 0;
+  background: var(--bg-elevated);
+  color: var(--text);
+  opacity: 0.5;
+  cursor: pointer;
+  transition: opacity 0.15s, color 0.15s, background 0.15s;
+}
+
+.install-copy-btn:hover {
+  color: var(--accent-2);
+  background: rgba(16, 185, 129, 0.08);
+  opacity: 1;
+}
+
+.install-copy-btn.copied {
+  color: var(--accent-2);
+  background: rgba(16, 185, 129, 0.15);
+  opacity: 1;
+}
+
 
 
 .plugin-card-foot {
