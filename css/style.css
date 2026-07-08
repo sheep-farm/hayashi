@@ -624,10 +624,6 @@ a {
   white-space: nowrap;
 }
 
-.plugin-install::before {
-  content: "$ ";
-  color: var(--text-muted);
-}
 
 .copy-btn {
   flex-shrink: 0;
