@@ -1,8 +1,10 @@
-name: Release
+name: Nightly
 
 on:
-  push:
-    tags: ['v*']
+  schedule:
+    # 03:00 UTC every day
+    - cron: '0 3 * * *'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -34,23 +36,23 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          key: release-${{ matrix.target }}
+          key: nightly-${{ matrix.target }}
 
       - name: Build
         run: cargo build --release
 
       - name: Package (Unix)
         if: runner.os != 'Windows'
-        run: tar czf hay-${{ github.ref_name }}-${{ matrix.target }}.tar.gz -C target/release hay
+        run: tar czf hay-nightly-${{ matrix.target }}.tar.gz -C target/release hay
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
-        run: Compress-Archive -Path target/release/hay.exe -DestinationPath hay-${{ github.ref_name }}-${{ matrix.target }}.zip
+        run: Compress-Archive -Path target/release/hay.exe -DestinationPath hay-nightly-${{ matrix.target }}.zip
 
       - uses: actions/upload-artifact@v4
         with:
           name: hay-${{ matrix.target }}
-          path: hay-${{ github.ref_name }}-*
+          path: hay-nightly-*
 
   publish:
     needs: build
@@ -60,7 +62,23 @@ jobs:
         with:
           merge-multiple: true
 
+      - name: Delete previous nightly release
+        run: gh release delete nightly --yes --cleanup-tag || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+
       - uses: softprops/action-gh-release@v2
         with:
-          files: hay-*
-          generate_release_notes: true
+          tag_name: nightly
+          name: Nightly Build
+          body: |
+            Automated nightly build from the `dev` branch.
+
+            **Not a stable release.** May contain bugs and incomplete features.
+            Use `hay dist-update --nightly` to install, or download manually below.
+
+            Build date: ${{ github.run_date }}
+            Commit: ${{ github.sha }}
+          prerelease: true
+          files: hay-nightly-*

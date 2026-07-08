@@ -477,12 +477,14 @@ fn run_validation(args: &[&str]) {
 
 /// Print dist-update subcommand help.
 fn dist_update_help() {
-    println!("Usage: hay dist-update [--help] [--check]");
+    println!("Usage: hay dist-update [--help] [--check] [--nightly]");
     println!();
     println!("Options:");
     println!("  --help, -h  Show this help message and exit");
     println!("  --check     Report whether a newer release is available without");
     println!("              downloading or replacing the current binary");
+    println!("  --nightly   Install the latest nightly build from the dev branch");
+    println!("              (pre-release, may be unstable)");
 }
 
 /// Check GitHub for the latest release and return the version string if it is
@@ -615,11 +617,123 @@ fn dist_update_install(remote_version: &str) {
     }
 }
 
+/// Download and install the latest nightly build (pre-release tagged "nightly").
+fn dist_update_nightly() {
+    let target = current_target_triple();
+    let (asset_ext, archive_cmd) = dist_asset_kind();
+    let asset_name = format!("hay-nightly-{target}.{asset_ext}");
+
+    // Fetch the nightly release by tag
+    let release_url = "https://api.github.com/repos/sheep-farm/hayashi/releases/tags/nightly";
+    let release_resp = match ureq::get(release_url)
+        .set("User-Agent", "hay")
+        .set("Accept", "application/vnd.github.v3+json")
+        .call()
+    {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("hay dist-update: cannot fetch nightly release: {e}");
+            eprintln!("hay dist-update: nightly builds may not be available yet");
+            std::process::exit(1);
+        }
+    };
+
+    let release_body: String = release_resp.into_string().unwrap_or_default();
+    let release: GhRelease = serde_json::from_str(&release_body).unwrap_or_else(|e| {
+        eprintln!("hay dist-update: cannot parse nightly release payload: {e}");
+        std::process::exit(1);
+    });
+
+    let asset = release
+        .assets
+        .iter()
+        .find(|a| a.name == asset_name)
+        .unwrap_or_else(|| {
+            eprintln!("hay dist-update: no nightly asset found for {asset_name}");
+            std::process::exit(1);
+        });
+
+    let exe_path = std::env::current_exe().unwrap_or_else(|e| {
+        eprintln!("hay dist-update: cannot locate current executable: {e}");
+        std::process::exit(1);
+    });
+
+    let tmp_dir = std::env::temp_dir().join("hay-dist-update-nightly");
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+    std::fs::create_dir_all(&tmp_dir).unwrap_or_else(|e| {
+        eprintln!("hay dist-update: cannot create temp dir: {e}");
+        std::process::exit(1);
+    });
+
+    let archive_path = tmp_dir.join(&asset_name);
+    println!("hay dist-update: downloading {} ...", asset.name);
+    match ureq::get(&asset.browser_download_url).call() {
+        Ok(resp) => {
+            let mut reader = resp.into_reader();
+            let mut file = std::fs::File::create(&archive_path).unwrap();
+            std::io::copy(&mut reader, &mut file).unwrap_or_else(|e| {
+                eprintln!("hay dist-update: download failed: {e}");
+                std::process::exit(1);
+            });
+        }
+        Err(e) => {
+            eprintln!("hay dist-update: download failed: {e}");
+            std::process::exit(1);
+        }
+    }
+
+    let extract_dir = tmp_dir.join("extract");
+    std::fs::create_dir_all(&extract_dir).unwrap();
+    if let Err(e) = archive_cmd(&archive_path, &extract_dir) {
+        eprintln!("hay dist-update: cannot extract archive: {e}");
+        std::process::exit(1);
+    }
+
+    let new_bin = find_extracted_bin(&extract_dir).unwrap_or_else(|| {
+        eprintln!("hay dist-update: no hay binary found in downloaded archive");
+        std::process::exit(1);
+    });
+
+    println!("hay dist-update: replacing {} ...", exe_path.display());
+
+    let is_windows = std::env::consts::OS == "windows";
+    let backup_path = exe_path.with_extension(if is_windows { "exe.old" } else { "old" });
+    let _ = std::fs::remove_file(&backup_path);
+
+    std::fs::rename(&exe_path, &backup_path).unwrap_or_else(|e| {
+        eprintln!("hay dist-update: cannot backup current executable: {e}");
+        std::process::exit(1);
+    });
+
+    std::fs::copy(&new_bin, &exe_path).unwrap_or_else(|e| {
+        eprintln!("hay dist-update: cannot install new binary: {e}");
+        let _ = std::fs::rename(&backup_path, &exe_path);
+        std::process::exit(1);
+    });
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = std::fs::metadata(&exe_path).unwrap().permissions();
+        perms.set_mode(0o755);
+        let _ = std::fs::set_permissions(&exe_path, perms);
+    }
+
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+
+    if is_windows {
+        println!("hay dist-update: installed nightly build. Please restart hay.");
+    } else {
+        println!("hay dist-update: installed nightly build. Run `hay --version` to verify.");
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum DistUpdateMode {
     Help,
     Check,
     Install,
+    Nightly,
 }
 
 /// Parse dist-update arguments into a safe mode or fail on unknown flags.
@@ -629,9 +743,12 @@ fn parse_dist_update_args(argv: &[&str]) -> Result<DistUpdateMode, String> {
     }
 
     let mut check = false;
+    let mut nightly = false;
     for arg in argv {
         if *arg == "--check" {
             check = true;
+        } else if *arg == "--nightly" {
+            nightly = true;
         } else if arg.starts_with('-') {
             return Err(format!("unknown flag '{arg}'"));
         } else {
@@ -639,7 +756,9 @@ fn parse_dist_update_args(argv: &[&str]) -> Result<DistUpdateMode, String> {
         }
     }
 
-    if check {
+    if nightly {
+        Ok(DistUpdateMode::Nightly)
+    } else if check {
         Ok(DistUpdateMode::Check)
     } else {
         Ok(DistUpdateMode::Install)
@@ -682,6 +801,11 @@ fn dist_update(argv: &[&str]) {
                     std::process::exit(1);
                 }
             }
+        }
+        Ok(DistUpdateMode::Nightly) => {
+            println!("hay dist-update: current version {VERSION}");
+            println!("hay dist-update: fetching nightly build...");
+            dist_update_nightly();
         }
         Err(e) => {
             eprintln!("hay dist-update: {e}");
