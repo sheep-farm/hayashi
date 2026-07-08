@@ -14,8 +14,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - **Safe modes for `hay dist-update`**:
   - `hay dist-update --help` prints subcommand-specific help without network access.
   - `hay dist-update --check` reports whether a newer release is available without downloading or replacing the binary.
+  - `hay dist-update --nightly` downloads and installs the latest nightly build from the `dev` branch (pre-release, may be unstable). Nightly builds are generated daily via GitHub Actions for Linux, macOS, and Windows.
   - Unknown flags and unexpected positional arguments fail fast.
   - Argument parser covered by focused unit tests.
+- **Plugin compatibility check**: plugins can declare a minimum Hayashi version in a `hayashi.toml` file at the repo root (`min_version = "0.2.9"`). During `hay install`, the file is fetched and the version is compared. If the current Hayashi version is lower, installation is refused with a clear message. Pre-release suffixes (`-dev`, `-rc`) are ignored in the comparison, so `0.2.9-dev` satisfies `min_version = "0.2.9"`.
 - **English-only user-facing output**: all comments, error messages, and printed strings in the Rust source tree translated to English. Mathematical notation (`×`, `ŷ`, `Ŷ`, `H₀`, `κ`, etc.) is preserved.
 - **Interpreter decomposition**: `src/lang/interpreter.rs` split into focused submodules:
   - `execution.rs` — statement execution

@@ -13,6 +13,8 @@ Stata-like syntax, modern language features, zero cost. Built in Rust on top of 
 
 ## Install
 
+### From source
+
 ```bash
 git clone https://github.com/sheep-farm/hayashi.git
 cd hayashi
@@ -21,6 +23,28 @@ cargo build --release
 
 # Optional: ODBC support (requires unixodbc)
 cargo build --release --features odbc
+```
+
+### Nightly builds
+
+Pre-built binaries are generated daily from the `dev` branch for Linux, macOS, and Windows:
+
+```bash
+hay dist-update --nightly
+```
+
+This downloads and replaces your current `hay` binary with the latest nightly build. Nightly builds are pre-releases and may be unstable — they include features not yet in the stable release (e.g. `tidy()`, `glance()`, `names()`, model serialization for plugins).
+
+To check for stable updates without installing:
+
+```bash
+hay dist-update --check
+```
+
+To install the latest stable release:
+
+```bash
+hay dist-update
 ```
 
 ## Usage
