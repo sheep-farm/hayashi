@@ -9,7 +9,6 @@ sheep-farm/hayexport v0.1.0
 
 # Web and data
 sheep-farm/hayweb v0.1.0
-sheep-farm/hayyahoo v0.1.0
 sheep-farm/hayfred v0.1.0
 
 # Geospatial
