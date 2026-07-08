@@ -28,6 +28,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: dev
 
       - name: Checkout Greeners dependency
         run: git clone --depth 1 --branch develop https://github.com/sheep-farm/Greeners.git ../Greeners
