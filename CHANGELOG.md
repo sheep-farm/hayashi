@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- **`tidy()` extended to all model types**: now supports IV, logit/probit, panel FE/RE, GMM, Poisson, NegBin, GLM, Quantile, Tobit, Heckman, Ordered, Arellano-Bond, Penalized (ridge/lasso/elasticnet), RLM, Beta, GEE, ARIMA, and GARCH — in addition to the existing OLS and Rolling support. Returns a DataFrame with `variable`, `coef`, `std_err`, `t` (or `z`), `p_value`, `conf_low`, `conf_high`.
+- **`glance()` extended to all model types**: returns model fit statistics as a DataFrame. Available keys vary by model type: `r2`, `adj_r2`, `pseudo_r2`, `n`, `f_stat`, `prob_f`, `aic`, `bic`, `log_lik`, `sigma`, `j_stat`, `j_p_value`, `df_overid`, `sigma_u`, `sigma_e`, `theta`, `tau`, `alpha`, `rho`, `delta`, `deviance`, `qic`, `n_entities`, `n_groups`, `n_censored`, `sigma2`.
+- **`names(df)` builtin**: returns DataFrame column names as a list of strings.
+- **Model serialization for native plugins**: `value_to_json` now serializes model results (`OlsResult`, `IvResult`, `BinaryResult`, `PanelResult`, `ReResult`, `GmmResult`, `PoissonResult`, `NegBinResult`, `GlmResult`, `QuantileResult`, `TobitResult`, `HeckmanResult`, `OrderedResult`, `AbResult`, `PenalizedResult`, `RlmResult`, `BetaResult`, `GeeResult`, `ArimaResult`, `GarchResult`) as JSON dicts with `__model_type__`, `variable`, `coef`, `std_err`, `p_value`, and fit statistics — instead of `null`. Enables native plugins (e.g. haytex) to consume model data directly.
 - **Safe modes for `hay dist-update`**:
   - `hay dist-update --help` prints subcommand-specific help without network access.
   - `hay dist-update --check` reports whether a newer release is available without downloading or replacing the binary.
