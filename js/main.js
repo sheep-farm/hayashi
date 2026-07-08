@@ -10,12 +10,28 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Copy buttons for install snippets
+  // Copy buttons for code windows (index.html)
+  document.querySelectorAll('.copy-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const text = btn.getAttribute('data-copy') || '';
+      navigator.clipboard.writeText(text).then(() => {
+        const original = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = original;
+          btn.classList.remove('copied');
+        }, 1500);
+      });
+    });
+  });
+
+  // Copy buttons for plugin install snippets
   document.querySelectorAll('.install-copy-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       const installBox = btn.closest('.plugin-install');
       const codeEl = installBox ? installBox.querySelector('code') : null;
-      const text = codeEl ? codeEl.textContent : (btn.getAttribute('data-copy') || '');
+      const text = codeEl ? codeEl.textContent : '';
       navigator.clipboard.writeText(text).then(() => {
         btn.classList.add('copied');
         const svg = btn.innerHTML;
