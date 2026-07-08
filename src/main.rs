@@ -334,10 +334,20 @@ fn run() {
         Some("install") => {
             let pkg = args_clean.get(2).unwrap_or_else(|| {
                 eprintln!("Usage: hay install user/repo [version] [-y]");
+                eprintln!("       hay install --file repositories.txt [-y]");
                 std::process::exit(1);
             });
-            let version = args_clean.get(3).copied();
-            pkg_install_internal(pkg, version, yes);
+            
+            if *pkg == "--file" {
+                let file_path = args_clean.get(3).unwrap_or_else(|| {
+                    eprintln!("Usage: hay install --file repositories.txt [-y]");
+                    std::process::exit(1);
+                });
+                pkg_install_from_file(file_path, yes);
+            } else {
+                let version = args_clean.get(3).copied();
+                pkg_install_internal(pkg, version, yes);
+            }
             return;
         }
         Some("update") => {
@@ -1097,13 +1107,14 @@ fn print_help() {
     println!("    summarize  tabulate  ttest  correlate  list  describe");
     println!();
     println!("PACKAGES:");
-    println!("    hay install user/repo    Install from GitHub (-y to bypass overwrite prompt)");
-    println!("    hay remove  user/repo    Uninstall a package");
-    println!("    hay list                 List installed packages");
-    println!("    hay update [user/repo]   Update package(s) (-y to bypass prompt)");
-    println!("    hay check-plugin [name]  Check integrity/version with remote repository");
-    println!("    hay validate [options]   Run the empirical validation programme (R/Python)");
-    println!("    hay dist-update          Check and install the latest hay release from GitHub");
+    println!("    hay install user/repo [version]    Install from GitHub (-y to bypass overwrite prompt)");
+    println!("    hay install --file repos.txt       Install packages from file (format: user/repo [v.N.N.N])");
+    println!("    hay remove  user/repo              Uninstall a package");
+    println!("    hay list                           List installed packages");
+    println!("    hay update [user/repo]             Update package(s) (-y to bypass prompt)");
+    println!("    hay check-plugin [name]            Check integrity/version with remote repository");
+    println!("    hay validate [options]             Run the empirical validation programme (R/Python)");
+    println!("    hay dist-update                    Check and install the latest hay release from GitHub");
     println!();
     println!("In REPL, type help() for full command list or help(cmd) for details.");
 }
@@ -1375,6 +1386,58 @@ fn pkg_install_internal(spec: &str, version: Option<&str>, force_overwrite: bool
         dest.display()
     );
     println!("  use: import(\"{user}/{repo}/module\")");
+}
+
+fn pkg_install_from_file(file_path: &str, force_overwrite: bool) {
+    let content = match std::fs::read_to_string(file_path) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("hay install: cannot read file '{file_path}': {e}");
+            std::process::exit(1);
+        }
+    };
+
+    let mut installed_count = 0;
+    let mut failed_count = 0;
+
+    for line in content.lines() {
+        let line = line.trim();
+        
+        // Skip empty lines and comments
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+
+        // Parse format: user/repo [v.N.N.N]
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.is_empty() {
+            continue;
+        }
+
+        let spec = parts[0];
+        let version = parts.get(1).map(|v| *v);
+
+        let (user, repo) = if let Some(pos) = spec.find('/') {
+            (&spec[..pos], &spec[pos + 1..])
+        } else {
+            eprintln!("hay install: expected 'user/repo', got '{spec}' in file");
+            failed_count += 1;
+            continue;
+        };
+
+        println!("Installing {user}/{repo}...");
+        
+        // Install this package
+        pkg_install_internal(spec, version, force_overwrite);
+        installed_count += 1;
+    }
+
+    println!();
+    println!("Installation summary:");
+    println!("  Installed: {installed_count}");
+    if failed_count > 0 {
+        println!("  Failed: {failed_count}");
+    }
 }
 
 fn pkg_remove(spec: &str) {
