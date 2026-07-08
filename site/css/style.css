@@ -365,7 +365,7 @@ a {
   padding-right: 4rem;
 }
 
-.copy-btn {
+.install-copy-btn {
   position: absolute;
   top: 0.75rem;
   right: 0.75rem;
@@ -379,12 +379,12 @@ a {
   transition: all 0.15s;
 }
 
-.copy-btn:hover {
+.install-copy-btn:hover {
   color: var(--text);
   border-color: var(--accent);
 }
 
-.copy-btn.copied {
+.install-copy-btn.copied {
   color: var(--accent-2);
   border-color: var(--accent-2);
 }

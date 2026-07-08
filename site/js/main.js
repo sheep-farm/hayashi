@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Copy buttons for install snippets
-  document.querySelectorAll('.copy-btn').forEach((btn) => {
+  document.querySelectorAll('.install-copy-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       const text = btn.getAttribute('data-copy') || '';
       navigator.clipboard.writeText(text).then(() => {
