@@ -505,6 +505,180 @@ a {
   font-size: 0.95rem;
 }
 
+/* ── Approved plugins ──────────────────────────────────────────── */
+
+.plugin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 1.5rem;
+}
+
+.plugin-card {
+  display: flex;
+  flex-direction: column;
+  padding: 1.75rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+
+.plugin-card:hover {
+  border-color: var(--accent-2);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+}
+
+.plugin-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.plugin-card h3 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.plugin-badge {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.plugin-badge.native {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--accent-2);
+}
+
+.plugin-badge.script {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--accent);
+}
+
+.plugin-badge.wasm {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--accent-3);
+}
+
+.plugin-category {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 4px;
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.plugin-card p.desc {
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  margin-bottom: 1rem;
+}
+
+.plugin-fns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.plugin-fn {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  padding: 0.15rem 0.5rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+}
+
+.plugin-install {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  overflow-x: auto;
+}
+
+.plugin-install code {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--accent-2);
+  background: none;
+  white-space: nowrap;
+}
+
+.plugin-install::before {
+  content: "$ ";
+  color: var(--text-muted);
+}
+
+.copy-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.copy-btn:hover {
+  border-color: var(--accent-2);
+  color: var(--accent-2);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.copy-btn.copied {
+  border-color: var(--accent-2);
+  color: var(--accent-2);
+  background: rgba(16, 185, 129, 0.15);
+}
+
+.plugin-card-foot {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.plugin-version {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.plugin-link {
+  color: var(--accent-2);
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+.plugin-link:hover {
+  text-decoration: underline;
+}
+
 /* CTA */
 .cta {
   padding: 5rem 0;
