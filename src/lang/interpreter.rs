@@ -54,7 +54,7 @@ mod estimators_timeseries;
 mod eval_expr;
 mod execution;
 mod helpers;
-mod models;
+pub mod models;
 mod post_estimation_ts;
 mod value;
 mod visualization;
