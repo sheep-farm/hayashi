@@ -7,11 +7,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- **`tidy()` extended to all model types**: now supports IV, logit/probit, panel FE/RE, GMM, Poisson, NegBin, GLM, Quantile, Tobit, Heckman, Ordered, Arellano-Bond, Penalized (ridge/lasso/elasticnet), RLM, Beta, GEE, ARIMA, and GARCH — in addition to the existing OLS and Rolling support. Returns a DataFrame with `variable`, `coef`, `std_err`, `t` (or `z`), `p_value`, `conf_low`, `conf_high`.
+- **`glance()` extended to all model types**: returns model fit statistics as a DataFrame. Available keys vary by model type: `r2`, `adj_r2`, `pseudo_r2`, `n`, `f_stat`, `prob_f`, `aic`, `bic`, `log_lik`, `sigma`, `j_stat`, `j_p_value`, `df_overid`, `sigma_u`, `sigma_e`, `theta`, `tau`, `alpha`, `rho`, `delta`, `deviance`, `qic`, `n_entities`, `n_groups`, `n_censored`, `sigma2`.
+- **`names(df)` builtin**: returns DataFrame column names as a list of strings.
+- **Model serialization for native plugins**: `value_to_json` now serializes model results (`OlsResult`, `IvResult`, `BinaryResult`, `PanelResult`, `ReResult`, `GmmResult`, `PoissonResult`, `NegBinResult`, `GlmResult`, `QuantileResult`, `TobitResult`, `HeckmanResult`, `OrderedResult`, `AbResult`, `PenalizedResult`, `RlmResult`, `BetaResult`, `GeeResult`, `ArimaResult`, `GarchResult`) as JSON dicts with `__model_type__`, `variable`, `coef`, `std_err`, `p_value`, and fit statistics — instead of `null`. Enables native plugins (e.g. haytex) to consume model data directly.
 - **Safe modes for `hay dist-update`**:
   - `hay dist-update --help` prints subcommand-specific help without network access.
   - `hay dist-update --check` reports whether a newer release is available without downloading or replacing the binary.
+  - `hay dist-update --nightly` downloads and installs the latest nightly build from the `dev` branch (pre-release, may be unstable). Nightly builds are generated daily via GitHub Actions for Linux, macOS, and Windows.
   - Unknown flags and unexpected positional arguments fail fast.
   - Argument parser covered by focused unit tests.
+- **Plugin compatibility check**: plugins can declare a minimum Hayashi version in a `hayashi.toml` file at the repo root (`min_version = "0.2.9"`). During `hay install`, the file is fetched and the version is compared. If the current Hayashi version is lower, installation is refused with a clear message. Pre-release suffixes (`-dev`, `-rc`) are ignored in the comparison, so `0.2.9-dev` satisfies `min_version = "0.2.9"`.
 - **English-only user-facing output**: all comments, error messages, and printed strings in the Rust source tree translated to English. Mathematical notation (`×`, `ŷ`, `Ŷ`, `H₀`, `κ`, etc.) is preserved.
 - **Interpreter decomposition**: `src/lang/interpreter.rs` split into focused submodules:
   - `execution.rs` — statement execution
@@ -38,6 +44,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Fixed
 
+- **CSV export column order**: `DataFrame::to_csv` no longer sorts columns alphabetically. Column insertion order is preserved via `IndexMap` (replacing `HashMap`). Affects all CSV/JSON exports and display functions.
+- **`append()` losing string columns**: `get_string()` now handles `Categorical` columns (previously returned error, causing `append()` to produce empty strings for any column with repeated values — e.g. dates, tickers, sectors).
+- **Plugin resolution on Windows**: `HOME` now falls back to `USERPROFILE`. `resolve_import` also searches the executable's directory (`exe_dir/`, `exe_dir/plugins/`, `exe_dir/.hay/plugins/`). `HAYASHI_PATH` uses `;` as separator on Windows.
 - **Validation workflow**: repaired malformed `.github/workflows/validation.yml`, added `../Greeners` checkout, and switched R dependency installation to use `validation/DESCRIPTION`.
 - **Clippy warnings**: fixed `empty_line_after_doc_comments`, `too_many_arguments`, and `needless_range_loop` warnings.
 - **`tobit_mroz` tracking**: marked as needing isolated intercept-difference investigation and linked to issue #42.

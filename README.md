@@ -13,6 +13,8 @@ Stata-like syntax, modern language features, zero cost. Built in Rust on top of 
 
 ## Install
 
+### From source
+
 ```bash
 git clone https://github.com/sheep-farm/hayashi.git
 cd hayashi
@@ -21,6 +23,28 @@ cargo build --release
 
 # Optional: ODBC support (requires unixodbc)
 cargo build --release --features odbc
+```
+
+### Nightly builds
+
+Pre-built binaries are generated daily from the `dev` branch for Linux, macOS, and Windows:
+
+```bash
+hay dist-update --nightly
+```
+
+This downloads and replaces your current `hay` binary with the latest nightly build. Nightly builds are pre-releases and may be unstable — they include features not yet in the stable release (e.g. `tidy()`, `glance()`, `names()`, model serialization for plugins).
+
+To check for stable updates without installing:
+
+```bash
+hay dist-update --check
+```
+
+To install the latest stable release:
+
+```bash
+hay dist-update
 ```
 
 ## Usage
@@ -276,6 +300,13 @@ predict df e = m, "residuals"    // residuals
 bootstrap(ols, Y ~ X, df, n=1000)
 influence(m)                 // DFFITS, Cook's D, leverage
 vif(m)                       // variance inflation factors
+
+// Tidy/glance: extract model data as DataFrames
+let t = tidy(m)              // variable, coef, std_err, t, p_value, conf_low, conf_high
+let g = glance(m)            // r2, adj_r2, n, f_stat, prob_f, aic, bic, log_lik, sigma
+
+// Column names of a DataFrame
+let cols = names(df)         // ["price", "mpg", "weight", ...]
 
 // Store and compare models
 eststo(m1)
@@ -641,6 +672,15 @@ plugin_path("/shared/plugins", "/team/lib")
 Packages, imports, and auto-loaded plugins execute Hayashi/native code in your session. Install and import only code you trust; see the [Trust Model](docs/src/trust-model.md).
 
 Native plugins (`.so`/`.dll`/`.dylib` / `.wasm`) are fully supported, enabling third parties to ship optimized estimators, spatial packages, and data connectors via Hayashi's namespace system (using the `hayashi-plugin-sdk`). Closed-source proprietary plugins are legally permitted through Hayashi's GPL-3.0 Linking Exception.
+
+Available plugins:
+
+| Plugin | Description |
+|--------|-------------|
+| [hayahoo](https://github.com/sheep-farm/hayahoo) | Yahoo Finance data (quotes, history, search, info) |
+| [hayfred](https://github.com/sheep-farm/hayfred) | FRED (Federal Reserve Economic Data) connector |
+| [hayplot](https://github.com/sheep-farm/hayplot) | Plotting (scatter, line, bar, histogram, box, area) via Arrow FFI |
+| [haytex](https://github.com/sheep-farm/haytex) | LaTeX snippet generator (regression tables, equations, summary stats, correlation matrices) |
 
 ## Build & test
 
