@@ -127,6 +127,19 @@ pub enum ForIter {
     Items(Expr),                // list or variable
 }
 
+/// One segment of an interpolated string literal.
+///
+/// `f"hello {name:.2f}!"` is parsed at parse-time into:
+/// `[Lit("hello "), Interp { expr: Var("name"), fmt: Some(".2f") }, Lit("!")]`
+/// so the interpreter never needs to re-lex/re-parse at runtime.
+#[derive(Debug, Clone)]
+pub enum FStringPart {
+    /// Literal text segment (already unescaped: `{{` → `{`, `}}` → `}`).
+    Lit(String),
+    /// Interpolated expression with an optional format specifier (e.g. `.2f`).
+    Interp { expr: Box<Expr>, fmt: Option<String> },
+}
+
 /// Language expressions
 #[derive(Debug, Clone)]
 pub enum Expr {
@@ -134,7 +147,7 @@ pub enum Expr {
     Int(i64),
     Bool(bool),
     Str(String),
-    FString(String),
+    FString(Vec<FStringPart>),
     Var(String),
     Formula(Formula),
     Nil,
