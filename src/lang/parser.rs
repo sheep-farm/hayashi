@@ -165,6 +165,81 @@ impl Parser {
         }
     }
 
+    // ── FString ──────────────────────────────────────────────────────────────
+
+    /// Parse an f-string template into `Vec<FStringPart>` at parse time.
+    ///
+    /// The `template` string is the raw content after the `f"…"` delimiters,
+    /// exactly as produced by the lexer.  This runs once per source location;
+    /// the resulting `Vec<FStringPart>` is stored in the AST and evaluated
+    /// directly at runtime without re-lexing or re-parsing.
+    fn parse_fstring_parts(&mut self, template: &str) -> crate::lang::error::Result<Vec<FStringPart>> {
+        let mut parts: Vec<FStringPart> = Vec::new();
+        let mut lit = String::new();
+        let mut chars = template.chars().peekable();
+
+        while let Some(c) = chars.next() {
+            if c == '{' {
+                if chars.peek() == Some(&'{') {
+                    // escaped brace: {{ → {
+                    chars.next();
+                    lit.push('{');
+                    continue;
+                }
+                // flush accumulated literal
+                if !lit.is_empty() {
+                    parts.push(FStringPart::Lit(std::mem::take(&mut lit)));
+                }
+                // collect expression (and optional format spec) until matching '}'
+                let mut expr_str = String::new();
+                let mut fmt_spec = String::new();
+                let mut in_fmt = false;
+                let mut depth: usize = 1;
+                for c2 in chars.by_ref() {
+                    if c2 == '{' {
+                        depth += 1;
+                    }
+                    if c2 == '}' {
+                        depth -= 1;
+                        if depth == 0 {
+                            break;
+                        }
+                    }
+                    if c2 == ':' && depth == 1 && !in_fmt {
+                        in_fmt = true;
+                        continue;
+                    }
+                    if in_fmt {
+                        fmt_spec.push(c2);
+                    } else {
+                        expr_str.push(c2);
+                    }
+                }
+                // parse the interpolated expression
+                let mut lexer = crate::lang::lexer::Lexer::new(&expr_str);
+                let tokens = lexer.tokenize()?;
+                let mut inner = Parser::new(tokens);
+                let expr = inner.parse_expr()?;
+                parts.push(FStringPart::Interp {
+                    expr: Box::new(expr),
+                    fmt: if fmt_spec.is_empty() { None } else { Some(fmt_spec) },
+                });
+            } else if c == '}' {
+                if chars.peek() == Some(&'}') {
+                    // escaped brace: }} → }
+                    chars.next();
+                }
+                lit.push('}');
+            } else {
+                lit.push(c);
+            }
+        }
+        if !lit.is_empty() {
+            parts.push(FStringPart::Lit(lit));
+        }
+        Ok(parts)
+    }
+
     // ── Formula ──────────────────────────────────────────────────────────────
 
     fn parse_formula(&mut self, lhs: String) -> Result<Formula> {
@@ -549,8 +624,10 @@ impl Parser {
                 })
             }
             Token::FStringLit(s) => {
+                let s = s.clone();
                 self.advance();
-                Ok(Expr::FString(s))
+                let parts = self.parse_fstring_parts(&s)?;
+                Ok(Expr::FString(parts))
             }
 
             // Grouping: (expr)
@@ -1148,8 +1225,10 @@ impl Parser {
                             Expr::Str(n)
                         }
                         Token::FStringLit(s) => {
+                            let s = s.clone();
                             self.advance();
-                            Expr::FString(s)
+                            let parts = self.parse_fstring_parts(&s)?;
+                            Expr::FString(parts)
                         }
                         _ => {
                             return Err(HayashiError::Parse {
