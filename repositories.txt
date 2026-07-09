@@ -19,3 +19,6 @@ sheep-farm/haygeobr v0.1.0
 sheep-farm/haysim v0.1.0
 sheep-farm/hayspatial v0.1.0
 sheep-farm/haybayes v0.1.0
+
+# Regional data
+sheep-farm/haybrasil v0.2.0
