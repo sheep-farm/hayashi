@@ -342,21 +342,24 @@ pub(super) fn coef_names_from_formula(
     let mut names: Vec<String> = vec!["_cons".into()];
     for term in &formula_ast.rhs {
         match term {
-            RhsTerm::Var(v) => names.push(v.clone()),
-            RhsTerm::Transform(fn_, v) => names.push(format!("{fn_}({v})")),
-            RhsTerm::Interaction(a, b) => names.push(format!("{a}:{b}")),
-            RhsTerm::Categorical(v) => {
-                let raw = col_to_strings(df, v).unwrap_or_default();
-                let mut unique: Vec<String> = raw
-                    .into_iter()
-                    .collect::<std::collections::HashSet<_>>()
-                    .into_iter()
-                    .collect();
-                sort_maybe_numeric_strings(&mut unique);
-                for val in unique.into_iter().skip(1) {
-                    names.push(format!("{v}={val}"));
+            RhsTerm::Categorical(e) => {
+                // Para C(Var(v)) simples extraímos os níveis do df
+                if let Expr::Var(v) = e.as_ref() {
+                    let raw = col_to_strings(df, v).unwrap_or_default();
+                    let mut unique: Vec<String> = raw
+                        .into_iter()
+                        .collect::<std::collections::HashSet<_>>()
+                        .into_iter()
+                        .collect();
+                    sort_maybe_numeric_strings(&mut unique);
+                    for val in unique.into_iter().skip(1) {
+                        names.push(format!("{v}={val}"));
+                    }
+                } else {
+                    names.push(term.display_name());
                 }
             }
+            other => names.push(other.display_name()),
         }
     }
     names.truncate(n_cols);

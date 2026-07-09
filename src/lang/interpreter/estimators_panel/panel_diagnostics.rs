@@ -49,9 +49,7 @@ impl Interpreter {
                     ))
                 })?,
         };
-        let formula_str = Self::formula_to_string(&formula_ast);
-        let g_formula =
-            GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
         let (y_vec, x_mat) = df
             .to_design_matrix(&g_formula)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -121,9 +119,7 @@ impl Interpreter {
                     ))
                 })?,
         };
-        let formula_str = Self::formula_to_string(&formula_ast);
-        let g_formula =
-            GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
         let (y_vec, x_mat) = df
             .to_design_matrix(&g_formula)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -206,9 +202,7 @@ impl Interpreter {
                     ))
                 })?,
         };
-        let formula_str = Self::formula_to_string(&formula_ast);
-        let g_formula =
-            GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
         let (y_vec, x_mat) = df
             .to_design_matrix(&g_formula)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -310,9 +304,7 @@ impl Interpreter {
                     ))
                 })?,
         };
-        let formula_str = Self::formula_to_string(&formula_ast);
-        let g_formula =
-            GFormula::parse(&formula_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
         let (y_vec, x_mat) = df
             .to_design_matrix(&g_formula)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;

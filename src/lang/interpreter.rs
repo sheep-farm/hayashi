@@ -665,7 +665,7 @@ impl Interpreter {
                         let rhs_str = parts[1].trim();
                         let rhs: Vec<RhsTerm> = rhs_str
                             .split('+')
-                            .map(|t| RhsTerm::Var(t.trim().to_string()))
+                            .map(|t| RhsTerm::var(t.trim()))
                             .collect();
                         Ok(Formula {
                             lhs,
@@ -706,6 +706,143 @@ impl Interpreter {
         };
         let df = self.maybe_filter_df(&df_raw, opts)?;
         Ok((formula_ast, df))
+    }
+
+    // ── Formula materialization ─────────────────────────────────────────────
+
+    /// Atalho para o padrão `formula_to_string → GFormula::parse` que existia
+    /// em todos os estimadores.  Agora usa `materialize_formula` internamente,
+    /// então `log(K):log(L)`, `I(x^2)`, etc. funcionam corretamente.
+    ///
+    /// Retorna `(df_aumentado, g_formula, display_names)`.
+    pub(super) fn prepare_formula(
+        &mut self,
+        formula: &Formula,
+        df: &Rc<greeners::DataFrame>,
+    ) -> Result<(Rc<greeners::DataFrame>, GFormula, Vec<String>)> {
+        self.materialize_formula(formula, df)
+    }
+
+    /// Materializa os termos de uma fórmula em colunas concretas do DataFrame,
+    /// retornando um DataFrame aumentado e uma `GFormula` com apenas nomes planos.
+    ///
+    /// Isso elimina a serialização `formula_to_string → GFormula::parse` que
+    /// impedia `log(K):log(L)`, `I(x^2)`, etc. O Greeners recebe colunas já
+    /// computadas; nunca precisa parsear strings como `"log(K)"`.
+    ///
+    /// # Nomes de exibição
+    /// Retorna também um `Vec<String>` paralelo com os nomes legíveis
+    /// (`"log(K)"`, `"I(experience^2)"`, …) para usar em `summary()` / `tidy()`.
+    pub(super) fn materialize_formula(
+        &mut self,
+        formula: &Formula,
+        df: &Rc<greeners::DataFrame>,
+    ) -> Result<(Rc<greeners::DataFrame>, GFormula, Vec<String>)> {
+        let mut augmented: greeners::DataFrame = df.as_ref().clone();
+        let mut col_names: Vec<String> = Vec::new();
+        let mut display_names: Vec<String> = Vec::new();
+        let mut counter: usize = 0;
+
+        for term in &formula.rhs {
+            let (col, display) =
+                self.materialize_term(term, df, &mut augmented, &mut counter)?;
+            col_names.push(col);
+            display_names.push(display);
+        }
+
+        let g_formula = GFormula {
+            dependent: formula.lhs.clone(),
+            independents: col_names,
+            intercept: true,
+        };
+
+        Ok((Rc::new(augmented), g_formula, display_names))
+    }
+
+    /// Materializa um único `RhsTerm` em uma coluna do `augmented` DataFrame,
+    /// retornando `(col_name, display_name)`.
+    fn materialize_term(
+        &mut self,
+        term: &RhsTerm,
+        original_df: &Rc<greeners::DataFrame>,
+        augmented: &mut greeners::DataFrame,
+        counter: &mut usize,
+    ) -> Result<(String, String)> {
+        match term {
+            // Variável simples que já existe no df — sem cópia
+            RhsTerm::Expr(e) if matches!(e.as_ref(), Expr::Var(_)) => {
+                if let Expr::Var(v) = e.as_ref() {
+                    return Ok((v.clone(), v.clone()));
+                }
+                unreachable!()
+            }
+
+            // C(Var(v)) simples — delega para o Greeners (ele já expande dummies)
+            RhsTerm::Categorical(e) if matches!(e.as_ref(), Expr::Var(_)) => {
+                if let Expr::Var(v) = e.as_ref() {
+                    let col_name = format!("C({v})");
+                    let display = col_name.clone();
+                    return Ok((col_name, display));
+                }
+                unreachable!()
+            }
+
+            // Qualquer outra expressão: avalia element-wise e insere como coluna
+            RhsTerm::Expr(e) => {
+                let display = crate::lang::ast::expr_display(e);
+                let col_name = format!("__term_{counter}");
+                *counter += 1;
+                let vals = self.eval_col_expr(e, original_df)?;
+                augmented
+                    .insert(col_name.clone(), ndarray::Array1::from(vals))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                Ok((col_name, display))
+            }
+
+            // C(expr) composta: materializa a expr, depois envolve com C(...)
+            RhsTerm::Categorical(e) => {
+                let display = format!("C({})", crate::lang::ast::expr_display(e));
+                let inner_col = format!("__cat_{counter}");
+                *counter += 1;
+                let vals = self.eval_col_expr(e, original_df)?;
+                augmented
+                    .insert(inner_col.clone(), ndarray::Array1::from(vals))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let col_name = format!("C({inner_col})");
+                Ok((col_name, display))
+            }
+
+            // Interação: materializa ambos os lados e multiplica element-wise
+            RhsTerm::Interaction(lhs, rhs) => {
+                let (lcol, ldisp) =
+                    self.materialize_term(lhs, original_df, augmented, counter)?;
+                let (rcol, rdisp) =
+                    self.materialize_term(rhs, original_df, augmented, counter)?;
+
+                let col_name = format!("__inter_{counter}");
+                *counter += 1;
+                let display = format!("{ldisp}:{rdisp}");
+
+                // Produto element-wise das duas colunas já materializadas
+                // Usa get_column (que funciona tanto para colunas originais quanto
+                // para colunas inseridas via insert())
+                let lvals = augmented
+                    .get_column(&lcol)
+                    .map(|c| c.to_float().to_vec())
+                    .map_err(|e| HayashiError::Runtime(format!("interaction: left column '{lcol}': {e}")))?;
+                let rvals = augmented
+                    .get_column(&rcol)
+                    .map(|c| c.to_float().to_vec())
+                    .map_err(|e| HayashiError::Runtime(format!("interaction: right column '{rcol}': {e}")))?;
+
+                let prod: Vec<f64> = lvals.iter().zip(rvals.iter()).map(|(a, b)| a * b).collect();
+                augmented
+                    .insert(col_name.clone(), ndarray::Array1::from(prod))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                Ok((col_name, display))
+            }
+        }
     }
 
     // ── Object methods ──────────────────────────────────────────────────────

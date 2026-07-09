@@ -100,9 +100,7 @@ impl Interpreter {
                     }
                     _ => return Err(HayashiError::Type("clogit: group= must be string".into())),
                 };
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
                 let (y_vec, x_mat) = df
                     .to_design_matrix(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -149,9 +147,7 @@ impl Interpreter {
                     }
                     _ => return Err(HayashiError::Type("cpoisson: group= must be string".into())),
                 };
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
                 let (y_vec, x_mat) = df
                     .to_design_matrix(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -206,9 +202,7 @@ impl Interpreter {
                     }
                     _ => return Err(HayashiError::Type("cmnlogit: alts= must be integer".into())),
                 };
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
                 let (y_vec, x_mat) = df
                     .to_design_matrix(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -391,9 +385,7 @@ impl Interpreter {
                             ))
                         })?,
                 };
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
                 let (y_vec, x_mat) = df
                     .to_design_matrix(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -485,9 +477,7 @@ impl Interpreter {
 
                 for arg in &args[1..] {
                     let formula_ast = self.resolve_formula(arg)?;
-                    let formula_str = Self::formula_to_string(&formula_ast);
-                    let g_formula = GFormula::parse(&formula_str)
-                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
                     let (y, x) = df
                         .to_design_matrix(&g_formula)
                         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -631,16 +621,9 @@ impl Interpreter {
             // ── Fixed Effects ─────────────────────────────────────────────────
             "fe" => {
                 let (formula_ast, df, _df_name, id_col) = self.extract_panel_args(args, opt_map)?;
-                let formula_str = Self::formula_to_string(&formula_ast);
-                // FE removes the intercept via within-transform; we force - 1
-                // to avoid a zero column after demeaning (singular matrix)
-                let formula_no_const = if formula_str.contains("- 1") {
-                    formula_str
-                } else {
-                    format!("{} - 1", formula_str)
-                };
-                let g_formula = GFormula::parse(&formula_no_const)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, mut g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+                // FE removes the intercept via within-transform; force intercept=false
+                g_formula.intercept = false;
 
                 // try int; fall back to float→int; then to string
                 let result = if let Ok(ids) = df.get_int(&id_col) {
@@ -667,9 +650,7 @@ impl Interpreter {
             // ── Random Effects ────────────────────────────────────────────────
             "re" => {
                 let (formula_ast, df, _df_name, id_col) = self.extract_panel_args(args, opt_map)?;
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
 
                 // accepts float column of integer values (e.g. idcode read as f64)
                 let ids_owned: ndarray::Array1<i64>;
@@ -698,16 +679,11 @@ impl Interpreter {
                 // H₀: all individual effects are zero (pooled OLS adequate)
                 // H₁: individual effects exist (use FE)
                 let (formula_ast, df, _df_name, id_col) = self.extract_panel_args(args, opt_map)?;
-                let formula_str = Self::formula_to_string(&formula_ast);
+                let (df, g_formula_base, _display) = self.prepare_formula(&formula_ast, &df)?;
 
-                // FE (within)
-                let formula_no_const = if formula_str.contains("- 1") {
-                    formula_str.clone()
-                } else {
-                    format!("{} - 1", formula_str)
-                };
-                let g_formula_fe = GFormula::parse(&formula_no_const)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                // FE (within) — sem intercept
+                let mut g_formula_fe = g_formula_base.clone();
+                g_formula_fe.intercept = false;
 
                 let entity_ids_fe: Vec<i64> = if let Ok(ids) = df.get_int(&id_col) {
                     ids.to_vec()
@@ -722,9 +698,8 @@ impl Interpreter {
                 let fe = FixedEffects::from_formula(&g_formula_fe, &df, &entity_ids_fe)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-                // Pooled OLS (with intercept)
-                let g_formula_ols = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                // Pooled OLS (com intercept)
+                let g_formula_ols = g_formula_base;
                 let (y_pool, x_pool) = df
                     .to_design_matrix(&g_formula_ols)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -788,9 +763,7 @@ impl Interpreter {
                 // H₀: residuals independent across entities (no cross-sectional dependence)
                 // H₁: cross-sectional dependence present
                 let (formula_ast, df, _df_name, id_col) = self.extract_panel_args(args, opt_map)?;
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
 
                 // OLS pooled for residuals
                 let (y_vec, x_mat) = df
@@ -868,9 +841,7 @@ impl Interpreter {
                 // H₀: no individual effects (σ²_u = 0) — pooled OLS adequate
                 // H₁: individual effects exist — use FE or RE
                 let (formula_ast, df, _df_name, id_col) = self.extract_panel_args(args, opt_map)?;
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
 
                 // OLS pooled to obtain residuals
                 let (y_vec, x_mat) = df
@@ -954,9 +925,7 @@ impl Interpreter {
                 let (formula_ast, df, df_name, id_col) = self.extract_panel_args(args, opt_map)?;
                 let time_col = self.get_time_col(&df_name, opt_map)?;
 
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
 
                 let (y_vec, x_mat) = df
                     .to_design_matrix(&g_formula)
@@ -1051,9 +1020,7 @@ impl Interpreter {
             // ── Arellano-Bond Diff-GMM (OLD mundlak removed — use new mundlak above) ─
             "mundlak_OLD_REMOVED" => {
                 let (formula_ast, df, _df_name, id_col) = self.extract_panel_args(args, opt_map)?;
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
 
                 let (y_vec, x_mat) = df
                     .to_design_matrix(&g_formula)
@@ -1183,9 +1150,7 @@ impl Interpreter {
                     _ => return Err(HayashiError::Runtime("ab(): step must be 1 or 2".into())),
                 };
 
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
 
                 let (y_vec, x_mat) = df
                     .to_design_matrix(&g_formula)
@@ -1252,38 +1217,26 @@ impl Interpreter {
                     _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
 
-                let endog_str = Self::formula_to_string(&endog_ast);
-                let instr_str = Self::formula_to_string(&instr_ast);
-
-                let g_endog = GFormula::parse(&endog_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df_endog, g_endog, _) = self.prepare_formula(&endog_ast, &df)?;
 
                 let g_instr = if instr_ast.lhs.is_empty() {
-                    let independents: Vec<String> = instr_ast
-                        .rhs
-                        .iter()
-                        .map(|t| match t {
-                            RhsTerm::Var(v) => v.clone(),
-                            RhsTerm::Categorical(v) => format!("C({v})"),
-                            RhsTerm::Transform(fn_, v) => format!("{fn_}({v})"),
-                            RhsTerm::Interaction(a, b) => format!("{a}:{b}"),
-                        })
-                        .collect();
+                    let (_, g_i, _) = self.prepare_formula(&instr_ast, &df)?;
                     GFormula {
                         dependent: String::new(),
-                        independents,
+                        independents: g_i.independents,
                         intercept: true,
                     }
                 } else {
-                    GFormula::parse(&instr_str).map_err(|e| HayashiError::Runtime(e.to_string()))?
+                    let (_, g_i, _) = self.prepare_formula(&instr_ast, &df)?;
+                    g_i
                 };
 
-                let (y, x) = df
+                let (y, x) = df_endog
                     .to_design_matrix(&g_endog)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
                 let z = {
-                    let n_rows = df.n_rows();
+                    let n_rows = df_endog.n_rows();
                     let n_cols = g_instr.independents.len() + if g_instr.intercept { 1 } else { 0 };
                     let mut z_mat = ndarray::Array2::<f64>::zeros((n_rows, n_cols));
                     let mut col_idx = 0;
@@ -1294,7 +1247,7 @@ impl Interpreter {
                         col_idx = 1;
                     }
                     for (j, var_name) in g_instr.independents.iter().enumerate() {
-                        let col_data = df
+                        let col_data = df_endog
                             .get(var_name)
                             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                         for i in 0..n_rows {
@@ -1339,9 +1292,7 @@ impl Interpreter {
                     }
                 };
 
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
 
                 let (y_vec, x_mat) = df
                     .to_design_matrix(&g_formula)
@@ -1426,24 +1377,14 @@ impl Interpreter {
                 };
 
                 // structural formula → y and X (no constant, FE absorbs it)
-                let endog_str = Self::formula_to_string(&endog_ast);
-                let g_endog = GFormula::parse(&endog_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let (y_vec, x_mat) = df
+                let (df_endog2, g_endog, _) = self.prepare_formula(&endog_ast, &df)?;
+                let (y_vec, x_mat) = df_endog2
                     .to_design_matrix(&g_endog)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-                // instrument formula → Z (no constant)
-                let instr_vars: Vec<String> = instr_ast
-                    .rhs
-                    .iter()
-                    .map(|t| match t {
-                        RhsTerm::Var(v) => v.clone(),
-                        RhsTerm::Categorical(v) => format!("C({v})"),
-                        RhsTerm::Transform(fn_, v) => format!("{fn_}({v})"),
-                        RhsTerm::Interaction(a, b) => format!("{a}:{b}"),
-                    })
-                    .collect();
+                // instrument formula → Z (no constant); materializamos para suportar exprs
+                let (_, g_instr2, _) = self.prepare_formula(&instr_ast, &df)?;
+                let instr_vars: Vec<String> = g_instr2.independents;
 
                 let n = y_vec.len();
                 let l = instr_vars.len();
@@ -1491,9 +1432,7 @@ impl Interpreter {
             "pcse" => {
                 let (formula_ast, df, df_name, id_col) = self.extract_panel_args(args, opt_map)?;
                 let time_col = self.get_time_col(&df_name, opt_map)?;
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
                 let (y_vec, x_mat) = df
                     .to_design_matrix(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1527,9 +1466,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
                 let (y_vec, x_mat) = df
                     .to_design_matrix(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1561,9 +1498,7 @@ impl Interpreter {
                 let (formula_ast, df, df_name, id_col) = self.extract_panel_args(args, opt_map)?;
                 let time_col = self.get_time_col(&df_name, opt_map)?;
 
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
 
                 let (y_vec, x_mat) = df
                     .to_design_matrix(&g_formula)
@@ -1693,9 +1628,7 @@ impl Interpreter {
                 let (formula_ast, df, df_name, id_col) = self.extract_panel_args(args, opt_map)?;
                 let time_col = self.get_time_col(&df_name, opt_map)?;
 
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
 
                 let (y_vec, x_mat) = df
                     .to_design_matrix(&g_formula)
