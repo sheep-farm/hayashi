@@ -1,5 +1,3 @@
-/* @ts-self-types="./hayashi_lang.d.ts" */
-
 /**
  * @param {string} source
  * @returns {string}
@@ -9,7 +7,7 @@ export function run_hayashi(source) {
     let deferred2_1;
     try {
         const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passStringToWasm0(source, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+        const ptr0 = passStringToWasm0(source, wasm.__wbindgen_export2, wasm.__wbindgen_export3);
         const len0 = WASM_VECTOR_LEN;
         wasm.run_hayashi(retptr, ptr0, len0);
         var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
@@ -34,13 +32,6 @@ export function set_print_callback(cb) {
 function __wbg_get_imports() {
     const import0 = {
         __proto__: null,
-        __wbg___wbindgen_debug_string_8a447059637473e2: function(arg0, arg1) {
-            const ret = debugString(getObject(arg1));
-            const ptr1 = passStringToWasm0(ret, wasm.__wbindgen_export, wasm.__wbindgen_export2);
-            const len1 = WASM_VECTOR_LEN;
-            getDataViewMemory0().setInt32(arg0 + 4 * 1, len1, true);
-            getDataViewMemory0().setInt32(arg0 + 4 * 0, ptr1, true);
-        },
         __wbg___wbindgen_is_function_acc5528be2b923f2: function(arg0) {
             const ret = typeof(getObject(arg0)) === 'function';
             return ret;
@@ -61,52 +52,17 @@ function __wbg_get_imports() {
         __wbg___wbindgen_throw_ea4887a5f8f9a9db: function(arg0, arg1) {
             throw new Error(getStringFromWasm0(arg0, arg1));
         },
-        __wbg_append_52800d6b56f733ed: function() { return handleError(function (arg0, arg1) {
-            getObject(arg0).append(getObject(arg1));
-        }, arguments); },
-        __wbg_body_c94f9310613c153b: function(arg0) {
-            const ret = getObject(arg0).body;
-            return isLikeNone(ret) ? 0 : addHeapObject(ret);
-        },
         __wbg_call_5575218572ead796: function() { return handleError(function (arg0, arg1, arg2) {
             const ret = getObject(arg0).call(getObject(arg1), getObject(arg2));
-            return addHeapObject(ret);
-        }, arguments); },
-        __wbg_createElement_9e23ac95e40e302c: function() { return handleError(function (arg0, arg1, arg2) {
-            const ret = getObject(arg0).createElement(getStringFromWasm0(arg1, arg2));
             return addHeapObject(ret);
         }, arguments); },
         __wbg_crypto_38df2bab126b63dc: function(arg0) {
             const ret = getObject(arg0).crypto;
             return addHeapObject(ret);
         },
-        __wbg_document_2634180a4c694068: function(arg0) {
-            const ret = getObject(arg0).document;
-            return isLikeNone(ret) ? 0 : addHeapObject(ret);
-        },
         __wbg_getRandomValues_c44a50d8cfdaebeb: function() { return handleError(function (arg0, arg1) {
             getObject(arg0).getRandomValues(getObject(arg1));
         }, arguments); },
-        __wbg_instanceof_HtmlElement_c91c44c5fc58a478: function(arg0) {
-            let result;
-            try {
-                result = getObject(arg0) instanceof HTMLElement;
-            } catch (_) {
-                result = false;
-            }
-            const ret = result;
-            return ret;
-        },
-        __wbg_instanceof_Window_0d356b88a2f77c42: function(arg0) {
-            let result;
-            try {
-                result = getObject(arg0) instanceof Window;
-            } catch (_) {
-                result = false;
-            }
-            const ret = result;
-            return ret;
-        },
         __wbg_length_589238bdcf171f0e: function(arg0) {
             const ret = getObject(arg0).length;
             return ret;
@@ -127,14 +83,6 @@ function __wbg_get_imports() {
             const ret = getObject(arg0).now();
             return ret;
         },
-        __wbg_offsetHeight_112efe2ab532d954: function(arg0) {
-            const ret = getObject(arg0).offsetHeight;
-            return ret;
-        },
-        __wbg_offsetWidth_96ca6cd7e7655feb: function(arg0) {
-            const ret = getObject(arg0).offsetWidth;
-            return ret;
-        },
         __wbg_performance_3fcf6e32a7e1ed0a: function(arg0) {
             const ret = getObject(arg0).performance;
             return addHeapObject(ret);
@@ -149,19 +97,10 @@ function __wbg_get_imports() {
         __wbg_randomFillSync_6c25eac9869eb53c: function() { return handleError(function (arg0, arg1) {
             getObject(arg0).randomFillSync(takeObject(arg1));
         }, arguments); },
-        __wbg_remove_627151898f1aafc8: function(arg0) {
-            getObject(arg0).remove();
-        },
         __wbg_require_b4edbdcf3e2a1ef0: function() { return handleError(function () {
             const ret = module.require;
             return addHeapObject(ret);
         }, arguments); },
-        __wbg_setAttribute_8bccfbabf2a83682: function() { return handleError(function (arg0, arg1, arg2, arg3, arg4) {
-            getObject(arg0).setAttribute(getStringFromWasm0(arg1, arg2), getStringFromWasm0(arg3, arg4));
-        }, arguments); },
-        __wbg_set_textContent_5c5fef072bd24f7a: function(arg0, arg1, arg2) {
-            getObject(arg0).textContent = arg1 === 0 ? undefined : getStringFromWasm0(arg1, arg2);
-        },
         __wbg_static_accessor_GLOBAL_THIS_2fee5048bcca5938: function() {
             const ret = typeof globalThis === 'undefined' ? null : globalThis;
             return isLikeNone(ret) ? 0 : addHeapObject(ret);
@@ -219,71 +158,6 @@ function addHeapObject(obj) {
     return idx;
 }
 
-function debugString(val) {
-    // primitive types
-    const type = typeof val;
-    if (type == 'number' || type == 'boolean' || val == null) {
-        return  `${val}`;
-    }
-    if (type == 'string') {
-        return `"${val}"`;
-    }
-    if (type == 'symbol') {
-        const description = val.description;
-        if (description == null) {
-            return 'Symbol';
-        } else {
-            return `Symbol(${description})`;
-        }
-    }
-    if (type == 'function') {
-        const name = val.name;
-        if (typeof name == 'string' && name.length > 0) {
-            return `Function(${name})`;
-        } else {
-            return 'Function';
-        }
-    }
-    // objects
-    if (Array.isArray(val)) {
-        const length = val.length;
-        let debug = '[';
-        if (length > 0) {
-            debug += debugString(val[0]);
-        }
-        for(let i = 1; i < length; i++) {
-            debug += ', ' + debugString(val[i]);
-        }
-        debug += ']';
-        return debug;
-    }
-    // Test for built-in
-    const builtInMatches = /\[object ([^\]]+)\]/.exec(toString.call(val));
-    let className;
-    if (builtInMatches && builtInMatches.length > 1) {
-        className = builtInMatches[1];
-    } else {
-        // Failed to match the standard '[object ClassName]'
-        return toString.call(val);
-    }
-    if (className == 'Object') {
-        // we're a user defined class or Object
-        // JSON.stringify avoids problems with cycles, and is generally much
-        // easier than looping through ownProperties of `val`.
-        try {
-            return 'Object(' + JSON.stringify(val) + ')';
-        } catch (_) {
-            return 'Object';
-        }
-    }
-    // errors
-    if (val instanceof Error) {
-        return `${val.name}: ${val.message}\n${val.stack}`;
-    }
-    // TODO we could test for more things here, like `Set`s and `Map`s.
-    return className;
-}
-
 function dropObject(idx) {
     if (idx < 1028) return;
     heap[idx] = heap_next;
@@ -321,7 +195,7 @@ function handleError(f, args) {
     try {
         return f.apply(this, args);
     } catch (e) {
-        wasm.__wbindgen_export3(addHeapObject(e));
+        wasm.__wbindgen_export(addHeapObject(e));
     }
 }
 
