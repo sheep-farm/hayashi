@@ -14,6 +14,50 @@ iv(Y ~ X_exog + X_endog, ~ Z1 + Z2 + X_exog, df)
 - Second formula: the instrument list (all exogenous variables + excluded instruments)
 - Exogenous regressors must appear in both formulas
 
+## Formula Syntax — Transformations and Interactions
+
+The same formula features available in OLS (transformations, interactions, `I()`,
+`C()`) work identically in both the structural equation and the instrument
+formula.
+
+### Transformations
+
+Any function from the language can appear as a regressor or instrument:
+
+```hay
+// transformed endogenous regressor
+iv(Y ~ log(X2), ~ Z, df)
+
+// multiple transformations in the structural equation
+iv(output ~ log(K) + log(L), ~ Z1 + Z2, df)
+
+// transformed instrument
+iv(Y ~ X2, ~ log(Z), df)
+```
+
+Coefficient names in the output reflect the original expression: `log(K)`, etc.
+
+### Interactions
+
+The `:` operator creates an element-wise product. Each side can be any expression:
+
+```hay
+// interaction of transformations in the structural equation
+iv(output ~ log(K) + log(L) + log(K):log(L), ~ Z1 + Z2, df)
+
+// interaction term only
+iv(Y ~ log(K):log(L), ~ Z, df)
+```
+
+The `*` shorthand works here too (`x1*x2` ≡ `x1 + x2 + x1:x2`):
+
+```hay
+iv(Y ~ X1 * X2, ~ Z, df)
+```
+
+See the [OLS formula section](ols.md#formula-syntax) for full details on
+`I(expr)` and `C(var)`.
+
 ## Classic Example: Returns to Education
 
 Using the MROZ dataset, `educ` is endogenous (correlated with unobserved ability). Parents' education serves as instruments:

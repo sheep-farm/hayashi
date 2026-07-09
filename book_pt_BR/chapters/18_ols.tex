@@ -268,8 +268,12 @@ ols(fórmula, df, if = condição)
 Alias: \lstinline{reg()} é equivalente a \lstinline{ols()}.
 
 \section{Fórmula}
+\label{sec:ols-formula}
+\index{fórmula!sintaxe}
+\index{fórmula!transformações}
+\index{fórmula!interações}
 
-A fórmula segue a notação padrão \texttt{y \textasciitilde{} x1 + x2 + ...}:
+A fórmula segue a notação \texttt{y \textasciitilde{} x1 + x2 + \ldots}:
 
 \begin{lstlisting}[caption={OLS básico}]
 input df
@@ -296,6 +300,94 @@ A fórmula pode ser passada como string:
 \begin{lstlisting}
 let formula = "Y ~ X1 + X2"
 ols(formula, df)
+\end{lstlisting}
+
+\subsection{Transformações}
+\label{subsec:formula-transformacoes}
+
+Qualquer função suportada pela linguagem pode ser usada diretamente
+no RHS da fórmula — o interpretador avalia a expressão
+\emph{antes} de passar os dados ao estimador, de modo que o Greeners
+recebe apenas colunas numéricas planas.
+
+\begin{lstlisting}[caption={Transformações em regressores}]
+// log de uma variável
+ols(Y ~ log(X), df)
+
+// raiz quadrada
+ols(Y ~ sqrt(X), df)
+
+// múltiplas transformações
+ols(Y ~ log(K) + log(L), df)
+
+// termo quadrático (equivalente a I(X^2))
+ols(Y ~ X + X^2, df)
+\end{lstlisting}
+
+O nome do coeficiente na tabela de resultados reflete a expressão
+original: \texttt{log(K)}, \texttt{sqrt(X)}, etc.
+
+\subsection{Interações}
+\label{subsec:formula-interacoes}
+
+O operador \texttt{:} cria um termo de interação (produto
+\emph{element-wise}) entre dois regressores. Cada lado pode ser uma
+expressão arbitrária:
+
+\begin{lstlisting}[caption={Interações}]
+// interação entre variáveis simples
+ols(Y ~ X1 + X2 + X1:X2, df)
+
+// interação de transformações — log(K)*log(L)
+ols(Y ~ log(K) + log(L) + log(K):log(L), df)
+
+// apenas o termo de interação
+ols(Y ~ log(K):log(L), df)
+\end{lstlisting}
+
+O operador \texttt{*} é açúcar sintático para expansão completa
+(\texttt{x1*x2} $\equiv$ \texttt{x1 + x2 + x1:x2}):
+
+\begin{lstlisting}
+// equivalente: ols(Y ~ X1 + X2 + X1:X2, df)
+ols(Y ~ X1 * X2, df)
+\end{lstlisting}
+
+\subsection{\texttt{I(expr)} — expressões aritméticas arbitrárias}
+\label{subsec:formula-I}
+
+A função \texttt{I(\ldots)} isola uma expressão aritmética composta
+dentro da fórmula, protegendo os operadores \texttt{+}, \texttt{-} e
+\texttt{*} do significado especial que têm na gramática de fórmulas:
+
+\begin{lstlisting}[caption={Termos arbitrários com \texttt{I()}}]
+// quadrado de X
+ols(Y ~ X + I(X^2), df)
+
+// interação linear construída explicitamente
+ols(Y ~ X1 + X2 + I(X1 * X2), df)
+
+// combinação linear de variáveis
+ols(Y ~ I(X1 + X2), df)
+\end{lstlisting}
+
+\begin{nota}
+  \texttt{I(X^2)} e \texttt{X\textasciicircum{}2} são equivalentes quando
+  \texttt{X\textasciicircum{}2} aparece sozinho como termo (fora de
+  interações e adições de nível superior). Use \texttt{I(\ldots)} para
+  eliminar qualquer ambiguidade ou quando a expressão contém \texttt{+}
+  ou \texttt{*}.
+\end{nota}
+
+\subsection{Variável categórica: \texttt{C()}}
+\label{subsec:formula-categorica}
+
+\texttt{C(var)} instrui o estimador a tratar \texttt{var} como
+categórica, gerando dummies automáticas (categoria de referência = primeira
+por ordem lexicográfica):
+
+\begin{lstlisting}
+ols(Y ~ X + C(regiao), df)
 \end{lstlisting}
 
 \section{Opções de erro padrão}

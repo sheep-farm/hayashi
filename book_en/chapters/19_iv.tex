@@ -248,6 +248,24 @@ For multiple endogenous regressors and instruments:
 iv(y ~ x1 + x2, ~ z1 + z2, df)
 \end{lstlisting}
 
+\subsection{Transformations and interactions in formulas}
+\label{subsec:iv-formula-advanced}
+
+The same transformations and interactions available in OLS
+(Section~\ref{subsec:formula-transformations}--\ref{subsec:formula-I})
+work equally in the structural and instrument formulas of IV:
+
+\begin{lstlisting}[caption={IV with transformations and interactions}]
+// transformed endogenous regressor
+iv(Y ~ log(X2), ~ Z, df)
+
+// interaction of transformations in the structural equation
+iv(Y ~ log(K) + log(L) + log(K):log(L), ~ Z1 + Z2, df)
+
+// transformed instrument
+iv(Y ~ X2, ~ log(Z), df)
+\end{lstlisting}
+
 \begin{nota}
   Included exogenous regressors ($X_1$) do not need to be listed in the
   instrument formula --- they are added automatically as their own

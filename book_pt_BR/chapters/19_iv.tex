@@ -249,6 +249,24 @@ Para múltiplos regressores endógenos e instrumentos:
 iv(y ~ x1 + x2, ~ z1 + z2, df)
 \end{lstlisting}
 
+\subsection{Transformações e interações nas fórmulas}
+\label{subsec:iv-formula-avancada}
+
+As mesmas transformações e interações disponíveis no OLS
+(Seção~\ref{subsec:formula-transformacoes}--\ref{subsec:formula-I})
+funcionam igualmente nas fórmulas estrutural e de instrumentos do IV:
+
+\begin{lstlisting}[caption={IV com transformações e interações}]
+// regressor endógeno transformado
+iv(Y ~ log(X2), ~ Z, df)
+
+// interação de transformações na equação estrutural
+iv(Y ~ log(K) + log(L) + log(K):log(L), ~ Z1 + Z2, df)
+
+// instrumento transformado
+iv(Y ~ X2, ~ log(Z), df)
+\end{lstlisting}
+
 \begin{nota}
   Os regressores exógenos incluídos ($X_1$) não precisam ser listados na
   fórmula dos instrumentos — são adicionados automaticamente como seus
