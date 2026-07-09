@@ -48,9 +48,8 @@ impl Interpreter {
                 // at_X=value — fixes variable X at the given value for margins calculation
                 let at_vals: HashMap<String, f64> = opt_map
                     .iter()
-                    .filter(|(k, _)| k.starts_with("at_"))
                     .filter_map(|(k, v)| {
-                        let var = k.strip_prefix("at_").unwrap().to_string();
+                        let var = k.strip_prefix("at_")?.to_string();
                         match v {
                             Value::Float(f) => Some((var, *f)),
                             Value::Int(i) => Some((var, *i as f64)),

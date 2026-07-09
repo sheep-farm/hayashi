@@ -593,13 +593,13 @@ impl Interpreter {
                     println!(
                         " Best AIC: {}   Best BIC: {}",
                         rows.iter()
-                            .min_by(|a, b| a.aic.partial_cmp(&b.aic).unwrap())
-                            .unwrap()
-                            .label,
+                            .min_by(|a, b| a.aic.total_cmp(&b.aic))
+                            .map(|r| r.label.as_str())
+                            .unwrap_or("—"),
                         rows.iter()
-                            .min_by(|a, b| a.bic.partial_cmp(&b.bic).unwrap())
-                            .unwrap()
-                            .label
+                            .min_by(|a, b| a.bic.total_cmp(&b.bic))
+                            .map(|r| r.label.as_str())
+                            .unwrap_or("—")
                     );
                     // Akaike weights
                     let delta_aics: Vec<f64> = rows.iter().map(|r| r.aic - min_aic).collect();
