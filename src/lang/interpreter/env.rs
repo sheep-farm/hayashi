@@ -37,6 +37,19 @@ impl Env {
         }
     }
 
+    /// Returns a mutable reference to the innermost active scope.
+    ///
+    /// # Panics
+    /// Only if the interpreter is constructed without a global scope — which
+    /// `Env::new()` guarantees never happens.  An unreachable panic here
+    /// signals an internal invariant violation, not a user error.
+    #[inline]
+    fn current_scope_mut(&mut self) -> &mut Scope {
+        self.scopes
+            .last_mut()
+            .expect("Env invariant violated: scope stack is empty")
+    }
+
     pub fn push_scope(&mut self) {
         self.quiet_stack.push(self.quiet_mode);
         self.scopes.push(Scope::new());
@@ -65,16 +78,14 @@ impl Env {
                 )));
             }
         }
-        self.scopes
-            .last_mut()
-            .unwrap()
+        self.current_scope_mut()
             .vars
             .insert(name.to_string(), val);
         Ok(())
     }
 
     pub fn declare_const(&mut self, name: &str, val: Value) {
-        let scope = self.scopes.last_mut().unwrap();
+        let scope = self.current_scope_mut();
         scope.vars.insert(name.to_string(), val);
         scope.consts.insert(name.to_string());
     }
@@ -93,9 +104,7 @@ impl Env {
                 return Ok(());
             }
         }
-        self.scopes
-            .last_mut()
-            .unwrap()
+        self.current_scope_mut()
             .vars
             .insert(name.to_string(), val);
         Ok(())
