@@ -61,9 +61,7 @@ impl Interpreter {
                     _ => 0,
                 };
 
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
 
                 let result = greeners::FamaMacBeth::fit(&g_formula, &df, &time_col, nw_lags)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -361,18 +359,19 @@ impl Interpreter {
                     Some(Value::DataFrame(df)) => df.clone(),
                     _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
-                let df = self.maybe_filter_df(&df_raw, opts)?;
-                let formula_str = Self::formula_to_string(&formula_ast);
+                let df_raw2 = self.maybe_filter_df(&df_raw, opts)?;
+                let (df, g_formula, display_names) = self.prepare_formula(&formula_ast, &df_raw2)?;
                 let cov = resolve_cov_full(opt_map, &df)?;
-
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
                 let (y, x) = df
                     .to_design_matrix(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-                let result = OLS::from_formula(&g_formula, &df, cov)
+                // Usa fit_with_names para preservar nomes legíveis (e.g. "log(K):log(L)")
+                let var_names: Vec<String> = std::iter::once("_cons".to_string())
+                    .chain(display_names)
+                    .collect();
+                let result = OLS::fit_with_names(&y, &x, cov, Some(var_names))
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
                 let fitted = result.x_clean.as_ref().unwrap_or(&x).dot(&result.params);
@@ -407,36 +406,24 @@ impl Interpreter {
                     Some(Value::DataFrame(df)) => df.clone(),
                     _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
-                let cov = resolve_cov_full(opt_map, &df)?;
+                let (df_endog, g_endog, _) = self.prepare_formula(&endog_ast, &df)?;
+                let cov = resolve_cov_full(opt_map, &df_endog)?;
 
-                let endog_str = Self::formula_to_string(&endog_ast);
-                let instr_str = Self::formula_to_string(&instr_ast);
-
-                let g_endog = GFormula::parse(&endog_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                // The instrument formula may have empty LHS (syntax ~ z1 + z2).
-                // GFormula::parse rejects empty LHS; we build it directly.
+                // Instrumento pode ter LHS vazio (~ z1 + z2)
                 let g_instr = if instr_ast.lhs.is_empty() {
-                    let independents: Vec<String> = instr_ast
-                        .rhs
-                        .iter()
-                        .map(|t| match t {
-                            RhsTerm::Var(v) => v.clone(),
-                            RhsTerm::Categorical(v) => format!("C({v})"),
-                            RhsTerm::Transform(fn_, v) => format!("{fn_}({v})"),
-                            RhsTerm::Interaction(a, b) => format!("{a}:{b}"),
-                        })
-                        .collect();
+                    let (df_instr, g_i, _) = self.prepare_formula(&instr_ast, &df)?;
+                    let _ = df_instr; // df aumentado não é necessário para instrumento
                     GFormula {
                         dependent: String::new(),
-                        independents,
+                        independents: g_i.independents,
                         intercept: true,
                     }
                 } else {
-                    GFormula::parse(&instr_str).map_err(|e| HayashiError::Runtime(e.to_string()))?
+                    let (_, g_i, _) = self.prepare_formula(&instr_ast, &df)?;
+                    g_i
                 };
 
-                let result = IV::from_formula(&g_endog, &g_instr, &df, cov)
+                let result = IV::from_formula(&g_endog, &g_instr, &df_endog, cov)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
                 Ok(Value::IvResult(Rc::new(result)))
@@ -474,59 +461,33 @@ impl Interpreter {
                 let endog_vars: std::collections::HashSet<String> = endog_ast
                     .rhs
                     .iter()
-                    .map(|t| match t {
-                        RhsTerm::Var(v) => v.clone(),
-                        _ => String::new(),
-                    })
-                    .filter(|s| !s.is_empty())
+                    .filter_map(|t| t.as_var().map(|s| s.to_string()))
                     .collect();
                 let instr_vars: std::collections::HashSet<String> = instr_ast
                     .rhs
                     .iter()
-                    .map(|t| match t {
-                        RhsTerm::Var(v) => v.clone(),
-                        _ => String::new(),
-                    })
-                    .filter(|s| !s.is_empty())
+                    .filter_map(|t| t.as_var().map(|s| s.to_string()))
                     .collect();
 
                 // endogenous = in endog but NOT in instr
                 let x_endog_names: Vec<String> = endog_ast
                     .rhs
                     .iter()
-                    .filter_map(|t| {
-                        if let RhsTerm::Var(v) = t {
-                            Some(v.clone())
-                        } else {
-                            None
-                        }
-                    })
+                    .filter_map(|t| t.as_var().map(|s| s.to_string()))
                     .filter(|v| !instr_vars.contains(v))
                     .collect();
                 // excluded instruments = in instr but NOT in endog
                 let z_excl_names: Vec<String> = instr_ast
                     .rhs
                     .iter()
-                    .filter_map(|t| {
-                        if let RhsTerm::Var(v) = t {
-                            Some(v.clone())
-                        } else {
-                            None
-                        }
-                    })
+                    .filter_map(|t| t.as_var().map(|s| s.to_string()))
                     .filter(|v| !endog_vars.contains(v))
                     .collect();
                 // included exogenous = in both
                 let x_exog_names: Vec<String> = instr_ast
                     .rhs
                     .iter()
-                    .filter_map(|t| {
-                        if let RhsTerm::Var(v) = t {
-                            Some(v.clone())
-                        } else {
-                            None
-                        }
-                    })
+                    .filter_map(|t| t.as_var().map(|s| s.to_string()))
                     .filter(|v| endog_vars.contains(v.as_str()))
                     .collect();
 
@@ -709,9 +670,7 @@ impl Interpreter {
             // ── Logit ─────────────────────────────────────────────────────────
             "logit" => {
                 let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
                 let (y, x) = df
                     .to_design_matrix(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -730,9 +689,7 @@ impl Interpreter {
             // ── Probit ────────────────────────────────────────────────────────
             "probit" => {
                 let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
                 let (y, x) = df
                     .to_design_matrix(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -778,26 +735,26 @@ impl Interpreter {
                 };
 
                 // Outcome equation
-                let out_str = Self::formula_to_string(&out_ast);
-                let g_out =
-                    GFormula::parse(&out_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let (y_vec_raw, x_out) = df
+                let (df_out, g_out, out_display) = self.prepare_formula(&out_ast, &df)?;
+                let (y_vec_raw, x_out) = df_out
                     .to_design_matrix(&g_out)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let out_names = df
-                    .formula_var_names(&g_out)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let out_names = {
+                    let mut n = vec!["_cons".to_string()];
+                    n.extend(out_display);
+                    n
+                };
 
                 // Selection equation
-                let sel_str = Self::formula_to_string(&sel_ast);
-                let g_sel =
-                    GFormula::parse(&sel_str).map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let (z_vec, x_sel) = df
+                let (df_sel, g_sel, sel_display) = self.prepare_formula(&sel_ast, &df)?;
+                let (z_vec, x_sel) = df_sel
                     .to_design_matrix(&g_sel)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let sel_names = df
-                    .formula_var_names(&g_sel)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let sel_names = {
+                    let mut n = vec!["_cons".to_string()];
+                    n.extend(sel_display);
+                    n
+                };
 
                 // Heckman: y and x_out may contain NaN for unselected obs (z=0).
                 // Replace NaN/Inf with 0.0 in those rows (values are not used in outcome equation).
@@ -821,9 +778,7 @@ impl Interpreter {
             // tobit(formula, df [, ll=0])
             "tobit" => {
                 let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
                 let (y_vec, x_mat) = df
                     .to_design_matrix(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -871,7 +826,7 @@ impl Interpreter {
                 // Extract names directly from Hayashi formula AST
                 let outcome_name = formula_ast.lhs.clone();
                 let running_name = formula_ast.rhs.first()
-                    .and_then(|t| if let RhsTerm::Var(v) = t { Some(v.clone()) } else { None })
+                    .and_then(|t| t.as_var().map(|s| s.to_string()))
                     .ok_or_else(|| HayashiError::Runtime(
                         "rd(): formula must have exactly one variable on the right side (running var)".into()
                     ))?;
@@ -948,7 +903,7 @@ impl Interpreter {
 
                 let outcome_name = formula_ast.lhs.clone();
                 let running_name = formula_ast.rhs.first()
-                    .and_then(|t| if let RhsTerm::Var(v) = t { Some(v.clone()) } else { None })
+                    .and_then(|t| t.as_var().map(|s| s.to_string()))
                     .ok_or_else(|| HayashiError::Runtime(
                         "fuzzy_rd(): formula must have exactly one variable on the right side (running var)".into()
                     ))?;
@@ -1023,13 +978,7 @@ impl Interpreter {
                 let mut rhs_names: Vec<String> = formula_ast
                     .rhs
                     .iter()
-                    .filter_map(|t| {
-                        if let RhsTerm::Var(v) = t {
-                            Some(v.clone())
-                        } else {
-                            None
-                        }
-                    })
+                    .filter_map(|t| t.as_var().map(|s| s.to_string()))
                     .collect();
                 if rhs_names.is_empty() {
                     return Err(HayashiError::Runtime(
@@ -1201,9 +1150,7 @@ impl Interpreter {
             // ── Poisson ───────────────────────────────────────────────────────
             "poisson" => {
                 let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
                 let (y_vec, x_mat) = df
                     .to_design_matrix(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1220,9 +1167,7 @@ impl Interpreter {
             // ── Negative Binomial (NB2) ───────────────────────────────────────
             "nbreg" | "negbin" => {
                 let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
                 let (y_vec, x_mat) = df
                     .to_design_matrix(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1238,9 +1183,7 @@ impl Interpreter {
             // ── Ordered Logit ─────────────────────────────────────────────────
             "ologit" => {
                 let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
                 let result = greeners::OrderedLogit::from_formula(&g_formula, &df)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 Ok(Value::OrderedResult(Rc::new(result)))
@@ -1249,9 +1192,7 @@ impl Interpreter {
             // ── Ordered Probit ────────────────────────────────────────────────
             "oprobit" => {
                 let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
                 let result = greeners::OrderedProbit::from_formula(&g_formula, &df)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 Ok(Value::OrderedResult(Rc::new(result)))
@@ -1260,9 +1201,7 @@ impl Interpreter {
             // ── Multinomial Logit ─────────────────────────────────────────────
             "mlogit" => {
                 let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
                 let (y_vec, x_mat) = df
                     .to_design_matrix(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1292,16 +1231,10 @@ impl Interpreter {
                     }
                 };
                 // formula: outcome ~ treated_col + post_col
-                let rhs_vars: Vec<&str> = formula_ast
+                let rhs_vars: Vec<String> = formula_ast
                     .rhs
                     .iter()
-                    .filter_map(|t| {
-                        if let RhsTerm::Var(v) = t {
-                            Some(v.as_str())
-                        } else {
-                            None
-                        }
-                    })
+                    .filter_map(|t| t.as_var().map(|s| s.to_string()))
                     .collect();
                 if rhs_vars.len() < 2 {
                     return Err(HayashiError::Runtime(
@@ -1310,8 +1243,8 @@ impl Interpreter {
                     ));
                 }
                 let y = get_col_f64(&df, &formula_ast.lhs)?;
-                let treated = get_col_f64(&df, rhs_vars[0])?;
-                let post = get_col_f64(&df, rhs_vars[1])?;
+                let treated = get_col_f64(&df, &rhs_vars[0])?;
+                let post = get_col_f64(&df, &rhs_vars[1])?;
                 let cov = resolve_cov_full(opt_map, &df)?;
                 let result = greeners::DiffInDiff::fit(&y, &treated, &post, cov)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1334,9 +1267,7 @@ impl Interpreter {
                     None => 200,
                     _ => return Err(HayashiError::Type("boot= must be integer".into())),
                 };
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
                 let (y_vec, x_mat) = df
                     .to_design_matrix(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1427,13 +1358,7 @@ impl Interpreter {
                 let rhs_vars: Vec<String> = formula_ast
                     .rhs
                     .iter()
-                    .filter_map(|t| {
-                        if let RhsTerm::Var(v) = t {
-                            Some(v.clone())
-                        } else {
-                            None
-                        }
-                    })
+                    .filter_map(|t| t.as_var().map(|s| s.to_string()))
                     .collect();
                 if rhs_vars.is_empty() {
                     return Err(HayashiError::Runtime(
@@ -1461,9 +1386,7 @@ impl Interpreter {
             // default norm: Huber (c=1.345)
             "rlm" => {
                 let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
                 let (y_vec, x_mat) = df
                     .to_design_matrix(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1543,9 +1466,7 @@ impl Interpreter {
                     "poisson" => (greeners::Family::Poisson, greeners::Link::Log),
                     _ => (greeners::Family::Gaussian, greeners::Link::Identity),
                 };
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
                 let (y_vec, x_mat) = df
                     .to_design_matrix(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1585,9 +1506,7 @@ impl Interpreter {
             // wls(y ~ x1 + x2, df, weights="w_col", cov=HC3)
             "wls" => {
                 let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
                 let w_name = match opt_map.get("weights") {
                     Some(Value::Str(s)) => s.clone(),
                     None => {
@@ -1622,9 +1541,7 @@ impl Interpreter {
             // zinb(y ~ x1 + x2, df)
             "zip" | "zinb" => {
                 let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
                 let (y_vec, x_count) = df
                     .to_design_matrix(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1695,9 +1612,7 @@ impl Interpreter {
             // mixed(y ~ x1 + x2, df, id="group", re=["x1"]) # + random slope
             "mixed" | "mixedlm" => {
                 let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
 
                 // id= required: group column
                 let id_col = match opt_map.get("id") {
@@ -1829,9 +1744,7 @@ impl Interpreter {
             // glsar(y ~ x1 + x2, df, ar=1, iter=50)
             "glsar" | "prais" => {
                 let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
                 let (y_vec, x_mat) = df
                     .to_design_matrix(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1923,9 +1836,7 @@ impl Interpreter {
             // Requires y ∈ (0,1) strictly (proportions, probabilities)
             "betareg" | "beta" => {
                 let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
                 let (y_vec, x_mat) = df
                     .to_design_matrix(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1959,9 +1870,7 @@ impl Interpreter {
             // If link omitted uses canonical link of family
             "glm" => {
                 let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
                 let (y_vec, x_mat) = df
                     .to_design_matrix(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;

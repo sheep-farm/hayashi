@@ -1,0 +1,24 @@
+// Testa fórmulas com transformações e interações
+// Antes da correção: log(K):log(L) falhava com "column not found: log(K)"
+
+load "/tmp/test_formula.csv" as df
+
+// Teste 1: transformação simples
+print("=== Teste 1: log(K) simples ===")
+let m1 = ols(Y ~ log(K), df)
+print(m1)
+
+// Teste 2: duas transformações
+print("=== Teste 2: log(K) + log(L) ===")
+let m2 = ols(Y ~ log(K) + log(L), df)
+print(m2)
+
+// Teste 3: interação de transformações (era o bug principal)
+print("=== Teste 3: log(K):log(L) ===")
+let m3 = ols(Y ~ log(K):log(L), df)
+print(m3)
+
+// Teste 4: variável + interação de transforms
+print("=== Teste 4: log(K) + log(L) + log(K):log(L) ===")
+let m4 = ols(Y ~ log(K) + log(L) + log(K):log(L), df)
+print(m4)

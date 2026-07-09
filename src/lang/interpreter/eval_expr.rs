@@ -434,17 +434,7 @@ impl Interpreter {
     // ── Convert AST formula → Greeners string ───────────────────────────────
 
     pub(super) fn formula_to_string(f: &Formula) -> String {
-        let rhs_parts: Vec<String> = f
-            .rhs
-            .iter()
-            .map(|t| match t {
-                RhsTerm::Var(v) => v.clone(),
-                RhsTerm::Categorical(v) => format!("C({v})"),
-                RhsTerm::Transform(fn_, v) => format!("{fn_}({v})"),
-                RhsTerm::Interaction(a, b) => format!("{a}:{b}"),
-            })
-            .collect();
-
+        let rhs_parts: Vec<String> = f.rhs.iter().map(|t| t.display_name()).collect();
         let mut formula_str = if f.lhs.is_empty() {
             format!("~ {}", rhs_parts.join(" + "))
         } else {

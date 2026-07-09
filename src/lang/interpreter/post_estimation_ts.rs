@@ -440,9 +440,7 @@ impl Interpreter {
                     _ => 1,
                 };
 
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
 
                 // to_design_matrix retorna (y, x_com_constante)
                 let (y_vec, x_with_const) = df

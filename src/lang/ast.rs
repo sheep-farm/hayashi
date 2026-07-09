@@ -6,12 +6,82 @@ pub struct Formula {
     pub fe: Vec<String>, // after |
 }
 
+/// Um termo no RHS de uma fórmula econométrica.
+///
+/// `Expr` carrega qualquer expressão do AST (variável, transformação, operação
+/// aritmética, etc.).  A materialização em coluna numérica é feita pelo
+/// interpreter via `eval_col_expr` antes de montar a design matrix — o Greeners
+/// nunca vê strings como `"log(income):age"`.
+///
+/// `Categorical` preserva semântica de dummy-encoding: o Greeners ainda recebe
+/// `C(colname)` para colunas que já existem no DataFrame, mas para expressões
+/// compostas o interpreter as materializa primeiro.
+///
+/// `Interaction(lhs, rhs)` representa `lhs:rhs` (produto element-wise).
+/// Cada lado é recursivamente um `RhsTerm`, o que permite `log(K):log(L)` ou
+/// `I(x^2):C(region)`.
 #[derive(Debug, Clone)]
 pub enum RhsTerm {
-    Var(String),
-    Categorical(String),       // C(var)
-    Transform(String, String), // log(var), sqrt(var), I(expr)
-    Interaction(String, String),
+    /// Qualquer expressão: variável simples, transformação, aritmética, etc.
+    Expr(Box<Expr>),
+    /// C(expr) — dummy-encoding; expr é normalmente Var mas pode ser composta.
+    Categorical(Box<Expr>),
+    /// lhs:rhs — interação (produto element-wise dos dois termos).
+    Interaction(Box<RhsTerm>, Box<RhsTerm>),
+}
+
+impl RhsTerm {
+    /// Constrói um termo simples a partir de um nome de variável.
+    pub fn var(name: impl Into<String>) -> Self {
+        RhsTerm::Expr(Box::new(Expr::Var(name.into())))
+    }
+
+    /// Retorna o nome da variável se o termo for exatamente `Expr(Var(name))`.
+    pub fn as_var(&self) -> Option<&str> {
+        if let RhsTerm::Expr(e) = self {
+            if let Expr::Var(v) = e.as_ref() {
+                return Some(v.as_str());
+            }
+        }
+        None
+    }
+
+    /// Representação legível para nomes de coeficientes, diagnósticos, etc.
+    pub fn display_name(&self) -> String {
+        match self {
+            RhsTerm::Expr(e) => expr_display(e),
+            RhsTerm::Categorical(e) => format!("C({})", expr_display(e)),
+            RhsTerm::Interaction(a, b) => format!("{}:{}", a.display_name(), b.display_name()),
+        }
+    }
+}
+
+/// Serializa uma Expr de forma compacta para nomes de colunas e fórmulas.
+pub(crate) fn expr_display(e: &Expr) -> String {
+    match e {
+        Expr::Var(v) => v.clone(),
+        Expr::Int(n) => n.to_string(),
+        Expr::Float(f) => format!("{f}"),
+        Expr::Bool(b) => b.to_string(),
+        Expr::Str(s) => format!("\"{s}\""),
+        Expr::Neg(inner) => format!("-{}", expr_display(inner)),
+        Expr::Not(inner) => format!("!{}", expr_display(inner)),
+        Expr::BinOp { op, lhs, rhs } => {
+            let op_str = match op {
+                BinOp::Add => "+", BinOp::Sub => "-", BinOp::Mul => "*",
+                BinOp::Div => "/", BinOp::Pow => "^", BinOp::Mod => "%",
+                BinOp::Gt => ">", BinOp::Lt => "<", BinOp::GtEq => ">=",
+                BinOp::LtEq => "<=", BinOp::Eq => "==", BinOp::Ne => "!=",
+                BinOp::And => "&&", BinOp::Or => "||", BinOp::In => "in",
+            };
+            format!("({}{}{})", expr_display(lhs), op_str, expr_display(rhs))
+        }
+        Expr::Call { func, args, .. } => {
+            let args_s: Vec<String> = args.iter().map(expr_display).collect();
+            format!("{}({})", func, args_s.join(","))
+        }
+        _ => "_".to_string(),
+    }
 }
 
 /// Named options passed to estimators: cov=HC3, lags=4, ...
