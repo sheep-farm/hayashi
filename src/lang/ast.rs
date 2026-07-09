@@ -80,6 +80,65 @@ pub(crate) fn expr_display(e: &Expr) -> String {
             let args_s: Vec<String> = args.iter().map(expr_display).collect();
             format!("{}({})", func, args_s.join(","))
         }
+        // f-string: reconstruct as f"lit{expr}lit" for readable coefficient names
+        Expr::FString(parts) => {
+            let mut s = String::from("f\"");
+            for part in parts {
+                match part {
+                    FStringPart::Lit(lit) => s.push_str(lit),
+                    FStringPart::Interp { expr, fmt } => {
+                        s.push('{');
+                        s.push_str(&expr_display(expr));
+                        if let Some(f) = fmt {
+                            s.push(':');
+                            s.push_str(f);
+                        }
+                        s.push('}');
+                    }
+                }
+            }
+            s.push('"');
+            s
+        }
+        // time-series operators: L.price, L2.price, F.gdp, D.wage
+        Expr::TsOp { op, var, n } => {
+            let prefix = match op {
+                TsOpKind::Lag  => "L",
+                TsOpKind::Lead => "F",
+                TsOpKind::Diff => "D",
+            };
+            if *n == 1 {
+                format!("{prefix}.{var}")
+            } else {
+                format!("{prefix}{n}.{var}")
+            }
+        }
+        // if expression: if(cond,then,else)
+        Expr::If { cond, then_expr, else_expr } => {
+            format!(
+                "if({},{},{})",
+                expr_display(cond),
+                expr_display(then_expr),
+                expr_display(else_expr)
+            )
+        }
+        // indexing: obj[idx]
+        Expr::Index { obj, idx } => format!("{}[{}]", expr_display(obj), expr_display(idx)),
+        // list literal: [a,b,c]
+        Expr::List(items) => {
+            let s: Vec<String> = items.iter().map(expr_display).collect();
+            format!("[{}]", s.join(","))
+        }
+        // field access: obj.field or obj.method(args)
+        Expr::Field { obj, field, args, .. } => {
+            if args.is_empty() {
+                format!("{}.{}", expr_display(obj), field)
+            } else {
+                let args_s: Vec<String> = args.iter().map(expr_display).collect();
+                format!("{}.{}({})", expr_display(obj), field, args_s.join(","))
+            }
+        }
+        // remaining variants are not meaningful as column/coefficient names
         _ => "_".to_string(),
     }
 }
