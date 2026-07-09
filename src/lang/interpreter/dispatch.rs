@@ -10,7 +10,14 @@ impl Interpreter {
                 for arg in args {
                     evaluated_args.push(self.eval_expr(arg)?);
                 }
-                let mut plugin = self.plugins.remove(ns).unwrap();
+                // Injeta __seed__ como argumento extra quando set_seed() foi chamado.
+                // Plugins que declaram `seed: Option<Seed>` como último parâmetro
+                // receberão a semente; os demais ignoram o argumento extra silenciosamente.
+                if let Some(s) = self.rng_seed {
+                    evaluated_args.push(Value::Int(s as i64));
+                }
+                let mut plugin = self.plugins.remove(ns)
+                    .expect("plugin namespace verified by contains_key but missing on remove");
                 let res = plugin
                     .call(member, &evaluated_args)
                     .map_err(|e| HayashiError::Runtime(format!("plugin '{ns}' error: {e}")));

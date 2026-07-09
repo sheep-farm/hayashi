@@ -9,6 +9,82 @@ reg(price ~ mpg + weight + foreign, auto)
 
 Output displays coefficients, standard errors, t-statistics, p-values, R-squared, and F-test. Collinear variables are automatically detected and displayed as `(omitted)`.
 
+## Formula Syntax
+
+### Transformations
+
+Any language function can appear directly in the RHS of a formula. The
+interpreter evaluates the expression element-wise before passing the data to
+the estimator, so Greeners only sees flat numeric columns.
+
+```hay
+// log of a regressor
+reg(price ~ log(weight) + mpg, auto)
+
+// square root
+reg(Y ~ sqrt(X), df)
+
+// multiple transformations
+reg(output ~ log(K) + log(L), df)
+
+// quadratic term
+reg(Y ~ X + X^2, df)
+```
+
+Coefficient names in the output reflect the original expression: `log(K)`,
+`sqrt(X)`, etc.
+
+### Interactions
+
+The `:` operator creates an interaction term (element-wise product). Each side
+can be any expression:
+
+```hay
+// interaction between simple variables
+reg(Y ~ X1 + X2 + X1:X2, df)
+
+// interaction of transformations — log(K)*log(L)
+reg(output ~ log(K) + log(L) + log(K):log(L), df)
+
+// interaction term only
+reg(Y ~ log(K):log(L), df)
+```
+
+The `*` operator is shorthand for full expansion (`x1*x2` ≡ `x1 + x2 + x1:x2`):
+
+```hay
+reg(Y ~ X1 * X2, df)   // equivalent to Y ~ X1 + X2 + X1:X2
+```
+
+### `I(expr)` — arbitrary arithmetic expressions
+
+`I(...)` wraps a compound arithmetic expression, shielding `+`, `-`, and `*`
+from their special meaning in formula grammar:
+
+```hay
+// square of X
+reg(Y ~ X + I(X^2), df)
+
+// explicit interaction term
+reg(Y ~ X1 + X2 + I(X1 * X2), df)
+
+// linear combination as single regressor
+reg(Y ~ I(X1 + X2), df)
+```
+
+> **Note:** `I(X^2)` and `X^2` are equivalent when the term appears alone at
+> the top level. Use `I(...)` to avoid ambiguity when the expression contains
+> `+` or `*`.
+
+### Categorical variables: `C()`
+
+`C(var)` treats `var` as categorical and generates dummies automatically
+(reference = first level in lexicographic order):
+
+```hay
+reg(Y ~ X + C(region), df)
+```
+
 ## Robust Standard Errors
 
 ```hay

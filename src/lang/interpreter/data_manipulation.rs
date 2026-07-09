@@ -1125,7 +1125,7 @@ impl Interpreter {
                             }
                             _ => df
                                 .get_string(name)
-                                .map(|a| a.to_vec().into_iter().take(n_rows).collect())
+                                .map(|a| a.into_iter().take(n_rows).collect())
                                 .unwrap_or_else(|_| vec!["?".into(); n_rows]),
                         };
                         (name.clone(), vals)
@@ -1506,8 +1506,8 @@ impl Interpreter {
                         _ => {
                             if let Ok(arr) = df.get_string(col_name) {
                                 let vals: Vec<String> = arr
-                                    .to_vec()
-                                    .into_iter()
+                                    .iter()
+                                    .cloned()
                                     .enumerate()
                                     .filter(|(i, _)| keep[*i])
                                     .map(|(_, v)| v)

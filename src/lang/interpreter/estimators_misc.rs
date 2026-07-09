@@ -132,9 +132,7 @@ impl Interpreter {
                         ))
                     }
                 };
-                let formula_str = Self::formula_to_string(&formula);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula, &df)?;
                 let (y_vec, x_mat) = df
                     .to_design_matrix(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1301,9 +1299,7 @@ impl Interpreter {
                     Some(Value::Int(v)) => *v as f64,
                     _ => 1.0_f64,
                 };
-                let formula_str = Self::formula_to_string(&formula);
-                let gformula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, gformula, _display) = self.prepare_formula(&formula, &df)?;
                 let (y, x) = df
                     .to_design_matrix(&gformula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1336,7 +1332,7 @@ impl Interpreter {
                     display_names = var_names.clone();
                 }
                 println!("\n{:=^60}", " Ridge Regression ");
-                println!("  Formula: {formula_str}   α = {alpha}");
+                println!("  Formula: {}   α = {alpha}", Self::formula_to_string(&formula));
                 println!("  n = {n}   k = {k}   R² = {r2:.4}");
                 println!("\n  {:<20} {:>12}", "Variable", "Coeff");
                 println!("  {}", "─".repeat(33));
@@ -1391,9 +1387,7 @@ impl Interpreter {
                     Some(Value::Float(v)) => *v as usize,
                     _ => 10_000usize,
                 };
-                let formula_str = Self::formula_to_string(&formula);
-                let gformula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, gformula, _display) = self.prepare_formula(&formula, &df)?;
                 let (y, x) = df
                     .to_design_matrix(&gformula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1495,7 +1489,7 @@ impl Interpreter {
                 }
                 display_names.extend(var_names.iter().cloned());
                 println!("\n{:=^60}", " Lasso Regression ");
-                println!("  Formula: {formula_str}   α = {alpha}");
+                println!("  Formula: {}   α = {alpha}", Self::formula_to_string(&formula));
                 println!(
                     "  n = {}   k = {}   R² = {r2:.4}   vars ativas: {n_nonzero}",
                     x.nrows(),
@@ -1559,9 +1553,7 @@ impl Interpreter {
                     Some(Value::Float(v)) => *v as usize,
                     _ => 10_000usize,
                 };
-                let formula_str = Self::formula_to_string(&formula);
-                let gformula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, gformula, _display) = self.prepare_formula(&formula, &df)?;
                 let (y, x) = df
                     .to_design_matrix(&gformula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -1661,7 +1653,7 @@ impl Interpreter {
                 }
                 display_names.extend(var_names.iter().cloned());
                 println!("\n{:=^60}", " ElasticNet Regression ");
-                println!("  Formula: {formula_str}   α={alpha}   l1_ratio={l1_ratio}");
+                println!("  Formula: {}   α={alpha}   l1_ratio={l1_ratio}", Self::formula_to_string(&formula));
                 println!(
                     "  n={}  k={}  R²={r2:.4}  vars ativas: {n_nonzero}",
                     x.nrows(),

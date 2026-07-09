@@ -172,6 +172,92 @@ print(result)</code></pre>
             </div>
           </article>
 
+          <article class="plugin-card">
+            <div class="plugin-card-head">
+              <h3>haybrasil</h3>
+              <span class="plugin-badge native">NATIVE</span>
+              <span class="plugin-category">Regional data</span>
+            </div>
+            <p class="desc">Brazilian macroeconomic data plugin with real API integration. Access BCB (Selic, PIB, reserves), IBGE (municipal GDP, IPCA, unemployment), and CVM (company data, financial statements, FIIs) directly from official Brazilian government APIs.</p>
+            <div class="plugin-fns">
+              <span class="plugin-fn">bcb_selic</span>
+              <span class="plugin-fn">bcb_pib</span>
+              <span class="plugin-fn">ibge_inflacao_ipc_a12</span>
+              <span class="plugin-fn">cvm_empresas_cia_aberta</span>
+            </div>
+            <div class="plugin-install"><code>$ hay install sheep-farm/haybrasil</code><button class="install-copy-btn" aria-label="Copy install command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
+            <div class="plugin-card-foot">
+              <span class="plugin-version">v0.2.0</span>
+              <a href="https://github.com/sheep-farm/haybrasil" class="plugin-link" target="_blank" rel="noopener">GitHub &rarr;</a>
+            </div>
+          </article>
+
+          <!--
+            Descomentar quando Hayashi 0.2.9 for lançado.
+            Ambos exigem min_version = "0.2.9" (Arrow FFI DataFrame return).
+
+          <article class="plugin-card">
+            <div class="plugin-card-head">
+              <h3>haytex</h3>
+              <span class="plugin-badge native">NATIVE</span>
+              <span class="plugin-category">LaTeX output</span>
+            </div>
+            <p class="desc">Export Hayashi estimation results and DataFrames to publication-ready LaTeX. Supports regression tables, summary statistics, and tabular data with customizable formatting, column alignment, and booktabs-style rules.</p>
+            <div class="plugin-fns">
+              <span class="plugin-fn">regression</span>
+              <span class="plugin-fn">summary</span>
+              <span class="plugin-fn">table</span>
+            </div>
+            <div class="plugin-install"><code>$ hay install sheep-farm/haytex</code><button class="install-copy-btn" aria-label="Copy install command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
+            <div class="plugin-card-foot">
+              <span class="plugin-version">v0.1.0</span>
+              <a href="https://github.com/sheep-farm/haytex" class="plugin-link" target="_blank" rel="noopener">GitHub &rarr;</a>
+            </div>
+          </article>
+
+          <!--
+          <article class="plugin-card">
+            <div class="plugin-card-head">
+              <h3>haygeobr</h3>
+              <span class="plugin-badge native">NATIVE</span>
+              <span class="plugin-category">Spatial data</span>
+            </div>
+            <p class="desc">Official Brazilian spatial data from IPEA's geobr project. Download states, municipalities, biomes, regions, census tracts, indigenous lands, conservation units, and more as DataFrames with WKT geometry. 28 datasets available with automatic caching.</p>
+            <div class="plugin-fns">
+              <span class="plugin-fn">read_state</span>
+              <span class="plugin-fn">read_municipality</span>
+              <span class="plugin-fn">read_biomes</span>
+              <span class="plugin-fn">read_country</span>
+              <span class="plugin-fn">read_census_tract</span>
+              <span class="plugin-fn">list_datasets</span>
+            </div>
+            <div class="plugin-install"><code>$ hay install sheep-farm/haygeobr</code><button class="install-copy-btn" aria-label="Copy install command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
+            <div class="plugin-card-foot">
+              <span class="plugin-version">v0.1.1</span>
+              <a href="https://github.com/sheep-farm/haygeobr" class="plugin-link" target="_blank" rel="noopener">GitHub &rarr;</a>
+            </div>
+          </article>
+
+          <article class="plugin-card">
+            <div class="plugin-card-head">
+              <h3>haygeom</h3>
+              <span class="plugin-badge native">NATIVE</span>
+              <span class="plugin-category">Geographic mapping</span>
+            </div>
+            <p class="desc">Geographic mapping plugin for Hayashi. Create maps with multiple layers, automatic projection, and SVG output. Supports WKT geometries (POINT, POLYGON, MULTIPOLYGON) and integrates with haygeobr for Brazilian spatial data.</p>
+            <div class="plugin-fns">
+              <span class="plugin-fn">map</span>
+              <span class="plugin-fn">add_layer</span>
+              <span class="plugin-fn">render</span>
+            </div>
+            <div class="plugin-install"><code>$ hay install sheep-farm/haygeom</code><button class="install-copy-btn" aria-label="Copy install command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
+            <div class="plugin-card-foot">
+              <span class="plugin-version">v0.1.0</span>
+              <a href="https://github.com/sheep-farm/haygeom" class="plugin-link" target="_blank" rel="noopener">GitHub &rarr;</a>
+            </div>
+          </article>
+          -->
+
         </div>
 
         <p style="margin-top: 2rem; color: var(--text-muted); font-size: 0.9rem;">

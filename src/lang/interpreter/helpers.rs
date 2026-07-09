@@ -1,5 +1,7 @@
 use super::*;
 
+// ── Conversão de tipos e valores ─────────────────────────────────────────────
+
 /// Builds a rendered diagnostic value.
 pub(super) fn diag(rendered: String) -> Value {
     Value::DiagResult(Rc::new(DiagResult { rendered }))
@@ -70,6 +72,8 @@ pub(super) fn value_as_f64(v: &Value) -> Result<f64> {
         _ => Err(HayashiError::Type("expected numeric value".into())),
     }
 }
+
+// ── Avaliação de operadores ───────────────────────────────────────────────────
 
 /// Evaluates a scalar binary operator.
 pub(super) fn eval_scalar_binop(op: &BinOp, l: Value, r: Value) -> Result<Value> {
@@ -147,6 +151,8 @@ pub(super) fn eval_scalar_binop(op: &BinOp, l: Value, r: Value) -> Result<Value>
     }
 }
 
+// ── Manipulação de DataFrame ─────────────────────────────────────────────────
+
 /// Extracts a column as Array1<f64>; accepts Float, Int, Bool, Categorical, etc.
 pub(super) fn get_col_f64(df: &DataFrame, name: &str) -> Result<ndarray::Array1<f64>> {
     let col = df
@@ -181,6 +187,8 @@ pub(super) fn build_x_from_varnames(
     }
     Ok(x)
 }
+
+// ── Resolução de covariância ──────────────────────────────────────────────────
 
 /// Resolves a simple covariance option.
 pub(super) fn resolve_cov(opt_val: Option<&Value>) -> Result<CovarianceType> {
@@ -333,6 +341,8 @@ pub(super) fn sort_df_by(df: &DataFrame, col: &str) -> Result<DataFrame> {
         .map_err(|e| HayashiError::Runtime(e.to_string()))
 }
 
+// ── Extração de coeficientes e metadados de modelos ──────────────────────────
+
 /// Generates coefficient names from the formula and observed categories.
 pub(super) fn coef_names_from_formula(
     formula_ast: &Formula,
@@ -342,21 +352,24 @@ pub(super) fn coef_names_from_formula(
     let mut names: Vec<String> = vec!["_cons".into()];
     for term in &formula_ast.rhs {
         match term {
-            RhsTerm::Var(v) => names.push(v.clone()),
-            RhsTerm::Transform(fn_, v) => names.push(format!("{fn_}({v})")),
-            RhsTerm::Interaction(a, b) => names.push(format!("{a}:{b}")),
-            RhsTerm::Categorical(v) => {
-                let raw = col_to_strings(df, v).unwrap_or_default();
-                let mut unique: Vec<String> = raw
-                    .into_iter()
-                    .collect::<std::collections::HashSet<_>>()
-                    .into_iter()
-                    .collect();
-                sort_maybe_numeric_strings(&mut unique);
-                for val in unique.into_iter().skip(1) {
-                    names.push(format!("{v}={val}"));
+            RhsTerm::Categorical(e) => {
+                // Para C(Var(v)) simples extraímos os níveis do df
+                if let Expr::Var(v) = e.as_ref() {
+                    let raw = col_to_strings(df, v).unwrap_or_default();
+                    let mut unique: Vec<String> = raw
+                        .into_iter()
+                        .collect::<std::collections::HashSet<_>>()
+                        .into_iter()
+                        .collect();
+                    sort_maybe_numeric_strings(&mut unique);
+                    for val in unique.into_iter().skip(1) {
+                        names.push(format!("{v}={val}"));
+                    }
+                } else {
+                    names.push(term.display_name());
                 }
             }
+            other => names.push(other.display_name()),
         }
     }
     names.truncate(n_cols);
@@ -365,6 +378,8 @@ pub(super) fn coef_names_from_formula(
     }
     names
 }
+
+// ── Tabulação e tabelas de frequência ────────────────────────────────────────
 
 /// Extracts a column as Vec<String> (for tabulate, categories, etc.).
 pub(super) fn col_to_strings(df: &DataFrame, name: &str) -> Result<Vec<String>> {
@@ -577,6 +592,8 @@ pub(super) fn tabulate_two(
     Ok(())
 }
 
+// ── Ordenação de strings ──────────────────────────────────────────────────────
+
 /// Converts a finite numeric string, if possible.
 pub(super) fn finite_numeric_string(value: &str) -> Option<f64> {
     value.parse::<f64>().ok().filter(|v| v.is_finite())
@@ -598,6 +615,8 @@ pub(super) fn sort_maybe_numeric_strings(values: &mut [String]) {
         values.sort();
     }
 }
+
+// ── Visualização ASCII ────────────────────────────────────────────────────────
 
 /// ASCII histogram.
 pub(super) fn ascii_histogram(data: &[f64], bins: usize, title: &str, var: &str, width: usize) {
@@ -1101,6 +1120,8 @@ pub(super) fn ascii_corrplot(cols: &[Vec<f64>], names: &[String]) {
     println!("  Scale: ████ |r|≥0.9  ▓▓▓▓ ≥0.7  ▒▒▒▒ ≥0.5  ░░░░ ≥0.3  (+neg=-)");
     println!();
 }
+
+// ── Funções estatísticas ──────────────────────────────────────────────────────
 
 /// Φ(x) normal CDF — Abramowitz & Stegun 26.2.17 (error < 7.5e-8).
 pub(super) fn norm_cdf(x: f64) -> f64 {

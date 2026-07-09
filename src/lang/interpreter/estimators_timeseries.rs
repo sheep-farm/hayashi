@@ -1949,9 +1949,7 @@ impl Interpreter {
             // gam(y ~ x2, df, smooth="x1", spline_df=10, alpha=0.1, family=gaussian, link=log)
             "gam" | "gamfit" => {
                 let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
-                let formula_str = Self::formula_to_string(&formula_ast);
-                let g_formula = GFormula::parse(&formula_str)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
                 let (y_vec, x_linear) = df
                     .to_design_matrix(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -2135,8 +2133,8 @@ impl Interpreter {
                     _ => 10,
                 };
 
-                let mut data: std::collections::HashMap<String, ndarray::Array1<f64>> =
-                    std::collections::HashMap::new();
+                let mut data: indexmap::IndexMap<String, ndarray::Array1<f64>> =
+                    indexmap::IndexMap::new();
                 for vname in &var_names {
                     data.insert(
                         vname.clone(),
@@ -2390,9 +2388,7 @@ impl Interpreter {
                 let mut eq_var_names: Vec<Vec<String>> = Vec::new();
                 for arg in &args[1..] {
                     let formula_ast = self.resolve_formula(arg)?;
-                    let formula_str = Self::formula_to_string(&formula_ast);
-                    let g_formula = GFormula::parse(&formula_str)
-                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
                     let (y, x) = df
                         .to_design_matrix(&g_formula)
                         .map_err(|e| HayashiError::Runtime(e.to_string()))?;

@@ -165,6 +165,81 @@ impl Parser {
         }
     }
 
+    // ── FString ──────────────────────────────────────────────────────────────
+
+    /// Parse an f-string template into `Vec<FStringPart>` at parse time.
+    ///
+    /// The `template` string is the raw content after the `f"…"` delimiters,
+    /// exactly as produced by the lexer.  This runs once per source location;
+    /// the resulting `Vec<FStringPart>` is stored in the AST and evaluated
+    /// directly at runtime without re-lexing or re-parsing.
+    fn parse_fstring_parts(&mut self, template: &str) -> crate::lang::error::Result<Vec<FStringPart>> {
+        let mut parts: Vec<FStringPart> = Vec::new();
+        let mut lit = String::new();
+        let mut chars = template.chars().peekable();
+
+        while let Some(c) = chars.next() {
+            if c == '{' {
+                if chars.peek() == Some(&'{') {
+                    // escaped brace: {{ → {
+                    chars.next();
+                    lit.push('{');
+                    continue;
+                }
+                // flush accumulated literal
+                if !lit.is_empty() {
+                    parts.push(FStringPart::Lit(std::mem::take(&mut lit)));
+                }
+                // collect expression (and optional format spec) until matching '}'
+                let mut expr_str = String::new();
+                let mut fmt_spec = String::new();
+                let mut in_fmt = false;
+                let mut depth: usize = 1;
+                for c2 in chars.by_ref() {
+                    if c2 == '{' {
+                        depth += 1;
+                    }
+                    if c2 == '}' {
+                        depth -= 1;
+                        if depth == 0 {
+                            break;
+                        }
+                    }
+                    if c2 == ':' && depth == 1 && !in_fmt {
+                        in_fmt = true;
+                        continue;
+                    }
+                    if in_fmt {
+                        fmt_spec.push(c2);
+                    } else {
+                        expr_str.push(c2);
+                    }
+                }
+                // parse the interpolated expression
+                let mut lexer = crate::lang::lexer::Lexer::new(&expr_str);
+                let tokens = lexer.tokenize()?;
+                let mut inner = Parser::new(tokens);
+                let expr = inner.parse_expr()?;
+                parts.push(FStringPart::Interp {
+                    expr: Box::new(expr),
+                    fmt: if fmt_spec.is_empty() { None } else { Some(fmt_spec) },
+                });
+            } else if c == '}' {
+                if chars.peek() == Some(&'}') {
+                    // escaped brace: }} → }
+                    chars.next();
+                }
+                lit.push('}');
+            } else {
+                lit.push(c);
+            }
+        }
+        if !lit.is_empty() {
+            parts.push(FStringPart::Lit(lit));
+        }
+        Ok(parts)
+    }
+
     // ── Formula ──────────────────────────────────────────────────────────────
 
     fn parse_formula(&mut self, lhs: String) -> Result<Formula> {
@@ -181,49 +256,104 @@ impl Parser {
                     self.advance();
                     in_fe = true;
                 }
-                Token::Plus | Token::Minus => {
+                Token::Plus => {
                     self.advance();
                 }
-                Token::Ident(name) => {
+                Token::Minus => {
+                    // "-1" remove intercept — o interpreter trata via `fe`/flags
                     self.advance();
-                    if self.peek() == &Token::LParen {
-                        // C(var) / log(var) / sqrt(var) / I(...)
-                        self.advance();
-                        let inner = self.expect_ident()?;
-                        self.expect(&Token::RParen)?;
-                        if in_fe {
-                            fe.push(format!("{name}({inner})"));
-                        } else {
-                            let term = match name.as_str() {
-                                "C" => RhsTerm::Categorical(inner),
-                                f => RhsTerm::Transform(f.to_string(), inner),
-                            };
-                            rhs.push(term);
-                        }
-                    } else if self.peek() == &Token::Colon {
-                        // pure interaction: x1:x2
-                        self.advance();
-                        let right = self.expect_ident()?;
-                        rhs.push(RhsTerm::Interaction(name, right));
-                    } else if self.peek() == &Token::Star {
-                        // x1*x2 → x1 + x2 + x1:x2
-                        self.advance();
-                        let right = self.expect_ident()?;
-                        rhs.push(RhsTerm::Var(name.clone()));
-                        rhs.push(RhsTerm::Var(right.clone()));
-                        rhs.push(RhsTerm::Interaction(name, right));
-                    } else if in_fe {
-                        fe.push(name);
-                    } else {
-                        rhs.push(RhsTerm::Var(name));
-                    }
                 }
                 _ => {
-                    self.advance();
+                    if in_fe {
+                        // Dentro de efeitos fixos aceitamos apenas idents simples
+                        if let Token::Ident(name) = self.peek().clone() {
+                            self.advance();
+                            fe.push(name);
+                        } else {
+                            self.advance();
+                        }
+                        continue;
+                    }
+
+                    // parse_formula_terms pode retornar 1 ou 3 termos (expansão x1*x2)
+                    let terms = self.parse_formula_terms()?;
+                    rhs.extend(terms);
                 }
             }
         }
         Ok(Formula { lhs, rhs, fe })
+    }
+
+    /// Parseia um ou mais termos do RHS.
+    ///
+    /// Retorna Vec porque `x1*x2` expande em `[x1, x2, x1:x2]`.
+    ///
+    /// Gramática:
+    ///   terms  = primary ( ':' primary )*        -- interação pura
+    ///          | primary '*' primary              -- expansão completa
+    ///   primary = 'C' '(' expr ')'
+    ///           | formula_expr
+    fn parse_formula_terms(&mut self) -> Result<Vec<RhsTerm>> {
+        let left = self.parse_formula_primary()?;
+
+        // x1 * x2  →  [x1, x2, x1:x2]
+        if self.peek() == &Token::Star {
+            self.advance();
+            let right = self.parse_formula_primary()?;
+            return Ok(vec![
+                left.clone(),
+                right.clone(),
+                RhsTerm::Interaction(Box::new(left), Box::new(right)),
+            ]);
+        }
+
+        // x1:x2:x3  →  encadeia interações
+        let mut lhs = left;
+        while self.peek() == &Token::Colon {
+            self.advance();
+            let rhs = self.parse_formula_primary()?;
+            lhs = RhsTerm::Interaction(Box::new(lhs), Box::new(rhs));
+        }
+
+        Ok(vec![lhs])
+    }
+
+    /// Parseia o elemento atômico de um termo de fórmula.
+    fn parse_formula_primary(&mut self) -> Result<RhsTerm> {
+        // C(expr) — dummy encoding
+        if let Token::Ident(name) = self.peek().clone() {
+            if name == "C" && self.peek_raw_at(1) == Some(&Token::LParen) {
+                self.advance(); // consome 'C'
+                self.advance(); // consome '('
+                let inner = self.parse_expr()?;
+                self.expect(&Token::RParen)?;
+                return Ok(RhsTerm::Categorical(Box::new(inner)));
+            }
+        }
+
+        // Qualquer outra expressão — parse_formula_expr para antes de '+', '|'
+        let expr = self.parse_formula_expr()?;
+        Ok(RhsTerm::Expr(Box::new(expr)))
+    }
+
+    /// Parseia uma expressão dentro de um termo de fórmula.
+    ///
+    /// Para antes de '+', '-', '|' e ',' de nível superior (sem parênteses),
+    /// que têm significado especial na gramática de fórmulas.
+    /// Consome: unário, '^', chamadas de função, indexação, fields.
+    /// Não consome: '+', '-', '|', ',', '*' (a menos que dentro de parênteses).
+    fn parse_formula_expr(&mut self) -> Result<Expr> {
+        let mut lhs = self.parse_unary()?;
+
+        // '^' e '**' são seguros de consumir — não ambíguos na fórmula
+        while matches!(self.peek(), Token::Caret | Token::StarStar) {
+            let op = BinOp::Pow;
+            self.advance();
+            let rhs = self.parse_unary()?;
+            lhs = Expr::BinOp { op, lhs: Box::new(lhs), rhs: Box::new(rhs) };
+        }
+
+        Ok(lhs)
     }
 
     // ── Arithmetic expression (Pratt parsing) ────────────────────────────────
@@ -494,8 +624,10 @@ impl Parser {
                 })
             }
             Token::FStringLit(s) => {
+                let s = s.clone();
                 self.advance();
-                Ok(Expr::FString(s))
+                let parts = self.parse_fstring_parts(&s)?;
+                Ok(Expr::FString(parts))
             }
 
             // Grouping: (expr)
@@ -1093,8 +1225,10 @@ impl Parser {
                             Expr::Str(n)
                         }
                         Token::FStringLit(s) => {
+                            let s = s.clone();
                             self.advance();
-                            Expr::FString(s)
+                            let parts = self.parse_fstring_parts(&s)?;
+                            Expr::FString(parts)
                         }
                         _ => {
                             return Err(HayashiError::Parse {

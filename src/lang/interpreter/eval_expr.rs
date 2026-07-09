@@ -9,76 +9,42 @@ impl Interpreter {
             Expr::Str(v) => Ok(Value::Str(v.clone())),
             Expr::Nil => Ok(Value::Nil),
 
-            Expr::FString(template) => {
+            Expr::FString(parts) => {
+                // Parts were parsed at parse-time; no re-lexing or re-parsing here.
                 let mut result = String::new();
-                let mut chars = template.chars().peekable();
-                while let Some(c) = chars.next() {
-                    if c == '{' {
-                        if chars.peek() == Some(&'{') {
-                            chars.next();
-                            result.push('{');
-                            continue;
-                        }
-                        let mut expr_str = String::new();
-                        let mut fmt_spec = String::new();
-                        let mut in_fmt = false;
-                        let mut depth = 1;
-                        for c2 in chars.by_ref() {
-                            if c2 == '{' {
-                                depth += 1;
-                            }
-                            if c2 == '}' {
-                                depth -= 1;
-                                if depth == 0 {
-                                    break;
+                for part in parts {
+                    match part {
+                        FStringPart::Lit(s) => result.push_str(s),
+                        FStringPart::Interp { expr, fmt } => {
+                            let val = self.eval_expr(expr)?;
+                            match fmt {
+                                None => result.push_str(&format!("{val}")),
+                                Some(spec) => {
+                                    let num = match &val {
+                                        Value::Float(f) => *f,
+                                        Value::Int(i) => *i as f64,
+                                        _ => {
+                                            result.push_str(&format!("{val}"));
+                                            continue;
+                                        }
+                                    };
+                                    let formatted = match spec.as_str() {
+                                        s if s.starts_with('.') && s.ends_with('f') => {
+                                            let prec: usize =
+                                                s[1..s.len() - 1].parse().unwrap_or(2);
+                                            format!("{num:.prec$}")
+                                        }
+                                        s if s.starts_with('.') && s.ends_with('e') => {
+                                            let prec: usize =
+                                                s[1..s.len() - 1].parse().unwrap_or(2);
+                                            format!("{num:.prec$e}")
+                                        }
+                                        _ => format!("{val}"),
+                                    };
+                                    result.push_str(&formatted);
                                 }
                             }
-                            if c2 == ':' && depth == 1 && !in_fmt {
-                                in_fmt = true;
-                                continue;
-                            }
-                            if in_fmt {
-                                fmt_spec.push(c2);
-                            } else {
-                                expr_str.push(c2);
-                            }
                         }
-                        let mut lexer = crate::lang::lexer::Lexer::new(&expr_str);
-                        let tokens = lexer.tokenize()?;
-                        let mut parser = crate::lang::parser::Parser::new(tokens);
-                        let expr = parser.parse_expr()?;
-                        let val = self.eval_expr(&expr)?;
-                        if fmt_spec.is_empty() {
-                            result.push_str(&format!("{val}"));
-                        } else {
-                            let num = match &val {
-                                Value::Float(f) => *f,
-                                Value::Int(i) => *i as f64,
-                                _ => {
-                                    result.push_str(&format!("{val}"));
-                                    continue;
-                                }
-                            };
-                            let formatted = match fmt_spec.as_str() {
-                                s if s.starts_with('.') && s.ends_with('f') => {
-                                    let prec: usize = s[1..s.len() - 1].parse().unwrap_or(2);
-                                    format!("{num:.prec$}")
-                                }
-                                s if s.starts_with('.') && s.ends_with('e') => {
-                                    let prec: usize = s[1..s.len() - 1].parse().unwrap_or(2);
-                                    format!("{num:.prec$e}")
-                                }
-                                _ => format!("{val}"),
-                            };
-                            result.push_str(&formatted);
-                        }
-                    } else if c == '}' {
-                        if chars.peek() == Some(&'}') {
-                            chars.next();
-                        }
-                        result.push('}');
-                    } else {
-                        result.push(c);
                     }
                 }
                 Ok(Value::Str(result))
@@ -434,17 +400,7 @@ impl Interpreter {
     // ── Convert AST formula → Greeners string ───────────────────────────────
 
     pub(super) fn formula_to_string(f: &Formula) -> String {
-        let rhs_parts: Vec<String> = f
-            .rhs
-            .iter()
-            .map(|t| match t {
-                RhsTerm::Var(v) => v.clone(),
-                RhsTerm::Categorical(v) => format!("C({v})"),
-                RhsTerm::Transform(fn_, v) => format!("{fn_}({v})"),
-                RhsTerm::Interaction(a, b) => format!("{a}:{b}"),
-            })
-            .collect();
-
+        let rhs_parts: Vec<String> = f.rhs.iter().map(|t| t.display_name()).collect();
         let mut formula_str = if f.lhs.is_empty() {
             format!("~ {}", rhs_parts.join(" + "))
         } else {

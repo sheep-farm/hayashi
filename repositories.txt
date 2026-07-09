@@ -1,0 +1,24 @@
+# Hayashi plugins repository file
+# Format: user/repo [v.N.N.N]
+# Comments start with # and empty lines are ignored
+
+# Core plugins
+sheep-farm/haytime v0.1.0
+sheep-farm/hayopt v0.1.0
+sheep-farm/hayexport v0.1.0
+
+# Web and data
+sheep-farm/hayweb v0.1.0
+sheep-farm/hayfred v0.1.0
+
+# Geospatial
+sheep-farm/haygeom v0.1.0
+sheep-farm/haygeobr v0.1.0
+
+# Advanced econometrics
+sheep-farm/haysim v0.1.0
+sheep-farm/hayspatial v0.1.0
+sheep-farm/haybayes v0.1.0
+
+# Regional data
+sheep-farm/haybrasil v0.2.0
