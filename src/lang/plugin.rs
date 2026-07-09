@@ -570,6 +570,17 @@ pub fn value_to_json(
             map.insert("bic".into(), serde_json::json!(r.bic));
             serde_json::Value::Object(map)
         }
+        Value::Geometry(wkt) => {
+            let mut map = serde_json::Map::new();
+            map.insert("__geometry_wkt__".to_string(), serde_json::json!(wkt));
+            serde_json::Value::Object(map)
+        }
+        Value::Plot { spec, format } => {
+            let mut map = serde_json::Map::new();
+            map.insert("__plot_spec__".to_string(), serde_json::json!(spec));
+            map.insert("__plot_format__".to_string(), serde_json::json!(format));
+            serde_json::Value::Object(map)
+        }
         _ => serde_json::Value::Null,
     }
 }
@@ -686,6 +697,24 @@ pub fn json_to_value(
                             }
                         }
                     }
+                }
+            }
+
+            // Geometry (WKT) retornada pelo plugin
+            if let Some(wkt_val) = obj.get("__geometry_wkt__") {
+                if let Some(wkt) = wkt_val.as_str() {
+                    return Value::Geometry(wkt.to_owned());
+                }
+            }
+            // Plot retornado pelo plugin
+            if let (Some(spec_val), Some(fmt_val)) =
+                (obj.get("__plot_spec__"), obj.get("__plot_format__"))
+            {
+                if let (Some(spec), Some(format)) = (spec_val.as_str(), fmt_val.as_str()) {
+                    return Value::Plot {
+                        spec: spec.to_owned(),
+                        format: format.to_owned(),
+                    };
                 }
             }
 

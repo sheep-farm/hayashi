@@ -1228,6 +1228,25 @@ fn pkg_install_internal(spec: &str, version: Option<&str>, force_overwrite: bool
                         }
                     }
                 }
+                // Parse primitives = ["export", "plot", ...]
+                // Informa ao usuário que o plugin substitui builtins do host.
+                if let Some(line) = toml_body.lines().find(|l| l.trim_start().starts_with("primitives")) {
+                    if let Some(val) = line.split('=').nth(1) {
+                        let primitives: Vec<&str> = val
+                            .trim()
+                            .trim_matches(['[', ']'])
+                            .split(',')
+                            .map(|s| s.trim().trim_matches('"').trim_matches('\''))
+                            .filter(|s| !s.is_empty())
+                            .collect();
+                        if !primitives.is_empty() {
+                            println!(
+                                "hay install: {user}/{repo} overrides builtin(s): {}",
+                                primitives.join(", ")
+                            );
+                        }
+                    }
+                }
             }
         }
     }
