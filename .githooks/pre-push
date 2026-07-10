@@ -1,0 +1,14 @@
+#!/bin/sh
+# Pre-push hook for Hayashi
+# Runs cargo fmt --check and cargo clippy -- -D warnings before pushing.
+# Install with: git config core.hooksPath .githooks
+
+set -e
+
+echo "[pre-push] Running cargo fmt --check..."
+cargo fmt --check
+
+echo "[pre-push] Running cargo clippy -- -D warnings..."
+cargo clippy -- -D warnings
+
+echo "[pre-push] OK"
