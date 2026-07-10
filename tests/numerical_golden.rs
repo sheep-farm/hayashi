@@ -125,17 +125,17 @@ fn ols_nonrobust_golden_matches_statsmodels() {
     let rows = run_model_csv("ols_nonrobust_golden", "ols(Y ~ X, df)");
 
     assert_close(
-        row(&rows, "_cons").coef,
+        row(&rows, "const").coef,
         7.064516129032259,
         TOL,
-        "_cons coef",
+        "const coef",
     );
     assert_close(row(&rows, "X").coef, 1.6129032258064515, TOL, "X coef");
     assert_close(
-        row(&rows, "_cons").std_err,
+        row(&rows, "const").std_err,
         0.41394358182624,
         TOL,
-        "_cons classical SE",
+        "const classical SE",
     );
     assert_close(
         row(&rows, "X").std_err,
@@ -151,17 +151,17 @@ fn ols_hc1_golden_matches_statsmodels() {
     let rows = run_model_csv("ols_hc1_golden", "ols(Y ~ X, df, cov=robust)");
 
     assert_close(
-        row(&rows, "_cons").coef,
+        row(&rows, "const").coef,
         7.064516129032259,
         TOL,
-        "_cons coef",
+        "const coef",
     );
     assert_close(row(&rows, "X").coef, 1.6129032258064515, TOL, "X coef");
     assert_close(
-        row(&rows, "_cons").std_err,
+        row(&rows, "const").std_err,
         0.45006215415299705,
         TOL,
-        "_cons HC1 SE",
+        "const HC1 SE",
     );
     assert_close(
         row(&rows, "X").std_err,
@@ -177,17 +177,17 @@ fn ols_clustered_golden_matches_statsmodels() {
     let rows = run_model_csv("ols_clustered_golden", "ols(Y ~ X, df, cluster=firm)");
 
     assert_close(
-        row(&rows, "_cons").coef,
+        row(&rows, "const").coef,
         7.064516129032259,
         TOL,
-        "_cons coef",
+        "const coef",
     );
     assert_close(row(&rows, "X").coef, 1.6129032258064515, TOL, "X coef");
     assert_close(
-        row(&rows, "_cons").std_err,
+        row(&rows, "const").std_err,
         0.5869675263055752,
         TOL,
-        "_cons clustered SE",
+        "const clustered SE",
     );
     assert_close(
         row(&rows, "X").std_err,
