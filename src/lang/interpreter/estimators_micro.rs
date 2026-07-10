@@ -360,7 +360,8 @@ impl Interpreter {
                     _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
                 };
                 let df_raw2 = self.maybe_filter_df(&df_raw, opts)?;
-                let (df, g_formula, display_names) = self.prepare_formula(&formula_ast, &df_raw2)?;
+                let (df, g_formula, display_names) =
+                    self.prepare_formula(&formula_ast, &df_raw2)?;
                 let cov = resolve_cov_full(opt_map, &df)?;
 
                 let (y, x) = df

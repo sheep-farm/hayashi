@@ -649,11 +649,7 @@ pub(super) fn ascii_histogram(data: &[f64], bins: usize, title: &str, var: &str,
     for (i, &cnt) in counts.iter().enumerate() {
         let lo = min + i as f64 * step;
         let hi = lo + step;
-        let bar_len = if max_count > 0 {
-            cnt * bar_w / max_count
-        } else {
-            0
-        };
+        let bar_len = (cnt * bar_w).checked_div(max_count).unwrap_or(0);
         let bar: String = "█".repeat(bar_len);
         println!(
             "  [{:>10.4},{:>10.4})  {:>5}  {:<width$}",

@@ -673,9 +673,8 @@ impl Interpreter {
                         );
                     }
                     Value::GmmResult(r) => {
-                        let names: Vec<String> = (0..r.params.len())
-                            .map(|i| format!("x{i}"))
-                            .collect();
+                        let names: Vec<String> =
+                            (0..r.params.len()).map(|i| format!("x{i}")).collect();
                         map = self.build_tidy_simple(
                             names,
                             &r.params,
@@ -873,7 +872,10 @@ impl Interpreter {
                     Value::IvResult(r) => {
                         let scalar = |v: f64| Value::List(Rc::new(vec![Value::Float(v)]));
                         map.insert("r2".into(), scalar(r.r_squared));
-                        map.insert("n".into(), Value::List(Rc::new(vec![Value::Int(r.n_obs as i64)])));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Rc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
                         map.insert("sigma".into(), scalar(r.sigma));
                     }
                     Value::BinaryResult(m) => {
@@ -881,13 +883,20 @@ impl Interpreter {
                         let scalar = |v: f64| Value::List(Rc::new(vec![Value::Float(v)]));
                         map.insert("pseudo_r2".into(), scalar(r.pseudo_r2));
                         map.insert("log_lik".into(), scalar(r.log_likelihood));
-                        map.insert("n".into(), Value::List(Rc::new(vec![Value::Int(0)]))); // n not stored
+                        map.insert("n".into(), Value::List(Rc::new(vec![Value::Int(0)])));
+                        // n not stored
                     }
                     Value::PanelResult(r) => {
                         let scalar = |v: f64| Value::List(Rc::new(vec![Value::Float(v)]));
                         map.insert("r2".into(), scalar(r.r_squared));
-                        map.insert("n".into(), Value::List(Rc::new(vec![Value::Int(r.n_obs as i64)])));
-                        map.insert("n_entities".into(), Value::List(Rc::new(vec![Value::Int(r.n_entities as i64)])));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Rc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                        map.insert(
+                            "n_entities".into(),
+                            Value::List(Rc::new(vec![Value::Int(r.n_entities as i64)])),
+                        );
                         map.insert("sigma".into(), scalar(r.sigma));
                     }
                     Value::ReResult(r) => {
@@ -901,8 +910,14 @@ impl Interpreter {
                         let scalar = |v: f64| Value::List(Rc::new(vec![Value::Float(v)]));
                         map.insert("j_stat".into(), scalar(r.j_stat));
                         map.insert("j_p_value".into(), scalar(r.j_p_value));
-                        map.insert("n".into(), Value::List(Rc::new(vec![Value::Int(r.n_obs as i64)])));
-                        map.insert("df_overid".into(), Value::List(Rc::new(vec![Value::Int(r.df_overid as i64)])));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Rc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                        map.insert(
+                            "df_overid".into(),
+                            Value::List(Rc::new(vec![Value::Int(r.df_overid as i64)])),
+                        );
                     }
                     Value::PoissonResult(r) => {
                         let scalar = |v: f64| Value::List(Rc::new(vec![Value::Float(v)]));
@@ -910,7 +925,10 @@ impl Interpreter {
                         map.insert("aic".into(), scalar(r.aic));
                         map.insert("bic".into(), scalar(r.bic));
                         map.insert("pseudo_r2".into(), scalar(r.pseudo_r2));
-                        map.insert("n".into(), Value::List(Rc::new(vec![Value::Int(r.n_obs as i64)])));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Rc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
                     }
                     Value::NegBinResult(r) => {
                         let scalar = |v: f64| Value::List(Rc::new(vec![Value::Float(v)]));
@@ -919,7 +937,10 @@ impl Interpreter {
                         map.insert("bic".into(), scalar(r.bic));
                         map.insert("pseudo_r2".into(), scalar(r.pseudo_r2));
                         map.insert("alpha".into(), scalar(r.alpha));
-                        map.insert("n".into(), Value::List(Rc::new(vec![Value::Int(r.n_obs as i64)])));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Rc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
                     }
                     Value::GlmResult(r) => {
                         let scalar = |v: f64| Value::List(Rc::new(vec![Value::Float(v)]));
@@ -928,7 +949,10 @@ impl Interpreter {
                         map.insert("bic".into(), scalar(r.bic));
                         map.insert("pseudo_r2".into(), scalar(r.pseudo_r2));
                         map.insert("deviance".into(), scalar(r.deviance));
-                        map.insert("n".into(), Value::List(Rc::new(vec![Value::Int(r.n_obs as i64)])));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Rc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
                     }
                     Value::QuantileResult(r) => {
                         let scalar = |v: f64| Value::List(Rc::new(vec![Value::Float(v)]));
@@ -938,14 +962,23 @@ impl Interpreter {
                     Value::TobitResult(r) => {
                         let scalar = |v: f64| Value::List(Rc::new(vec![Value::Float(v)]));
                         map.insert("log_lik".into(), scalar(r.log_likelihood));
-                        map.insert("n".into(), Value::List(Rc::new(vec![Value::Int(r.n_obs as i64)])));
-                        map.insert("n_censored".into(), Value::List(Rc::new(vec![Value::Int(r.n_censored as i64)])));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Rc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                        map.insert(
+                            "n_censored".into(),
+                            Value::List(Rc::new(vec![Value::Int(r.n_censored as i64)])),
+                        );
                     }
                     Value::HeckmanResult(r) => {
                         let scalar = |v: f64| Value::List(Rc::new(vec![Value::Float(v)]));
                         map.insert("rho".into(), scalar(r.rho));
                         map.insert("delta".into(), scalar(r.delta));
-                        map.insert("n".into(), Value::List(Rc::new(vec![Value::Int(r.n_obs as i64)])));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Rc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
                     }
                     Value::OrderedResult(r) => {
                         let scalar = |v: f64| Value::List(Rc::new(vec![Value::Float(v)]));
@@ -957,7 +990,10 @@ impl Interpreter {
                     Value::PenalizedResult(m) => {
                         let scalar = |v: f64| Value::List(Rc::new(vec![Value::Float(v)]));
                         map.insert("r2".into(), scalar(m.r_squared));
-                        map.insert("n".into(), Value::List(Rc::new(vec![Value::Int(m.n_obs as i64)])));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Rc::new(vec![Value::Int(m.n_obs as i64)])),
+                        );
                         map.insert("alpha".into(), scalar(m.alpha));
                     }
                     Value::ArimaResult(r) => {
@@ -983,7 +1019,9 @@ impl Interpreter {
             // ── names: column names of a DataFrame ─────────────────────────────
             "names" => {
                 if args.len() != 1 {
-                    return Err(HayashiError::Runtime("names(df) requires 1 argument".into()));
+                    return Err(HayashiError::Runtime(
+                        "names(df) requires 1 argument".into(),
+                    ));
                 }
                 let df = match self.eval_expr(&args[0])? {
                     Value::DataFrame(df) => df,

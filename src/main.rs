@@ -337,7 +337,7 @@ fn run() {
                 eprintln!("       hay install --file repositories.txt [-y]");
                 std::process::exit(1);
             });
-            
+
             if *pkg == "--file" {
                 let file_path = args_clean.get(3).unwrap_or_else(|| {
                     eprintln!("Usage: hay install --file repositories.txt [-y]");
@@ -1112,8 +1112,12 @@ fn print_help() {
     println!("    hay remove  user/repo              Uninstall a package");
     println!("    hay list                           List installed packages");
     println!("    hay update [user/repo]             Update package(s) (-y to bypass prompt)");
-    println!("    hay check-plugin [name]            Check integrity/version with remote repository");
-    println!("    hay validate [options]             Run the empirical validation programme (R/Python)");
+    println!(
+        "    hay check-plugin [name]            Check integrity/version with remote repository"
+    );
+    println!(
+        "    hay validate [options]             Run the empirical validation programme (R/Python)"
+    );
     println!("    hay dist-update                    Check and install the latest hay release from GitHub");
     println!();
     println!("In REPL, type help() for full command list or help(cmd) for details.");
@@ -1217,7 +1221,10 @@ fn pkg_install_internal(spec: &str, version: Option<&str>, force_overwrite: bool
             if let Ok(resp) = ureq::get(url).set("User-Agent", "hay").call() {
                 let toml_body = resp.into_string().unwrap_or_default();
                 // Parse min_version = "x.y.z" (simple TOML, no crate needed)
-                if let Some(line) = toml_body.lines().find(|l| l.trim_start().starts_with("min_version")) {
+                if let Some(line) = toml_body
+                    .lines()
+                    .find(|l| l.trim_start().starts_with("min_version"))
+                {
                     if let Some(val) = line.split('=').nth(1) {
                         let min_ver = val.trim().trim_matches('"').trim_matches('\'');
                         if !meets_min_version(VERSION, min_ver) {
@@ -1230,7 +1237,10 @@ fn pkg_install_internal(spec: &str, version: Option<&str>, force_overwrite: bool
                 }
                 // Parse primitives = ["export", "plot", ...]
                 // Informa ao usuário que o plugin substitui builtins do host.
-                if let Some(line) = toml_body.lines().find(|l| l.trim_start().starts_with("primitives")) {
+                if let Some(line) = toml_body
+                    .lines()
+                    .find(|l| l.trim_start().starts_with("primitives"))
+                {
                     if let Some(val) = line.split('=').nth(1) {
                         let primitives: Vec<&str> = val
                             .trim()
@@ -1421,7 +1431,7 @@ fn pkg_install_from_file(file_path: &str, force_overwrite: bool) {
 
     for line in content.lines() {
         let line = line.trim();
-        
+
         // Skip empty lines and comments
         if line.is_empty() || line.starts_with('#') {
             continue;
@@ -1434,7 +1444,7 @@ fn pkg_install_from_file(file_path: &str, force_overwrite: bool) {
         }
 
         let spec = parts[0];
-        let version = parts.get(1).map(|v| *v);
+        let version = parts.get(1).copied();
 
         let (user, repo) = if let Some(pos) = spec.find('/') {
             (&spec[..pos], &spec[pos + 1..])
@@ -1445,7 +1455,7 @@ fn pkg_install_from_file(file_path: &str, force_overwrite: bool) {
         };
 
         println!("Installing {user}/{repo}...");
-        
+
         // Install this package
         pkg_install_internal(spec, version, force_overwrite);
         installed_count += 1;

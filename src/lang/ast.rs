@@ -68,11 +68,21 @@ pub(crate) fn expr_display(e: &Expr) -> String {
         Expr::Not(inner) => format!("!{}", expr_display(inner)),
         Expr::BinOp { op, lhs, rhs } => {
             let op_str = match op {
-                BinOp::Add => "+", BinOp::Sub => "-", BinOp::Mul => "*",
-                BinOp::Div => "/", BinOp::Pow => "^", BinOp::Mod => "%",
-                BinOp::Gt => ">", BinOp::Lt => "<", BinOp::GtEq => ">=",
-                BinOp::LtEq => "<=", BinOp::Eq => "==", BinOp::Ne => "!=",
-                BinOp::And => "&&", BinOp::Or => "||", BinOp::In => "in",
+                BinOp::Add => "+",
+                BinOp::Sub => "-",
+                BinOp::Mul => "*",
+                BinOp::Div => "/",
+                BinOp::Pow => "^",
+                BinOp::Mod => "%",
+                BinOp::Gt => ">",
+                BinOp::Lt => "<",
+                BinOp::GtEq => ">=",
+                BinOp::LtEq => "<=",
+                BinOp::Eq => "==",
+                BinOp::Ne => "!=",
+                BinOp::And => "&&",
+                BinOp::Or => "||",
+                BinOp::In => "in",
             };
             format!("({}{}{})", expr_display(lhs), op_str, expr_display(rhs))
         }
@@ -103,7 +113,7 @@ pub(crate) fn expr_display(e: &Expr) -> String {
         // time-series operators: L.price, L2.price, F.gdp, D.wage
         Expr::TsOp { op, var, n } => {
             let prefix = match op {
-                TsOpKind::Lag  => "L",
+                TsOpKind::Lag => "L",
                 TsOpKind::Lead => "F",
                 TsOpKind::Diff => "D",
             };
@@ -114,7 +124,11 @@ pub(crate) fn expr_display(e: &Expr) -> String {
             }
         }
         // if expression: if(cond,then,else)
-        Expr::If { cond, then_expr, else_expr } => {
+        Expr::If {
+            cond,
+            then_expr,
+            else_expr,
+        } => {
             format!(
                 "if({},{},{})",
                 expr_display(cond),
@@ -130,7 +144,9 @@ pub(crate) fn expr_display(e: &Expr) -> String {
             format!("[{}]", s.join(","))
         }
         // field access: obj.field or obj.method(args)
-        Expr::Field { obj, field, args, .. } => {
+        Expr::Field {
+            obj, field, args, ..
+        } => {
             if args.is_empty() {
                 format!("{}.{}", expr_display(obj), field)
             } else {
@@ -196,7 +212,10 @@ pub enum FStringPart {
     /// Literal text segment (already unescaped: `{{` → `{`, `}}` → `}`).
     Lit(String),
     /// Interpolated expression with an optional format specifier (e.g. `.2f`).
-    Interp { expr: Box<Expr>, fmt: Option<String> },
+    Interp {
+        expr: Box<Expr>,
+        fmt: Option<String>,
+    },
 }
 
 /// Language expressions

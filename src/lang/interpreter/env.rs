@@ -78,9 +78,7 @@ impl Env {
                 )));
             }
         }
-        self.current_scope_mut()
-            .vars
-            .insert(name.to_string(), val);
+        self.current_scope_mut().vars.insert(name.to_string(), val);
         Ok(())
     }
 
@@ -104,9 +102,7 @@ impl Env {
                 return Ok(());
             }
         }
-        self.current_scope_mut()
-            .vars
-            .insert(name.to_string(), val);
+        self.current_scope_mut().vars.insert(name.to_string(), val);
         Ok(())
     }
 

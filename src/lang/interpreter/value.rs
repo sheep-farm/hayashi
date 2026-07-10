@@ -254,7 +254,10 @@ pub enum Value {
     /// Geometria vetorial em WKT. Produzida por plugins geoespaciais.
     Geometry(String),
     /// Output visual composável. Produzido por plugins de visualização.
-    Plot { spec: String, format: String },
+    Plot {
+        spec: String,
+        format: String,
+    },
     Nil,
 }
 
@@ -370,7 +373,11 @@ impl std::fmt::Display for Value {
                 write!(f, ")")
             }
             Value::Geometry(wkt) => {
-                let preview = if wkt.len() > 60 { &wkt[..60] } else { wkt.as_str() };
+                let preview = if wkt.len() > 60 {
+                    &wkt[..60]
+                } else {
+                    wkt.as_str()
+                };
                 write!(f, "Geometry({preview}...)")
             }
             Value::Plot { format, .. } => write!(f, "Plot({format})"),

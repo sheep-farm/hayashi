@@ -1332,7 +1332,10 @@ impl Interpreter {
                     display_names = var_names.clone();
                 }
                 println!("\n{:=^60}", " Ridge Regression ");
-                println!("  Formula: {}   α = {alpha}", Self::formula_to_string(&formula));
+                println!(
+                    "  Formula: {}   α = {alpha}",
+                    Self::formula_to_string(&formula)
+                );
                 println!("  n = {n}   k = {k}   R² = {r2:.4}");
                 println!("\n  {:<20} {:>12}", "Variable", "Coeff");
                 println!("  {}", "─".repeat(33));
@@ -1489,7 +1492,10 @@ impl Interpreter {
                 }
                 display_names.extend(var_names.iter().cloned());
                 println!("\n{:=^60}", " Lasso Regression ");
-                println!("  Formula: {}   α = {alpha}", Self::formula_to_string(&formula));
+                println!(
+                    "  Formula: {}   α = {alpha}",
+                    Self::formula_to_string(&formula)
+                );
                 println!(
                     "  n = {}   k = {}   R² = {r2:.4}   vars ativas: {n_nonzero}",
                     x.nrows(),
@@ -1653,7 +1659,10 @@ impl Interpreter {
                 }
                 display_names.extend(var_names.iter().cloned());
                 println!("\n{:=^60}", " ElasticNet Regression ");
-                println!("  Formula: {}   α={alpha}   l1_ratio={l1_ratio}", Self::formula_to_string(&formula));
+                println!(
+                    "  Formula: {}   α={alpha}   l1_ratio={l1_ratio}",
+                    Self::formula_to_string(&formula)
+                );
                 println!(
                     "  n={}  k={}  R²={r2:.4}  vars ativas: {n_nonzero}",
                     x.nrows(),

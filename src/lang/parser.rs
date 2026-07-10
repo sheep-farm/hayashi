@@ -75,11 +75,10 @@ impl Parser {
                     }
                     braces += 1;
                 }
-                Token::RBrace => {
-                    if braces > 0 {
-                        braces -= 1;
-                    }
+                Token::RBrace if braces > 0 => {
+                    braces -= 1;
                 }
+                Token::RBrace => {}
                 Token::Newline | Token::Eof | Token::Comma
                     if parens == 0 && brackets == 0 && braces == 0 =>
                 {
@@ -173,7 +172,10 @@ impl Parser {
     /// exactly as produced by the lexer.  This runs once per source location;
     /// the resulting `Vec<FStringPart>` is stored in the AST and evaluated
     /// directly at runtime without re-lexing or re-parsing.
-    fn parse_fstring_parts(&mut self, template: &str) -> crate::lang::error::Result<Vec<FStringPart>> {
+    fn parse_fstring_parts(
+        &mut self,
+        template: &str,
+    ) -> crate::lang::error::Result<Vec<FStringPart>> {
         let mut parts: Vec<FStringPart> = Vec::new();
         let mut lit = String::new();
         let mut chars = template.chars().peekable();
@@ -222,7 +224,11 @@ impl Parser {
                 let expr = inner.parse_expr()?;
                 parts.push(FStringPart::Interp {
                     expr: Box::new(expr),
-                    fmt: if fmt_spec.is_empty() { None } else { Some(fmt_spec) },
+                    fmt: if fmt_spec.is_empty() {
+                        None
+                    } else {
+                        Some(fmt_spec)
+                    },
                 });
             } else if c == '}' {
                 if chars.peek() == Some(&'}') {
@@ -350,7 +356,11 @@ impl Parser {
             let op = BinOp::Pow;
             self.advance();
             let rhs = self.parse_unary()?;
-            lhs = Expr::BinOp { op, lhs: Box::new(lhs), rhs: Box::new(rhs) };
+            lhs = Expr::BinOp {
+                op,
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
+            };
         }
 
         Ok(lhs)

@@ -663,10 +663,8 @@ impl Interpreter {
                         }
                         let lhs = parts[0].trim().to_string();
                         let rhs_str = parts[1].trim();
-                        let rhs: Vec<RhsTerm> = rhs_str
-                            .split('+')
-                            .map(|t| RhsTerm::var(t.trim()))
-                            .collect();
+                        let rhs: Vec<RhsTerm> =
+                            rhs_str.split('+').map(|t| RhsTerm::var(t.trim())).collect();
                         Ok(Formula {
                             lhs,
                             rhs,
@@ -744,8 +742,7 @@ impl Interpreter {
         let mut counter: usize = 0;
 
         for term in &formula.rhs {
-            let (col, display) =
-                self.materialize_term(term, df, &mut augmented, &mut counter)?;
+            let (col, display) = self.materialize_term(term, df, &mut augmented, &mut counter)?;
             col_names.push(col);
             display_names.push(display);
         }
@@ -814,10 +811,8 @@ impl Interpreter {
 
             // Interação: materializa ambos os lados e multiplica element-wise
             RhsTerm::Interaction(lhs, rhs) => {
-                let (lcol, ldisp) =
-                    self.materialize_term(lhs, original_df, augmented, counter)?;
-                let (rcol, rdisp) =
-                    self.materialize_term(rhs, original_df, augmented, counter)?;
+                let (lcol, ldisp) = self.materialize_term(lhs, original_df, augmented, counter)?;
+                let (rcol, rdisp) = self.materialize_term(rhs, original_df, augmented, counter)?;
 
                 let col_name = format!("__inter_{counter}");
                 *counter += 1;
@@ -829,11 +824,15 @@ impl Interpreter {
                 let lvals = augmented
                     .get_column(&lcol)
                     .map(|c| c.to_float().to_vec())
-                    .map_err(|e| HayashiError::Runtime(format!("interaction: left column '{lcol}': {e}")))?;
+                    .map_err(|e| {
+                        HayashiError::Runtime(format!("interaction: left column '{lcol}': {e}"))
+                    })?;
                 let rvals = augmented
                     .get_column(&rcol)
                     .map(|c| c.to_float().to_vec())
-                    .map_err(|e| HayashiError::Runtime(format!("interaction: right column '{rcol}': {e}")))?;
+                    .map_err(|e| {
+                        HayashiError::Runtime(format!("interaction: right column '{rcol}': {e}"))
+                    })?;
 
                 let prod: Vec<f64> = lvals.iter().zip(rvals.iter()).map(|(a, b)| a * b).collect();
                 augmented
