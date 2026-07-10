@@ -33,15 +33,22 @@ Useful runner options:
 
 ```bash
 python validation/run.py --list
+python validation/run.py --check
 python validation/run.py --case heckman_mroz
 python validation/run.py --case heckman_mroz --case ols_cluster_wagepan --no-write
 ```
 
+Use `--check` before adding or editing cases. It validates the case registry,
+case metadata, declared script paths, and generated `MATRIX.md` without running
+Hayashi or reference estimators.
+
 Exit codes:
 
 - `0` — all selected cases passed.
+- `0` — metadata is consistent when `--check` is passed.
 - `0` — validation blocked, but `--allow-blocked` was passed.
 - `1` — at least one case failed, or a case is blocked without `--allow-blocked`.
+- `1` — metadata is inconsistent when `--check` is passed.
 
 The same options can be passed through `hay validate`, for example
 `hay validate --case heckman_mroz --no-write`.
@@ -124,7 +131,8 @@ validation/
    `cases/<id>/hayashi/output.*` for debugging).
 5. Optional: add an entry to `matrix.yml` with `id`, `dimension`, and `notes`.
    If omitted, `hay validate` auto-discovers the case from the filesystem.
-6. Run `hay validate` and commit the updated `MATRIX.md`.
+6. Run `python validation/run.py --check`, then `hay validate`, and commit the
+   updated `MATRIX.md`.
 
 ### Book-based simulated cases
 
