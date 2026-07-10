@@ -195,13 +195,14 @@ def parse_reference_json(path: Path) -> dict[str, Any]:
 
 
 def normalise_intercept(data: dict[str, Any]) -> dict[str, Any]:
-    """Rename 'const' to 'Intercept' and clean up Heckman lambda label in coefficient/standard-error dicts."""
+    """Rename intercept labels ('const' or '_cons') to 'Intercept' and clean up Heckman lambda label."""
     for key in ("coefficients", "standard_errors"):
         if key not in data:
             continue
         d = data[key]
-        if "const" in d:
-            d["Intercept"] = d.pop("const")
+        for src in ("const", "_cons"):
+            if src in d:
+                d["Intercept"] = d.pop(src)
         # Hayashi prints the inverse Mills ratio as "lambda (IMR)".
         if "lambda (IMR)" in d:
             d["lambda_IMR"] = d.pop("lambda (IMR)")
