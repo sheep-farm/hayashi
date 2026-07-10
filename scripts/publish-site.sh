@@ -26,14 +26,19 @@ fi
 
 echo "Publicando site a partir de '$SOURCE_BRANCH'..."
 
+# Copia o site para um diretório temporário porque o branch gh-pages não contém a pasta site/
+TMP_DIR="$(mktemp -d)"
+cp -a "$SOURCE_DIR"/ "$TMP_DIR/"
+
 # Salva o branch atual e muda para gh-pages
 git checkout "$TARGET_BRANCH"
 
 # Remove tudo na raiz exceto .git e CNAME
 find . -mindepth 1 -maxdepth 1 ! -name '.git' ! -name 'CNAME' -exec rm -rf {} +
 
-# Copia o conteúdo de site/ para a raiz do gh-pages
-cp -a "$SOURCE_DIR"/ .
+# Copia o conteúdo do site do temporário para a raiz do gh-pages
+cp -a "$TMP_DIR"/ .
+rm -rf "$TMP_DIR"
 
 # Garante que o CNAME existe
 if [[ ! -f CNAME ]]; then
