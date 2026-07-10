@@ -1,0 +1,21 @@
+// Generate deterministic ARMA(1,1) data from Chapter 26 DGP.
+seed(42)
+input df
+id
+1
+end
+for i in 1..=9 { df = append(df, df) }
+df |> filter(_n <= 500)
+generate df e = rnormal()
+generate df t = _n
+let n = nrow(df)
+generate df y = e
+let i = 2
+while i <= n {
+    let lag_y = mean(df, y, if = t == i - 1)
+    let lag_e = mean(df, e, if = t == i - 1)
+    let et    = mean(df, e, if = t == i)
+    replace df y = 0.6 * lag_y + et + 0.4 * lag_e if t == i
+    i = i + 1
+}
+export(df, "csv", "validation/cases/arma_book/data/arma.csv")

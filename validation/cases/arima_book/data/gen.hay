@@ -1,0 +1,11 @@
+// Generate deterministic random walk data for ARIMA(1,1,0) case.
+seed(42)
+input df
+id
+1
+end
+for i in 1..=9 { df = append(df, df) }
+df |> filter(_n <= 500)
+generate df e = rnormal()
+generate df rw = cumsum(e)
+export(df, "csv", "validation/cases/arima_book/data/arima.csv")

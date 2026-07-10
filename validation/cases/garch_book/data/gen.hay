@@ -1,0 +1,20 @@
+// Generate deterministic GARCH(1,1) data from Chapter 30 DGP.
+seed(42)
+input df
+id
+1
+end
+for i in 1..=9 { df = append(df, df) }
+df |> filter(_n <= 500)
+generate df z = rnormal()
+generate df e = z
+generate df t = _n
+let n = nrow(df)
+let i = 2
+while i <= n {
+    let le = mean(df, e, if = t == i - 1)
+    let lz = mean(df, z, if = t == i)
+    replace df e = sqrt(0.3 + 0.5 * le * le) * lz if t == i
+    i = i + 1
+}
+export(df, "csv", "validation/cases/garch_book/data/garch.csv")

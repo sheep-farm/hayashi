@@ -8,7 +8,8 @@ docs/book
 compile_books.sh
 .venv/
 validation/.venv
-validation/cases/**/data/
+validation/cases/**/data/*
+!validation/cases/**/data/gen.hay
 validation/cases/**/hayashi/output.csv
 validation/cases/**/reference/expected.*
 planning.md
