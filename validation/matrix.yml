@@ -86,6 +86,12 @@ cases:
   notes: Lasso regression of house price on lot size, square footage and bedrooms.
   dimension: numerical
   status: pass
+- id: logit_margins_mroz
+  notes: 'Blocked real-dataset validation case for logit average marginal effects
+    on the Mroz dataset; Hayashi AMEs match R/statsmodels, but delta-method SEs differ
+    pending issue #58.'
+  dimension: numerical
+  status: blocked
 - id: logit_mroz
   notes: Logit labour-force participation on the Mroz dataset.
   dimension: numerical

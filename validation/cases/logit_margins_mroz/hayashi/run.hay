@@ -1,0 +1,8 @@
+// Load the Wooldridge mroz dataset from CSV.
+load "validation/cases/logit_margins_mroz/data/mroz.csv" as df
+
+// Labour-force participation logit using the same formula as logit_mroz.
+let m = logit(inlf ~ nwifeinc + educ + exper + age + kidslt6 + kidsge6, df)
+
+// Print average marginal effects for automated comparison.
+margins(m)
