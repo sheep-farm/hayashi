@@ -252,6 +252,53 @@ def parse_hayashi_rd(text: str) -> dict[str, dict[str, float]]:
     raise ValueError(f"Could not parse RDD tau/SE from Hayashi output: {text[:200]!r}")
 
 
+def parse_hayashi_margins(text: str) -> dict[str, dict[str, float]]:
+    """Parse a Hayashi average-marginal-effects table."""
+    import re
+
+    lines = text.splitlines()
+    start_idx = -1
+    for i, line in enumerate(lines):
+        lower = line.lower()
+        if "dy/dx" in lower and ("std.err" in lower or "std err" in lower):
+            start_idx = i
+            break
+    if start_idx == -1:
+        raise ValueError(f"Margins table header not found in Hayashi output: {text[:200]!r}")
+
+    result: dict[str, dict[str, float]] = {
+        "marginal_effects": {},
+        "standard_errors": {},
+    }
+    pattern = re.compile(
+        r"^\s*(\S.*?)\s+"
+        r"([-+]?\d+\.?\d*(?:[eE][-+]?\d+)?)\s+"
+        r"([-+]?\d+\.?\d*(?:[eE][-+]?\d+)?)\s+"
+        r"([-+]?\d+\.?\d*(?:[eE][-+]?\d+)?)\s+"
+        r"([-+]?\d+\.?\d*(?:[eE][-+]?\d+)?)"
+    )
+
+    for line in lines[start_idx + 1:]:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("-") or stripped.startswith("="):
+            continue
+        lower = stripped.lower()
+        if lower.startswith("n ="):
+            break
+        match = pattern.match(line)
+        if not match:
+            continue
+        var = match.group(1).strip()
+        if var.lower() == "variable":
+            continue
+        result["marginal_effects"][var] = float(match.group(2))
+        result["standard_errors"][var] = float(match.group(3))
+
+    if not result["marginal_effects"]:
+        raise ValueError(f"Could not parse margins rows from Hayashi output: {text[:200]!r}")
+    return result
+
+
 def parse_hayashi_synth(text: str) -> dict[str, dict[str, float]]:
     """Parse the post-treatment effect table and return the mean ATT."""
     import re
@@ -557,6 +604,8 @@ def run_case(case: dict[str, Any]) -> tuple[str, list[str], dict[str, dict]]:
                 hayashi = normalise_intercept(parse_hayashi_mlogit(hay_res.stdout))
             elif family == "sur":
                 hayashi = normalise_intercept(parse_hayashi_sur(hay_res.stdout))
+            elif output_format == "margins":
+                hayashi = normalise_intercept(parse_hayashi_margins(hay_res.stdout))
             elif output_format == "txt":
                 hayashi = normalise_intercept(parse_hayashi_txt_table(hay_res.stdout))
             else:
@@ -575,7 +624,12 @@ def run_case(case: dict[str, Any]) -> tuple[str, list[str], dict[str, dict]]:
             except Exception:
                 return "blocked", [f"Could not parse Hayashi stdout ({output_format}): {e}"], ref_report
     if hayashi is None:
-        if output_format == "txt":
+        if output_format == "margins":
+            hayashi_txt = hayashi_dir / "output.txt"
+            if not hayashi_txt.exists():
+                return "blocked", [f"Hayashi output not found: {hayashi_txt}"], ref_report
+            hayashi = normalise_intercept(parse_hayashi_margins(hayashi_txt.read_text()))
+        elif output_format == "txt":
             hayashi_txt = hayashi_dir / "output.txt"
             if not hayashi_txt.exists():
                 return "blocked", [f"Hayashi output not found: {hayashi_txt}"], ref_report
