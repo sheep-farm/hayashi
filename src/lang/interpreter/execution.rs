@@ -26,7 +26,11 @@ impl Interpreter {
                 self.env.set(name, val)?;
             }
 
-            Stmt::Input { alias, headers, rows } => self.exec_input(alias, headers, rows)?,
+            Stmt::Input {
+                alias,
+                headers,
+                rows,
+            } => self.exec_input(alias, headers, rows)?,
 
             // ── display expr ─────────────────────────────────────────────────
             Stmt::Display(expr) => {
@@ -50,9 +54,12 @@ impl Interpreter {
 
             Stmt::Load { path, alias, opts } => self.exec_load(path, alias, opts)?,
 
-            Stmt::Predict { df, varname, model, kind } => {
-                self.exec_predict(df, varname, model, kind)?
-            }
+            Stmt::Predict {
+                df,
+                varname,
+                model,
+                kind,
+            } => self.exec_predict(df, varname, model, kind)?,
 
             Stmt::Count { df, cond } => {
                 let df_val = match self.env.get(df) {
@@ -68,9 +75,12 @@ impl Interpreter {
                 println!("{n}");
             }
 
-            Stmt::Replace { df, varname, expr, cond } => {
-                self.exec_replace(df, varname, expr, cond.as_ref())?
-            }
+            Stmt::Replace {
+                df,
+                varname,
+                expr,
+                cond,
+            } => self.exec_replace(df, varname, expr, cond.as_ref())?,
 
             Stmt::Generate { df, varname, expr } => {
                 let mut df_val = match self.env.get(df) {
@@ -145,7 +155,11 @@ impl Interpreter {
             }
 
             // ── if / else ────────────────────────────────────────────────────
-            Stmt::If { cond, then_body, else_body } => {
+            Stmt::If {
+                cond,
+                then_body,
+                else_body,
+            } => {
                 let cond_val = self.eval_expr(cond)?;
                 if value_as_bool(&cond_val) {
                     self.env.push_scope();
@@ -162,17 +176,29 @@ impl Interpreter {
                 }
             }
 
-            Stmt::TryCatch { try_body, error_var, catch_body, finally_body } => {
-                self.exec_try_catch(try_body, error_var, catch_body, finally_body)?
-            }
+            Stmt::TryCatch {
+                try_body,
+                error_var,
+                catch_body,
+                finally_body,
+            } => self.exec_try_catch(try_body, error_var, catch_body, finally_body)?,
 
             // ── for var in iter { ... } ───────────────────────────────────────
-            Stmt::For { var, var2, iter, body } => {
-                self.exec_for(var, var2.as_deref(), iter, body)?
-            }
+            Stmt::For {
+                var,
+                var2,
+                iter,
+                body,
+            } => self.exec_for(var, var2.as_deref(), iter, body)?,
 
             // ── fn name(params) { body } ─────────────────────────────────────
-            Stmt::Fn { name, params, defaults, doc, body } => {
+            Stmt::Fn {
+                name,
+                params,
+                defaults,
+                doc,
+                body,
+            } => {
                 self.env.set(
                     name,
                     Value::UserFn(Rc::new(UserFn {
@@ -222,7 +248,11 @@ impl Interpreter {
             },
 
             Stmt::Expr(expr) => {
-                if let Expr::Pipe { source, expr: inner } = expr {
+                if let Expr::Pipe {
+                    source,
+                    expr: inner,
+                } = expr
+                {
                     let val = self.eval_expr(inner)?;
                     if let Expr::Var(name) = source.as_ref() {
                         self.env.set(name, val)?;
@@ -392,8 +422,8 @@ impl Interpreter {
                     opt_query.as_deref(),
                 )?,
                 "json" => {
-                    let df = DataFrame::from_json(local_path)
-                        .map_err(|e| self.rt_err(e.to_string()))?;
+                    let df =
+                        DataFrame::from_json(local_path).map_err(|e| self.rt_err(e.to_string()))?;
                     let n = df.n_rows();
                     (df, n)
                 }
@@ -428,13 +458,7 @@ impl Interpreter {
 
     // ── predict ──────────────────────────────────────────────────────────────
 
-    fn exec_predict(
-        &mut self,
-        df: &str,
-        varname: &str,
-        model: &Expr,
-        kind: &Expr,
-    ) -> Result<()> {
+    fn exec_predict(&mut self, df: &str, varname: &str, model: &Expr, kind: &Expr) -> Result<()> {
         let mut df_val = match self.env.get(df) {
             Some(Value::DataFrame(d)) => d.clone(),
             _ => return Err(self.rt_err(format!("'{df}' is not a DataFrame"))),
@@ -1057,20 +1081,17 @@ impl Interpreter {
             // ── OLS → CSV / LaTeX / HTML ──────────────────────────────
             (Value::OlsResult(m), "csv") => {
                 let content = m.result.to_csv();
-                std::fs::write(&path_str, &content)
-                    .map_err(|e| HayashiError::Io(e.to_string()))?;
+                std::fs::write(&path_str, &content).map_err(|e| HayashiError::Io(e.to_string()))?;
                 println!("Exported OLS → '{path_str}'");
             }
             (Value::OlsResult(m), "latex" | "tex") => {
                 let content = m.result.to_latex();
-                std::fs::write(&path_str, &content)
-                    .map_err(|e| HayashiError::Io(e.to_string()))?;
+                std::fs::write(&path_str, &content).map_err(|e| HayashiError::Io(e.to_string()))?;
                 println!("Exported OLS → '{path_str}'");
             }
             (Value::OlsResult(m), "html" | "htm") => {
                 let content = m.result.to_html();
-                std::fs::write(&path_str, &content)
-                    .map_err(|e| HayashiError::Io(e.to_string()))?;
+                std::fs::write(&path_str, &content).map_err(|e| HayashiError::Io(e.to_string()))?;
                 println!("Exported OLS → '{path_str}'");
             }
 
@@ -1189,9 +1210,7 @@ impl Interpreter {
         for s in try_body {
             match self.exec(s) {
                 Ok(()) => {}
-                Err(
-                    HayashiError::Return | HayashiError::Break | HayashiError::Continue,
-                ) => {
+                Err(HayashiError::Return | HayashiError::Break | HayashiError::Continue) => {
                     try_result = Err(HayashiError::Return);
                     break;
                 }
@@ -1264,22 +1283,28 @@ impl Interpreter {
                 let start = match self.eval_expr(start_expr)? {
                     Value::Int(i) => i,
                     Value::Float(f) => f as i64,
-                    v => return Err(HayashiError::Type(format!(
-                        "for: range start must be integer, not {v}"
-                    ))),
+                    v => {
+                        return Err(HayashiError::Type(format!(
+                            "for: range start must be integer, not {v}"
+                        )))
+                    }
                 };
                 let end = match self.eval_expr(end_expr)? {
                     Value::Int(i) => i,
                     Value::Float(f) => f as i64,
-                    v => return Err(HayashiError::Type(format!(
-                        "for: range end must be integer, not {v}"
-                    ))),
+                    v => {
+                        return Err(HayashiError::Type(format!(
+                            "for: range end must be integer, not {v}"
+                        )))
+                    }
                 };
                 let step: i64 = if start <= end { 1 } else { -1 };
                 let mut cur = start;
                 while if step > 0 { cur < end } else { cur > end } {
                     self.env.set(var, Value::Int(cur))?;
-                    if run_body!() { break; }
+                    if run_body!() {
+                        break;
+                    }
                     cur += step;
                 }
             }
@@ -1287,22 +1312,28 @@ impl Interpreter {
                 let start = match self.eval_expr(start_expr)? {
                     Value::Int(i) => i,
                     Value::Float(f) => f as i64,
-                    v => return Err(HayashiError::Type(format!(
-                        "for: range start must be integer, not {v}"
-                    ))),
+                    v => {
+                        return Err(HayashiError::Type(format!(
+                            "for: range start must be integer, not {v}"
+                        )))
+                    }
                 };
                 let end = match self.eval_expr(end_expr)? {
                     Value::Int(i) => i,
                     Value::Float(f) => f as i64,
-                    v => return Err(HayashiError::Type(format!(
-                        "for: range end must be integer, not {v}"
-                    ))),
+                    v => {
+                        return Err(HayashiError::Type(format!(
+                            "for: range end must be integer, not {v}"
+                        )))
+                    }
                 };
                 let step: i64 = if start <= end { 1 } else { -1 };
                 let mut cur = start;
                 while if step > 0 { cur <= end } else { cur >= end } {
                     self.env.set(var, Value::Int(cur))?;
-                    if run_body!() { break; }
+                    if run_body!() {
+                        break;
+                    }
                     cur += step;
                 }
             }
@@ -1315,26 +1346,33 @@ impl Interpreter {
                             for (i, item) in items.into_iter().enumerate() {
                                 self.env.set(var, Value::Int(i as i64))?;
                                 self.env.set(v2, item)?;
-                                if run_body!() { break; }
+                                if run_body!() {
+                                    break;
+                                }
                             }
                         } else {
                             for item in items {
                                 self.env.set(var, item)?;
-                                if run_body!() { break; }
+                                if run_body!() {
+                                    break;
+                                }
                             }
                         }
                     }
                     Value::Dict(d) => {
                         let Some(v2) = var2 else {
                             return Err(HayashiError::Type(
-                                "for: dict iteration requires two variables (for k, v in dict)".into(),
+                                "for: dict iteration requires two variables (for k, v in dict)"
+                                    .into(),
                             ));
                         };
                         let items = (*d).clone();
                         for (k, v) in items {
                             self.env.set(var, Value::Str(k))?;
                             self.env.set(v2, v)?;
-                            if run_body!() { break; }
+                            if run_body!() {
+                                break;
+                            }
                         }
                     }
                     other => {

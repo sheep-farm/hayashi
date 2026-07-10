@@ -1,5 +1,5 @@
+use super::interpreter::models::{BinaryModel, OlsModel, PenalizedModel};
 use super::interpreter::Value;
-use super::interpreter::models::{OlsModel, BinaryModel, PenalizedModel};
 use arrow::array::{
     make_array, Array, ArrayRef, BooleanArray, Float64Array, Int64Array, StringArray,
 };
@@ -332,7 +332,10 @@ pub fn value_to_json(
         Value::IvResult(r) => {
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("iv"));
-            map.insert("variable".into(), serde_json::json!(r.variable_names.clone().unwrap_or_default()));
+            map.insert(
+                "variable".into(),
+                serde_json::json!(r.variable_names.clone().unwrap_or_default()),
+            );
             map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
             map.insert("std_err".into(), serde_json::json!(r.std_errors.to_vec()));
             map.insert("t".into(), serde_json::json!(r.t_values.to_vec()));
@@ -346,7 +349,10 @@ pub fn value_to_json(
         Value::PanelResult(r) => {
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("panel_fe"));
-            map.insert("variable".into(), serde_json::json!(r.variable_names.clone().unwrap_or_default()));
+            map.insert(
+                "variable".into(),
+                serde_json::json!(r.variable_names.clone().unwrap_or_default()),
+            );
             map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
             map.insert("std_err".into(), serde_json::json!(r.std_errors.to_vec()));
             map.insert("t".into(), serde_json::json!(r.t_values.to_vec()));
@@ -360,7 +366,10 @@ pub fn value_to_json(
         Value::ReResult(r) => {
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("panel_re"));
-            map.insert("variable".into(), serde_json::json!(r.variable_names.clone().unwrap_or_default()));
+            map.insert(
+                "variable".into(),
+                serde_json::json!(r.variable_names.clone().unwrap_or_default()),
+            );
             map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
             map.insert("std_err".into(), serde_json::json!(r.std_errors.to_vec()));
             map.insert("t".into(), serde_json::json!(r.t_values.to_vec()));
@@ -389,7 +398,10 @@ pub fn value_to_json(
         Value::PoissonResult(r) => {
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("poisson"));
-            map.insert("variable".into(), serde_json::json!(r.variable_names.clone().unwrap_or_default()));
+            map.insert(
+                "variable".into(),
+                serde_json::json!(r.variable_names.clone().unwrap_or_default()),
+            );
             map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
             map.insert("std_err".into(), serde_json::json!(r.std_errors.to_vec()));
             map.insert("z".into(), serde_json::json!(r.z_values.to_vec()));
@@ -404,7 +416,10 @@ pub fn value_to_json(
         Value::NegBinResult(r) => {
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("negbin"));
-            map.insert("variable".into(), serde_json::json!(r.variable_names.clone().unwrap_or_default()));
+            map.insert(
+                "variable".into(),
+                serde_json::json!(r.variable_names.clone().unwrap_or_default()),
+            );
             map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
             map.insert("std_err".into(), serde_json::json!(r.std_errors.to_vec()));
             map.insert("z".into(), serde_json::json!(r.z_values.to_vec()));
@@ -420,7 +435,10 @@ pub fn value_to_json(
         Value::GlmResult(r) => {
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("glm"));
-            map.insert("variable".into(), serde_json::json!(r.variable_names.clone().unwrap_or_default()));
+            map.insert(
+                "variable".into(),
+                serde_json::json!(r.variable_names.clone().unwrap_or_default()),
+            );
             map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
             map.insert("std_err".into(), serde_json::json!(r.std_errors.to_vec()));
             map.insert("z".into(), serde_json::json!(r.z_values.to_vec()));
@@ -436,7 +454,10 @@ pub fn value_to_json(
         Value::QuantileResult(r) => {
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("quantile"));
-            map.insert("variable".into(), serde_json::json!(r.variable_names.clone().unwrap_or_default()));
+            map.insert(
+                "variable".into(),
+                serde_json::json!(r.variable_names.clone().unwrap_or_default()),
+            );
             map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
             map.insert("std_err".into(), serde_json::json!(r.std_errors.to_vec()));
             map.insert("t".into(), serde_json::json!(r.t_values.to_vec()));
@@ -448,7 +469,10 @@ pub fn value_to_json(
         Value::TobitResult(r) => {
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("tobit"));
-            map.insert("variable".into(), serde_json::json!(r.variable_names.clone().unwrap_or_default()));
+            map.insert(
+                "variable".into(),
+                serde_json::json!(r.variable_names.clone().unwrap_or_default()),
+            );
             map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
             map.insert("std_err".into(), serde_json::json!(r.std_errors.to_vec()));
             map.insert("t".into(), serde_json::json!(r.t_values.to_vec()));
@@ -462,7 +486,10 @@ pub fn value_to_json(
         Value::HeckmanResult(r) => {
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("heckman"));
-            map.insert("variable".into(), serde_json::json!(r.variable_names.clone().unwrap_or_default()));
+            map.insert(
+                "variable".into(),
+                serde_json::json!(r.variable_names.clone().unwrap_or_default()),
+            );
             map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
             map.insert("std_err".into(), serde_json::json!(r.std_errors.to_vec()));
             map.insert("t".into(), serde_json::json!(r.t_values.to_vec()));
@@ -475,7 +502,10 @@ pub fn value_to_json(
         Value::OrderedResult(r) => {
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("ordered"));
-            map.insert("variable".into(), serde_json::json!(r.variable_names.clone().unwrap_or_default()));
+            map.insert(
+                "variable".into(),
+                serde_json::json!(r.variable_names.clone().unwrap_or_default()),
+            );
             map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
             map.insert("std_err".into(), serde_json::json!(r.std_errors.to_vec()));
             map.insert("z".into(), serde_json::json!(r.z_values.to_vec()));
@@ -489,7 +519,10 @@ pub fn value_to_json(
         Value::AbResult(r) => {
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("arellano_bond"));
-            map.insert("variable".into(), serde_json::json!(r.variable_names.clone().unwrap_or_default()));
+            map.insert(
+                "variable".into(),
+                serde_json::json!(r.variable_names.clone().unwrap_or_default()),
+            );
             map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
             map.insert("std_err".into(), serde_json::json!(r.std_errors.to_vec()));
             map.insert("t".into(), serde_json::json!(r.t_values.to_vec()));
@@ -501,7 +534,10 @@ pub fn value_to_json(
         Value::RlmResult(r) => {
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("rlm"));
-            map.insert("variable".into(), serde_json::json!(r.variable_names.clone().unwrap_or_default()));
+            map.insert(
+                "variable".into(),
+                serde_json::json!(r.variable_names.clone().unwrap_or_default()),
+            );
             map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
             map.insert("std_err".into(), serde_json::json!(r.std_errors.to_vec()));
             map.insert("t".into(), serde_json::json!(r.t_values.to_vec()));
@@ -511,7 +547,10 @@ pub fn value_to_json(
         Value::BetaResult(r) => {
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("beta"));
-            map.insert("variable".into(), serde_json::json!(r.variable_names.clone().unwrap_or_default()));
+            map.insert(
+                "variable".into(),
+                serde_json::json!(r.variable_names.clone().unwrap_or_default()),
+            );
             map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
             map.insert("std_err".into(), serde_json::json!(r.std_errors.to_vec()));
             map.insert("z".into(), serde_json::json!(r.z_values.to_vec()));
@@ -521,7 +560,10 @@ pub fn value_to_json(
         Value::GeeResult(r) => {
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("gee"));
-            map.insert("variable".into(), serde_json::json!(r.variable_names.clone().unwrap_or_default()));
+            map.insert(
+                "variable".into(),
+                serde_json::json!(r.variable_names.clone().unwrap_or_default()),
+            );
             map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
             map.insert("std_err".into(), serde_json::json!(r.robust_se.to_vec()));
             map.insert("z".into(), serde_json::json!(r.z_values.to_vec()));
@@ -536,14 +578,32 @@ pub fn value_to_json(
             all_params.extend(r.ma_params.iter().cloned());
             all_params.push(r.intercept);
             let p = r.p_values.len();
-            let se = if r.std_errors.len() >= p { r.std_errors.slice(ndarray::s![..p]).to_vec() } else { vec![f64::NAN; p] };
-            let tv = if r.t_values.len() >= p { r.t_values.slice(ndarray::s![..p]).to_vec() } else { vec![f64::NAN; p] };
-            let pv = if r.p_values.len() >= p { r.p_values.slice(ndarray::s![..p]).to_vec() } else { vec![f64::NAN; p] };
-            let names: Vec<String> = (0..all_params.len()).map(|i| {
-                if i < r.ar_params.len() { format!("ar{}", i + 1) }
-                else if i < r.ar_params.len() + r.ma_params.len() { format!("ma{}", i - r.ar_params.len() + 1) }
-                else { "intercept".into() }
-            }).collect();
+            let se = if r.std_errors.len() >= p {
+                r.std_errors.slice(ndarray::s![..p]).to_vec()
+            } else {
+                vec![f64::NAN; p]
+            };
+            let tv = if r.t_values.len() >= p {
+                r.t_values.slice(ndarray::s![..p]).to_vec()
+            } else {
+                vec![f64::NAN; p]
+            };
+            let pv = if r.p_values.len() >= p {
+                r.p_values.slice(ndarray::s![..p]).to_vec()
+            } else {
+                vec![f64::NAN; p]
+            };
+            let names: Vec<String> = (0..all_params.len())
+                .map(|i| {
+                    if i < r.ar_params.len() {
+                        format!("ar{}", i + 1)
+                    } else if i < r.ar_params.len() + r.ma_params.len() {
+                        format!("ma{}", i - r.ar_params.len() + 1)
+                    } else {
+                        "intercept".into()
+                    }
+                })
+                .collect();
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("arima"));
             map.insert("variable".into(), serde_json::json!(names));
@@ -560,7 +620,10 @@ pub fn value_to_json(
         Value::GarchResult(r) => {
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("garch"));
-            map.insert("variable".into(), serde_json::json!(r.variable_names.clone()));
+            map.insert(
+                "variable".into(),
+                serde_json::json!(r.variable_names.clone()),
+            );
             map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
             map.insert("std_err".into(), serde_json::json!(r.std_errors.to_vec()));
             map.insert("z".into(), serde_json::json!(r.z_values.to_vec()));
@@ -590,7 +653,10 @@ fn ols_model_to_json(m: &OlsModel) -> serde_json::Value {
     let r = &m.result;
     let mut map = serde_json::Map::new();
     map.insert("__model_type__".into(), serde_json::json!("ols"));
-    map.insert("variable".into(), serde_json::json!(r.variable_names.clone().unwrap_or_default()));
+    map.insert(
+        "variable".into(),
+        serde_json::json!(r.variable_names.clone().unwrap_or_default()),
+    );
     map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
     map.insert("std_err".into(), serde_json::json!(r.std_errors.to_vec()));
     map.insert("t".into(), serde_json::json!(r.t_values.to_vec()));
@@ -628,7 +694,10 @@ fn binary_model_to_json(m: &BinaryModel) -> serde_json::Value {
 fn penalized_model_to_json(m: &PenalizedModel) -> serde_json::Value {
     let mut map = serde_json::Map::new();
     map.insert("__model_type__".into(), serde_json::json!(m.kind.as_str()));
-    map.insert("variable".into(), serde_json::json!(m.variable_names.clone()));
+    map.insert(
+        "variable".into(),
+        serde_json::json!(m.variable_names.clone()),
+    );
     map.insert("coef".into(), serde_json::json!(m.params.to_vec()));
     map.insert("std_err".into(), serde_json::json!(m.std_errors.to_vec()));
     map.insert("r2".into(), serde_json::json!(m.r_squared));

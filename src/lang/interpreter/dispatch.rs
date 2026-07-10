@@ -16,7 +16,9 @@ impl Interpreter {
                 if let Some(s) = self.rng_seed {
                     evaluated_args.push(Value::Int(s as i64));
                 }
-                let mut plugin = self.plugins.remove(ns)
+                let mut plugin = self
+                    .plugins
+                    .remove(ns)
                     .expect("plugin namespace verified by contains_key but missing on remove");
                 let res = plugin
                     .call(member, &evaluated_args)
