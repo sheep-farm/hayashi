@@ -608,7 +608,7 @@ def run_case(case: dict[str, Any]) -> tuple[str, list[str], dict[str, dict]]:
     return status, failures, ref_report
 
 
-def update_matrix_md(cases: list[dict[str, Any]]) -> None:
+def render_matrix_md(cases: list[dict[str, Any]]) -> str:
     lines = [
         "# Hayashi Validation Matrix",
         "",
@@ -661,7 +661,114 @@ def update_matrix_md(cases: list[dict[str, Any]]) -> None:
         "\"Estimators not covered by validation\" do README.",
         "",
     ])
-    MATRIX_MD.write_text("\n".join(lines) + "\n")
+    return "\n".join(lines) + "\n"
+
+
+def update_matrix_md(cases: list[dict[str, Any]]) -> None:
+    MATRIX_MD.write_text(render_matrix_md(cases))
+
+
+def _case_matrix_metadata(case: dict[str, Any]) -> tuple[str, str, str, str, str]:
+    family = case.get("estimator_family", "")
+    dataset = case.get("dataset", {}).get("name", "")
+    status = case.get("status", "not-started")
+    issue = case.get("result", {}).get("issues_opened", [])
+    issue_str = ", ".join(str(i) for i in issue) if issue else "—"
+    notes = case.get("notes", "").replace("\n", " ")
+    return family, dataset, status, issue_str, notes
+
+
+def matrix_md_metadata_matches(cases: list[dict[str, Any]], text: str) -> bool:
+    """Return True when MATRIX.md reflects stable case metadata.
+
+    The Reference column may include dynamic per-reference run status, so this
+    check intentionally compares only the stable metadata columns.
+    """
+    actual_rows: list[tuple[str, str, str, str, str]] = []
+    for line in text.splitlines():
+        if (
+            not line.startswith("| ")
+            or line.startswith("| Family ")
+            or line.startswith("|---")
+        ):
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if len(cells) != 6:
+            return False
+        family, dataset, _reference, status, issue, notes = cells
+        actual_rows.append((family, dataset, status, issue, notes))
+
+    expected_rows = [_case_matrix_metadata(case) for case in cases]
+    return actual_rows == expected_rows
+
+
+def _validation_relative_path(path: str) -> Path:
+    return VALIDATION_DIR / path
+
+
+def _check_declared_script(
+    findings: list[str],
+    case_id: str,
+    label: str,
+    script_path: str | None,
+) -> None:
+    if not script_path:
+        findings.append(f"{case_id}: missing {label} script path")
+        return
+    if not _validation_relative_path(script_path).exists():
+        findings.append(f"{case_id}: declared {label} script not found: {script_path}")
+
+
+def check_metadata(
+    _matrix: dict[str, Any],
+    cases: list[dict[str, Any]],
+    registry_ids: set[str],
+    discovered_ids: set[str],
+) -> list[str]:
+    """Validate validation metadata without running estimator scripts."""
+    findings: list[str] = []
+
+    for case_id in sorted(registry_ids - discovered_ids):
+        findings.append(f"{case_id}: matrix.yml registry entry has no case.yml on disk")
+    for case_id in sorted(discovered_ids - registry_ids):
+        findings.append(f"{case_id}: case.yml exists but matrix.yml has no registry entry")
+
+    for case in sorted(cases, key=lambda c: c["id"]):
+        case_id = case["id"]
+        case_dir = VALIDATION_DIR / "cases" / case_id
+        if not (case_dir / "README.md").exists():
+            findings.append(f"{case_id}: missing README.md")
+
+        status = case.get("status", "not-started")
+        references = case.get("references", [])
+        tolerances = case.get("comparison", {}).get("tolerances", {})
+
+        if status == "pass":
+            if not references:
+                findings.append(
+                    f"{case_id}: status pass requires at least one declared reference"
+                )
+            if not tolerances:
+                findings.append(f"{case_id}: status pass requires comparison tolerances")
+
+        hayashi_script = case.get("hayashi_script", f"cases/{case_id}/hayashi/run.hay")
+        _check_declared_script(findings, case_id, "Hayashi", hayashi_script)
+
+        reference_scripts = case.get("reference_scripts", {})
+        for ref_name in references:
+            _check_declared_script(
+                findings,
+                case_id,
+                f"{ref_name} reference",
+                reference_scripts.get(ref_name),
+            )
+
+    if not MATRIX_MD.exists():
+        findings.append("validation/MATRIX.md is missing")
+    elif not matrix_md_metadata_matches(cases, MATRIX_MD.read_text()):
+        findings.append("validation/MATRIX.md is stale; regenerate it with validation/run.py")
+
+    return findings
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -690,6 +797,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--allow-blocked",
         action="store_true",
         help="Exit with status 0 when validation cases are blocked. By default blocked counts as failure.",
+    )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Check validation metadata consistency without running validation cases.",
     )
     return parser.parse_args(argv)
 
@@ -838,6 +950,16 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.list:
         list_cases(cases)
+        return 0
+
+    if args.check:
+        findings = check_metadata(matrix, cases, registry_ids, discovered_ids)
+        if findings:
+            log("Validation metadata check failed:")
+            for finding in findings:
+                log(f"  - {finding}")
+            return 1
+        log("Validation metadata check passed")
         return 0
 
     try:
