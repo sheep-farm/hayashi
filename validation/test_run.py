@@ -184,6 +184,25 @@ class MetadataCheckTests(unittest.TestCase):
 
         self.assertIn("ols_example: case.yml exists but matrix.yml has no registry entry", findings)
 
+    def test_parse_hayashi_margins_table(self):
+        text = """
+==============================================
+ Average Marginal Effects — LOGIT
+==============================================
+Variable                dy/dx   Std.Err.        z    P>|z|
+----------------------------------------------
+nwifeinc            -0.003811   0.001538   -2.478   0.0132 **
+educ                 0.039496   0.008468    4.664   0.0000 ***
+----------------------------------------------
+n = 753
+==============================================
+"""
+
+        parsed = self.module.parse_hayashi_margins(text)
+
+        self.assertAlmostEqual(parsed["marginal_effects"]["nwifeinc"], -0.003811)
+        self.assertAlmostEqual(parsed["standard_errors"]["educ"], 0.008468)
+
 
 if __name__ == "__main__":
     unittest.main()
