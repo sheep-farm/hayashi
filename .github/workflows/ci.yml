@@ -10,6 +10,17 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  validation-metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r validation/requirements.txt
+      - run: python -m unittest validation/test_run.py
+      - run: python validation/run.py --check
+
   advisories:
     runs-on: ubuntu-latest
     steps:
