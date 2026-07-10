@@ -1,10 +1,13 @@
 // Load the Wooldridge fertil2 dataset from CSV.
 load "validation/cases/poisson_fertil2/data/fertil2.csv" as df
 
-// Sanitize: electric and tv contain NA values, so the CSV loader treats them
-// as categorical. Rebuild them as 0/1 numeric columns; NA rows become 0, which
-// the model effectively excludes from the binary comparison and keeps the
-// sample size stable for the other regressors.
+// Sanitize: electric and tv contain NA values, which makes the CSV loader
+// treat them as categorical and invert their numeric meaning when converted
+// back to float. Filter out the NA rows and recode the dummies as 0/1 floats.
+// Clone binary float columns before filtering to work around a filter quirk.
+generate df urban = urban
+generate df evermarr = evermarr
+df = df |> filter(tv != "NA" && electric != "NA")
 generate df electric = electric == "1"
 generate df tv = tv == "1"
 
