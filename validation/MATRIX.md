@@ -14,6 +14,7 @@
 | did | wooldridge::kielmc | R, Python | pass | — | Difference-in-differences effect of incinerator proximity on log house prices. |
 | elasticnet | wooldridge::hprice1 | R, Python | pass | — | Elastic Net regression of log house price on log lot size, log square footage, bedrooms and colonial dummy. |
 | ets | statsmodels::macrodata | R, Python | pass | — | Exponential smoothing state-space model on US real GDP. Blocked because Hayashi uses SSE grid search while references use MLE. |
+| fmb | simulated_fmb_panel | R:passed, Python:passed * | pass | 49 | Classic Fama-MacBeth regression on a deterministic simulated asset panel. |
 | garch | simulated_garch11 | Python | pass | — | Uses the same simulated GARCH(1,1) DGP as Chapter 30 of the book. MLE tolerances are looser because the optimizer may stop at slightly different points. |
 | garch | wooldridge::nyse | R, Python | pass | — | GARCH(1,1) on NYSE returns. |
 | glsar | wooldridge::hprice1 | R, Python | pass | — | GLS with AR(1) errors on housing price equation. |
@@ -51,6 +52,10 @@
 - `blocked` — cannot run because of a missing feature or bug.
 - `not-supported` — estimator/workflow not supported yet.
 - `not-started` — registered but not implemented.
+
+The Reference column shows per-reference status as `name:status`,
+where `*` marks the reference used for comparison. A declared
+reference that fails or is missing blocks the case.
 
 This matrix is generated from `validation/matrix.yml` by `validation/run.py`.
 
