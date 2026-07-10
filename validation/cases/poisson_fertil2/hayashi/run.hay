@@ -1,6 +1,13 @@
 // Load the Wooldridge fertil2 dataset from CSV.
 load "validation/cases/poisson_fertil2/data/fertil2.csv" as df
 
+// Sanitize: electric and tv contain NA values, so the CSV loader treats them
+// as categorical. Rebuild them as 0/1 numeric columns; NA rows become 0, which
+// the model effectively excludes from the binary comparison and keeps the
+// sample size stable for the other regressors.
+generate df electric = electric == "1"
+generate df tv = tv == "1"
+
 // Poisson regression for number of children.
 let m = poisson(children ~ educ + age + agesq + evermarr + urban + electric + tv, df)
 
