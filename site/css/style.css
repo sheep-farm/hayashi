@@ -276,6 +276,20 @@ a {
   margin-bottom: 2.5rem;
 }
 
+.category-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  text-align: left;
+  margin-bottom: 0.5rem;
+}
+
+.category-subtitle {
+  text-align: left;
+  color: var(--text);
+  opacity: 0.6;
+  margin-bottom: 1.5rem;
+}
+
 /* Features */
 .features {
   padding: 5rem 0;
