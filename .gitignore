@@ -6,6 +6,7 @@ docs/book
 .standards/
 .agents/
 compile_books.sh
+.venv/
 validation/.venv
 validation/cases/**/data/
 validation/cases/**/hayashi/output.csv
