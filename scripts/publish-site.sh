@@ -28,7 +28,7 @@ echo "Publicando site a partir de '$SOURCE_BRANCH'..."
 
 # Copia o site para um diretório temporário porque o branch gh-pages não contém a pasta site/
 TMP_DIR="$(mktemp -d)"
-cp -a "$SOURCE_DIR"/ "$TMP_DIR/"
+cp -a "$SOURCE_DIR"/. "$TMP_DIR/"
 
 # Salva o branch atual e muda para gh-pages
 git checkout "$TARGET_BRANCH"
