@@ -37,7 +37,7 @@ git checkout "$TARGET_BRANCH"
 find . -mindepth 1 -maxdepth 1 ! -name '.git' ! -name 'CNAME' -exec rm -rf {} +
 
 # Copia o conteúdo do site do temporário para a raiz do gh-pages
-cp -a "$TMP_DIR"/ .
+cp -a "$TMP_DIR"/. .
 rm -rf "$TMP_DIR"
 
 # Garante que o CNAME existe
