@@ -85,7 +85,7 @@ fn parse_model_csv(csv: &str) -> HashMap<String, CoefRow> {
         );
 
         rows.insert(
-            fields[0].to_string(),
+            normalise_coefficient_name(fields[0]).to_string(),
             CoefRow {
                 coef: fields[1]
                     .parse()
@@ -97,6 +97,13 @@ fn parse_model_csv(csv: &str) -> HashMap<String, CoefRow> {
         );
     }
     rows
+}
+
+fn normalise_coefficient_name(name: &str) -> &str {
+    match name {
+        "_cons" | "Intercept" | "(Intercept)" => "const",
+        _ => name,
+    }
 }
 
 fn assert_close(actual: f64, expected: f64, tol: f64, label: &str) {
