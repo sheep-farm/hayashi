@@ -1,0 +1,13 @@
+// Generate deterministic cointegrated data from Chapter 29 DGP.
+seed(42)
+input df
+id
+1
+end
+for i in 1..=9 { df = append(df, df) }
+df |> filter(_n <= 300)
+generate df e1 = rnormal()
+generate df e2 = rnormal()
+generate df x = cumsum(e1)
+generate df y = 2.0 * x + e2
+export(df, "csv", "validation/cases/coint_book/data/coint.csv")
