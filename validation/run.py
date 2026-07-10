@@ -114,6 +114,7 @@ def parse_hayashi_txt_table(text: str) -> dict[str, dict[str, float]]:
         has_se = (
             "std err" in line_lower
             or "stderr" in line_lower
+            or "fm-se" in line_lower
             or line_lower.strip().endswith(" se")
             or (" se" in line_lower and " sse" not in line_lower)
         )
