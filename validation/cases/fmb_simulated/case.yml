@@ -1,0 +1,37 @@
+id: fmb_simulated
+title: Fama-MacBeth regression on a deterministic simulated panel
+estimator_family: fmb
+status: active
+dimension: numerical
+
+dataset:
+  name: simulated_fmb_panel
+  source: deterministic DGP in reference scripts
+  licence: generated test data
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-4
+    standard_errors: 1e-4
+
+output_format: txt
+
+hayashi_script: cases/fmb_simulated/hayashi/run.hay
+reference_scripts:
+  R: cases/fmb_simulated/reference/run.R
+  Python: cases/fmb_simulated/reference/run.py
+
+notes: Classic Fama-MacBeth regression on a deterministic simulated asset panel.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened:
+    - 49

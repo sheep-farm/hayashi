@@ -52,6 +52,10 @@ cases:
     uses SSE grid search while references use MLE.
   dimension: numerical
   status: pass
+- id: fmb_simulated
+  notes: Classic Fama-MacBeth regression on a deterministic simulated asset panel.
+  dimension: numerical
+  status: pass
 - id: garch_book
   notes: Uses the same simulated GARCH(1,1) DGP as Chapter 30 of the book. MLE tolerances
     are looser because the optimizer may stop at slightly different points.
