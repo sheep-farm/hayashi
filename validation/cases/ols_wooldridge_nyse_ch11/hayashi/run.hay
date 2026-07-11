@@ -1,0 +1,9 @@
+// Wooldridge (Introductory Econometrics, 7e), Chapter 11, Example 11.4.
+// AR(1) test of efficient markets hypothesis: ret ~ return_1.
+// The 'return' column is renamed to 'ret' in the CSV to avoid the Hayashi/Python reserved keyword.
+
+load "validation/cases/ols_wooldridge_nyse_ch11/data/nyse.csv" as df
+
+let m = ols(ret ~ return_1, df)
+
+export(m, "csv", "/dev/stdout")

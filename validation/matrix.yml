@@ -200,6 +200,26 @@ cases:
   notes: Wooldridge Introductory Econometrics Chapter 10 Example 10.2 interest rate on inflation and deficit.
   dimension: numerical
   status: pass
+- id: ols_wooldridge_hprice2_ch6
+  notes: Wooldridge Introductory Econometrics Chapter 6 Example 6.2 log housing price equation with rooms quadratic.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_htv_ch9
+  notes: Wooldridge Introductory Econometrics Chapter 9 Example 9.3 education equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_nyse_ch11
+  notes: Wooldridge Introductory Econometrics Chapter 11 Example 11.4 efficient markets hypothesis.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_prminwge_ch10
+  notes: Wooldridge Introductory Econometrics Chapter 10 Example 10.3 Puerto Rican employment equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_wage1_interaction_ch7
+  notes: Wooldridge Introductory Econometrics Chapter 7 Example 7.6 hourly wage equation with marriage-gender interactions.
+  dimension: numerical
+  status: pass
 - id: ols_wooldridge_phillips_ch10
   notes: Wooldridge Introductory Econometrics Chapter 10 Example 10.1 static Phillips curve.
   dimension: numerical

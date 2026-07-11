@@ -1,0 +1,34 @@
+id: ols_wooldridge_prminwge_ch10
+title: OLS Puerto Rican employment equation on Wooldridge prminwge (Chapter 10, Example 10.3)
+estimator_family: ols
+status: active
+dimension: numerical
+
+dataset:
+  name: wooldridge::prminwge
+  source: R package wooldridge / Python wooldridge-python
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-6
+    standard_errors: 1e-6
+
+hayashi_script: cases/ols_wooldridge_prminwge_ch10/hayashi/run.hay
+reference_scripts:
+  R: cases/ols_wooldridge_prminwge_ch10/reference/run.R
+  Python: cases/ols_wooldridge_prminwge_ch10/reference/run.py
+
+notes: Wooldridge Introductory Econometrics Chapter 10, Example 10.3 Puerto Rican employment and minimum wage equation.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []
