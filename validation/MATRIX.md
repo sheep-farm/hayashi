@@ -14,7 +14,7 @@
 | did | wooldridge::kielmc | R, Python | pass | — | Difference-in-differences effect of incinerator proximity on log house prices. |
 | elasticnet | wooldridge::hprice1 | R, Python | pass | — | Elastic Net regression of log house price on log lot size, log square footage, bedrooms and colonial dummy. |
 | ets | statsmodels::macrodata | R, Python | pass | — | Exponential smoothing state-space model on US real GDP. Blocked because Hayashi uses SSE grid search while references use MLE. |
-| fmb | simulated_fmb_panel | R:passed, Python:passed * | pass | 49 | Classic Fama-MacBeth regression on a deterministic simulated asset panel. |
+| fmb | simulated_fmb_panel | R, Python | pass | 49 | Classic Fama-MacBeth regression on a deterministic simulated asset panel. |
 | garch | simulated_garch11 | Python | pass | — | Uses the same simulated GARCH(1,1) DGP as Chapter 30 of the book. MLE tolerances are looser because the optimizer may stop at slightly different points. |
 | garch | wooldridge::nyse | R, Python | pass | — | GARCH(1,1) on NYSE returns. |
 | gee | wooldridge::wagepan | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 14 Example 14.4 generalized estimating equations wage equation. |
@@ -25,7 +25,7 @@
 | iv | wooldridge::card | R, Python | pass | — | IV with education endogenous and nearc4 as instrument. |
 | iv | wooldridge::mroz | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 15 Example 15.1 IV returns to schooling for married women. |
 | lasso | wooldridge::hprice1 | R, Python | pass | — | Lasso regression of house price on lot size, square footage and bedrooms. |
-| logit | wooldridge::mroz | R, Python | blocked | 58 | Blocked real-dataset validation case for logit average marginal effects on the Mroz dataset; Hayashi AMEs match R/statsmodels, but delta-method SEs differ pending issue #58. |
+| logit | wooldridge::mroz | R:passed, Python:passed * | pass | — | Logit average marginal effects on Wooldridge mroz. |
 | logit | wooldridge::mroz | R, Python | pass | — | Logit labour-force participation on the Mroz dataset. |
 | arima | simulated_ma1 | R, Python | pass | — | Uses the same simulated MA(1) DGP as Chapter 26 of the book. |
 | mixed | wooldridge::wagepan | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 14 Example 14.4 mixed linear model wage equation. |
@@ -103,3 +103,4 @@ covered by validation" section of the README.
 Esta matriz abrange os estimadores empíricos centrais. Alguns comandos são
 deixados de fora intencionalmente pelos motivos descritos na seção
 "Estimators not covered by validation" do README.
+
