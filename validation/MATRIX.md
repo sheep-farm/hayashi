@@ -83,7 +83,7 @@
 | rlm | wooldridge::wage1 | R:passed *, Python:passed * | pass | — | Huber robust linear regression of log wage on education, experience, and tenure. |
 | sur | wooldridge::grunfeld | R:passed *, Python:passed * | pass | — | Two-equation SUR (Zellner FGLS) on the Grunfeld investment data. |
 | svar | statsmodels::macrodata | R:passed *, Python:passed * | pass | — | Cholesky-identified SVAR(2) on log US real GDP and consumption. |
-| synth | synth_smoking | R, Python | blocked | — | Synthetic-control ATT on a simulated panel with 10 donors and 1 treated unit. |
+| synth | synth_smoking | R:passed *, Python:passed * | pass | — | Synthetic-control ATT on a simulated panel with 10 donors and 1 treated unit. |
 | sysgmm | wooldridge::wagepan | R | blocked | https://github.com/sheep-farm/hayashi/issues/67 | Blocked — Hayashi sysgmm raises a singular-matrix error for the wagepan dynamic panel specification. |
 | tobit | wooldridge::mroz | R:passed * | pass | — | Tobit regression of hours worked with left censoring at zero. Hayashi matches AER::tobit at displayed precision; the custom Python MLE is retained as a diagnostic script but is not the active reference. |
 | var | simulated_var1 | R:passed *, Python:passed * | pass | — | Uses the same simulated bivariate VAR(1) DGP as Chapter 28 of the book. |
