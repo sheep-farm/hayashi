@@ -156,6 +156,22 @@ cases:
   notes: Wooldridge Introductory Econometrics Chapter 7 Example 7.1 hourly wage equation with female dummy.
   dimension: numerical
   status: pass
+- id: ols_wooldridge_ceosal1_ch2
+  notes: Wooldridge Introductory Econometrics Chapter 2 Example 2.11 log-log CEO salary equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_campus_ch4
+  notes: Wooldridge Introductory Econometrics Chapter 4 Example 4.4 log-log campus crime equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_attend_ch6
+  notes: Wooldridge Introductory Econometrics Chapter 6 Example 6.3 attendance effects on exam score.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_wage1_log_female_ch7
+  notes: Wooldridge Introductory Econometrics Chapter 7 Example 7.1 log hourly wage equation with female dummy.
+  dimension: numerical
+  status: pass
 - id: oprobit_beauty
   notes: Ordered probit model of self-reported beauty rating (looks 2-5) on female,
     education, experience and black indicators.
