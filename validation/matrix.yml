@@ -128,6 +128,18 @@ cases:
   notes: Wooldridge Introductory Econometrics Chapter 2 Example 2.10 log wage equation.
   dimension: numerical
   status: pass
+- id: ols_wooldridge_gpa1_ch3
+  notes: Wooldridge Introductory Econometrics Chapter 3 Example 3.1 college GPA equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_401k_ch3
+  notes: Wooldridge Introductory Econometrics Chapter 3 Example 3.3 401(k) participation equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_crime1_ch3
+  notes: Wooldridge Introductory Econometrics Chapter 3 Example 3.5 arrest records equation.
+  dimension: numerical
+  status: pass
 - id: oprobit_beauty
   notes: Ordered probit model of self-reported beauty rating (looks 2-5) on female,
     education, experience and black indicators.
