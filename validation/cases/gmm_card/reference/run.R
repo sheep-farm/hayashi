@@ -1,7 +1,7 @@
 # Reference implementation in R for the GMM card case.
 
 library(wooldridge)
-library(AER)
+library(gmm)
 library(jsonlite)
 
 data(card)
@@ -13,14 +13,16 @@ dir.create(data_dir, recursive = TRUE, showWarnings = FALSE)
 # Write CSV for Hayashi to read.
 write.csv(card, file.path(data_dir, "card.csv"), row.names = FALSE)
 
-# GMM returns-to-schooling with nearc4 as instrument for education.
-model <- ivreg(
-  lwage ~ educ + exper + expersq + smsa + black + south
-    | nearc4 + exper + expersq + smsa + black + south,
-  data = card
+# Two-step GMM returns-to-schooling with nearc4 as instrument for education.
+# MDS with prewhite = 0 matches linearmodels' robust cross-sectional covariance.
+model <- gmm(
+  lwage ~ educ + exper + expersq + smsa + black + south,
+  ~ nearc4 + exper + expersq + smsa + black + south,
+  data = card,
+  type = "twoStep",
+  vcov = "MDS",
+  prewhite = 0
 )
-
-summary_model <- summary(model)
 
 name_map <- c(
   "(Intercept)" = "x0",
@@ -35,8 +37,8 @@ name_map <- c(
 coefs <- as.numeric(coef(model))
 names(coefs) <- name_map[names(coef(model))]
 
-std_errors <- as.numeric(summary_model$coefficients[, "Std. Error"])
-names(std_errors) <- name_map[rownames(summary_model$coefficients)]
+std_errors <- as.numeric(sqrt(diag(vcov(model))))
+names(std_errors) <- name_map[names(coef(model))]
 
 result <- list(
   coefficients = as.list(coefs),

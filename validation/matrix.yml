@@ -95,7 +95,7 @@ cases:
 - id: gmm_card
   notes: GMM returns to schooling with nearc4 as instrument for education.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: heckman_mroz
   notes: Two-step Heckman (Heckit) on the Mroz dataset. SEs are approximate because
     the reference implementations are two-step.
