@@ -261,6 +261,14 @@ cases:
   notes: Wooldridge Introductory Econometrics Chapter 14 Example 14.4 panel fixed-effects wage equation.
   dimension: numerical
   status: pass
+- id: mixed_wooldridge_wagepan_ch14
+  notes: Wooldridge Introductory Econometrics Chapter 14 Example 14.4 mixed linear model wage equation.
+  dimension: numerical
+  status: pass
+- id: gee_wooldridge_wagepan_ch14
+  notes: Wooldridge Introductory Econometrics Chapter 14 Example 14.4 generalized estimating equations wage equation.
+  dimension: numerical
+  status: pass
 - id: iv_wooldridge_mroz_ch15
   notes: Wooldridge Introductory Econometrics Chapter 15 Example 15.1 IV returns to schooling for married women.
   dimension: numerical
