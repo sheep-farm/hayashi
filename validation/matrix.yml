@@ -340,7 +340,7 @@ cases:
   notes: 1:1 nearest-neighbor propensity score matching with caliper 0.2 and bootstrap
     SE.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: quantile_wage1
   notes: Median quantile regression of wage on education, experience, and tenure.
   dimension: numerical
