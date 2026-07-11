@@ -1,7 +1,7 @@
 id: logit_margins_mroz
 title: Logit average marginal effects on Wooldridge mroz
 estimator_family: logit
-status: blocked
+status: active
 dimension: numerical
 dataset:
   name: wooldridge::mroz
@@ -22,9 +22,8 @@ hayashi_script: cases/logit_margins_mroz/hayashi/run.hay
 reference_scripts:
   R: cases/logit_margins_mroz/reference/run.R
   Python: cases/logit_margins_mroz/reference/run.py
-notes: Blocked — R reference for logit marginal effects fails to run in this environment.
+notes: Logit average marginal effects and delta-method standard errors match R/statsmodels within tolerance.
 result:
-  summary: R reference script for logit marginal effects terminates with an error.
-  known_differences:
-  - Rscript reference/run.R fails with "Execução interrompida".
+  summary: Average marginal effects and delta-method standard errors match R/statsmodels within tolerance.
+  known_differences: []
   issues_opened: []

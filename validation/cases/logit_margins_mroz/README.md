@@ -4,9 +4,6 @@ This validation case estimates the same labour-force-participation logit model
 as `logit_mroz`, then compares `margins(m)` against independent average
 marginal effects and delta-method standard errors.
 
-Upstream issue: #57.
-Blocking discrepancy: #58.
-
 ## Model
 
 ```
@@ -35,9 +32,9 @@ inlf ~ nwifeinc + educ + exper + age + kidslt6 + kidsge6
 
 ## Current status
 
-Blocked. Hayashi's average marginal effects match the R and Python references,
-but several delta-method standard errors differ beyond the declared tolerance.
-The case should be flipped to `pass` once #58 is resolved.
+Active and passing on current `dev`. Hayashi's average marginal effects and
+delta-method standard errors match both R and Python within the declared
+tolerance.
 
 ## Tolerances
 
