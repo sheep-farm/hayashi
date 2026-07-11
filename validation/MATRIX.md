@@ -75,7 +75,7 @@
 | pcse | wooldridge::wagepan | R:passed * | pass | — | PCSE estimation of log wage on education, experience, and dummies using panel-corrected standard errors. |
 | poisson | wooldridge::fertil2 | R:passed *, Python:passed * | pass | — | Poisson regression for number of children on the fertil2 dataset. |
 | probit | wooldridge::mroz | R:passed *, Python:passed * | pass | — | Probit labour-force participation on the Mroz dataset. |
-| psm | wooldridge::jtrain3 | R, Python | blocked | — | 1:1 nearest-neighbor propensity score matching with caliper 0.2 and bootstrap SE. |
+| psm | wooldridge::jtrain3 | R:passed *, Python:passed * | pass | — | 1:1 nearest-neighbor propensity score matching with caliper 0.2 and bootstrap SE. |
 | qreg | wooldridge::wage1 | R:passed *, Python:passed * | pass | — | Median quantile regression of wage on education, experience, and tenure. |
 | rdd | rdd_book | R:passed *, Python:passed * | pass | — | Sharp RDD with local linear regression, triangular kernel and Imbens-Kalyanaraman bandwidth. |
 | re | grunfeld | R:passed *, Python:passed * | pass | — | Random-effects investment demand model (Grunfeld). |

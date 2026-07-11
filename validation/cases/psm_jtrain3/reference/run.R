@@ -32,7 +32,7 @@ formula <- as.formula(paste(treatment, "~", paste(covariates, collapse = " + "))
 ps_model <- glm(formula, data = df, family = binomial(link = "logit"))
 ps <- predict(ps_model, type = "response")
 
-caliper <- 0.2 * sd(ps)
+caliper <- 0.2
 
 treated_idx <- which(df[[treatment]] == 1)
 control_idx <- which(df[[treatment]] == 0)
@@ -43,12 +43,18 @@ ps_c <- ps[control_idx]
 # 1:1 nearest-neighbor matching without replacement.
 match_c <- rep(NA_integer_, length(treated_idx))
 valid <- rep(FALSE, length(treated_idx))
+used_c <- rep(FALSE, length(control_idx))
 for (i in seq_along(treated_idx)) {
-  d <- abs(ps_c - ps_t[i])
+  available <- which(!used_c)
+  if (length(available) == 0) {
+    next
+  }
+  d <- abs(ps_c[available] - ps_t[i])
   j <- which.min(d)
   if (d[j] <= caliper) {
-    match_c[i] <- j
+    match_c[i] <- available[j]
     valid[i] <- TRUE
+    used_c[available[j]] <- TRUE
   }
 }
 
@@ -76,12 +82,18 @@ for (b in seq_len(B)) {
   boot_ps_c <- boot_ps[boot_c]
   boot_match <- rep(NA_integer_, length(boot_t))
   boot_valid <- rep(FALSE, length(boot_t))
+  boot_used <- rep(FALSE, length(boot_c))
   for (i in seq_along(boot_t)) {
-    d <- abs(boot_ps_c - boot_ps_t[i])
+    available <- which(!boot_used)
+    if (length(available) == 0) {
+      next
+    }
+    d <- abs(boot_ps_c[available] - boot_ps_t[i])
     j <- which.min(d)
     if (d[j] <= caliper) {
-      boot_match[i] <- j
+      boot_match[i] <- available[j]
       boot_valid[i] <- TRUE
+      boot_used[available[j]] <- TRUE
     }
   }
   if (any(boot_valid)) {
