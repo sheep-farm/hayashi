@@ -28,7 +28,7 @@ model <- ugarchfit(spec, data = nyse$return)
 coefs <- as.numeric(coef(model))
 names(coefs) <- names(coef(model))
 
-std_errors <- as.numeric(model@fit$matcoef[, "Std. Error"])
+std_errors <- as.numeric(model@fit$matcoef[, " Std. Error"])
 names(std_errors) <- names(coef(model))
 
 result <- list(

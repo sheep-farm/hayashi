@@ -10,11 +10,14 @@ library(jsonlite)
 data_dir <- "validation/cases/arima_gdp/data"
 dir.create(data_dir, recursive = TRUE, showWarnings = FALSE)
 
-# Load macrodata from statsmodels mirror (Rdatasets).
+# Load macrodata from local CSV or statsmodels mirror (Rdatasets).
+local_csv <- "validation/cases/arima_gdp/data/macrodata.csv"
 url <- "https://raw.githubusercontent.com/vincentarelbundock/Rdatasets/master/csv/statsmodels/macrodata.csv"
-macro <- read.csv(url)
-macro <- macro[, c("year", "quarter", "realgdp")]
-names(macro)[names(macro) == "realgdp"] <- "gdp"
+macro <- if (file.exists(local_csv)) read.csv(local_csv) else read.csv(url)
+if (!"gdp" %in% names(macro)) {
+  macro <- macro[, c("year", "quarter", "realgdp")]
+  names(macro)[names(macro) == "realgdp"] <- "gdp"
+}
 
 # Write CSV for Hayashi to read.
 write.csv(macro, file.path(data_dir, "macrodata.csv"), row.names = FALSE)
@@ -117,7 +120,7 @@ for (phi in phi_grid) {
       next
     }
     res <- exact_loglik(phi, theta)
-    if (res$log_lik > best_ll) {
+    if (!is.na(res$log_lik) && res$sigma2 > 0 && res$log_lik > best_ll) {
       best_ll <- res$log_lik
       best_phi <- phi
       best_theta <- theta
@@ -133,7 +136,7 @@ for (phi in seq(best_phi - 0.05, best_phi + 0.05, by = 0.01)) {
       next
     }
     res <- exact_loglik(phi, theta)
-    if (res$log_lik > best_ll) {
+    if (!is.na(res$log_lik) && res$sigma2 > 0 && res$log_lik > best_ll) {
       best_ll <- res$log_lik
       best_phi <- phi
       best_theta <- theta

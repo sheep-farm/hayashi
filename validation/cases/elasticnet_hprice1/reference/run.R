@@ -1,6 +1,7 @@
 # Reference implementation in R for the Elastic Net hprice1 case.
 
 library(glmnet)
+library(jsonlite)
 
 case_dir <- "validation/cases/elasticnet_hprice1"
 data_dir <- file.path(case_dir, "data")
