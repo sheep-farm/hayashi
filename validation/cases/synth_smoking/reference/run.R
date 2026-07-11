@@ -29,23 +29,42 @@ Y_d_pre <- as.matrix(y_pre[, -1])
 Y_d_post <- as.matrix(y_post[, -1])
 
 n_d <- ncol(Y_d_pre)
-
-# Optimise weights with L-BFGS-B inside [0,1], then project onto the simplex.
-objective <- function(w) {
-  sum((y_t_pre - Y_d_pre %*% w) ^ 2)
+if (n_d < 2) {
+  stop("At least two donor units are required for the constrained reference")
 }
 
-init <- rep(1 / n_d, n_d)
-opt <- optim(init, objective, method = "L-BFGS-B", lower = rep(0, n_d), upper = rep(1, n_d))
-
-# Projection onto the unit simplex (non-negative, sum to 1).
-project_simplex <- function(v) {
-  v <- pmax(v, 0)
-  s <- sum(v)
-  if (s > 0) v / s else rep(1 / length(v), length(v))
+# Solve the basic outcome-only SCM quadratic programme on the unit simplex.
+# Eliminate the final weight so constrOptim can enforce non-negativity with
+# linear inequalities while preserving the exact sum-to-one constraint.
+objective <- function(theta) {
+  w <- c(theta, 1 - sum(theta))
+  residuals <- y_t_pre - Y_d_pre %*% w
+  sum(residuals^2)
 }
 
-w <- project_simplex(opt$par)
+gradient <- function(theta) {
+  w <- c(theta, 1 - sum(theta))
+  residuals <- y_t_pre - Y_d_pre %*% w
+  donor_differences <- Y_d_pre[, -n_d, drop = FALSE] - Y_d_pre[, n_d]
+  as.vector(-2 * crossprod(donor_differences, residuals))
+}
+
+ui <- rbind(diag(n_d - 1), -rep(1, n_d - 1))
+ci <- c(rep(0, n_d - 1), -1)
+opt <- constrOptim(
+  theta = rep(1 / n_d, n_d - 1),
+  f = objective,
+  grad = gradient,
+  ui = ui,
+  ci = ci,
+  method = "BFGS",
+  control = list(reltol = 1e-12, maxit = 10000)
+)
+if (opt$convergence != 0) {
+  stop(sprintf("Simplex optimisation failed with code %s", opt$convergence))
+}
+
+w <- c(opt$par, 1 - sum(opt$par))
 
 y_sc_post <- Y_d_post %*% w
 att <- mean(y_post[, "y.1"] - y_sc_post)
