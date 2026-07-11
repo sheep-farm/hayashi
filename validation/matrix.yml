@@ -28,7 +28,7 @@ cases:
 - id: autoreg_gdp
   notes: AR(1) on US real GDP with constant and trend.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: betareg_wooldridge_401k
   notes: Blocked — Greeners beta regression MLE does not converge with multiple regressors,
     producing coefficients that diverge from R betareg.

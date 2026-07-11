@@ -1,6 +1,5 @@
 # Reference implementation in R for the autoregressive GDP case.
 
-library(forecast)
 library(jsonlite)
 
 # Ensure the data directory exists.
@@ -19,14 +18,23 @@ if (!"gdp" %in% names(macro)) {
 # Write CSV for Hayashi to read.
 write.csv(macro, file.path(data_dir, "macrodata.csv"), row.names = FALSE)
 
-# AR(1) on GDP with constant and drift (trend).
-model <- Arima(macro$gdp, order = c(1, 0, 0), include.drift = TRUE)
+# Conditional AR(1) on GDP with a constant and linear trend.
+y <- macro$gdp[-1]
+y_lag <- macro$gdp[-nrow(macro)]
+trend <- seq.int(2, nrow(macro))
+model <- lm(y ~ y_lag + trend)
 
-coefs <- as.numeric(coef(model))
-names(coefs) <- c("y.L1", "const", "trend")
+coefs <- c(
+  const = unname(coef(model)["(Intercept)"]),
+  trend = unname(coef(model)["trend"]),
+  "y.L1" = unname(coef(model)["y_lag"])
+)
 
-std_errors <- as.numeric(sqrt(diag(model$var.coef)))
-names(std_errors) <- c("y.L1", "const", "trend")
+std_errors <- c(
+  const = unname(summary(model)$coefficients["(Intercept)", "Std. Error"]),
+  trend = unname(summary(model)$coefficients["trend", "Std. Error"]),
+  "y.L1" = unname(summary(model)$coefficients["y_lag", "Std. Error"])
+)
 
 result <- list(
   coefficients = as.list(coefs),
