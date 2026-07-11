@@ -73,8 +73,9 @@ exact_loglik <- function(phi, theta) {
     xhat <- 0.0
     if (t > 1) {
       prev <- phi_coefs[[t - 1]]
+      # R uses one-based indices; j = 1 is the most recent lag.
       for (j in seq_along(prev)) {
-        xhat <- xhat + prev[j] * zc[t - 1 - j]
+        xhat <- xhat + prev[j] * zc[t - j]
       }
     }
     eps <- zc[t] - xhat
@@ -93,7 +94,7 @@ exact_loglik <- function(phi, theta) {
       new_phi <- numeric(min(k, max_lag))
       for (j in 1:min(k - 1, max_lag)) {
         prev_j <- prev[j]
-        prev_kj <- if (k - 1 - j >= 1 && k - 1 - j <= length(prev)) prev[k - 1 - j] else 0.0
+        prev_kj <- if (k - j >= 1 && k - j <= length(prev)) prev[k - j] else 0.0
         new_phi[j] <- prev_j - phi_kk * prev_kj
       }
       new_phi[min(k, max_lag)] <- phi_kk
