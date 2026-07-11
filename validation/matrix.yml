@@ -122,7 +122,7 @@ cases:
 - id: logit_margins_mroz
   notes: Logit average marginal effects on Wooldridge mroz.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: logit_mroz
   notes: Logit labour-force participation on the Mroz dataset.
   dimension: numerical
