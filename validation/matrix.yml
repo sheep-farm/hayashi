@@ -87,11 +87,9 @@ cases:
   dimension: numerical
   status: pass
 - id: logit_margins_mroz
-  notes: 'Blocked real-dataset validation case for logit average marginal effects
-    on the Mroz dataset; Hayashi AMEs match R/statsmodels, but delta-method SEs differ
-    pending issue #58.'
+  notes: Logit average marginal effects on the Mroz dataset.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: logit_mroz
   notes: Logit labour-force participation on the Mroz dataset.
   dimension: numerical

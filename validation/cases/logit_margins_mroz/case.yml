@@ -1,7 +1,7 @@
 id: logit-margins-mroz
 title: Logit average marginal effects on Wooldridge mroz
 estimator_family: logit
-status: blocked
+status: active
 dimension: numerical
 
 dataset:
@@ -28,11 +28,9 @@ reference_scripts:
   R: cases/logit_margins_mroz/reference/run.R
   Python: cases/logit_margins_mroz/reference/run.py
 
-notes: "Blocked real-dataset validation case for logit average marginal effects on the Mroz dataset; Hayashi AMEs match R/statsmodels, but delta-method SEs differ pending issue #58."
+notes: "Logit average marginal effects on the Mroz dataset."
 
 result:
-  summary: "Average marginal effects match, but Hayashi delta-method standard errors differ from R/statsmodels beyond tolerance."
-  known_differences:
-    - "Hayashi standard errors for several logit AMEs are larger than R/statsmodels delta-method SEs."
-  issues_opened:
-    - 58
+  summary: "Matches R and Python/statsmodels average marginal effects and delta-method standard errors within displayed-output tolerance."
+  known_differences: []
+  issues_opened: []

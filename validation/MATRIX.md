@@ -22,7 +22,7 @@
 | heckman | wooldridge::mroz | R, Python | pass | — | Two-step Heckman (Heckit) on the Mroz dataset. SEs are approximate because the reference implementations are two-step. |
 | iv | wooldridge::card | R, Python | pass | — | IV with education endogenous and nearc4 as instrument. |
 | lasso | wooldridge::hprice1 | R, Python | pass | — | Lasso regression of house price on lot size, square footage and bedrooms. |
-| logit | wooldridge::mroz | R, Python | blocked | 58 | Blocked real-dataset validation case for logit average marginal effects on the Mroz dataset; Hayashi AMEs match R/statsmodels, but delta-method SEs differ pending issue #58. |
+| logit | wooldridge::mroz | R, Python | pass | — | Logit average marginal effects on the Mroz dataset. |
 | logit | wooldridge::mroz | R, Python | pass | — | Logit labour-force participation on the Mroz dataset. |
 | arima | simulated_ma1 | R, Python | pass | — | Uses the same simulated MA(1) DGP as Chapter 26 of the book. |
 | mlogit | AER::TravelMode | R, Python | pass | — | Multinomial logit of chosen travel mode (air=1, train=2, bus=3, car=4) on income, wait time, vehicle cost and travel time. Alternative-specific attributes are averaged per individual to make them individual-specific covariates. |

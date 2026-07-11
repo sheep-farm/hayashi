@@ -5,7 +5,6 @@ as `logit_mroz`, then compares `margins(m)` against independent average
 marginal effects and delta-method standard errors.
 
 Upstream issue: #57.
-Blocking discrepancy: #58.
 
 ## Model
 
@@ -35,9 +34,9 @@ inlf ~ nwifeinc + educ + exper + age + kidslt6 + kidsge6
 
 ## Current status
 
-Blocked. Hayashi's average marginal effects match the R and Python references,
-but several delta-method standard errors differ beyond the declared tolerance.
-The case should be flipped to `pass` once #58 is resolved.
+Passing. Hayashi's average marginal effects and delta-method standard errors
+match the R and Python references within the declared displayed-output
+tolerance.
 
 ## Tolerances
 
