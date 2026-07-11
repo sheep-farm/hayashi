@@ -91,7 +91,7 @@ cases:
 - id: glsar_hprice1
   notes: GLS with AR(1) errors on housing price equation.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: gmm_card
   notes: GMM returns to schooling with nearc4 as instrument for education.
   dimension: numerical

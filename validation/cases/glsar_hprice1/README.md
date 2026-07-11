@@ -21,7 +21,7 @@ with first-order autoregressive errors.
 
 - **Python:** `statsmodels.regression.linear_model.GLSAR.from_formula(..., rho=1).fit()`
 - **Hayashi:** `glsar(price ~ lotsize + sqrft + bdrms, df, order=1)`
-- **R:** fallback to OLS because dedicated AR-error GLS packages are not guaranteed in the environment.
+- **R:** explicit base-R iterative GLSAR(1) using adjusted Yule-Walker updates
 
 ## Compared quantities
 

@@ -19,18 +19,45 @@ if (!file.exists(csv_path)) {
 
 df <- read.csv(csv_path)
 
-# Cochrane-Orcutt / Prais-Winsten AR(1) via orcutt or nlme.
-# Fallback to OLS with Newey-West because the exact AR(1) GLS packages are not
-# guaranteed to be installed.
-model <- lm(price ~ lotsize + sqrft + bdrms, data = df)
+# Iterative GLSAR(1), matching statsmodels' adjusted Yule-Walker update.
+y <- df$price
+X <- model.matrix(~ lotsize + sqrft + bdrms, data = df)
+rho <- 0.0
+last_beta <- NULL
 
-summary_model <- summary(model)
+# statsmodels performs maxiter - 1 update steps, then one final fit.
+for (iteration in seq_len(9)) {
+  y_white <- y[-1] - rho * y[-length(y)]
+  X_white <- X[-1, , drop = FALSE] - rho * X[-nrow(X), , drop = FALSE]
+  fit <- lm.fit(X_white, y_white)
+  beta <- fit$coefficients
 
-coefs <- as.numeric(coef(model))
-names(coefs) <- names(coef(model))
+  if (!is.null(last_beta)) {
+    relative_change <- max(abs(last_beta - beta) / abs(last_beta))
+    if (relative_change < 1e-4) {
+      break
+    }
+  }
+  last_beta <- beta
 
-std_errors <- as.numeric(summary_model$coefficients[, "Std. Error"])
-names(std_errors) <- rownames(summary_model$coefficients)
+  # Estimate AR(1) rho from demeaned original residuals using the adjusted
+  # Yule-Walker denominator n - 1, as statsmodels does by default.
+  residuals <- y - drop(X %*% beta)
+  centered <- residuals - mean(residuals)
+  r0 <- sum(centered^2) / length(centered)
+  r1 <- sum(centered[-length(centered)] * centered[-1]) / (length(centered) - 1)
+  rho <- r1 / r0
+}
+
+y_white <- y[-1] - rho * y[-length(y)]
+X_white <- X[-1, , drop = FALSE] - rho * X[-nrow(X), , drop = FALSE]
+fit <- lm.fit(X_white, y_white)
+sigma2 <- sum(fit$residuals^2) / fit$df.residual
+coefs <- setNames(fit$coefficients, colnames(X))
+std_errors <- setNames(
+  sqrt(diag(sigma2 * solve(crossprod(X_white)))),
+  colnames(X)
+)
 
 result <- list(
   coefficients = as.list(coefs),
