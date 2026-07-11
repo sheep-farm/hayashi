@@ -19,7 +19,7 @@ cases:
 - id: arima_gdp
   notes: ARIMA(1,1,1) on log US real GDP via exact Gaussian MLE.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: arma_book
   notes: Uses the same simulated ARMA(1,1) DGP as Chapter 26 of the book. Intercept
     is excluded from comparison because Hayashi profiles it out in MLE (SE = 0).
