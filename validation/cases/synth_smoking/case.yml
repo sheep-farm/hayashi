@@ -1,7 +1,7 @@
 id: synth_smoking
 title: Synthetic control on simulated smoking-style panel
 estimator_family: synth
-status: blocked
+status: active
 dimension: numerical
 dataset:
   name: synth_smoking
@@ -20,9 +20,9 @@ hayashi_script: cases/synth_smoking/hayashi/run.hay
 reference_scripts:
   R: cases/synth_smoking/reference/run.R
   Python: cases/synth_smoking/reference/run.py
-notes: Blocked — Hayashi synthetic-control ATT differs from R reference implementation.
+notes: R, Python, and Hayashi implement the same outcome-only simplex SCM and
+  agree on ATT within tolerance.
 result:
-  summary: Hayashi synthetic-control ATT differs from the custom R reference.
-  known_differences:
-  - ATT estimate differs between Hayashi and the R reference.
+  summary: Hayashi synthetic-control ATT matches the aligned R and Python references.
+  known_differences: []
   issues_opened: []

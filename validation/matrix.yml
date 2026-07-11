@@ -375,7 +375,7 @@ cases:
 - id: synth_smoking
   notes: Synthetic-control ATT on a simulated panel with 10 donors and 1 treated unit.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: sysgmm_wagepan
   notes: Blocked — Hayashi sysgmm raises a singular-matrix error for the wagepan dynamic
     panel specification.
