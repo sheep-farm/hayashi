@@ -1,0 +1,6 @@
+// Wooldridge dataset fertil2: Poisson GLM for number of children.
+// children ~ age + electric + educ + urban + tv.
+
+load "validation/cases/glm_wooldridge_fertil2_poisson/data/fertil2.csv" as df
+
+glm(children ~ age + electric + educ + urban + tv, df, family="poisson")

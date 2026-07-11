@@ -269,6 +269,10 @@ cases:
   notes: Wooldridge Introductory Econometrics Chapter 14 Example 14.4 generalized estimating equations wage equation.
   dimension: numerical
   status: pass
+- id: glm_wooldridge_fertil2_poisson
+  notes: Poisson GLM for number of children on Wooldridge fertil2.
+  dimension: numerical
+  status: pass
 - id: iv_wooldridge_mroz_ch15
   notes: Wooldridge Introductory Econometrics Chapter 15 Example 15.1 IV returns to schooling for married women.
   dimension: numerical
