@@ -36,16 +36,21 @@
 | ols | wooldridge::campus | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 4 Example 4.4 log-log campus crime equation. |
 | ols | wooldridge::ceosal1 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 2 Example 2.11 log-log CEO salary equation. |
 | ols | wooldridge::ceosal1 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 2 Example 2.3 CEO salary on return on equity. |
+| ols | wooldridge::consump | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 10 Example 10.4 consumption growth on income growth. |
 | ols | wooldridge::crime1 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 3 Example 3.5 arrest records equation with average sentence. |
 | ols | wooldridge::crime1 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 3 Example 3.5 arrest records equation. |
+| ols | wooldridge::fertil3 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 13 Example 13.3 fertility distributed lag equation. |
 | ols | wooldridge::gpa1 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 3 Example 3.1 college GPA equation. |
 | ols | wooldridge::hprice1 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 4 Section 4.5 log housing price equation. |
 | ols | wooldridge::hprice2 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 6 Example 6.2 log housing price equation with rooms quadratic. |
 | ols | wooldridge::htv | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 9 Example 9.3 education equation. |
 | ols | wooldridge::intdef | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 10 Example 10.2 interest rate on inflation and deficit. |
+| ols | wooldridge::jtrain | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 14 Example 14.3 pooled job training scrap rate equation. |
+| ols | wooldridge::kielmc | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 13 Example 13.1 difference-in-differences housing price equation. |
 | ols | wooldridge::meap93 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 4 math pass rate equation. |
 | ols | wooldridge::nyse | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 11 Example 11.4 efficient markets hypothesis. |
 | ols | wooldridge::phillips | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 10 Example 10.1 static Phillips curve. |
+| ols | wooldridge::phillips | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 11 Example 11.5 expectations-augmented Phillips curve. |
 | ols | wooldridge::prminwge | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 10 Example 10.3 Puerto Rican employment equation. |
 | ols | wooldridge::sleep75 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 5 Problem 3.3 sleep equation. |
 | ols | wooldridge::twoyear | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 4 Example 4.10 returns to college equation. |

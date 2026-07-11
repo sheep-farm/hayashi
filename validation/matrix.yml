@@ -224,6 +224,26 @@ cases:
   notes: Wooldridge Introductory Econometrics Chapter 10 Example 10.1 static Phillips curve.
   dimension: numerical
   status: pass
+- id: ols_wooldridge_phillips_cinf_ch11
+  notes: Wooldridge Introductory Econometrics Chapter 11 Example 11.5 expectations-augmented Phillips curve.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_consump_ch10
+  notes: Wooldridge Introductory Econometrics Chapter 10 Example 10.4 consumption growth on income growth.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_fertil3_ch13
+  notes: Wooldridge Introductory Econometrics Chapter 13 Example 13.3 fertility distributed lag equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_jtrain_pooled_ch14
+  notes: Wooldridge Introductory Econometrics Chapter 14 Example 14.3 pooled job training scrap rate equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_kielmc_ch13
+  notes: Wooldridge Introductory Econometrics Chapter 13 Example 13.1 difference-in-differences housing price equation.
+  dimension: numerical
+  status: pass
 - id: ols_wooldridge_vote1_ch2
   notes: Wooldridge Introductory Econometrics Chapter 2 Examples 2.5 and 2.9 election outcomes equation.
   dimension: numerical

@@ -1,0 +1,8 @@
+// Wooldridge (Introductory Econometrics, 7e), Chapter 13, Example 13.3.
+// fertility distributed lag equation: gfr ~ pe + pe_1 + pe_2 + ww2 + pill.
+
+load "validation/cases/ols_wooldridge_fertil3_ch13/data/fertil3.csv" as df
+
+let m = ols(gfr ~ pe + pe_1 + pe_2 + ww2 + pill, df)
+
+export(m, "csv", "/dev/stdout")
