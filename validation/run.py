@@ -252,6 +252,47 @@ def parse_hayashi_rd(text: str) -> dict[str, dict[str, float]]:
     raise ValueError(f"Could not parse RDD tau/SE from Hayashi output: {text[:200]!r}")
 
 
+def parse_hayashi_km(text: str) -> dict[str, dict[str, float]]:
+    """Parse a Kaplan-Meier survival table at selected time points."""
+    import re
+
+    lines = text.splitlines()
+    start_idx = -1
+    for i, line in enumerate(lines):
+        if re.match(r"^\s*Time\s+S\(t\)", line):
+            start_idx = i
+            break
+    if start_idx == -1:
+        raise ValueError(f"KM table header not found in Hayashi output: {text[:200]!r}")
+
+    curve: dict[float, float] = {}
+    for line in lines[start_idx + 1:]:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("-") or stripped.startswith("="):
+            continue
+        parts = stripped.split()
+        if len(parts) < 2:
+            continue
+        try:
+            t = float(parts[0])
+            s = float(parts[1])
+        except ValueError:
+            continue
+        curve[t] = s
+
+    times = [10, 20, 30, 40, 50, 60, 70]
+    result: dict[str, float] = {}
+    for t in times:
+        available = [tt for tt in curve if tt <= t]
+        if not available:
+            raise ValueError(f"No KM estimate available at or before t={t}")
+        result[f"t{t}"] = curve[max(available)]
+
+    if not result:
+        raise ValueError(f"Could not parse KM survival probabilities: {text[:200]!r}")
+    return {"survival_probabilities": result}
+
+
 def parse_hayashi_margins(text: str) -> dict[str, dict[str, float]]:
     """Parse a Hayashi average-marginal-effects table."""
     import re
@@ -318,6 +359,170 @@ def parse_hayashi_synth(text: str) -> dict[str, dict[str, float]]:
         raise ValueError(f"Could not parse synthetic-control post-treatment effects: {text[:200]!r}")
     att = sum(effects) / len(effects)
     return {"coefficients": {"ATT": att}}
+
+
+def parse_hayashi_svar(text: str) -> dict[str, dict[str, float]]:
+    """Parse SVAR A and B matrices from Hayashi text output."""
+    import re
+
+    lines = text.splitlines()
+    section: str | None = None
+    rows: list[list[float]] = []
+    a_matrix: list[list[float]] = []
+    b_matrix: list[list[float]] = []
+
+    for line in lines:
+        stripped = line.strip()
+        if "A Matrix" in stripped:
+            section = "A"
+            rows = []
+            continue
+        if "B Matrix" in stripped:
+            if section == "A":
+                a_matrix = rows
+            section = "B"
+            rows = []
+            continue
+        if stripped.startswith("[") and stripped.endswith("]") and section in ("A", "B"):
+            numbers = re.findall(r"[-+]?\d+\.?\d*(?:[eE][-+]?\d+)?", stripped)
+            rows.append([float(n) for n in numbers])
+
+    if section == "B":
+        b_matrix = rows
+
+    if not a_matrix or not b_matrix:
+        raise ValueError(f"Could not parse SVAR A/B matrices: {text[:200]!r}")
+
+    return {
+        "a_matrix": {"a" + str(i): v for i, v in enumerate(sum(a_matrix, []))},
+        "b_matrix": {"b" + str(i): v for i, v in enumerate(sum(b_matrix, []))},
+    }
+
+
+def parse_hayashi_pcse(text: str) -> dict[str, dict[str, float]]:
+    """Parse a PCSE coefficient table where SE column is labelled 'PCSE'."""
+    import re
+
+    lines = text.splitlines()
+    start_idx = -1
+    for i, line in enumerate(lines):
+        if re.search(r"Variável\s+coef\s+PCSE", line):
+            start_idx = i
+            break
+    if start_idx == -1:
+        raise ValueError(f"PCSE table header not found in Hayashi output: {text[:200]!r}")
+
+    result: dict[str, dict[str, float]] = {"coefficients": {}, "standard_errors": {}}
+    pattern = re.compile(
+        r"^\s*(\S.*?)\s+"
+        r"([-+]?\d+\.?\d*(?:[eE][-+]\d+)?)\s+"
+        r"([-+]?\d+\.?\d*(?:[eE][-+]\d+)?)\s+"
+        r"([-+]?\d+\.?\d*(?:[eE][-+]\d+)?)\s+"
+        r"([-+]?\d+\.?\d*(?:[eE][-+]\d+)?)"
+    )
+
+    for line in lines[start_idx + 1:]:
+        stripped = line.strip()
+        if not stripped or set(stripped) <= {"─", "═", " "}:
+            continue
+        match = pattern.match(line)
+        if not match:
+            continue
+        var = match.group(1).strip()
+        if var.lower() == "variável":
+            continue
+        result["coefficients"][var] = float(match.group(2))
+        result["standard_errors"][var] = float(match.group(3))
+
+    if not result["coefficients"]:
+        raise ValueError(f"Could not parse PCSE rows from Hayashi output: {text[:200]!r}")
+    return result
+
+
+def parse_hayashi_zip(text: str) -> dict[str, dict[str, float]]:
+    """Parse a zero-inflated count model (ZIP/ZINB) coefficient table.
+
+    Hayashi prints a 'Count Model' block (with real variable names) and an
+    'Inflate Model (Logit)' block (with z0..zN placeholders).  z0 maps to the
+    intercept and zN (N>=1) maps to the N-th non-intercept variable from the
+    count block.
+    """
+    import re
+
+    lines = text.splitlines()
+    count_names: list[str] = []
+    result: dict[str, dict[str, float]] = {"coefficients": {}, "standard_errors": {}}
+    section: str | None = None
+    pattern = re.compile(
+        r"^\s*(\S.*?)\s+"
+        r"([-+]?\d+\.?\d*(?:[eE][-+]?\d+)?)\s+"
+        r"([-+]?\d+\.?\d*(?:[eE][-+]?\d+)?)\s+"
+        r"([-+]?\d+\.?\d*(?:[eE][-+]?\d+)?)\s+"
+        r"([-+]?\d+\.?\d*(?:[eE][-+]?\d+)?)"
+    )
+
+    # First pass: collect count-model variable order.
+    for line in lines:
+        stripped = line.strip()
+        if "Count Model" in stripped:
+            section = "count"
+            continue
+        if "Inflate Model" in stripped:
+            break
+        if not stripped or stripped.startswith("-") or stripped.startswith("="):
+            continue
+        lower = stripped.lower()
+        if "coef" in lower and "std err" in lower:
+            continue
+        match = pattern.match(line)
+        if not match:
+            continue
+        var = match.group(1).strip()
+        if var.lower() == "variable" or var == "":
+            continue
+        count_names.append(var)
+
+    # Second pass: store coefficients with mapped names.
+    section = None
+    for line in lines:
+        stripped = line.strip()
+        if "Count Model" in stripped:
+            section = "count"
+            continue
+        if "Inflate Model" in stripped:
+            section = "inflate"
+            continue
+        if not stripped or stripped.startswith("-") or stripped.startswith("="):
+            continue
+        lower = stripped.lower()
+        if "coef" in lower and "std err" in lower:
+            continue
+        match = pattern.match(line)
+        if not match:
+            continue
+        var = match.group(1).strip()
+        if var.lower() == "variable" or var == "":
+            continue
+        coef = float(match.group(2))
+        se = float(match.group(3))
+
+        if section == "count":
+            key = f"count_{var}"
+        elif section == "inflate":
+            m = re.match(r"^z(\d+)$", var)
+            if m and count_names:
+                idx = int(m.group(1))
+                var = count_names[idx] if idx < len(count_names) else var
+            key = f"inflate_{var}"
+        else:
+            continue
+
+        result["coefficients"][key] = coef
+        result["standard_errors"][key] = se
+
+    if not result["coefficients"]:
+        raise ValueError(f"Could not parse ZIP/ZINB coefficient table: {text[:200]!r}")
+    return result
 
 
 def parse_hayashi_mlogit(text: str) -> dict[str, dict[str, float]]:
@@ -604,6 +809,14 @@ def run_case(case: dict[str, Any]) -> tuple[str, list[str], dict[str, dict]]:
                 hayashi = normalise_intercept(parse_hayashi_mlogit(hay_res.stdout))
             elif family == "sur":
                 hayashi = normalise_intercept(parse_hayashi_sur(hay_res.stdout))
+            elif family in ("zip", "zinb"):
+                hayashi = normalise_intercept(parse_hayashi_zip(hay_res.stdout))
+            elif family == "km":
+                hayashi = normalise_intercept(parse_hayashi_km(hay_res.stdout))
+            elif family == "svar":
+                hayashi = normalise_intercept(parse_hayashi_svar(hay_res.stdout))
+            elif family == "pcse":
+                hayashi = normalise_intercept(parse_hayashi_pcse(hay_res.stdout))
             elif output_format == "margins":
                 hayashi = normalise_intercept(parse_hayashi_margins(hay_res.stdout))
             elif output_format == "txt":

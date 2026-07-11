@@ -1,0 +1,34 @@
+id: zinb_affairs
+title: Zero-inflated negative binomial on Wooldridge affairs
+estimator_family: zinb
+status: active
+dimension: numerical
+
+dataset:
+  name: wooldridge::affairs
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+
+references:
+  - R
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 5e-2
+    standard_errors: 1e-1
+
+output_format: txt
+
+hayashi_script: cases/zinb_affairs/hayashi/run.hay
+reference_scripts:
+  R: cases/zinb_affairs/reference/run.R
+
+notes: ZINB model of number of affairs on demographic predictors.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []

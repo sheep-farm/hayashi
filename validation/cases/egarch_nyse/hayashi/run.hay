@@ -1,0 +1,8 @@
+// Load the Wooldridge NYSE dataset from CSV.
+load "validation/cases/egarch_nyse/data/nyse.csv" as df
+
+// EGARCH(1,1) on NYSE returns.
+let m = egarch(df, return, p=1, q=1)
+
+// Export coefficient table for automated comparison.
+export(m, "txt", "/dev/stdout")

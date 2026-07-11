@@ -1,0 +1,36 @@
+id: egarch_nyse
+title: EGARCH(1,1) on NYSE returns
+estimator_family: egarch
+status: active
+dimension: numerical
+
+dataset:
+  name: wooldridge::nyse
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 5e-1
+    standard_errors: 5e0
+
+output_format: txt
+
+hayashi_script: cases/egarch_nyse/hayashi/run.hay
+reference_scripts:
+  R: cases/egarch_nyse/reference/run.R
+  Python: cases/egarch_nyse/reference/run.py
+
+notes: EGARCH(1,1) on NYSE returns.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []

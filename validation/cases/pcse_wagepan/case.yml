@@ -1,0 +1,34 @@
+id: pcse_wagepan
+title: Panel-corrected standard errors on Wooldridge wagepan
+estimator_family: pcse
+status: active
+dimension: numerical
+
+dataset:
+  name: wooldridge::wagepan
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+
+references:
+  - R
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-3
+    standard_errors: 1e-1
+
+output_format: txt
+
+hayashi_script: cases/pcse_wagepan/hayashi/run.hay
+reference_scripts:
+  R: cases/pcse_wagepan/reference/run.R
+
+notes: PCSE estimation of log wage on education, experience, and dummies using panel-corrected standard errors.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []

@@ -1,0 +1,35 @@
+id: xtgls_wagepan
+title: Panel feasible GLS on Wooldridge wagepan
+estimator_family: xtgls
+status: blocked
+dimension: numerical
+
+dataset:
+  name: wooldridge::wagepan
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+
+references:
+  - R
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-3
+    standard_errors: 1e-2
+
+output_format: txt
+
+hayashi_script: cases/xtgls_wagepan/hayashi/run.hay
+reference_scripts:
+  R: cases/xtgls_wagepan/reference/run.R
+
+notes: Blocked — no suitable R reference implementation for panel FGLS (Parks/Kmenta) available in this environment.
+
+result:
+  summary: "No R package providing Stata-style xtgls could be installed."
+  known_differences:
+    - "R package pggls is not available; plm does not implement panel FGLS."
+  issues_opened: []
