@@ -172,6 +172,22 @@ cases:
   notes: Wooldridge Introductory Econometrics Chapter 7 Example 7.1 log hourly wage equation with female dummy.
   dimension: numerical
   status: pass
+- id: ols_wooldridge_meap93_ch4
+  notes: Wooldridge Introductory Econometrics Chapter 4 math pass rate equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_barium_ch10
+  notes: Wooldridge Introductory Econometrics Chapter 10 Example 10.5 barium chloride import equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_twoyear_ch4
+  notes: Wooldridge Introductory Econometrics Chapter 4 Example 4.10 returns to college equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_wage1_quad_ch6
+  notes: Wooldridge Introductory Econometrics Chapter 6 Section 6.2 wage equation with experience quadratic.
+  dimension: numerical
+  status: pass
 - id: oprobit_beauty
   notes: Ordered probit model of self-reported beauty rating (looks 2-5) on female,
     education, experience and black indicators.
