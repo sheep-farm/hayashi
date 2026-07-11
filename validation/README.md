@@ -75,12 +75,13 @@ Rscript -e 'install.packages(c("wooldridge", "jsonlite", "MASS", "glmnet", "syst
 ## Reference implementation coverage
 
 Most cases provide both an R and a Python reference implementation. The
-validation runner runs every declared reference and blocks the case if any
-declared reference fails or is missing. Hayashi is then compared against one
-selected reference implementation, and the generated matrix marks that
-reference with `*`. A few cases implement the estimator manually in base
-R/Python because no suitable packaged reference is available; each case's
-`README.md` documents the exact packages and implementation choices.
+validation runner runs every declared reference, blocks the case if any
+declared reference fails or is missing, and compares Hayashi independently
+against every reference that ran successfully. The generated matrix marks
+each reference used for comparison with `*`. A few cases implement the
+estimator manually in base R/Python because no suitable packaged reference is
+available; each case's `README.md` documents the exact packages and
+implementation choices.
 
 ## Directory layout
 
@@ -109,6 +110,12 @@ validation/
 ```
 
 ## Status values
+
+`case.yml` and `matrix.yml` carry different status meanings. The case manifest
+status controls lifecycle (`active`, `not-started`, `blocked`, or
+`not-supported`). The registry status records the last observed run result
+(`pass`, `fail`, `blocked`, or `not-started`). The metadata check rejects
+contradictions such as a `not-started` case with a recorded `pass` result.
 
 - `pass` — Hayashi matches reference within declared tolerances.
 - `fail` — Hayashi differs from reference beyond tolerances; an issue should

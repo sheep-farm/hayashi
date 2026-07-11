@@ -184,16 +184,6 @@ def parse_hayashi_txt_table(text: str) -> dict[str, dict[str, float]]:
     return result
 
 
-def parse_reference_json(path: Path) -> dict[str, Any]:
-    with open(path) as f:
-        result = json.load(f)
-    # Normalise intercept label across implementations.
-    for key in ("coefficients", "standard_errors"):
-        if key in result and "const" in result[key]:
-            result[key]["Intercept"] = result[key].pop("const")
-    return result
-
-
 def normalise_intercept(data: dict[str, Any]) -> dict[str, Any]:
     """Rename intercept labels ('const' or '_cons') to 'Intercept' and clean up Heckman lambda label."""
     for key in ("coefficients", "standard_errors"):
@@ -466,6 +456,23 @@ def compare_quantities(
     return "pass", []
 
 
+def compare_against_references(
+    hayashi: dict[str, Any],
+    references: dict[str, dict[str, Any]],
+    tolerances: dict[str, float],
+) -> tuple[list[str], dict[str, list[str]]]:
+    """Compare Hayashi output independently with every reference output."""
+    failures: list[str] = []
+    failures_by_reference: dict[str, list[str]] = {}
+    for reference_name, reference in references.items():
+        _, reference_failures = compare_quantities(hayashi, reference, tolerances)
+        failures_by_reference[reference_name] = reference_failures
+        failures.extend(
+            f"{reference_name}: {failure}" for failure in reference_failures
+        )
+    return failures, failures_by_reference
+
+
 def run_case(case: dict[str, Any]) -> tuple[str, list[str], dict[str, dict]]:
     """Run a single validation case.
 
@@ -475,7 +482,6 @@ def run_case(case: dict[str, Any]) -> tuple[str, list[str], dict[str, dict]]:
     case_id = case["id"]
     case_dir = VALIDATION_DIR / "cases" / case_id
     hayashi_dir = case_dir / "hayashi"
-    reference_dir = case_dir / "reference"
     data_dir = case_dir / "data"
 
     log(f"\n[case] {case_id}: {case['title']}")
@@ -569,30 +575,26 @@ def run_case(case: dict[str, Any]) -> tuple[str, list[str], dict[str, dict]]:
     if hay_res.returncode != 0:
         return "blocked", [f"Hayashi script failed:\n{hay_res.stderr}"], ref_report
 
-    # ── Parse reference output (prefer Python, then R, then file) ────
-    reference: dict[str, Any] | None = None
-    used_ref: str | None = None
-
-    if "Python" in ref_results and ref_results["Python"].stdout.strip():
+    # ── Parse every declared reference output ────────────────────────
+    reference_outputs: dict[str, dict[str, Any]] = {}
+    for reference_name in available_refs:
+        stdout = ref_results[reference_name].stdout.strip()
+        if not stdout:
+            return (
+                "blocked",
+                [f"{reference_name} reference produced no JSON output"],
+                ref_report,
+            )
         try:
-            reference = normalise_intercept(json.loads(ref_results["Python"].stdout.strip().splitlines()[-1]))
-            used_ref = "Python"
+            reference_outputs[reference_name] = normalise_intercept(
+                json.loads(stdout.splitlines()[-1])
+            )
         except json.JSONDecodeError as e:
-            return "blocked", [f"Could not parse Python reference stdout as JSON: {e}"], ref_report
-
-    if reference is None and "R" in ref_results and ref_results["R"].stdout.strip():
-        try:
-            reference = normalise_intercept(json.loads(ref_results["R"].stdout.strip().splitlines()[-1]))
-            used_ref = "R"
-        except json.JSONDecodeError as e:
-            return "blocked", [f"Could not parse R reference stdout as JSON: {e}"], ref_report
-
-    if reference is None:
-        expected_json = reference_dir / "expected.json"
-        if not expected_json.exists():
-            return "blocked", [f"Reference output not found: {expected_json}"], ref_report
-        reference = parse_reference_json(expected_json)
-        used_ref = "expected.json"
+            return (
+                "blocked",
+                [f"Could not parse {reference_name} reference stdout as JSON: {e}"],
+                ref_report,
+            )
 
     # Prefer the stdout emitted by Hayashi; fall back to the written file.
     hayashi: dict[str, dict[str, float]] | None = None
@@ -640,24 +642,24 @@ def run_case(case: dict[str, Any]) -> tuple[str, list[str], dict[str, dict]]:
                 return "blocked", [f"Hayashi output not found: {hayashi_csv}"], ref_report
             hayashi = normalise_intercept(parse_hayashi_csv(hayashi_csv))
 
-    # Compare declared quantities.
+    # Compare declared quantities independently against every reference.
     tolerances = case.get("comparison", {}).get("tolerances", {})
-    status, failures = compare_quantities(hayashi, reference, tolerances)
+    failures, failures_by_reference = compare_against_references(
+        hayashi,
+        reference_outputs,
+        tolerances,
+    )
+    for reference_name, reference_failures in failures_by_reference.items():
+        ref_report[reference_name]["used"] = True
+        if reference_failures:
+            ref_report[reference_name]["detail"] = "; ".join(reference_failures)
+    status = "fail" if failures else "pass"
 
-    # Mark the reference that was actually used for comparison.
-    if used_ref and used_ref in ref_report:
-        ref_report[used_ref]["used"] = True
-
-    if status == "blocked":
-        for f in failures:
-            log(f"  BLOCKED: {f}")
-        if not failures:
-            log("  BLOCKED")
-    elif failures:
+    if failures:
         for f in failures:
             log(f"  FAIL: {f}")
     else:
-        log(f"  PASS (compared against {used_ref})")
+        log(f"  PASS (compared against {', '.join(reference_outputs)})")
 
     return status, failures, ref_report
 
@@ -794,6 +796,15 @@ def check_metadata(
             findings.append(f"{case_id}: missing README.md")
 
         status = case.get("status", "not-started")
+        manifest_status = case.get("_manifest_status", status)
+        registry_entry = next(
+            (entry for entry in _matrix.get("cases", []) if entry.get("id") == case_id),
+            {},
+        )
+        if manifest_status == "not-started" and registry_entry.get("status") == "pass":
+            findings.append(
+                f"{case_id}: not-started case cannot have a recorded pass result"
+            )
         references = case.get("references", [])
         tolerances = case.get("comparison", {}).get("tolerances", {})
 
@@ -877,6 +888,7 @@ def load_cases() -> tuple[dict[str, Any], list[dict[str, Any]], set[str], set[st
         with open(case_yml) as f:
             case = yaml.safe_load(f) or {}
         case["id"] = case_id
+        case["_manifest_status"] = case.get("status", "not-started")
         discovered.append(case)
 
     # Merge registry entries with discovered cases. Registry entries provide
