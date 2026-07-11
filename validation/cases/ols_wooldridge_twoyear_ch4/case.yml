@@ -1,0 +1,34 @@
+id: ols_wooldridge_twoyear_ch4
+title: OLS returns to two- and four-year colleges on Wooldridge twoyear (Chapter 4, Example 4.10)
+estimator_family: ols
+status: active
+dimension: numerical
+
+dataset:
+  name: wooldridge::twoyear
+  source: R package wooldridge / Python wooldridge-python
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-6
+    standard_errors: 1e-6
+
+hayashi_script: cases/ols_wooldridge_twoyear_ch4/hayashi/run.hay
+reference_scripts:
+  R: cases/ols_wooldridge_twoyear_ch4/reference/run.R
+  Python: cases/ols_wooldridge_twoyear_ch4/reference/run.py
+
+notes: Wooldridge Introductory Econometrics Chapter 4, Example 4.10 returns to two-year and four-year college credits.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []
