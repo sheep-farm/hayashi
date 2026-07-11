@@ -1,34 +1,29 @@
-id: ols-wooldridge-ceosal1-ch2
+id: ols_wooldridge_ceosal1_ch2
 title: OLS CEO salary equation on Wooldridge ceosal1 (Chapter 2, Example 2.11)
 estimator_family: ols
 status: active
 dimension: numerical
-
 dataset:
   name: wooldridge::ceosal1
   source: R package wooldridge / Python wooldridge-python
   licence: public teaching dataset
-
 references:
-  - R
-  - Python
-
+- R
+- Python
 comparison:
   quantities:
-    - coefficients
-    - standard_errors
+  - coefficients
+  - standard_errors
   tolerances:
     coefficients: 1e-6
     standard_errors: 1e-6
-
 hayashi_script: cases/ols_wooldridge_ceosal1_ch2/hayashi/run.hay
 reference_scripts:
   R: cases/ols_wooldridge_ceosal1_ch2/reference/run.R
   Python: cases/ols_wooldridge_ceosal1_ch2/reference/run.py
-
-notes: Wooldridge Introductory Econometrics Chapter 2, Example 2.11 log-log CEO salary equation.
-
+notes: Wooldridge Introductory Econometrics Chapter 2, Example 2.11 log-log CEO salary
+  equation.
 result:
-  summary: ""
+  summary: ''
   known_differences: []
   issues_opened: []

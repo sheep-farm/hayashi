@@ -1,36 +1,29 @@
-id: var-macro
+id: var_macro
 title: VAR(2) on US real GDP and consumption
 estimator_family: var
 status: active
 dimension: numerical
-
 dataset:
   name: statsmodels::macrodata
   source: statsmodels.datasets / Rdatasets
   licence: public teaching dataset
-
 references:
-  - R
-  - Python
-
+- R
+- Python
 comparison:
   quantities:
-    - coefficients
-    - standard_errors
+  - coefficients
+  - standard_errors
   tolerances:
     coefficients: 1e-2
     standard_errors: 1e-2
-
 output_format: txt
-
 hayashi_script: cases/var_macro/hayashi/run.hay
 reference_scripts:
   R: cases/var_macro/reference/run.R
   Python: cases/var_macro/reference/run.py
-
 notes: VAR(2) on US real GDP and consumption.
-
 result:
-  summary: ""
+  summary: ''
   known_differences: []
   issues_opened: []

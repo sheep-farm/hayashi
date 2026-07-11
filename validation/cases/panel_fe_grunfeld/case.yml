@@ -1,36 +1,29 @@
-id: panel-fe-grunfeld
+id: panel_fe_grunfeld
 title: Fixed-effects investment demand on Wooldridge grunfeld
 estimator_family: panel_fe
 status: active
 dimension: numerical
-
 dataset:
   name: wooldridge::grunfeld
   source: R package wooldridge / Python wooldridge package
   licence: public teaching dataset
-
 references:
-  - R
-  - Python
-
+- R
+- Python
 comparison:
   quantities:
-    - coefficients
-    - standard_errors
+  - coefficients
+  - standard_errors
   tolerances:
     coefficients: 1e-4
     standard_errors: 1e-4
-
 output_format: txt
-
 hayashi_script: cases/panel_fe_grunfeld/hayashi/run.hay
 reference_scripts:
   R: cases/panel_fe_grunfeld/reference/run.R
   Python: cases/panel_fe_grunfeld/reference/run.py
-
 notes: Panel fixed-effects investment demand model (Grunfeld).
-
 result:
-  summary: ""
+  summary: ''
   known_differences: []
   issues_opened: []

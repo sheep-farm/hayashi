@@ -1,34 +1,30 @@
-id: ols-wooldridge-sleep75-ch5
-title: OLS sleep equation on Wooldridge sleep75 (Chapter 5, Problem 3.3 / Example 5.3)
+id: ols_wooldridge_sleep75_ch5
+title: OLS sleep equation on Wooldridge sleep75 (Chapter 5, Problem 3.3 / Example
+  5.3)
 estimator_family: ols
 status: active
 dimension: numerical
-
 dataset:
   name: wooldridge::sleep75
   source: R package wooldridge / Python wooldridge-python
   licence: public teaching dataset
-
 references:
-  - R
-  - Python
-
+- R
+- Python
 comparison:
   quantities:
-    - coefficients
-    - standard_errors
+  - coefficients
+  - standard_errors
   tolerances:
     coefficients: 1e-6
     standard_errors: 1e-6
-
 hayashi_script: cases/ols_wooldridge_sleep75_ch5/hayashi/run.hay
 reference_scripts:
   R: cases/ols_wooldridge_sleep75_ch5/reference/run.R
   Python: cases/ols_wooldridge_sleep75_ch5/reference/run.py
-
-notes: Wooldridge Introductory Econometrics Chapter 5, Problem 3.3 sleep-work tradeoff equation.
-
+notes: Wooldridge Introductory Econometrics Chapter 5, Problem 3.3 sleep-work tradeoff
+  equation.
 result:
-  summary: ""
+  summary: ''
   known_differences: []
   issues_opened: []

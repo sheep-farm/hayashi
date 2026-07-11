@@ -1,36 +1,30 @@
-id: gmm-card
+id: gmm_card
 title: GMM returns to schooling on Wooldridge card
 estimator_family: gmm
-status: active
+status: blocked
 dimension: numerical
-
 dataset:
   name: wooldridge::card
   source: R package wooldridge / Python wooldridge package
   licence: public teaching dataset
-
 references:
-  - R
-  - Python
-
+- R
+- Python
 comparison:
   quantities:
-    - coefficients
-    - standard_errors
+  - coefficients
+  - standard_errors
   tolerances:
     coefficients: 1e-3
     standard_errors: 1e-3
-
 output_format: txt
-
 hayashi_script: cases/gmm_card/hayashi/run.hay
 reference_scripts:
   R: cases/gmm_card/reference/run.R
   Python: cases/gmm_card/reference/run.py
-
-notes: GMM returns to schooling with nearc4 as instrument for education.
-
+notes: Blocked — Hayashi GMM standard errors differ from R AER::gmm reference.
 result:
-  summary: ""
-  known_differences: []
+  summary: Hayashi GMM produces standard errors that differ from R AER::gmm.
+  known_differences:
+  - Standard errors for instruments x0 and x5 differ from R.
   issues_opened: []

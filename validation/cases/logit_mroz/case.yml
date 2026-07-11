@@ -1,36 +1,29 @@
-id: logit-mroz
+id: logit_mroz
 title: Logit labour-force participation on Wooldridge mroz
 estimator_family: logit
 status: active
 dimension: numerical
-
 dataset:
   name: wooldridge::mroz
   source: R package wooldridge / Python wooldridge package
   licence: public teaching dataset
-
 references:
-  - R
-  - Python
-
+- R
+- Python
 comparison:
   quantities:
-    - coefficients
-    - standard_errors
+  - coefficients
+  - standard_errors
   tolerances:
     coefficients: 1e-4
     standard_errors: 1e-4
-
 output_format: txt
-
 hayashi_script: cases/logit_mroz/hayashi/run.hay
 reference_scripts:
   R: cases/logit_mroz/reference/run.R
   Python: cases/logit_mroz/reference/run.py
-
 notes: Logit labour-force participation on the Mroz dataset.
-
 result:
-  summary: ""
+  summary: ''
   known_differences: []
   issues_opened: []

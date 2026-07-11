@@ -1,32 +1,29 @@
-id: coint-book
+id: coint_book
 title: Bivariate cointegrated system from the Hayashi book
 estimator_family: vecm
 status: active
 dimension: numerical
-
 dataset:
   name: simulated_cointegrated
   source: DGP from book_pt_BR/codes/29_coint.hay
   size: 300 observations
-
 references:
-  - R
-  - Python
-
+- R
+- Python
 reference_scripts:
   R: cases/coint_book/reference/run.R
   Python: cases/coint_book/reference/run.py
-
 hayashi_script: cases/coint_book/hayashi/run.hay
-
 output_format: txt
-
 comparison:
   quantities:
-    - coefficients
-    - standard_errors
+  - coefficients
+  - standard_errors
   tolerances:
     coefficients: 1e-2
     standard_errors: 5e-1
-
-notes: VECM(1) on a simulated cointegrated system where y = 2*x + e2 and x = cumsum(e1). The cointegration (beta) and adjustment (alpha) coefficients and standard errors are compared. Beta SEs are approximate Engle-Granger/OLS proxies; alpha SEs are OLS conditional SEs given the estimated beta. The 5e-1 tolerance accommodates the bootstrap SEs produced by Hayashi.
+notes: VECM(1) on a simulated cointegrated system where y = 2*x + e2 and x = cumsum(e1).
+  The cointegration (beta) and adjustment (alpha) coefficients and standard errors
+  are compared. Beta SEs are approximate Engle-Granger/OLS proxies; alpha SEs are
+  OLS conditional SEs given the estimated beta. The 5e-1 tolerance accommodates the
+  bootstrap SEs produced by Hayashi.

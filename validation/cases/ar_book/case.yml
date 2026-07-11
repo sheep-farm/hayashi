@@ -1,32 +1,25 @@
-id: ar-book
+id: ar_book
 title: AR(1) on simulated data from the Hayashi book
 estimator_family: arima
 status: active
 dimension: numerical
-
 dataset:
   name: simulated_ar1
   source: DGP from book_pt_BR/codes/26_arma.hay
   size: 500 observations
-
 references:
-  - R
-  - Python
-
+- R
+- Python
 reference_scripts:
   R: cases/ar_book/reference/run.R
   Python: cases/ar_book/reference/run.py
-
 hayashi_script: cases/ar_book/hayashi/run.hay
-
 output_format: txt
-
 comparison:
   quantities:
-    - coefficients
-    - standard_errors
+  - coefficients
+  - standard_errors
   tolerances:
     coefficients: 5e-3
     standard_errors: 1e-2
-
 notes: Uses the same simulated AR(1) DGP as Chapter 26 of the book.
