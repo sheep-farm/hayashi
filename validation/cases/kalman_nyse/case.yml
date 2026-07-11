@@ -32,4 +32,5 @@ result:
   summary: "Hayashi kalman returns nil and writes columns to the DataFrame; no coefficient-like output is available for comparison."
   known_differences:
     - "Hayashi kalman is a state-space filter, not an estimator returning a parameter table."
-  issues_opened: []
+  issues_opened:
+    - https://github.com/sheep-farm/hayashi/issues/65

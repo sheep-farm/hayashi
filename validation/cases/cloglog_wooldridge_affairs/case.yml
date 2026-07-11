@@ -34,4 +34,5 @@ result:
   summary: "Hayashi binomial/cloglog GLM overflows during IRLS; coefficients diverge from R/statsmodels."
   known_differences:
     - "Hayashi reports extreme coefficients and deviance for cloglog link."
-  issues_opened: []
+  issues_opened:
+    - https://github.com/sheep-farm/hayashi/issues/64

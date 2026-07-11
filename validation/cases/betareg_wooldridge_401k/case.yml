@@ -32,4 +32,5 @@ result:
   summary: "Greeners beta regression MLE fails to converge; coefficients differ from R betareg beyond tolerance."
   known_differences:
     - "Hayashi beta regression reports Converged=No and coefficient estimates differ from R."
-  issues_opened: []
+  issues_opened:
+    - https://github.com/sheep-farm/hayashi/issues/63
