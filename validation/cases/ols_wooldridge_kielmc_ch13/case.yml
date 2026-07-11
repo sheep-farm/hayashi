@@ -1,0 +1,34 @@
+id: ols_wooldridge_kielmc_ch13
+title: OLS difference-in-differences housing price equation on Wooldridge kielmc (Chapter 13, Example 13.1)
+estimator_family: ols
+status: active
+dimension: numerical
+
+dataset:
+  name: wooldridge::kielmc
+  source: R package wooldridge / Python wooldridge-python
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-6
+    standard_errors: 1e-6
+
+hayashi_script: cases/ols_wooldridge_kielmc_ch13/hayashi/run.hay
+reference_scripts:
+  R: cases/ols_wooldridge_kielmc_ch13/reference/run.R
+  Python: cases/ols_wooldridge_kielmc_ch13/reference/run.py
+
+notes: Wooldridge Introductory Econometrics Chapter 13, Example 13.1 difference-in-differences housing price equation.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []

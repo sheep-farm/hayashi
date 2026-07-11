@@ -1,0 +1,8 @@
+// Wooldridge (Introductory Econometrics, 7e), Chapter 10, Example 10.4.
+// consumption growth on income growth equation: gc ~ gy.
+
+load "validation/cases/ols_wooldridge_consump_ch10/data/consump.csv" as df
+
+let m = ols(gc ~ gy, df)
+
+export(m, "csv", "/dev/stdout")
