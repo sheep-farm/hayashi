@@ -1,7 +1,7 @@
 id: psm_jtrain3
 title: Propensity score matching on Wooldridge jtrain3
 estimator_family: psm
-status: blocked
+status: active
 dimension: numerical
 dataset:
   name: wooldridge::jtrain3
@@ -22,9 +22,9 @@ hayashi_script: cases/psm_jtrain3/hayashi/run.hay
 reference_scripts:
   R: cases/psm_jtrain3/reference/run.R
   Python: cases/psm_jtrain3/reference/run.py
-notes: Blocked — Hayashi PSM ATT estimate differs from R reference implementation.
+notes: R, Python, and Hayashi use the same absolute-caliper, no-replacement
+  matching protocol; ATT agrees and bootstrap SEs are within tolerance.
 result:
-  summary: Hayashi propensity-score matching ATT differs from the custom R reference.
-  known_differences:
-  - ATT estimate differs between Hayashi and the R reference.
+  summary: Hayashi PSM ATT and bootstrap SE match the aligned R and Python references.
+  known_differences: []
   issues_opened: []
