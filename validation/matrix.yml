@@ -124,6 +124,10 @@ cases:
   notes: First real-dataset validation case.
   dimension: numerical
   status: pass
+- id: ols_wooldridge_wage1_ch2
+  notes: Wooldridge Introductory Econometrics Chapter 2 Example 2.10 log wage equation.
+  dimension: numerical
+  status: pass
 - id: oprobit_beauty
   notes: Ordered probit model of self-reported beauty rating (looks 2-5) on female,
     education, experience and black indicators.

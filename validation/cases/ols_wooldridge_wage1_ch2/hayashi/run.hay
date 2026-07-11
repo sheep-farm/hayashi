@@ -1,0 +1,8 @@
+// Wooldridge (Introductory Econometrics, 7e), Chapter 2, Example 2.10.
+// Log wage equation: log(wage) ~ educ.
+
+load "validation/cases/ols_wooldridge_wage1_ch2/data/wage1.csv" as df
+
+let m = ols(lwage ~ educ, df)
+
+export(m, "csv", "/dev/stdout")
