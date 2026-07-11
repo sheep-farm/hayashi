@@ -17,7 +17,7 @@ X <- as.matrix(df[, predictors])
 y <- df$lprice
 
 # Elastic Net with alpha=0.5 and lambda=0.1 (matching the Hayashi parameterisation).
-model <- glmnet(X, y, alpha = 0.5, lambda = 0.1, standardize = TRUE)
+model <- glmnet(X, y, alpha = 0.5, lambda = 0.1, standardize = FALSE)
 
 coefs <- as.numeric(coef(model))
 names(coefs) <- rownames(coef(model))
@@ -34,4 +34,4 @@ out_dir <- "validation/cases/elasticnet_hprice1/reference"
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 write_json(result, file.path(out_dir, "expected.json"), pretty = TRUE, auto_unbox = TRUE)
-cat(toJSON(result, pretty = TRUE, auto_unbox = TRUE))
+cat(toJSON(result, pretty = FALSE, digits = NA, auto_unbox = TRUE))

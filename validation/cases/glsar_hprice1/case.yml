@@ -1,7 +1,7 @@
-id: glsar-hprice1
+id: glsar_hprice1
 title: GLSAR(1) on Wooldridge hprice1
 estimator_family: glsar
-status: active
+status: blocked
 dimension: numerical
 
 dataset:
@@ -28,9 +28,10 @@ reference_scripts:
   R: cases/glsar_hprice1/reference/run.R
   Python: cases/glsar_hprice1/reference/run.py
 
-notes: GLS with AR(1) errors on housing price equation.
+notes: Blocked — Hayashi GLSAR(1) coefficients differ from R/Python statsmodels reference implementations beyond tolerance.
 
 result:
-  summary: ""
-  known_differences: []
+  summary: "Hayashi GLSAR(1) produces different coefficient estimates than R and Python."
+  known_differences:
+    - "Intercept and bdrms coefficients differ by more than the declared tolerance."
   issues_opened: []

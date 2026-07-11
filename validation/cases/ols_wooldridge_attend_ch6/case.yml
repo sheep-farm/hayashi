@@ -1,34 +1,30 @@
-id: ols-wooldridge-attend-ch6
-title: OLS attendance effects on exam score on Wooldridge attend (Chapter 6, Example 6.3)
+id: ols_wooldridge_attend_ch6
+title: OLS attendance effects on exam score on Wooldridge attend (Chapter 6, Example
+  6.3)
 estimator_family: ols
 status: active
 dimension: numerical
-
 dataset:
   name: wooldridge::attend
   source: R package wooldridge / Python wooldridge-python
   licence: public teaching dataset
-
 references:
-  - R
-  - Python
-
+- R
+- Python
 comparison:
   quantities:
-    - coefficients
-    - standard_errors
+  - coefficients
+  - standard_errors
   tolerances:
     coefficients: 1e-6
     standard_errors: 1e-6
-
 hayashi_script: cases/ols_wooldridge_attend_ch6/hayashi/run.hay
 reference_scripts:
   R: cases/ols_wooldridge_attend_ch6/reference/run.R
   Python: cases/ols_wooldridge_attend_ch6/reference/run.py
-
-notes: Wooldridge Introductory Econometrics Chapter 6, Example 6.3 attendance effects on standardized final exam score.
-
+notes: Wooldridge Introductory Econometrics Chapter 6, Example 6.3 attendance effects
+  on standardized final exam score.
 result:
-  summary: ""
+  summary: ''
   known_differences: []
   issues_opened: []

@@ -1,34 +1,28 @@
-id: synth-smoking
+id: synth_smoking
 title: Synthetic control on simulated smoking-style panel
 estimator_family: synth
-status: active
+status: blocked
 dimension: numerical
-
 dataset:
   name: synth_smoking
   source: Simulated DGP from the Hayashi book chapter 32
   licence: simulated
-
 references:
-  - R
-  - Python
-
+- R
+- Python
 comparison:
   quantities:
-    - coefficients
+  - coefficients
   tolerances:
     coefficients: 1e-1
-
 output_format: txt
-
 hayashi_script: cases/synth_smoking/hayashi/run.hay
 reference_scripts:
   R: cases/synth_smoking/reference/run.R
   Python: cases/synth_smoking/reference/run.py
-
-notes: Synthetic-control ATT on a simulated panel with 10 donors and 1 treated unit.
-
+notes: Blocked — Hayashi synthetic-control ATT differs from R reference implementation.
 result:
-  summary: ""
-  known_differences: []
+  summary: Hayashi synthetic-control ATT differs from the custom R reference.
+  known_differences:
+  - ATT estimate differs between Hayashi and the R reference.
   issues_opened: []

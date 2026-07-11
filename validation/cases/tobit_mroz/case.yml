@@ -1,35 +1,30 @@
-id: tobit-mroz
+id: tobit_mroz
 title: Tobit hours-worked model on Wooldridge mroz
 estimator_family: tobit
 status: active
 dimension: numerical
-
 dataset:
   name: wooldridge::mroz
   source: R package wooldridge / Python wooldridge package
   licence: public teaching dataset
-
 references:
-  - R
-
+- R
 comparison:
   quantities:
-    - coefficients
-    - standard_errors
+  - coefficients
+  - standard_errors
   tolerances:
     coefficients: 1e-3
     standard_errors: 1e-3
-
 output_format: txt
-
 hayashi_script: cases/tobit_mroz/hayashi/run.hay
 reference_scripts:
   R: cases/tobit_mroz/reference/run.R
-
-notes: Tobit regression of hours worked with left censoring at zero. Hayashi matches AER::tobit at displayed precision; the custom Python MLE is retained as a diagnostic script but is not the active reference.
-
+notes: Tobit regression of hours worked with left censoring at zero. Hayashi matches
+  AER::tobit at displayed precision; the custom Python MLE is retained as a diagnostic
+  script but is not the active reference.
 result:
-  summary: "Matches AER::tobit within strict displayed-output tolerance."
+  summary: Matches AER::tobit within strict displayed-output tolerance.
   known_differences:
-    - custom Python MLE converges to a nearby solution with a modest intercept delta
+  - custom Python MLE converges to a nearby solution with a modest intercept delta
   issues_opened: []

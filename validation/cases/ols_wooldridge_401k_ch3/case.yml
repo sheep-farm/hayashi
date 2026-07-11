@@ -1,34 +1,29 @@
-id: ols-wooldridge-401k-ch3
+id: ols_wooldridge_401k_ch3
 title: OLS 401(k) participation equation on Wooldridge 401k (Chapter 3, Example 3.3)
 estimator_family: ols
 status: active
 dimension: numerical
-
 dataset:
   name: wooldridge::401k
   source: R package wooldridge / Python wooldridge-python
   licence: public teaching dataset
-
 references:
-  - R
-  - Python
-
+- R
+- Python
 comparison:
   quantities:
-    - coefficients
-    - standard_errors
+  - coefficients
+  - standard_errors
   tolerances:
     coefficients: 1e-6
     standard_errors: 1e-6
-
 hayashi_script: cases/ols_wooldridge_401k_ch3/hayashi/run.hay
 reference_scripts:
   R: cases/ols_wooldridge_401k_ch3/reference/run.R
   Python: cases/ols_wooldridge_401k_ch3/reference/run.py
-
-notes: Wooldridge Introductory Econometrics Chapter 3 Example 3.3 401(k) participation equation.
-
+notes: Wooldridge Introductory Econometrics Chapter 3 Example 3.3 401(k) participation
+  equation.
 result:
-  summary: ""
+  summary: ''
   known_differences: []
   issues_opened: []

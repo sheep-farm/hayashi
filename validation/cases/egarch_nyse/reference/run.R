@@ -27,9 +27,12 @@ model <- ugarchfit(spec, data = nyse$return)
 
 coefs <- as.numeric(coef(model))
 names(coefs) <- names(coef(model))
+# rugarch order for eGARCH is mu, omega, alpha1, beta1, gamma1.
+# Hayashi order is mu, omega, alpha[1], gamma[1], beta[1].
+names(coefs) <- c("mu", "omega", "gamma[1]", "beta[1]", "alpha[1]")
 
 std_errors <- as.numeric(model@fit$matcoef[, " Std. Error"])
-names(std_errors) <- names(coef(model))
+names(std_errors) <- names(coefs)
 
 result <- list(
   coefficients = as.list(coefs),

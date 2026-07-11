@@ -1,36 +1,30 @@
-id: rdd-book
+id: rdd_book
 title: Sharp regression discontinuity on simulated book DGP
 estimator_family: rdd
 status: active
 dimension: numerical
-
 dataset:
   name: rdd_book
   source: Simulated DGP from Hayashi book chapter 24
   licence: simulated
-
 references:
-  - R
-  - Python
-
+- R
+- Python
 comparison:
   quantities:
-    - coefficients
-    - standard_errors
+  - coefficients
+  - standard_errors
   tolerances:
     coefficients: 1e-1
     standard_errors: 1e-1
-
 output_format: txt
-
 hayashi_script: cases/rdd_book/hayashi/run.hay
 reference_scripts:
   R: cases/rdd_book/reference/run.R
   Python: cases/rdd_book/reference/run.py
-
-notes: Sharp RDD with local linear regression, triangular kernel and Imbens-Kalyanaraman bandwidth.
-
+notes: Sharp RDD with local linear regression, triangular kernel and Imbens-Kalyanaraman
+  bandwidth.
 result:
-  summary: ""
+  summary: ''
   known_differences: []
   issues_opened: []

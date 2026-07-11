@@ -19,7 +19,7 @@ cases:
 - id: arima_gdp
   notes: ARIMA(1,1,1) on log US real GDP via exact Gaussian MLE.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: arma_book
   notes: Uses the same simulated ARMA(1,1) DGP as Chapter 26 of the book. Intercept
     is excluded from comparison because Hayashi profiles it out in MLE (SE = 0).
@@ -28,7 +28,7 @@ cases:
 - id: autoreg_gdp
   notes: AR(1) on US real GDP with constant and trend.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: betareg_wooldridge_401k
   notes: Blocked — Greeners beta regression MLE does not converge with multiple regressors,
     producing coefficients that diverge from R betareg.
@@ -91,11 +91,11 @@ cases:
 - id: glsar_hprice1
   notes: GLS with AR(1) errors on housing price equation.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: gmm_card
   notes: GMM returns to schooling with nearc4 as instrument for education.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: heckman_mroz
   notes: Two-step Heckman (Heckit) on the Mroz dataset. SEs are approximate because
     the reference implementations are two-step.
@@ -122,7 +122,7 @@ cases:
 - id: logit_margins_mroz
   notes: Logit average marginal effects on Wooldridge mroz.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: logit_mroz
   notes: Logit labour-force participation on the Mroz dataset.
   dimension: numerical
@@ -155,7 +155,7 @@ cases:
 - id: ols_cluster_wagepan
   notes: OLS wage equation with one-way cluster-robust standard errors by worker id.
   dimension: numerical
-  status: not-started
+  status: pass
 - id: ols_wooldridge_401k_ch3
   notes: Wooldridge Introductory Econometrics Chapter 3 Example 3.3 401(k) participation
     equation.
@@ -340,7 +340,7 @@ cases:
   notes: 1:1 nearest-neighbor propensity score matching with caliper 0.2 and bootstrap
     SE.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: quantile_wage1
   notes: Median quantile regression of wage on education, experience, and tenure.
   dimension: numerical
@@ -375,7 +375,7 @@ cases:
 - id: synth_smoking
   notes: Synthetic-control ATT on a simulated panel with 10 donors and 1 treated unit.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: sysgmm_wagepan
   notes: Blocked — Hayashi sysgmm raises a singular-matrix error for the wagepan dynamic
     panel specification.

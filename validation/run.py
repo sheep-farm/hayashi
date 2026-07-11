@@ -184,13 +184,41 @@ def parse_hayashi_txt_table(text: str) -> dict[str, dict[str, float]]:
     return result
 
 
+def parse_reference_json(stdout: str) -> dict[str, Any] | None:
+    """Extract JSON from reference stdout, tolerating pretty-printed output."""
+    text = stdout.strip()
+    # Fast path: single-line JSON emitted by toJSON(..., pretty = FALSE).
+    try:
+        return json.loads(text.splitlines()[-1])
+    except json.JSONDecodeError:
+        pass
+    # Fallback: find the largest JSON object/array in the output.
+    for start_char, end_char in ("{", "}"), ("[", "]"):
+        start = text.find(start_char)
+        if start == -1:
+            continue
+        # Search for the matching outer object by bracket counting.
+        depth = 0
+        for i, ch in enumerate(text[start:], start):
+            if ch == start_char:
+                depth += 1
+            elif ch == end_char:
+                depth -= 1
+                if depth == 0:
+                    try:
+                        return json.loads(text[start : i + 1])
+                    except json.JSONDecodeError:
+                        break
+    return None
+
+
 def normalise_intercept(data: dict[str, Any]) -> dict[str, Any]:
-    """Rename intercept labels ('const' or '_cons') to 'Intercept' and clean up Heckman lambda label."""
+    """Rename intercept labels ('const', '_cons' or '(Intercept)') to 'Intercept' and clean up Heckman lambda label."""
     for key in ("coefficients", "standard_errors"):
         if key not in data:
             continue
         d = data[key]
-        for src in ("const", "_cons"):
+        for src in ("const", "_cons", "(Intercept)"):
             if src in d:
                 d["Intercept"] = d.pop(src)
         # Hayashi prints the inverse Mills ratio as "lambda (IMR)".
@@ -790,16 +818,14 @@ def run_case(case: dict[str, Any]) -> tuple[str, list[str], dict[str, dict]]:
                 [f"{reference_name} reference produced no JSON output"],
                 ref_report,
             )
-        try:
-            reference_outputs[reference_name] = normalise_intercept(
-                json.loads(stdout.splitlines()[-1])
-            )
-        except json.JSONDecodeError as e:
+        parsed = parse_reference_json(stdout)
+        if parsed is None:
             return (
                 "blocked",
-                [f"Could not parse {reference_name} reference stdout as JSON: {e}"],
+                [f"Could not parse {reference_name} reference stdout as JSON"],
                 ref_report,
             )
+        reference_outputs[reference_name] = normalise_intercept(parsed)
 
     # Prefer the stdout emitted by Hayashi; fall back to the written file.
     hayashi: dict[str, dict[str, float]] | None = None

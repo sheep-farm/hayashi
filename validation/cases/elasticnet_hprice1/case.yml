@@ -10,7 +10,6 @@ dataset:
   licence: public teaching dataset
 
 references:
-  - R
   - Python
 
 comparison:

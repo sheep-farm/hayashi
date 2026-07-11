@@ -1,36 +1,29 @@
-id: garch-nyse
+id: garch_nyse
 title: GARCH(1,1) on NYSE returns
 estimator_family: garch
 status: active
 dimension: numerical
-
 dataset:
   name: wooldridge::nyse
   source: R package wooldridge / Python wooldridge package
   licence: public teaching dataset
-
 references:
-  - R
-  - Python
-
+- R
+- Python
 comparison:
   quantities:
-    - coefficients
-    - standard_errors
+  - coefficients
+  - standard_errors
   tolerances:
     coefficients: 2e-1
     standard_errors: 2e0
-
 output_format: txt
-
 hayashi_script: cases/garch_nyse/hayashi/run.hay
 reference_scripts:
   R: cases/garch_nyse/reference/run.R
   Python: cases/garch_nyse/reference/run.py
-
 notes: GARCH(1,1) on NYSE returns.
-
 result:
-  summary: ""
+  summary: ''
   known_differences: []
   issues_opened: []

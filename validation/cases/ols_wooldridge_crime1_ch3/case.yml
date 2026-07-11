@@ -1,34 +1,28 @@
-id: ols-wooldridge-crime1-ch3
+id: ols_wooldridge_crime1_ch3
 title: OLS arrest records equation on Wooldridge crime1 (Chapter 3, Example 3.5)
 estimator_family: ols
 status: active
 dimension: numerical
-
 dataset:
   name: wooldridge::crime1
   source: R package wooldridge / Python wooldridge-python
   licence: public teaching dataset
-
 references:
-  - R
-  - Python
-
+- R
+- Python
 comparison:
   quantities:
-    - coefficients
-    - standard_errors
+  - coefficients
+  - standard_errors
   tolerances:
     coefficients: 1e-6
     standard_errors: 1e-6
-
 hayashi_script: cases/ols_wooldridge_crime1_ch3/hayashi/run.hay
 reference_scripts:
   R: cases/ols_wooldridge_crime1_ch3/reference/run.R
   Python: cases/ols_wooldridge_crime1_ch3/reference/run.py
-
 notes: Wooldridge Introductory Econometrics Chapter 3 Example 3.5 arrest records equation.
-
 result:
-  summary: ""
+  summary: ''
   known_differences: []
   issues_opened: []

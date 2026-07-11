@@ -1,7 +1,7 @@
-id: ols-cluster-wagepan
+id: ols_cluster_wagepan
 title: OLS wage equation with clustered SEs on Wooldridge wagepan
 estimator_family: ols
-status: not-started
+status: active
 dimension: numerical
 
 dataset:

@@ -1,38 +1,36 @@
-id: ets-gdp
+id: ets_gdp
 title: ETS on US real GDP
 estimator_family: ets
 status: active
 dimension: numerical
-
 dataset:
   name: statsmodels::macrodata
   source: statsmodels.datasets / Rdatasets
   licence: public teaching dataset
-
 references:
-  - R
-  - Python
-
+- R
+- Python
 comparison:
   quantities:
-    - coefficients
+  - coefficients
   tolerances:
     coefficients: 1e-2
-
 output_format: txt
-
 hayashi_script: cases/ets_gdp/hayashi/run.hay
 reference_scripts:
   R: cases/ets_gdp/reference/run.R
   Python: cases/ets_gdp/reference/run.py
+notes: 'Simple exponential smoothing (ETS(A,N,N)) on US real GDP.  Hayashi uses `ses(df,
+  gdp)`,
 
-notes: |
-  Simple exponential smoothing (ETS(A,N,N)) on US real GDP.  Hayashi uses `ses(df, gdp)`,
   and the R/Python references use SES with SSE grid search / statsmodels optimisation.
+
   Only the smoothing parameter alpha is compared because the Hayashi text output does
+
   not expose the initial level.
 
+  '
 result:
-  summary: "Simple exponential smoothing on US real GDP"
+  summary: Simple exponential smoothing on US real GDP
   known_differences: []
   issues_opened: []

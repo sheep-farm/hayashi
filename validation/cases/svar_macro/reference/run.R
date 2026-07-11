@@ -29,7 +29,7 @@ A <- diag(2)
 
 result <- list(
   a_matrix = as.list(setNames(as.numeric(A), paste0("a", 0:3))),
-  b_matrix = as.list(setNames(as.numeric(B), paste0("b", 0:3)))
+  b_matrix = as.list(setNames(as.numeric(t(B)), paste0("b", 0:3)))
 )
 
 write_json(result, file.path(ref_dir, "expected.json"), pretty = TRUE, auto_unbox = TRUE, digits = NA)

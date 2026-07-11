@@ -48,4 +48,4 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 write_json(result, file.path(out_dir, "expected.json"), pretty = TRUE, auto_unbox = TRUE)
 
-cat(toJSON(result, pretty = TRUE, auto_unbox = TRUE))
+cat(toJSON(result, pretty = FALSE, digits = NA, auto_unbox = TRUE))

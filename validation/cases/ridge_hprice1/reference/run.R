@@ -1,6 +1,6 @@
 # Reference implementation in R for the Ridge hprice1 case.
 
-library(MASS)
+library(glmnet)
 
 case_dir <- "validation/cases/ridge_hprice1"
 data_dir <- file.path(case_dir, "data")
@@ -11,11 +11,17 @@ dir.create(ref_dir, recursive = TRUE, showWarnings = FALSE)
 csv_path <- file.path(data_dir, "hprice1.csv")
 df <- read.csv(csv_path)
 
-# Ridge regression via MASS::lm.ridge (standardises X, intercept not penalised).
-model <- lm.ridge(lprice ~ llotsize + lsqrft + bdrms + colonial, data = df, lambda = 0.1)
+predictors <- c("llotsize", "lsqrft", "bdrms", "colonial")
+X <- as.matrix(df[, predictors])
+y <- df$lprice
+
+# Ridge regression (alpha = 0) matching Hayashi's implementation.
+# glmnet's lambda corresponds to alpha/n relative to sklearn's Ridge penalty.
+model <- glmnet(X, y, alpha = 0, lambda = 0.1 / length(y), standardize = FALSE)
 
 coefs <- as.numeric(coef(model))
-names(coefs) <- names(coef(model))
+names(coefs) <- rownames(coef(model))
+names(coefs)[names(coefs) == "(Intercept)"] <- "Intercept"
 
 std_errors <- as.numeric(rep(0.0, length(coefs)))
 names(std_errors) <- names(coefs)

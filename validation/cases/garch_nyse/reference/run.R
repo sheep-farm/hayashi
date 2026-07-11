@@ -27,9 +27,10 @@ model <- ugarchfit(spec, data = nyse$return)
 
 coefs <- as.numeric(coef(model))
 names(coefs) <- names(coef(model))
+names(coefs) <- c("mu", "omega", "alpha[1]", "beta[1]")
 
 std_errors <- as.numeric(model@fit$matcoef[, " Std. Error"])
-names(std_errors) <- names(coef(model))
+names(std_errors) <- names(coefs)
 
 result <- list(
   coefficients = as.list(coefs),
@@ -41,4 +42,4 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 write_json(result, file.path(out_dir, "expected.json"), pretty = TRUE, auto_unbox = TRUE)
 
-cat(toJSON(result, pretty = TRUE, auto_unbox = TRUE))
+cat(toJSON(result, pretty = FALSE, digits = NA, auto_unbox = TRUE))

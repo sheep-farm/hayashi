@@ -1,34 +1,29 @@
-id: ols-wooldridge-campus-ch4
+id: ols_wooldridge_campus_ch4
 title: OLS campus crime equation on Wooldridge campus (Chapter 4, Example 4.4)
 estimator_family: ols
 status: active
 dimension: numerical
-
 dataset:
   name: wooldridge::campus
   source: R package wooldridge / Python wooldridge-python
   licence: public teaching dataset
-
 references:
-  - R
-  - Python
-
+- R
+- Python
 comparison:
   quantities:
-    - coefficients
-    - standard_errors
+  - coefficients
+  - standard_errors
   tolerances:
     coefficients: 1e-6
     standard_errors: 1e-6
-
 hayashi_script: cases/ols_wooldridge_campus_ch4/hayashi/run.hay
 reference_scripts:
   R: cases/ols_wooldridge_campus_ch4/reference/run.R
   Python: cases/ols_wooldridge_campus_ch4/reference/run.py
-
-notes: Wooldridge Introductory Econometrics Chapter 4, Example 4.4 log-log campus crime and enrollment equation.
-
+notes: Wooldridge Introductory Econometrics Chapter 4, Example 4.4 log-log campus
+  crime and enrollment equation.
 result:
-  summary: ""
+  summary: ''
   known_differences: []
   issues_opened: []
