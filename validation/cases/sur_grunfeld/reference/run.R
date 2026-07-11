@@ -9,6 +9,12 @@ dir.create(data_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(ref_dir, recursive = TRUE, showWarnings = FALSE)
 
 csv_path <- file.path(data_dir, "grunfeld.csv")
+if (!file.exists(csv_path)) {
+  fallback <- "validation/cases/panel_fe_grunfeld/data/grunfeld.csv"
+  if (file.exists(fallback)) {
+    file.copy(fallback, csv_path)
+  }
+}
 df <- read.csv(csv_path)
 
 # Two-equation SUR.

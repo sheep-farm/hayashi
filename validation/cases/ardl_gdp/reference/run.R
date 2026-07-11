@@ -7,12 +7,15 @@ library(jsonlite)
 data_dir <- "validation/cases/ardl_gdp/data"
 dir.create(data_dir, recursive = TRUE, showWarnings = FALSE)
 
-# Load macrodata from statsmodels mirror (Rdatasets).
+# Load macrodata from local CSV or statsmodels mirror (Rdatasets).
+local_csv <- "validation/cases/ardl_gdp/data/macrodata.csv"
 url <- "https://raw.githubusercontent.com/vincentarelbundock/Rdatasets/master/csv/statsmodels/macrodata.csv"
-macro <- read.csv(url)
-macro <- macro[, c("year", "quarter", "realgdp", "realcons")]
-names(macro)[names(macro) == "realgdp"] <- "gdp"
-names(macro)[names(macro) == "realcons"] <- "cons"
+macro <- if (file.exists(local_csv)) read.csv(local_csv) else read.csv(url)
+if (!"gdp" %in% names(macro)) {
+  macro <- macro[, c("year", "quarter", "realgdp", "realcons")]
+  names(macro)[names(macro) == "realgdp"] <- "gdp"
+  names(macro)[names(macro) == "realcons"] <- "cons"
+}
 
 # Write CSV for Hayashi to read.
 write.csv(macro, file.path(data_dir, "macrodata.csv"), row.names = FALSE)

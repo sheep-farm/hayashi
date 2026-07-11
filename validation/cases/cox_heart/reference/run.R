@@ -7,12 +7,17 @@ library(jsonlite)
 data_dir <- "validation/cases/cox_heart/data"
 dir.create(data_dir, recursive = TRUE, showWarnings = FALSE)
 
-# Load the heart transplant dataset from the Rdatasets mirror.
+# Load the heart transplant dataset from local CSV or Rdatasets mirror.
+local_csv <- "validation/cases/cox_heart/data/heart.csv"
 url <- "https://raw.githubusercontent.com/vincentarelbundock/Rdatasets/master/csv/statsmodels/heart.csv"
-heart <- read.csv(url)
-heart <- heart[, c("survival", "age", "censors")]
-names(heart)[names(heart) == "survival"] <- "time"
-names(heart)[names(heart) == "censors"] <- "censored"
+if (file.exists(local_csv)) {
+  heart <- read.csv(local_csv)
+} else {
+  heart <- read.csv(url)
+  heart <- heart[, c("survival", "age", "censors")]
+  names(heart)[names(heart) == "survival"] <- "time"
+  names(heart)[names(heart) == "censors"] <- "censored"
+}
 
 # Write CSV for Hayashi to read.
 write.csv(heart, file.path(data_dir, "heart.csv"), row.names = FALSE)
