@@ -1,0 +1,35 @@
+id: sysgmm_wagepan
+title: System GMM (Blundell-Bond) on Wooldridge wagepan
+estimator_family: sysgmm
+status: blocked
+dimension: numerical
+
+dataset:
+  name: wooldridge::wagepan
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+
+references:
+  - R
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 5e-2
+    standard_errors: 1e-1
+
+output_format: txt
+
+hayashi_script: cases/sysgmm_wagepan/hayashi/run.hay
+reference_scripts:
+  R: cases/sysgmm_wagepan/reference/run.R
+
+notes: Blocked — Hayashi sysgmm raises a singular-matrix error for the wagepan dynamic panel specification.
+
+result:
+  summary: "Hayashi sysgmm fails with singular matrix during GMM weighting matrix inversion."
+  known_differences:
+    - "Hayashi sysgmm does not converge on the chosen wagepan dynamic panel."
+  issues_opened: []

@@ -29,6 +29,16 @@ cases:
   notes: AR(1) on US real GDP with constant and trend.
   dimension: numerical
   status: pass
+- id: betareg_wooldridge_401k
+  notes: Blocked — Greeners beta regression MLE does not converge with multiple regressors,
+    producing coefficients that diverge from R betareg.
+  dimension: numerical
+  status: blocked
+- id: cloglog_wooldridge_affairs
+  notes: Blocked — Hayashi GLM with binomial/cloglog link overflows and produces nonsensical
+    coefficients.
+  dimension: numerical
+  status: blocked
 - id: coint_book
   notes: VECM(1) on a simulated cointegrated system where y = 2*x + e2 and x = cumsum(e1).
     Only the cointegration (beta) and adjustment (alpha) coefficients are compared.
@@ -40,6 +50,10 @@ cases:
   status: pass
 - id: did_kielmc
   notes: Difference-in-differences effect of incinerator proximity on log house prices.
+  dimension: numerical
+  status: pass
+- id: egarch_nyse
+  notes: EGARCH(1,1) on NYSE returns.
   dimension: numerical
   status: pass
 - id: elasticnet_hprice1
@@ -96,6 +110,11 @@ cases:
     schooling for married women.
   dimension: numerical
   status: pass
+- id: kalman_nyse
+  notes: Blocked — Hayashi kalman() adds filtered/smoothed columns to a DataFrame
+    and returns nil, which the current validation harness does not capture.
+  dimension: numerical
+  status: blocked
 - id: lasso_hprice1
   notes: Lasso regression of house price on lot size, square footage and bedrooms.
   dimension: numerical
@@ -304,6 +323,11 @@ cases:
     wage equation.
   dimension: numerical
   status: pass
+- id: pcse_wagepan
+  notes: PCSE estimation of log wage on education, experience, and dummies using panel-corrected
+    standard errors.
+  dimension: numerical
+  status: pass
 - id: poisson_fertil2
   notes: Poisson regression for number of children on the fertil2 dataset.
   dimension: numerical
@@ -335,14 +359,28 @@ cases:
     bedrooms and colonial dummy.
   dimension: numerical
   status: pass
+- id: rlm_wage1
+  notes: Huber robust linear regression of log wage on education, experience, and
+    tenure.
+  dimension: numerical
+  status: pass
 - id: sur_grunfeld
   notes: Two-equation SUR (Zellner FGLS) on the Grunfeld investment data.
+  dimension: numerical
+  status: pass
+- id: svar_macro
+  notes: Cholesky-identified SVAR(2) on log US real GDP and consumption.
   dimension: numerical
   status: pass
 - id: synth_smoking
   notes: Synthetic-control ATT on a simulated panel with 10 donors and 1 treated unit.
   dimension: numerical
   status: pass
+- id: sysgmm_wagepan
+  notes: Blocked — Hayashi sysgmm raises a singular-matrix error for the wagepan dynamic
+    panel specification.
+  dimension: numerical
+  status: blocked
 - id: tobit_mroz
   notes: Tobit regression of hours worked with left censoring at zero. Hayashi matches
     AER::tobit at displayed precision; the custom Python MLE is retained as a diagnostic
@@ -359,5 +397,18 @@ cases:
   status: pass
 - id: wls_hprice1
   notes: WLS with weights generated inside Hayashi to avoid sandbox file issues.
+  dimension: numerical
+  status: pass
+- id: xtgls_wagepan
+  notes: Blocked — no suitable R reference implementation for panel FGLS (Parks/Kmenta)
+    available in this environment.
+  dimension: numerical
+  status: blocked
+- id: zinb_affairs
+  notes: ZINB model of number of affairs on demographic predictors.
+  dimension: numerical
+  status: pass
+- id: zip_affairs
+  notes: ZIP model of number of affairs on demographic predictors.
   dimension: numerical
   status: pass

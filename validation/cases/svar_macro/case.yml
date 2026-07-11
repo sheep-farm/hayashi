@@ -1,0 +1,36 @@
+id: svar_macro
+title: Structural VAR on US real GDP and consumption
+estimator_family: svar
+status: active
+dimension: numerical
+
+dataset:
+  name: statsmodels::macrodata
+  source: statsmodels / Rdatasets
+  licence: public domain
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - a_matrix
+    - b_matrix
+  tolerances:
+    a_matrix: 1e-6
+    b_matrix: 5e-2
+
+output_format: txt
+
+hayashi_script: cases/svar_macro/hayashi/run.hay
+reference_scripts:
+  R: cases/svar_macro/reference/run.R
+  Python: cases/svar_macro/reference/run.py
+
+notes: Cholesky-identified SVAR(2) on log US real GDP and consumption.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []

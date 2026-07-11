@@ -1,0 +1,35 @@
+id: kalman_nyse
+title: Local-level Kalman filter on NYSE returns
+estimator_family: kalman
+status: blocked
+dimension: numerical
+
+dataset:
+  name: wooldridge::nyse
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+
+references:
+  - R
+
+comparison:
+  quantities:
+    - sigma_obs
+    - sigma_state
+  tolerances:
+    sigma_obs: 1e-2
+    sigma_state: 1e-3
+
+output_format: txt
+
+hayashi_script: cases/kalman_nyse/hayashi/run.hay
+reference_scripts:
+  R: cases/kalman_nyse/reference/run.R
+
+notes: Blocked — Hayashi kalman() adds filtered/smoothed columns to a DataFrame and returns nil, which the current validation harness does not capture.
+
+result:
+  summary: "Hayashi kalman returns nil and writes columns to the DataFrame; no coefficient-like output is available for comparison."
+  known_differences:
+    - "Hayashi kalman is a state-space filter, not an estimator returning a parameter table."
+  issues_opened: []

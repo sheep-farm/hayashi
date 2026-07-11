@@ -1,0 +1,5 @@
+load "validation/cases/betareg_wooldridge_401k/data/401k.csv" as df
+
+let m = betareg(prate ~ mrate + age + sole, df)
+
+export(m, "txt", "/dev/stdout")

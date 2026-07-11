@@ -1,0 +1,5 @@
+load "validation/cases/cloglog_wooldridge_affairs/data/affairs.csv" as df
+
+let m = glm(affair ~ age + yrsmarr + kids + educ + relig + ratemarr, df, family=binomial, link=cloglog)
+
+export(m, "txt", "/dev/stdout")

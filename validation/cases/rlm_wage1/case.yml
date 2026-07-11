@@ -1,11 +1,11 @@
-id: ologit_beauty
-title: Ordered logit of beauty rating on Wooldridge beauty
-estimator_family: ologit
+id: rlm_wage1
+title: Robust linear model on Wooldridge wage1
+estimator_family: rlm
 status: active
 dimension: numerical
 
 dataset:
-  name: wooldridge::beauty
+  name: wooldridge::wage1
   source: R package wooldridge / Python wooldridge package
   licence: public teaching dataset
 
@@ -19,16 +19,16 @@ comparison:
     - standard_errors
   tolerances:
     coefficients: 1e-3
-    standard_errors: 5e-2
+    standard_errors: 1e-2
 
 output_format: txt
 
-hayashi_script: cases/ologit_beauty/hayashi/run.hay
+hayashi_script: cases/rlm_wage1/hayashi/run.hay
 reference_scripts:
-  R: cases/ologit_beauty/reference/run.R
-  Python: cases/ologit_beauty/reference/run.py
+  R: cases/rlm_wage1/reference/run.R
+  Python: cases/rlm_wage1/reference/run.py
 
-notes: Ordered logit of looks (2, 3, 4) on female, educ, exper, black.
+notes: Huber robust linear regression of log wage on education, experience, and tenure.
 
 result:
   summary: ""

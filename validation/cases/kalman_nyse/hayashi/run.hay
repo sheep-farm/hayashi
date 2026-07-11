@@ -1,0 +1,5 @@
+load "validation/cases/kalman_nyse/data/nyse.csv" as df
+
+let df2 = kalman(df, return, model="ll")
+
+print(df2)

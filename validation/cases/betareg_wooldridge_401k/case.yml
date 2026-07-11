@@ -1,0 +1,35 @@
+id: betareg_wooldridge_401k
+title: Beta regression on 401k participation rates
+estimator_family: betareg
+status: blocked
+dimension: numerical
+
+dataset:
+  name: wooldridge::401k
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+
+references:
+  - R
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-3
+    standard_errors: 1e-2
+
+output_format: txt
+
+hayashi_script: cases/betareg_wooldridge_401k/hayashi/run.hay
+reference_scripts:
+  R: cases/betareg_wooldridge_401k/reference/run.R
+
+notes: Blocked — Greeners beta regression MLE does not converge with multiple regressors, producing coefficients that diverge from R betareg.
+
+result:
+  summary: "Greeners beta regression MLE fails to converge; coefficients differ from R betareg beyond tolerance."
+  known_differences:
+    - "Hayashi beta regression reports Converged=No and coefficient estimates differ from R."
+  issues_opened: []
