@@ -6,7 +6,7 @@
 | arima | simulated_ar1 | R:passed *, Python:passed * | pass | — | Uses the same simulated AR(1) DGP as Chapter 26 of the book. |
 | ardl | statsmodels::macrodata | R:passed *, Python:passed * | pass | — | ARDL(1,1) model of US real GDP on consumption. |
 | arima | simulated_rw | R:passed *, Python:passed * | pass | — | ARIMA(1,1,0) on a simulated random walk with seed 42. Intercept is excluded from comparison because R/Python references are estimated without trend. |
-| arima | statsmodels::macrodata | R, Python | blocked | — | ARIMA(1,1,1) on log US real GDP via exact Gaussian MLE. |
+| arima | statsmodels::macrodata | R:passed *, Python:passed * | pass | — | ARIMA(1,1,1) on log US real GDP via exact Gaussian MLE. |
 | arima | simulated_arma11 | R:passed *, Python:passed * | pass | — | Uses the same simulated ARMA(1,1) DGP as Chapter 26 of the book. Intercept is excluded from comparison because Hayashi profiles it out in MLE (SE = 0). |
 | autoreg | statsmodels::macrodata | R, Python | blocked | — | AR(1) on US real GDP with constant and trend. |
 | betareg | wooldridge::401k | R | blocked | https://github.com/sheep-farm/hayashi/issues/63 | Blocked — Greeners beta regression MLE does not converge with multiple regressors, producing coefficients that diverge from R betareg. |

@@ -1,7 +1,7 @@
 id: arima_gdp
 title: ARIMA(1,1,1) on log US real GDP
 estimator_family: arima
-status: blocked
+status: active
 dimension: numerical
 dataset:
   name: statsmodels::macrodata
@@ -20,10 +20,9 @@ hayashi_script: cases/arima_gdp/hayashi/run.hay
 reference_scripts:
   R: cases/arima_gdp/reference/run.R
   Python: cases/arima_gdp/reference/run.py
-notes: Blocked — Hayashi ARIMA(1,1,1) estimates differ from R/Python references beyond
-  tolerance.
+notes: R and Python exact-likelihood references agree after correcting two R
+  one-based indexing errors; current Hayashi estimates match both within tolerance.
 result:
-  summary: Hayashi ARIMA(1,1,1) estimates diverge from R stats::arima and Python statsmodels.
-  known_differences:
-  - AR and MA coefficients differ substantially from R/Python.
+  summary: Hayashi ARIMA(1,1,1) estimates match the corrected R and Python references.
+  known_differences: []
   issues_opened: []
