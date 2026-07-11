@@ -1,0 +1,8 @@
+// Wooldridge (Introductory Econometrics, 7e), Chapter 3, Example 3.3.
+// 401(k) participation equation: prate ~ mrate + age.
+
+load "validation/cases/ols_wooldridge_401k_ch3/data/401k.csv" as df
+
+let m = ols(prate ~ mrate + age, df)
+
+export(m, "csv", "/dev/stdout")

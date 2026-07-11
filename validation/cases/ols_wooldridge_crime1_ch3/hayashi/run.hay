@@ -1,0 +1,8 @@
+// Wooldridge (Introductory Econometrics, 7e), Chapter 3, Example 3.5.
+// Arrest records equation: narr86 ~ pcnv + ptime86 + qemp86.
+
+load "validation/cases/ols_wooldridge_crime1_ch3/data/crime1.csv" as df
+
+let m = ols(narr86 ~ pcnv + ptime86 + qemp86, df)
+
+export(m, "csv", "/dev/stdout")
