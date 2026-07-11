@@ -32,4 +32,5 @@ result:
   summary: "No R package providing Stata-style xtgls could be installed."
   known_differences:
     - "R package pggls is not available; plm does not implement panel FGLS."
-  issues_opened: []
+  issues_opened:
+    - https://github.com/sheep-farm/hayashi/issues/66

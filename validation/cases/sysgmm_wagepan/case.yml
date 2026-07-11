@@ -32,4 +32,5 @@ result:
   summary: "Hayashi sysgmm fails with singular matrix during GMM weighting matrix inversion."
   known_differences:
     - "Hayashi sysgmm does not converge on the chosen wagepan dynamic panel."
-  issues_opened: []
+  issues_opened:
+    - https://github.com/sheep-farm/hayashi/issues/67
