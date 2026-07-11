@@ -30,10 +30,14 @@
 | logit | wooldridge::beauty | R, Python | pass | — | Ordered logit of looks (2, 3, 4) on female, educ, exper, black. |
 | ols | wooldridge::wagepan | R, Python | pass | — | OLS wage equation with one-way cluster-robust standard errors by worker id. |
 | ols | wooldridge::401k | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 3 Example 3.3 401(k) participation equation. |
+| ols | wooldridge::crime1 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 3 Example 3.5 arrest records equation with average sentence. |
 | ols | wooldridge::crime1 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 3 Example 3.5 arrest records equation. |
 | ols | wooldridge::gpa1 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 3 Example 3.1 college GPA equation. |
+| ols | wooldridge::hprice1 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 4 Section 4.5 log housing price equation. |
+| ols | wooldridge::sleep75 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 5 Problem 3.3 sleep equation. |
 | ols | wooldridge::wage1 | R, Python | pass | — | First real-dataset validation case. |
 | ols | wooldridge::wage1 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 2 Example 2.10 log wage equation. |
+| ols | wooldridge::wage1 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 7 Example 7.1 hourly wage equation with female dummy. |
 | oprobit | wooldridge::beauty | R, Python | pass | — | Ordered probit model of self-reported beauty rating (looks 2-5) on female, education, experience and black indicators. |
 | panel_fe | wooldridge::grunfeld | R, Python | pass | — | Panel fixed-effects investment demand model (Grunfeld). |
 | poisson | wooldridge::fertil2 | R, Python | pass | — | Poisson regression for number of children on the fertil2 dataset. |

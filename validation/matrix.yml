@@ -140,6 +140,22 @@ cases:
   notes: Wooldridge Introductory Econometrics Chapter 3 Example 3.5 arrest records equation.
   dimension: numerical
   status: pass
+- id: ols_wooldridge_crime1_avgsen_ch3
+  notes: Wooldridge Introductory Econometrics Chapter 3 Example 3.5 arrest records equation with average sentence.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_hprice1_ch4
+  notes: Wooldridge Introductory Econometrics Chapter 4 Section 4.5 log housing price equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_sleep75_ch5
+  notes: Wooldridge Introductory Econometrics Chapter 5 Problem 3.3 sleep equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_wage1_female_ch7
+  notes: Wooldridge Introductory Econometrics Chapter 7 Example 7.1 hourly wage equation with female dummy.
+  dimension: numerical
+  status: pass
 - id: oprobit_beauty
   notes: Ordered probit model of self-reported beauty rating (looks 2-5) on female,
     education, experience and black indicators.
