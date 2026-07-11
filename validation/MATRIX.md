@@ -9,8 +9,8 @@
 | arima | statsmodels::macrodata | R:passed, Python:passed * | pass | — | ARIMA(1,1,1) on log US real GDP via exact Gaussian MLE. |
 | arima | simulated_arma11 | R:passed, Python:passed * | pass | — | Uses the same simulated ARMA(1,1) DGP as Chapter 26 of the book. Intercept is excluded from comparison because Hayashi profiles it out in MLE (SE = 0). |
 | autoreg | statsmodels::macrodata | R:passed, Python:passed * | pass | — | AR(1) on US real GDP with constant and trend. |
-| betareg | wooldridge::401k | R | blocked | — | Blocked — Greeners beta regression MLE does not converge with multiple regressors, producing coefficients that diverge from R betareg. |
-| cloglog | wooldridge::affairs | R, Python | blocked | — | Blocked — Hayashi GLM with binomial/cloglog link overflows and produces nonsensical coefficients. |
+| betareg | wooldridge::401k | R | blocked | https://github.com/sheep-farm/hayashi/issues/63 | Blocked — Greeners beta regression MLE does not converge with multiple regressors, producing coefficients that diverge from R betareg. |
+| cloglog | wooldridge::affairs | R, Python | blocked | https://github.com/sheep-farm/hayashi/issues/64 | Blocked — Hayashi GLM with binomial/cloglog link overflows and produces nonsensical coefficients. |
 | vecm | simulated_cointegrated | R:passed, Python:passed * | pass | — | VECM(1) on a simulated cointegrated system where y = 2*x + e2 and x = cumsum(e1). Only the cointegration (beta) and adjustment (alpha) coefficients are compared. |
 | cox | statsmodels::heart | R:passed, Python:passed * | pass | — | Cox proportional hazards regression for survival time after heart transplant. |
 | did | wooldridge::kielmc | R:passed, Python:passed * | pass | — | Difference-in-differences effect of incinerator proximity on log house prices. |
@@ -27,7 +27,7 @@
 | heckman | wooldridge::mroz | R:passed, Python:passed * | pass | — | Two-step Heckman (Heckit) on the Mroz dataset. SEs are approximate because the reference implementations are two-step. |
 | iv | wooldridge::card | R:passed, Python:passed * | pass | — | IV with education endogenous and nearc4 as instrument. |
 | iv | wooldridge::mroz | R:passed, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 15 Example 15.1 IV returns to schooling for married women. |
-| kalman | wooldridge::nyse | R | blocked | — | Blocked — Hayashi kalman() adds filtered/smoothed columns to a DataFrame and returns nil, which the current validation harness does not capture. |
+| kalman | wooldridge::nyse | R | blocked | https://github.com/sheep-farm/hayashi/issues/65 | Blocked — Hayashi kalman() adds filtered/smoothed columns to a DataFrame and returns nil, which the current validation harness does not capture. |
 | lasso | wooldridge::hprice1 | R:passed, Python:passed * | pass | — | Lasso regression of house price on lot size, square footage and bedrooms. |
 | logit | wooldridge::mroz | R:passed, Python:passed * | pass | — | Logit average marginal effects on Wooldridge mroz. |
 | logit | wooldridge::mroz | R:passed, Python:passed * | pass | — | Logit labour-force participation on the Mroz dataset. |
@@ -84,12 +84,12 @@
 | sur | wooldridge::grunfeld | R:passed, Python:passed * | pass | — | Two-equation SUR (Zellner FGLS) on the Grunfeld investment data. |
 | svar | statsmodels::macrodata | R:passed, Python:passed * | pass | — | Cholesky-identified SVAR(2) on log US real GDP and consumption. |
 | synth | synth_smoking | R:passed, Python:passed * | pass | — | Synthetic-control ATT on a simulated panel with 10 donors and 1 treated unit. |
-| sysgmm | wooldridge::wagepan | R | blocked | — | Blocked — Hayashi sysgmm raises a singular-matrix error for the wagepan dynamic panel specification. |
+| sysgmm | wooldridge::wagepan | R | blocked | https://github.com/sheep-farm/hayashi/issues/67 | Blocked — Hayashi sysgmm raises a singular-matrix error for the wagepan dynamic panel specification. |
 | tobit | wooldridge::mroz | R:passed * | pass | — | Tobit regression of hours worked with left censoring at zero. Hayashi matches AER::tobit at displayed precision; the custom Python MLE is retained as a diagnostic script but is not the active reference. |
 | var | simulated_var1 | R:passed, Python:passed * | pass | — | Uses the same simulated bivariate VAR(1) DGP as Chapter 28 of the book. |
 | var | statsmodels::macrodata | R:passed, Python:passed * | pass | — | VAR(2) on US real GDP and consumption. |
 | wls | wooldridge::hprice1 | R:passed, Python:passed * | pass | — | WLS with weights generated inside Hayashi to avoid sandbox file issues. |
-| xtgls | wooldridge::wagepan | R | blocked | — | Blocked — no suitable R reference implementation for panel FGLS (Parks/Kmenta) available in this environment. |
+| xtgls | wooldridge::wagepan | R | blocked | https://github.com/sheep-farm/hayashi/issues/66 | Blocked — no suitable R reference implementation for panel FGLS (Parks/Kmenta) available in this environment. |
 | zinb | wooldridge::affairs | R:passed * | pass | — | ZINB model of number of affairs on demographic predictors. |
 | zip | wooldridge::affairs | R:passed * | pass | — | ZIP model of number of affairs on demographic predictors. |
 
