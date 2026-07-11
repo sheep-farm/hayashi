@@ -1,0 +1,8 @@
+// Wooldridge (Introductory Econometrics, 7e), Chapter 7, Example 7.1.
+// log hourly wage equation with a qualitative dummy variable: lwage ~ female + educ + exper + tenure.
+
+load "validation/cases/ols_wooldridge_wage1_log_female_ch7/data/wage1.csv" as df
+
+let m = ols(lwage ~ female + educ + exper + tenure, df)
+
+export(m, "csv", "/dev/stdout")
