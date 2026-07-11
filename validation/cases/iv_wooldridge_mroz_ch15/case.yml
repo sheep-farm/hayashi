@@ -1,0 +1,36 @@
+id: iv_wooldridge_mroz_ch15
+title: IV returns to schooling for married women on Wooldridge mroz (Chapter 15, Example 15.1)
+estimator_family: iv
+status: active
+dimension: numerical
+
+dataset:
+  name: wooldridge::mroz
+  source: R package wooldridge / Python wooldridge-python
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-4
+    standard_errors: 1e-2
+
+output_format: txt
+
+hayashi_script: cases/iv_wooldridge_mroz_ch15/hayashi/run.hay
+reference_scripts:
+  R: cases/iv_wooldridge_mroz_ch15/reference/run.R
+  Python: cases/iv_wooldridge_mroz_ch15/reference/run.py
+
+notes: Wooldridge Introductory Econometrics Chapter 15, Example 15.1 returns to schooling IV equation for married women.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []

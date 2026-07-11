@@ -1,0 +1,36 @@
+id: panel_fe_wooldridge_wagepan_ch14
+title: Panel fixed-effects wage equation on Wooldridge wagepan (Chapter 14, Example 14.4)
+estimator_family: panel_fe
+status: active
+dimension: numerical
+
+dataset:
+  name: wooldridge::wagepan
+  source: R package wooldridge / Python wooldridge-python
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-4
+    standard_errors: 1e-4
+
+output_format: txt
+
+hayashi_script: cases/panel_fe_wooldridge_wagepan_ch14/hayashi/run.hay
+reference_scripts:
+  R: cases/panel_fe_wooldridge_wagepan_ch14/reference/run.R
+  Python: cases/panel_fe_wooldridge_wagepan_ch14/reference/run.py
+
+notes: Wooldridge Introductory Econometrics Chapter 14, Example 14.4 panel fixed-effects wage equation.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []
