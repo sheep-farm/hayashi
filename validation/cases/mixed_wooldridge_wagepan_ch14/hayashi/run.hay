@@ -1,0 +1,6 @@
+// Wooldridge (Introductory Econometrics, 7e), Chapter 14, Example 14.4.
+// mixed linear model wage equation: lwage ~ union + married + d81 + d82 + d83 + d84 + d85 + d86 + d87.
+
+load "validation/cases/mixed_wooldridge_wagepan_ch14/data/wagepan.csv" as df
+
+mixed(lwage ~ union + married + d81 + d82 + d83 + d84 + d85 + d86 + d87, df, id="nr")
