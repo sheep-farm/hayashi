@@ -65,6 +65,15 @@ cases:
   notes: GARCH(1,1) on NYSE returns.
   dimension: numerical
   status: pass
+- id: gee_wooldridge_wagepan_ch14
+  notes: Wooldridge Introductory Econometrics Chapter 14 Example 14.4 generalized
+    estimating equations wage equation.
+  dimension: numerical
+  status: pass
+- id: glm_wooldridge_fertil2_poisson
+  notes: Poisson GLM for number of children on Wooldridge fertil2.
+  dimension: numerical
+  status: pass
 - id: glsar_hprice1
   notes: GLS with AR(1) errors on housing price equation.
   dimension: numerical
@@ -82,22 +91,30 @@ cases:
   notes: IV with education endogenous and nearc4 as instrument.
   dimension: numerical
   status: pass
+- id: iv_wooldridge_mroz_ch15
+  notes: Wooldridge Introductory Econometrics Chapter 15 Example 15.1 IV returns to
+    schooling for married women.
+  dimension: numerical
+  status: pass
 - id: lasso_hprice1
   notes: Lasso regression of house price on lot size, square footage and bedrooms.
   dimension: numerical
   status: pass
 - id: logit_margins_mroz
-  notes: 'Blocked real-dataset validation case for logit average marginal effects
-    on the Mroz dataset; Hayashi AMEs match R/statsmodels, but delta-method SEs differ
-    pending issue #58.'
+  notes: Logit average marginal effects on Wooldridge mroz.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: logit_mroz
   notes: Logit labour-force participation on the Mroz dataset.
   dimension: numerical
   status: pass
 - id: ma_book
   notes: Uses the same simulated MA(1) DGP as Chapter 26 of the book.
+  dimension: numerical
+  status: pass
+- id: mixed_wooldridge_wagepan_ch14
+  notes: Wooldridge Introductory Econometrics Chapter 14 Example 14.4 mixed linear
+    model wage equation.
   dimension: numerical
   status: pass
 - id: mlogit_mode
@@ -120,6 +137,131 @@ cases:
   notes: OLS wage equation with one-way cluster-robust standard errors by worker id.
   dimension: numerical
   status: pass
+- id: ols_wooldridge_401k_ch3
+  notes: Wooldridge Introductory Econometrics Chapter 3 Example 3.3 401(k) participation
+    equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_attend_ch6
+  notes: Wooldridge Introductory Econometrics Chapter 6 Example 6.3 attendance effects
+    on exam score.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_barium_ch10
+  notes: Wooldridge Introductory Econometrics Chapter 10 Example 10.5 barium chloride
+    import equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_bwght_ch5
+  notes: Wooldridge Introductory Econometrics Chapter 5 Example 5.2 birth weight equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_campus_ch4
+  notes: Wooldridge Introductory Econometrics Chapter 4 Example 4.4 log-log campus
+    crime equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_ceosal1_ch2
+  notes: Wooldridge Introductory Econometrics Chapter 2 Example 2.11 log-log CEO salary
+    equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_ceosal1_roe_ch2
+  notes: Wooldridge Introductory Econometrics Chapter 2 Example 2.3 CEO salary on
+    return on equity.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_consump_ch10
+  notes: Wooldridge Introductory Econometrics Chapter 10 Example 10.4 consumption
+    growth on income growth.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_crime1_avgsen_ch3
+  notes: Wooldridge Introductory Econometrics Chapter 3 Example 3.5 arrest records
+    equation with average sentence.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_crime1_ch3
+  notes: Wooldridge Introductory Econometrics Chapter 3 Example 3.5 arrest records
+    equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_fertil3_ch13
+  notes: Wooldridge Introductory Econometrics Chapter 13 Example 13.3 fertility distributed
+    lag equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_gpa1_ch3
+  notes: Wooldridge Introductory Econometrics Chapter 3 Example 3.1 college GPA equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_hprice1_ch4
+  notes: Wooldridge Introductory Econometrics Chapter 4 Section 4.5 log housing price
+    equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_hprice2_ch6
+  notes: Wooldridge Introductory Econometrics Chapter 6 Example 6.2 log housing price
+    equation with rooms quadratic.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_htv_ch9
+  notes: Wooldridge Introductory Econometrics Chapter 9 Example 9.3 education equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_intdef_ch10
+  notes: Wooldridge Introductory Econometrics Chapter 10 Example 10.2 interest rate
+    on inflation and deficit.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_jtrain_pooled_ch14
+  notes: Wooldridge Introductory Econometrics Chapter 14 Example 14.3 pooled job training
+    scrap rate equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_kielmc_ch13
+  notes: Wooldridge Introductory Econometrics Chapter 13 Example 13.1 difference-in-differences
+    housing price equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_meap93_ch4
+  notes: Wooldridge Introductory Econometrics Chapter 4 math pass rate equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_nyse_ch11
+  notes: Wooldridge Introductory Econometrics Chapter 11 Example 11.4 efficient markets
+    hypothesis.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_phillips_ch10
+  notes: Wooldridge Introductory Econometrics Chapter 10 Example 10.1 static Phillips
+    curve.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_phillips_cinf_ch11
+  notes: Wooldridge Introductory Econometrics Chapter 11 Example 11.5 expectations-augmented
+    Phillips curve.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_prminwge_ch10
+  notes: Wooldridge Introductory Econometrics Chapter 10 Example 10.3 Puerto Rican
+    employment equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_sleep75_ch5
+  notes: Wooldridge Introductory Econometrics Chapter 5 Problem 3.3 sleep equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_twoyear_ch4
+  notes: Wooldridge Introductory Econometrics Chapter 4 Example 4.10 returns to college
+    equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_vote1_ch2
+  notes: Wooldridge Introductory Econometrics Chapter 2 Examples 2.5 and 2.9 election
+    outcomes equation.
+  dimension: numerical
+  status: pass
 - id: ols_wooldridge_wage1
   notes: First real-dataset validation case.
   dimension: numerical
@@ -128,124 +270,24 @@ cases:
   notes: Wooldridge Introductory Econometrics Chapter 2 Example 2.10 log wage equation.
   dimension: numerical
   status: pass
-- id: ols_wooldridge_gpa1_ch3
-  notes: Wooldridge Introductory Econometrics Chapter 3 Example 3.1 college GPA equation.
-  dimension: numerical
-  status: pass
-- id: ols_wooldridge_401k_ch3
-  notes: Wooldridge Introductory Econometrics Chapter 3 Example 3.3 401(k) participation equation.
-  dimension: numerical
-  status: pass
-- id: ols_wooldridge_crime1_ch3
-  notes: Wooldridge Introductory Econometrics Chapter 3 Example 3.5 arrest records equation.
-  dimension: numerical
-  status: pass
-- id: ols_wooldridge_crime1_avgsen_ch3
-  notes: Wooldridge Introductory Econometrics Chapter 3 Example 3.5 arrest records equation with average sentence.
-  dimension: numerical
-  status: pass
-- id: ols_wooldridge_hprice1_ch4
-  notes: Wooldridge Introductory Econometrics Chapter 4 Section 4.5 log housing price equation.
-  dimension: numerical
-  status: pass
-- id: ols_wooldridge_sleep75_ch5
-  notes: Wooldridge Introductory Econometrics Chapter 5 Problem 3.3 sleep equation.
-  dimension: numerical
-  status: pass
 - id: ols_wooldridge_wage1_female_ch7
-  notes: Wooldridge Introductory Econometrics Chapter 7 Example 7.1 hourly wage equation with female dummy.
-  dimension: numerical
-  status: pass
-- id: ols_wooldridge_ceosal1_ch2
-  notes: Wooldridge Introductory Econometrics Chapter 2 Example 2.11 log-log CEO salary equation.
-  dimension: numerical
-  status: pass
-- id: ols_wooldridge_campus_ch4
-  notes: Wooldridge Introductory Econometrics Chapter 4 Example 4.4 log-log campus crime equation.
-  dimension: numerical
-  status: pass
-- id: ols_wooldridge_attend_ch6
-  notes: Wooldridge Introductory Econometrics Chapter 6 Example 6.3 attendance effects on exam score.
-  dimension: numerical
-  status: pass
-- id: ols_wooldridge_wage1_log_female_ch7
-  notes: Wooldridge Introductory Econometrics Chapter 7 Example 7.1 log hourly wage equation with female dummy.
-  dimension: numerical
-  status: pass
-- id: ols_wooldridge_meap93_ch4
-  notes: Wooldridge Introductory Econometrics Chapter 4 math pass rate equation.
-  dimension: numerical
-  status: pass
-- id: ols_wooldridge_barium_ch10
-  notes: Wooldridge Introductory Econometrics Chapter 10 Example 10.5 barium chloride import equation.
-  dimension: numerical
-  status: pass
-- id: ols_wooldridge_twoyear_ch4
-  notes: Wooldridge Introductory Econometrics Chapter 4 Example 4.10 returns to college equation.
-  dimension: numerical
-  status: pass
-- id: ols_wooldridge_wage1_quad_ch6
-  notes: Wooldridge Introductory Econometrics Chapter 6 Section 6.2 wage equation with experience quadratic.
-  dimension: numerical
-  status: pass
-- id: ols_wooldridge_bwght_ch5
-  notes: Wooldridge Introductory Econometrics Chapter 5 Example 5.2 birth weight equation.
-  dimension: numerical
-  status: pass
-- id: ols_wooldridge_ceosal1_roe_ch2
-  notes: Wooldridge Introductory Econometrics Chapter 2 Example 2.3 CEO salary on return on equity.
-  dimension: numerical
-  status: pass
-- id: ols_wooldridge_intdef_ch10
-  notes: Wooldridge Introductory Econometrics Chapter 10 Example 10.2 interest rate on inflation and deficit.
-  dimension: numerical
-  status: pass
-- id: ols_wooldridge_hprice2_ch6
-  notes: Wooldridge Introductory Econometrics Chapter 6 Example 6.2 log housing price equation with rooms quadratic.
-  dimension: numerical
-  status: pass
-- id: ols_wooldridge_htv_ch9
-  notes: Wooldridge Introductory Econometrics Chapter 9 Example 9.3 education equation.
-  dimension: numerical
-  status: pass
-- id: ols_wooldridge_nyse_ch11
-  notes: Wooldridge Introductory Econometrics Chapter 11 Example 11.4 efficient markets hypothesis.
-  dimension: numerical
-  status: pass
-- id: ols_wooldridge_prminwge_ch10
-  notes: Wooldridge Introductory Econometrics Chapter 10 Example 10.3 Puerto Rican employment equation.
+  notes: Wooldridge Introductory Econometrics Chapter 7 Example 7.1 hourly wage equation
+    with female dummy.
   dimension: numerical
   status: pass
 - id: ols_wooldridge_wage1_interaction_ch7
-  notes: Wooldridge Introductory Econometrics Chapter 7 Example 7.6 hourly wage equation with marriage-gender interactions.
+  notes: Wooldridge Introductory Econometrics Chapter 7 Example 7.6 hourly wage equation
+    with marriage-gender interactions.
   dimension: numerical
   status: pass
-- id: ols_wooldridge_phillips_ch10
-  notes: Wooldridge Introductory Econometrics Chapter 10 Example 10.1 static Phillips curve.
+- id: ols_wooldridge_wage1_log_female_ch7
+  notes: Wooldridge Introductory Econometrics Chapter 7 Example 7.1 log hourly wage
+    equation with female dummy.
   dimension: numerical
   status: pass
-- id: ols_wooldridge_phillips_cinf_ch11
-  notes: Wooldridge Introductory Econometrics Chapter 11 Example 11.5 expectations-augmented Phillips curve.
-  dimension: numerical
-  status: pass
-- id: ols_wooldridge_consump_ch10
-  notes: Wooldridge Introductory Econometrics Chapter 10 Example 10.4 consumption growth on income growth.
-  dimension: numerical
-  status: pass
-- id: ols_wooldridge_fertil3_ch13
-  notes: Wooldridge Introductory Econometrics Chapter 13 Example 13.3 fertility distributed lag equation.
-  dimension: numerical
-  status: pass
-- id: ols_wooldridge_jtrain_pooled_ch14
-  notes: Wooldridge Introductory Econometrics Chapter 14 Example 14.3 pooled job training scrap rate equation.
-  dimension: numerical
-  status: pass
-- id: ols_wooldridge_kielmc_ch13
-  notes: Wooldridge Introductory Econometrics Chapter 13 Example 13.1 difference-in-differences housing price equation.
-  dimension: numerical
-  status: pass
-- id: ols_wooldridge_vote1_ch2
-  notes: Wooldridge Introductory Econometrics Chapter 2 Examples 2.5 and 2.9 election outcomes equation.
+- id: ols_wooldridge_wage1_quad_ch6
+  notes: Wooldridge Introductory Econometrics Chapter 6 Section 6.2 wage equation
+    with experience quadratic.
   dimension: numerical
   status: pass
 - id: oprobit_beauty
@@ -258,23 +300,8 @@ cases:
   dimension: numerical
   status: pass
 - id: panel_fe_wooldridge_wagepan_ch14
-  notes: Wooldridge Introductory Econometrics Chapter 14 Example 14.4 panel fixed-effects wage equation.
-  dimension: numerical
-  status: pass
-- id: mixed_wooldridge_wagepan_ch14
-  notes: Wooldridge Introductory Econometrics Chapter 14 Example 14.4 mixed linear model wage equation.
-  dimension: numerical
-  status: pass
-- id: gee_wooldridge_wagepan_ch14
-  notes: Wooldridge Introductory Econometrics Chapter 14 Example 14.4 generalized estimating equations wage equation.
-  dimension: numerical
-  status: pass
-- id: glm_wooldridge_fertil2_poisson
-  notes: Poisson GLM for number of children on Wooldridge fertil2.
-  dimension: numerical
-  status: pass
-- id: iv_wooldridge_mroz_ch15
-  notes: Wooldridge Introductory Econometrics Chapter 15 Example 15.1 IV returns to schooling for married women.
+  notes: Wooldridge Introductory Econometrics Chapter 14 Example 14.4 panel fixed-effects
+    wage equation.
   dimension: numerical
   status: pass
 - id: poisson_fertil2
