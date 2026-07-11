@@ -1,7 +1,7 @@
 id: gmm_card
 title: GMM returns to schooling on Wooldridge card
 estimator_family: gmm
-status: blocked
+status: active
 dimension: numerical
 dataset:
   name: wooldridge::card
@@ -22,9 +22,9 @@ hayashi_script: cases/gmm_card/hayashi/run.hay
 reference_scripts:
   R: cases/gmm_card/reference/run.R
   Python: cases/gmm_card/reference/run.py
-notes: Blocked — Hayashi GMM standard errors differ from R AER::gmm reference.
+notes: R and Python use robust two-step GMM references with matching covariance
+  conventions; current Hayashi estimates match both within tolerance.
 result:
-  summary: Hayashi GMM produces standard errors that differ from R AER::gmm.
-  known_differences:
-  - Standard errors for instruments x0 and x5 differ from R.
+  summary: Hayashi GMM estimates match the aligned R and Python references.
+  known_differences: []
   issues_opened: []
