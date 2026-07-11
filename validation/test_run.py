@@ -2,9 +2,11 @@
 """Focused tests for validation runner metadata checks."""
 
 import importlib.util
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import yaml
 
@@ -39,6 +41,7 @@ class MetadataCheckTests(unittest.TestCase):
         self,
         case_id: str = "ols_example",
         *,
+        status: str = "active",
         references: list[str] | None = None,
         tolerances: dict[str, float] | None = None,
         include_readme: bool = True,
@@ -57,7 +60,7 @@ class MetadataCheckTests(unittest.TestCase):
         case = {
             "title": "OLS example",
             "estimator_family": "ols",
-            "status": "pass",
+            "status": status,
             "dataset": {
                 "name": "example",
                 "source": "simulated",
@@ -101,6 +104,26 @@ class MetadataCheckTests(unittest.TestCase):
         findings = self.module.check_metadata(matrix, cases, registry_ids, discovered_ids)
 
         self.assertEqual(findings, [])
+
+    def test_metadata_check_rejects_not_started_case_with_pass_result(self):
+        self.write_case(status="not-started")
+        self.write_matrix([
+            {
+                "id": "ols_example",
+                "notes": "Example case.",
+                "dimension": "numerical",
+                "status": "pass",
+            }
+        ])
+        matrix, cases, registry_ids, discovered_ids = self.module.load_cases()
+        self.module.MATRIX_MD.write_text(self.module.render_matrix_md(cases))
+
+        findings = self.module.check_metadata(matrix, cases, registry_ids, discovered_ids)
+
+        self.assertIn(
+            "ols_example: not-started case cannot have a recorded pass result",
+            findings,
+        )
 
     def test_metadata_check_rejects_pass_case_without_reference(self):
         self.write_case(references=[])
@@ -202,6 +225,53 @@ n = 753
 
         self.assertAlmostEqual(parsed["marginal_effects"]["nwifeinc"], -0.003811)
         self.assertAlmostEqual(parsed["standard_errors"]["educ"], 0.008468)
+
+    def test_compare_against_references_reports_each_reference(self):
+        hayashi = {"coefficients": {"x": 1.0}}
+        references = {
+            "R": {"coefficients": {"x": 1.0}},
+            "Python": {"coefficients": {"x": 1.5}},
+        }
+
+        failures, failures_by_reference = self.module.compare_against_references(
+            hayashi,
+            references,
+            {"coefficients": 1e-6},
+        )
+
+        self.assertEqual(failures_by_reference["R"], [])
+        self.assertEqual(len(failures_by_reference["Python"]), 1)
+        self.assertEqual(len(failures), 1)
+        self.assertTrue(failures[0].startswith("Python: coefficients.x:"))
+
+    def test_run_case_compares_hayashi_with_all_references(self):
+        case_id = "ols_example"
+        case_dir = self.validation_dir / "cases" / case_id
+        self.write_case(case_id=case_id, references=["R", "Python"])
+        (case_dir / "reference" / "run.R").write_text("# R reference\n")
+        case = yaml.safe_load((case_dir / "case.yml").read_text())
+        case["id"] = case_id
+        case["reference_scripts"]["R"] = f"cases/{case_id}/reference/run.R"
+
+        def fake_run_command(cmd, cwd=None):
+            if cmd[0] == "Rscript":
+                stdout = '{"coefficients": {"x": 1.0}}\n'
+            elif cmd[0] in {"python", "python3"}:
+                stdout = '{"coefficients": {"x": 2.0}}\n'
+            else:
+                stdout = "Variable,Coef,Std_Err\nx,1.0,0.1\n"
+            return subprocess.CompletedProcess(cmd, 0, stdout=stdout, stderr="")
+
+        with patch.object(self.module, "check_executable", return_value=True), patch.object(
+            self.module, "run_command", side_effect=fake_run_command
+        ):
+            status, failures, ref_report = self.module.run_case(case)
+
+        self.assertEqual(status, "fail")
+        self.assertEqual(len(failures), 1)
+        self.assertTrue(failures[0].startswith("Python: coefficients.x:"))
+        self.assertTrue(ref_report["R"]["used"])
+        self.assertTrue(ref_report["Python"]["used"])
 
 
 if __name__ == "__main__":

@@ -155,7 +155,7 @@ cases:
 - id: ols_cluster_wagepan
   notes: OLS wage equation with one-way cluster-robust standard errors by worker id.
   dimension: numerical
-  status: pass
+  status: not-started
 - id: ols_wooldridge_401k_ch3
   notes: Wooldridge Introductory Econometrics Chapter 3 Example 3.3 401(k) participation
     equation.
