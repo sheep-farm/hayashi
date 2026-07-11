@@ -1,0 +1,8 @@
+// Wooldridge (Introductory Econometrics, 7e), Chapter 7, Example 7.6.
+// hourly wage equation with marriage and gender dummy interactions: lwage ~ marrmale + marrfem + singfem + educ + exper + expersq + tenure + tenursq.
+
+load "validation/cases/ols_wooldridge_wage1_interaction_ch7/data/wage1.csv" as df
+
+let m = ols(lwage ~ marrmale + marrfem + singfem + educ + exper + expersq + tenure + tenursq, df)
+
+export(m, "csv", "/dev/stdout")

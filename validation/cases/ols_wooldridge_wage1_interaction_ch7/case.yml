@@ -1,0 +1,34 @@
+id: ols_wooldridge_wage1_interaction_ch7
+title: OLS hourly wage equation with marriage-gender interactions on Wooldridge wage1 (Chapter 7, Example 7.6)
+estimator_family: ols
+status: active
+dimension: numerical
+
+dataset:
+  name: wooldridge::wage1
+  source: R package wooldridge / Python wooldridge-python
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-6
+    standard_errors: 1e-6
+
+hayashi_script: cases/ols_wooldridge_wage1_interaction_ch7/hayashi/run.hay
+reference_scripts:
+  R: cases/ols_wooldridge_wage1_interaction_ch7/reference/run.R
+  Python: cases/ols_wooldridge_wage1_interaction_ch7/reference/run.py
+
+notes: Wooldridge Introductory Econometrics Chapter 7, Example 7.6 hourly wage equation with marriage and gender dummy interactions.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []

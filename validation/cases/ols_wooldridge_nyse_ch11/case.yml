@@ -1,0 +1,34 @@
+id: ols_wooldridge_nyse_ch11
+title: OLS efficient markets hypothesis on Wooldridge nyse (Chapter 11, Example 11.4)
+estimator_family: ols
+status: active
+dimension: numerical
+
+dataset:
+  name: wooldridge::nyse
+  source: R package wooldridge / Python wooldridge-python
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-6
+    standard_errors: 1e-6
+
+hayashi_script: cases/ols_wooldridge_nyse_ch11/hayashi/run.hay
+reference_scripts:
+  R: cases/ols_wooldridge_nyse_ch11/reference/run.R
+  Python: cases/ols_wooldridge_nyse_ch11/reference/run.py
+
+notes: Wooldridge Introductory Econometrics Chapter 11, Example 11.4 AR(1) test of efficient markets hypothesis.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []
