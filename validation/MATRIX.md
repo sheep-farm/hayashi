@@ -18,6 +18,7 @@
 | garch | simulated_garch11 | Python | pass | — | Uses the same simulated GARCH(1,1) DGP as Chapter 30 of the book. MLE tolerances are looser because the optimizer may stop at slightly different points. |
 | garch | wooldridge::nyse | R, Python | pass | — | GARCH(1,1) on NYSE returns. |
 | gee | wooldridge::wagepan | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 14 Example 14.4 generalized estimating equations wage equation. |
+| glm | wooldridge::fertil2 | R, Python | pass | — | Poisson GLM for number of children on Wooldridge fertil2. |
 | glsar | wooldridge::hprice1 | R, Python | pass | — | GLS with AR(1) errors on housing price equation. |
 | gmm | wooldridge::card | R, Python | pass | — | GMM returns to schooling with nearc4 as instrument for education. |
 | heckman | wooldridge::mroz | R, Python | pass | — | Two-step Heckman (Heckit) on the Mroz dataset. SEs are approximate because the reference implementations are two-step. |

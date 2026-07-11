@@ -1,0 +1,36 @@
+id: glm_wooldridge_fertil2_poisson
+title: GLM Poisson children count on Wooldridge fertil2
+estimator_family: glm
+status: active
+dimension: numerical
+
+dataset:
+  name: wooldridge::fertil2
+  source: R package wooldridge / Python wooldridge-python
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 0.0001
+    standard_errors: 0.0001
+
+output_format: txt
+
+hayashi_script: cases/glm_wooldridge_fertil2_poisson/hayashi/run.hay
+reference_scripts:
+  R: cases/glm_wooldridge_fertil2_poisson/reference/run.R
+  Python: cases/glm_wooldridge_fertil2_poisson/reference/run.py
+
+notes: Wooldridge dataset fertil2 Poisson GLM for number of children.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []
