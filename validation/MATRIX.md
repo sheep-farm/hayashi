@@ -22,7 +22,7 @@
 | garch | wooldridge::nyse | R:passed *, Python:passed * | pass | — | GARCH(1,1) on NYSE returns. |
 | gee | wooldridge::wagepan | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 14 Example 14.4 generalized estimating equations wage equation. |
 | glm | wooldridge::fertil2 | R:passed *, Python:passed * | pass | — | Poisson GLM for number of children on Wooldridge fertil2. |
-| glsar | wooldridge::hprice1 | R, Python | blocked | — | GLS with AR(1) errors on housing price equation. |
+| glsar | wooldridge::hprice1 | R:passed *, Python:passed * | pass | — | GLS with AR(1) errors on housing price equation. |
 | gmm | wooldridge::card | R:passed *, Python:passed * | pass | — | GMM returns to schooling with nearc4 as instrument for education. |
 | heckman | wooldridge::mroz | R:passed *, Python:passed * | pass | — | Two-step Heckman (Heckit) on the Mroz dataset. SEs are approximate because the reference implementations are two-step. |
 | iv | wooldridge::card | R:passed *, Python:passed * | pass | — | IV with education endogenous and nearc4 as instrument. |
