@@ -188,6 +188,26 @@ cases:
   notes: Wooldridge Introductory Econometrics Chapter 6 Section 6.2 wage equation with experience quadratic.
   dimension: numerical
   status: pass
+- id: ols_wooldridge_bwght_ch5
+  notes: Wooldridge Introductory Econometrics Chapter 5 Example 5.2 birth weight equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_ceosal1_roe_ch2
+  notes: Wooldridge Introductory Econometrics Chapter 2 Example 2.3 CEO salary on return on equity.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_intdef_ch10
+  notes: Wooldridge Introductory Econometrics Chapter 10 Example 10.2 interest rate on inflation and deficit.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_phillips_ch10
+  notes: Wooldridge Introductory Econometrics Chapter 10 Example 10.1 static Phillips curve.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_vote1_ch2
+  notes: Wooldridge Introductory Econometrics Chapter 2 Examples 2.5 and 2.9 election outcomes equation.
+  dimension: numerical
+  status: pass
 - id: oprobit_beauty
   notes: Ordered probit model of self-reported beauty rating (looks 2-5) on female,
     education, experience and black indicators.
