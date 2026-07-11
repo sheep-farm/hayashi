@@ -1,7 +1,7 @@
 id: autoreg_gdp
 title: AR(1) on US real GDP with constant and trend
 estimator_family: autoreg
-status: blocked
+status: active
 dimension: numerical
 dataset:
   name: statsmodels::macrodata
@@ -22,11 +22,9 @@ hayashi_script: cases/autoreg_gdp/hayashi/run.hay
 reference_scripts:
   R: cases/autoreg_gdp/reference/run.R
   Python: cases/autoreg_gdp/reference/run.py
-notes: Blocked — Hayashi autoreg with constant and trend produces coefficients on
-  a different scale than R/Python.
+notes: The R and Python references use the same conditional AR(1) design with a
+  constant and linear trend; current Hayashi estimates match both within tolerance.
 result:
-  summary: Hayashi autoreg trend and intercept are on a different scale than R/Python
-    references.
-  known_differences:
-  - Trend and intercept coefficients differ by orders of magnitude.
+  summary: Hayashi autoreg estimates match the corrected R and Python references.
+  known_differences: []
   issues_opened: []
