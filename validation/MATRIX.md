@@ -8,7 +8,7 @@
 | arima | simulated_rw | R:passed *, Python:passed * | pass | — | ARIMA(1,1,0) on a simulated random walk with seed 42. Intercept is excluded from comparison because R/Python references are estimated without trend. |
 | arima | statsmodels::macrodata | R:passed *, Python:passed * | pass | — | ARIMA(1,1,1) on log US real GDP via exact Gaussian MLE. |
 | arima | simulated_arma11 | R:passed *, Python:passed * | pass | — | Uses the same simulated ARMA(1,1) DGP as Chapter 26 of the book. Intercept is excluded from comparison because Hayashi profiles it out in MLE (SE = 0). |
-| autoreg | statsmodels::macrodata | R, Python | blocked | — | AR(1) on US real GDP with constant and trend. |
+| autoreg | statsmodels::macrodata | R:passed *, Python:passed * | pass | — | AR(1) on US real GDP with constant and trend. |
 | betareg | wooldridge::401k | R | blocked | https://github.com/sheep-farm/hayashi/issues/63 | Blocked — Greeners beta regression MLE does not converge with multiple regressors, producing coefficients that diverge from R betareg. |
 | cloglog | wooldridge::affairs | R, Python | blocked | https://github.com/sheep-farm/hayashi/issues/64 | Blocked — Hayashi GLM with binomial/cloglog link overflows and produces nonsensical coefficients. |
 | vecm | simulated_cointegrated | R:passed *, Python:passed * | pass | — | VECM(1) on a simulated cointegrated system where y = 2*x + e2 and x = cumsum(e1). Only the cointegration (beta) and adjustment (alpha) coefficients are compared. |
