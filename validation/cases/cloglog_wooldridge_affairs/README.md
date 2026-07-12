@@ -23,5 +23,4 @@ glm(affair ~ age + yrsmarr + kids + educ + relig + ratemarr, df,
 
 ## Status
 
-Blocked — Hayashi's binomial/cloglog GLM overflows during IRLS.
-See [sheep-farm/hayashi#64](https://github.com/sheep-farm/hayashi/issues/64).
+Pass — A sign error in the cloglog link derivative caused IRLS divergence. With the derivative fixed, Hayashi converges to the same coefficients and standard errors as R glm and statsmodels.
