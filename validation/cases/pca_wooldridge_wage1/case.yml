@@ -1,0 +1,30 @@
+id: pca_wooldridge_wage1
+title: PCA on Wooldridge wage1 variables
+estimator_family: pca
+status: active
+dimension: numerical
+dataset:
+  name: wooldridge::wage1
+  source: R package wooldridge / Python wooldridge-python
+  licence: public teaching dataset
+references:
+- R
+- Python
+comparison:
+  quantities:
+  - explained_variance
+  - explained_variance_ratio
+  - absolute_loadings
+  tolerances:
+    explained_variance: 1e-4
+    explained_variance_ratio: 1e-4
+    absolute_loadings: 1e-4
+hayashi_script: cases/pca_wooldridge_wage1/hayashi/run.hay
+reference_scripts:
+  R: cases/pca_wooldridge_wage1/reference/run.R
+  Python: cases/pca_wooldridge_wage1/reference/run.py
+notes: |
+  PCA is run on educ, exper, tenure, and wage with centering and unit-variance
+  scaling. Loadings are compared in absolute value because each eigenvector's
+  sign is arbitrary. Hayashi displays four decimal places, so tolerances allow
+  for output rounding.

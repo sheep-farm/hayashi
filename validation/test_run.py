@@ -226,6 +226,29 @@ n = 753
         self.assertAlmostEqual(parsed["marginal_effects"]["nwifeinc"], -0.003811)
         self.assertAlmostEqual(parsed["standard_errors"]["educ"], 0.008468)
 
+    def test_parse_hayashi_pca_output_is_sign_invariant(self):
+        text = """
+ Principal Component Analysis
+ Component      Var Expl.       % Cum. Eigenvalue
+ PC1               0.4167       0.4167     1.6669
+ PC2               0.3636       0.7803     1.4545
+ Loadings
+ Variable                PC1      PC2
+ educ                -0.1133  -0.8893
+ exper                0.7911   0.3763
+ """
+
+        parsed = self.module.parse_hayashi_pca(text)
+
+        self.assertAlmostEqual(parsed["explained_variance"]["PC1"], 1.6669)
+        self.assertAlmostEqual(parsed["explained_variance_ratio"]["PC2"], 0.3636)
+        self.assertAlmostEqual(parsed["absolute_loadings"]["educ:PC1"], 0.1133)
+        self.assertAlmostEqual(parsed["absolute_loadings"]["educ:PC2"], 0.8893)
+
+    def test_parse_hayashi_pca_rejects_missing_sections(self):
+        with self.assertRaises(ValueError):
+            self.module.parse_hayashi_pca("Principal Component Analysis\n")
+
     def test_compare_against_references_reports_each_reference(self):
         hayashi = {"coefficients": {"x": 1.0}}
         references = {
