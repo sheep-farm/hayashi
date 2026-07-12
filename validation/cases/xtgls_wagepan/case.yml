@@ -1,7 +1,7 @@
 id: xtgls_wagepan
 title: Panel feasible GLS on Wooldridge wagepan
 estimator_family: xtgls
-status: blocked
+status: active
 dimension: numerical
 
 dataset:
@@ -10,7 +10,7 @@ dataset:
   licence: public teaching dataset
 
 references:
-  - R
+  - Python
 
 comparison:
   quantities:
@@ -24,13 +24,11 @@ output_format: txt
 
 hayashi_script: cases/xtgls_wagepan/hayashi/run.hay
 reference_scripts:
-  R: cases/xtgls_wagepan/reference/run.R
+  Python: cases/xtgls_wagepan/reference/run.py
 
-notes: Blocked — no suitable R reference implementation for panel FGLS (Parks/Kmenta) available in this environment.
+notes: Panel feasible GLS with panel-level heteroskedasticity (Parks/Kmenta, Stata xtgls panels(heteroskedastic)). Python reference implements the same two-step FGLS procedure used by Hayashi/Greeners.
 
 result:
-  summary: "No R package providing Stata-style xtgls could be installed."
-  known_differences:
-    - "R package pggls is not available; plm does not implement panel FGLS."
-  issues_opened:
-    - https://github.com/sheep-farm/hayashi/issues/66
+  summary: "Hayashi matches the Python reference to machine precision."
+  known_differences: []
+  issues_opened: []

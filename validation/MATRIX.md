@@ -2,96 +2,96 @@
 
 | Family | Dataset | Reference | Status | Blocking Issue | Notes |
 |---|---|---:|---|---|---|
-| ab | wooldridge::grunfeld | R:passed * | pass | — | Arellano-Bond difference GMM for dynamic panel investment demand. |
-| arima | simulated_ar1 | R:passed *, Python:passed * | pass | — | Uses the same simulated AR(1) DGP as Chapter 26 of the book. |
-| ardl | statsmodels::macrodata | R:passed *, Python:passed * | pass | — | ARDL(1,1) model of US real GDP on consumption. |
-| arima | simulated_rw | R:passed *, Python:passed * | pass | — | ARIMA(1,1,0) on a simulated random walk with seed 42. Intercept is excluded from comparison because R/Python references are estimated without trend. |
-| arima | statsmodels::macrodata | R:passed *, Python:passed * | pass | — | ARIMA(1,1,1) on log US real GDP via exact Gaussian MLE. |
-| arima | simulated_arma11 | R:passed *, Python:passed * | pass | — | Uses the same simulated ARMA(1,1) DGP as Chapter 26 of the book. Intercept is excluded from comparison because Hayashi profiles it out in MLE (SE = 0). |
-| autoreg | statsmodels::macrodata | R:passed *, Python:passed * | pass | — | AR(1) on US real GDP with constant and trend. |
+| ab | wooldridge::grunfeld | R | pass | — | Arellano-Bond difference GMM for dynamic panel investment demand. |
+| arima | simulated_ar1 | R, Python | pass | — | Uses the same simulated AR(1) DGP as Chapter 26 of the book. |
+| ardl | statsmodels::macrodata | R, Python | pass | — | ARDL(1,1) model of US real GDP on consumption. |
+| arima | simulated_rw | R, Python | pass | — | ARIMA(1,1,0) on a simulated random walk with seed 42. Intercept is excluded from comparison because R/Python references are estimated without trend. |
+| arima | statsmodels::macrodata | R, Python | pass | — | ARIMA(1,1,1) on log US real GDP via exact Gaussian MLE. |
+| arima | simulated_arma11 | R, Python | pass | — | Uses the same simulated ARMA(1,1) DGP as Chapter 26 of the book. Intercept is excluded from comparison because Hayashi profiles it out in MLE (SE = 0). |
+| autoreg | statsmodels::macrodata | R, Python | pass | — | AR(1) on US real GDP with constant and trend. |
 | betareg | wooldridge::401k | R | blocked | https://github.com/sheep-farm/hayashi/issues/63 | Blocked — Greeners beta regression MLE does not converge with multiple regressors, producing coefficients that diverge from R betareg. |
 | cloglog | wooldridge::affairs | R, Python | blocked | https://github.com/sheep-farm/hayashi/issues/64 | Blocked — Hayashi GLM with binomial/cloglog link overflows and produces nonsensical coefficients. |
-| vecm | simulated_cointegrated | R:passed *, Python:passed * | pass | — | VECM(1) on a simulated cointegrated system where y = 2*x + e2 and x = cumsum(e1). Only the cointegration (beta) and adjustment (alpha) coefficients are compared. |
-| cox | statsmodels::heart | R:passed *, Python:passed * | pass | — | Cox proportional hazards regression for survival time after heart transplant. |
-| did | wooldridge::kielmc | R:passed *, Python:passed * | pass | — | Difference-in-differences effect of incinerator proximity on log house prices. |
-| egarch | wooldridge::nyse | R:passed *, Python:passed * | pass | — | EGARCH(1,1) on NYSE returns. |
-| elasticnet | wooldridge::hprice1 | Python:passed * | pass | — | Elastic Net regression of log house price on log lot size, log square footage, bedrooms and colonial dummy. |
-| ets | statsmodels::macrodata | R:passed *, Python:passed * | pass | — | Exponential smoothing state-space model on US real GDP. Blocked because Hayashi uses SSE grid search while references use MLE. |
-| fmb | simulated_fmb_panel | R:passed *, Python:passed * | pass | 49 | Classic Fama-MacBeth regression on a deterministic simulated asset panel. |
-| garch | simulated_garch11 | Python:passed * | pass | — | Uses the same simulated GARCH(1,1) DGP as Chapter 30 of the book. MLE tolerances are looser because the optimizer may stop at slightly different points. |
-| garch | wooldridge::nyse | R:passed *, Python:passed * | pass | — | GARCH(1,1) on NYSE returns. |
-| gee | wooldridge::wagepan | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 14 Example 14.4 generalized estimating equations wage equation. |
-| glm | wooldridge::fertil2 | R:passed *, Python:passed * | pass | — | Poisson GLM for number of children on Wooldridge fertil2. |
-| glsar | wooldridge::hprice1 | R:passed *, Python:passed * | pass | — | GLS with AR(1) errors on housing price equation. |
-| gmm | wooldridge::card | R:passed *, Python:passed * | pass | — | GMM returns to schooling with nearc4 as instrument for education. |
-| heckman | wooldridge::mroz | R:passed *, Python:passed * | pass | — | Two-step Heckman (Heckit) on the Mroz dataset. SEs are approximate because the reference implementations are two-step. |
-| iv | wooldridge::card | R:passed *, Python:passed * | pass | — | IV with education endogenous and nearc4 as instrument. |
-| iv | wooldridge::mroz | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 15 Example 15.1 IV returns to schooling for married women. |
+| vecm | simulated_cointegrated | R, Python | pass | — | VECM(1) on a simulated cointegrated system where y = 2*x + e2 and x = cumsum(e1). Only the cointegration (beta) and adjustment (alpha) coefficients are compared. |
+| cox | statsmodels::heart | R, Python | pass | — | Cox proportional hazards regression for survival time after heart transplant. |
+| did | wooldridge::kielmc | R, Python | pass | — | Difference-in-differences effect of incinerator proximity on log house prices. |
+| egarch | wooldridge::nyse | R, Python | pass | — | EGARCH(1,1) on NYSE returns. |
+| elasticnet | wooldridge::hprice1 | Python | pass | — | Elastic Net regression of log house price on log lot size, log square footage, bedrooms and colonial dummy. |
+| ets | statsmodels::macrodata | R, Python | pass | — | Exponential smoothing state-space model on US real GDP. Blocked because Hayashi uses SSE grid search while references use MLE. |
+| fmb | simulated_fmb_panel | R, Python | pass | 49 | Classic Fama-MacBeth regression on a deterministic simulated asset panel. |
+| garch | simulated_garch11 | Python | pass | — | Uses the same simulated GARCH(1,1) DGP as Chapter 30 of the book. MLE tolerances are looser because the optimizer may stop at slightly different points. |
+| garch | wooldridge::nyse | R, Python | pass | — | GARCH(1,1) on NYSE returns. |
+| gee | wooldridge::wagepan | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 14 Example 14.4 generalized estimating equations wage equation. |
+| glm | wooldridge::fertil2 | R, Python | pass | — | Poisson GLM for number of children on Wooldridge fertil2. |
+| glsar | wooldridge::hprice1 | R, Python | pass | — | GLS with AR(1) errors on housing price equation. |
+| gmm | wooldridge::card | R, Python | pass | — | GMM returns to schooling with nearc4 as instrument for education. |
+| heckman | wooldridge::mroz | R, Python | pass | — | Two-step Heckman (Heckit) on the Mroz dataset. SEs are approximate because the reference implementations are two-step. |
+| iv | wooldridge::card | R, Python | pass | — | IV with education endogenous and nearc4 as instrument. |
+| iv | wooldridge::mroz | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 15 Example 15.1 IV returns to schooling for married women. |
 | kalman | wooldridge::nyse | R | blocked | https://github.com/sheep-farm/hayashi/issues/65 | Blocked — Hayashi kalman() adds filtered/smoothed columns to a DataFrame and returns nil, which the current validation harness does not capture. |
-| lasso | wooldridge::hprice1 | R:passed *, Python:passed * | pass | — | Lasso regression of house price on lot size, square footage and bedrooms. |
-| logit | wooldridge::mroz | R:passed *, Python:passed * | pass | — | Logit average marginal effects on Wooldridge mroz. |
-| logit | wooldridge::mroz | R:passed *, Python:passed * | pass | — | Logit labour-force participation on the Mroz dataset. |
-| arima | simulated_ma1 | R:passed *, Python:passed * | pass | — | Uses the same simulated MA(1) DGP as Chapter 26 of the book. |
-| mixed | wooldridge::wagepan | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 14 Example 14.4 mixed linear model wage equation. |
-| mlogit | AER::TravelMode | R:passed *, Python:passed * | pass | — | Multinomial logit of chosen travel mode (air=1, train=2, bus=3, car=4) on income, wait time, vehicle cost and travel time. Alternative-specific attributes are averaged per individual to make them individual-specific covariates. |
-| negbin | wooldridge::fertil2 | R:passed *, Python:passed * | pass | — | Negative binomial regression for number of children on age, education, electric and urban indicators. Dispersion parameter (alpha) is not compared because Hayashi does not report it; coefficient tolerance is 2e-1 due to different alpha estimates. |
-| ologit | wooldridge::beauty | R:passed *, Python:passed * | pass | — | Ordered logit of looks (2, 3, 4) on female, educ, exper, black. |
-| ols | wooldridge::wagepan | R:passed *, Python:passed * | pass | — | OLS wage equation with one-way cluster-robust standard errors by worker id. |
-| ols | wooldridge::401k | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 3 Example 3.3 401(k) participation equation. |
-| ols | wooldridge::attend | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 6 Example 6.3 attendance effects on exam score. |
-| ols | wooldridge::barium | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 10 Example 10.5 barium chloride import equation. |
-| ols | wooldridge::bwght | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 5 Example 5.2 birth weight equation. |
-| ols | wooldridge::campus | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 4 Example 4.4 log-log campus crime equation. |
-| ols | wooldridge::ceosal1 | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 2 Example 2.11 log-log CEO salary equation. |
-| ols | wooldridge::ceosal1 | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 2 Example 2.3 CEO salary on return on equity. |
-| ols | wooldridge::consump | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 10 Example 10.4 consumption growth on income growth. |
-| ols | wooldridge::crime1 | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 3 Example 3.5 arrest records equation with average sentence. |
-| ols | wooldridge::crime1 | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 3 Example 3.5 arrest records equation. |
-| ols | wooldridge::fertil3 | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 13 Example 13.3 fertility distributed lag equation. |
-| ols | wooldridge::gpa1 | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 3 Example 3.1 college GPA equation. |
-| ols | wooldridge::hprice1 | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 4 Section 4.5 log housing price equation. |
-| ols | wooldridge::hprice2 | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 6 Example 6.2 log housing price equation with rooms quadratic. |
-| ols | wooldridge::htv | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 9 Example 9.3 education equation. |
-| ols | wooldridge::intdef | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 10 Example 10.2 interest rate on inflation and deficit. |
-| ols | wooldridge::jtrain | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 14 Example 14.3 pooled job training scrap rate equation. |
-| ols | wooldridge::kielmc | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 13 Example 13.1 difference-in-differences housing price equation. |
-| ols | wooldridge::meap93 | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 4 math pass rate equation. |
-| ols | wooldridge::nyse | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 11 Example 11.4 efficient markets hypothesis. |
-| ols | wooldridge::phillips | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 10 Example 10.1 static Phillips curve. |
-| ols | wooldridge::phillips | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 11 Example 11.5 expectations-augmented Phillips curve. |
-| ols | wooldridge::prminwge | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 10 Example 10.3 Puerto Rican employment equation. |
-| ols | wooldridge::sleep75 | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 5 Problem 3.3 sleep equation. |
-| ols | wooldridge::twoyear | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 4 Example 4.10 returns to college equation. |
-| ols | wooldridge::vote1 | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 2 Examples 2.5 and 2.9 election outcomes equation. |
-| ols | wooldridge::wage1 | R:passed *, Python:passed * | pass | — | First real-dataset validation case. |
-| ols | wooldridge::wage1 | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 2 Example 2.10 log wage equation. |
-| ols | wooldridge::wage1 | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 7 Example 7.1 hourly wage equation with female dummy. |
-| ols | wooldridge::wage1 | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 7 Example 7.6 hourly wage equation with marriage-gender interactions. |
-| ols | wooldridge::wage1 | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 7 Example 7.1 log hourly wage equation with female dummy. |
-| ols | wooldridge::wage1 | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 6 Section 6.2 wage equation with experience quadratic. |
-| oprobit | wooldridge::beauty | R:passed *, Python:passed * | pass | — | Ordered probit model of self-reported beauty rating (looks 2-5) on female, education, experience and black indicators. |
-| panel_fe | wooldridge::grunfeld | R:passed *, Python:passed * | pass | — | Panel fixed-effects investment demand model (Grunfeld). |
-| panel_fe | wooldridge::wagepan | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 14 Example 14.4 panel fixed-effects wage equation. |
-| pcse | wooldridge::wagepan | R:passed * | pass | — | PCSE estimation of log wage on education, experience, and dummies using panel-corrected standard errors. |
-| poisson | wooldridge::fertil2 | R:passed *, Python:passed * | pass | — | Poisson regression for number of children on the fertil2 dataset. |
-| probit | wooldridge::mroz | R:passed *, Python:passed * | pass | — | Probit labour-force participation on the Mroz dataset. |
-| psm | wooldridge::jtrain3 | R:passed *, Python:passed * | pass | — | 1:1 nearest-neighbor propensity score matching with caliper 0.2 and bootstrap SE. |
-| qreg | wooldridge::wage1 | R:passed *, Python:passed * | pass | — | Median quantile regression of wage on education, experience, and tenure. |
-| rdd | rdd_book | R:passed *, Python:passed * | pass | — | Sharp RDD with local linear regression, triangular kernel and Imbens-Kalyanaraman bandwidth. |
-| re | grunfeld | R:passed *, Python:passed * | pass | — | Random-effects investment demand model (Grunfeld). |
-| ridge | wooldridge::hprice1 | Python:passed * | pass | — | Ridge regression of log house price on log lot size, log square footage, bedrooms and colonial dummy. |
-| rlm | wooldridge::wage1 | R:passed *, Python:passed * | pass | — | Huber robust linear regression of log wage on education, experience, and tenure. |
-| sur | wooldridge::grunfeld | R:passed *, Python:passed * | pass | — | Two-equation SUR (Zellner FGLS) on the Grunfeld investment data. |
-| svar | statsmodels::macrodata | R:passed *, Python:passed * | pass | — | Cholesky-identified SVAR(2) on log US real GDP and consumption. |
-| synth | synth_smoking | R:passed *, Python:passed * | pass | — | Synthetic-control ATT on a simulated panel with 10 donors and 1 treated unit. |
+| lasso | wooldridge::hprice1 | R, Python | pass | — | Lasso regression of house price on lot size, square footage and bedrooms. |
+| logit | wooldridge::mroz | R, Python | pass | — | Logit average marginal effects on Wooldridge mroz. |
+| logit | wooldridge::mroz | R, Python | pass | — | Logit labour-force participation on the Mroz dataset. |
+| arima | simulated_ma1 | R, Python | pass | — | Uses the same simulated MA(1) DGP as Chapter 26 of the book. |
+| mixed | wooldridge::wagepan | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 14 Example 14.4 mixed linear model wage equation. |
+| mlogit | AER::TravelMode | R, Python | pass | — | Multinomial logit of chosen travel mode (air=1, train=2, bus=3, car=4) on income, wait time, vehicle cost and travel time. Alternative-specific attributes are averaged per individual to make them individual-specific covariates. |
+| negbin | wooldridge::fertil2 | R, Python | pass | — | Negative binomial regression for number of children on age, education, electric and urban indicators. Dispersion parameter (alpha) is not compared because Hayashi does not report it; coefficient tolerance is 2e-1 due to different alpha estimates. |
+| ologit | wooldridge::beauty | R, Python | pass | — | Ordered logit of looks (2, 3, 4) on female, educ, exper, black. |
+| ols | wooldridge::wagepan | R, Python | pass | — | OLS wage equation with one-way cluster-robust standard errors by worker id. |
+| ols | wooldridge::401k | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 3 Example 3.3 401(k) participation equation. |
+| ols | wooldridge::attend | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 6 Example 6.3 attendance effects on exam score. |
+| ols | wooldridge::barium | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 10 Example 10.5 barium chloride import equation. |
+| ols | wooldridge::bwght | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 5 Example 5.2 birth weight equation. |
+| ols | wooldridge::campus | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 4 Example 4.4 log-log campus crime equation. |
+| ols | wooldridge::ceosal1 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 2 Example 2.11 log-log CEO salary equation. |
+| ols | wooldridge::ceosal1 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 2 Example 2.3 CEO salary on return on equity. |
+| ols | wooldridge::consump | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 10 Example 10.4 consumption growth on income growth. |
+| ols | wooldridge::crime1 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 3 Example 3.5 arrest records equation with average sentence. |
+| ols | wooldridge::crime1 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 3 Example 3.5 arrest records equation. |
+| ols | wooldridge::fertil3 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 13 Example 13.3 fertility distributed lag equation. |
+| ols | wooldridge::gpa1 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 3 Example 3.1 college GPA equation. |
+| ols | wooldridge::hprice1 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 4 Section 4.5 log housing price equation. |
+| ols | wooldridge::hprice2 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 6 Example 6.2 log housing price equation with rooms quadratic. |
+| ols | wooldridge::htv | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 9 Example 9.3 education equation. |
+| ols | wooldridge::intdef | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 10 Example 10.2 interest rate on inflation and deficit. |
+| ols | wooldridge::jtrain | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 14 Example 14.3 pooled job training scrap rate equation. |
+| ols | wooldridge::kielmc | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 13 Example 13.1 difference-in-differences housing price equation. |
+| ols | wooldridge::meap93 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 4 math pass rate equation. |
+| ols | wooldridge::nyse | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 11 Example 11.4 efficient markets hypothesis. |
+| ols | wooldridge::phillips | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 10 Example 10.1 static Phillips curve. |
+| ols | wooldridge::phillips | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 11 Example 11.5 expectations-augmented Phillips curve. |
+| ols | wooldridge::prminwge | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 10 Example 10.3 Puerto Rican employment equation. |
+| ols | wooldridge::sleep75 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 5 Problem 3.3 sleep equation. |
+| ols | wooldridge::twoyear | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 4 Example 4.10 returns to college equation. |
+| ols | wooldridge::vote1 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 2 Examples 2.5 and 2.9 election outcomes equation. |
+| ols | wooldridge::wage1 | R, Python | pass | — | First real-dataset validation case. |
+| ols | wooldridge::wage1 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 2 Example 2.10 log wage equation. |
+| ols | wooldridge::wage1 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 7 Example 7.1 hourly wage equation with female dummy. |
+| ols | wooldridge::wage1 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 7 Example 7.6 hourly wage equation with marriage-gender interactions. |
+| ols | wooldridge::wage1 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 7 Example 7.1 log hourly wage equation with female dummy. |
+| ols | wooldridge::wage1 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 6 Section 6.2 wage equation with experience quadratic. |
+| oprobit | wooldridge::beauty | R, Python | pass | — | Ordered probit model of self-reported beauty rating (looks 2-5) on female, education, experience and black indicators. |
+| panel_fe | wooldridge::grunfeld | R, Python | pass | — | Panel fixed-effects investment demand model (Grunfeld). |
+| panel_fe | wooldridge::wagepan | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 14 Example 14.4 panel fixed-effects wage equation. |
+| pcse | wooldridge::wagepan | R | pass | — | PCSE estimation of log wage on education, experience, and dummies using panel-corrected standard errors. |
+| poisson | wooldridge::fertil2 | R, Python | pass | — | Poisson regression for number of children on the fertil2 dataset. |
+| probit | wooldridge::mroz | R, Python | pass | — | Probit labour-force participation on the Mroz dataset. |
+| psm | wooldridge::jtrain3 | R, Python | pass | — | 1:1 nearest-neighbor propensity score matching with caliper 0.2 and bootstrap SE. |
+| qreg | wooldridge::wage1 | R, Python | pass | — | Median quantile regression of wage on education, experience, and tenure. |
+| rdd | rdd_book | R, Python | pass | — | Sharp RDD with local linear regression, triangular kernel and Imbens-Kalyanaraman bandwidth. |
+| re | grunfeld | R, Python | pass | — | Random-effects investment demand model (Grunfeld). |
+| ridge | wooldridge::hprice1 | Python | pass | — | Ridge regression of log house price on log lot size, log square footage, bedrooms and colonial dummy. |
+| rlm | wooldridge::wage1 | R, Python | pass | — | Huber robust linear regression of log wage on education, experience, and tenure. |
+| sur | wooldridge::grunfeld | R, Python | pass | — | Two-equation SUR (Zellner FGLS) on the Grunfeld investment data. |
+| svar | statsmodels::macrodata | R, Python | pass | — | Cholesky-identified SVAR(2) on log US real GDP and consumption. |
+| synth | synth_smoking | R, Python | pass | — | Synthetic-control ATT on a simulated panel with 10 donors and 1 treated unit. |
 | sysgmm | wooldridge::wagepan | R | blocked | https://github.com/sheep-farm/hayashi/issues/67 | Blocked — Hayashi sysgmm raises a singular-matrix error for the wagepan dynamic panel specification. |
-| tobit | wooldridge::mroz | R:passed * | pass | — | Tobit regression of hours worked with left censoring at zero. Hayashi matches AER::tobit at displayed precision; the custom Python MLE is retained as a diagnostic script but is not the active reference. |
-| var | simulated_var1 | R:passed *, Python:passed * | pass | — | Uses the same simulated bivariate VAR(1) DGP as Chapter 28 of the book. |
-| var | statsmodels::macrodata | R:passed *, Python:passed * | pass | — | VAR(2) on US real GDP and consumption. |
-| wls | wooldridge::hprice1 | R:passed *, Python:passed * | pass | — | WLS with weights generated inside Hayashi to avoid sandbox file issues. |
-| xtgls | wooldridge::wagepan | R | blocked | https://github.com/sheep-farm/hayashi/issues/66 | Blocked — no suitable R reference implementation for panel FGLS (Parks/Kmenta) available in this environment. |
-| zinb | wooldridge::affairs | R:passed * | pass | — | ZINB model of number of affairs on demographic predictors. |
-| zip | wooldridge::affairs | R:passed * | pass | — | ZIP model of number of affairs on demographic predictors. |
+| tobit | wooldridge::mroz | R | pass | — | Tobit regression of hours worked with left censoring at zero. Hayashi matches AER::tobit at displayed precision; the custom Python MLE is retained as a diagnostic script but is not the active reference. |
+| var | simulated_var1 | R, Python | pass | — | Uses the same simulated bivariate VAR(1) DGP as Chapter 28 of the book. |
+| var | statsmodels::macrodata | R, Python | pass | — | VAR(2) on US real GDP and consumption. |
+| wls | wooldridge::hprice1 | R, Python | pass | — | WLS with weights generated inside Hayashi to avoid sandbox file issues. |
+| xtgls | wooldridge::wagepan | Python:passed * | pass | — | Panel feasible GLS with panel-level heteroskedasticity (Parks/Kmenta, Stata xtgls panels(heteroskedastic)). Python reference implements the same two-step FGLS procedure used by Hayashi/Greeners. |
+| zinb | wooldridge::affairs | R | pass | — | ZINB model of number of affairs on demographic predictors. |
+| zip | wooldridge::affairs | R | pass | — | ZIP model of number of affairs on demographic predictors. |
 
 ## Status legend
 
@@ -114,3 +114,4 @@ covered by validation" section of the README.
 Esta matriz abrange os estimadores empíricos centrais. Alguns comandos são
 deixados de fora intencionalmente pelos motivos descritos na seção
 "Estimators not covered by validation" do README.
+

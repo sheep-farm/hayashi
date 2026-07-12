@@ -17,10 +17,9 @@ xtgls(lwage ~ educ + exper + expersq + married + union, df,
 
 ## Reference implementation
 
-- **R:** to be determined — no suitable CRAN package for Stata-style `xtgls` was available.
+- **Python:** Two-step feasible GLS with panel-level heteroskedasticity, reproducing the Parks/Kmenta `xtgls panels(heteroskedastic)` estimator.
 - **Hayashi:** `xtgls(...)`
 
 ## Status
 
-Blocked — no R reference implementation for panel FGLS (Parks/Kmenta) could be installed.
-See [sheep-farm/hayashi#66](https://github.com/sheep-farm/hayashi/issues/66).
+Pass — Hayashi matches the Python reference for coefficients and standard errors.

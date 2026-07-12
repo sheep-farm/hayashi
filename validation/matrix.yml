@@ -400,10 +400,11 @@ cases:
   dimension: numerical
   status: pass
 - id: xtgls_wagepan
-  notes: Blocked — no suitable R reference implementation for panel FGLS (Parks/Kmenta)
-    available in this environment.
+  notes: Panel feasible GLS with panel-level heteroskedasticity (Parks/Kmenta, Stata
+    xtgls panels(heteroskedastic)). Python reference implements the same two-step
+    FGLS procedure used by Hayashi/Greeners.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: zinb_affairs
   notes: ZINB model of number of affairs on demographic predictors.
   dimension: numerical
