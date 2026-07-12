@@ -323,6 +323,11 @@ cases:
     wage equation.
   dimension: numerical
   status: pass
+- id: pca_wooldridge_wage1
+  notes: Standardised PCA of educ, exper, tenure, and wage; absolute loadings are
+    compared because component signs are arbitrary.
+  dimension: numerical
+  status: pass
 - id: pcse_wagepan
   notes: PCSE estimation of log wage on education, experience, and dummies using panel-corrected
     standard errors.
