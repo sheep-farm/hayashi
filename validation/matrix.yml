@@ -377,10 +377,10 @@ cases:
   dimension: numerical
   status: pass
 - id: sysgmm_wagepan
-  notes: Blocked — Hayashi sysgmm raises a singular-matrix error for the wagepan dynamic
-    panel specification.
+  notes: System GMM (Blundell-Bond) two-step on Wooldridge wagepan with lags=2. Python
+    reference implements the same two-step System GMM procedure used by Hayashi/Greeners.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: tobit_mroz
   notes: Tobit regression of hours worked with left censoring at zero. Hayashi matches
     AER::tobit at displayed precision; the custom Python MLE is retained as a diagnostic

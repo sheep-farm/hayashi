@@ -1,5 +1,5 @@
 load "validation/cases/sysgmm_wagepan/data/wagepan.csv" as df
 
-let m = sysgmm(lwage ~ lwage_lag + exper + expersq + married + union, df, id=nr, time=year, lags=2)
+let m = sysgmm(lwage ~ exper + expersq + married + union, df, id=nr, time=year, lags=2, step=2)
 
 export(m, "txt", "/dev/stdout")

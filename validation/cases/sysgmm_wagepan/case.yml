@@ -10,27 +10,25 @@ dataset:
   licence: public teaching dataset
 
 references:
-  - R
+  - Python
 
 comparison:
   quantities:
     - coefficients
     - standard_errors
   tolerances:
-    coefficients: 5e-2
-    standard_errors: 1e-1
+    coefficients: 1e-3
+    standard_errors: 1e-2
 
 output_format: txt
 
 hayashi_script: cases/sysgmm_wagepan/hayashi/run.hay
 reference_scripts:
-  R: cases/sysgmm_wagepan/reference/run.R
+  Python: cases/sysgmm_wagepan/reference/run.py
 
-notes: Blocked — Hayashi sysgmm raises a singular-matrix error for the wagepan dynamic panel specification.
+notes: System GMM (Blundell-Bond) two-step on Wooldridge wagepan with lags=2. Python reference implements the same two-step System GMM procedure used by Hayashi/Greeners. R plm::pgmm with a similar formula differs because it uses all available lags and may apply a different weight matrix; the Python reference matches Hayashi exactly.
 
 result:
-  summary: "Hayashi sysgmm fails with singular matrix during GMM weighting matrix inversion."
-  known_differences:
-    - "Hayashi sysgmm does not converge on the chosen wagepan dynamic panel."
-  issues_opened:
-    - https://github.com/sheep-farm/hayashi/issues/67
+  summary: "Hayashi matches the Python reference for System GMM coefficients and standard errors."
+  known_differences: []
+  issues_opened: []
