@@ -209,6 +209,62 @@ def parse_hayashi_local_level(text: str) -> dict[str, float]:
     return result
 
 
+def parse_hayashi_pca(text: str) -> dict[str, dict[str, float]]:
+    """Parse PCA eigenvalues, variance ratios, and loadings from Hayashi text."""
+    import re
+
+    eigenvalues: dict[str, float] = {}
+    variance_ratios: dict[str, float] = {}
+    loadings: dict[str, float] = {}
+    in_components = False
+    in_loadings = False
+
+    for line in text.splitlines():
+        stripped = line.strip()
+        lower = stripped.lower()
+        if "component" in lower and "eigenvalue" in lower:
+            in_components = True
+            in_loadings = False
+            continue
+        if lower == "loadings":
+            in_components = False
+            in_loadings = False
+            continue
+        if in_components:
+            match = re.match(
+                r"^(PC\d+)\s+([-+]?\d*\.?\d+)\s+[-+]?\d*\.?\d+\s+"
+                r"([-+]?\d*\.?\d+)$",
+                stripped,
+            )
+            if match:
+                component = match.group(1)
+                variance_ratios[component] = float(match.group(2))
+                eigenvalues[component] = float(match.group(3))
+            continue
+        if not in_loadings and stripped.startswith("Variable"):
+            in_loadings = True
+            continue
+        if in_loadings:
+            parts = stripped.split()
+            if len(parts) < 2 or parts[0].startswith("="):
+                continue
+            variable = parts[0]
+            try:
+                values = [float(value) for value in parts[1:]]
+            except ValueError:
+                continue
+            for index, value in enumerate(values, start=1):
+                loadings[f"{variable}:PC{index}"] = abs(value)
+
+    if not eigenvalues or not variance_ratios or not loadings:
+        raise ValueError(f"PCA output not found in Hayashi stdout: {text[:300]!r}")
+    return {
+        "explained_variance": eigenvalues,
+        "explained_variance_ratio": variance_ratios,
+        "absolute_loadings": loadings,
+    }
+
+
 def parse_reference_json(stdout: str) -> dict[str, Any] | None:
     """Extract JSON from reference stdout, tolerating pretty-printed output."""
     text = stdout.strip()
@@ -860,6 +916,8 @@ def run_case(case: dict[str, Any]) -> tuple[str, list[str], dict[str, dict]]:
         try:
             if family == "mlogit":
                 hayashi = normalise_intercept(parse_hayashi_mlogit(hay_res.stdout))
+            elif family == "pca":
+                hayashi = parse_hayashi_pca(hay_res.stdout)
             elif family == "sur":
                 hayashi = normalise_intercept(parse_hayashi_sur(hay_res.stdout))
             elif family in ("zip", "zinb"):
