@@ -35,10 +35,10 @@ cases:
   dimension: numerical
   status: pass
 - id: cloglog_wooldridge_affairs
-  notes: Blocked — Hayashi GLM with binomial/cloglog link overflows and produces nonsensical
-    coefficients.
+  notes: Complementary log-log GLM on Wooldridge affairs. Fixed cloglog link derivative
+    sign; Hayashi now converges and matches R glm.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: coint_book
   notes: VECM(1) on a simulated cointegrated system where y = 2*x + e2 and x = cumsum(e1).
     Only the cointegration (beta) and adjustment (alpha) coefficients are compared.

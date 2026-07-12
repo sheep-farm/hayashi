@@ -1,7 +1,7 @@
 id: cloglog_wooldridge_affairs
 title: Complementary log-log on Wooldridge affairs
 estimator_family: cloglog
-status: blocked
+status: active
 dimension: numerical
 
 dataset:
@@ -28,11 +28,9 @@ reference_scripts:
   R: cases/cloglog_wooldridge_affairs/reference/run.R
   Python: cases/cloglog_wooldridge_affairs/reference/run.py
 
-notes: Blocked — Hayashi GLM with binomial/cloglog link overflows and produces nonsensical coefficients.
+notes: Complementary log-log GLM on Wooldridge affairs. A sign error in the Greeners cloglog derivative caused IRLS divergence; the derivative is now positive and the model converges to the same estimates as R glm and statsmodels.
 
 result:
-  summary: "Hayashi binomial/cloglog GLM overflows during IRLS; coefficients diverge from R/statsmodels."
-  known_differences:
-    - "Hayashi reports extreme coefficients and deviance for cloglog link."
-  issues_opened:
-    - https://github.com/sheep-farm/hayashi/issues/64
+  summary: "Hayashi matches R and Python references for binomial/cloglog coefficients and standard errors."
+  known_differences: []
+  issues_opened: []

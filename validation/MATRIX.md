@@ -9,8 +9,8 @@
 | arima | statsmodels::macrodata | R, Python | pass | — | ARIMA(1,1,1) on log US real GDP via exact Gaussian MLE. |
 | arima | simulated_arma11 | R, Python | pass | — | Uses the same simulated ARMA(1,1) DGP as Chapter 26 of the book. Intercept is excluded from comparison because Hayashi profiles it out in MLE (SE = 0). |
 | autoreg | statsmodels::macrodata | R, Python | pass | — | AR(1) on US real GDP with constant and trend. |
-| betareg | wooldridge::401k | R:passed * | pass | — | Beta regression on 401k participation rates. Greeners estimates by BFGS with an analytic gradient and matches R betareg. |
-| cloglog | wooldridge::affairs | R, Python | blocked | https://github.com/sheep-farm/hayashi/issues/64 | Blocked — Hayashi GLM with binomial/cloglog link overflows and produces nonsensical coefficients. |
+| betareg | wooldridge::401k | R | pass | — | Beta regression on 401k participation rates. Greeners estimates by BFGS with an analytic gradient and matches R betareg. |
+| cloglog | wooldridge::affairs | R:passed *, Python:passed * | pass | — | Complementary log-log GLM on Wooldridge affairs. Fixed cloglog link derivative sign; Hayashi now converges and matches R glm. |
 | vecm | simulated_cointegrated | R, Python | pass | — | VECM(1) on a simulated cointegrated system where y = 2*x + e2 and x = cumsum(e1). Only the cointegration (beta) and adjustment (alpha) coefficients are compared. |
 | cox | statsmodels::heart | R, Python | pass | — | Cox proportional hazards regression for survival time after heart transplant. |
 | did | wooldridge::kielmc | R, Python | pass | — | Difference-in-differences effect of incinerator proximity on log house prices. |
