@@ -21,5 +21,4 @@ kalman(df, return, model="ll")
 
 ## Status
 
-Blocked — Hayashi `kalman()` adds filtered/smoothed columns to the DataFrame and returns `nil`, so the validation harness cannot capture the estimated variances.
-See [sheep-farm/hayashi#65](https://github.com/sheep-farm/hayashi/issues/65).
+Pass — Hayashi `kalman()` now estimates `sigma_obs` and `sigma_state` by maximum likelihood and returns a printable result object. sigma_state is very small and the likelihood is flat in that direction, so the declared tolerance is 1e-3.
