@@ -24,6 +24,10 @@ prate ~ mrate + age + sole
 
 - Regression coefficients and standard errors for `const`, `mrate`, `age`, `sole`.
 
+## Status
+
+Pass — Greeners now estimates beta regression by BFGS with an analytic gradient and computes standard errors from the observed inverse Hessian, matching R betareg.
+
 ## Tolerances
 
 | Quantity | Tolerance | Rationale |

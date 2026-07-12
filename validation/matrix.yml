@@ -30,10 +30,10 @@ cases:
   dimension: numerical
   status: pass
 - id: betareg_wooldridge_401k
-  notes: Blocked — Greeners beta regression MLE does not converge with multiple regressors,
-    producing coefficients that diverge from R betareg.
+  notes: Beta regression on 401k participation rates. Greeners estimates by BFGS with
+    an analytic gradient and matches R betareg.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: cloglog_wooldridge_affairs
   notes: Blocked — Hayashi GLM with binomial/cloglog link overflows and produces nonsensical
     coefficients.
