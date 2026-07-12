@@ -401,7 +401,7 @@ cases:
   status: pass
 - id: xtgls_wagepan
   notes: Panel feasible GLS with panel-level heteroskedasticity (Parks/Kmenta, Stata
-    xtgls panels(heteroskedastic)). Python reference implements the same two-step
+    xtgls panels(heteroskedastic)). R and Python references implement the same two-step
     FGLS procedure used by Hayashi/Greeners.
   dimension: numerical
   status: pass
