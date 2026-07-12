@@ -9,7 +9,7 @@
 | arima | statsmodels::macrodata | R, Python | pass | — | ARIMA(1,1,1) on log US real GDP via exact Gaussian MLE. |
 | arima | simulated_arma11 | R, Python | pass | — | Uses the same simulated ARMA(1,1) DGP as Chapter 26 of the book. Intercept is excluded from comparison because Hayashi profiles it out in MLE (SE = 0). |
 | autoreg | statsmodels::macrodata | R, Python | pass | — | AR(1) on US real GDP with constant and trend. |
-| betareg | wooldridge::401k | R | blocked | https://github.com/sheep-farm/hayashi/issues/63 | Blocked — Greeners beta regression MLE does not converge with multiple regressors, producing coefficients that diverge from R betareg. |
+| betareg | wooldridge::401k | R:passed * | pass | — | Beta regression on 401k participation rates. Greeners estimates by BFGS with an analytic gradient and matches R betareg. |
 | cloglog | wooldridge::affairs | R, Python | blocked | https://github.com/sheep-farm/hayashi/issues/64 | Blocked — Hayashi GLM with binomial/cloglog link overflows and produces nonsensical coefficients. |
 | vecm | simulated_cointegrated | R, Python | pass | — | VECM(1) on a simulated cointegrated system where y = 2*x + e2 and x = cumsum(e1). Only the cointegration (beta) and adjustment (alpha) coefficients are compared. |
 | cox | statsmodels::heart | R, Python | pass | — | Cox proportional hazards regression for survival time after heart transplant. |
@@ -27,7 +27,7 @@
 | heckman | wooldridge::mroz | R, Python | pass | — | Two-step Heckman (Heckit) on the Mroz dataset. SEs are approximate because the reference implementations are two-step. |
 | iv | wooldridge::card | R, Python | pass | — | IV with education endogenous and nearc4 as instrument. |
 | iv | wooldridge::mroz | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 15 Example 15.1 IV returns to schooling for married women. |
-| kalman | wooldridge::nyse | R:passed * | pass | — | Local-level Kalman filter on NYSE returns. Hayashi estimates sigma_obs and sigma_state by MLE and returns a printable result object. |
+| kalman | wooldridge::nyse | R | pass | — | Local-level Kalman filter on NYSE returns. Hayashi estimates sigma_obs and sigma_state by MLE and returns a printable result object. |
 | lasso | wooldridge::hprice1 | R, Python | pass | — | Lasso regression of house price on lot size, square footage and bedrooms. |
 | logit | wooldridge::mroz | R, Python | pass | — | Logit average marginal effects on Wooldridge mroz. |
 | logit | wooldridge::mroz | R, Python | pass | — | Logit labour-force participation on the Mroz dataset. |
