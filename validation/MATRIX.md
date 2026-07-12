@@ -89,7 +89,7 @@
 | var | simulated_var1 | R, Python | pass | — | Uses the same simulated bivariate VAR(1) DGP as Chapter 28 of the book. |
 | var | statsmodels::macrodata | R, Python | pass | — | VAR(2) on US real GDP and consumption. |
 | wls | wooldridge::hprice1 | R, Python | pass | — | WLS with weights generated inside Hayashi to avoid sandbox file issues. |
-| xtgls | wooldridge::wagepan | Python:passed * | pass | — | Panel feasible GLS with panel-level heteroskedasticity (Parks/Kmenta, Stata xtgls panels(heteroskedastic)). Python reference implements the same two-step FGLS procedure used by Hayashi/Greeners. |
+| xtgls | wooldridge::wagepan | R:passed *, Python:passed * | pass | — | Panel feasible GLS with panel-level heteroskedasticity (Parks/Kmenta, Stata xtgls panels(heteroskedastic)). R and Python references implement the same two-step FGLS procedure used by Hayashi/Greeners. |
 | zinb | wooldridge::affairs | R | pass | — | ZINB model of number of affairs on demographic predictors. |
 | zip | wooldridge::affairs | R | pass | — | ZIP model of number of affairs on demographic predictors. |
 

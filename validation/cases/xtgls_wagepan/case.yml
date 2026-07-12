@@ -10,6 +10,7 @@ dataset:
   licence: public teaching dataset
 
 references:
+  - R
   - Python
 
 comparison:
@@ -24,9 +25,10 @@ output_format: txt
 
 hayashi_script: cases/xtgls_wagepan/hayashi/run.hay
 reference_scripts:
+  R: cases/xtgls_wagepan/reference/run.R
   Python: cases/xtgls_wagepan/reference/run.py
 
-notes: Panel feasible GLS with panel-level heteroskedasticity (Parks/Kmenta, Stata xtgls panels(heteroskedastic)). Python reference implements the same two-step FGLS procedure used by Hayashi/Greeners.
+notes: Panel feasible GLS with panel-level heteroskedasticity (Parks/Kmenta, Stata xtgls panels(heteroskedastic)). R and Python references implement the same two-step FGLS procedure used by Hayashi/Greeners.
 
 result:
   summary: "Hayashi matches the Python reference to machine precision."
