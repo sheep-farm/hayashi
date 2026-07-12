@@ -23,7 +23,7 @@ if (!requireNamespace("plm", quietly = TRUE)) {
 library(plm)
 
 pdata <- pdata.frame(wagepan, index = c("nr", "year"))
-model <- pgmm(lwage ~ lag(lwage, 1) + exper + expersq + married + union | lag(lwage, 2:99),
+model <- pgmm(lwage ~ lag(lwage, 1) + exper + expersq + married + union | lag(lwage, 2:3),
               data = pdata, effect = "individual", model = "twosteps", transformation = "ld")
 sm <- summary(model)
 

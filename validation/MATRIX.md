@@ -84,12 +84,12 @@
 | sur | wooldridge::grunfeld | R, Python | pass | — | Two-equation SUR (Zellner FGLS) on the Grunfeld investment data. |
 | svar | statsmodels::macrodata | R, Python | pass | — | Cholesky-identified SVAR(2) on log US real GDP and consumption. |
 | synth | synth_smoking | R, Python | pass | — | Synthetic-control ATT on a simulated panel with 10 donors and 1 treated unit. |
-| sysgmm | wooldridge::wagepan | R | blocked | https://github.com/sheep-farm/hayashi/issues/67 | Blocked — Hayashi sysgmm raises a singular-matrix error for the wagepan dynamic panel specification. |
+| sysgmm | wooldridge::wagepan | Python:passed * | pass | — | System GMM (Blundell-Bond) two-step on Wooldridge wagepan with lags=2. Python reference implements the same two-step System GMM procedure used by Hayashi/Greeners. |
 | tobit | wooldridge::mroz | R | pass | — | Tobit regression of hours worked with left censoring at zero. Hayashi matches AER::tobit at displayed precision; the custom Python MLE is retained as a diagnostic script but is not the active reference. |
 | var | simulated_var1 | R, Python | pass | — | Uses the same simulated bivariate VAR(1) DGP as Chapter 28 of the book. |
 | var | statsmodels::macrodata | R, Python | pass | — | VAR(2) on US real GDP and consumption. |
 | wls | wooldridge::hprice1 | R, Python | pass | — | WLS with weights generated inside Hayashi to avoid sandbox file issues. |
-| xtgls | wooldridge::wagepan | R:passed *, Python:passed * | pass | — | Panel feasible GLS with panel-level heteroskedasticity (Parks/Kmenta, Stata xtgls panels(heteroskedastic)). R and Python references implement the same two-step FGLS procedure used by Hayashi/Greeners. |
+| xtgls | wooldridge::wagepan | R, Python | pass | — | Panel feasible GLS with panel-level heteroskedasticity (Parks/Kmenta, Stata xtgls panels(heteroskedastic)). R and Python references implement the same two-step FGLS procedure used by Hayashi/Greeners. |
 | zinb | wooldridge::affairs | R | pass | — | ZINB model of number of affairs on demographic predictors. |
 | zip | wooldridge::affairs | R | pass | — | ZIP model of number of affairs on demographic predictors. |
 
