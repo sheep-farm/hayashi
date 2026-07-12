@@ -986,7 +986,14 @@ fn open_depth(s: &str) -> i32 {
 }
 
 fn run_repl() {
-    println!("Hayashi {VERSION}  — Applied Econometrics Language");
+    println!("Hayashi (x86_64-pc-linux-gnu) version {VERSION}");
+    println!("Copyright (C) 2026 Flávio de Vasconcellos Corrêa");
+    println!("License GPL-3.0-only: GNU GPL version 3 only <https://gnu.org/licenses/gpl.html>");
+    println!();
+    println!("This is free software; see the source code for copying conditions.");
+    println!("There is NO WARRANTY, to the extent permitted by law.");
+    println!();
+    println!("Home page:            <https://github.com/sheep-farm/hayashi>");
     println!("In honor of Fumio Hayashi. Type 'exit' or Ctrl-D to quit.\n");
 
     let mut interp = Interpreter::new();
