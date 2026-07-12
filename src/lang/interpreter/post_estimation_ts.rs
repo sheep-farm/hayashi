@@ -548,18 +548,10 @@ impl Interpreter {
 
                 let ss_result = match model_kind.as_str() {
                     "ll" | "local_level" => {
-                        // H=[[1]], F=[[1]], R=[[1]], Q=[[sigma_state^2]], R_obs=[[sigma_obs^2]]
-                        let model = greeners::StateSpaceModel {
-                            h: ndarray::Array2::from_elem((1, 1), 1.0),
-                            f: ndarray::Array2::from_elem((1, 1), 1.0),
-                            r: ndarray::Array2::from_elem((1, 1), 1.0),
-                            q: ndarray::Array2::from_elem((1, 1), sigma_state.powi(2)),
-                            r_obs: ndarray::Array2::from_elem((1, 1), sigma_obs.powi(2)),
-                            s0: ndarray::Array1::from_vec(vec![y_vec[0]]),
-                            p0: ndarray::Array2::from_elem((1, 1), sigma_obs.powi(2) * 10.0),
-                        };
-                        greeners::state_space_estimate(&model, &obs)
-                            .map_err(|e| self.rt_err(format!("kalman (ll): {e}")))?
+                        // Local-level model: fit variances by MLE and return a result object.
+                        let result = greeners::LocalLevel::fit(&y_vec)
+                            .map_err(|e| self.rt_err(format!("kalman (ll): {e}")))?;
+                        return Ok(Some(Value::LocalLevelResult(Rc::new(result))));
                     }
                     "llt" | "local_linear_trend" => {
                         // States: [level, slope]

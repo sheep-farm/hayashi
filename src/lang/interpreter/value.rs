@@ -246,6 +246,7 @@ pub enum Value {
     ThresholdResult(Rc<greeners::threshold::ThresholdResult>),
     AutoRegResult(Rc<greeners::AutoRegResult>),
     ArdlResult(Rc<greeners::ARDLResult>),
+    LocalLevelResult(Rc<greeners::LocalLevelResult>),
     List(Rc<Vec<Value>>),
     Dict(Rc<HashMap<String, Value>>),
     Series(Rc<Series>),
@@ -328,6 +329,7 @@ impl std::fmt::Display for Value {
             Value::ThresholdResult(r) => write!(f, "{r}"),
             Value::AutoRegResult(r) => write!(f, "{r}"),
             Value::ArdlResult(r) => write!(f, "{r}"),
+            Value::LocalLevelResult(r) => write!(f, "{r}"),
             Value::List(v) => {
                 write!(f, "[")?;
                 for (i, item) in v.iter().enumerate() {

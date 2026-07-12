@@ -1168,7 +1168,8 @@ impl Interpreter {
                 | Value::PanelGlsResult(_)
                 | Value::OrderedResult(_)
                 | Value::MNLogitResult(_)
-                | Value::PenalizedResult(_)),
+                | Value::PenalizedResult(_)
+                | Value::LocalLevelResult(_)),
                 "txt" | "text",
             ) => {
                 std::fs::write(&path_str, format!("{val}"))

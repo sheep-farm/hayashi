@@ -184,6 +184,31 @@ def parse_hayashi_txt_table(text: str) -> dict[str, dict[str, float]]:
     return result
 
 
+def parse_hayashi_local_level(text: str) -> dict[str, float]:
+    """Parse the plain-text output of a local-level Kalman filter result.
+
+    Expects a block like:
+
+        =================== Local-Level Kalman Filter ===================
+        Observations:               690
+        sigma_obs:             2.113422
+        sigma_state:           0.000004
+        Log-likelihood:      -1499.7967
+        ===========================================================
+    """
+    result: dict[str, float] = {}
+    for line in text.splitlines():
+        if line.startswith("sigma_obs:"):
+            result["sigma_obs"] = float(line.split(":", 1)[1].strip())
+        elif line.startswith("sigma_state:"):
+            result["sigma_state"] = float(line.split(":", 1)[1].strip())
+        elif line.startswith("Log-likelihood:"):
+            result["log_likelihood"] = float(line.split(":", 1)[1].strip())
+    if "sigma_obs" not in result or "sigma_state" not in result:
+        raise ValueError(f"Local-level Kalman output not found in Hayashi stdout: {text[:200]!r}")
+    return result
+
+
 def parse_reference_json(stdout: str) -> dict[str, Any] | None:
     """Extract JSON from reference stdout, tolerating pretty-printed output."""
     text = stdout.strip()
@@ -848,7 +873,10 @@ def run_case(case: dict[str, Any]) -> tuple[str, list[str], dict[str, dict]]:
             elif output_format == "margins":
                 hayashi = normalise_intercept(parse_hayashi_margins(hay_res.stdout))
             elif output_format == "txt":
-                hayashi = normalise_intercept(parse_hayashi_txt_table(hay_res.stdout))
+                if family == "kalman":
+                    hayashi = parse_hayashi_local_level(hay_res.stdout)
+                else:
+                    hayashi = normalise_intercept(parse_hayashi_txt_table(hay_res.stdout))
             else:
                 hayashi = normalise_intercept(parse_hayashi_csv_from_string(hay_res.stdout))
         except Exception as e:
@@ -874,7 +902,10 @@ def run_case(case: dict[str, Any]) -> tuple[str, list[str], dict[str, dict]]:
             hayashi_txt = hayashi_dir / "output.txt"
             if not hayashi_txt.exists():
                 return "blocked", [f"Hayashi output not found: {hayashi_txt}"], ref_report
-            hayashi = normalise_intercept(parse_hayashi_txt_table(hayashi_txt.read_text()))
+            if family == "kalman":
+                hayashi = parse_hayashi_local_level(hayashi_txt.read_text())
+            else:
+                hayashi = normalise_intercept(parse_hayashi_txt_table(hayashi_txt.read_text()))
         else:
             hayashi_csv = hayashi_dir / "output.csv"
             if not hayashi_csv.exists():

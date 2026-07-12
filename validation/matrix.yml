@@ -111,10 +111,10 @@ cases:
   dimension: numerical
   status: pass
 - id: kalman_nyse
-  notes: Blocked — Hayashi kalman() adds filtered/smoothed columns to a DataFrame
-    and returns nil, which the current validation harness does not capture.
+  notes: Local-level Kalman filter on NYSE returns. Hayashi estimates sigma_obs and
+    sigma_state by MLE and returns a printable result object.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: lasso_hprice1
   notes: Lasso regression of house price on lot size, square footage and bedrooms.
   dimension: numerical

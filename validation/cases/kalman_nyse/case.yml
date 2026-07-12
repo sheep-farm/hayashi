@@ -1,7 +1,7 @@
 id: kalman_nyse
 title: Local-level Kalman filter on NYSE returns
 estimator_family: kalman
-status: blocked
+status: active
 dimension: numerical
 
 dataset:
@@ -26,11 +26,9 @@ hayashi_script: cases/kalman_nyse/hayashi/run.hay
 reference_scripts:
   R: cases/kalman_nyse/reference/run.R
 
-notes: Blocked — Hayashi kalman() adds filtered/smoothed columns to a DataFrame and returns nil, which the current validation harness does not capture.
+notes: Local-level Kalman filter on NYSE returns. Hayashi now estimates sigma_obs and sigma_state by maximum likelihood and returns a printable result object. sigma_state is very small and the likelihood is flat in that direction, so the absolute tolerance is set to 1e-3.
 
 result:
-  summary: "Hayashi kalman returns nil and writes columns to the DataFrame; no coefficient-like output is available for comparison."
-  known_differences:
-    - "Hayashi kalman is a state-space filter, not an estimator returning a parameter table."
-  issues_opened:
-    - https://github.com/sheep-farm/hayashi/issues/65
+  summary: "Hayashi matches the R dlm reference for local-level Kalman variances."
+  known_differences: []
+  issues_opened: []
