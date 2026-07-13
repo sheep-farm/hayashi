@@ -6,6 +6,8 @@ pub mod excel;
 pub mod fetch;
 #[cfg(feature = "odbc")]
 pub mod odbc;
+#[cfg(feature = "native")]
+pub mod packages;
 pub mod parquet;
 pub mod plot;
 #[cfg(feature = "native")]

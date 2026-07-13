@@ -91,7 +91,7 @@ pub const HELP_INDEX_GROUPS: &[CommandIndexGroup] = &[
         category: CommandCategory::Language,
         entries: &[
             "let  const  if/else  for  while  fn  return  display  input",
-            "source  export  print  quietly  capture  assert  timer  set_seed",
+            "source  install  export  print  quietly  capture  assert  timer  set_seed",
         ],
     },
     CommandIndexGroup {

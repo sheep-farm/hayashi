@@ -282,6 +282,59 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── install: download and install a Hayashi plugin from GitHub ──────
+            "install" => {
+                if args.is_empty() {
+                    return Err(self.rt_err("install(\"user/repo\")"));
+                }
+                let spec = match self.eval_expr(&args[0])? {
+                    Value::Str(s) => s,
+                    _ => return Err(HayashiError::Type("install() requires a string".into())),
+                };
+
+                let version = if args.len() >= 2 {
+                    match self.eval_expr(&args[1])? {
+                        Value::Str(s) => Some(s),
+                        _ => {
+                            return Err(HayashiError::Type(
+                                "install(): version must be a string".into(),
+                            ))
+                        }
+                    }
+                } else if let Some(Value::Str(s)) = opt_map.get("version") {
+                    Some(s.clone())
+                } else {
+                    None
+                };
+
+                let force = if args.len() >= 3 {
+                    match self.eval_expr(&args[2])? {
+                        Value::Bool(b) => b,
+                        Value::Int(i) => i != 0,
+                        Value::Float(f) => f != 0.0,
+                        _ => {
+                            return Err(HayashiError::Type(
+                                "install(): force must be boolean or numeric".into(),
+                            ))
+                        }
+                    }
+                } else {
+                    opt_map.get("force").map(value_as_bool).unwrap_or(false)
+                };
+
+                #[cfg(feature = "native")]
+                {
+                    crate::io::packages::install(&spec, version.as_deref(), force)?;
+                    Ok(Value::Nil)
+                }
+                #[cfg(not(feature = "native"))]
+                {
+                    Err(HayashiError::Runtime(
+                        "install() requires the 'native' feature".into(),
+                    ))
+                }
+            }
+
             "plugin_path" => {
                 if args.is_empty() {
                     if self.plugin_paths.is_empty() {

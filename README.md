@@ -651,7 +651,10 @@ import("finance")                    // finance::sharpe(), finance::sortino()
 import("finance", as=fin)            // fin::sharpe()
 
 // Install script or native plugin from GitHub (-y to bypass overwrite prompt)
-// $ hay install user/repo [-y]
+// $ hay install user/repo [version] [-y]
+install("user/repo")                    // callable from inside a Hayashi script
+install("user/repo", version="v1.2.3")
+install("user/repo", force=true)        // overwrite if already installed
 
 // Uninstall a package (successfully deletes native plugin files, dirs, and metadata)
 // $ hay remove user/repo
