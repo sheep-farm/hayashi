@@ -5894,6 +5894,16 @@ display double(4)"#,
     );
 }
 
+#[test]
+fn install_rejects_bad_spec() {
+    let (ok, out) = run_inline(r#"install("bad_spec")"#);
+    assert!(!ok, "install bad_spec should fail:\n{out}");
+    assert!(
+        out.contains("expected 'user/repo'"),
+        "expected 'user/repo' error:\n{out}"
+    );
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // F-STRING — string interpolation
 // ══════════════════════════════════════════════════════════════════════════════

@@ -153,6 +153,7 @@ pub const BUILTIN_NAMES: &[&str] = &[
     "display",
     "source",
     "import",
+    "install",
     "assert",
     "timer",
     "push",

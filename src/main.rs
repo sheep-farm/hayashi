@@ -1,3 +1,4 @@
+use hayashi_lang::io::packages;
 use hayashi_lang::lang;
 
 use lang::interpreter::Interpreter;
@@ -29,6 +30,7 @@ const KEYWORDS: &[&str] = &[
     "try",
     "catch",
     "import",
+    "install",
     "source",
     "display",
     "input",
@@ -343,10 +345,43 @@ fn run() {
                     eprintln!("Usage: hay install --file repositories.txt [-y]");
                     std::process::exit(1);
                 });
-                pkg_install_from_file(file_path, yes);
+                if let Err(e) = packages::install_from_file(file_path, yes) {
+                    eprintln!("hay install: {e}");
+                    std::process::exit(1);
+                }
             } else {
                 let version = args_clean.get(3).copied();
-                pkg_install_internal(pkg, version, yes);
+                let (user, repo) = packages::parse_spec(pkg).unwrap_or_else(|e| {
+                    eprintln!("hay install: {e}");
+                    std::process::exit(1);
+                });
+                if !yes {
+                    if let Some(installed_path) = packages::is_pkg_installed(user, repo) {
+                        print!(
+                            "Package {}/{} is already installed at {}. Overwrite? (y/N): ",
+                            user,
+                            repo,
+                            installed_path.display()
+                        );
+                        use std::io::Write;
+                        let _ = std::io::stdout().flush();
+                        let mut input = String::new();
+                        if std::io::stdin().read_line(&mut input).is_ok() {
+                            let trimmed = input.trim().to_lowercase();
+                            if trimmed != "y" && trimmed != "yes" {
+                                println!("Installation cancelled.");
+                                return;
+                            }
+                        } else {
+                            println!("Installation cancelled.");
+                            return;
+                        }
+                    }
+                }
+                if let Err(e) = packages::install(pkg, version, true) {
+                    eprintln!("hay install: {e}");
+                    std::process::exit(1);
+                }
             }
             return;
         }
@@ -508,7 +543,7 @@ fn check_latest_release() -> Result<Option<String>, String> {
         .map_err(|e| format!("cannot fetch latest release: {e}"))?;
 
     let release_body: String = release_resp.into_string().unwrap_or_default();
-    let release: GhRelease = serde_json::from_str(&release_body)
+    let release: packages::GhRelease = serde_json::from_str(&release_body)
         .map_err(|e| format!("cannot parse release payload: {e}"))?;
 
     let remote_version = release.tag_name.trim_start_matches('v').to_string();
@@ -520,7 +555,10 @@ fn check_latest_release() -> Result<Option<String>, String> {
 
 /// Download and replace the current binary with the given release version.
 fn dist_update_install(remote_version: &str) {
-    let target = current_target_triple();
+    let target = packages::current_target_triple().unwrap_or_else(|e| {
+        eprintln!("hay dist-update: {e}");
+        std::process::exit(1);
+    });
     let (asset_ext, archive_cmd) = dist_asset_kind();
     let asset_name = format!("hay-v{remote_version}-{target}.{asset_ext}");
 
@@ -538,7 +576,7 @@ fn dist_update_install(remote_version: &str) {
     };
 
     let release_body: String = release_resp.into_string().unwrap_or_default();
-    let release: GhRelease = serde_json::from_str(&release_body).unwrap_or_else(|e| {
+    let release: packages::GhRelease = serde_json::from_str(&release_body).unwrap_or_else(|e| {
         eprintln!("hay dist-update: cannot parse release payload: {e}");
         std::process::exit(1);
     });
@@ -629,7 +667,10 @@ fn dist_update_install(remote_version: &str) {
 
 /// Download and install the latest nightly build (pre-release tagged "nightly").
 fn dist_update_nightly() {
-    let target = current_target_triple();
+    let target = packages::current_target_triple().unwrap_or_else(|e| {
+        eprintln!("hay dist-update: {e}");
+        std::process::exit(1);
+    });
     let (asset_ext, archive_cmd) = dist_asset_kind();
     let asset_name = format!("hay-nightly-{target}.{asset_ext}");
 
@@ -649,7 +690,7 @@ fn dist_update_nightly() {
     };
 
     let release_body: String = release_resp.into_string().unwrap_or_default();
-    let release: GhRelease = serde_json::from_str(&release_body).unwrap_or_else(|e| {
+    let release: packages::GhRelease = serde_json::from_str(&release_body).unwrap_or_else(|e| {
         eprintln!("hay dist-update: cannot parse nightly release payload: {e}");
         std::process::exit(1);
     });
@@ -937,32 +978,6 @@ fn is_newer_version(remote: &str, current: &str) -> bool {
     }
 }
 
-/// Check if current Hayashi version meets the minimum required by a plugin.
-/// Compares only the numeric part (ignores -dev, -rc, etc. pre-release suffixes),
-/// so 0.2.9-dev is considered compatible with min_version "0.2.9".
-fn meets_min_version(current: &str, required: &str) -> bool {
-    fn parse_nums(v: &str) -> Vec<u32> {
-        let v = v.trim_start_matches('v');
-        let num = v.split('-').next().unwrap_or(v);
-        num.split('.')
-            .filter_map(|s| s.parse::<u32>().ok())
-            .collect()
-    }
-    let c = parse_nums(current);
-    let r = parse_nums(required);
-    let n = c.len().max(r.len());
-    for i in 0..n {
-        let cv = c.get(i).copied().unwrap_or(0);
-        let rv = r.get(i).copied().unwrap_or(0);
-        match cv.cmp(&rv) {
-            std::cmp::Ordering::Less => return false,
-            std::cmp::Ordering::Greater => return true,
-            std::cmp::Ordering::Equal => {}
-        }
-    }
-    true // equal
-}
-
 /// Calcula a profundidade de delimitadores abertos numa linha para o REPL.
 /// Conta {, [, ( como +1 e }, ], ) como -1, ignorando o interior de strings.
 fn open_depth(s: &str) -> i32 {
@@ -986,15 +1001,18 @@ fn open_depth(s: &str) -> i32 {
 }
 
 fn run_repl() {
-    println!("Hayashi (x86_64-pc-linux-gnu) version {VERSION}");
+    println!("Hayashi version {VERSION}");
     println!("Copyright (C) 2026 Flávio de Vasconcellos Corrêa");
-    println!("License GPL-3.0-only: GNU GPL version 3 only <https://gnu.org/licenses/gpl.html>");
     println!();
-    println!("This is free software; see the source code for copying conditions.");
-    println!("There is NO WARRANTY, to the extent permitted by law.");
+    println!("Hayashi is free software licensed under GPL-3.0-only.");
+    println!("You may redistribute it under the terms of the GNU General Public License version 3.");
+    println!("This program comes with ABSOLUTELY NO WARRANTY.");
     println!();
-    println!("Home page:            <https://github.com/sheep-farm/hayashi>");
-    println!("In honor of Fumio Hayashi. Type 'exit' or Ctrl-D to quit.\n");
+    println!("Source code:          <https://github.com/sheep-farm/hayashi>");
+    println!("License text:         <https://www.gnu.org/licenses/gpl-3.0.html>");
+    println!("Project website:      <https://haylang.dev>");
+    println!();
+    println!("In honor of Fumio Hayashi. Type 'exit' or Ctrl-D to quit.");
 
     let mut interp = Interpreter::new();
     interp.load_plugins();
@@ -1130,538 +1148,46 @@ fn print_help() {
     println!("In REPL, type help() for full command list or help(cmd) for details.");
 }
 
-fn packages_dir() -> std::path::PathBuf {
-    let home = std::env::var("HOME")
-        .unwrap_or_else(|_| std::env::var("USERPROFILE").unwrap_or_else(|_| ".".into()));
-    std::path::Path::new(&home).join(".hay").join("packages")
-}
-
-fn is_pkg_installed(user: &str, repo: &str) -> Option<std::path::PathBuf> {
-    let dir = packages_dir().join(user).join(repo);
-    if dir.exists() && dir.is_dir() {
-        return Some(dir);
-    }
-    let ext = current_target_ext();
-    let file = packages_dir().join(user).join(format!("{repo}.{ext}"));
-    if file.exists() && file.is_file() {
-        return Some(file);
-    }
-    None
-}
-
-#[allow(dead_code)]
-fn pkg_install(spec: &str) {
-    pkg_install_internal(spec, None, false);
-}
-
 fn pkg_install_internal(spec: &str, version: Option<&str>, force_overwrite: bool) {
-    let (user, repo) = if let Some(pos) = spec.find('/') {
-        (&spec[..pos], &spec[pos + 1..])
-    } else {
-        eprintln!("hay install: expected 'user/repo', got '{spec}'");
+    if let Err(e) = packages::install(spec, version, force_overwrite) {
+        eprintln!("hay install: {e}");
         std::process::exit(1);
-    };
-
-    let version_tag = version.and_then(|v| {
-        let trimmed = v.trim();
-        if trimmed.is_empty() || trimmed == "latest" {
-            None
-        } else if trimmed.starts_with('v') {
-            Some(trimmed.to_string())
-        } else {
-            Some(format!("v{trimmed}"))
-        }
-    });
-
-    if !force_overwrite {
-        if let Some(installed_path) = is_pkg_installed(user, repo) {
-            print!(
-                "Package {}/{} is already installed at {}. Overwrite? (y/N): ",
-                user,
-                repo,
-                installed_path.display()
-            );
-            use std::io::Write;
-            let _ = std::io::stdout().flush();
-            let mut input = String::new();
-            if std::io::stdin().read_line(&mut input).is_ok() {
-                let trimmed = input.trim().to_lowercase();
-                if trimmed != "y" && trimmed != "yes" {
-                    println!("Installation cancelled.");
-                    return;
-                }
-            } else {
-                println!("Installation cancelled.");
-                return;
-            }
-        }
-    }
-
-    let dest = packages_dir().join(user).join(repo);
-    let api_url = format!("https://api.github.com/repos/{user}/{repo}/contents/");
-    println!("Fetching {user}/{repo}...");
-
-    let resp = match ureq::get(&api_url)
-        .set("User-Agent", "hay")
-        .set("Accept", "application/vnd.github.v3+json")
-        .call()
-    {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("hay install: cannot reach GitHub API: {e}");
-            std::process::exit(1);
-        }
-    };
-
-    let body: String = resp.into_string().unwrap_or_default();
-    let entries: Vec<GhEntry> = match serde_json::from_str(&body) {
-        Ok(v) => v,
-        Err(e) => {
-            eprintln!("hay install: cannot parse GitHub response: {e}");
-            std::process::exit(1);
-        }
-    };
-
-    // Check plugin compatibility: look for hayashi.toml in repo root
-    if let Some(toml_entry) = entries.iter().find(|e| e.name == "hayashi.toml") {
-        if let Some(url) = &toml_entry.download_url {
-            if let Ok(resp) = ureq::get(url).set("User-Agent", "hay").call() {
-                let toml_body = resp.into_string().unwrap_or_default();
-                // Parse min_version = "x.y.z" (simple TOML, no crate needed)
-                if let Some(line) = toml_body
-                    .lines()
-                    .find(|l| l.trim_start().starts_with("min_version"))
-                {
-                    if let Some(val) = line.split('=').nth(1) {
-                        let min_ver = val.trim().trim_matches('"').trim_matches('\'');
-                        if !meets_min_version(VERSION, min_ver) {
-                            eprintln!(
-                                "hay install: {user}/{repo} requires Hayashi >= {min_ver} (you have {VERSION})"
-                            );
-                            std::process::exit(1);
-                        }
-                    }
-                }
-                // Parse primitives = ["export", "plot", ...]
-                // Informa ao usuário que o plugin substitui builtins do host.
-                if let Some(line) = toml_body
-                    .lines()
-                    .find(|l| l.trim_start().starts_with("primitives"))
-                {
-                    if let Some(val) = line.split('=').nth(1) {
-                        let primitives: Vec<&str> = val
-                            .trim()
-                            .trim_matches(['[', ']'])
-                            .split(',')
-                            .map(|s| s.trim().trim_matches('"').trim_matches('\''))
-                            .filter(|s| !s.is_empty())
-                            .collect();
-                        if !primitives.is_empty() {
-                            println!(
-                                "hay install: {user}/{repo} overrides builtin(s): {}",
-                                primitives.join(", ")
-                            );
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    let dominated = |name: &str| -> bool {
-        let lower = name.to_lowercase();
-        lower.ends_with(".hay")
-            || lower == "readme.md"
-            || lower == "readme"
-            || lower == "readme.txt"
-            || lower == "license"
-            || lower == "license.md"
-            || lower == "license.txt"
-            || lower == "licence"
-            || lower == "licence.md"
-    };
-
-    let files: Vec<&GhEntry> = entries
-        .iter()
-        .filter(|e| e.r#type == "file" && e.download_url.is_some() && dominated(&e.name))
-        .collect();
-
-    let n_hy = files.iter().filter(|e| e.name.ends_with(".hay")).count();
-    if n_hy == 0 {
-        println!("No .hay scripts found. Checking for native/WASM releases...");
-        let release_url = match &version_tag {
-            Some(tag) => format!("https://api.github.com/repos/{user}/{repo}/releases/tags/{tag}"),
-            None => format!("https://api.github.com/repos/{user}/{repo}/releases/latest"),
-        };
-
-        let release_resp = match ureq::get(&release_url)
-            .set("User-Agent", "hay")
-            .set("Accept", "application/vnd.github.v3+json")
-            .call()
-        {
-            Ok(r) => r,
-            Err(e) => {
-                if let Some(tag) = &version_tag {
-                    eprintln!("hay install: release {tag} not found for {user}/{repo}: {e}");
-                } else {
-                    eprintln!(
-                        "hay install: no scripts or native releases found for {user}/{repo}: {e}"
-                    );
-                }
-                std::process::exit(1);
-            }
-        };
-
-        let release_body: String = release_resp.into_string().unwrap_or_default();
-        let release: GhRelease = serde_json::from_str(&release_body).unwrap_or_else(|e| {
-            eprintln!("hay install: cannot parse release payload: {e}");
-            std::process::exit(1);
-        });
-
-        let target = current_target_triple();
-        let ext = current_target_ext();
-
-        let matching_asset = release
-            .assets
-            .iter()
-            .find(|asset| asset.name.contains(target) && asset.name.ends_with(ext));
-
-        if let Some(asset) = matching_asset {
-            println!("Found binary release for {target}: {}", asset.name);
-            let parent_dir = packages_dir().join(user);
-            std::fs::create_dir_all(&parent_dir).unwrap();
-            let dest_file = parent_dir.join(format!("{repo}.{ext}"));
-
-            print!("Downloading {} ... ", asset.name);
-            match ureq::get(&asset.browser_download_url).call() {
-                Ok(resp) => {
-                    let mut reader = resp.into_reader();
-                    let mut out_file = std::fs::File::create(&dest_file).unwrap();
-                    if std::io::copy(&mut reader, &mut out_file).is_ok() {
-                        println!("ok");
-
-                        let meta = PkgMetadata {
-                            user: user.to_string(),
-                            repo: repo.to_string(),
-                            version: release.tag_name.clone(),
-                            installed_at: chrono::Utc::now().to_rfc3339(),
-                            pkg_type: "native".to_string(),
-                        };
-                        write_pkg_metadata(&meta);
-
-                        println!(
-                            "Successfully installed native plugin {user}/{repo} at {}",
-                            dest_file.display()
-                        );
-                        println!("  use: import(\"{user}/{repo}\")");
-                        return;
-                    } else {
-                        println!("write error");
-                    }
-                }
-                Err(e) => println!("download error: {e}"),
-            }
-        } else {
-            eprintln!("hay install: no compatible release asset found for {target}");
-            std::process::exit(1);
-        }
-        return;
-    }
-
-    std::fs::create_dir_all(&dest).unwrap_or_else(|e| {
-        eprintln!("hay install: cannot create {}: {e}", dest.display());
-        std::process::exit(1);
-    });
-
-    let mut installed = 0;
-    for file in &files {
-        let url = file.download_url.as_ref().unwrap();
-        print!("  {} ... ", file.name);
-        match ureq::get(url).call() {
-            Ok(resp) => {
-                let content = resp.into_string().unwrap_or_default();
-                let path = dest.join(&file.name);
-                if std::fs::write(&path, &content).is_ok() {
-                    println!("ok");
-                    installed += 1;
-                } else {
-                    println!("write error");
-                }
-            }
-            Err(e) => println!("download error: {e}"),
-        }
-    }
-
-    let commit_url = format!("https://api.github.com/repos/{user}/{repo}/commits");
-    let mut version = "unknown".to_string();
-    if let Ok(c_resp) = ureq::get(&commit_url)
-        .set("User-Agent", "hay")
-        .set("Accept", "application/vnd.github.v3+json")
-        .call()
-    {
-        if let Ok(c_body) = c_resp.into_string() {
-            if let Ok(commits) = serde_json::from_str::<Vec<GhCommitInfo>>(&c_body) {
-                if let Some(first) = commits.first() {
-                    version = first.sha.clone();
-                }
-            }
-        }
-    }
-
-    let meta = PkgMetadata {
-        user: user.to_string(),
-        repo: repo.to_string(),
-        version,
-        installed_at: chrono::Utc::now().to_rfc3339(),
-        pkg_type: "script".to_string(),
-    };
-    write_pkg_metadata(&meta);
-
-    println!(
-        "Installed {user}/{repo}: {installed} file(s) → {}",
-        dest.display()
-    );
-    println!("  use: import(\"{user}/{repo}/module\")");
-}
-
-fn pkg_install_from_file(file_path: &str, force_overwrite: bool) {
-    let content = match std::fs::read_to_string(file_path) {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!("hay install: cannot read file '{file_path}': {e}");
-            std::process::exit(1);
-        }
-    };
-
-    let mut installed_count = 0;
-    let mut failed_count = 0;
-
-    for line in content.lines() {
-        let line = line.trim();
-
-        // Skip empty lines and comments
-        if line.is_empty() || line.starts_with('#') {
-            continue;
-        }
-
-        // Parse format: user/repo [v.N.N.N]
-        let parts: Vec<&str> = line.split_whitespace().collect();
-        if parts.is_empty() {
-            continue;
-        }
-
-        let spec = parts[0];
-        let version = parts.get(1).copied();
-
-        let (user, repo) = if let Some(pos) = spec.find('/') {
-            (&spec[..pos], &spec[pos + 1..])
-        } else {
-            eprintln!("hay install: expected 'user/repo', got '{spec}' in file");
-            failed_count += 1;
-            continue;
-        };
-
-        println!("Installing {user}/{repo}...");
-
-        // Install this package
-        pkg_install_internal(spec, version, force_overwrite);
-        installed_count += 1;
-    }
-
-    println!();
-    println!("Installation summary:");
-    println!("  Installed: {installed_count}");
-    if failed_count > 0 {
-        println!("  Failed: {failed_count}");
     }
 }
 
 fn pkg_remove(spec: &str) {
-    let (user, repo) = if let Some(pos) = spec.find('/') {
-        (&spec[..pos], &spec[pos + 1..])
-    } else {
-        eprintln!("hay remove: expected 'user/repo', got '{spec}'");
-        std::process::exit(1);
-    };
-
-    let dir = packages_dir().join(user).join(repo);
-    let ext = current_target_ext();
-    let file = packages_dir().join(user).join(format!("{repo}.{ext}"));
-    let meta_file = pkg_metadata_path(user, repo);
-
-    let mut removed = false;
-
-    if dir.exists() && dir.is_dir() {
-        std::fs::remove_dir_all(&dir).unwrap_or_else(|e| {
-            eprintln!("hay remove: cannot remove {}: {e}", dir.display());
-            std::process::exit(1);
-        });
-        removed = true;
-    }
-
-    if file.exists() && file.is_file() {
-        std::fs::remove_file(&file).unwrap_or_else(|e| {
-            eprintln!("hay remove: cannot remove {}: {e}", file.display());
-            std::process::exit(1);
-        });
-        removed = true;
-    }
-
-    if meta_file.exists() {
-        let _ = std::fs::remove_file(&meta_file);
-    }
-
-    if !removed {
-        eprintln!("hay remove: package '{spec}' not installed");
+    if let Err(e) = packages::remove(spec) {
+        eprintln!("hay remove: {e}");
         std::process::exit(1);
     }
-
-    let user_dir = packages_dir().join(user);
-    if user_dir.exists() {
-        let _ = std::fs::remove_dir(&user_dir);
-    }
-
-    println!("Removed {spec}");
 }
 
 fn migrate_legacy_packages() {
-    let dir = packages_dir();
-    if !dir.is_dir() {
-        return;
-    }
-    if let Ok(users) = std::fs::read_dir(&dir) {
-        for user_entry in users.filter_map(|e| e.ok()) {
-            if user_entry.path().is_dir() {
-                let user = user_entry.file_name().to_string_lossy().to_string();
-                if let Ok(repos) = std::fs::read_dir(user_entry.path()) {
-                    for repo_entry in repos.filter_map(|e| e.ok()) {
-                        let path = repo_entry.path();
-                        let repo_name = repo_entry.file_name().to_string_lossy().to_string();
-
-                        if path.is_dir() {
-                            let metadata_file = pkg_metadata_path(&user, &repo_name);
-                            if !metadata_file.exists() {
-                                let meta = PkgMetadata {
-                                    user: user.clone(),
-                                    repo: repo_name,
-                                    version: "unknown".to_string(),
-                                    installed_at: "unknown".to_string(),
-                                    pkg_type: "script".to_string(),
-                                };
-                                write_pkg_metadata(&meta);
-                            }
-                        } else if path.is_file() {
-                            let ext = path
-                                .extension()
-                                .and_then(|x| x.to_str())
-                                .unwrap_or("")
-                                .to_lowercase();
-                            if matches!(ext.as_str(), "so" | "dll" | "dylib" | "wasm") {
-                                let clean_name =
-                                    repo_name.trim_end_matches(&format!(".{ext}")).to_string();
-                                let metadata_file = pkg_metadata_path(&user, &clean_name);
-                                if !metadata_file.exists() {
-                                    let meta = PkgMetadata {
-                                        user: user.clone(),
-                                        repo: clean_name,
-                                        version: "unknown".to_string(),
-                                        installed_at: "unknown".to_string(),
-                                        pkg_type: "native".to_string(),
-                                    };
-                                    write_pkg_metadata(&meta);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+    packages::migrate_legacy_packages();
 }
 
-fn get_installed_packages() -> Vec<PkgMetadata> {
-    let mut pkgs = Vec::new();
-    let dir = packages_dir();
-    if !dir.is_dir() {
-        return pkgs;
-    }
-    if let Ok(users) = std::fs::read_dir(&dir) {
-        for user_entry in users.filter_map(|e| e.ok()) {
-            if user_entry.path().is_dir() {
-                if let Ok(repos) = std::fs::read_dir(user_entry.path()) {
-                    for repo_entry in repos.filter_map(|e| e.ok()) {
-                        let path = repo_entry.path();
-                        if path.is_file() {
-                            let name = repo_entry.file_name().to_string_lossy().to_string();
-                            if name.ends_with(".metadata.json") {
-                                if let Ok(content) = std::fs::read_to_string(&path) {
-                                    if let Ok(meta) = serde_json::from_str::<PkgMetadata>(&content)
-                                    {
-                                        pkgs.push(meta);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    pkgs
+fn get_installed_packages() -> Vec<packages::PkgMetadata> {
+    packages::get_installed_packages()
 }
 
-fn check_pkg_integrity(meta: &PkgMetadata) -> Result<(String, bool), String> {
-    if meta.pkg_type == "native" {
-        let release_url = format!(
-            "https://api.github.com/repos/{}/{}/releases/latest",
-            meta.user, meta.repo
-        );
-        let resp = ureq::get(&release_url)
-            .set("User-Agent", "hay")
-            .set("Accept", "application/vnd.github.v3+json")
-            .call()
-            .map_err(|e| e.to_string())?;
+fn check_pkg_integrity(meta: &packages::PkgMetadata) -> Result<(String, bool), String> {
+    packages::check_integrity(meta).map_err(|e| e.to_string())
+}
 
-        let body: String = resp.into_string().map_err(|e| e.to_string())?;
-        let release: GhRelease = serde_json::from_str(&body).map_err(|e| e.to_string())?;
-
-        let up_to_date = meta.version == release.tag_name;
-        Ok((release.tag_name, up_to_date))
-    } else {
-        let commit_url = format!(
-            "https://api.github.com/repos/{}/{}/commits",
-            meta.user, meta.repo
-        );
-        let resp = ureq::get(&commit_url)
-            .set("User-Agent", "hay")
-            .set("Accept", "application/vnd.github.v3+json")
-            .call()
-            .map_err(|e| e.to_string())?;
-
-        let body: String = resp.into_string().map_err(|e| e.to_string())?;
-        let commits: Vec<GhCommitInfo> = serde_json::from_str(&body).map_err(|e| e.to_string())?;
-
-        if let Some(first) = commits.first() {
-            let up_to_date = meta.version == first.sha;
-            Ok((first.sha.clone(), up_to_date))
-        } else {
-            Err("No commits found in remote repository".to_string())
-        }
-    }
+fn normalize_version(v: &str) -> String {
+    packages::normalize_version(v)
 }
 
 fn pkg_check_plugin(spec_opt: Option<&str>) {
     migrate_legacy_packages();
 
     if let Some(spec) = spec_opt {
-        let (user, repo) = if let Some(pos) = spec.find('/') {
-            (&spec[..pos], &spec[pos + 1..])
-        } else {
-            eprintln!("hay check-plugin: expected 'user/repo', got '{spec}'");
+        let (user, repo) = packages::parse_spec(spec).unwrap_or_else(|e| {
+            eprintln!("hay check-plugin: {e}");
             std::process::exit(1);
-        };
+        });
 
-        match read_pkg_metadata(user, repo) {
+        match packages::read_pkg_metadata(user, repo) {
             Some(meta) => {
                 println!("Checking {}/{} ...", user, repo);
                 match check_pkg_integrity(&meta) {
@@ -1724,14 +1250,12 @@ fn pkg_update(spec_opt: Option<&str>, auto_confirm: bool) {
     migrate_legacy_packages();
 
     if let Some(spec) = spec_opt {
-        let (user, repo) = if let Some(pos) = spec.find('/') {
-            (&spec[..pos], &spec[pos + 1..])
-        } else {
-            eprintln!("hay update: expected 'user/repo', got '{spec}'");
+        let (user, repo) = packages::parse_spec(spec).unwrap_or_else(|e| {
+            eprintln!("hay update: {e}");
             std::process::exit(1);
-        };
+        });
 
-        let meta = match read_pkg_metadata(user, repo) {
+        let meta = match packages::read_pkg_metadata(user, repo) {
             Some(m) => m,
             None => {
                 eprintln!("hay update: package '{spec}' not installed");
@@ -1868,7 +1392,7 @@ fn pkg_update(spec_opt: Option<&str>, auto_confirm: bool) {
 
 fn pkg_list() {
     migrate_legacy_packages();
-    let dir = packages_dir();
+    let dir = packages::packages_dir();
     if !dir.is_dir() {
         println!("No packages installed.");
         return;
@@ -1918,7 +1442,7 @@ fn pkg_list() {
                     }
                     let user_s = user.to_string_lossy().to_string();
                     let repo_s = repo.to_string_lossy().to_string();
-                    let version = read_pkg_metadata(&user_s, &repo_s)
+                    let version = packages::read_pkg_metadata(&user_s, &repo_s)
                         .map(|m| normalize_version(&m.version))
                         .unwrap_or_else(|| "unknown".into());
                     println!(
@@ -1946,7 +1470,7 @@ fn pkg_list() {
                         .to_string_lossy()
                         .trim_end_matches(&format!(".{ext}"))
                         .to_string();
-                    let version = read_pkg_metadata(&user_s, &clean_name)
+                    let version = packages::read_pkg_metadata(&user_s, &clean_name)
                         .map(|m| normalize_version(&m.version))
                         .unwrap_or_else(|| "unknown".into());
                     println!(
@@ -1959,92 +1483,6 @@ fn pkg_list() {
     }
     if !found {
         println!("No packages installed.");
-    }
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
-struct PkgMetadata {
-    user: String,
-    repo: String,
-    version: String,
-    installed_at: String,
-    pkg_type: String, // "native" or "script"
-}
-
-fn pkg_metadata_path(user: &str, repo: &str) -> std::path::PathBuf {
-    packages_dir()
-        .join(user)
-        .join(format!("{repo}.metadata.json"))
-}
-
-fn read_pkg_metadata(user: &str, repo: &str) -> Option<PkgMetadata> {
-    let path = pkg_metadata_path(user, repo);
-    if path.exists() {
-        if let Ok(content) = std::fs::read_to_string(path) {
-            return serde_json::from_str(&content).ok();
-        }
-    }
-    None
-}
-
-/// Strip a leading 'v' from version strings so output is consistently `vX.Y.Z`.
-fn normalize_version(v: &str) -> String {
-    v.trim().trim_start_matches('v').to_string()
-}
-
-fn write_pkg_metadata(meta: &PkgMetadata) {
-    let path = pkg_metadata_path(&meta.user, &meta.repo);
-    if let Some(parent) = path.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-    if let Ok(content) = serde_json::to_string_pretty(meta) {
-        let _ = std::fs::write(path, content);
-    }
-}
-
-#[derive(serde::Deserialize)]
-struct GhEntry {
-    name: String,
-    r#type: String,
-    download_url: Option<String>,
-}
-
-#[derive(serde::Deserialize)]
-struct GhRelease {
-    tag_name: String,
-    assets: Vec<GhAsset>,
-}
-
-#[derive(serde::Deserialize)]
-struct GhAsset {
-    name: String,
-    browser_download_url: String,
-}
-
-#[derive(serde::Deserialize)]
-struct GhCommitInfo {
-    sha: String,
-}
-
-fn current_target_triple() -> &'static str {
-    match (std::env::consts::OS, std::env::consts::ARCH) {
-        ("linux", "x86_64") => "x86_64-unknown-linux-gnu",
-        ("macos", "aarch64") => "aarch64-apple-darwin",
-        ("macos", "x86_64") => "x86_64-apple-darwin",
-        ("windows", "x86_64") => "x86_64-pc-windows-msvc",
-        (os, arch) => {
-            eprintln!("Unsupported target platform: {os}-{arch}");
-            std::process::exit(1);
-        }
-    }
-}
-
-fn current_target_ext() -> &'static str {
-    match std::env::consts::OS {
-        "linux" => "so",
-        "macos" => "dylib",
-        "windows" => "dll",
-        _ => "so",
     }
 }
 
