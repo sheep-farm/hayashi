@@ -195,7 +195,7 @@ core empirical estimators and intentionally excludes some command categories:
 - **Visualization commands** (e.g., `plot`, `scatter`, `histogram`) — not part
   of numerical validation.
 - **Niche or hard-to-reference estimators** (e.g., `portfolio_sort`,
-  `double_sort`, Fama-MacBeth, dynamic factor, GAM, multiple imputation) —
+  `double_sort`, dynamic factor, GAM, multiple imputation) —
   require specialised datasets or lack canonical open-source reference
   implementations.
 - **Estimators with output format limitations** (e.g., `svar`, `svec`) —
