@@ -1005,7 +1005,9 @@ fn run_repl() {
     println!("Copyright (C) 2026 Flávio de Vasconcellos Corrêa");
     println!();
     println!("Hayashi is free software licensed under GPL-3.0-only.");
-    println!("You may redistribute it under the terms of the GNU General Public License version 3.");
+    println!(
+        "You may redistribute it under the terms of the GNU General Public License version 3."
+    );
     println!("This program comes with ABSOLUTELY NO WARRANTY.");
     println!();
     println!("Source code:          <https://github.com/sheep-farm/hayashi>");
