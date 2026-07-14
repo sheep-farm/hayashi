@@ -68,10 +68,96 @@ load "painel.dta" as painel        // formato Stata
 load "resultado.parquet" as df
 load "planilha.xlsx" as df         // primeira aba
 load "planilha.xlsx" sheet="Dados" as df
+load "base.db" as df, table=precos
+load "base.db" as df, query="SELECT * FROM precos WHERE ano > 2020"
+load "dados.csv" as df, sep=";"
 \end{lstlisting}
 
-Formatos suportados: CSV, Parquet, Stata (\texttt{.dta}), Excel (\texttt{.xlsx}),
-SQLite.
+Formatos suportados: CSV, TSV, JSON, Parquet, Stata (\texttt{.dta}),
+Excel (\texttt{.xlsx}/\texttt{.xls}/\texttt{.ods}), SQLite, ODBC. URLs HTTP(S)
+são baixadas automaticamente.
+
+\subsection*{Projeção de colunas e filtro de linhas (\texttt{columns=}, \texttt{where=})}
+
+Para arquivos grandes, carregar todas as colunas e linhas em RAM pode ser
+desperdício ou inviável. As opções \texttt{columns=} e \texttt{where=} fazem
+\textit{pushdown} da projeção e do filtro para a fonte de dados: apenas as
+colunas pedidas e as linhas que casam com o predicado são materializadas em
+memória.
+
+\begin{lstlisting}[caption={Pushdown de colunas e filtro}]
+load "cotacoes.parquet" as aapl, columns=[ticker, date, adj_close], where="ticker == \"AAPL\""
+load "base.db" as df, table=precos, columns=[data, close], where="close > 100"
+load "survey.csv" as df, where="age >= 18 && region == \"South\""
+load "painel.dta" as df, columns=[id, year, y], where="year >= 2000"
+load "planilha.xlsx" as df, columns=[name, score], where="score > 75"
+\end{lstlisting}
+
+\begin{center}
+\begin{tabular}{llll}
+\toprule
+\textbf{Fonte} & \textbf{\texttt{columns=}} & \textbf{\texttt{where=}} & \textbf{Mecanismo de pushdown} \\
+\midrule
+Parquet   & sim & sim & Arrow \texttt{ProjectionMask} + \texttt{RowFilter} \\
+SQLite    & sim & sim & \texttt{SELECT cols FROM t WHERE pred} \\
+ODBC      & sim & sim & idem SQLite \\
+CSV / TSV & sim & sim & projeção no loop, predicado linha a linha \\
+DTA       & sim & sim & projeção em \texttt{read\_record}, predicado linha a linha \\
+Excel     & sim & sim & projeção após \texttt{worksheet\_range}, filtro nas células \\
+JSON      & ainda não & ainda não & --- \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Passar \texttt{columns=} ou \texttt{where=} para um \texttt{load} JSON retorna
+erro. \texttt{query=} não pode ser combinado com \texttt{columns=} ou
+\texttt{where=} --- se você precisa de SQL customizado, escreva a projeção e o
+filtro dentro da própria string de \texttt{query}.
+
+\subsubsection*{Sintaxe de \texttt{columns=}}
+
+Aceita uma lista de nomes de colunas (identificadores ou strings):
+
+\begin{lstlisting}
+columns=[ticker, date, adj_close]
+columns=["ticker", "date", "adj_close"]
+columns=ticker              // coluna única também aceita
+\end{lstlisting}
+
+Os nomes são validados contra o \textit{schema} da fonte antes de qualquer
+dado ser lido; colunas inexistentes produzem erro listando as disponíveis.
+
+\subsubsection*{Sintaxe de \texttt{where=}}
+
+\texttt{where=} aceita uma expressão Hayashi da forma \texttt{coluna OP literal},
+combinada com \texttt{\&\&}, \texttt{||}, \texttt{!} e \texttt{in [...]}.
+A expressão é parseada pelo parser do Hayashi e normalizada em um
+\texttt{RowPredicate} que cada loader avalia (ou empurra para a fonte).
+
+\begin{lstlisting}
+where="ticker == \"AAPL\""                     // igualdade de string
+where="preco > 100"                            // comparação numérica
+where="preco > 100 && volume > 1e6"            // AND
+where="ticker in [\"AAPL\", \"MSFT\"]"         // pertinência
+where="!(setor == \"Financeiro\")"             // negação
+where="ano >= 2022 && produto == \"Soja\""     // combinado
+\end{lstlisting}
+
+Operadores suportados: \texttt{==}, \texttt{!=}, \texttt{>}, \texttt{>=},
+\texttt{<}, \texttt{<=}, \texttt{in}, \texttt{\&\&} (e), \texttt{||} (ou),
+\texttt{!} (não). Comparações devem ser \texttt{coluna OP literal} ---
+comparar duas colunas não é suportado (use \texttt{generate} + \texttt{filter}
+para isso).
+
+\begin{nota}
+  Em arquivos Parquet grandes, o \textit{pushdown} de filtro é especialmente
+  eficaz: o predicado é avaliado durante o \textit{scan} do \textit{row group},
+  antes de qualquer dado ser decodificado para a memória. Em um arquivo de
+  837\,MB com 30 milhões de linhas e 8.292 \textit{tickers}, carregar
+  \texttt{columns=[ticker, date, adj\_close], where="ticker == \textbackslash"AAPL\textbackslash""}
+  reduziu o pico de RAM de $\sim$7{,}5\,GB (carga \textit{eager} completa) para
+  $\sim$4\,MB.
+\end{nota}
 
 \section{Salvando DataFrames}
 

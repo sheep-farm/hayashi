@@ -98,7 +98,8 @@ match  try  catch  and  or  not  true  false  nil  quietly
 \toprule
 \textbf{Function} & \textbf{Description} \\
 \midrule
-\texttt{load "f" as df}           & Load file (CSV, parquet) \\
+\texttt{load "f" as df [, opts]}  & Load file (CSV, TSV, JSON, Parquet, DTA, XLSX, SQLite, ODBC) \\
+                                  & \quad \textit{opts}: \texttt{sheet=}, \texttt{table=}, \texttt{query=}, \texttt{sep=}, \texttt{columns=}, \texttt{where=} \\
 \texttt{save df "f"}              & Save file \\
 \texttt{count(df [, cond])}       & Number of rows \\
 \texttt{filter(df, cond)}         & Filter rows \\
@@ -132,7 +133,7 @@ match  try  catch  and  or  not  true  false  nil  quietly
 \texttt{ensure\_dir(path)}        & Create directory (and parents) \\
 \texttt{write(content, path)}     & Write string to file \\
 \texttt{export(df, "csv", path)}   & Save DataFrame to CSV \\
-\texttt{load "path" as df}        & Load CSV/parquet into DataFrame \\
+\texttt{load "path" as df [, opts]} & Load CSV/TSV/JSON/Parquet/DTA/XLSX/SQLite/ODBC; \texttt{opts}: \texttt{columns=}, \texttt{where=} (pushdown) \\
 \bottomrule
 \end{tabular}
 \end{center}

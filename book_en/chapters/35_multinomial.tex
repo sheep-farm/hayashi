@@ -148,8 +148,8 @@ mlogit(y ~ x1 + x2, df, base=1)    // explicit base alternative
 \section{Empirical validation}
 
 The Wooldridge \texttt{beauty} dataset is used in the validation cases
-\texttt{ologit_beauty} and \texttt{oprobit_beauty} in \texttt{validation/cases/},
-and the \texttt{AER::TravelMode} dataset is used in the \texttt{mlogit_mode} case.
+\texttt{ologit\_beauty} and \texttt{oprobit\_beauty} in \texttt{validation/cases/},
+and the \texttt{AER::TravelMode} dataset is used in the \texttt{mlogit\_mode} case.
 The cases estimate ordered logit, ordered probit and multinomial logit models in
 \hayashi{} and compare the coefficients with reference implementations in R and
 Python. Run \lstinline{hay validate} to see the current status.
