@@ -1,3 +1,4 @@
+use super::eval_expr::ColResult;
 use super::*;
 
 impl Interpreter {
@@ -95,11 +96,22 @@ impl Interpreter {
                         )))
                     }
                 };
-                let vals = self.eval_col_expr(expr, &df_val)?;
-                let arr = ndarray::Array1::from(vals);
-                Rc::make_mut(&mut df_val)
-                    .insert(col_name.clone(), arr)
-                    .map_err(|e: greeners::GreenersError| self.rt_err(e.to_string()))?;
+                let col_result = self.eval_col_expr_typed(expr, &df_val)?;
+                match col_result {
+                    ColResult::Float(vals) => {
+                        let arr = ndarray::Array1::from(vals);
+                        Rc::make_mut(&mut df_val)
+                            .insert(col_name.clone(), arr)
+                            .map_err(|e: greeners::GreenersError| self.rt_err(e.to_string()))?;
+                    }
+                    ColResult::String(strs) => {
+                        use greeners::Column;
+                        let col = Column::String(ndarray::Array1::from(strs));
+                        Rc::make_mut(&mut df_val)
+                            .insert_column(col_name.clone(), col)
+                            .map_err(|e: greeners::GreenersError| self.rt_err(e.to_string()))?;
+                    }
+                }
                 emitln!(self, "({} obs)  {df}.{col_name} generated", df_val.n_rows());
                 self.env.set(df, Value::DataFrame(df_val))?;
             }
@@ -345,7 +357,17 @@ impl Interpreter {
         let mut opt_table: Option<String> = None;
         let mut opt_query: Option<String> = None;
         let mut opt_sep: Option<String> = None;
+        let mut opt_columns: Option<Vec<String>> = None;
+        let mut opt_where: Option<String> = None;
         for o in opts {
+            // `columns=` aceita uma lista de identificadores/strings ou um
+            // único identificador/string. Extraímos os nomes diretamente da
+            // AST (sem avaliar) para que `columns=[ano, preco]` funcione com
+            // nomes de colunas que ainda não são variáveis no ambiente.
+            if o.name == "columns" {
+                opt_columns = Some(extract_column_names(&o.value)?);
+                continue;
+            }
             let val = match self.eval_expr(&o.value)? {
                 Value::Str(s) => s,
                 Value::Float(f) => format!("{f}"),
@@ -357,12 +379,27 @@ impl Interpreter {
                 "table" => opt_table = Some(val),
                 "query" => opt_query = Some(val),
                 "sep" | "delimiter" => opt_sep = Some(val),
+                "where" => opt_where = Some(val),
                 k => {
                     return Err(HayashiError::Runtime(format!(
-                        "load: unknown option '{k}' — use: sheet, table, query, sep"
+                        "load: unknown option '{k}' — use: sheet, table, query, sep, columns, where"
                     )))
                 }
             }
+        }
+
+        // Predicado where= (parseado uma única vez aqui e reutilizado pelos
+        // loaders). Ainda não suportado para JSON.
+        let predicate: Option<crate::lang::predicate::RowPredicate> = match opt_where.as_deref() {
+            Some(s) => Some(crate::lang::predicate::RowPredicate::parse(s)?),
+            None => None,
+        };
+
+        // Combinações inválidas.
+        if opt_query.is_some() && (opt_columns.is_some() || predicate.is_some()) {
+            return Err(HayashiError::Runtime(
+                "load: query= cannot be combined with columns= or where=".into(),
+            ));
         }
 
         // ── ODBC ────────────────────────────────────────────────
@@ -370,13 +407,20 @@ impl Interpreter {
             #[cfg(feature = "odbc")]
             {
                 let conn_str = &path_str["odbc://".len()..];
-                let sql = if let Some(q) = &opt_query {
-                    q.clone()
-                } else if let Some(t) = &opt_table {
-                    format!("SELECT * FROM \"{t}\"")
+                let sql = if let Some(t) = &opt_table {
+                    let cols = opt_columns
+                        .as_deref()
+                        .map(|c| c.join(", "))
+                        .unwrap_or_else(|| "*".to_string());
+                    let mut s = format!("SELECT {cols} FROM \"{t}\"");
+                    if let Some(p) = &predicate {
+                        s.push_str(&format!(" WHERE {}", p.to_sql()));
+                    }
+                    s
                 } else {
                     return Err(HayashiError::Runtime(
-                        "load odbc: requires query= or table= option".into(),
+                        "load odbc: requires table= (with optional columns=/where=) or query="
+                            .into(),
                     ));
                 };
                 let (df, n_rows) = crate::io::odbc::load_odbc(conn_str, &sql)?;
@@ -409,17 +453,34 @@ impl Interpreter {
 
             let ext = local_path.rsplit('.').next().unwrap_or("").to_lowercase();
 
+            if ext == "json" && (opt_columns.is_some() || predicate.is_some()) {
+                return Err(HayashiError::Runtime(
+                    "load: columns=/where= not yet supported for JSON \
+                     (use a different format or post-load filter/keep)"
+                        .into(),
+                ));
+            }
+
             let (df, n_rows) = match ext.as_str() {
                 #[cfg(feature = "native")]
-                "dta" => crate::io::dta::load_dta(local_path)?,
-                "xlsx" | "xls" | "ods" => {
-                    crate::io::excel::load_excel(local_path, opt_sheet.as_deref())?
-                }
+                "dta" => crate::io::dta::load_dta(
+                    local_path,
+                    opt_columns.as_deref(),
+                    predicate.as_ref(),
+                )?,
+                "xlsx" | "xls" | "ods" => crate::io::excel::load_excel(
+                    local_path,
+                    opt_sheet.as_deref(),
+                    opt_columns.as_deref(),
+                    predicate.as_ref(),
+                )?,
                 #[cfg(feature = "native")]
                 "sqlite" | "sqlite3" | "db" => crate::io::sqlite::load_sqlite(
                     local_path,
                     opt_table.as_deref(),
                     opt_query.as_deref(),
+                    opt_columns.as_deref(),
+                    predicate.as_ref(),
                 )?,
                 "json" => {
                     let df =
@@ -427,8 +488,17 @@ impl Interpreter {
                     let n = df.n_rows();
                     (df, n)
                 }
-                "tsv" | "tab" => crate::io::dsv::load_dsv(local_path, b'\t')?,
-                "parquet" | "pq" => crate::io::parquet::load_parquet(local_path)?,
+                "tsv" | "tab" => crate::io::dsv::load_dsv(
+                    local_path,
+                    b'\t',
+                    opt_columns.as_deref(),
+                    predicate.as_ref(),
+                )?,
+                "parquet" | "pq" => crate::io::parquet::load_parquet(
+                    local_path,
+                    opt_columns.as_deref(),
+                    predicate.as_ref(),
+                )?,
                 _ => {
                     let delim = match opt_sep.as_deref() {
                         Some("\\t") | Some("tab") => b'\t',
@@ -440,13 +510,20 @@ impl Interpreter {
                         }
                         None => b',',
                     };
-                    if delim == b',' {
+                    if delim == b',' && opt_columns.is_none() && predicate.is_none() {
+                        // Caminho padrão (greeners): sem columns/where.
                         let df = DataFrame::from_csv(local_path)
                             .map_err(|e| self.rt_err(e.to_string()))?;
                         let n = df.n_rows();
                         (df, n)
                     } else {
-                        crate::io::dsv::load_dsv(local_path, delim)?
+                        // Loader DSV do hayashi — suporta columns=/where=.
+                        crate::io::dsv::load_dsv(
+                            local_path,
+                            delim,
+                            opt_columns.as_deref(),
+                            predicate.as_ref(),
+                        )?
                     }
                 }
             };
@@ -1385,5 +1462,32 @@ impl Interpreter {
             }
         }
         Ok(())
+    }
+}
+
+/// Extrai nomes de colunas da AST de `columns=` sem avaliar contra o
+/// ambiente. Aceita `Expr::Var` (identificador sem aspas) e `Expr::Str`
+/// (string literal), em lista ou único.
+fn extract_column_names(expr: &Expr) -> Result<Vec<String>> {
+    match expr {
+        Expr::List(items) => {
+            let mut out = Vec::with_capacity(items.len());
+            for e in items {
+                out.push(col_name_from_expr(e)?);
+            }
+            Ok(out)
+        }
+        other => Ok(vec![col_name_from_expr(other)?]),
+    }
+}
+
+fn col_name_from_expr(e: &Expr) -> Result<String> {
+    match e {
+        Expr::Var(name) => Ok(name.clone()),
+        Expr::Str(s) => Ok(s.clone()),
+        other => Err(HayashiError::Type(format!(
+            "load: columns= expects column names (identifiers or strings), got {:?}",
+            other
+        ))),
     }
 }

@@ -1,4 +1,5 @@
 use crate::lang::error::{HayashiError, Result};
+use crate::lang::predicate::RowPredicate;
 use greeners::DataFrame;
 use rusqlite::Connection;
 use std::collections::HashMap;
@@ -7,17 +8,67 @@ pub fn load_sqlite(
     path: &str,
     table: Option<&str>,
     query: Option<&str>,
+    columns: Option<&[String]>,
+    predicate: Option<&RowPredicate>,
 ) -> Result<(DataFrame, usize)> {
     let conn = Connection::open(path)
         .map_err(|e| HayashiError::Runtime(format!("cannot open '{path}': {e}")))?;
 
     let sql = if let Some(q) = query {
+        // Caminho legado: query= explícita. columns=/where= já rejeitados
+        // em exec_load antes de chegar aqui.
         q.to_string()
-    } else if let Some(t) = table {
-        format!("SELECT * FROM {}", quote_sqlite_identifier(t)?)
     } else {
-        let tbl = first_table(&conn)?;
-        format!("SELECT * FROM {}", quote_sqlite_identifier(&tbl)?)
+        // Montar SELECT a partir de table= (ou primeira tabela) + columns= +
+        // where=. Identifiers de tabela/columns são escapados; literais do
+        // where são escapados por RowPredicate::to_sql.
+        let tbl = match table {
+            Some(t) => t.to_string(),
+            None => first_table(&conn)?,
+        };
+
+        // Validar columns= e where= contra o schema real da tabela.
+        // O SQLite, em modo compatível, trata `"xxx"` como string literal
+        // quando a coluna não existe — então a validação explícita evita
+        // resultados silenciosamente errados.
+        let table_cols = table_columns(&conn, &tbl)?;
+        if let Some(cols) = columns {
+            for c in cols {
+                if !table_cols.contains(c) {
+                    return Err(HayashiError::Runtime(format!(
+                        "load sqlite: column '{c}' not found in table '{tbl}' — available: {}",
+                        table_cols.join(", ")
+                    )));
+                }
+            }
+        }
+        if let Some(p) = predicate {
+            for c in p.referenced_columns() {
+                if !table_cols.contains(&c) {
+                    return Err(HayashiError::Runtime(format!(
+                        "load sqlite: where references unknown column '{c}' in table '{tbl}' — available: {}",
+                        table_cols.join(", ")
+                    )));
+                }
+            }
+        }
+
+        let cols_clause = match columns {
+            Some(cols) if !cols.is_empty() => cols
+                .iter()
+                .map(|c| quote_sqlite_identifier(c))
+                .collect::<Result<Vec<_>>>()?
+                .join(", "),
+            _ => "*".to_string(),
+        };
+        let mut s = format!(
+            "SELECT {cols_clause} FROM {}",
+            quote_sqlite_identifier(&tbl)?
+        );
+        if let Some(p) = predicate {
+            s.push_str(&format!(" WHERE {}", p.to_sql()));
+        }
+        s
     };
 
     let mut stmt = conn
@@ -120,6 +171,27 @@ fn first_table(conn: &Connection) -> Result<String> {
     Ok(name)
 }
 
+/// Lista os nomes das colunas de uma tabela via `PRAGMA table_info`.
+fn table_columns(conn: &Connection, table: &str) -> Result<Vec<String>> {
+    let quoted = quote_sqlite_identifier(table)?;
+    let mut stmt = conn
+        .prepare(&format!("PRAGMA table_info({quoted})"))
+        .map_err(|e| HayashiError::Runtime(format!("cannot read schema of '{table}': {e}")))?;
+    let rows = stmt
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|e| HayashiError::Runtime(format!("schema query error: {e}")))?;
+    let mut out = Vec::new();
+    for r in rows {
+        out.push(r.map_err(|e| HayashiError::Runtime(format!("schema row error: {e}")))?);
+    }
+    if out.is_empty() {
+        return Err(HayashiError::Runtime(format!(
+            "table '{table}' not found or has no columns"
+        )));
+    }
+    Ok(out)
+}
+
 fn quote_sqlite_identifier(name: &str) -> Result<String> {
     if name.contains('\0') {
         return Err(HayashiError::Runtime(
@@ -213,7 +285,7 @@ mod tests {
         conn.execute("INSERT INTO \"quoted\"\"table\" VALUES (42)", [])
             .unwrap();
 
-        let (_df, rows) = load_sqlite(&path, Some("quoted\"table"), None).unwrap();
+        let (_df, rows) = load_sqlite(&path, Some("quoted\"table"), None, None, None).unwrap();
 
         assert_eq!(rows, 1);
     }

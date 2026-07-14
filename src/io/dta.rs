@@ -1,4 +1,5 @@
 use crate::lang::error::{HayashiError, Result};
+use crate::lang::predicate::{RowAccess, RowPredicate};
 use dta::stata::dta::dta_reader::DtaReader;
 use dta::stata::dta::value::Value as DtaValue;
 use dta::stata::dta::variable_type::VariableType;
@@ -10,7 +11,15 @@ use std::collections::HashMap;
 /// Numeric columns (byte, int, long, float, double) are imported
 /// as Float. String columns are imported as String. Stata missing
 /// values are converted to NaN.
-pub fn load_dta(path: &str) -> Result<(DataFrame, usize)> {
+///
+/// Quando `columns` ou `predicate` são fornecidos, apenas as colunas
+/// pedidas (e as linhas que satisfazem o predicado) são materializadas,
+/// economizando RAM em arquivos grandes.
+pub fn load_dta(
+    path: &str,
+    columns: Option<&[String]>,
+    predicate: Option<&RowPredicate>,
+) -> Result<(DataFrame, usize)> {
     let header_reader = DtaReader::default()
         .from_path(path)
         .map_err(|e| HayashiError::Runtime(format!("cannot open '{path}': {e}")))?;
@@ -34,14 +43,53 @@ pub fn load_dta(path: &str) -> Result<(DataFrame, usize)> {
         .map(|v| (v.name().to_string(), v.variable_type()))
         .collect();
 
-    let _n_vars = variables.len();
+    let all_names: Vec<String> = variables.iter().map(|(n, _)| n.clone()).collect();
 
-    // column accumulators
+    // Validar columns= e where=.
+    let pred_cols: Vec<String> = predicate
+        .map(|p| p.referenced_columns())
+        .unwrap_or_default();
+    for c in &pred_cols {
+        if !all_names.contains(c) {
+            return Err(HayashiError::Runtime(format!(
+                "load dta: where references unknown column '{c}' — available: {}",
+                all_names.join(", ")
+            )));
+        }
+    }
+    let keep_cols: Vec<String> = match columns {
+        Some(cols) if !cols.is_empty() => {
+            for c in cols {
+                if !all_names.contains(c) {
+                    return Err(HayashiError::Runtime(format!(
+                        "load dta: column '{c}' not found — available: {}",
+                        all_names.join(", ")
+                    )));
+                }
+            }
+            cols.to_vec()
+        }
+        _ => all_names.clone(),
+    };
+
+    // Índices (em variables) das colunas que vamos retornar e das colunas
+    // referenciadas pelo predicado.
+    let keep_idx: Vec<usize> = keep_cols
+        .iter()
+        .map(|c| all_names.iter().position(|n| n == c).unwrap())
+        .collect();
+    let pred_idx: Vec<usize> = pred_cols
+        .iter()
+        .map(|c| all_names.iter().position(|n| n == c).unwrap())
+        .collect();
+
+    // column accumulators — só para as colunas que vamos retornar.
     let mut float_cols: HashMap<String, Vec<f64>> = HashMap::new();
     let mut str_cols: HashMap<String, Vec<String>> = HashMap::new();
     let mut col_order: Vec<(String, bool)> = Vec::new(); // (name, is_numeric)
 
-    for (name, vtype) in &variables {
+    for &i in &keep_idx {
+        let (name, vtype) = &variables[i];
         match vtype {
             VariableType::FixedString(_) | VariableType::LongString => {
                 str_cols.insert(name.clone(), Vec::new());
@@ -63,9 +111,22 @@ pub fn load_dta(path: &str) -> Result<(DataFrame, usize)> {
         {
             None => break,
             Some(record) => {
+                let values = record.values();
+                // where= ?
+                if let Some(pred) = predicate {
+                    let row = DtaRowRef {
+                        values,
+                        variables: &variables,
+                        pred_idx: &pred_idx,
+                    };
+                    if !pred.evaluate(&row) {
+                        continue;
+                    }
+                }
                 n_rows += 1;
-                for (i, value) in record.values().iter().enumerate() {
+                for &i in &keep_idx {
                     let name = &variables[i].0;
+                    let value = &values[i];
                     match value {
                         DtaValue::Double(d) => {
                             let v = (*d).present().unwrap_or(f64::NAN);
@@ -99,7 +160,7 @@ pub fn load_dta(path: &str) -> Result<(DataFrame, usize)> {
         }
     }
 
-    // Build the DataFrame in the original column order
+    // Build the DataFrame in the requested column order
     let mut builder = DataFrame::builder();
     for (name, is_numeric) in &col_order {
         if *is_numeric {
@@ -116,4 +177,47 @@ pub fn load_dta(path: &str) -> Result<(DataFrame, usize)> {
         .map_err(|e| HayashiError::Runtime(format!("DataFrame build error: {e}")))?;
 
     Ok((df, n_rows))
+}
+
+/// Linha de um .dta para avaliação do `where`. Expõe apenas as colunas
+/// referenciadas pelo predicado.
+struct DtaRowRef<'a> {
+    values: &'a [DtaValue<'a>],
+    variables: &'a [(String, VariableType)],
+    pred_idx: &'a [usize],
+}
+
+impl<'a> RowAccess for DtaRowRef<'a> {
+    fn get_f64(&self, col: &str) -> Option<f64> {
+        let pos = self
+            .pred_idx
+            .iter()
+            .position(|i| self.variables[*i].0 == col)?;
+        let i = self.pred_idx[pos];
+        let v = &self.values[i];
+        Some(match v {
+            DtaValue::Double(d) => d.present().unwrap_or(f64::NAN),
+            DtaValue::Float(f) => f.present().map(|x| x as f64).unwrap_or(f64::NAN),
+            DtaValue::Long(l) => l.present().map(|x| x as f64).unwrap_or(f64::NAN),
+            DtaValue::Int(iv) => iv.present().map(|x| x as f64).unwrap_or(f64::NAN),
+            DtaValue::Byte(b) => b.present().map(|x| x as f64).unwrap_or(f64::NAN),
+            // Strings em coluna numérica: NaN (vai ser tratado como null).
+            DtaValue::String(_) | DtaValue::LongStringRef(_) => f64::NAN,
+        })
+    }
+
+    fn get_str(&self, col: &str) -> Option<&str> {
+        let pos = self
+            .pred_idx
+            .iter()
+            .position(|i| self.variables[*i].0 == col)?;
+        let i = self.pred_idx[pos];
+        match &self.values[i] {
+            DtaValue::String(s) => Some(&s[..]),
+            DtaValue::LongStringRef(_) => Some(""),
+            // Numéricos em coluna string: o trait exige &str; o predicado
+            // cai no caminho numérico via get_f64.
+            _ => None,
+        }
+    }
 }

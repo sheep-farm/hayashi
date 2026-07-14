@@ -586,6 +586,44 @@ display mean(df, Y)
 }
 
 #[test]
+fn generate_substr_on_string_column() {
+    // substr() in generate must produce a String column from a String column.
+    let (ok, out) = run_inline(
+        r#"load "examples/data/sample.json" as df
+generate df city_upper = upper(city)
+generate df city_first3 = substr(city, 0, 3)
+print(df)"#,
+    );
+    assert!(ok, "generate substr/upper failed:\n{out}");
+    assert!(
+        out.contains("city_upper"),
+        "expected city_upper column:\n{out}"
+    );
+    assert!(
+        out.contains("city_first3"),
+        "expected city_first3 column:\n{out}"
+    );
+    assert!(out.contains("SÃO"), "expected uppercased city:\n{out}");
+    assert!(
+        out.contains("São"),
+        "expected original city preserved:\n{out}"
+    );
+}
+
+#[test]
+fn generate_str_literal_broadcast() {
+    // A bare string literal in generate must broadcast to a String column.
+    let (ok, out) = run_inline(
+        r#"load "examples/data/sample.json" as df
+generate df tag = "BR"
+print(df)"#,
+    );
+    assert!(ok, "generate str literal failed:\n{out}");
+    assert!(out.contains("tag"), "expected tag column:\n{out}");
+    assert!(out.contains("BR"), "expected BR value:\n{out}");
+}
+
+#[test]
 fn data_replace_if() {
     assert_ok_contains(
         "replace_if",
@@ -6161,6 +6199,296 @@ print(df2)"#,
     let (ok, out) = run_inline(&script);
     assert!(ok, "load parquet failed:\n{out}");
     assert!(out.contains("8 rows"), "expected 8 rows:\n{out}");
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LOAD — columns= / where= pushdown
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn load_parquet_columns() {
+    let p = tmp("hayashi_cols.parquet");
+    let script = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "parquet", "{p}")
+load "{p}" as df2, columns=[ano, preco]
+describe(df2)"#,
+    );
+    let (ok, out) = run_inline(&script);
+    assert!(ok, "parquet columns= failed:\n{out}");
+    assert!(out.contains("ano"), "expected 'ano' column:\n{out}");
+    assert!(out.contains("preco"), "expected 'preco' column:\n{out}");
+    assert!(
+        !out.contains("produto"),
+        "expected 'produto' to be excluded:\n{out}"
+    );
+}
+
+#[test]
+fn load_parquet_where_eq() {
+    let p = tmp("hayashi_where.parquet");
+    let script = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "parquet", "{p}")
+load "{p}" as df2, where="produto == \"Soja\""
+display count(df2)"#,
+    );
+    let (ok, out) = run_inline(&script);
+    assert!(ok, "parquet where= failed:\n{out}");
+    assert!(out.contains("4"), "expected 4 rows for Soja:\n{out}");
+}
+
+#[test]
+fn load_parquet_columns_where_combined() {
+    let p = tmp("hayashi_cw.parquet");
+    let script = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "parquet", "{p}")
+load "{p}" as df2, columns=[ano, preco], where="produto == \"Milho\""
+display count(df2)
+summarize(df2, preco)"#,
+    );
+    let (ok, out) = run_inline(&script);
+    assert!(ok, "parquet columns+where failed:\n{out}");
+    assert!(out.contains("4"), "expected 4 rows for Milho:\n{out}");
+    // mean of Milho preco: (42.10 + 55.80 + 68.30 + 50.50) / 4 = 54.175
+    assert!(
+        out.contains("54.17") || out.contains("54.18"),
+        "expected mean ~54.17:\n{out}"
+    );
+}
+
+#[test]
+fn load_parquet_where_gt() {
+    let p = tmp("hayashi_gt.parquet");
+    let script = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "parquet", "{p}")
+load "{p}" as df2, where="preco > 100"
+display count(df2)"#,
+    );
+    let (ok, out) = run_inline(&script);
+    assert!(ok, "parquet where= > failed:\n{out}");
+    // preco > 100: 130.7, 145.2, 120.0 → 3 rows
+    assert!(
+        out.contains("3"),
+        "expected 3 rows with preco > 100:\n{out}"
+    );
+}
+
+#[test]
+fn load_sqlite_columns() {
+    let (ok, out) = run_inline(
+        r#"load "examples/data/sample.db" as df, table=precos, columns=[ano, preco]
+describe(df)"#,
+    );
+    assert!(ok, "sqlite columns= failed:\n{out}");
+    assert!(out.contains("ano"), "expected 'ano':\n{out}");
+    assert!(out.contains("preco"), "expected 'preco':\n{out}");
+    assert!(
+        !out.contains("produto"),
+        "expected 'produto' excluded:\n{out}"
+    );
+}
+
+#[test]
+fn load_sqlite_where_eq() {
+    let (ok, out) = run_inline(
+        r#"load "examples/data/sample.db" as df, table=precos, where="produto == \"Soja\""
+display count(df)"#,
+    );
+    assert!(ok, "sqlite where= failed:\n{out}");
+    assert!(out.contains("4"), "expected 4 Soja rows:\n{out}");
+}
+
+#[test]
+fn load_sqlite_columns_where() {
+    let (ok, out) = run_inline(
+        r#"load "examples/data/sample.db" as df, table=precos, columns=[preco], where="ano >= 2022"
+display count(df)
+summarize(df, preco)"#,
+    );
+    assert!(ok, "sqlite columns+where failed:\n{out}");
+    // ano >= 2022: 145.20, 68.30, 120.00, 50.50 → 4 rows
+    assert!(out.contains("4"), "expected 4 rows:\n{out}");
+}
+
+#[test]
+fn load_sqlite_where_in_list() {
+    let (ok, out) = run_inline(
+        r#"load "examples/data/sample.db" as df, table=precos, where="ano in [2020, 2023]"
+display count(df)"#,
+    );
+    assert!(ok, "sqlite where in= failed:\n{out}");
+    // 2020 (2) + 2023 (2) = 4
+    assert!(out.contains("4"), "expected 4 rows:\n{out}");
+}
+
+#[test]
+fn load_csv_columns() {
+    let (ok, out) = run_inline(
+        r#"load "examples/data/sample_semicolon.csv" as df, sep=";", columns=[produto, preco]
+describe(df)"#,
+    );
+    assert!(ok, "csv columns= failed:\n{out}");
+    assert!(out.contains("produto"), "expected 'produto':\n{out}");
+    assert!(out.contains("preco"), "expected 'preco':\n{out}");
+    assert!(!out.contains("qtd"), "expected 'qtd' excluded:\n{out}");
+}
+
+#[test]
+fn load_csv_where_gt() {
+    let (ok, out) = run_inline(
+        r#"load "examples/data/sample_semicolon.csv" as df, sep=";", where="preco > 5"
+display count(df)"#,
+    );
+    assert!(ok, "csv where= failed:\n{out}");
+    // preco > 5: Arroz 5.49, Feijão 8.99, Café 14.50 → 3 rows
+    assert!(out.contains("3"), "expected 3 rows with preco > 5:\n{out}");
+}
+
+#[test]
+fn load_csv_columns_where_combined() {
+    let (ok, out) = run_inline(
+        r#"load "examples/data/sample_semicolon.csv" as df, sep=";", columns=[produto], where="preco > 5"
+display count(df)
+list(df, produto)"#,
+    );
+    assert!(ok, "csv columns+where failed:\n{out}");
+    assert!(out.contains("2"), "expected 2 rows:\n{out}");
+    assert!(out.contains("Feij"), "expected Feijão:\n{out}");
+    assert!(out.contains("Caf"), "expected Café:\n{out}");
+}
+
+#[test]
+fn load_tsv_where_string_eq() {
+    let (ok, out) = run_inline(
+        r#"load "examples/data/sample.tsv" as df, where="grade == \"A\""
+display count(df)"#,
+    );
+    assert!(ok, "tsv where= string eq failed:\n{out}");
+    // grade A: Alice, Carol → 2 rows
+    assert!(out.contains("2"), "expected 2 rows with grade A:\n{out}");
+}
+
+#[test]
+fn load_tsv_columns_where_score() {
+    let (ok, out) = run_inline(
+        r#"load "examples/data/sample.tsv" as df, columns=[name, score], where="score > 75"
+display count(df)
+list(df, name)"#,
+    );
+    assert!(ok, "tsv columns+where failed:\n{out}");
+    // score > 75: Alice 85.5, Carol 91.3, Eve 79.2 → 3 rows
+    assert!(out.contains("3"), "expected 3 rows:\n{out}");
+    assert!(out.contains("Alice"), "expected Alice:\n{out}");
+    assert!(out.contains("Carol"), "expected Carol:\n{out}");
+}
+
+#[test]
+fn load_xlsx_columns_where() {
+    let p = tmp("hayashi_xlsx_cols.xlsx");
+    let script = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "xlsx", "{p}")
+load "{p}" as df2, columns=[ano, preco], where="produto == \"Soja\""
+display count(df2)
+summarize(df2, preco)"#,
+    );
+    let (ok, out) = run_inline(&script);
+    assert!(ok, "xlsx columns+where failed:\n{out}");
+    assert!(out.contains("4"), "expected 4 Soja rows:\n{out}");
+    // mean of Soja preco: (95.30 + 130.70 + 145.20 + 120.00) / 4 = 122.80
+    assert!(out.contains("122.8"), "expected mean ~122.80:\n{out}");
+}
+
+#[test]
+fn load_where_and_or() {
+    let p = tmp("hayashi_andor.parquet");
+    let script = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "parquet", "{p}")
+load "{p}" as df2, where="produto == \"Soja\" && ano > 2021"
+display count(df2)"#,
+    );
+    let (ok, out) = run_inline(&script);
+    assert!(ok, "where AND failed:\n{out}");
+    // Soja + ano > 2021: 2022 (145.20), 2023 (120.00) → 2 rows
+    assert!(out.contains("2"), "expected 2 rows:\n{out}");
+}
+
+#[test]
+fn load_where_not() {
+    let p = tmp("hayashi_not.parquet");
+    let script = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "parquet", "{p}")
+load "{p}" as df2, where="!(produto == \"Soja\")"
+display count(df2)"#,
+    );
+    let (ok, out) = run_inline(&script);
+    assert!(ok, "where NOT failed:\n{out}");
+    // não-Soja = Milho: 4 rows
+    assert!(out.contains("4"), "expected 4 rows (not Soja):\n{out}");
+}
+
+// ── Combinações inválidas / erros ────────────────────────────────────────
+
+#[test]
+fn load_query_with_where_error() {
+    let (ok, out) = run_inline(
+        r#"load "examples/data/sample.db" as df, query="SELECT * FROM precos", where="ano > 2020""#,
+    );
+    assert!(!ok, "should reject query= + where=:\n{out}");
+    assert!(
+        out.contains("cannot be combined"),
+        "expected 'cannot be combined':\n{out}"
+    );
+}
+
+#[test]
+fn load_columns_unknown_error() {
+    let (ok, out) =
+        run_inline(r#"load "examples/data/sample.db" as df, table=precos, columns=[xxx]"#);
+    assert!(!ok, "should reject unknown column:\n{out}");
+    // SQLite rejeita no engine SQL; outros loaders validam antes.
+    assert!(
+        out.contains("not found") || out.contains("unknown") || out.contains("no such column"),
+        "expected 'not found', 'unknown' or 'no such column':\n{out}"
+    );
+}
+
+#[test]
+fn load_where_unknown_column_error() {
+    let (ok, out) =
+        run_inline(r#"load "examples/data/sample.db" as df, table=precos, where="xxx == 1""#);
+    assert!(!ok, "should reject where with unknown column:\n{out}");
+    // Para SQLite, o erro vem do engine SQL; para outras fontes, do loader.
+    assert!(
+        out.contains("unknown column") || out.contains("no such column"),
+        "expected 'unknown column' or 'no such column':\n{out}"
+    );
+}
+
+#[test]
+fn load_json_columns_unsupported_error() {
+    let (ok, out) = run_inline(r#"load "examples/data/sample.json" as df, columns=[pop]"#);
+    assert!(!ok, "should reject columns= on JSON:\n{out}");
+    assert!(
+        out.contains("not yet supported") || out.contains("JSON"),
+        "expected JSON unsupported message:\n{out}"
+    );
+}
+
+#[test]
+fn load_help_lists_new_options() {
+    let (ok, out) = run_inline("help(load)");
+    assert!(ok, "help(load) failed:\n{out}");
+    assert!(
+        out.contains("columns="),
+        "help should mention columns=:\n{out}"
+    );
+    assert!(out.contains("where="), "help should mention where=:\n{out}");
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
