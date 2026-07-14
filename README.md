@@ -245,6 +245,7 @@ load "file.db" as df, query="SELECT * FROM prices WHERE year > 2020"
 load "odbc://DSN=mydb" as df, query="SELECT * FROM t"  // ODBC (feature flag)
 load "https://...data.csv" as df         // URL (auto-download)
 load "data.csv" as df, sep=";"           // custom delimiter
+load "panel.parquet" as df, columns=[ticker, date, close], where="ticker == \"AAPL\""  // projection + filter pushdown
 
 // Export — 8 formats
 export(df, "csv", "out.csv")
@@ -257,7 +258,7 @@ export(m, "latex", "table.tex")
 export(m, "html", "table.html")
 ```
 
-`query=` is raw SQL executed by SQLite or the configured ODBC database. Remote `load` downloads untrusted input even with URL validation and size/time limits. ODBC support is optional and requires system ODBC drivers. See the [Trust Model](docs/src/trust-model.md).
+`query=` is raw SQL executed by SQLite or the configured ODBC database. `columns=` and `where=` push column projection and row filtering down to the data source (Parquet uses Arrow `ProjectionMask` + `RowFilter`; SQLite/ODBC rewrites the `SELECT`/`WHERE`; CSV/TSV/DTA/Excel filter row-by-row), avoiding loading the full dataset into RAM — useful for large files. `query=` cannot be combined with `columns=` or `where=`. Remote `load` downloads untrusted input even with URL validation and size/time limits. ODBC support is optional and requires system ODBC drivers. See the [Trust Model](docs/src/trust-model.md).
 
 ## Estimators
 

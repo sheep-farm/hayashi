@@ -35,6 +35,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - **`match` as contextual keyword**: `match` now works as a regular identifier (`let match = 1`) and still starts a match expression when followed by a scrutinee and brace (`let r = match x { ... }`).
 - **README smoke test**: `scripts/readme_smoke.hay` exercises the main features documented in `README.md` and is run by the test suite.
 - **`list_files()` builtin**: `list_files(dir)` and `list_files(dir, pattern)` return a sorted list of file paths, enabling dynamic batch processing of datasets.
+- **`columns=` and `where=` options for `load`**: push column projection and row filtering down to the data source, avoiding loading the full dataset into RAM. Supported by Parquet (Arrow `ProjectionMask` + `RowFilter` — filter evaluated during row-group scan), SQLite and ODBC (`SELECT cols FROM t WHERE pred`, validated against `PRAGMA table_info`), CSV/TSV (projection in read loop, row-by-row predicate), DTA (projection in `read_record`, row-by-row predicate), and Excel (projection after `worksheet_range`, row filter on cells). JSON is not yet supported. `where=` accepts a Hayashi expression of the form `column OP literal` combined with `&&`, `||`, `!`, and `in [...]` — parsed by the Hayashi parser and normalized into a `RowPredicate` enum (`src/lang/predicate.rs`). `query=` cannot be combined with `columns=` or `where=`. On a 837 MB / 30 M-row Parquet file, `columns=[ticker, date, adj_close], where="ticker == \"AAPL\""` reduced peak RAM from ~7.5 GB (eager full load) to ~4 MB.
 
 ### Changed
 

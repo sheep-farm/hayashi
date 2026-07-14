@@ -12,7 +12,7 @@ Quick reference for all Hayashi commands and functions. For detailed usage, type
 | `export` | `export(value, "fmt", "path")` | Export DataFrame or model (csv, json, tsv, xlsx, parquet, sqlite, latex, html) |
 | `input` | `input alias` ... `end` | Create DataFrame from inline numeric data |
 
-Load options: `sheet=`, `table=`, `query=`, `sep=`. URLs are downloaded automatically.
+Load options: `sheet=`, `table=`, `query=`, `sep=`, `columns=`, `where=`. URLs are downloaded automatically. `columns=` and `where=` push projection and filtering down to the source (Parquet, SQLite, ODBC, CSV/TSV, DTA, Excel) — see [Loading Data](../data/loading.md#column-projection-and-row-filtering-columns-where).
 
 ---
 
