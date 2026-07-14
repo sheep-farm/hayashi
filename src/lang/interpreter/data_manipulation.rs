@@ -1,3 +1,4 @@
+use super::eval_expr::ColResult;
 use super::helpers::*;
 use super::*;
 
@@ -1946,11 +1947,22 @@ impl Interpreter {
                 }
                 let mut generated = Vec::new();
                 for o in opts {
-                    let vals = self.eval_col_expr(&o.value, &df_val)?;
-                    let arr = ndarray::Array1::from(vals);
-                    Rc::make_mut(&mut df_val)
-                        .insert(o.name.clone(), arr)
-                        .map_err(|e: greeners::GreenersError| self.rt_err(e.to_string()))?;
+                    let col_result = self.eval_col_expr_typed(&o.value, &df_val)?;
+                    match col_result {
+                        ColResult::Float(vals) => {
+                            let arr = ndarray::Array1::from(vals);
+                            Rc::make_mut(&mut df_val)
+                                .insert(o.name.clone(), arr)
+                                .map_err(|e: greeners::GreenersError| self.rt_err(e.to_string()))?;
+                        }
+                        ColResult::String(strs) => {
+                            use greeners::Column;
+                            let col = Column::String(ndarray::Array1::from(strs));
+                            Rc::make_mut(&mut df_val)
+                                .insert_column(o.name.clone(), col)
+                                .map_err(|e: greeners::GreenersError| self.rt_err(e.to_string()))?;
+                        }
+                    }
                     generated.push(o.name.clone());
                 }
                 if !self.capturing {
