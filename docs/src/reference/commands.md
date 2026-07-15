@@ -188,6 +188,11 @@ Covariance options (where applicable): `cov=nonrobust|HC1|HC2|HC3|HC4|robust`, `
 | `sfa_production` | `sfa_production(y ~ x1 + x2, df)` | Stochastic production frontier |
 | `sfa_cost` | `sfa_cost(y ~ x1 + x2, df)` | Stochastic cost frontier |
 | `panel_tobit` | `panel_tobit(y ~ x, df, id="firm", censor=0)` | Panel Tobit (random effects) |
+| `panel_heckman` | `panel_heckman(y ~ x, df, sel="z ~ w", id="firm")` | Panel Heckman (selection) |
+| `spatial_panel_sar` | `spatial_panel_sar(y ~ x, df, w=W, id="entity")` | Spatial panel SAR (FE) |
+| `spatial_panel_sem` | `spatial_panel_sem(y ~ x, df, w=W, id="entity")` | Spatial panel SEM (FE) |
+| `bayes_sfa_production` | `bayes_sfa_production(y ~ x, df, burn=, draws=)` | Bayesian SFA production |
+| `bayes_sfa_cost` | `bayes_sfa_cost(y ~ x, df, burn=, draws=)` | Bayesian SFA cost |
 | `hausman` | `hausman(m_fe, m_re)` | Hausman specification test |
 | `lincom` | `lincom(m, expr)` | Linear combination of coefficients |
 | `bootstrap` | `bootstrap(est, formula, df, n=)` | Generic bootstrap |

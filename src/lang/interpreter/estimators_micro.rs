@@ -1783,6 +1783,251 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── Panel Heckman (selection with random effects) ───────────────
+            // panel_heckman(y ~ x1 + x2, df, sel="z ~ w1 + w2", id="firm")
+            "panel_heckman" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+                let (y_vec, x_mat) = df
+                    .to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                let id_col = match opt_map.get("id") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(
+                            "panel_heckman() requires id=\"column\" option".into(),
+                        ))
+                    }
+                };
+                let sel_formula_str = match opt_map.get("sel") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(
+                            "panel_heckman() requires sel=\"z ~ w1 + w2\" option".into(),
+                        ))
+                    }
+                };
+
+                // Parse selection formula from string
+                let sel_hayashi_formula = {
+                    let parts: Vec<&str> = sel_formula_str.splitn(2, '~').collect();
+                    if parts.len() != 2 {
+                        return Err(HayashiError::Runtime(format!(
+                            "panel_heckman: sel formula '{sel_formula_str}' is not valid (needs ~)"
+                        )));
+                    }
+                    let lhs = parts[0].trim().to_string();
+                    let rhs_str = parts[1].trim();
+                    let rhs: Vec<crate::lang::ast::RhsTerm> = rhs_str
+                        .split('+')
+                        .map(|t| crate::lang::ast::RhsTerm::var(t.trim()))
+                        .collect();
+                    crate::lang::ast::Formula {
+                        lhs,
+                        rhs,
+                        fe: vec![],
+                    }
+                };
+                let (df_sel, sel_g_formula, _) = self.prepare_formula(&sel_hayashi_formula, &df)?;
+                let z_col = &sel_g_formula.dependent;
+                let z_vec: Vec<bool> = {
+                    let col = df_sel
+                        .get_column(z_col)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    if let Some(b) = col.as_bool() {
+                        b.iter().copied().collect()
+                    } else if let Some(f) = col.as_float() {
+                        f.iter().map(|v| *v > 0.0).collect()
+                    } else if let Some(i) = col.as_int() {
+                        i.iter().map(|v| *v != 0).collect()
+                    } else {
+                        return Err(HayashiError::Runtime(format!(
+                            "panel_heckman: selection variable '{z_col}' must be numeric/boolean"
+                        )));
+                    }
+                };
+                let (_z_dummy, w_mat) = df_sel
+                    .to_design_matrix(&sel_g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                let panel_ids: Vec<i64> = {
+                    let col = df
+                        .get_column(&id_col)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    if let Some(int_arr) = col.as_int() {
+                        int_arr.iter().copied().collect()
+                    } else if let Some(float_arr) = col.as_float() {
+                        float_arr.iter().map(|v| *v as i64).collect()
+                    } else {
+                        return Err(HayashiError::Runtime(format!(
+                            "panel_heckman: id column '{id_col}' must be numeric"
+                        )));
+                    }
+                };
+
+                let sel_names = sel_g_formula.independents.clone();
+                let out_names = g_formula.independents.clone();
+                let result = greeners::PanelHeckman::fit(
+                    &z_vec,
+                    &y_vec,
+                    &w_mat,
+                    &x_mat,
+                    &panel_ids,
+                    Some(sel_names),
+                    Some(out_names),
+                )
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── Spatial panel (SAR/SEM with fixed effects) ──────────────────
+            // spatial_panel_sar(y ~ x1 + x2, df, w=W, id="entity")
+            // spatial_panel_sem(y ~ x1 + x2, df, w=W, id="entity")
+            "spatial_panel_sar" | "spatial_panel_sem" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+                let (y_vec, x_mat) = df
+                    .to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                let id_col = match opt_map.get("id") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(
+                            "spatial_panel requires id=\"column\" option".into(),
+                        ))
+                    }
+                };
+                let entity_ids: Vec<i64> = {
+                    let col = df
+                        .get_column(&id_col)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    if let Some(int_arr) = col.as_int() {
+                        int_arr.iter().copied().collect()
+                    } else if let Some(float_arr) = col.as_float() {
+                        float_arr.iter().map(|v| *v as i64).collect()
+                    } else {
+                        return Err(HayashiError::Runtime(format!(
+                            "spatial_panel: id column '{id_col}' must be numeric"
+                        )));
+                    }
+                };
+
+                // Extract W matrix from w= option (list of lists)
+                let w_mat = match opt_map.get("w") {
+                    Some(Value::List(rows)) => {
+                        let n_rows = rows.len();
+                        let mut w = ndarray::Array2::<f64>::zeros((n_rows, n_rows));
+                        for (i, row) in rows.iter().enumerate() {
+                            match row {
+                                Value::List(cols) => {
+                                    if cols.len() != n_rows {
+                                        return Err(HayashiError::Runtime(format!(
+                                            "{func}: W must be square, row {i} has {} cols, expected {n_rows}",
+                                            cols.len()
+                                        )));
+                                    }
+                                    for (j, val) in cols.iter().enumerate() {
+                                        w[(i, j)] = match val {
+                                            Value::Float(f) => *f,
+                                            Value::Int(v) => *v as f64,
+                                            _ => return Err(HayashiError::Runtime(
+                                                format!("{func}: W matrix contains non-numeric values")
+                                            )),
+                                        };
+                                    }
+                                }
+                                _ => return Err(HayashiError::Runtime(
+                                    format!("{func}: W must be a list of lists (matrix)")
+                                )),
+                            }
+                        }
+                        w
+                    }
+                    _ => return Err(HayashiError::Runtime(
+                        format!("{func}() requires w=W option with a spatial weights matrix (list of lists)")
+                    )),
+                };
+
+                let var_names = g_formula.independents.clone();
+                let result = if func == "spatial_panel_sar" {
+                    greeners::SpatialPanel::fit_sar(
+                        &y_vec,
+                        &x_mat,
+                        &w_mat,
+                        &entity_ids,
+                        Some(var_names),
+                    )
+                } else {
+                    greeners::SpatialPanel::fit_sem(
+                        &y_vec,
+                        &x_mat,
+                        &w_mat,
+                        &entity_ids,
+                        Some(var_names),
+                    )
+                }
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── Bayesian Stochastic Frontier ─────────────────────────────────
+            // bayes_sfa_production(y ~ x1 + x2, df [, burn=1000, draws=2000])
+            // bayes_sfa_cost(y ~ x1 + x2, df [, burn=1000, draws=2000])
+            "bayes_sfa_production" | "bayes_sfa_cost" | "bayes_frontier" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+                let (y_vec, x_mat) = df
+                    .to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                let n_burn = match opt_map.get("burn") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    None => 1000,
+                    _ => 1000,
+                };
+                let n_draws = match opt_map.get("draws") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    None => 2000,
+                    _ => 2000,
+                };
+
+                let var_names = g_formula.independents.clone();
+                let model_type = if func == "bayes_sfa_cost" {
+                    "cost"
+                } else {
+                    "production"
+                };
+                let result = if model_type == "production" {
+                    greeners::BayesianSFA::fit_production(
+                        &y_vec,
+                        &x_mat,
+                        Some(var_names),
+                        n_burn,
+                        n_draws,
+                    )
+                } else {
+                    greeners::BayesianSFA::fit_cost(
+                        &y_vec,
+                        &x_mat,
+                        Some(var_names),
+                        n_burn,
+                        n_draws,
+                    )
+                }
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
             // ── Spatial econometrics ────────────────────────────────────────
             // spatial_sar(y ~ x1 + x2, df, w=W_matrix)
             // spatial_sem(y ~ x1 + x2, df, w=W_matrix)

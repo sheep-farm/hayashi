@@ -131,13 +131,15 @@ reporta o p-value do coeficiente de ŷ².
 
 ## Pendente
 
-- **Panel Heckman** — seleção amostral em painel com efeitos aleatórios.
-  Exige MLE bivariada com correlação entre seleção e resultado. +0,5 pp.
+- **MIDAS** — mixed-frequency data sampling. Regressão com dados de
+  frequências diferentes (mensal vs trimestral). +0,5 pp.
 
-- **Spatial panel** — SAR/SEM com efeitos fixos ou aleatórios. Atualmente
-  apenas cross-section. +0,5 pp.
+- **TVP (time-varying parameters)** — coeficientes que variam no tempo
+  via Kalman filter. +0,5 pp.
 
-- **Bayesian stochastic frontier** — versão Bayesiana com priors
-  informativos. +0,5 pp.
+- **SETAR / threshold AR** — modelos autorregressivos com mudança de
+  regime. +0,5 pp.
 
-**Cobertura atual: 86,55%.**
+- **Panel quantile** — quantile regression com efeitos fixos. +0,5 pp.
+
+**Cobertura atual: 88,05%.**

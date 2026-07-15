@@ -10676,3 +10676,91 @@ panel_tobit(y ~ x, df, id="firm", censor=0)
         "Panel Tobit",
     );
 }
+
+#[test]
+fn panel_heckman_basic() {
+    assert_ok_contains(
+        "panel_heckman",
+        r#"
+input df
+id wage educ exper particip kids
+1 10 8 2 1 0
+1 12 8 5 1 1
+1 0 8 8 0 3
+1 15 8 11 1 0
+2 8 6 1 1 1
+2 0 6 4 0 2
+2 11 6 7 1 0
+2 13 6 10 1 1
+3 0 10 3 0 3
+3 18 10 6 1 0
+3 20 10 9 1 1
+3 22 10 12 1 0
+4 9 7 2 1 0
+4 0 7 5 0 3
+4 12 7 8 1 1
+4 14 7 11 1 0
+5 11 9 3 1 0
+5 0 9 6 0 2
+5 16 9 9 1 1
+5 19 9 12 1 0
+end
+panel_heckman(wage ~ educ + exper, df, sel="particip ~ educ + kids", id="id")
+"#,
+        "Panel Heckman",
+    );
+}
+
+#[test]
+fn spatial_panel_sar_basic() {
+    assert_ok_contains(
+        "spatial_panel_sar",
+        r#"
+input df
+entity y x
+1 10 1.0
+1 12 2.0
+1 15 3.0
+2 8 0.8
+2 10 1.8
+2 13 2.8
+3 11 1.2
+3 14 2.2
+3 17 3.2
+4 9 0.9
+4 11 1.9
+4 14 2.9
+end
+let W = [[0, 0.5, 0.3, 0.2],
+         [0.5, 0, 0.3, 0.2],
+         [0.3, 0.3, 0, 0.4],
+         [0.2, 0.2, 0.4, 0]]
+spatial_panel_sar(y ~ x, df, w=W, id="entity")
+"#,
+        "Spatial Panel SAR",
+    );
+}
+
+#[test]
+fn bayes_sfa_basic() {
+    assert_ok_contains(
+        "bayes_sfa",
+        r#"
+input df
+y k l
+10 5 5
+12 6 6
+15 8 7
+18 10 8
+20 12 10
+22 13 11
+25 15 12
+28 17 13
+30 18 14
+32 20 15
+end
+bayes_sfa_production(y ~ k + l, df, burn=200, draws=500)
+"#,
+        "Bayesian Stochastic",
+    );
+}
