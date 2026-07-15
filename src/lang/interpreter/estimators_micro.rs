@@ -668,6 +668,139 @@ impl Interpreter {
                 Ok(diag(out))
             }
 
+            // ── Sargan / Hansen J overidentification test ───────────────────
+            // estat_overid(endog_formula, instrument_formula, df)
+            "estat_overid" | "sargan" | "overid" | "sargan_test" => {
+                if args.len() < 3 {
+                    return Err(self.rt_err(
+                        "estat_overid(endog_formula, instrument_formula, df) requires 3 arguments",
+                    ));
+                }
+                let endog_ast = self.resolve_formula(&args[0])?;
+                let instr_ast = self.resolve_formula(&args[1])?;
+                let df_name = match &args[2] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(self.rt_err("third argument must be a DataFrame variable")),
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(df)) => df.clone(),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
+                };
+                let (df_endog, g_endog, _) = self.prepare_formula(&endog_ast, &df)?;
+                let g_instr = if instr_ast.lhs.is_empty() {
+                    let (_, g_i, _) = self.prepare_formula(&instr_ast, &df)?;
+                    GFormula {
+                        dependent: String::new(),
+                        independents: g_i.independents,
+                        intercept: true,
+                    }
+                } else {
+                    let (_, g_i, _) = self.prepare_formula(&instr_ast, &df)?;
+                    g_i
+                };
+                // Build y, x, z
+                let (y, x) = df_endog
+                    .to_design_matrix(&g_endog)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let instr_formula = GFormula {
+                    dependent: g_endog.dependent.clone(),
+                    independents: g_instr.independents.clone(),
+                    intercept: g_instr.intercept,
+                };
+                let (_, z) = df_endog
+                    .to_design_matrix(&instr_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                // Fit IV to get beta
+                let iv_result = IV::fit_with_names(&y, &x, &z, CovarianceType::NonRobust, None)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let result = IV::sargan_test(&y, &x, &z, &iv_result.params)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── Durbin-Wu-Hausman endogeneity test ──────────────────────────
+            // estat_endog(endog_formula, instrument_formula, df)
+            "estat_endog" | "endog_test" | "dwh" => {
+                if args.len() < 3 {
+                    return Err(self.rt_err(
+                        "estat_endog(endog_formula, instrument_formula, df) requires 3 arguments",
+                    ));
+                }
+                let endog_ast = self.resolve_formula(&args[0])?;
+                let instr_ast = self.resolve_formula(&args[1])?;
+                let df_name = match &args[2] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(self.rt_err("third argument must be a DataFrame variable")),
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(df)) => df.clone(),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
+                };
+                let (df_endog, g_endog, _) = self.prepare_formula(&endog_ast, &df)?;
+
+                // Identify endogenous variables (in endog but NOT in instr)
+                let instr_vars: std::collections::HashSet<String> = instr_ast
+                    .rhs
+                    .iter()
+                    .filter_map(|t| t.as_var().map(|s| s.to_string()))
+                    .collect();
+                let endog_var_names: Vec<String> = endog_ast
+                    .rhs
+                    .iter()
+                    .filter_map(|t| t.as_var().map(|s| s.to_string()))
+                    .filter(|v| !instr_vars.contains(v))
+                    .collect();
+
+                if endog_var_names.is_empty() {
+                    return Err(self.rt_err(
+                        "estat_endog: no endogenous variable found (variables in endog formula not present in instrument formula)",
+                    ));
+                }
+
+                let g_instr = if instr_ast.lhs.is_empty() {
+                    let (_, g_i, _) = self.prepare_formula(&instr_ast, &df)?;
+                    GFormula {
+                        dependent: String::new(),
+                        independents: g_i.independents,
+                        intercept: true,
+                    }
+                } else {
+                    let (_, g_i, _) = self.prepare_formula(&instr_ast, &df)?;
+                    g_i
+                };
+
+                // Build y, x, z
+                let (y, x) = df_endog
+                    .to_design_matrix(&g_endog)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let instr_formula = GFormula {
+                    dependent: g_endog.dependent.clone(),
+                    independents: g_instr.independents.clone(),
+                    intercept: g_instr.intercept,
+                };
+                let (_, z) = df_endog
+                    .to_design_matrix(&instr_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                // Find column indices of endogenous variables in X
+                // X columns come from g_endog.independents (+ intercept if present)
+                let x_names = df_endog
+                    .formula_var_names(&g_endog)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let endog_cols: Vec<usize> = x_names
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, name)| endog_var_names.contains(name))
+                    .map(|(i, _)| i)
+                    .collect();
+
+                let result = IV::endogeneity_test(&y, &x, &z, &endog_cols, endog_var_names)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
             // ── Logit ─────────────────────────────────────────────────────────
             "logit" => {
                 let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;

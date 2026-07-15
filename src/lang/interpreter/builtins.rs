@@ -146,6 +146,8 @@ pub const BUILTIN_NAMES: &[&str] = &[
     "cusumtest",
     "akaike_weights",
     "lrtest",
+    "estat_overid",
+    "estat_endog",
     "histogram",
     "boxplot",
     "kdensity",

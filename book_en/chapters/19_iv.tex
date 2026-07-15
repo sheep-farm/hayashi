@@ -304,6 +304,39 @@ The function reports:
   \item Reference: $F > 10$ (Staiger \& Stock, 1997)
 \end{itemize}
 
+\section{IV post-estimation tests}
+
+\subsection{Sargan / Hansen J --- overidentification}
+
+When there are more instruments than endogenous regressors
+(overidentification), test the exogeneity of the instruments:
+
+\begin{lstlisting}
+estat_overid(y ~ x1 + x_endog, ~ z1 + z2, df)
+\end{lstlisting}
+
+$H_0$: instruments are exogenous (valid). The Sargan statistic is
+$n \cdot R^2$ from the regression of IV residuals on the instruments,
+distributed as $\chi^2(L - K)$, where $L$ is the number of instruments
+and $K$ the number of regressors. Rejecting $H_0$ suggests the
+instruments may be invalid. Not applicable when the model is exactly
+identified ($L = K$).
+
+\subsection{Durbin-Wu-Hausman --- endogeneity}
+
+Tests whether the suspect variable is truly endogenous, comparing OLS
+and IV:
+
+\begin{lstlisting}
+estat_endog(y ~ x1 + x_endog, ~ z1 + z2, df)
+\end{lstlisting}
+
+$H_0$: regressors are exogenous (OLS is consistent). Uses the augmented
+regression approach: adds first-stage residuals to the structural
+equation and tests their significance via $F$. If $H_0$ is rejected, IV
+is needed; if not rejected, OLS is consistent and preferred (more
+efficient).
+
 \section{Fitted values}
 
 \begin{lstlisting}

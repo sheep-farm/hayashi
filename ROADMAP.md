@@ -69,6 +69,20 @@ reporta o p-value do coeficiente de ŷ².
   m_unrestricted)`. Suporta OLS, logit/probit, Poisson, NegBin, Tobit, Ordered,
   Mixed, ZI, GLM, GARCH, ARIMA.
 
+- ~~IV: first-stage F~~ — já existia em Hayashi como `weak_iv(endog_formula,
+  instrument_formula, df)`. Computa F do primeiro estágio por variável
+  endógena, Cragg-Donald Wald F, e critical values de Stock-Yogo (2005).
+
+- ~~IV: Sargan/Hansen J~~ — implementado em `Greeners/src/iv.rs` como
+  `IV::sargan_test()`. Exposto em Hayashi como `estat_overid(endog_formula,
+  instrument_formula, df)`. Testa exogeneidade dos instrumentos quando
+  sobreidentificado (L > K).
+
+- ~~IV: endogeneity test (DWH)~~ — implementado em `Greeners/src/iv.rs` como
+  `IV::endogeneity_test()`. Exposto em Hayashi como `estat_endog(endog_formula,
+  instrument_formula, df)`. Testa se regressores são exógenos via regressão
+  augmentada (Hausman).
+
 ---
 
 ## Priorização sugerida

@@ -165,6 +165,9 @@ Covariance options (where applicable): `cov=nonrobust|HC1|HC2|HC3|HC4|robust`, `
 | `estat` / `ic` | `estat(m1, m2)` | AIC/BIC comparison |
 | `akaike_weights` | `akaike_weights(m1, m2)` | Akaike weights (dict) |
 | `lrtest` | `lrtest(m_restricted, m_unrestricted)` | Likelihood-ratio test |
+| `weak_iv` | `weak_iv(endog_formula, instr_formula, df)` | Weak instrument test (1st-stage F, Cragg-Donald) |
+| `estat_overid` | `estat_overid(endog_formula, instr_formula, df)` | Sargan/Hansen J overidentification test |
+| `estat_endog` | `estat_endog(endog_formula, instr_formula, df)` | Durbin-Wu-Hausman endogeneity test |
 | `hausman` | `hausman(m_fe, m_re)` | Hausman specification test |
 | `lincom` | `lincom(m, expr)` | Linear combination of coefficients |
 | `bootstrap` | `bootstrap(est, formula, df, n=)` | Generic bootstrap |

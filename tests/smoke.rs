@@ -10030,3 +10030,54 @@ try {
         "caught",
     );
 }
+
+#[test]
+fn iv_sargan_overid() {
+    // Overidentified: 2 instruments (z1, z2) for 1 endogenous (x)
+    // z1 and z2 are valid instruments → should not reject H0
+    assert_ok_contains(
+        "sargan_test",
+        r#"
+input df
+y x z1 z2
+3 2 1 3
+5 3 2 1
+4 4 3 4
+7 5 4 2
+6 6 5 5
+9 7 6 3
+8 8 7 6
+11 9 8 4
+10 10 9 7
+13 11 10 5
+end
+estat_overid(y ~ x, ~ z1 + z2, df)
+"#,
+        "Sargan",
+    );
+}
+
+#[test]
+fn iv_endog_test() {
+    // DWH endogeneity test: x is endogenous (correlated with error via construction)
+    assert_ok_contains(
+        "endog_test",
+        r#"
+input df
+y x z1
+1 2 1
+2 3 2
+3 4 3
+4 5 4
+5 6 5
+6 7 6
+7 8 7
+8 9 8
+9 10 9
+10 11 10
+end
+estat_endog(y ~ x, ~ z1, df)
+"#,
+        "Durbin-Wu-Hausman",
+    );
+}

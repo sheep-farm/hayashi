@@ -301,9 +301,41 @@ A função reporta:
 \begin{itemize}
   \item Estatística $F$ da primeira etapa (por variável endógena)
   \item Estatística de Cragg-Donald $CD$
-  \item Valores críticos de Stock \& Yogo (2005) para viés relativo de 5\%–30\%
+  \item Valores críticos de Stock \& Yogo (2005) para viés relativo de 5\%--30\%
   \item Referência: $F > 10$ (Staiger \& Stock, 1997)
 \end{itemize}
+
+\section{Testes de pós-estimação de IV}
+
+\subsection{Sargan / Hansen J — sobreidentificação}
+
+Quando há mais instrumentos que variáveis endógenas (sobreidentificação),
+testa-se a exogeneidade dos instrumentos:
+
+\begin{lstlisting}
+estat_overid(y ~ x1 + x_endog, ~ z1 + z2, df)
+\end{lstlisting}
+
+$H_0$: instrumentos são exógenos (válidos). A estatística de Sargan é
+$n \cdot R^2$ da regressão dos resíduos IV sobre os instrumentos,
+distribuída como $\chi^2(L - K)$, onde $L$ é o número de instrumentos e
+$K$ o de regressores. Rejeitar $H_0$ indica que os instrumentos podem
+ser inválidos. Não se aplica quando o modelo é exatamente identificado
+($L = K$).
+
+\subsection{Durbin-Wu-Hausman — endogeneidade}
+
+Testa se a variável suspeita é realmente endógena, comparando OLS e IV:
+
+\begin{lstlisting}
+estat_endog(y ~ x1 + x_endog, ~ z1 + z2, df)
+\end{lstlisting}
+
+$H_0$: regressores são exógenos (OLS é consistente). Usa a abordagem de
+regressão augmentada: adiciona os resíduos do primeiro estágio à equação
+estrutural e testa sua significância via $F$. Se rejeitar $H_0$, IV é
+necessário; se não rejeitar, OLS é consistente e preferível (mais
+eficiente).
 
 \section{Valores ajustados}
 

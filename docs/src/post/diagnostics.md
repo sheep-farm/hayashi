@@ -81,6 +81,32 @@ gqtest(m, split=0.2)
 
 Tests for heteroskedasticity by comparing the variance of residuals in the first and last portions of the sample (split fraction defaults to 0.2). Reports an F-statistic and p-value.
 
+## IV diagnostics
+
+### Weak instrument test
+
+```
+weak_iv(y ~ x_endog, ~ z1 + z2, df)
+```
+
+Computes first-stage F-statistics for each endogenous variable (partial F on excluded instruments), the Cragg-Donald Wald F statistic, and Stock-Yogo (2005) critical values. Rule of thumb: F > 10 indicates strong instruments (Staiger & Stock 1997).
+
+### Sargan / Hansen J overidentification test
+
+```
+estat_overid(y ~ x1 + x_endog, ~ z1 + z2, df)
+```
+
+Tests H0: the instruments are exogenous (valid). Only applicable when overidentified (more instruments than endogenous regressors). The Sargan statistic is n × R² from the regression of IV residuals on all instruments, distributed as chi²(L - K). If rejected, the instruments may be invalid.
+
+### Durbin-Wu-Hausman endogeneity test
+
+```
+estat_endog(y ~ x1 + x_endog, ~ z1 + z2, df)
+```
+
+Tests H0: the endogenous regressors are actually exogenous (OLS is consistent). Uses the augmented regression approach: adds first-stage residuals to the structural equation and tests their significance via an F-test. If rejected, IV is needed. If not rejected, OLS is consistent and preferred (more efficient).
+
 ## Coefficient plot
 
 ```

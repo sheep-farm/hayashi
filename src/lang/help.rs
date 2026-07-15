@@ -437,6 +437,8 @@ fn legacy_help_text(topic: &str) -> Option<&'static str> {
         "cusumtest" => "cusumtest(model)\n  CUSUM test for structural stability (Brown-Durbin-Evans 1975).\n  Uses recursive residuals; checks if cumulative sum stays within 5% bounds.\n\n  cusumtest(m_ols)\n",
         "akaike_weights" | "aic_weights" => "akaike_weights(m1, m2, ...)\n  Returns Akaike weights as a dict {model_name: weight}.\n  Supports OLS, logit/probit, Poisson, NegBin, Tobit, Ordered, Mixed, ZI.\n\n  akaike_weights(m1, m2, m3)\n",
         "lrtest" | "lr_test" => "lrtest(m_restricted, m_unrestricted)\n  Likelihood-ratio test for nested models.\n  H0: restricted model is adequate (additional parameters are zero).\n  LR = -2*(lnL_restricted - lnL_unrestricted) ~ chi²(df).\n  Supports OLS, logit/probit, Poisson, NegBin, Tobit, Ordered, Mixed, ZI, GLM, GARCH, ARIMA.\n\n  lrtest(m1, m2)\n",
+        "estat_overid" | "sargan" | "overid" => "estat_overid(endog_formula, instrument_formula, df)\n  Sargan / Hansen J overidentification test.\n  H0: instruments are exogenous (valid).\n  Only applicable when overidentified (L > K).\n\n  estat_overid(y ~ x1 + x_endog, ~ z1 + z2, df)\n",
+        "estat_endog" | "dwh" => "estat_endog(endog_formula, instrument_formula, df)\n  Durbin-Wu-Hausman endogeneity test.\n  H0: regressors are exogenous (OLS is consistent).\n  If rejected, IV is needed.\n\n  estat_endog(y ~ x1 + x_endog, ~ z1 + z2, df)\n",
         "qqplot" => "qqplot(df, var)\n  Q-Q plot (ASCII).\n\n  qqplot(df, residuals)\n",
         "corrplot" => "corrplot(df, var1, var2 [, ...])\n  Correlation heatmap (ASCII).\n\n  corrplot(df, price, mpg, weight)\n",
         "adf" | "adtest" => "adf(df, var [, lags=auto])\n  Augmented Dickey-Fuller unit root test.\n\n  adf(df, gdp)\n",
