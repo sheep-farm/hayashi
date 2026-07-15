@@ -56,22 +56,33 @@ for v in ["X1", "X2", "X3"] {
 
 Concurrent variant of `for`. Iterations run in parallel across threads;
 each iteration's return value (last expression or explicit `return`) is
-collected into a list, which is stored back into the **iteration variable**
-after all threads complete.
+collected into a list.
+
+**As an expression** (preferred — result goes to a named variable):
+
+```
+let results = parallel for t in tickers {
+    let sub = filter(df, ticker == t)
+    nrow(sub)
+}
+// results is a list of nrow values, one per ticker
+```
+
+**As a statement** (result stored in the iteration variable):
 
 ```
 parallel for t in tickers {
     let sub = filter(df, ticker == t)
     nrow(sub)
 }
-// t now holds a list of nrow values, one per ticker
+// t now holds a list of nrow values
 ```
 
 Optional `threads=N` limits the number of worker threads (default: all
 available CPUs):
 
 ```
-parallel for t in tickers, threads=4 {
+let results = parallel for t in tickers, threads=4 {
     // at most 4 iterations run concurrently
     load "data.db" as sub, query=f"SELECT * FROM prices WHERE ticker = '{t}'"
     nrow(sub)
@@ -141,13 +152,13 @@ DataFrames.
 The typical pattern for batch processing is `parallel for` + `rbind`:
 
 ```
-parallel for i in 0..n, threads=8 {
+let results = parallel for i in 0..n, threads=8 {
     let t = tickers[i]
     if t == "SPY" { return nil }
     let df_t = compute_betas(t)
     df_t
 }
-let all_betas = rbind(i)   // i holds the list of DataFrames
+let all_betas = rbind(results)
 ```
 
 ## while

@@ -1579,7 +1579,7 @@ impl Interpreter {
         }
     }
 
-    fn exec_parallel_for(
+    pub(super) fn exec_parallel_for(
         &mut self,
         var: &str,
         var2: Option<&str>,

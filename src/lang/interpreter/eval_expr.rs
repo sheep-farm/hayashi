@@ -406,6 +406,33 @@ impl Interpreter {
                 self.env.quiet_mode = old;
                 result
             }
+
+            Expr::ParallelFor {
+                var,
+                var2,
+                iter,
+                body,
+                threads,
+            } => {
+                let n_threads = match threads {
+                    Some(e) => match self.eval_expr(e.as_ref())? {
+                        Value::Int(n) if n > 0 => Some(n as usize),
+                        Value::Float(f) if f > 0.0 => Some(f as usize),
+                        _ => None,
+                    },
+                    None => None,
+                };
+                // Reconstruct ForIter from the boxed Expr.
+                let for_iter = match iter.as_ref() {
+                    Expr::Range(s, e) => ForIter::Range((**s).clone(), (**e).clone()),
+                    Expr::RangeInclusive(s, e) => {
+                        ForIter::RangeInclusive((**s).clone(), (**e).clone())
+                    }
+                    other => ForIter::Items(other.clone()),
+                };
+                // Expression form: return the list, do NOT store in var.
+                self.exec_parallel_for(var, var2.as_deref(), &for_iter, body, n_threads)
+            }
         }
     }
 

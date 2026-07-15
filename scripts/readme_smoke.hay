@@ -28,12 +28,12 @@ for k, v in d {
     print(k + " = " + str(v))
 }
 
-// Parallel for (result is stored in the iteration variable)
+// Parallel for (expression form: result goes to a named variable)
 let tickers = ["AAPL", "MSFT", "GOOG"]
-parallel for t in tickers, threads=2 {
+let counts = parallel for t in tickers, threads=2 {
     len(t)
 }
-print("parallel for counts = " + str(t))
+print("parallel for counts = " + str(counts))
 
 // rbind
 let df1 = dataframe({"x": [1, 2], "y": [10, 20]})

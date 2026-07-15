@@ -61,13 +61,13 @@ let full = append(df2019, df2020)
 `parallel for` where some iterations return `nil`:
 
 ```
-parallel for i in 0..n, threads=8 {
+let results = parallel for i in 0..n, threads=8 {
     let t = tickers[i]
     if t == "SPY" { return nil }
     let df_t = compute(t)
     df_t
 }
-let results = rbind(i)   // i holds the list; concat all, skip nils
+let combined = rbind(results)   // concat all, skip nils
 ```
 
 ## Collapsing (group aggregation)

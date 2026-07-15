@@ -318,6 +318,15 @@ pub enum Expr {
 
     // expression block: { stmt; ...; expr }
     Block(Vec<Stmt>, Option<Box<Expr>>),
+
+    // parallel for as expression: returns the list of results
+    ParallelFor {
+        var: String,
+        var2: Option<String>,
+        iter: Box<Expr>, // boxed to break recursive type cycle (ForIter contains Expr)
+        body: Vec<Spanned>,
+        threads: Option<Box<Expr>>,
+    },
 }
 
 pub type Spanned = (Stmt, usize);

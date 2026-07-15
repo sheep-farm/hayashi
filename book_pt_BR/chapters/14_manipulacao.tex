@@ -109,13 +109,13 @@ combinar resultados de \texttt{parallel for} onde algumas iterações
 retornam \texttt{nil}:
 
 \begin{lstlisting}[caption={rbind com parallel for}]
-parallel for i in 0..n, threads=8 {
+let resultados = parallel for i in 0..n, threads=8 {
   let t = tickers[i]
   if t == "SPY" { return nil }
   let df_t = calcular_betas(t)
   df_t
 }
-let todos_betas = rbind(i)
+let todos_betas = rbind(resultados)
 \end{lstlisting}
 
 \section{\texttt{collapse} e \texttt{group\_by}}

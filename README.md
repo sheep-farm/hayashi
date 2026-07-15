@@ -130,7 +130,7 @@ Function parameters are `const` by default — data enters immutable, result exi
 | Match | `match expr { pat => result, _ => default }` | Yes |
 | Block expression | `{ stmt; ...; expr }` | Yes |
 | For loop | `for i in 1..10 { }` / `for v in list { }` | No |
-| Parallel for | `parallel for v in list, threads=N { }` | No |
+| Parallel for | `let r = parallel for v in list, threads=N { }` | No |
 | While loop | `while cond { }` | No |
 | Try/catch | `try { } catch e { }` | No |
 | Break/continue | `break` / `continue` | — |
@@ -524,7 +524,7 @@ let name = match code {
 // Loops
 for i in 1..10 { display i }
 for v in ["X1", "X2"] { eststo(ols("Y ~ " + v, df)) }
-parallel for v in list, threads=4 { eststo(ols("Y ~ " + v, df)) }  // result in v
+let r = parallel for v in list, threads=4 { eststo(ols("Y ~ " + v, df)) }
 while cond { ... }
 
 // Try/catch

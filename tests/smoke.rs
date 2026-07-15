@@ -8578,6 +8578,24 @@ display x[7]
     );
 }
 
+#[test]
+fn parallel_for_expression_form() {
+    // parallel for as expression: let r = parallel for ...
+    assert_ok_contains(
+        "parallel_expr",
+        r#"
+let items = [1, 2, 3, 4, 5]
+let r = parallel for x in items, threads=2 {
+    x * 10
+}
+display len(r)
+display r[0]
+display r[4]
+"#,
+        "50",
+    );
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // MATCH — cases with types and expressions in arms
 // ══════════════════════════════════════════════════════════════════════════════

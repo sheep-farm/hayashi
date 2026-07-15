@@ -713,6 +713,26 @@ impl Parser {
                 Ok(Expr::Quietly(Box::new(inner)))
             }
 
+            // parallel for as expression: let r = parallel for x in iter { ... }
+            Token::Parallel => {
+                let line = self.line();
+                let (var, var2, iter, body, threads) = self.parse_parallel_for(line)?;
+                // Store the ForIter as a boxed Expr to break the recursive type
+                // cycle (ForIter contains Expr, Expr now contains ForIter).
+                let iter_expr = match iter {
+                    ForIter::Range(s, e) => Expr::Range(Box::new(s), Box::new(e)),
+                    ForIter::RangeInclusive(s, e) => Expr::RangeInclusive(Box::new(s), Box::new(e)),
+                    ForIter::Items(e) => e,
+                };
+                Ok(Expr::ParallelFor {
+                    var,
+                    var2,
+                    iter: Box::new(iter_expr),
+                    body,
+                    threads: threads.map(Box::new),
+                })
+            }
+
             // Match expression: match expr { pat => result, ... }
             // `match` is a contextual keyword: it starts a match expression only
             // when followed by a scrutinee expression and an opening brace.
@@ -1114,6 +1134,59 @@ impl Parser {
         }
     }
 
+    /// Parses `parallel for var [, var2] in iter [, threads=N] { body }`
+    /// and returns the components. Called from both `parse_stmt` (statement
+    /// form) and `parse_primary` (expression form).
+    #[allow(clippy::type_complexity)]
+    fn parse_parallel_for(
+        &mut self,
+        line: usize,
+    ) -> Result<(String, Option<String>, ForIter, Vec<Spanned>, Option<Expr>)> {
+        self.advance(); // consume 'parallel'
+        match self.advance().clone() {
+            Token::For => {}
+            t => {
+                return Err(HayashiError::Parse {
+                    line,
+                    msg: format!("expected 'for' after 'parallel', got {t:?}"),
+                })
+            }
+        }
+        let var = self.expect_ident()?;
+        let var2 = if self.peek() == &Token::Comma {
+            self.advance();
+            Some(self.expect_ident()?)
+        } else {
+            None
+        };
+        match self.advance().clone() {
+            Token::In => {}
+            t => {
+                return Err(HayashiError::Parse {
+                    line,
+                    msg: format!("expected 'in' after for variable, got {t:?}"),
+                })
+            }
+        }
+        let iter = self.parse_for_iter()?;
+        let threads = if self.peek() == &Token::Comma {
+            self.advance();
+            let opt_name = self.expect_ident()?;
+            if opt_name != "threads" {
+                return Err(HayashiError::Parse {
+                    line,
+                    msg: format!("expected 'threads' after ',' in parallel for, got '{opt_name}'"),
+                });
+            }
+            self.expect(&Token::Eq)?;
+            Some(self.parse_expr()?)
+        } else {
+            None
+        };
+        let body = self.parse_block()?;
+        Ok((var, var2, iter, body, threads))
+    }
+
     // ── Statement ────────────────────────────────────────────────────────────
 
     fn parse_stmt(&mut self) -> Result<Option<Stmt>> {
@@ -1378,53 +1451,10 @@ impl Parser {
 
             // ── parallel for var in iter { ... } ─────────────────────────────
             // Like `for`, but iterations run concurrently.
+            // As a statement: result is stored in the iteration variable.
+            // As an expression (via parse_primary): result is returned.
             Token::Parallel => {
-                self.advance();
-                // expects "for" after "parallel"
-                match self.advance().clone() {
-                    Token::For => {}
-                    t => {
-                        return Err(HayashiError::Parse {
-                            line,
-                            msg: format!("expected 'for' after 'parallel', got {t:?}"),
-                        })
-                    }
-                }
-                let var = self.expect_ident()?;
-                let var2 = if self.peek() == &Token::Comma {
-                    self.advance();
-                    Some(self.expect_ident()?)
-                } else {
-                    None
-                };
-                match self.advance().clone() {
-                    Token::In => {}
-                    t => {
-                        return Err(HayashiError::Parse {
-                            line,
-                            msg: format!("expected 'in' after for variable, got {t:?}"),
-                        })
-                    }
-                }
-                let iter = self.parse_for_iter()?;
-                // Optional: , threads=N  (before the body block)
-                let threads = if self.peek() == &Token::Comma {
-                    self.advance();
-                    let opt_name = self.expect_ident()?;
-                    if opt_name != "threads" {
-                        return Err(HayashiError::Parse {
-                            line,
-                            msg: format!(
-                                "expected 'threads' after ',' in parallel for, got '{opt_name}'"
-                            ),
-                        });
-                    }
-                    self.expect(&Token::Eq)?;
-                    Some(self.parse_expr()?)
-                } else {
-                    None
-                };
-                let body = self.parse_block()?;
+                let (var, var2, iter, body, threads) = self.parse_parallel_for(line)?;
                 Ok(Some(Stmt::ParallelFor {
                     var,
                     var2,

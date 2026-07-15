@@ -109,13 +109,13 @@ results from \texttt{parallel for} where some iterations return
 \texttt{nil}:
 
 \begin{lstlisting}[caption={rbind with parallel for}]
-parallel for i in 0..n, threads=8 {
+let results = parallel for i in 0..n, threads=8 {
   let t = tickers[i]
   if t == "SPY" { return nil }
   let df_t = compute_betas(t)
   df_t
 }
-let all_betas = rbind(i)
+let all_betas = rbind(results)
 \end{lstlisting}
 
 \section{\texttt{collapse} and \texttt{group\_by}}
