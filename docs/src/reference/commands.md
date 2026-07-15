@@ -228,6 +228,10 @@ Covariance options (where applicable): `cov=nonrobust|HC1|HC2|HC3|HC4|robust`, `
 | `xgboost` | `xgboost(y ~ x, df, trees=100, lr=0.3, lambda=1.0)` | XGBoost (L1/L2 regularized) |
 | `dml_crossfit` | `dml_crossfit(y ~ d, df, x="x1,x2", folds=5)` | Double ML with cross-fitting |
 | `bsc` | `bsc(df, y, "c1,c2", period, prior=1.0)` | Bayesian Synthetic Control |
+| `lstm` | `lstm(df, var, hidden=10, seqlen=10, forecast=5)` | LSTM recurrent neural network |
+| `causalforest` | `causalforest(y ~ t, df, x="x1,x2", trees=100)` | Causal Forest (Wager-Athey 2018) |
+| `grf` | `grf(y ~ t, df, x="x1,x2", trees=100)` | Generalized Random Forest (Athey 2019) |
+| `conformal` | `conformal(y ~ x, df, alpha=0.1, calib=0.3)` | Conformal prediction intervals |
 | `hausman` | `hausman(m_fe, m_re)` | Hausman specification test |
 | `lincom` | `lincom(m, expr)` | Linear combination of coefficients |
 | `bootstrap` | `bootstrap(est, formula, df, n=)` | Generic bootstrap |

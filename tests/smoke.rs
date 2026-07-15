@@ -11881,3 +11881,140 @@ bsc(df, y_treated, "c1,c2", 4, prior=1.0)
         "Bayesian Synthetic Control",
     );
 }
+
+#[test]
+fn lstm_basic() {
+    assert_ok_contains(
+        "lstm",
+        r#"
+input df
+y
+10
+12
+15
+18
+20
+22
+25
+28
+30
+32
+35
+38
+40
+42
+45
+48
+50
+52
+55
+58
+60
+62
+65
+68
+70
+end
+lstm(df, y, hidden=5, seqlen=5, lr=0.01, epochs=20, forecast=3)
+"#,
+        "LSTM",
+    );
+}
+
+#[test]
+fn causalforest_basic() {
+    assert_ok_contains(
+        "causalforest",
+        r#"
+input df
+y treated x1 x2
+10 1 5 2
+12 1 6 3
+15 0 7 4
+18 1 8 5
+20 0 9 6
+22 1 10 7
+25 0 11 8
+28 1 12 9
+30 0 13 10
+32 1 14 11
+35 0 15 12
+38 1 16 13
+40 0 17 14
+42 1 18 15
+45 0 19 16
+48 1 20 17
+50 0 21 18
+52 1 22 19
+55 0 23 20
+58 1 24 21
+end
+causalforest(y ~ treated, df, x="x1,x2", trees=10, depth=3)
+"#,
+        "Causal Forest",
+    );
+}
+
+#[test]
+fn grf_basic() {
+    assert_ok_contains(
+        "grf",
+        r#"
+input df
+y treated x1 x2
+10 1 5 2
+12 1 6 3
+15 0 7 4
+18 1 8 5
+20 0 9 6
+22 1 10 7
+25 0 11 8
+28 1 12 9
+30 0 13 10
+32 1 14 11
+35 0 15 12
+38 1 16 13
+40 0 17 14
+42 1 18 15
+45 0 19 16
+48 1 20 17
+50 0 21 18
+52 1 22 19
+55 0 23 20
+58 1 24 21
+end
+grf(y ~ treated, df, x="x1,x2", trees=10, depth=3)
+"#,
+        "Generalized Random Forest",
+    );
+}
+
+#[test]
+fn conformal_basic() {
+    assert_ok_contains(
+        "conformal",
+        r#"
+input df
+y x1 x2
+10 1.0 5
+12 2.0 6
+15 3.0 7
+18 4.0 8
+20 5.0 9
+22 6.0 10
+25 7.0 11
+28 8.0 12
+30 9.0 13
+32 10.0 14
+35 11.0 15
+38 12.0 16
+40 13.0 17
+42 14.0 18
+45 15.0 19
+48 16.0 20
+end
+conformal(y ~ x1 + x2, df, alpha=0.1, calib=0.3)
+"#,
+        "Conformal Prediction",
+    );
+}

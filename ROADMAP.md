@@ -133,12 +133,12 @@ reporta o p-value do coeficiente de ŷ².
 
 ## Pendente
 
-- **LSTM** — recurrent neural network para series. +0,05 pp.
+- **Transformer** — attention mechanism para series. +0,05 pp.
 
-- **Causal forest** — Wager-Athey para heterogeneous effects. +0,05 pp.
+- **Double robustness DR-learner** — nuisance estimation. +0,05 pp.
 
-- **Generalized random forest** — GRF para treatment effects. +0,05 pp.
+- **BART** — Bayesian additive regression trees. +0,05 pp.
 
-- **Conformal prediction** — distribution-free uncertainty. +0,05 pp.
+- **Gaussian process regression** — Kriging. +0,05 pp.
 
-**Cobertura atual: 98,85%.**
+**Cobertura atual: 99,05%.**

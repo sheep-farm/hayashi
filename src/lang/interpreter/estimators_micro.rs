@@ -4097,6 +4097,282 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── LSTM Time Series ───────────────────────────────────────────
+            // lstm(df, var [, hidden=10, seqlen=10, lr=0.01, epochs=100, forecast=5])
+            "lstm" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(format!(
+                        "{func}() requires (df, var)"
+                    )));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(format!(
+                            "{func}: first arg must be DataFrame"
+                        )))
+                    }
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
+                };
+                let y_var = match &args[1] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(format!(
+                            "{func}: var must be identifier"
+                        )))
+                    }
+                };
+
+                let n_hidden = match opt_map.get("hidden") {
+                    Some(Value::Int(v)) => Some(*v as usize),
+                    Some(Value::Float(v)) => Some(*v as usize),
+                    _ => None,
+                };
+                let seq_len = match opt_map.get("seqlen") {
+                    Some(Value::Int(v)) => Some(*v as usize),
+                    Some(Value::Float(v)) => Some(*v as usize),
+                    _ => None,
+                };
+                let lr = match opt_map.get("lr") {
+                    Some(Value::Float(v)) => Some(*v),
+                    Some(Value::Int(v)) => Some(*v as f64),
+                    _ => None,
+                };
+                let n_epochs = match opt_map.get("epochs") {
+                    Some(Value::Int(v)) => Some(*v as usize),
+                    Some(Value::Float(v)) => Some(*v as usize),
+                    _ => None,
+                };
+                let n_forecast = match opt_map.get("forecast") {
+                    Some(Value::Int(v)) => Some(*v as usize),
+                    Some(Value::Float(v)) => Some(*v as usize),
+                    _ => None,
+                };
+
+                let y_col = df
+                    .get_column(y_var.as_str())
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let y_vals = y_col.as_float().ok_or_else(|| {
+                    HayashiError::Runtime(format!("{func}: '{y_var}' must be numeric"))
+                })?;
+                let y_arr = ndarray::Array1::from_vec(y_vals.to_vec());
+
+                let result =
+                    greeners::LSTM::fit(&y_arr, n_hidden, seq_len, lr, n_epochs, n_forecast)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── Causal Forest ──────────────────────────────────────────────
+            // causalforest(y ~ treated, df, x="x1,x2", trees=100, depth=5)
+            "causalforest" | "causal_forest" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let y_var = g_formula.dependent.clone();
+                let t_var = g_formula
+                    .independents
+                    .first()
+                    .ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: need treatment variable"))
+                    })?
+                    .clone();
+
+                let x_str = match opt_map.get("x") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires x=\"x1,x2\" option (features)"
+                        )))
+                    }
+                };
+                let x_vars: Vec<String> = x_str.split(',').map(|s| s.trim().to_string()).collect();
+                let n_trees = match opt_map.get("trees") {
+                    Some(Value::Int(v)) => Some(*v as usize),
+                    Some(Value::Float(v)) => Some(*v as usize),
+                    _ => None,
+                };
+                let max_depth = match opt_map.get("depth") {
+                    Some(Value::Int(v)) => Some(*v as usize),
+                    Some(Value::Float(v)) => Some(*v as usize),
+                    _ => None,
+                };
+
+                let n = df.n_rows();
+                let y_col = df
+                    .get_column(y_var.as_str())
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let y_vals = y_col.as_float().ok_or_else(|| {
+                    HayashiError::Runtime(format!("{func}: '{y_var}' must be numeric"))
+                })?;
+                let y_arr = ndarray::Array1::from_vec(y_vals.to_vec());
+
+                let t_col = df
+                    .get_column(t_var.as_str())
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let t_vec: Vec<bool> = if let Some(b) = t_col.as_bool() {
+                    b.to_vec()
+                } else if let Some(i) = t_col.as_int() {
+                    i.iter().map(|&v| v != 0).collect()
+                } else if let Some(f) = t_col.as_float() {
+                    f.iter().map(|&v| v != 0.0).collect()
+                } else {
+                    return Err(HayashiError::Runtime(format!(
+                        "{func}: '{t_var}' must be boolean or numeric"
+                    )));
+                };
+
+                let k = x_vars.len();
+                let mut x_mat = ndarray::Array2::<f64>::zeros((n, k));
+                for (j, xname) in x_vars.iter().enumerate() {
+                    let col = df
+                        .get_column(xname.as_str())
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let vals = col.as_float().ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: '{xname}' must be numeric"))
+                    })?;
+                    for i in 0..n {
+                        x_mat[(i, j)] = vals[i];
+                    }
+                }
+
+                let result = greeners::CausalForest::fit(
+                    &y_arr,
+                    &t_vec,
+                    &x_mat,
+                    n_trees,
+                    max_depth,
+                    Some(x_vars),
+                )
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── Generalized Random Forest ──────────────────────────────────
+            // grf(y ~ treated, df, x="x1,x2", trees=100, depth=5)
+            "grf" | "generalized_rf" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let y_var = g_formula.dependent.clone();
+                let t_var = g_formula
+                    .independents
+                    .first()
+                    .ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: need treatment variable"))
+                    })?
+                    .clone();
+
+                let x_str = match opt_map.get("x") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires x=\"x1,x2\" option (features)"
+                        )))
+                    }
+                };
+                let x_vars: Vec<String> = x_str.split(',').map(|s| s.trim().to_string()).collect();
+                let n_trees = match opt_map.get("trees") {
+                    Some(Value::Int(v)) => Some(*v as usize),
+                    Some(Value::Float(v)) => Some(*v as usize),
+                    _ => None,
+                };
+                let max_depth = match opt_map.get("depth") {
+                    Some(Value::Int(v)) => Some(*v as usize),
+                    Some(Value::Float(v)) => Some(*v as usize),
+                    _ => None,
+                };
+
+                let n = df.n_rows();
+                let y_col = df
+                    .get_column(y_var.as_str())
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let y_vals = y_col.as_float().ok_or_else(|| {
+                    HayashiError::Runtime(format!("{func}: '{y_var}' must be numeric"))
+                })?;
+                let y_arr = ndarray::Array1::from_vec(y_vals.to_vec());
+
+                let t_col = df
+                    .get_column(t_var.as_str())
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let t_vec: Vec<bool> = if let Some(b) = t_col.as_bool() {
+                    b.to_vec()
+                } else if let Some(i) = t_col.as_int() {
+                    i.iter().map(|&v| v != 0).collect()
+                } else if let Some(f) = t_col.as_float() {
+                    f.iter().map(|&v| v != 0.0).collect()
+                } else {
+                    return Err(HayashiError::Runtime(format!(
+                        "{func}: '{t_var}' must be boolean or numeric"
+                    )));
+                };
+
+                let k = x_vars.len();
+                let mut x_mat = ndarray::Array2::<f64>::zeros((n, k));
+                for (j, xname) in x_vars.iter().enumerate() {
+                    let col = df
+                        .get_column(xname.as_str())
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let vals = col.as_float().ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: '{xname}' must be numeric"))
+                    })?;
+                    for i in 0..n {
+                        x_mat[(i, j)] = vals[i];
+                    }
+                }
+
+                let result =
+                    greeners::GRF::fit(&y_arr, &t_vec, &x_mat, n_trees, max_depth, Some(x_vars))
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── Conformal Prediction ───────────────────────────────────────
+            // conformal(y ~ x1 + x2, df, alpha=0.1, calib=0.3)
+            "conformal" | "conformal_pred" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let alpha = match opt_map.get("alpha") {
+                    Some(Value::Float(v)) => Some(*v),
+                    Some(Value::Int(v)) => Some(*v as f64),
+                    _ => None,
+                };
+                let calib_frac = match opt_map.get("calib") {
+                    Some(Value::Float(v)) => Some(*v),
+                    Some(Value::Int(v)) => Some(*v as f64),
+                    _ => None,
+                };
+
+                let (y_arr, x_arr) = df
+                    .to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = g_formula.independents.clone();
+
+                // Use x_arr itself as test set (in-sample intervals)
+                let result = greeners::ConformalPrediction::fit(
+                    &y_arr,
+                    &x_arr,
+                    &x_arr,
+                    alpha,
+                    calib_frac,
+                    Some(var_names),
+                )
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
             // ── Spatial econometrics ────────────────────────────────────────
             // spatial_sar(y ~ x1 + x2, df, w=W_matrix)
             // spatial_sem(y ~ x1 + x2, df, w=W_matrix)
