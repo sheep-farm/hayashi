@@ -66,8 +66,67 @@ jb(m)
 
 Tests normality of residuals via skewness and kurtosis. Reports the JB statistic and p-value.
 
+## Panel diagnostics
+
+### Breusch-Pagan LM (RE vs OLS)
+
+```
+bptest(df, Y ~ X1 + X2, id="entity")
+```
+
+Tests H0: σ²_u = 0 (no panel effect — pooled OLS adequate). If rejected, use RE or FE instead of pooled OLS. Requires `id=` column or prior `xtset`.
+
+### F-test for fixed effects (FE vs OLS)
+
+```
+ftest_fe(df, Y ~ X1 + X2, id="entity")
+```
+
+Tests H0: all individual effects are zero (pooled OLS adequate). If rejected, use FE. Reports SSR pooled, SSR FE, and the F-statistic.
+
+### Hausman (FE vs RE)
+
+```
+hausman(m_fe, m_re)
+```
+
+Tests H0: RE is consistent (individual effects uncorrelated with regressors). If rejected, use FE. Requires both an FE and an RE model.
+
+### Wooldridge serial correlation
+
+```
+wooldridge(df, Y ~ X1, id="entity", time="time")
+```
+
+Tests H0: no first-order serial correlation in idiosyncratic errors. Useful for panel time series.
+
+### Pesaran CD (cross-sectional dependence)
+
+```
+pesaran(df, Y ~ X1, id="entity", time="time")
+```
+
+Tests H0: no cross-sectional dependence. Relevant for large-N panels where spatial or network spillovers may exist.
+
+### Arellano-Bond m1/m2
+
+```
+abtest(df, Y ~ X1, id="entity", time="time")
+```
+
+Tests for serial correlation in first-differenced residuals. m1 should reject H0 (FD induces AR(1) by construction); m2 should not reject H0 (validates instruments y_{i,t-2} for GMM).
+
+### Mundlak
+
+```
+mundlak(df, Y ~ X1 + X2, id="entity")
+```
+
+Tests H0: RE is consistent, by augmenting the model with entity means of regressors. A generalization of the Hausman test.
+
 ## Notes
 
 - `test` works with any estimator that stores a variance-covariance matrix (OLS, IV, logit, probit, panel models, etc.).
 - Diagnostic tests (`bp`, `white`, `dw`) are restricted to OLS results.
+- Panel diagnostics (`bptest`, `ftest_fe`, `wooldridge`, `pesaran`, `abtest`, `mundlak`) require `id=` and `time=` columns, or a prior `xtset(df, id, time)`.
 - All tests print a summary table to stdout and return a record with fields `stat`, `pval`, and `df`.

@@ -432,7 +432,7 @@ impl Interpreter {
                             / (n - 1.0).max(1.0))
                         .sqrt();
                         let mut sorted = data.clone();
-                        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                        sorted.sort_by(nan_last_cmp);
                         let min = sorted[0];
                         let max = *sorted.last().unwrap();
                         let sum = data.iter().sum::<f64>();
@@ -526,7 +526,7 @@ impl Interpreter {
                 let id_col = get_col_f64(&df, &id_name)?;
                 // Identify unique entities
                 let mut ids_uniq: Vec<f64> = id_col.to_vec();
-                ids_uniq.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                ids_uniq.sort_by(nan_last_cmp);
                 ids_uniq.dedup();
                 let n_total = df.n_rows();
                 let n_entities = ids_uniq.len();
@@ -756,7 +756,7 @@ impl Interpreter {
                 let n_total = y_col.len();
                 // Split into two groups by unique value
                 let mut gvals: Vec<f64> = grp_col.to_vec();
-                gvals.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                gvals.sort_by(nan_last_cmp);
                 gvals.dedup();
                 if gvals.len() != 2 {
                     return Err(self.rt_err(format!(
@@ -864,7 +864,7 @@ impl Interpreter {
                 let grp_col = get_col_f64(&df, &by_name)?;
                 let n = y_col.len();
                 let mut gvals: Vec<f64> = grp_col.to_vec();
-                gvals.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                gvals.sort_by(nan_last_cmp);
                 gvals.dedup();
                 let k = gvals.len();
                 if k < 2 {

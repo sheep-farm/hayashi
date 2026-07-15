@@ -484,6 +484,88 @@ let m = ols(Y ~ X, df)
 margins(m)
 \end{lstlisting}
 
+\subsection{Diagnósticos de especificação}
+
+\subsubsection*{RESET de Ramsey}
+
+Testa erro de especificação adicionando potências de $\hat{y}$ como regressores:
+
+\begin{lstlisting}
+reset(m)              // potência padrão 3
+reset(m, power=2)     // apenas $\hat{y}^2$
+\end{lstlisting}
+
+\subsubsection*{CUSUM — estabilidade estrutural}
+
+Teste CUSUM (Brown, Durbin, Evans 1975) usando resíduos recursivos. Verifica
+se a soma cumulativa dos resíduos recursivos permanece dentro dos limites de
+5\% de significância:
+
+\begin{lstlisting}
+cusumtest(m)
+\end{lstlisting}
+
+Rejeita $H_0$ (estabilidade) se a soma cumulativa cruza os limites — indica
+quebra estrutural no período amostral.
+
+\subsection{Diagnósticos de resíduos}
+
+\subsubsection*{Heterocedasticidade}
+
+\begin{lstlisting}
+test(m, "white")      // White (1980) — geral
+test(m, "bp")         // Breusch-Pagan — forma linear
+gqtest(m, split=0.2)  // Goldfeld-Quandt — comparação de variâncias
+\end{lstlisting}
+
+O Goldfeld-Quandt divide a amostra em dois grupos (omitindo a fração central
+\texttt{split}) e compara as variâncias dos resíduos via estatística $F$.
+
+\subsubsection*{Autocorrelação}
+
+\begin{lstlisting}
+test(m, "dw")         // Durbin-Watson — AR(1)
+bgodfrey(m, lags=4)   // Breusch-Godfrey — AR(p) de ordem arbitrária
+\end{lstlisting}
+
+\subsubsection*{Autocorrelação e PACF dos resíduos}
+
+\begin{lstlisting}
+let a = acf(m, lags=10)    // FAC dos resíduos
+let p = pacf(m, lags=10)   // FAC parcial dos resíduos
+ljungbox(m, lags=10)       // teste conjunto de autocorrelação
+\end{lstlisting}
+
+\texttt{acf} e \texttt{pacf} retornam listas de tamanho \texttt{lags + 1}
+(elemento 0 é sempre 1.0). Aceitam também \texttt{acf(df, var, lags=20)} para
+séries brutas. Para visualização ASCII, use \texttt{acfplot} e \texttt{pacfplot}.
+
+\subsubsection*{Normalidade}
+
+\begin{lstlisting}
+jb(m)                 // Jarque-Bera (assimetria + curtose)
+swilk(df, residuals)  // Shapiro-Wilk
+\end{lstlisting}
+
+\subsection{Diagnósticos de influência}
+
+\begin{lstlisting}
+influence(m)          // DFBETAS, DFFITS, Cook's D, alavancagem
+leverage(m)           // apenas diagonal da hat matrix
+\end{lstlisting}
+
+\subsection{Comparação de modelos}
+
+\begin{lstlisting}
+estat(m1, m2, m3)              // tabela AIC/BIC com pesos de Akaike
+let w = akaike_weights(m1, m2) // pesos como dict {modelo: peso}
+\end{lstlisting}
+
+\texttt{akaike\_weights} retorna um dicionário com os pesos de Akaike
+$w_i = \frac{e^{-\Delta_i/2}}{\sum_j e^{-\Delta_j/2}}$, onde $\Delta_i =
+\mathrm{AIC}_i - \min_j \mathrm{AIC}_j$. Suporta OLS, logit/probit, Poisson,
+NegBin, Tobit, Ordered, Mixed e Zero-Inflated.
+
 \section{Tabela de resultados com \texttt{esttab}}
 
 \begin{lstlisting}[caption={Comparação de especificações}]

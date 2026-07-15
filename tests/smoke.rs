@@ -9856,3 +9856,123 @@ display nrow(df)"#,
         "3",
     );
 }
+
+#[test]
+fn diag_acf_returns_list() {
+    assert_ok_contains(
+        "acf_list",
+        r#"
+input df
+Y
+1
+2
+3
+4
+5
+6
+7
+8
+end
+let v = acf(df, Y, lags=3)
+display len(v)
+"#,
+        "4",
+    );
+}
+
+#[test]
+fn diag_pacf_returns_list() {
+    assert_ok_contains(
+        "pacf_list",
+        r#"
+input df
+Y
+1
+2
+3
+4
+5
+6
+7
+8
+end
+let v = pacf(df, Y, lags=3)
+display len(v)
+"#,
+        "4",
+    );
+}
+
+#[test]
+fn diag_acf_on_model() {
+    assert_ok_contains(
+        "acf_model",
+        r#"
+input df
+Y X
+10 2
+12 3
+8 1
+15 5
+11 2
+14 4
+9 1
+13 4
+end
+let m = ols(Y ~ X, df)
+let v = acf(m, lags=2)
+display len(v)
+"#,
+        "3",
+    );
+}
+
+#[test]
+fn diag_cusumtest() {
+    assert_ok_contains(
+        "cusum_test",
+        r#"
+input df
+Y X
+10 2
+12 3
+8 1
+15 5
+11 2
+14 4
+9 1
+13 4
+16 5
+17 6
+end
+let m = ols(Y ~ X, df)
+cusumtest(m)
+"#,
+        "CUSUM",
+    );
+}
+
+#[test]
+fn diag_akaike_weights() {
+    assert_ok_contains(
+        "akaike_weights_test",
+        r#"
+input df
+Y X1 X2
+10 2 1
+12 3 2
+8 1 0
+15 5 3
+11 2 1
+14 4 2
+9 1 0
+13 4 3
+end
+let m1 = ols(Y ~ X1, df)
+let m2 = ols(Y ~ X1 + X2, df)
+let w = akaike_weights(m1, m2)
+display has_key(w, "m1")
+"#,
+        "true",
+    );
+}

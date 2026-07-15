@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- **`acf()` / `pacf()`**: return autocorrelation / partial autocorrelation values as a list. Accept a DataFrame + column name, or a model (OLS/GARCH/ARIMA — uses residuals). Complements the existing `acfplot`/`pacfplot` ASCII visualizations.
+- **`cusumtest(model)`**: CUSUM test for structural stability (Brown, Durbin, Evans 1975). Uses recursive residuals and checks if the cumulative sum stays within 5% significance bounds. Supports OLS models.
+- **`akaike_weights(m1, m2, ...)`**: returns Akaike weights as a dict `{model_name: weight}` for programmatic model comparison. Supports OLS, logit/probit, Poisson, NegBin, Tobit, Ordered, Mixed, and Zero-Inflated models. Prints a summary table with AIC, ΔAIC, and weights.
+
 - **`tidy()` extended to all model types**: now supports IV, logit/probit, panel FE/RE, GMM, Poisson, NegBin, GLM, Quantile, Tobit, Heckman, Ordered, Arellano-Bond, Penalized (ridge/lasso/elasticnet), RLM, Beta, GEE, ARIMA, and GARCH — in addition to the existing OLS and Rolling support. Returns a DataFrame with `variable`, `coef`, `std_err`, `t` (or `z`), `p_value`, `conf_low`, `conf_high`.
 - **`glance()` extended to all model types**: returns model fit statistics as a DataFrame. Available keys vary by model type: `r2`, `adj_r2`, `pseudo_r2`, `n`, `f_stat`, `prob_f`, `aic`, `bic`, `log_lik`, `sigma`, `j_stat`, `j_p_value`, `df_overid`, `sigma_u`, `sigma_e`, `theta`, `tau`, `alpha`, `rho`, `delta`, `deviance`, `qic`, `n_entities`, `n_groups`, `n_censored`, `sigma2`.
 - **`names(df)` builtin**: returns DataFrame column names as a list of strings.

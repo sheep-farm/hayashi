@@ -232,7 +232,7 @@ impl Interpreter {
                 } else {
                     let id_vals = get_col_f64(&df, &i_col)?;
                     let mut unique_ids: Vec<f64> = id_vals.to_vec();
-                    unique_ids.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                    unique_ids.sort_by(nan_last_cmp);
                     unique_ids.dedup();
                     n_wide = unique_ids.len();
                     builder = builder.add_column(&i_col, unique_ids.clone());
@@ -245,7 +245,7 @@ impl Interpreter {
                             for (row, (id, j)) in id_vals.iter().zip(j_strs.iter()).enumerate() {
                                 if j == jv {
                                     if let Ok(pos) =
-                                        unique_ids.binary_search_by(|a| a.partial_cmp(id).unwrap())
+                                        unique_ids.binary_search_by(|a| nan_last_cmp(a, id))
                                     {
                                         vals[pos] = var_data[row];
                                     }
@@ -1129,12 +1129,7 @@ impl Interpreter {
                     use std::cmp::Ordering;
                     for key in &keys {
                         let ord = match key {
-                            SortKey::Num(v) => match (v[a].is_nan(), v[b].is_nan()) {
-                                (true, true) => Ordering::Equal,
-                                (true, false) => Ordering::Greater,
-                                (false, true) => Ordering::Less,
-                                (false, false) => v[a].partial_cmp(&v[b]).unwrap(),
-                            },
+                            SortKey::Num(v) => nan_last_cmp(&v[a], &v[b]),
                             SortKey::Str(v) => v[a].cmp(&v[b]),
                         };
                         if ord != Ordering::Equal {
@@ -1484,7 +1479,7 @@ impl Interpreter {
                         "centile: no finite observations in '{var}'"
                     )));
                 }
-                sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                sorted.sort_by(nan_last_cmp);
                 let n = sorted.len();
                 let pcts = match opt_map.get("centiles") {
                     Some(Value::List(lst)) => lst

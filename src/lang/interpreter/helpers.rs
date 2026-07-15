@@ -1,7 +1,20 @@
 use super::*;
+use std::cmp::Ordering;
 use std::sync::Arc;
 
 // ── Conversão de tipos e valores ─────────────────────────────────────────────
+
+/// Comparator for `f64` that treats `NaN` as greater than any finite value
+/// (matching Stata's convention where missing sorts last in ascending order).
+/// This avoids panics from `partial_cmp(...).unwrap()` when data contains NaN.
+pub(super) fn nan_last_cmp(a: &f64, b: &f64) -> Ordering {
+    match (a.is_nan(), b.is_nan()) {
+        (false, false) => a.partial_cmp(b).unwrap_or(Ordering::Equal),
+        (true, false) => Ordering::Greater,
+        (false, true) => Ordering::Less,
+        (true, true) => Ordering::Equal,
+    }
+}
 
 /// Builds a rendered diagnostic value.
 pub(super) fn diag(rendered: String) -> Value {
@@ -303,11 +316,11 @@ pub(super) fn sort_df_by(df: &DataFrame, col: &str) -> Result<DataFrame> {
     match df.get_column(col) {
         Ok(Column::Float(arr)) => {
             let v = arr.to_vec();
-            idx.sort_by(|&a, &b| v[a].partial_cmp(&v[b]).unwrap_or(std::cmp::Ordering::Equal));
+            idx.sort_by(|&a, &b| nan_last_cmp(&v[a], &v[b]));
         }
         Ok(Column::Int(arr)) => {
             let v: Vec<f64> = arr.iter().map(|&x| x as f64).collect();
-            idx.sort_by(|&a, &b| v[a].partial_cmp(&v[b]).unwrap());
+            idx.sort_by(|&a, &b| nan_last_cmp(&v[a], &v[b]));
         }
         _ => {
             if let Ok(arr) = df.get_string(col) {
@@ -747,7 +760,7 @@ pub(super) fn ascii_lineplot(
         .filter(|(&x, &y)| !x.is_nan() && !y.is_nan())
         .map(|(&x, &y)| (x, y))
         .collect();
-    pairs.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    pairs.sort_by(|a, b| nan_last_cmp(&a.0, &b.0));
     let mut grid = vec![vec![' '; w]; h];
     let mut prev_col: Option<(usize, usize)> = None;
     for &(x, y) in &pairs {
@@ -804,7 +817,7 @@ pub(super) fn ascii_boxplot(data: &[f64], title: &str, var: &str, w: usize) {
     }
     let mut sorted = data.to_vec();
     sorted.retain(|v| !v.is_nan());
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    sorted.sort_by(nan_last_cmp);
     let n = sorted.len();
     if n < 4 {
         println!("  (too few data for boxplot)");

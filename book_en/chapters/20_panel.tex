@@ -255,3 +255,77 @@ let m = fe(y ~ x, df, id=id)
 display m
 let yhat = predict(m, "xb")
 \end{lstlisting}
+
+\section{Panel diagnostics}
+
+The choice between pooled OLS, Fixed Effects, and Random Effects depends on
+formal tests. Hayashi implements all standard tests from the literature.
+
+\subsection{Pooled OLS vs.\ Random Effects}
+
+\textbf{Breusch-Pagan LM} (\texttt{bptest}): tests $H_0: \sigma_u^2 = 0$
+(no panel effect --- pooled OLS is adequate):
+
+\begin{lstlisting}
+bptest(df, y ~ x, id="entity")
+\end{lstlisting}
+
+If $H_0$ is rejected, use RE or FE instead of pooled OLS.
+
+\subsection{Pooled OLS vs.\ Fixed Effects}
+
+\textbf{F-test for FE} (\texttt{ftest\_fe}): tests $H_0$: all individual
+effects are zero:
+
+\begin{lstlisting}
+ftest_fe(df, y ~ x, id="entity")
+\end{lstlisting}
+
+Rejecting $H_0$ indicates FE is preferable to pooled OLS.
+
+\subsection{Fixed Effects vs.\ Random Effects}
+
+\textbf{Hausman} (\texttt{hausman}): tests $H_0$: RE is consistent
+(individual effects uncorrelated with regressors):
+
+\begin{lstlisting}
+hausman(m_fe, m_re)
+\end{lstlisting}
+
+Rejecting $H_0$ implies FE (consistent under correlation); not rejecting
+implies RE (more efficient).
+
+\textbf{Mundlak} (\texttt{mundlak}): a generalization of Hausman that
+augments the model with entity means of regressors:
+
+\begin{lstlisting}
+mundlak(df, y ~ x1 + x2, id="entity")
+\end{lstlisting}
+
+\subsection{Serial correlation and cross-sectional dependence}
+
+\textbf{Wooldridge} (\texttt{wooldridge}): tests $H_0$: no first-order
+serial correlation in idiosyncratic errors:
+
+\begin{lstlisting}
+wooldridge(df, y ~ x, id="entity", time="time")
+\end{lstlisting}
+
+\textbf{Pesaran CD} (\texttt{pesaran}): tests $H_0$: no cross-sectional
+dependence. Relevant for large-$N$ panels where spatial or network spillovers
+may exist:
+
+\begin{lstlisting}
+pesaran(df, y ~ x, id="entity", time="time")
+\end{lstlisting}
+
+\subsection{Arellano-Bond m1/m2}
+
+\textbf{Arellano-Bond} (\texttt{abtest}): tests serial correlation in
+first-differenced residuals. $m_1$ should reject $H_0$ (FD induces AR(1) by
+construction); $m_2$ should not reject $H_0$ (validates the $y_{i,t-2}$
+instruments for GMM):
+
+\begin{lstlisting}
+abtest(df, y ~ x, id="entity", time="time")
+\end{lstlisting}

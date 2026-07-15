@@ -569,7 +569,7 @@ impl Interpreter {
                 let _min_bic = rows
                     .iter()
                     .map(|r| r.bic)
-                    .min_by(|a, b| a.partial_cmp(b).unwrap())
+                    .min_by(nan_last_cmp)
                     .unwrap_or(0.0);
                 println!("\n{:=^80}", " Information Criteria ");
                 println!(
@@ -617,6 +617,78 @@ impl Interpreter {
                 }
                 println!("{:=^80}", "");
                 Ok(Value::Nil)
+            }
+
+            // akaike_weights(m1, m2, ...) → dict {model_name: weight}
+            // Returns Akaike weights as a dict for programmatic use.
+            "akaike_weights" | "aic_weights" => {
+                if args.is_empty() {
+                    return Err(
+                        self.rt_err("akaike_weights(m1, m2, ...) requires at least one model")
+                    );
+                }
+                let mut labels: Vec<String> = Vec::new();
+                let mut aics: Vec<f64> = Vec::new();
+                for arg in args {
+                    let label = match arg {
+                        Expr::Var(name) => name.clone(),
+                        _ => "model".to_string(),
+                    };
+                    let val = self.eval_expr(arg)?;
+                    let ll = match &val {
+                        Value::OlsResult(m) => m.result.log_likelihood,
+                        Value::BinaryResult(b) => b.result.log_likelihood,
+                        Value::PoissonResult(r) => r.log_likelihood,
+                        Value::NegBinResult(r) => r.log_likelihood,
+                        Value::OrderedResult(r) => r.log_likelihood,
+                        Value::TobitResult(r) => r.log_likelihood,
+                        Value::MixedResult(r) => r.log_likelihood,
+                        Value::ZeroInflatedResult(r) => r.log_likelihood,
+                        _ => {
+                            return Err(self.rt_err(format!(
+                                "akaike_weights: '{label}' has no log-likelihood"
+                            )))
+                        }
+                    };
+                    let k = match &val {
+                        Value::OlsResult(m) => m.result.params.len(),
+                        Value::BinaryResult(b) => b.result.params.len(),
+                        Value::PoissonResult(r) => r.params.len(),
+                        Value::NegBinResult(r) => r.params.len(),
+                        Value::OrderedResult(r) => r.params.len() + r.thresholds.len(),
+                        Value::TobitResult(r) => r.params.len(),
+                        Value::MixedResult(r) => r.fixed_effects.len(),
+                        Value::ZeroInflatedResult(r) => {
+                            r.count_params.len() + r.inflate_params.len()
+                        }
+                        _ => 0,
+                    };
+                    labels.push(label);
+                    aics.push(-2.0 * ll + 2.0 * k as f64);
+                }
+                let (deltas, weights) = greeners::ModelSelection::akaike_weights(&aics);
+                let mut out = std::collections::HashMap::new();
+                for (i, label) in labels.iter().enumerate() {
+                    out.insert(label.clone(), Value::Float(weights[i]));
+                }
+                // Print summary
+                let sep = "─".repeat(50);
+                println!("\nAkaike Weights");
+                println!("{sep}");
+                println!(
+                    "{:<20} {:>10} {:>10} {:>10}",
+                    "Model", "AIC", "ΔAIC", "Weight"
+                );
+                println!("{sep}");
+                for (i, label) in labels.iter().enumerate() {
+                    println!(
+                        "{:<20} {:>10.2} {:>10.2} {:>10.4}",
+                        label, aics[i], deltas[i], weights[i]
+                    );
+                }
+                println!("{sep}");
+                println!();
+                Ok(Value::Dict(Arc::new(out)))
             }
 
             // ── Fixed Effects ─────────────────────────────────────────────────

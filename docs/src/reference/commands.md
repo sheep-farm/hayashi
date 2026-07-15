@@ -163,12 +163,17 @@ Covariance options (where applicable): `cov=nonrobust|HC1|HC2|HC3|HC4|robust`, `
 | `estclear` | `estclear()` | Clear stored models |
 | `testparm` | `testparm(m, ["x1", "x2"])` | Joint F-test |
 | `estat` / `ic` | `estat(m1, m2)` | AIC/BIC comparison |
+| `akaike_weights` | `akaike_weights(m1, m2)` | Akaike weights (dict) |
 | `hausman` | `hausman(m_fe, m_re)` | Hausman specification test |
 | `lincom` | `lincom(m, expr)` | Linear combination of coefficients |
 | `bootstrap` | `bootstrap(est, formula, df, n=)` | Generic bootstrap |
 | `bootse` | `bootse(est, formula, df, n=)` | Bootstrap standard errors |
 | `vif` | `vif(m)` | Variance inflation factors |
 | `influence` | `influence(m)` | DFFITS, Cook's D, leverage |
+| `cusumtest` | `cusumtest(m)` | CUSUM structural stability test |
+| `acf` | `acf(df, var [, lags=])` or `acf(m [, lags=])` | ACF values (list) |
+| `pacf` | `pacf(df, var [, lags=])` or `pacf(m [, lags=])` | PACF values (list) |
+| `gqtest` | `gqtest(m [, split=])` | Goldfeld-Quandt heteroskedasticity |
 | `irf` | `irf(m [, periods=])` | Impulse response function |
 | `fevd` | `fevd(m [, periods=])` | Forecast error variance decomposition |
 | `coefplot` | `coefplot(m [, width=])` | ASCII coefficient plot |
@@ -186,7 +191,12 @@ Covariance options (where applicable): `cov=nonrobust|HC1|HC2|HC3|HC4|robust`, `
 | `archtest` | `archtest(df, var [, lags=])` | Engle's ARCH test |
 | `granger` | `granger(df, y, x [, lags=])` | Granger causality |
 | `johansen` | `johansen(df, var1, var2 [, lags=])` | Johansen cointegration |
-| `bptest` | `bptest(df, formula, id=)` | Breusch-Pagan LM |
+| `bptest` | `bptest(df, formula, id=)` | Breusch-Pagan LM (RE vs OLS) |
+| `ftest_fe` | `ftest_fe(df, formula, id=)` | F-test (FE vs OLS) |
+| `wooldridge` | `wooldridge(df, formula, id=, time=)` | Wooldridge serial correlation |
+| `pesaran` | `pesaran(df, formula, id=, time=)` | Pesaran CD cross-sectional dependence |
+| `abtest` | `abtest(df, formula, id=, time=)` | Arellano-Bond m1/m2 |
+| `mundlak` | `mundlak(df, formula, id=)` | Mundlak (RE vs FE) |
 | `jb` | `jb(df, var)` | Jarque-Bera normality |
 | `reset` | `reset(m)` | Ramsey RESET |
 | `white` | `white(m)` | White heteroskedasticity |

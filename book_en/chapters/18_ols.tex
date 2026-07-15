@@ -481,6 +481,89 @@ let m = ols(Y ~ X, df)
 margins(m)
 \end{lstlisting}
 
+\subsection{Specification diagnostics}
+
+\subsubsection*{Ramsey RESET}
+
+Tests specification error by adding powers of $\hat{y}$ as regressors:
+
+\begin{lstlisting}
+reset(m)              // default power 3
+reset(m, power=2)     // only $\hat{y}^2$
+\end{lstlisting}
+
+\subsubsection*{CUSUM --- structural stability}
+
+CUSUM test (Brown, Durbin, Evans 1975) using recursive residuals. Checks
+whether the cumulative sum of recursive residuals stays within 5\%
+significance bounds:
+
+\begin{lstlisting}
+cusumtest(m)
+\end{lstlisting}
+
+Rejects $H_0$ (stability) if the cumulative sum crosses the bounds ---
+indicates a structural break in the sample period.
+
+\subsection{Residual diagnostics}
+
+\subsubsection*{Heteroskedasticity}
+
+\begin{lstlisting}
+test(m, "white")      // White (1980) --- general
+test(m, "bp")         // Breusch-Pagan --- linear form
+gqtest(m, split=0.2)  // Goldfeld-Quandt --- variance comparison
+\end{lstlisting}
+
+The Goldfeld-Quandt splits the sample into two groups (omitting the central
+fraction \texttt{split}) and compares residual variances via an $F$ statistic.
+
+\subsubsection*{Autocorrelation}
+
+\begin{lstlisting}
+test(m, "dw")         // Durbin-Watson --- AR(1)
+bgodfrey(m, lags=4)   // Breusch-Godfrey --- AR(p) of arbitrary order
+\end{lstlisting}
+
+\subsubsection*{ACF and PACF of residuals}
+
+\begin{lstlisting}
+let a = acf(m, lags=10)    // ACF of residuals
+let p = pacf(m, lags=10)   // PACF of residuals
+ljungbox(m, lags=10)       // joint autocorrelation test
+\end{lstlisting}
+
+\texttt{acf} and \texttt{pacf} return lists of length \texttt{lags + 1}
+(element 0 is always 1.0). They also accept \texttt{acf(df, var, lags=20)}
+for raw series. For ASCII visualization, use \texttt{acfplot} and
+\texttt{pacfplot}.
+
+\subsubsection*{Normality}
+
+\begin{lstlisting}
+jb(m)                 // Jarque-Bera (skewness + kurtosis)
+swilk(df, residuals)  // Shapiro-Wilk
+\end{lstlisting}
+
+\subsection{Influence diagnostics}
+
+\begin{lstlisting}
+influence(m)          // DFBETAS, DFFITS, Cook's D, leverage
+leverage(m)           // hat matrix diagonal only
+\end{lstlisting}
+
+\subsection{Model comparison}
+
+\begin{lstlisting}
+estat(m1, m2, m3)              // AIC/BIC table with Akaike weights
+let w = akaike_weights(m1, m2) // weights as dict {model: weight}
+\end{lstlisting}
+
+\texttt{akaike\_weights} returns a dictionary with Akaike weights
+$w_i = \frac{e^{-\Delta_i/2}}{\sum_j e^{-\Delta_j/2}}$, where $\Delta_i =
+\mathrm{AIC}_i - \min_j \mathrm{AIC}_j$. Supports OLS, logit/probit, Poisson,
+NegBin, Tobit, Ordered, Mixed, and Zero-Inflated.
+
 \section{Results table with \texttt{esttab}}
 
 \begin{lstlisting}[caption={Comparing specifications}]

@@ -483,7 +483,7 @@ impl Interpreter {
                                 let min = vals.iter().cloned().fold(f64::INFINITY, f64::min);
                                 let max = vals.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
                                 let mut sorted = vals.clone();
-                                sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                                sorted.sort_by(nan_last_cmp);
                                 let pctile = |p: f64| -> f64 {
                                     let idx = (p * (n - 1) as f64).round() as usize;
                                     sorted[idx.min(n - 1)]
@@ -519,7 +519,7 @@ impl Interpreter {
                                 let min = vals.iter().cloned().fold(f64::INFINITY, f64::min);
                                 let max = vals.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
                                 let mut sorted = vals.clone();
-                                sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                                sorted.sort_by(nan_last_cmp);
                                 let mut unique = sorted.clone();
                                 unique.dedup();
                                 println!(
@@ -962,7 +962,7 @@ impl Interpreter {
 
                     if detail {
                         let mut sorted = vals.clone();
-                        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                        sorted.sort_by(nan_last_cmp);
                         let pctile = |p: f64| -> f64 {
                             let idx = (p * (n - 1) as f64).round() as usize;
                             sorted[idx.min(n - 1)]

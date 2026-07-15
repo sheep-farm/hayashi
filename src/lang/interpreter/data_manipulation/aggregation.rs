@@ -129,7 +129,7 @@ impl Interpreter {
                         return f64::NAN;
                     }
                     let mut s = vals.to_vec();
-                    s.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                    s.sort_by(nan_last_cmp);
                     if n.is_multiple_of(2) {
                         (s[n / 2 - 1] + s[n / 2]) / 2.0
                     } else {
@@ -273,7 +273,7 @@ impl Interpreter {
                         return f64::NAN;
                     }
                     let mut s = vals.to_vec();
-                    s.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                    s.sort_by(nan_last_cmp);
                     if n.is_multiple_of(2) {
                         (s[n / 2 - 1] + s[n / 2]) / 2.0
                     } else {

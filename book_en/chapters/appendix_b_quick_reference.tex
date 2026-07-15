@@ -373,7 +373,25 @@ Normality (SF)      & \texttt{sfrancia(df, var)} \\
 Homoscedasticity    & \texttt{vif(m\_ols)} \\
 Hausman             & \texttt{hausman(m\_fe, m\_re)} \\
 Linear test         & \texttt{test(m, "x1 = x2")} \\
+Joint test          & \texttt{testparm(m, ["x1", "x2"])} \\
 Linear combination  & \texttt{lincom(m, "x1 + x2")} \\
+White               & \texttt{test(m, "white")} \\
+Breusch-Pagan       & \texttt{test(m, "bp")} \\
+Durbin-Watson       & \texttt{test(m, "dw")} \\
+Goldfeld-Quandt     & \texttt{gqtest(m, split=0.2)} \\
+RESET               & \texttt{reset(m)} \\
+CUSUM               & \texttt{cusumtest(m)} \\
+Jarque-Bera         & \texttt{jb(m)} \\
+Ljung-Box           & \texttt{ljungbox(df, var, lags=10)} \\
+ARCH-LM             & \texttt{archtest(df, var, lags=5)} \\
+ACF / PACF          & \texttt{acf(df, var)} \quad \texttt{pacf(df, var)} \\
+BP LM (panel)       & \texttt{bptest(df, formula, id="entity")} \\
+F-test FE           & \texttt{ftest\_fe(df, formula, id="entity")} \\
+Wooldridge          & \texttt{wooldridge(df, formula, id=, time=)} \\
+Pesaran CD          & \texttt{pesaran(df, formula, id=, time=)} \\
+Arellano-Bond       & \texttt{abtest(df, formula, id=, time=)} \\
+Mundlak             & \texttt{mundlak(df, formula, id="entity")} \\
+Akaike weights      & \texttt{akaike\_weights(m1, m2)} \\
 \bottomrule
 \end{tabular}
 \end{center}

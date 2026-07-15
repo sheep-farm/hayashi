@@ -141,6 +141,10 @@ pub const BUILTIN_NAMES: &[&str] = &[
     "nlcom",
     "bootstrap",
     "bootse",
+    "acf",
+    "pacf",
+    "cusumtest",
+    "akaike_weights",
     "histogram",
     "boxplot",
     "kdensity",
@@ -1700,7 +1704,7 @@ impl Interpreter {
                 if sorted.is_empty() {
                     return Err(self.rt_err("quantile(): no finite value"));
                 }
-                sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                sorted.sort_by(nan_last_cmp);
                 let idx = p * (sorted.len() - 1) as f64;
                 let lo = idx.floor() as usize;
                 let hi = idx.ceil() as usize;

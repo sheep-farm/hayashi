@@ -124,7 +124,7 @@ impl Interpreter {
                     .filter(|(s, r)| s.is_finite() && r.is_finite())
                     .map(|(&s, &r)| (s, r))
                     .collect();
-                pairs.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+                pairs.sort_by(|a, b| nan_last_cmp(&a.0, &b.0));
                 let n_valid = pairs.len();
                 let per_port = n_valid / n_ports;
 
@@ -270,7 +270,7 @@ impl Interpreter {
                         .filter(|(_, v)| v.is_finite())
                         .map(|(i, &v)| (i, v))
                         .collect();
-                    indexed.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+                    indexed.sort_by(|a, b| nan_last_cmp(&a.1, &b.1));
                     let n = indexed.len();
                     let mut q = vec![usize::MAX; vals.len()];
                     for (rank, &(orig_i, _)) in indexed.iter().enumerate() {

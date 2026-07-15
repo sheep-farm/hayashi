@@ -637,7 +637,7 @@ impl Interpreter {
                         (0..probs.nrows()).map(|i| {
                             let row = probs.row(i);
                             let (cat, _) = row.iter().enumerate()
-                                .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+                                .max_by(|(_, a), (_, b)| nan_last_cmp(a, b))
                                 .unwrap_or((0, &0.0));
                             (cat + 1) as f64
                         }).collect()

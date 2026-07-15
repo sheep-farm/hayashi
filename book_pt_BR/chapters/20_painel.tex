@@ -255,3 +255,77 @@ let m = fe(y ~ x, df, id=id)
 display m
 let yhat = predict(m, "xb")
 \end{lstlisting}
+
+\section{Diagnósticos de painel}
+
+A escolha entre OLS agrupado, Efeitos Fixos e Efeitos Aleatórios depende de
+testes formais. Hayashi implementa todos os testes padrão da literatura.
+
+\subsection{OLS agrupado vs.\ Efeitos Aleatórios}
+
+\textbf{Breusch-Pagan LM} (\texttt{bptest}): testa $H_0: \sigma_u^2 = 0$
+(não há efeito de painel — OLS agrupado é adequado):
+
+\begin{lstlisting}
+bptest(df, y ~ x, id="entity")
+\end{lstlisting}
+
+Se rejeitar $H_0$, use RE ou FE em vez de OLS agrupado.
+
+\subsection{OLS agrupado vs.\ Efeitos Fixos}
+
+\textbf{F-test para FE} (\texttt{ftest\_fe}): testa $H_0$: todos os efeitos
+individuais são zero:
+
+\begin{lstlisting}
+ftest_fe(df, y ~ x, id="entity")
+\end{lstlisting}
+
+Rejeitar $H_0$ indica que FE é preferível a OLS agrupado.
+
+\subsection{Efeitos Fixos vs.\ Efeitos Aleatórios}
+
+\textbf{Hausman} (\texttt{hausman}): testa $H_0$: RE é consistente (efeitos
+individuais não correlacionados com regressores):
+
+\begin{lstlisting}
+hausman(m_fe, m_re)
+\end{lstlisting}
+
+Rejeitar $H_0$ implica FE (consistente sob correlação); não rejeitar implica
+RE (mais eficiente).
+
+\textbf{Mundlak} (\texttt{mundlak}): generalização do Hausman que aumenta o
+modelo com médias individuais dos regressores:
+
+\begin{lstlisting}
+mundlak(df, y ~ x1 + x2, id="entity")
+\end{lstlisting}
+
+\subsection{Correlação serial e dependência cross-section}
+
+\textbf{Wooldridge} (\texttt{wooldridge}): testa $H_0$: ausência de
+correlação serial de primeira ordem nos erros idiossincráticos:
+
+\begin{lstlisting}
+wooldridge(df, y ~ x, id="entity", time="time")
+\end{lstlisting}
+
+\textbf{Pesaran CD} (\texttt{pesaran}): testa $H_0$: ausência de dependência
+cross-sectional. Relevante para painéis com $N$ grande onde spillovers
+espaciais ou de rede podem existir:
+
+\begin{lstlisting}
+pesaran(df, y ~ x, id="entity", time="time")
+\end{lstlisting}
+
+\subsection{Arellano-Bond m1/m2}
+
+\textbf{Arellano-Bond} (\texttt{abtest}): testa correlação serial nos
+resíduos em primeira diferença. $m_1$ deve rejeitar $H_0$ (a FD induz AR(1)
+por construção); $m_2$ não deve rejeitar $H_0$ (valida os instrumentos
+$y_{i,t-2}$ do GMM):
+
+\begin{lstlisting}
+abtest(df, y ~ x, id="entity", time="time")
+\end{lstlisting}

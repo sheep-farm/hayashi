@@ -790,6 +790,106 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // acf(df, var, lags=20)
+            // Returns autocorrelation function values as a list.
+            // Also accepts a model (OLS/GARCH/ARIMA) — uses residuals.
+            "acf" => {
+                if args.is_empty() {
+                    return Err(self.rt_err("acf(df, var, lags=20) or acf(model, lags=20)"));
+                }
+                let series = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(df) => {
+                        let col_name = match args.get(1) {
+                            Some(Expr::Var(n)) => n.clone(),
+                            _ => {
+                                return Err(self
+                                    .rt_err("acf(df, var): second argument must be a column name"))
+                            }
+                        };
+                        Array1::from(self.eval_col_expr(&Expr::Var(col_name), &df)?)
+                    }
+                    Value::OlsResult(m) => m.residuals.clone(),
+                    Value::GarchResult(m) => m.standardized_residuals.clone(),
+                    Value::ArimaResult(m) => Array1::from_vec(m.residuals().to_vec()),
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "acf(): argument must be a DataFrame or model".into(),
+                        ))
+                    }
+                };
+                let lags = match opt_map.get("lags") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 20,
+                };
+                let vals = greeners::TimeSeries::acf(&series, lags)
+                    .map_err(|e| self.rt_err(format!("acf: {e}")))?;
+                let list: Vec<Value> = vals.iter().map(|&v| Value::Float(v)).collect();
+                Ok(Value::List(Arc::new(list)))
+            }
+
+            // pacf(df, var, lags=20)
+            // Returns partial autocorrelation function values as a list.
+            // Also accepts a model (OLS/GARCH/ARIMA) — uses residuals.
+            "pacf" => {
+                if args.is_empty() {
+                    return Err(self.rt_err("pacf(df, var, lags=20) or pacf(model, lags=20)"));
+                }
+                let series = match self.eval_expr(&args[0])? {
+                    Value::DataFrame(df) => {
+                        let col_name = match args.get(1) {
+                            Some(Expr::Var(n)) => n.clone(),
+                            _ => {
+                                return Err(self.rt_err(
+                                    "pacf(df, var): second argument must be a column name",
+                                ))
+                            }
+                        };
+                        Array1::from(self.eval_col_expr(&Expr::Var(col_name), &df)?)
+                    }
+                    Value::OlsResult(m) => m.residuals.clone(),
+                    Value::GarchResult(m) => m.standardized_residuals.clone(),
+                    Value::ArimaResult(m) => Array1::from_vec(m.residuals().to_vec()),
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "pacf(): argument must be a DataFrame or model".into(),
+                        ))
+                    }
+                };
+                let lags = match opt_map.get("lags") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 20,
+                };
+                let vals = greeners::TimeSeries::pacf(&series, lags)
+                    .map_err(|e| self.rt_err(format!("pacf: {e}")))?;
+                let list: Vec<Value> = vals.iter().map(|&v| Value::Float(v)).collect();
+                Ok(Value::List(Arc::new(list)))
+            }
+
+            // cusumtest(model)
+            // CUSUM test for structural stability (Brown, Durbin, Evans 1975)
+            // Uses recursive residuals; checks if cumulative sum stays within 5% bounds.
+            "cusumtest" | "cusum_test" => {
+                if args.is_empty() {
+                    return Err(self.rt_err("cusumtest(model) requires an OLS model"));
+                }
+                let ols = match self.eval_expr(&args[0])? {
+                    Value::OlsResult(m) => m,
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "cusumtest(): only supports OLS models".into(),
+                        ))
+                    }
+                };
+                // Reconstruct y from residuals + fitted (x · params)
+                let y = &ols.residuals + &ols.x.dot(&ols.result.params);
+                let result = greeners::CUSUMTest::test(&y, &ols.x)
+                    .map_err(|e| self.rt_err(format!("cusumtest: {e}")))?;
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
             // forecast_vol(model, steps=10)
             "forecast_vol" => {
                 if args.is_empty() {
