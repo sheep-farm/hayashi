@@ -92,8 +92,9 @@ let results = parallel for t in tickers, threads=4 {
 ### Isolation model
 
 Each thread gets its own interpreter with a **snapshot** of the outer
-environment (only send-safe values are captured). This has important
-consequences:
+environment (only send-safe values are captured). Auto-display is
+suppressed inside threads — only explicit `print()` calls produce
+output. This has important consequences:
 
 - **Reads from outer scope work**: variables defined before the
   `parallel for` are visible inside the body.
@@ -101,6 +102,9 @@ consequences:
   variable inside the body has no effect on the outer scope. The
   mutation lives only in that thread's local environment and is lost
   when the thread exits.
+- **Auto-display is suppressed**: the body's last expression is
+  collected as a result, not printed. Use `print()` explicitly if you
+  need output from individual iterations.
 
 ```
 let n = 0

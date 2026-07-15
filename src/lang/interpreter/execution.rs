@@ -1660,6 +1660,10 @@ impl Interpreter {
 
                     // Each thread gets a fresh interpreter.
                     let mut interp = Interpreter::new();
+                    // Suppress auto-display: the body's last expression is
+                    // collected as a result, not printed. Only explicit
+                    // print() calls should produce output.
+                    interp.env.set_quiet_mode(true);
 
                     // Load the snapshot into the global scope.
                     for (name, sv) in &snapshot {

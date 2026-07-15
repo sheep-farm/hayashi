@@ -129,8 +129,10 @@ let resultados = parallel for t in tickers, threads=4 {
 \subsection*{Modelo de isolamento}
 
 Cada thread recebe seu próprio interpretador com um \textbf{snapshot} do
-ambiente externo (apenas valores send-safe são capturados). Isso tem
-consequências importantes:
+ambiente externo (apenas valores send-safe são capturados). O
+auto-display é suprimido dentro das threads --- apenas chamadas
+explícitas a \texttt{print()} produzem saída. Isso tem consequências
+importantes:
 
 \begin{itemize}
   \item \textbf{Leituras do escopo externo funcionam}: variáveis definidas
@@ -139,6 +141,9 @@ consequências importantes:
     reatribuir uma variável externa dentro do corpo não tem efeito sobre
     o escopo externo. A mutação existe apenas no ambiente local da thread
     e é perdida quando a thread termina.
+  \item \textbf{Auto-display é suprimido}: a última expressão do corpo é
+    coletada como resultado, não impressa. Use \texttt{print()}
+    explicitamente se precisar de saída de iterações individuais.
 \end{itemize}
 
 \begin{lstlisting}[caption={Mutações são descartadas}]
