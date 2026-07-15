@@ -240,6 +240,10 @@ Covariance options (where applicable): `cov=nonrobust|HC1|HC2|HC3|HC4|robust`, `
 | `orf` | `orf(y ~ t, df, x="x1", w="c1", trees=50)` | Orthogonal Random Forest (ORF) |
 | `spectral` | `spectral(df, x="x1,x2", k=3)` | Spectral clustering (Ng-Jordan-Weiss) |
 | `isotonic` | `isotonic(y ~ x, df)` | Isotonic regression (PAVA) |
+| `causal_impact` | `causal_impact(df, y, controls="c1,c2", period=N)` | Causal Impact (Brodersen 2015) |
+| `mice_chained` | `mice_chained(df, vars="x1,x2", m=5, iter=10)` | MICE imputation (van Buuren 2011) |
+| `kmeans` | `kmeans(df, x="x1,x2", k=3)` | K-Means clustering (MacQueen 1967) |
+| `bayes_lm` | `bayes_lm(y ~ x, df)` | Bayesian linear regression (NIG prior) |
 | `hausman` | `hausman(m_fe, m_re)` | Hausman specification test |
 | `lincom` | `lincom(m, expr)` | Linear combination of coefficients |
 | `bootstrap` | `bootstrap(est, formula, df, n=)` | Generic bootstrap |

@@ -12301,3 +12301,89 @@ isotonic(y ~ x, df)
         "Isotonic Regression",
     );
 }
+
+#[test]
+fn causal_impact_basic() {
+    assert_ok_contains(
+        "causal_impact",
+        r#"
+input df
+y c1 c2
+10 5 2
+11 6 3
+12 7 4
+13 8 5
+14 9 6
+15 10 7
+16 11 8
+17 12 9
+18 13 10
+19 14 11
+20 15 12
+21 16 13
+22 17 14
+23 18 15
+24 19 16
+25 20 17
+30 21 18
+35 22 19
+40 23 20
+45 24 21
+end
+causal_impact(df, y, controls="c1,c2", period=15)
+"#,
+        "Causal Impact",
+    );
+}
+
+#[test]
+fn kmeans_basic() {
+    assert_ok_contains(
+        "kmeans",
+        r#"
+input df
+x1 x2
+1.0 1.0
+1.1 1.1
+0.9 1.0
+1.0 0.9
+5.0 5.0
+5.1 5.1
+4.9 5.0
+5.0 4.9
+10.0 10.0
+10.1 10.1
+9.9 10.0
+10.0 9.9
+end
+kmeans(df, x="x1,x2", k=3)
+"#,
+        "K-Means",
+    );
+}
+
+#[test]
+fn bayes_lm_basic() {
+    assert_ok_contains(
+        "bayes_lm",
+        r#"
+input df
+y x1 x2
+10 1.0 5
+12 2.0 6
+15 3.0 7
+18 4.0 8
+20 5.0 9
+22 6.0 10
+25 7.0 11
+28 8.0 12
+30 9.0 13
+32 10.0 14
+35 11.0 15
+38 12.0 16
+end
+bayes_lm(y ~ x1 + x2, df)
+"#,
+        "Bayesian Linear",
+    );
+}

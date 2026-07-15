@@ -4869,6 +4869,237 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── Causal Impact ─────────────────────────────────────────────
+            // causal_impact(df, y_var, controls="c1,c2", treatment_period=N)
+            "causal_impact" | "causalimpact" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(format!(
+                        "{func}() requires (df, y_var)"
+                    )));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(format!(
+                            "{func}: first arg must be DataFrame"
+                        )))
+                    }
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
+                };
+                let y_var = match &args[1] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(format!(
+                            "{func}: var must be identifier"
+                        )))
+                    }
+                };
+
+                let controls_str = match opt_map.get("controls") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires controls=\"c1,c2\" option"
+                        )))
+                    }
+                };
+                let control_vars: Vec<String> = controls_str
+                    .split(',')
+                    .map(|s| s.trim().to_string())
+                    .collect();
+                let treatment_period = match opt_map.get("period") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires period=N option (treatment start index)"
+                        )))
+                    }
+                };
+
+                let n = df.n_rows();
+                let y_col = df
+                    .get_column(y_var.as_str())
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let y_vals = y_col.as_float().ok_or_else(|| {
+                    HayashiError::Runtime(format!("{func}: '{y_var}' must be numeric"))
+                })?;
+                let y_arr = ndarray::Array1::from_vec(y_vals.to_vec());
+
+                let kk = control_vars.len();
+                let mut controls_mat = ndarray::Array2::<f64>::zeros((n, kk));
+                for (j, cname) in control_vars.iter().enumerate() {
+                    let col = df
+                        .get_column(cname.as_str())
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let vals = col.as_float().ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: '{cname}' must be numeric"))
+                    })?;
+                    for i in 0..n {
+                        controls_mat[(i, j)] = vals[i];
+                    }
+                }
+
+                let result = greeners::CausalImpact::fit(
+                    &y_arr,
+                    &controls_mat,
+                    treatment_period,
+                    Some(control_vars),
+                )
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── MICE (Chained Equations) ──────────────────────────────────
+            // mice_chained(df, vars="x1,x2,x3" [, m=5, iter=10])
+            "mice_chained" | "mice_eq" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(format!("{func}() requires (df)")));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(format!(
+                            "{func}: first arg must be DataFrame"
+                        )))
+                    }
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
+                };
+
+                let vars_str = match opt_map.get("vars") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires vars=\"x1,x2\" option"
+                        )))
+                    }
+                };
+                let var_names: Vec<String> =
+                    vars_str.split(',').map(|s| s.trim().to_string()).collect();
+                let m = match opt_map.get("m") {
+                    Some(Value::Int(v)) => Some(*v as usize),
+                    Some(Value::Float(v)) => Some(*v as usize),
+                    _ => None,
+                };
+                let max_iter = match opt_map.get("iter") {
+                    Some(Value::Int(v)) => Some(*v as usize),
+                    Some(Value::Float(v)) => Some(*v as usize),
+                    _ => None,
+                };
+
+                let n = df.n_rows();
+                let kk = var_names.len();
+                let mut data_mat = ndarray::Array2::<f64>::zeros((n, kk));
+                for (j, vname) in var_names.iter().enumerate() {
+                    let col = df
+                        .get_column(vname.as_str())
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let vals = col.as_float();
+                    if let Some(v) = vals {
+                        for i in 0..n {
+                            data_mat[(i, j)] = v[i];
+                        }
+                    } else {
+                        // Fill with NaN for missing (non-numeric or null)
+                        for i in 0..n {
+                            data_mat[(i, j)] = f64::NAN;
+                        }
+                    }
+                }
+
+                let result = greeners::MiceChained::fit(&data_mat, m, max_iter, Some(var_names))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── K-Means Clustering ────────────────────────────────────────
+            // kmeans(df, x="x1,x2", k=3)
+            "kmeans" | "k_means" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(format!("{func}() requires (df)")));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(format!(
+                            "{func}: first arg must be DataFrame"
+                        )))
+                    }
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
+                };
+
+                let x_str = match opt_map.get("x") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires x=\"x1,x2\" option (features)"
+                        )))
+                    }
+                };
+                let x_vars: Vec<String> = x_str.split(',').map(|s| s.trim().to_string()).collect();
+                let k = match opt_map.get("k") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires k=N option (number of clusters)"
+                        )))
+                    }
+                };
+
+                let n = df.n_rows();
+                let kk = x_vars.len();
+                let mut x_mat = ndarray::Array2::<f64>::zeros((n, kk));
+                for (j, xname) in x_vars.iter().enumerate() {
+                    let col = df
+                        .get_column(xname.as_str())
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let vals = col.as_float().ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: '{xname}' must be numeric"))
+                    })?;
+                    for i in 0..n {
+                        x_mat[(i, j)] = vals[i];
+                    }
+                }
+
+                let result = greeners::KMeans::fit(&x_mat, k, None, None)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── Bayesian Linear Regression ────────────────────────────────
+            // bayes_lm(y ~ x1 + x2, df)
+            "bayes_lm" | "bayesian_lm" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let (y_arr, x_arr) = df
+                    .to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = g_formula.independents.clone();
+
+                let result = greeners::BayesianLinear::fit(&y_arr, &x_arr, Some(var_names))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
             // ── Spatial econometrics ────────────────────────────────────────
             // spatial_sar(y ~ x1 + x2, df, w=W_matrix)
             // spatial_sem(y ~ x1 + x2, df, w=W_matrix)
