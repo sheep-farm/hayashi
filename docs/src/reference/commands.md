@@ -248,6 +248,10 @@ Covariance options (where applicable): `cov=nonrobust|HC1|HC2|HC3|HC4|robust`, `
 | `gmm_clust` | `gmm_clust(df, x="x1,x2", k=3)` | GMM clustering via EM (Dempster 1977) |
 | `reg_path` | `reg_path(y ~ x, df, type="lasso")` | Regularization path (Ridge/Lasso/ElasticNet) |
 | `qrf_inf` | `qrf_inf(y ~ x, df, q="0.1,0.5,0.9")` | QRF with bootstrap CIs (Meinshausen 2006) |
+| `hclust` | `hclust(df, x="x1,x2", linkage="ward")` | Hierarchical clustering (Ward 1963) |
+| `tsne` | `tsne(df, x="x1,x2", perplexity=30)` | t-SNE dimensionality reduction (van der Maaten 2008) |
+| `umap` | `umap(df, x="x1,x2", neighbors=15)` | UMAP manifold learning (McInnes 2018) |
+| `biplot` | `biplot(df, x="x1,x2,x3", type="symmetric")` | PCA biplot (Gabriel 1971) |
 | `hausman` | `hausman(m_fe, m_re)` | Hausman specification test |
 | `lincom` | `lincom(m, expr)` | Linear combination of coefficients |
 | `bootstrap` | `bootstrap(est, formula, df, n=)` | Generic bootstrap |

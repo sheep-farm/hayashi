@@ -12504,3 +12504,105 @@ qrf_inf(y ~ x1 + x2, df, q="0.1,0.5,0.9", boot=10, trees=20, depth=5)
         "QRF Inference",
     );
 }
+
+#[test]
+fn hclust_basic() {
+    assert_ok_contains(
+        "hclust",
+        r#"
+input df
+x1 x2
+1.0 1.0
+1.1 1.1
+0.9 1.0
+1.0 0.9
+5.0 5.0
+5.1 5.1
+4.9 5.0
+5.0 4.9
+10.0 10.0
+10.1 10.1
+9.9 10.0
+10.0 9.9
+end
+hclust(df, x="x1,x2", linkage="ward")
+"#,
+        "Hierarchical",
+    );
+}
+
+#[test]
+fn tsne_basic() {
+    assert_ok_contains(
+        "tsne",
+        r#"
+input df
+x1 x2
+1.0 1.0
+1.1 1.1
+0.9 1.0
+1.0 0.9
+5.0 5.0
+5.1 5.1
+4.9 5.0
+5.0 4.9
+10.0 10.0
+10.1 10.1
+9.9 10.0
+10.0 9.9
+end
+tsne(df, x="x1,x2", perplexity=5, iter=100, lr=100)
+"#,
+        "t-SNE",
+    );
+}
+
+#[test]
+fn umap_basic() {
+    assert_ok_contains(
+        "umap",
+        r#"
+input df
+x1 x2
+1.0 1.0
+1.1 1.1
+0.9 1.0
+1.0 0.9
+5.0 5.0
+5.1 5.1
+4.9 5.0
+5.0 4.9
+10.0 10.0
+10.1 10.1
+9.9 10.0
+10.0 9.9
+end
+umap(df, x="x1,x2", neighbors=5, iter=100)
+"#,
+        "UMAP",
+    );
+}
+
+#[test]
+fn biplot_basic() {
+    assert_ok_contains(
+        "biplot",
+        r#"
+input df
+x1 x2 x3
+1.0 2.0 3.0
+2.0 3.0 4.0
+3.0 4.0 5.0
+4.0 5.0 6.0
+5.0 6.0 7.0
+6.0 7.0 8.0
+7.0 8.0 9.0
+8.0 9.0 10.0
+9.0 10.0 11.0
+10.0 11.0 12.0
+end
+biplot(df, x="x1,x2,x3", type="symmetric")
+"#,
+        "Biplot",
+    );
+}

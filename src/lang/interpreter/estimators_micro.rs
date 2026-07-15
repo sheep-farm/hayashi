@@ -5335,6 +5335,258 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── Hierarchical Clustering ───────────────────────────────────
+            // hclust(df, x="x1,x2" [, linkage="ward", cut=auto])
+            "hclust" | "hierarchical" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(format!("{func}() requires (df)")));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(format!(
+                            "{func}: first arg must be DataFrame"
+                        )))
+                    }
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
+                };
+
+                let x_str = match opt_map.get("x") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires x=\"x1,x2\" option (features)"
+                        )))
+                    }
+                };
+                let x_vars: Vec<String> = x_str.split(',').map(|s| s.trim().to_string()).collect();
+                let linkage = match opt_map.get("linkage") {
+                    Some(Value::Str(s)) => match s.as_str() {
+                        "ward" => greeners::Linkage::Ward,
+                        "single" => greeners::Linkage::Single,
+                        "complete" => greeners::Linkage::Complete,
+                        "average" => greeners::Linkage::Average,
+                        _ => greeners::Linkage::Ward,
+                    },
+                    _ => greeners::Linkage::Ward,
+                };
+                let cut_height = match opt_map.get("cut") {
+                    Some(Value::Float(v)) => Some(*v),
+                    Some(Value::Int(v)) => Some(*v as f64),
+                    _ => None,
+                };
+
+                let n = df.n_rows();
+                let kk = x_vars.len();
+                let mut x_mat = ndarray::Array2::<f64>::zeros((n, kk));
+                for (j, xname) in x_vars.iter().enumerate() {
+                    let col = df
+                        .get_column(xname.as_str())
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let vals = col.as_float().ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: '{xname}' must be numeric"))
+                    })?;
+                    for i in 0..n {
+                        x_mat[(i, j)] = vals[i];
+                    }
+                }
+
+                let result = greeners::HierarchicalClustering::fit(&x_mat, linkage, cut_height)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── t-SNE ─────────────────────────────────────────────────────
+            // tsne(df, x="x1,x2" [, perplexity=30, iter=500, lr=200])
+            "tsne" | "t_sne" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(format!("{func}() requires (df)")));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(format!(
+                            "{func}: first arg must be DataFrame"
+                        )))
+                    }
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
+                };
+
+                let x_str = match opt_map.get("x") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires x=\"x1,x2\" option (features)"
+                        )))
+                    }
+                };
+                let x_vars: Vec<String> = x_str.split(',').map(|s| s.trim().to_string()).collect();
+                let perplexity = match opt_map.get("perplexity") {
+                    Some(Value::Float(v)) => Some(*v),
+                    Some(Value::Int(v)) => Some(*v as f64),
+                    _ => None,
+                };
+                let max_iter = match opt_map.get("iter") {
+                    Some(Value::Int(v)) => Some(*v as usize),
+                    Some(Value::Float(v)) => Some(*v as usize),
+                    _ => None,
+                };
+                let lr = match opt_map.get("lr") {
+                    Some(Value::Float(v)) => Some(*v),
+                    Some(Value::Int(v)) => Some(*v as f64),
+                    _ => None,
+                };
+
+                let n = df.n_rows();
+                let kk = x_vars.len();
+                let mut x_mat = ndarray::Array2::<f64>::zeros((n, kk));
+                for (j, xname) in x_vars.iter().enumerate() {
+                    let col = df
+                        .get_column(xname.as_str())
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let vals = col.as_float().ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: '{xname}' must be numeric"))
+                    })?;
+                    for i in 0..n {
+                        x_mat[(i, j)] = vals[i];
+                    }
+                }
+
+                let result = greeners::TSNE::fit(&x_mat, perplexity, None, max_iter, lr)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── UMAP ──────────────────────────────────────────────────────
+            // umap(df, x="x1,x2" [, neighbors=15, iter=300])
+            "umap" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(format!("{func}() requires (df)")));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(format!(
+                            "{func}: first arg must be DataFrame"
+                        )))
+                    }
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
+                };
+
+                let x_str = match opt_map.get("x") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires x=\"x1,x2\" option (features)"
+                        )))
+                    }
+                };
+                let x_vars: Vec<String> = x_str.split(',').map(|s| s.trim().to_string()).collect();
+                let n_neighbors = match opt_map.get("neighbors") {
+                    Some(Value::Int(v)) => Some(*v as usize),
+                    Some(Value::Float(v)) => Some(*v as usize),
+                    _ => None,
+                };
+                let max_iter = match opt_map.get("iter") {
+                    Some(Value::Int(v)) => Some(*v as usize),
+                    Some(Value::Float(v)) => Some(*v as usize),
+                    _ => None,
+                };
+
+                let n = df.n_rows();
+                let kk = x_vars.len();
+                let mut x_mat = ndarray::Array2::<f64>::zeros((n, kk));
+                for (j, xname) in x_vars.iter().enumerate() {
+                    let col = df
+                        .get_column(xname.as_str())
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let vals = col.as_float().ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: '{xname}' must be numeric"))
+                    })?;
+                    for i in 0..n {
+                        x_mat[(i, j)] = vals[i];
+                    }
+                }
+
+                let result = greeners::UMAP::fit(&x_mat, n_neighbors, None, None, max_iter)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── PCA Biplot ────────────────────────────────────────────────
+            // biplot(df, x="x1,x2" [, type="symmetric"])
+            "biplot" | "pca_biplot" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(format!("{func}() requires (df)")));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(format!(
+                            "{func}: first arg must be DataFrame"
+                        )))
+                    }
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
+                };
+
+                let x_str = match opt_map.get("x") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires x=\"x1,x2\" option (features)"
+                        )))
+                    }
+                };
+                let x_vars: Vec<String> = x_str.split(',').map(|s| s.trim().to_string()).collect();
+                let bp_type = match opt_map.get("type") {
+                    Some(Value::Str(s)) => match s.as_str() {
+                        "form" => greeners::BiplotType::Form,
+                        "covariance" => greeners::BiplotType::Covariance,
+                        _ => greeners::BiplotType::Symmetric,
+                    },
+                    _ => greeners::BiplotType::Symmetric,
+                };
+
+                let n = df.n_rows();
+                let kk = x_vars.len();
+                let mut x_mat = ndarray::Array2::<f64>::zeros((n, kk));
+                for (j, xname) in x_vars.iter().enumerate() {
+                    let col = df
+                        .get_column(xname.as_str())
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let vals = col.as_float().ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: '{xname}' must be numeric"))
+                    })?;
+                    for i in 0..n {
+                        x_mat[(i, j)] = vals[i];
+                    }
+                }
+
+                let result = greeners::Biplot::fit(&x_mat, bp_type, Some(x_vars))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
             // ── Spatial econometrics ────────────────────────────────────────
             // spatial_sar(y ~ x1 + x2, df, w=W_matrix)
             // spatial_sem(y ~ x1 + x2, df, w=W_matrix)

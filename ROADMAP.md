@@ -133,12 +133,8 @@ reporta o p-value do coeficiente de ŷ².
 
 ## Pendente
 
-- **Hierarchical clustering** — agglomerative. +0,05 pp.
+- **Panel: Hausman robusto** — robust Hausman test. +0,05 pp.
 
-- **t-SNE** — dimensionality reduction. +0,05 pp.
+- **Painel: F-test robusto** — robust F-test para painel. +0,05 pp.
 
-- **UMAP** — manifold learning. +0,05 pp.
-
-- **PCA biplot** — visualização. +0,05 pp.
-
-**Cobertura atual: 99,80%.**
+**Cobertura atual: 99,85%.**
