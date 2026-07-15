@@ -61,7 +61,7 @@ Constante especial: \texttt{\_n} = número de linha (base 1).
 \section{Palavras-chave}
 
 \begin{lstlisting}[style=inline, basicstyle=\ttfamily\footnotesize]
-let  const  fn  return  if  else  for  in  while  break  continue
+let  const  fn  return  if  else  for  parallel  in  while  break  continue
 match  try  catch  and  or  not  true  false  nil  quietly
 \end{lstlisting}
 
@@ -131,6 +131,7 @@ match  try  catch  and  or  not  true  false  nil  quietly
 \texttt{dropna(df [, cols...])}   & Remove NaN \\
 \texttt{ffill(df)}                & Preenche NaN com último valor válido \\
 \texttt{append(df1, df2)}         & Empilha verticalmente \\
+\texttt{rbind(lista\_dfs)}        & Concatena vários DFs (ignora nil) \\
 \texttt{merge(df1, df2, on=col)}  & Junção horizontal \\
 \texttt{group\_by(df, col, agg)}  & Agrega por grupo \\
 \texttt{collapse(df, expr, by=c)} & Colapsa por grupo \\

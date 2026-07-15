@@ -28,6 +28,19 @@ for k, v in d {
     print(k + " = " + str(v))
 }
 
+// Parallel for (result is stored in the iteration variable)
+let tickers = ["AAPL", "MSFT", "GOOG"]
+parallel for t in tickers, threads=2 {
+    len(t)
+}
+print("parallel for counts = " + str(t))
+
+// rbind
+let df1 = dataframe({"x": [1, 2], "y": [10, 20]})
+let df2 = dataframe({"x": [3], "y": [30]})
+let combined = rbind([df1, df2])
+print("rbind rows = " + str(nrow(combined)))
+
 // Match expression
 let code = 2
 let name = match code {

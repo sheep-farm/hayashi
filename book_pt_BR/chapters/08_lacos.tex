@@ -87,3 +87,45 @@ for uf in ["RS", "SP", "RJ"] {
   display f"{uf}: {count(sub)} obs"
 }
 \end{lstlisting}
+
+\section{\texttt{parallel for}}
+
+Variante concorrente do \texttt{for}. As iterações executam em paralelo
+entre threads; o valor de retorno de cada iteração (última expressão ou
+\texttt{return} explícito) é coletado em uma lista, que é armazenada de
+volta na \textbf{variável de iteração} após todas as threads terminarem.
+
+\begin{lstlisting}[caption={parallel for básico}]
+parallel for t in tickers {
+  let sub = filter(df, ticker == t)
+  nrow(sub)
+}
+// t agora contém uma lista de valores nrow, um por ticker
+\end{lstlisting}
+
+O parâmetro opcional \texttt{threads=N} limita o número de threads
+trabalhadoras (padrão: todas as CPUs disponíveis):
+
+\begin{lstlisting}[caption={Limite de threads}]
+parallel for t in tickers, threads=4 {
+  load "data.db" as sub, query=f"SELECT * FROM p WHERE t='{t}'"
+  nrow(sub)
+}
+\end{lstlisting}
+
+Cada thread recebe seu próprio interpretador com um snapshot do ambiente
+externo (apenas valores send-safe são capturados). Use \texttt{return nil}
+para pular uma iteração; entradas \texttt{nil} são mantidas na lista de
+resultados.
+
+Combine com \texttt{rbind()} para agregar DataFrames por iteração:
+
+\begin{lstlisting}[caption={parallel for + rbind}]
+parallel for i in 0..n, threads=8 {
+  let t = tickers[i]
+  if t == "SPY" { return nil }
+  let df_t = calcular_betas(t)
+  df_t
+}
+let todos = rbind(i)   // i contém a lista de DataFrames
+\end{lstlisting}

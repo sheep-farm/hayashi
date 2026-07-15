@@ -29,7 +29,8 @@ Load options: `sheet=`, `table=`, `query=`, `sep=`, `columns=`, `where=`. URLs a
 | `sort` | `sort(df, var1 [, desc=true])` | Sort by columns |
 | `filter` | `filter(df, condition)` | Filter rows by condition |
 | `merge` | `merge(df1, df2, key=col [, type=])` | Merge two DataFrames (inner, left, right, outer) |
-| `append` | `append(df1, df2)` | Stack DataFrames vertically |
+| `append` | `append(df1, df2)` | Stack two DataFrames vertically |
+| `rbind` | `rbind(list_of_dfs)` | Concatenate a list of DataFrames vertically (skips nil) |
 | `collapse` | `collapse(df, stat, vars, by=group)` | Aggregate by group (mean, sd, min, max, median, count, sum) |
 | `reshape` | `reshape(df, id=col, stubs=[...])` | Reshape wide to long |
 | `encode` | `encode(df, col [, gen=new])` | String to numeric encoding |

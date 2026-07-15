@@ -49,10 +49,26 @@ sort df -wage              // descending
 ```
 let merged = merge(firms, returns, on="permno")
 let panel = merge(firms, macro, on=["year", "country"], how="left")
-let full = append(df2019, df2020, df2021)
+let full = append(df2019, df2020)
 ```
 
 `how=` accepts `"inner"` (default), `"left"`, `"right"`, `"outer"`.
+
+### rbind — concatenate many DataFrames
+
+`rbind` takes a list of DataFrames and stacks them vertically in one pass.
+`nil` entries are silently skipped — useful when combining results from
+`parallel for` where some iterations return `nil`:
+
+```
+parallel for i in 0..n, threads=8 {
+    let t = tickers[i]
+    if t == "SPY" { return nil }
+    let df_t = compute(t)
+    df_t
+}
+let results = rbind(i)   // i holds the list; concat all, skip nils
+```
 
 ## Collapsing (group aggregation)
 

@@ -98,7 +98,7 @@ load "planilha.xlsx" as df, columns=[name, score], where="score > 75"
 \toprule
 \textbf{Fonte} & \textbf{\texttt{columns=}} & \textbf{\texttt{where=}} & \textbf{Mecanismo de pushdown} \\
 \midrule
-Parquet   & sim & sim & Arrow \texttt{ProjectionMask} + \texttt{RowFilter} \\
+Parquet   & sim & sim & Arrow \texttt{ProjectionMask} + \texttt{RowFilter} + \textit{row group pruning} por min/max \\
 SQLite    & sim & sim & \texttt{SELECT cols FROM t WHERE pred} \\
 ODBC      & sim & sim & idem SQLite \\
 CSV / TSV & sim & sim & projeção no loop, predicado linha a linha \\
@@ -157,6 +157,53 @@ para isso).
   \texttt{columns=[ticker, date, adj\_close], where="ticker == \textbackslash"AAPL\textbackslash""}
   reduziu o pico de RAM de $\sim$7{,}5\,GB (carga \textit{eager} completa) para
   $\sim$4\,MB.
+\end{nota}
+
+\subsubsection*{\textit{Row group pruning} por estatísticas (Parquet)}
+
+Além do \texttt{RowFilter} (que avalia o predicado em cada linha durante o
+\textit{scan}), o loader do Parquet lê as estatísticas de min/max de cada
+\textit{row group} nos metadados do arquivo e pula \textit{row groups} inteiros
+onde o predicado não pode casar. Isso é especialmente eficaz quando os dados
+estão ordenados ou agrupados pela coluna filtrada.
+
+No mesmo arquivo de 799\,MB com 30 milhões de linhas e 8.292 \textit{row groups}
+ordenados por \textit{ticker}, \texttt{where="ticker == \textbackslash"AAPL\textbackslash""}
+podou 8.291 de 8.292 \textit{row groups}, reduzindo o tempo de carga de
+$\sim$62\,s (\textit{full scan}) para $\sim$312\,ms (212$\times$ mais rápido)
+com $\sim$60\,MB de RAM.
+
+\begin{nota}
+  Para \textit{point lookups} (buscar um único valor, como um \textit{ticker}
+  específico), SQLite com índice B-tree em \texttt{(ticker, date)} ainda é
+  mais rápido ($\sim$42\,ms, $\sim$26\,MB de RAM) porque faz \textit{seek}
+  direto sem ler metadados de todos os \textit{row groups}. Para análise
+  colunar completa (todas as linhas, poucas colunas), Parquet com \textit{pruning}
+  é superior devido à compressão colunar.
+\end{nota}
+
+\subsubsection*{Tipos temporais no Parquet}
+
+Colunas do tipo \texttt{Timestamp(s|ms|$\mu$s|ns)}, \texttt{Date32} e
+\texttt{Date64} no Parquet são convertidas para \textbf{strings ISO 8601}:
+\texttt{YYYY-MM-DD} quando a parte de tempo é meia-noite, ou
+\texttt{YYYY-MM-DDTHH:MM:SS} caso contrário. O Hayashi não possui tipo
+\textit{Date} nativo, então a representação textual é a mais prática para
+econometria --- permite extração de componentes via \texttt{substr} e
+conversão para \textit{timestamp} Unix quando necessário.
+
+\begin{lstlisting}[caption={Extraindo componentes de datas}]
+load "cotacoes.parquet" as df, columns=[ticker, date, close]
+
+generate df ano = substr(date, 0, 4)        // "2024"  (vetorial)
+generate df mes = substr(date, 5, 2)        // "03"    (vetorial)
+\end{lstlisting}
+
+\begin{nota}
+  \texttt{substr()} é vetorial e funciona dentro de \texttt{generate}, produzindo
+  colunas de string. Já \texttt{date()} e \texttt{datetime()} são funções
+  escalares --- aceitam uma única string ISO e retornam um \texttt{Float}
+  (segundos desde 1970-01-01). Exemplo: \texttt{let ts = date("2024-03-15")}.
 \end{nota}
 
 \section{Salvando DataFrames}

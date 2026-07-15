@@ -92,7 +92,7 @@ let daily = ffill(daily)
 
 \section{\texttt{append}}
 
-Stacks two DataFrames vertically (equivalent to \texttt{rbind}):
+Stacks two DataFrames vertically:
 
 \begin{lstlisting}
 let df_total = append(df_2024, df_2025)
@@ -100,6 +100,23 @@ let df_total = append(df_2024, df_2025)
 
 Columns must be compatible. Columns missing from one DataFrame are filled
 with \texttt{NaN}.
+
+\section{\texttt{rbind}}
+
+Concatenates a \textit{list} of DataFrames vertically in a single pass.
+\texttt{nil} entries are silently skipped --- useful when combining
+results from \texttt{parallel for} where some iterations return
+\texttt{nil}:
+
+\begin{lstlisting}[caption={rbind with parallel for}]
+parallel for i in 0..n, threads=8 {
+  let t = tickers[i]
+  if t == "SPY" { return nil }
+  let df_t = compute_betas(t)
+  df_t
+}
+let all_betas = rbind(i)
+\end{lstlisting}
 
 \section{\texttt{collapse} and \texttt{group\_by}}
 

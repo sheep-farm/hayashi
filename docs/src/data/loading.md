@@ -54,7 +54,7 @@ load "sheet.xlsx" as df, columns=[name, score], where="score > 75"
 
 | Source    | `columns=`            | `where=`              | Pushdown mechanism |
 |-----------|-----------------------|-----------------------|--------------------|
-| Parquet   | yes                   | yes                   | Arrow `ProjectionMask` + `RowFilter` (filter evaluated during row-group scan) |
+| Parquet   | yes                   | yes                   | Arrow `ProjectionMask` + `RowFilter` (filter evaluated during row-group scan) + **row group pruning** by min/max statistics |
 | SQLite    | yes                   | yes                   | `SELECT cols FROM t WHERE pred` (validated against `PRAGMA table_info`) |
 | ODBC      | yes                   | yes                   | same as SQLite |
 | CSV / TSV | yes                   | yes                   | projection in read loop, row-by-row predicate evaluation |
@@ -96,6 +96,22 @@ where="ano >= 2022 && produto == \"Soja\""              // combined
 Supported operators: `==`, `!=`, `>`, `>=`, `<`, `<=`, `in`, `&&` (and),
 `||` (or), `!` (not). Comparisons must be `column OP literal` — comparing
 two columns is not supported (use `generate` + `filter` for that).
+
+### Row group pruning (Parquet)
+
+In addition to `RowFilter` (which evaluates the predicate on each row during
+scan), the Parquet loader reads per-row-group min/max statistics from the file
+metadata and skips row groups where the predicate cannot possibly match. This
+is effective when the data is sorted or clustered by the filtered column.
+
+On a 799 MB / 30 M-row / 8 292-row-group Parquet file sorted by ticker,
+`where="ticker == \"AAPL\""` pruned 8 291 of 8 292 row groups, reducing load
+time from ~62 s (full scan) to ~312 ms with ~60 MB peak RSS.
+
+For point lookups on a single value (e.g. one ticker), SQLite with a B-tree
+index on `(ticker, date)` is still faster (~42 ms, ~26 MB RSS) because it seeks
+directly without reading all row-group metadata. For full-column analytics across
+all tickers, Parquet with pruning is superior due to columnar compression.
 
 ## Remote files
 
@@ -151,4 +167,10 @@ ODBC DSNs can point at production databases and require external system drivers.
 - DTA files support Stata 12--118 format (`.dta` versions 113--118).
 - Excel reads `.xlsx` only (not legacy `.xls`).
 - Parquet preserves column types exactly; prefer it for large datasets.
+- **Temporal types in Parquet** (`Timestamp(s|ms|µs|ns)`, `Date32`, `Date64`) are
+  converted to Hayashi strings formatted as ISO 8601 (`YYYY-MM-DD` when the time
+  component is midnight, otherwise `YYYY-MM-DDTHH:MM:SS`). To extract components
+  vectorially use `generate df ano = substr(date, 0, 4)`; to convert a single ISO
+  date string to a Unix timestamp use the scalar builtin `date("YYYY-MM-DD")` or
+  `datetime("YYYY-MM-DDTHH:MM:SS")`.
 - JSON expects an array of objects (one object per row).

@@ -89,3 +89,44 @@ for state in ["TX", "CA", "NY"] {
   display f"{state}: {count(sub)} obs"
 }
 \end{lstlisting}
+
+\section{\texttt{parallel for}}
+
+Concurrent variant of \texttt{for}. Iterations run in parallel across
+threads; each iteration's return value (last expression or explicit
+\texttt{return}) is collected into a list, which is stored back into the
+\textbf{iteration variable} after all threads complete.
+
+\begin{lstlisting}[caption={Basic parallel for}]
+parallel for t in tickers {
+  let sub = filter(df, ticker == t)
+  nrow(sub)
+}
+// t now holds a list of nrow values, one per ticker
+\end{lstlisting}
+
+Optional \texttt{threads=N} limits the number of worker threads
+(default: all available CPUs):
+
+\begin{lstlisting}[caption={Thread limit}]
+parallel for t in tickers, threads=4 {
+  load "data.db" as sub, query=f"SELECT * FROM p WHERE t='{t}'"
+  nrow(sub)
+}
+\end{lstlisting}
+
+Each thread gets its own interpreter with a snapshot of the outer
+environment (only send-safe values are captured). Use \texttt{return nil}
+to skip an iteration; \texttt{nil} entries are kept in the result list.
+
+Combine with \texttt{rbind()} to aggregate per-iteration DataFrames:
+
+\begin{lstlisting}[caption={parallel for + rbind}]
+parallel for i in 0..n, threads=8 {
+  let t = tickers[i]
+  if t == "SPY" { return nil }
+  let df_t = compute_betas(t)
+  df_t
+}
+let all = rbind(i)   // i holds the list of DataFrames
+\end{lstlisting}

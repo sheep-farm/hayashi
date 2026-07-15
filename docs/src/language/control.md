@@ -52,6 +52,47 @@ for v in ["X1", "X2", "X3"] {
 }
 ```
 
+## parallel for
+
+Concurrent variant of `for`. Iterations run in parallel across threads;
+each iteration's return value (last expression or explicit `return`) is
+collected into a list, which is stored back into the **iteration variable**
+after all threads complete.
+
+```
+parallel for t in tickers {
+    let sub = filter(df, ticker == t)
+    nrow(sub)
+}
+// t now holds a list of nrow values, one per ticker
+```
+
+Optional `threads=N` limits the number of worker threads (default: all
+available CPUs):
+
+```
+parallel for t in tickers, threads=4 {
+    // at most 4 iterations run concurrently
+    load "data.db" as sub, query=f"SELECT * FROM prices WHERE ticker = '{t}'"
+    nrow(sub)
+}
+```
+
+Each thread gets its own interpreter with a snapshot of the outer
+environment (only send-safe values are captured). Use `return nil` to
+skip an iteration; `nil` entries are kept in the result list.
+
+Combine with `rbind()` to aggregate per-iteration DataFrames into one:
+
+```
+parallel for i in 0..n, threads=8 {
+    let t = tickers[i]
+    let df_t = compute_betas(t)
+    df_t
+}
+let all_betas = rbind(i)   // i holds the list of DataFrames
+```
+
 ## while
 
 ```
