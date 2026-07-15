@@ -252,6 +252,8 @@ Covariance options (where applicable): `cov=nonrobust|HC1|HC2|HC3|HC4|robust`, `
 | `tsne` | `tsne(df, x="x1,x2", perplexity=30)` | t-SNE dimensionality reduction (van der Maaten 2008) |
 | `umap` | `umap(df, x="x1,x2", neighbors=15)` | UMAP manifold learning (McInnes 2018) |
 | `biplot` | `biplot(df, x="x1,x2,x3", type="symmetric")` | PCA biplot (Gabriel 1971) |
+| `hausman_robust` | `hausman_robust(fe, re)` | Robust Hausman test (Wooldridge 2010) |
+| `ftest_robust` | `ftest_robust(model, vars="x1,x2")` | Robust F-test (Wooldridge 2010) |
 | `hausman` | `hausman(m_fe, m_re)` | Hausman specification test |
 | `lincom` | `lincom(m, expr)` | Linear combination of coefficients |
 | `bootstrap` | `bootstrap(est, formula, df, n=)` | Generic bootstrap |

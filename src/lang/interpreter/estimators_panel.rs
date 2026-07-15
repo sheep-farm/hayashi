@@ -1973,6 +1973,177 @@ impl Interpreter {
                 Ok(diag(out))
             }
 
+            // ── Robust Hausman Test ──────────────────────────────────────────
+            "hausman_robust" | "hausman_r" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "hausman_robust(fe_model, re_model)".into(),
+                    ));
+                }
+
+                let fe = match self.eval_expr(&args[0])? {
+                    Value::PanelResult(r) => r,
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "hausman_robust(): first argument must be an FE model".into(),
+                        ))
+                    }
+                };
+                let re = match self.eval_expr(&args[1])? {
+                    Value::ReResult(r) => r,
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "hausman_robust(): second argument must be an RE model".into(),
+                        ))
+                    }
+                };
+
+                // Align parameters by variable names (exclude intercept from RE)
+                let fe_names: Vec<String> = fe
+                    .variable_names
+                    .clone()
+                    .unwrap_or_else(|| (0..fe.params.len()).map(|i| format!("x{}", i)).collect());
+                let re_names: Vec<String> = re
+                    .variable_names
+                    .clone()
+                    .unwrap_or_else(|| (0..re.params.len()).map(|i| format!("x{}", i)).collect());
+
+                // Find common variables (exclude const/intercept)
+                let mut common_indices: Vec<(usize, usize)> = Vec::new();
+                for (i, fe_name) in fe_names.iter().enumerate() {
+                    if fe_name == "const" || fe_name == "_cons" {
+                        continue;
+                    }
+                    if let Some(j) = re_names.iter().position(|n| n == fe_name) {
+                        common_indices.push((i, j));
+                    }
+                }
+
+                if common_indices.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "hausman_robust: no common variables between FE and RE".into(),
+                    ));
+                }
+
+                let k = common_indices.len();
+                let mut fe_beta = ndarray::Array1::<f64>::zeros(k);
+                let mut re_beta = ndarray::Array1::<f64>::zeros(k);
+                let mut fe_vcov = ndarray::Array2::<f64>::zeros((k, k));
+                let mut re_vcov = ndarray::Array2::<f64>::zeros((k, k));
+                for (idx, (i, j)) in common_indices.iter().enumerate() {
+                    fe_beta[idx] = fe.params[*i];
+                    re_beta[idx] = re.params[*j];
+                    fe_vcov[(idx, idx)] = fe.std_errors[*i].powi(2);
+                    re_vcov[(idx, idx)] = re.std_errors[*j].powi(2);
+                }
+
+                let result = greeners::RobustHausman::compare_arrays(
+                    &fe_beta, &re_beta, &fe_vcov, &re_vcov, None,
+                )
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                Ok(diag(format!("{result}")))
+            }
+
+            // ── Robust F-Test ────────────────────────────────────────────────
+            "ftest_robust" | "f_robust" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "ftest_robust(model [, vars=\"x1,x2\"])".into(),
+                    ));
+                }
+
+                let model = self.eval_expr(&args[0])?;
+
+                // Extract beta and vcov from model
+                let (beta, vcov, n, names) = match &model {
+                    Value::OlsResult(m) => {
+                        let p = m.result.params.len();
+                        let mut vcov = ndarray::Array2::<f64>::zeros((p, p));
+                        for i in 0..p {
+                            vcov[(i, i)] = m.result.std_errors[i].powi(2);
+                        }
+                        (
+                            m.result.params.clone(),
+                            vcov,
+                            m.x.nrows(),
+                            m.result.variable_names.clone().unwrap_or_default(),
+                        )
+                    }
+                    Value::PanelResult(m) => {
+                        let p = m.params.len();
+                        let mut vcov = ndarray::Array2::<f64>::zeros((p, p));
+                        for i in 0..p {
+                            vcov[(i, i)] = m.std_errors[i].powi(2);
+                        }
+                        (
+                            m.params.clone(),
+                            vcov,
+                            m.n_obs,
+                            m.variable_names.clone().unwrap_or_default(),
+                        )
+                    }
+                    Value::ReResult(m) => {
+                        let p = m.params.len();
+                        let mut vcov = ndarray::Array2::<f64>::zeros((p, p));
+                        for i in 0..p {
+                            vcov[(i, i)] = m.std_errors[i].powi(2);
+                        }
+                        // RE result has no n_obs; use a large default for df_denom
+                        (
+                            m.params.clone(),
+                            vcov,
+                            100,
+                            m.variable_names.clone().unwrap_or_default(),
+                        )
+                    }
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "ftest_robust(): supports OLS, FE, RE models".into(),
+                        ))
+                    }
+                };
+
+                // Determine which coefficients to test
+                let indices: Vec<usize> = if let Some(Value::Str(vars)) = opt_map.get("vars") {
+                    let var_list: Vec<String> =
+                        vars.split(',').map(|s| s.trim().to_string()).collect();
+                    var_list
+                        .iter()
+                        .filter_map(|v: &String| {
+                            if v == "all" {
+                                None // handled below
+                            } else if let Ok(idx) = v.parse::<usize>() {
+                                Some(idx)
+                            } else {
+                                names.iter().position(|n: &String| n == v)
+                            }
+                        })
+                        .collect()
+                } else {
+                    // Default: all slopes (exclude intercept)
+                    (1..beta.len()).collect::<Vec<usize>>()
+                };
+
+                let indices: Vec<usize> = if indices.is_empty() {
+                    (1..beta.len()).collect::<Vec<_>>()
+                } else {
+                    indices
+                };
+
+                let names_ref: Vec<String> = if names.is_empty() {
+                    (0..beta.len()).map(|i| format!("x{}", i + 1)).collect()
+                } else {
+                    names
+                };
+
+                let result =
+                    greeners::RobustFTest::test(&beta, &vcov, &indices, Some(&names_ref), n)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                Ok(diag(format!("{result}")))
+            }
+
             // ── Diagnostics ──────────────────────────────────────────────────
             "test" => {
                 if args.len() < 2 {
