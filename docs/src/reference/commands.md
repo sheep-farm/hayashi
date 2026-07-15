@@ -220,6 +220,10 @@ Covariance options (where applicable): `cov=nonrobust|HC1|HC2|HC3|HC4|robust`, `
 | `fapanel` | `fapanel(y ~ x, df, aux="df", id="e", period="p")` | Factor-augmented panel |
 | `hawkes` | `hawkes(df, time_var, T=100)` | Hawkes self-exciting process |
 | `rf` | `rf(y ~ x1 + x2, df, trees=100, depth=10)` | Random Forest regression |
+| `gbm` | `gbm(y ~ x1 + x2, df, trees=100, lr=0.1)` | Gradient Boosting regression |
+| `mlp` | `mlp(y ~ x1 + x2, df, hidden=10, lr=0.01)` | Neural Network (MLP) regression |
+| `synthdid` | `synthdid(df, y, treated, period, unit="u", period="p")` | Synthetic DiD (Arkhangelsky 2021) |
+| `cuped` | `cuped(y ~ x, df, treated="var")` | CUPED variance reduction |
 | `hausman` | `hausman(m_fe, m_re)` | Hausman specification test |
 | `lincom` | `lincom(m, expr)` | Linear combination of coefficients |
 | `bootstrap` | `bootstrap(est, formula, df, n=)` | Generic bootstrap |

@@ -133,12 +133,12 @@ reporta o p-value do coeficiente de ŷ².
 
 ## Pendente
 
-- **Gradient boosting** — XGBoost-style tree boosting. +0,2 pp.
+- **Quantile regression forest** — QRF para intervalos. +0,1 pp.
 
-- **Neural network** — MLP para regressao. +0,2 pp.
+- **XGBoost** — XGBoost com regularizacao L1/L2. +0,1 pp.
 
-- **Synthetic DiD** — Arkhangelsky et al. 2021. +0,2 pp.
+- **Double ML cross-fitting** — DML com sample splitting. +0,1 pp.
 
-- **CUPED** — Controlled-experiment using pre-experiment data. +0,2 pp.
+- **Bayesian synthetic control** — SC com priors. +0,1 pp.
 
-**Cobertura atual: 97,35%.**
+**Cobertura atual: 98,35%.**
