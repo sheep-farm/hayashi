@@ -2662,6 +2662,160 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── Panel Smooth Transition Regression (PSTR) ──────────────────
+            // pstr(y ~ x1 + x2, df, q="transition_var", id="entity")
+            "pstr" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let id_col = match opt_map.get("id") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires id=\"column\" option"
+                        )))
+                    }
+                };
+                let q_col = match opt_map.get("q") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires q=\"transition_var\" option"
+                        )))
+                    }
+                };
+
+                let (y_arr, x_arr) = df
+                    .to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = g_formula.independents.clone();
+
+                // Extract transition variable
+                let q_col_data = df
+                    .get_column(q_col.as_str())
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let q_vals = q_col_data.as_float().ok_or_else(|| {
+                    HayashiError::Runtime(format!(
+                        "{func}: transition variable '{q_col}' must be numeric"
+                    ))
+                })?;
+                let q_arr = ndarray::Array1::from_vec(q_vals.to_vec());
+
+                let entity_ids: Vec<i64> = {
+                    let col = df
+                        .get_column(id_col.as_str())
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    if let Some(i) = col.as_int() {
+                        i.to_vec()
+                    } else if let Some(f) = col.as_float() {
+                        f.iter().map(|v| *v as i64).collect()
+                    } else {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}: id column '{id_col}' must be numeric"
+                        )));
+                    }
+                };
+
+                let result =
+                    greeners::PSTR::fit(&y_arr, &x_arr, &q_arr, &entity_ids, Some(var_names))
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── MODWT Wavelet Decomposition ────────────────────────────────
+            // modwt(df, var, scales=4)
+            "modwt" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("modwt(df, var, scales=4)".into()));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "modwt: first argument must be a DataFrame".into(),
+                        ))
+                    }
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
+                };
+                let var_name = match &args[1] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "modwt: second argument must be a variable name".into(),
+                        ))
+                    }
+                };
+                let scales = match opt_map.get("scales") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 4,
+                };
+
+                let col = df
+                    .get_column(var_name.as_str())
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let vals = col.as_float().ok_or_else(|| {
+                    HayashiError::Runtime(format!("{func}: variable '{var_name}' must be numeric"))
+                })?;
+                let x_arr = ndarray::Array1::from_vec(vals.to_vec());
+
+                let result = greeners::MODWT::fit(&x_arr, scales)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── Copula dependence modeling ─────────────────────────────────
+            // copula(y1 + y2, df, type="gaussian")
+            "copula" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let copula_type = match opt_map.get("type") {
+                    Some(Value::Str(s)) => match s.as_str() {
+                        "gaussian" | "normal" => greeners::CopulaType::Gaussian,
+                        "clayton" => greeners::CopulaType::Clayton,
+                        "gumbel" => greeners::CopulaType::Gumbel,
+                        "frank" => greeners::CopulaType::Frank,
+                        _ => {
+                            return Err(HayashiError::Runtime(format!(
+                                "{func}: type must be gaussian, clayton, gumbel, or frank"
+                            )))
+                        }
+                    },
+                    _ => greeners::CopulaType::Gaussian,
+                };
+
+                let mut all_cols: Vec<String> = vec![g_formula.dependent.clone()];
+                all_cols.extend(g_formula.independents.iter().cloned());
+                let n_vars = all_cols.len();
+                let n = df.n_rows();
+                let mut x_mat = ndarray::Array2::<f64>::zeros((n, n_vars));
+                for (j, name) in all_cols.iter().enumerate() {
+                    let col = df
+                        .get_column(name)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let vals = col.as_float().ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: column '{name}' must be numeric"))
+                    })?;
+                    for i in 0..n {
+                        x_mat[(i, j)] = vals[i];
+                    }
+                }
+
+                let result = greeners::Copula::fit(&x_mat, copula_type, Some(all_cols))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
             // ── Spatial econometrics ────────────────────────────────────────
             // spatial_sar(y ~ x1 + x2, df, w=W_matrix)
             // spatial_sem(y ~ x1 + x2, df, w=W_matrix)

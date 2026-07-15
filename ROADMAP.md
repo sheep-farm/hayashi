@@ -131,13 +131,12 @@ reporta o p-value do coeficiente de ŷ².
 
 ## Pendente
 
-- **Dynamic factor model** — DFM com state-space + EM. +0,5 pp.
+- **Nonlinear ARDL** — NARDL com asymmetric cointegration. +0,5 pp.
 
-- **Panel smooth transition** — PSTR com múltiplos regimes. +0,5 pp.
+- **Panel VAR** — PVAR com GMM estimation. +0,5 pp.
 
-- **Wavelet decomposition** — MODWT para análise multi-escala. +0,5 pp.
+- **Functional coefficient** — varying coefficient models. +0,5 pp.
 
-- **Copula-based dependence** — Vine copulas para dependência
-  multivariada não-linear. +0,5 pp.
+- **Multivariate GARCH** — DCC-GARCH para volatilidade dinâmica. +0,5 pp.
 
-**Cobertura atual: 93,25%.**
+**Cobertura atual: 94,55%.**

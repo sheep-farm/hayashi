@@ -205,6 +205,9 @@ Covariance options (where applicable): `cov=nonrobust|HC1|HC2|HC3|HC4|robust`, `
 | `spatial_durbin_error` | `spatial_durbin_error(y ~ x, df, w=W, id="e")` | Spatial Durbin Error (panel FE) |
 | `fmols` | `fmols(y ~ x, df)` | Fully Modified OLS (cointegration) |
 | `qvar` | `qvar(y1 ~ y2, df, lags=1, tau=0.5)` | Quantile VAR |
+| `pstr` | `pstr(y ~ x, df, q="var", id="e")` | Panel Smooth Transition |
+| `modwt` | `modwt(df, var, scales=4)` | Wavelet decomposition (MODWT) |
+| `copula` | `copula(y1 ~ y2, df, type="gaussian")` | Copula dependence |
 | `hausman` | `hausman(m_fe, m_re)` | Hausman specification test |
 | `lincom` | `lincom(m, expr)` | Linear combination of coefficients |
 | `bootstrap` | `bootstrap(est, formula, df, n=)` | Generic bootstrap |

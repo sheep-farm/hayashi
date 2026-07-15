@@ -11128,3 +11128,119 @@ qvar(y1 ~ y2, df, lags=1, tau=0.5, boot=20)
         "Quantile VAR",
     );
 }
+
+#[test]
+fn dfm_basic() {
+    assert_ok_contains(
+        "dfm",
+        r#"
+input df
+y1 y2 y3
+10 5 20
+12 6 22
+15 7 25
+18 8 28
+20 9 30
+22 10 32
+25 11 35
+28 12 38
+30 13 40
+32 14 42
+35 15 45
+38 16 48
+40 17 50
+42 18 52
+45 19 55
+48 20 58
+end
+dfm(df, y1, y2, y3, factors=1)
+"#,
+        "Dynamic Factor Model",
+    );
+}
+
+#[test]
+fn pstr_basic() {
+    assert_ok_contains(
+        "pstr",
+        r#"
+input df
+entity y x q
+1 10 1.0 5
+1 12 2.0 6
+1 15 3.0 7
+2 8 0.8 4
+2 10 1.8 5
+2 13 2.8 6
+3 11 1.2 6
+3 14 2.2 7
+3 17 3.2 8
+4 9 0.9 5
+4 11 1.9 6
+4 14 2.9 7
+end
+pstr(y ~ x, df, q="q", id="entity")
+"#,
+        "PSTR",
+    );
+}
+
+#[test]
+fn modwt_basic() {
+    assert_ok_contains(
+        "modwt",
+        r#"
+input df
+y
+10
+12
+15
+18
+20
+22
+25
+28
+30
+32
+35
+38
+40
+42
+45
+48
+end
+modwt(df, y, scales=3)
+"#,
+        "MODWT",
+    );
+}
+
+#[test]
+fn copula_basic() {
+    assert_ok_contains(
+        "copula",
+        r#"
+input df
+y1 y2
+10 5
+12 6
+15 7
+18 8
+20 9
+22 10
+25 11
+28 12
+30 13
+32 14
+35 15
+38 16
+40 17
+42 18
+45 19
+48 20
+end
+copula(y1 ~ y2, df, type="gaussian")
+"#,
+        "Copula",
+    );
+}
