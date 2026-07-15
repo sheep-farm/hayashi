@@ -2028,6 +2028,207 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── MIDAS ────────────────────────────────────────────────────────
+            // midas(y ~ x, df, freq=3, lags=12, poly=2)
+            "midas" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let freq = match opt_map.get("freq") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 3,
+                };
+                let n_lags = match opt_map.get("lags") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 12,
+                };
+                let poly = match opt_map.get("poly") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 2,
+                };
+
+                if g_formula.independents.len() != 1 {
+                    return Err(HayashiError::Runtime(
+                        "midas: exactly one high-frequency regressor required".into(),
+                    ));
+                }
+
+                let y_col = &g_formula.dependent;
+                let x_col = &g_formula.independents[0];
+
+                let y_vec: Vec<f64> = {
+                    let col = df
+                        .get_column(y_col)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    col.as_float()
+                        .ok_or_else(|| {
+                            HayashiError::Runtime(format!(
+                                "midas: y column '{y_col}' must be numeric"
+                            ))
+                        })?
+                        .to_vec()
+                };
+                let x_vec: Vec<f64> = {
+                    let col = df
+                        .get_column(x_col)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    col.as_float()
+                        .ok_or_else(|| {
+                            HayashiError::Runtime(format!(
+                                "midas: x column '{x_col}' must be numeric"
+                            ))
+                        })?
+                        .to_vec()
+                };
+
+                let result = greeners::Midas::fit(
+                    &ndarray::Array1::from_vec(y_vec),
+                    &ndarray::Array1::from_vec(x_vec),
+                    freq,
+                    n_lags,
+                    poly,
+                )
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── TVP (Time-Varying Parameters) ────────────────────────────────
+            // tvp(y ~ x1 + x2, df)
+            "tvp" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let (y_arr, x_arr) = df
+                    .to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = g_formula.independents.clone();
+
+                let result = greeners::TVP::fit(&y_arr, &x_arr, Some(var_names))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── SETAR (Threshold AR) ────────────────────────────────────────
+            // setar(y, df, order=2, delay=1)
+            "setar" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let ar_order = match opt_map.get("order") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 2,
+                };
+                let delay = match opt_map.get("delay") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 1,
+                };
+
+                let y_col = &g_formula.dependent;
+                let y_vec: Vec<f64> = {
+                    let col = df
+                        .get_column(y_col)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    col.as_float()
+                        .ok_or_else(|| {
+                            HayashiError::Runtime(format!(
+                                "setar: y column '{y_col}' must be numeric"
+                            ))
+                        })?
+                        .to_vec()
+                };
+
+                let result =
+                    greeners::SETAR::fit(&ndarray::Array1::from_vec(y_vec), ar_order, delay)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── Panel Quantile ──────────────────────────────────────────────
+            // panel_qreg(y ~ x1 + x2, df, id="firm", tau=0.5)
+            "panel_qreg" | "panel_quantile" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let id_col = match opt_map.get("id") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires id=\"column\" option"
+                        )))
+                    }
+                };
+                let tau = match opt_map.get("tau") {
+                    Some(Value::Float(v)) => *v,
+                    Some(Value::Int(v)) => *v as f64,
+                    _ => 0.5,
+                };
+
+                // Extract y and x manually (no intercept — FE absorb it)
+                let y_vec: Vec<f64> = {
+                    let col = df
+                        .get_column(&g_formula.dependent)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    col.as_float()
+                        .ok_or_else(|| {
+                            HayashiError::Runtime(format!("{func}: y column must be numeric"))
+                        })?
+                        .to_vec()
+                };
+                let n = y_vec.len();
+                let k = g_formula.independents.len();
+                let mut x_arr = ndarray::Array2::<f64>::zeros((n, k));
+                for (j, name) in g_formula.independents.iter().enumerate() {
+                    let col = df
+                        .get_column(name)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let vals = col.as_float().ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: x column '{name}' must be numeric"))
+                    })?;
+                    for i in 0..n {
+                        x_arr[(i, j)] = vals[i];
+                    }
+                }
+                let var_names = g_formula.independents.clone();
+
+                let entity_ids: Vec<i64> = {
+                    let col = df
+                        .get_column(id_col.as_str())
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    if let Some(i) = col.as_int() {
+                        i.to_vec()
+                    } else if let Some(f) = col.as_float() {
+                        f.iter().map(|v| *v as i64).collect()
+                    } else {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}: id column '{id_col}' must be numeric"
+                        )));
+                    }
+                };
+
+                let result = greeners::PanelQuantile::fit(
+                    &ndarray::Array1::from_vec(y_vec),
+                    &x_arr,
+                    &entity_ids,
+                    tau,
+                    Some(var_names),
+                )
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
             // ── Spatial econometrics ────────────────────────────────────────
             // spatial_sar(y ~ x1 + x2, df, w=W_matrix)
             // spatial_sem(y ~ x1 + x2, df, w=W_matrix)

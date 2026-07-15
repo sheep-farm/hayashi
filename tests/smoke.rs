@@ -10764,3 +10764,121 @@ bayes_sfa_production(y ~ k + l, df, burn=200, draws=500)
         "Bayesian Stochastic",
     );
 }
+
+#[test]
+fn midas_basic() {
+    assert_ok_contains(
+        "midas",
+        r#"
+input df
+gdp ip
+100 30
+102 31
+101 29
+105 33
+108 35
+110 36
+112 38
+115 40
+113 39
+118 42
+120 43
+122 45
+end
+midas(gdp ~ ip, df, freq=1, lags=3, poly=1)
+"#,
+        "MIDAS",
+    );
+}
+
+#[test]
+fn tvp_basic() {
+    assert_ok_contains(
+        "tvp",
+        r#"
+input df
+y x1 x2
+10 1 5
+12 2 6
+15 3 7
+18 4 8
+20 5 9
+22 6 10
+25 7 11
+28 8 12
+30 9 13
+32 10 14
+end
+tvp(y ~ x1 + x2, df)
+"#,
+        "Time-Varying",
+    );
+}
+
+#[test]
+fn setar_basic() {
+    assert_ok_contains(
+        "setar",
+        r#"
+input df
+y
+10
+12
+11
+15
+18
+16
+20
+22
+19
+15
+12
+10
+8
+9
+11
+14
+17
+20
+23
+21
+18
+15
+12
+10
+end
+setar(y ~ 1, df, order=2, delay=1)
+"#,
+        "SETAR",
+    );
+}
+
+#[test]
+fn panel_qreg_basic() {
+    assert_ok_contains(
+        "panel_qreg",
+        r#"
+input df
+firm y x
+1 10 1.0
+1 12 2.0
+1 15 3.0
+1 18 4.0
+2 8 0.5
+2 10 1.5
+2 13 2.5
+2 16 3.5
+3 11 1.0
+3 14 2.0
+3 17 3.0
+3 20 4.0
+4 9 0.8
+4 12 1.8
+4 15 2.8
+4 18 3.8
+end
+panel_qreg(y ~ x, df, id="firm", tau=0.5)
+"#,
+        "Panel Quantile",
+    );
+}

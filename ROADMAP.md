@@ -131,15 +131,12 @@ reporta o p-value do coeficiente de ŷ².
 
 ## Pendente
 
-- **MIDAS** — mixed-frequency data sampling. Regressão com dados de
-  frequências diferentes (mensal vs trimestral). +0,5 pp.
+- **MS-VAR** — Markov-switching VAR com múltiplos regimes. +0,5 pp.
 
-- **TVP (time-varying parameters)** — coeficientes que variam no tempo
-  via Kalman filter. +0,5 pp.
+- **FAVAR** — Factor-augmented VAR. +0,5 pp.
 
-- **SETAR / threshold AR** — modelos autorregressivos com mudança de
-  regime. +0,5 pp.
+- **Panel spatial Durbin** — SDM com efeitos fixos. +0,5 pp.
 
-- **Panel quantile** — quantile regression com efeitos fixos. +0,5 pp.
+- **Cointegration testing** — Johansen com structural breaks. +0,5 pp.
 
-**Cobertura atual: 88,05%.**
+**Cobertura atual: 90,05%.**

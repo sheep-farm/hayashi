@@ -193,6 +193,10 @@ Covariance options (where applicable): `cov=nonrobust|HC1|HC2|HC3|HC4|robust`, `
 | `spatial_panel_sem` | `spatial_panel_sem(y ~ x, df, w=W, id="entity")` | Spatial panel SEM (FE) |
 | `bayes_sfa_production` | `bayes_sfa_production(y ~ x, df, burn=, draws=)` | Bayesian SFA production |
 | `bayes_sfa_cost` | `bayes_sfa_cost(y ~ x, df, burn=, draws=)` | Bayesian SFA cost |
+| `midas` | `midas(y ~ x, df, freq=3, lags=12, poly=2)` | Mixed Data Sampling regression |
+| `tvp` | `tvp(y ~ x1 + x2, df)` | Time-Varying Parameter (Kalman filter) |
+| `setar` | `setar(y ~ 1, df, order=2, delay=1)` | Self-Exciting Threshold AR |
+| `panel_qreg` | `panel_qreg(y ~ x, df, id="firm", tau=0.5)` | Panel quantile (FE) |
 | `hausman` | `hausman(m_fe, m_re)` | Hausman specification test |
 | `lincom` | `lincom(m, expr)` | Linear combination of coefficients |
 | `bootstrap` | `bootstrap(est, formula, df, n=)` | Generic bootstrap |
