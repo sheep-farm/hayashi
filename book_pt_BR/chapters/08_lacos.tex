@@ -113,12 +113,74 @@ parallel for t in tickers, threads=4 {
 }
 \end{lstlisting}
 
-Cada thread recebe seu próprio interpretador com um snapshot do ambiente
-externo (apenas valores send-safe são capturados). Use \texttt{return nil}
-para pular uma iteração; entradas \texttt{nil} são mantidas na lista de
-resultados.
+\subsection*{Modelo de isolamento}
 
-Combine com \texttt{rbind()} para agregar DataFrames por iteração:
+Cada thread recebe seu próprio interpretador com um \textbf{snapshot} do
+ambiente externo (apenas valores send-safe são capturados). Isso tem
+consequências importantes:
+
+\begin{itemize}
+  \item \textbf{Leituras do escopo externo funcionam}: variáveis definidas
+    antes do \texttt{parallel for} são visíveis dentro do corpo.
+  \item \textbf{Escritas no escopo externo são silenciosamente descartadas}:
+    reatribuir uma variável externa dentro do corpo não tem efeito sobre
+    o escopo externo. A mutação existe apenas no ambiente local da thread
+    e é perdida quando a thread termina.
+\end{itemize}
+
+\begin{lstlisting}[caption={Mutações são descartadas}]
+let n = 0
+parallel for i in 1..3 {
+  n = 10          // sem efeito sobre n externo
+  i * 2
+}
+print(n)          // ainda 0
+\end{lstlisting}
+
+\begin{aviso}
+  Trate o corpo como uma \textbf{função pura}: leia variáveis externas,
+  compute um resultado, e faça \texttt{return} dele. Não confie em
+  efeitos colaterais para propagar valores para fora.
+\end{aviso}
+
+\subsection*{O que pode e não pode ser capturado}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Tipo} & \textbf{Capturável?} & \textbf{Motivo} \\
+\midrule
+\texttt{Int}, \texttt{Float}, \texttt{Str}, \texttt{Bool} & Sim & Primitivos, copiados por valor \\
+\texttt{List}, \texttt{Dict} (send-safe) & Sim & \texttt{Arc}, leitura compartilhada \\
+\texttt{DataFrame}, \texttt{Series} & Sim & \texttt{Arc}, operações são funcionais \\
+\texttt{UserFn} & Sim & \texttt{Arc} \\
+Resultados de modelos (\texttt{ols}, \texttt{iv}, \texttt{rolling}, \ldots) & \textbf{Não} & Contêm \texttt{Rc}, não são \texttt{Send} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Resultados de modelos do escopo externo não podem ser capturados. Compute
+modelos \textbf{dentro} do corpo:
+
+\begin{lstlisting}[caption={Modelos devem ser computados dentro}]
+// ERRADO: m contém Rc, será rejeitado
+let m = ols(y ~ x, df)
+parallel for i in 1..10 { predict(m, newdata) }
+
+// CORRETO: computar dentro do corpo
+parallel for i in 1..10 {
+  let sub = filter(df, grupo == i)
+  let m = ols(y ~ x, sub)
+  tidy(m)
+}
+\end{lstlisting}
+
+\subsection*{Pular iterações e agregação}
+
+Use \texttt{return nil} para pular uma iteração. Entradas \texttt{nil} são
+mantidas na lista de resultados (em ordem). Combine com \texttt{rbind()}
+para agregar DataFrames por iteração --- \texttt{rbind} ignora
+silenciosamente entradas \texttt{nil}:
 
 \begin{lstlisting}[caption={parallel for + rbind}]
 parallel for i in 0..n, threads=8 {
