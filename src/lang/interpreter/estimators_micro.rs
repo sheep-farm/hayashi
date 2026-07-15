@@ -4585,6 +4585,290 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── TMLE ──────────────────────────────────────────────────────
+            // tmle(y ~ treated, df, w="x1,x2")
+            "tmle" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let y_var = g_formula.dependent.clone();
+                let t_var = g_formula
+                    .independents
+                    .first()
+                    .ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: need treatment variable"))
+                    })?
+                    .clone();
+
+                let w_str = match opt_map.get("w") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires w=\"x1,x2\" option (confounders)"
+                        )))
+                    }
+                };
+                let w_vars: Vec<String> = w_str.split(',').map(|s| s.trim().to_string()).collect();
+
+                let n = df.n_rows();
+                let y_col = df
+                    .get_column(y_var.as_str())
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let y_vals = y_col.as_float().ok_or_else(|| {
+                    HayashiError::Runtime(format!("{func}: '{y_var}' must be numeric"))
+                })?;
+                let y_arr = ndarray::Array1::from_vec(y_vals.to_vec());
+
+                let t_col = df
+                    .get_column(t_var.as_str())
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let t_vec: Vec<bool> = if let Some(b) = t_col.as_bool() {
+                    b.to_vec()
+                } else if let Some(i) = t_col.as_int() {
+                    i.iter().map(|&v| v != 0).collect()
+                } else if let Some(f) = t_col.as_float() {
+                    f.iter().map(|&v| v != 0.0).collect()
+                } else {
+                    return Err(HayashiError::Runtime(format!(
+                        "{func}: '{t_var}' must be boolean or numeric"
+                    )));
+                };
+
+                let p = w_vars.len();
+                let mut w_mat = ndarray::Array2::<f64>::zeros((n, p));
+                for (j, wname) in w_vars.iter().enumerate() {
+                    let col = df
+                        .get_column(wname.as_str())
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let vals = col.as_float().ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: '{wname}' must be numeric"))
+                    })?;
+                    for i in 0..n {
+                        w_mat[(i, j)] = vals[i];
+                    }
+                }
+
+                let result = greeners::TMLE::fit(&y_arr, &t_vec, &w_mat)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── Orthogonal Random Forest ──────────────────────────────────
+            // orf(y ~ treated, df, x="x1,x2", w="c1,c2", trees=50, depth=5)
+            "orf" | "orthogonal_forest" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let y_var = g_formula.dependent.clone();
+                let t_var = g_formula
+                    .independents
+                    .first()
+                    .ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: need treatment variable"))
+                    })?
+                    .clone();
+
+                let x_str = match opt_map.get("x") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires x=\"x1,x2\" option (features)"
+                        )))
+                    }
+                };
+                let x_vars: Vec<String> = x_str.split(',').map(|s| s.trim().to_string()).collect();
+                let w_str = match opt_map.get("w") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires w=\"c1,c2\" option (confounders)"
+                        )))
+                    }
+                };
+                let w_vars: Vec<String> = w_str.split(',').map(|s| s.trim().to_string()).collect();
+                let n_trees = match opt_map.get("trees") {
+                    Some(Value::Int(v)) => Some(*v as usize),
+                    Some(Value::Float(v)) => Some(*v as usize),
+                    _ => None,
+                };
+                let max_depth = match opt_map.get("depth") {
+                    Some(Value::Int(v)) => Some(*v as usize),
+                    Some(Value::Float(v)) => Some(*v as usize),
+                    _ => None,
+                };
+
+                let n = df.n_rows();
+                let y_col = df
+                    .get_column(y_var.as_str())
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let y_vals = y_col.as_float().ok_or_else(|| {
+                    HayashiError::Runtime(format!("{func}: '{y_var}' must be numeric"))
+                })?;
+                let y_arr = ndarray::Array1::from_vec(y_vals.to_vec());
+
+                let t_col = df
+                    .get_column(t_var.as_str())
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let t_vec: Vec<bool> = if let Some(b) = t_col.as_bool() {
+                    b.to_vec()
+                } else if let Some(i) = t_col.as_int() {
+                    i.iter().map(|&v| v != 0).collect()
+                } else if let Some(f) = t_col.as_float() {
+                    f.iter().map(|&v| v != 0.0).collect()
+                } else {
+                    return Err(HayashiError::Runtime(format!(
+                        "{func}: '{t_var}' must be boolean or numeric"
+                    )));
+                };
+
+                let k = x_vars.len();
+                let mut x_mat = ndarray::Array2::<f64>::zeros((n, k));
+                for (j, xname) in x_vars.iter().enumerate() {
+                    let col = df
+                        .get_column(xname.as_str())
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let vals = col.as_float().ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: '{xname}' must be numeric"))
+                    })?;
+                    for i in 0..n {
+                        x_mat[(i, j)] = vals[i];
+                    }
+                }
+
+                let p = w_vars.len();
+                let mut w_mat = ndarray::Array2::<f64>::zeros((n, p));
+                for (j, wname) in w_vars.iter().enumerate() {
+                    let col = df
+                        .get_column(wname.as_str())
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let vals = col.as_float().ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: '{wname}' must be numeric"))
+                    })?;
+                    for i in 0..n {
+                        w_mat[(i, j)] = vals[i];
+                    }
+                }
+
+                let result = greeners::OrthogonalForest::fit(
+                    &y_arr,
+                    &t_vec,
+                    &x_mat,
+                    &w_mat,
+                    n_trees,
+                    max_depth,
+                    Some(x_vars),
+                )
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── Spectral Clustering ───────────────────────────────────────
+            // spectral(df, x="x1,x2", k=3)
+            "spectral" | "spectral_clustering" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(format!("{func}() requires (df)")));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(format!(
+                            "{func}: first arg must be DataFrame"
+                        )))
+                    }
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
+                };
+
+                let x_str = match opt_map.get("x") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires x=\"x1,x2\" option (features)"
+                        )))
+                    }
+                };
+                let x_vars: Vec<String> = x_str.split(',').map(|s| s.trim().to_string()).collect();
+                let k = match opt_map.get("k") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires k=N option (number of clusters)"
+                        )))
+                    }
+                };
+                let sigma = match opt_map.get("sigma") {
+                    Some(Value::Float(v)) => Some(*v),
+                    Some(Value::Int(v)) => Some(*v as f64),
+                    _ => None,
+                };
+
+                let n = df.n_rows();
+                let kk = x_vars.len();
+                let mut x_mat = ndarray::Array2::<f64>::zeros((n, kk));
+                for (j, xname) in x_vars.iter().enumerate() {
+                    let col = df
+                        .get_column(xname.as_str())
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let vals = col.as_float().ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: '{xname}' must be numeric"))
+                    })?;
+                    for i in 0..n {
+                        x_mat[(i, j)] = vals[i];
+                    }
+                }
+
+                let result = greeners::SpectralClustering::fit(&x_mat, k, sigma, None)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── Isotonic Regression ───────────────────────────────────────
+            // isotonic(y ~ x, df [, decreasing])
+            "isotonic" | "isotonic_reg" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let y_var = g_formula.dependent.clone();
+                let x_var = g_formula
+                    .independents
+                    .first()
+                    .ok_or_else(|| HayashiError::Runtime(format!("{func}: need x variable")))?
+                    .clone();
+
+                let decreasing = opt_map.get("decreasing").is_some();
+
+                let y_col = df
+                    .get_column(y_var.as_str())
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let y_vals = y_col.as_float().ok_or_else(|| {
+                    HayashiError::Runtime(format!("{func}: '{y_var}' must be numeric"))
+                })?;
+                let y_arr = ndarray::Array1::from_vec(y_vals.to_vec());
+
+                let x_col = df
+                    .get_column(x_var.as_str())
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let x_vals = x_col.as_float().ok_or_else(|| {
+                    HayashiError::Runtime(format!("{func}: '{x_var}' must be numeric"))
+                })?;
+                let x_arr = ndarray::Array1::from_vec(x_vals.to_vec());
+
+                let result = greeners::IsotonicRegression::fit(&x_arr, &y_arr, !decreasing, None)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
             // ── Spatial econometrics ────────────────────────────────────────
             // spatial_sar(y ~ x1 + x2, df, w=W_matrix)
             // spatial_sem(y ~ x1 + x2, df, w=W_matrix)

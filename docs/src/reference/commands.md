@@ -236,6 +236,10 @@ Covariance options (where applicable): `cov=nonrobust|HC1|HC2|HC3|HC4|robust`, `
 | `dr_learner` | `dr_learner(y ~ t, df, x="x1,x2", folds=3)` | DR-Learner (Kennedy 2023) |
 | `bart` | `bart(y ~ x, df, trees=20, depth=3, iter=100)` | Bayesian Additive Regression Trees |
 | `gp` | `gp(y ~ x, df)` | Gaussian Process Regression (Kriging) |
+| `tmle` | `tmle(y ~ t, df, w="c1,c2")` | Targeted Maximum Likelihood Estimation |
+| `orf` | `orf(y ~ t, df, x="x1", w="c1", trees=50)` | Orthogonal Random Forest (ORF) |
+| `spectral` | `spectral(df, x="x1,x2", k=3)` | Spectral clustering (Ng-Jordan-Weiss) |
+| `isotonic` | `isotonic(y ~ x, df)` | Isotonic regression (PAVA) |
 | `hausman` | `hausman(m_fe, m_re)` | Hausman specification test |
 | `lincom` | `lincom(m, expr)` | Linear combination of coefficients |
 | `bootstrap` | `bootstrap(est, formula, df, n=)` | Generic bootstrap |

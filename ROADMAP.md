@@ -133,12 +133,12 @@ reporta o p-value do coeficiente de ŷ².
 
 ## Pendente
 
-- **TMLE** — Targeted maximum likelihood. +0,05 pp.
+- **Causal impact** — Brodersen-Gallus-Henderson-Orban. +0,05 pp.
 
-- **Orthogonal random forest** — ORF para CATE. +0,05 pp.
+- **Bayesian VAR** — BVAR com priors de Minnesota. +0,05 pp.
 
-- **Spectral clustering** — clustering via graph Laplacian. +0,05 pp.
+- **Hawkes process** — self-exciting point process. +0,05 pp.
 
-- **Isotonic regression** — monotone regression. +0,05 pp.
+- **MICE** — Multiple imputation by chained equations. +0,05 pp.
 
-**Cobertura atual: 99,25%.**
+**Cobertura atual: 99,45%.**

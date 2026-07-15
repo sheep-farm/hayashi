@@ -12163,3 +12163,141 @@ gp(y ~ x1 + x2, df)
         "Gaussian Process",
     );
 }
+
+#[test]
+fn tmle_basic() {
+    assert_ok_contains(
+        "tmle",
+        r#"
+input df
+y treated w1 w2
+10 1 5 2
+12 1 6 3
+15 0 7 4
+18 1 8 5
+20 0 9 6
+22 1 10 7
+25 0 11 8
+28 1 12 9
+30 0 13 10
+32 1 14 11
+35 0 15 12
+38 1 16 13
+40 0 17 14
+42 1 18 15
+45 0 19 16
+48 1 20 17
+50 0 21 18
+52 1 22 19
+55 0 23 20
+58 1 24 21
+60 0 25 22
+62 1 26 23
+65 0 27 24
+68 1 28 25
+70 0 29 26
+72 1 30 27
+75 0 31 28
+78 1 32 29
+80 0 33 30
+82 1 34 31
+end
+tmle(y ~ treated, df, w="w1,w2")
+"#,
+        "TMLE",
+    );
+}
+
+#[test]
+fn orf_basic() {
+    assert_ok_contains(
+        "orf",
+        r#"
+input df
+y treated x1 w1
+10 1 5 2
+12 1 6 3
+15 0 7 4
+18 1 8 5
+20 0 9 6
+22 1 10 7
+25 0 11 8
+28 1 12 9
+30 0 13 10
+32 1 14 11
+35 0 15 12
+38 1 16 13
+40 0 17 14
+42 1 18 15
+45 0 19 16
+48 1 20 17
+50 0 21 18
+52 1 22 19
+55 0 23 20
+58 1 24 21
+60 0 25 22
+62 1 26 23
+65 0 27 24
+68 1 28 25
+70 0 29 26
+72 1 30 27
+75 0 31 28
+78 1 32 29
+80 0 33 30
+82 1 34 31
+end
+orf(y ~ treated, df, x="x1", w="w1", trees=10, depth=3)
+"#,
+        "Orthogonal Random Forest",
+    );
+}
+
+#[test]
+fn spectral_basic() {
+    assert_ok_contains(
+        "spectral",
+        r#"
+input df
+x1 x2
+1.0 1.0
+1.1 1.1
+0.9 1.0
+1.0 0.9
+5.0 5.0
+5.1 5.1
+4.9 5.0
+5.0 4.9
+10.0 10.0
+10.1 10.1
+9.9 10.0
+10.0 9.9
+end
+spectral(df, x="x1,x2", k=3)
+"#,
+        "Spectral Clustering",
+    );
+}
+
+#[test]
+fn isotonic_basic() {
+    assert_ok_contains(
+        "isotonic",
+        r#"
+input df
+y x
+1 1
+2 2
+3 3
+2 4
+4 5
+5 6
+4 7
+6 8
+7 9
+8 10
+end
+isotonic(y ~ x, df)
+"#,
+        "Isotonic Regression",
+    );
+}
