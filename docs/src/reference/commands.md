@@ -184,6 +184,10 @@ Covariance options (where applicable): `cov=nonrobust|HC1|HC2|HC3|HC4|robust`, `
 | `marginsplot` | `marginsplot(m)` | AME plot for logit/probit |
 | `spatial_sar` | `spatial_sar(y ~ x, df, w=W)` | Spatial autoregressive (SAR) |
 | `spatial_sem` | `spatial_sem(y ~ x, df, w=W)` | Spatial error model (SEM) |
+| `double_ml` | `double_ml(y ~ d + x1 + x2, df, folds=5)` | Double/debiased ML (Chernozhukov) |
+| `sfa_production` | `sfa_production(y ~ x1 + x2, df)` | Stochastic production frontier |
+| `sfa_cost` | `sfa_cost(y ~ x1 + x2, df)` | Stochastic cost frontier |
+| `panel_tobit` | `panel_tobit(y ~ x, df, id="firm", censor=0)` | Panel Tobit (random effects) |
 | `hausman` | `hausman(m_fe, m_re)` | Hausman specification test |
 | `lincom` | `lincom(m, expr)` | Linear combination of coefficients |
 | `bootstrap` | `bootstrap(est, formula, df, n=)` | Generic bootstrap |

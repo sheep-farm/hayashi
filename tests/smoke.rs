@@ -10583,3 +10583,96 @@ spatial_sem(y ~ x, df, w=W)
         "Spatial Error",
     );
 }
+
+#[test]
+fn double_ml_basic() {
+    assert_ok_contains(
+        "double_ml",
+        r#"
+input df
+y d x1 x2
+2.5 1 1.0 0.5
+3.0 1 1.5 0.8
+3.5 1 2.0 1.0
+4.0 0 2.5 1.2
+4.5 0 3.0 1.5
+5.0 1 3.5 1.8
+5.5 1 4.0 2.0
+6.0 0 4.5 2.2
+6.5 0 5.0 2.5
+7.0 1 5.5 2.8
+7.5 1 6.0 3.0
+8.0 0 6.5 3.2
+8.5 0 7.0 3.5
+9.0 1 7.5 3.8
+9.5 1 8.0 4.0
+10.0 0 8.5 4.2
+10.5 0 9.0 4.5
+11.0 1 9.5 4.8
+11.5 1 10.0 5.0
+12.0 0 10.5 5.2
+end
+double_ml(y ~ d + x1 + x2, df, folds=5, poly=2)
+"#,
+        "Double/Debiased ML",
+    );
+}
+
+#[test]
+fn sfa_production_basic() {
+    assert_ok_contains(
+        "sfa_prod",
+        r#"
+input df
+y k l
+10 5 5
+12 6 6
+15 8 7
+18 10 8
+20 12 10
+22 13 11
+25 15 12
+28 17 13
+30 18 14
+32 20 15
+35 22 16
+38 24 17
+40 25 18
+42 27 19
+45 28 20
+end
+sfa_production(y ~ k + l, df)
+"#,
+        "Stochastic Production Frontier",
+    );
+}
+
+#[test]
+fn panel_tobit_basic() {
+    assert_ok_contains(
+        "panel_tobit",
+        r#"
+input df
+firm y x
+1 0 1.0
+1 5 2.0
+1 8 3.0
+1 12 4.0
+2 0 0.5
+2 3 1.5
+2 7 2.5
+2 10 3.5
+3 2 1.0
+3 6 2.0
+3 9 3.0
+3 11 4.0
+4 0 0.8
+4 4 1.8
+4 8 2.8
+4 13 3.8
+end
+panel_tobit(y ~ x, df, id="firm", censor=0)
+"#,
+        "Panel Tobit",
+    );
+}

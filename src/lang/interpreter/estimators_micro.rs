@@ -1659,6 +1659,130 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── Double/Debiased ML ───────────────────────────────────────────
+            // double_ml(y ~ d + x1 + x2, df [, folds=5, poly=2])
+            "double_ml" | "dml" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                // First RHS variable is treatment (d), rest are controls (x)
+                let independents = &g_formula.independents;
+                if independents.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "double_ml() requires y ~ d + x1 + x2 + ... (treatment + controls)".into(),
+                    ));
+                }
+                let d_var = &independents[0];
+                let x_vars = &independents[1..];
+
+                let n = df.n_rows();
+                let y_vec = get_col_f64(&df, &g_formula.dependent)?;
+                let d_vec = get_col_f64(&df, d_var)?;
+                let mut x_mat = ndarray::Array2::zeros((n, x_vars.len()));
+                for (j, v) in x_vars.iter().enumerate() {
+                    let col = get_col_f64(&df, v)?;
+                    for i in 0..n {
+                        x_mat[(i, j)] = col[i];
+                    }
+                }
+
+                let n_folds = match opt_map.get("folds") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    None => 5,
+                    _ => 5,
+                };
+                let poly_degree = match opt_map.get("poly") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    None => 2,
+                    _ => 2,
+                };
+
+                let result =
+                    greeners::DoubleML::fit_plr(&y_vec, &d_vec, &x_mat, n_folds, poly_degree)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── Stochastic Frontier ──────────────────────────────────────────
+            // sfa_production(y ~ x1 + x2, df)
+            // sfa_cost(y ~ x1 + x2, df)
+            "sfa_production" | "sfa_cost" | "frontier" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+                let (y_vec, x_mat) = df
+                    .to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                let var_names = g_formula.independents.clone();
+                let model_type = if func == "sfa_cost" {
+                    "cost"
+                } else {
+                    "production"
+                };
+
+                let result = if model_type == "production" {
+                    greeners::StochasticFrontier::fit_production(&y_vec, &x_mat, Some(var_names))
+                } else {
+                    greeners::StochasticFrontier::fit_cost(&y_vec, &x_mat, Some(var_names))
+                }
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── Panel Tobit (random effects) ─────────────────────────────────
+            // panel_tobit(y ~ x1 + x2, df, id="firm" [, censor=0])
+            "panel_tobit" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+                let (y_vec, x_mat) = df
+                    .to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                let id_col = match opt_map.get("id") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(
+                            "panel_tobit() requires id=\"column\" option".into(),
+                        ))
+                    }
+                };
+                let panel_ids: Vec<i64> = {
+                    let col = df
+                        .get_column(&id_col)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    if let Some(int_arr) = col.as_int() {
+                        int_arr.iter().copied().collect()
+                    } else if let Some(float_arr) = col.as_float() {
+                        float_arr.iter().map(|v| *v as i64).collect()
+                    } else {
+                        return Err(HayashiError::Runtime(format!(
+                            "panel_tobit: id column '{id_col}' must be numeric"
+                        )));
+                    }
+                };
+
+                let censor = match opt_map.get("censor") {
+                    Some(Value::Float(v)) => *v,
+                    Some(Value::Int(v)) => *v as f64,
+                    None => 0.0,
+                    _ => 0.0,
+                };
+
+                let var_names = g_formula.independents.clone();
+                let result =
+                    greeners::PanelTobit::fit(&y_vec, &x_mat, &panel_ids, censor, Some(var_names))
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
             // ── Spatial econometrics ────────────────────────────────────────
             // spatial_sar(y ~ x1 + x2, df, w=W_matrix)
             // spatial_sem(y ~ x1 + x2, df, w=W_matrix)

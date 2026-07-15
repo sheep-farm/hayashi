@@ -131,13 +131,13 @@ reporta o p-value do coeficiente de ŷ².
 
 ## Pendente
 
-- **Double/debiased ML** — inferência causal moderna (Chernozhukov 2018).
-  Exige cross-fitting + orthogonalization. +1 pp.
+- **Panel Heckman** — seleção amostral em painel com efeitos aleatórios.
+  Exige MLE bivariada com correlação entre seleção e resultado. +0,5 pp.
 
-- **Panel Tobit / Heckman** — dados limitados em painel. Exige MLE
-  conjunta com efeitos aleatórios. +1 pp.
+- **Spatial panel** — SAR/SEM com efeitos fixos ou aleatórios. Atualmente
+  apenas cross-section. +0,5 pp.
 
-- **Stochastic frontier** — análise de eficiência (Aigner/Lovell/Schmidt
-  1977). Exige MLE com erro composto (half-normal). +0,5 pp.
+- **Bayesian stochastic frontier** — versão Bayesiana com priors
+  informativos. +0,5 pp.
 
-**Cobertura atual: 85,05%.**
+**Cobertura atual: 86,55%.**
