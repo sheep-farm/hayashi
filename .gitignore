@@ -56,7 +56,9 @@ planning.md
 avaliacao.md
 avaliacao_projeto.md
 avaliacao_capm_hay.md
-
+.hayashi_history
+painel.csv
+dados.csv
 
 deploy-site.sh
 __pycache__/
