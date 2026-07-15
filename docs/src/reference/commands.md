@@ -176,6 +176,14 @@ Covariance options (where applicable): `cov=nonrobust|HC1|HC2|HC3|HC4|robust`, `
 | `xtprobit` | `xtprobit(y ~ x, df, id="g")` | Panel probit (GEE) |
 | `xtpoisson` | `xtpoisson(y ~ x, df, id="g")` | Panel Poisson (GEE) |
 | `eventstudy` | `eventstudy(y ~ etime + x, df, ref=-1, min=-5, max=5)` | Event study (dynamic DiD) |
+| `nls_exp` | `nls_exp(y ~ x, df, start=[a,b])` | NLS exponential: y = a*exp(b*x) |
+| `nls_power` | `nls_power(y ~ x, df, start=[a,b])` | NLS power: y = a*x^b |
+| `nls_logistic` | `nls_logistic(y ~ x, df, start=[a,b,c])` | NLS logistic: y = a/(1+exp(-b*(x-c))) |
+| `nls_cobb_douglas` | `nls_cobb_douglas(y ~ x1+x2, df, start=[a,b0,b1])` | Cobb-Douglas production |
+| `nls_ces` | `nls_ces(y ~ x1+x2, df, start=[a,b1,b2,rho])` | CES production |
+| `marginsplot` | `marginsplot(m)` | AME plot for logit/probit |
+| `spatial_sar` | `spatial_sar(y ~ x, df, w=W)` | Spatial autoregressive (SAR) |
+| `spatial_sem` | `spatial_sem(y ~ x, df, w=W)` | Spatial error model (SEM) |
 | `hausman` | `hausman(m_fe, m_re)` | Hausman specification test |
 | `lincom` | `lincom(m, expr)` | Linear combination of coefficients |
 | `bootstrap` | `bootstrap(est, formula, df, n=)` | Generic bootstrap |

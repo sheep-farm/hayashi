@@ -114,4 +114,30 @@ reporta o p-value do coeficiente de ŷ².
 
 3. ~~`linktest`~~ — **concluído**.
 
-**Todos os itens do ROADMAP estão implementados.**
+4. ~~Panel não-linear (xtlogit/xtprobit/xtpoisson)~~ — **concluído**
+   (wrappers sobre GEE).
+
+5. ~~Event study~~ — **concluído** (eventstudy com leads/lags).
+
+6. ~~ROC curve plot~~ — **concluído** (ASCII no lroc).
+
+7. ~~NLS~~ — **concluído** (nls_exp, nls_power, nls_logistic,
+   nls_cobb_douglas, nls_ces via Levenberg-Marquardt).
+
+8. ~~marginsplot~~ — **concluído** (AME plot ASCII para logit/probit).
+
+9. ~~Spatial econometrics~~ — **concluído** (spatial_sar, spatial_sem
+   via MLE com grid search + golden section).
+
+## Pendente
+
+- **Double/debiased ML** — inferência causal moderna (Chernozhukov 2018).
+  Exige cross-fitting + orthogonalization. +1 pp.
+
+- **Panel Tobit / Heckman** — dados limitados em painel. Exige MLE
+  conjunta com efeitos aleatórios. +1 pp.
+
+- **Stochastic frontier** — análise de eficiência (Aigner/Lovell/Schmidt
+  1977). Exige MLE com erro composto (half-normal). +0,5 pp.
+
+**Cobertura atual: 85,05%.**

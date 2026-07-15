@@ -337,6 +337,128 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── marginsplot ─────────────────────────────────────────────────
+            // marginsplot(model [, width=50])
+            "marginsplot" | "margins_plot" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "marginsplot(model) requires an estimated model".into(),
+                    ));
+                }
+                let model = self.eval_expr(&args[0])?;
+                let width = match opt_map.get("width") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 50,
+                };
+
+                match model {
+                    Value::BinaryResult(bm) => {
+                        let vcov = Self::binary_mle_vcov(&bm.kind, &bm.result.params, &bm.y, &bm.x);
+                        let ame = if bm.kind == "logit" {
+                            match &vcov {
+                                Some(v) => greeners::Margins::ame_logit_with_vcov(
+                                    &bm.result.params,
+                                    &bm.x,
+                                    &bm.coef_names,
+                                    v,
+                                ),
+                                None => greeners::Margins::ame_logit(
+                                    &bm.result.params,
+                                    &bm.x,
+                                    &bm.coef_names,
+                                ),
+                            }
+                        } else {
+                            match &vcov {
+                                Some(v) => greeners::Margins::ame_probit_with_vcov(
+                                    &bm.result.params,
+                                    &bm.x,
+                                    &bm.coef_names,
+                                    v,
+                                ),
+                                None => greeners::Margins::ame_probit(
+                                    &bm.result.params,
+                                    &bm.x,
+                                    &bm.coef_names,
+                                ),
+                            }
+                        };
+
+                        // Collect rows (name, effect, ci_lo, ci_hi) excluding constant
+                        let z = 1.96_f64;
+                        let mut rows: Vec<(String, f64, f64, f64)> = Vec::new();
+                        for (i, name) in ame.variable_names.iter().enumerate() {
+                            if name == "_cons" || name == "const" {
+                                continue;
+                            }
+                            let eff = ame.effects[i];
+                            let se = ame.std_errors[i];
+                            rows.push((name.clone(), eff, eff - z * se, eff + z * se));
+                        }
+
+                        if rows.is_empty() {
+                            println!("(no marginal effects to plot)");
+                            return Ok(Some(Value::Nil));
+                        }
+
+                        let label_w = rows
+                            .iter()
+                            .map(|(n, _, _, _)| n.len())
+                            .max()
+                            .unwrap_or(4)
+                            .max(8);
+                        let all_lo = rows
+                            .iter()
+                            .map(|(_, _, lo, _)| *lo)
+                            .fold(f64::INFINITY, f64::min);
+                        let all_hi = rows
+                            .iter()
+                            .map(|(_, _, _, hi)| *hi)
+                            .fold(f64::NEG_INFINITY, f64::max);
+                        let range = (all_hi - all_lo).max(1e-15);
+                        let plot_lo = all_lo.min(0.0) - range * 0.05;
+                        let plot_hi = all_hi.max(0.0) + range * 0.05;
+                        let plot_range = (plot_hi - plot_lo).max(1e-15);
+
+                        let to_col = |v: f64| -> usize {
+                            ((v - plot_lo) / plot_range * (width - 1) as f64)
+                                .round()
+                                .clamp(0.0, (width - 1) as f64) as usize
+                        };
+                        let zero_col = to_col(0.0);
+
+                        println!("\n  Marginal Effects Plot ({})", bm.kind);
+                        println!("  {}", "─".repeat(width + 4));
+                        for (name, eff, ci_lo, ci_hi) in &rows {
+                            let c_lo = to_col(*ci_lo);
+                            let c_hi = to_col(*ci_hi).min(width - 1);
+                            let c_pt = to_col(*eff);
+                            let mut line = vec![' '; width];
+                            if zero_col < width {
+                                line[zero_col] = '│';
+                            }
+                            if c_lo <= c_hi {
+                                line[c_lo..=c_hi].fill('─');
+                            }
+                            if c_pt < width {
+                                line[c_pt] = '●';
+                            }
+                            let bar: String = line.into_iter().collect();
+                            println!("{:>lw$} │{bar}  {eff:>8.4}", name, lw = label_w);
+                        }
+                        println!("  {}", "─".repeat(width + 4));
+                        println!("  {zero_col} (zero reference)");
+                    }
+                    _ => {
+                        return Err(HayashiError::Runtime(
+                            "marginsplot: supports logit/probit models".into(),
+                        ))
+                    }
+                }
+                Ok(Value::Nil)
+            }
+
             // ── vecm ─────────────────────────────────────────────────────────
             "vecm" => self.eval_vecm(args, opt_map),
 
