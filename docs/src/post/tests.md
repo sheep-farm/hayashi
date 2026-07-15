@@ -124,6 +124,26 @@ mundlak(df, Y ~ X1 + X2, id="entity")
 
 Tests H0: RE is consistent, by augmenting the model with entity means of regressors. A generalization of the Hausman test.
 
+## Likelihood-ratio test
+
+```
+lrtest(m_restricted, m_unrestricted)
+```
+
+Tests H0: the restricted model is adequate (the additional parameters in the unrestricted model are zero). The LR statistic is:
+
+LR = -2 * (ln L_restricted - ln L_unrestricted) ~ chi²(df)
+
+where df = k_unrestricted - k_restricted. The models must be nested (the restricted model is a special case of the unrestricted one).
+
+Supports any estimator that reports a log-likelihood: OLS, logit/probit, Poisson, NegBin, Tobit, Ordered, Mixed, Zero-Inflated, GLM, GARCH, ARIMA.
+
+```
+let m1 = ols(Y ~ X1, df)
+let m2 = ols(Y ~ X1 + X2, df)
+lrtest(m1, m2)
+```
+
 ## Notes
 
 - `test` works with any estimator that stores a variance-covariance matrix (OLS, IV, logit, probit, panel models, etc.).

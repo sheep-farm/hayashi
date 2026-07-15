@@ -436,6 +436,7 @@ fn legacy_help_text(topic: &str) -> Option<&'static str> {
         "acf" | "pacf" => "acf(df, var [, lags=20])\npacf(df, var [, lags=20])\n  Returns ACF/PACF values as a list. Also accepts a model (uses residuals).\n\n  acf(df, returns, lags=30)\n  pacf(m_ols, lags=10)\n",
         "cusumtest" => "cusumtest(model)\n  CUSUM test for structural stability (Brown-Durbin-Evans 1975).\n  Uses recursive residuals; checks if cumulative sum stays within 5% bounds.\n\n  cusumtest(m_ols)\n",
         "akaike_weights" | "aic_weights" => "akaike_weights(m1, m2, ...)\n  Returns Akaike weights as a dict {model_name: weight}.\n  Supports OLS, logit/probit, Poisson, NegBin, Tobit, Ordered, Mixed, ZI.\n\n  akaike_weights(m1, m2, m3)\n",
+        "lrtest" | "lr_test" => "lrtest(m_restricted, m_unrestricted)\n  Likelihood-ratio test for nested models.\n  H0: restricted model is adequate (additional parameters are zero).\n  LR = -2*(lnL_restricted - lnL_unrestricted) ~ chi²(df).\n  Supports OLS, logit/probit, Poisson, NegBin, Tobit, Ordered, Mixed, ZI, GLM, GARCH, ARIMA.\n\n  lrtest(m1, m2)\n",
         "qqplot" => "qqplot(df, var)\n  Q-Q plot (ASCII).\n\n  qqplot(df, residuals)\n",
         "corrplot" => "corrplot(df, var1, var2 [, ...])\n  Correlation heatmap (ASCII).\n\n  corrplot(df, price, mpg, weight)\n",
         "adf" | "adtest" => "adf(df, var [, lags=auto])\n  Augmented Dickey-Fuller unit root test.\n\n  adf(df, gdp)\n",

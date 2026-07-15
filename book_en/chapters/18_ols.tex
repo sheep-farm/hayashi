@@ -564,6 +564,23 @@ $w_i = \frac{e^{-\Delta_i/2}}{\sum_j e^{-\Delta_j/2}}$, where $\Delta_i =
 \mathrm{AIC}_i - \min_j \mathrm{AIC}_j$. Supports OLS, logit/probit, Poisson,
 NegBin, Tobit, Ordered, Mixed, and Zero-Inflated.
 
+\subsubsection*{Likelihood-ratio test}
+
+Compares two nested models --- the restricted is a special case of the
+unrestricted:
+
+\begin{lstlisting}
+let m1 = ols(Y ~ X1, df)
+let m2 = ols(Y ~ X1 + X2, df)
+lrtest(m1, m2)    // H0: m1 is adequate (X2 = 0)
+\end{lstlisting}
+
+The statistic is $\mathrm{LR} = -2(\ln L_r - \ln L_u) \sim \chi^2(\mathrm{df})$,
+where $\mathrm{df} = k_u - k_r$. Rejecting $H_0$ indicates the unrestricted
+model fits significantly better. Works with any estimator that reports a
+log-likelihood: OLS, logit/probit, Poisson, NegBin, Tobit, Ordered, Mixed,
+ZI, GLM, GARCH, ARIMA.
+
 \section{Results table with \texttt{esttab}}
 
 \begin{lstlisting}[caption={Comparing specifications}]

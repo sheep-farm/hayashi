@@ -691,6 +691,54 @@ impl Interpreter {
                 Ok(Value::Dict(Arc::new(out)))
             }
 
+            // lrtest(m_restricted, m_unrestricted)
+            // Likelihood-ratio test for nested models.
+            // H0: restricted model is adequate (additional parameters are zero)
+            // LR = -2 * (ln L_restricted - ln L_unrestricted) ~ chi²(df)
+            "lrtest" | "lr_test" => {
+                if args.len() < 2 {
+                    return Err(self.rt_err(
+                        "lrtest(m_restricted, m_unrestricted) requires two nested models",
+                    ));
+                }
+                let v_r = self.eval_expr(&args[0])?;
+                let v_u = self.eval_expr(&args[1])?;
+                // Extract (log_likelihood, n_params) from a model Value
+                let extract = |v: &Value| -> Result<(f64, usize)> {
+                    Ok(match v {
+                        Value::OlsResult(m) => (m.result.log_likelihood, m.result.params.len()),
+                        Value::BinaryResult(b) => (b.result.log_likelihood, b.result.params.len()),
+                        Value::PoissonResult(r) => (r.log_likelihood, r.params.len()),
+                        Value::NegBinResult(r) => (r.log_likelihood, r.params.len()),
+                        Value::OrderedResult(r) => {
+                            (r.log_likelihood, r.params.len() + r.thresholds.len())
+                        }
+                        Value::TobitResult(r) => (r.log_likelihood, r.params.len()),
+                        Value::MixedResult(r) => (r.log_likelihood, r.fixed_effects.len()),
+                        Value::ZeroInflatedResult(r) => (
+                            r.log_likelihood,
+                            r.count_params.len() + r.inflate_params.len(),
+                        ),
+                        Value::GlmResult(r) => (r.log_likelihood, r.params.len()),
+                        Value::GarchResult(r) => (r.log_likelihood, r.params.len()),
+                        Value::ArimaResult(r) => {
+                            (r.log_likelihood, r.ar_params.len() + r.ma_params.len() + 1)
+                        }
+                        _ => {
+                            return Err(HayashiError::Runtime(
+                                "lrtest: model has no log-likelihood — supports OLS, logit/probit, Poisson, NegBin, Tobit, Ordered, Mixed, ZI, GLM, GARCH, ARIMA".into(),
+                            ))
+                        }
+                    })
+                };
+                let (ll_r, k_r) = extract(&v_r)?;
+                let (ll_u, k_u) = extract(&v_u)?;
+                let result = greeners::ModelSelection::lr_test(ll_r, ll_u, k_r, k_u)
+                    .map_err(HayashiError::Runtime)?;
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
             // ── Fixed Effects ─────────────────────────────────────────────────
             "fe" => {
                 let (formula_ast, df, _df_name, id_col) = self.extract_panel_args(args, opt_map)?;

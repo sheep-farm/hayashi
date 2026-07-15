@@ -49,20 +49,7 @@ apenas coeficientes e efeitos marginais:
 **Onde implementar**: `Greeners/src/discrete.rs` — adicionar funções
 ao `BinaryModelResult` ou criar struct separada de diagnósticos.
 
-### 3. `lrtest(m1, m2)` — teste de razão de verossimilhanças
-
-Compara dois modelos aninhados (o restrito é caso especial do
-irrestrito). Estatística: LR = -2(ln L_restrito - ln L_irrestrito) ~
-χ²(df), onde df = diferença em número de parâmetros.
-
-Fundamental para comparar logit/probit/Poisson com restrições,
-testar exclusão conjunta de variáveis em modelos MLE, comparar
-ARIMA(p) vs ARIMA(p+q).
-
-**Onde implementar**: `Greeners/src/model_selection.rs` — nova
-função `lr_test(ll_restricted, ll_unrestricted, df)`.
-
-### 4. `linktest` — detecção de erro de especificação
+### 3. `linktest` — detecção de erro de especificação
 
 Stata's `linktest` para modelos binários: reestima o modelo usando
 ŷ e ŷ² como únicos regressores. Se ŷ² for significativo, há erro
@@ -75,16 +62,22 @@ reporta o p-value do coeficiente de ŷ².
 
 ---
 
+## Concluído
+
+- ~~`lrtest(m1, m2)`~~ — implementado em `Greeners/src/model_selection.rs`
+  como `ModelSelection::lr_test()`. Exposto em Hayashi como `lrtest(m_restricted,
+  m_unrestricted)`. Suporta OLS, logit/probit, Poisson, NegBin, Tobit, Ordered,
+  Mixed, ZI, GLM, GARCH, ARIMA.
+
+---
+
 ## Priorização sugerida
 
 1. **IV: first-stage F, Sargan/J, endogeneity** — sem isso, IV é
    inutilizável para pesquisa séria. Prioridade máxima.
 
-2. **`lrtest`** — implementação simples (3 linhas de matemática),
-   usado em quase todo paper empírico. Retorno alto por esforço baixo.
-
-3. **Logit: classification + ROC + Hosmer-Lemeshow** — avaliação de
+2. **Logit: classification + ROC + Hosmer-Lemeshow** — avaliação de
    qualidade de previsão binária. Importante para aplicações
    aplicadas (credit scoring, choice models).
 
-4. **`linktest`** — útil mas mais nicho. Pode ficar por último.
+3. **`linktest`** — útil mas mais nicho. Pode ficar por último.

@@ -145,6 +145,7 @@ pub const BUILTIN_NAMES: &[&str] = &[
     "pacf",
     "cusumtest",
     "akaike_weights",
+    "lrtest",
     "histogram",
     "boxplot",
     "kdensity",

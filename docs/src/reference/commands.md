@@ -164,6 +164,7 @@ Covariance options (where applicable): `cov=nonrobust|HC1|HC2|HC3|HC4|robust`, `
 | `testparm` | `testparm(m, ["x1", "x2"])` | Joint F-test |
 | `estat` / `ic` | `estat(m1, m2)` | AIC/BIC comparison |
 | `akaike_weights` | `akaike_weights(m1, m2)` | Akaike weights (dict) |
+| `lrtest` | `lrtest(m_restricted, m_unrestricted)` | Likelihood-ratio test |
 | `hausman` | `hausman(m_fe, m_re)` | Hausman specification test |
 | `lincom` | `lincom(m, expr)` | Linear combination of coefficients |
 | `bootstrap` | `bootstrap(est, formula, df, n=)` | Generic bootstrap |

@@ -9976,3 +9976,57 @@ display has_key(w, "m1")
         "true",
     );
 }
+
+#[test]
+fn diag_lrtest_ols() {
+    assert_ok_contains(
+        "lrtest_ols",
+        r#"
+input df
+Y X1 X2
+10 2 1
+12 3 2
+8 1 0
+15 5 3
+11 2 1
+14 4 2
+9 1 0
+13 4 3
+end
+let m1 = ols(Y ~ X1, df)
+let m2 = ols(Y ~ X1 + X2, df)
+lrtest(m1, m2)
+"#,
+        "Likelihood-Ratio",
+    );
+}
+
+#[test]
+fn diag_lrtest_rejects_non_nested() {
+    // m1 has MORE params than m2 — should error
+    assert_ok_contains(
+        "lrtest_non_nested",
+        r#"
+input df
+Y X1 X2
+10 2 1
+12 3 2
+8 1 0
+15 5 3
+11 2 1
+14 4 2
+9 1 0
+13 4 3
+end
+let m1 = ols(Y ~ X1 + X2, df)
+let m2 = ols(Y ~ X1, df)
+try {
+    lrtest(m1, m2)
+    display "no error"
+} catch e {
+    display "caught"
+}
+"#,
+        "caught",
+    );
+}

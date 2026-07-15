@@ -566,6 +566,22 @@ $w_i = \frac{e^{-\Delta_i/2}}{\sum_j e^{-\Delta_j/2}}$, onde $\Delta_i =
 \mathrm{AIC}_i - \min_j \mathrm{AIC}_j$. Suporta OLS, logit/probit, Poisson,
 NegBin, Tobit, Ordered, Mixed e Zero-Inflated.
 
+\subsubsection*{Teste de razão de verossimilhanças}
+
+Compara dois modelos aninhados — o restrito é caso especial do irrestrito:
+
+\begin{lstlisting}
+let m1 = ols(Y ~ X1, df)
+let m2 = ols(Y ~ X1 + X2, df)
+lrtest(m1, m2)    // H0: m1 é adequado (X2 = 0)
+\end{lstlisting}
+
+A estatística é $\mathrm{LR} = -2(\ln L_r - \ln L_u) \sim \chi^2(\mathrm{df})$,
+onde $\mathrm{df} = k_u - k_r$. Rejeitar $H_0$ indica que o modelo irrestrito
+ajusta significativamente melhor. Funciona com qualquer estimador que
+reporte log-verossimilhança: OLS, logit/probit, Poisson, NegBin, Tobit,
+Ordered, Mixed, ZI, GLM, GARCH, ARIMA.
+
 \section{Tabela de resultados com \texttt{esttab}}
 
 \begin{lstlisting}[caption={Comparação de especificações}]
