@@ -232,6 +232,10 @@ Covariance options (where applicable): `cov=nonrobust|HC1|HC2|HC3|HC4|robust`, `
 | `causalforest` | `causalforest(y ~ t, df, x="x1,x2", trees=100)` | Causal Forest (Wager-Athey 2018) |
 | `grf` | `grf(y ~ t, df, x="x1,x2", trees=100)` | Generalized Random Forest (Athey 2019) |
 | `conformal` | `conformal(y ~ x, df, alpha=0.1, calib=0.3)` | Conformal prediction intervals |
+| `transformer` | `transformer(df, var, d_model=8, seqlen=10, forecast=5)` | Transformer for time series |
+| `dr_learner` | `dr_learner(y ~ t, df, x="x1,x2", folds=3)` | DR-Learner (Kennedy 2023) |
+| `bart` | `bart(y ~ x, df, trees=20, depth=3, iter=100)` | Bayesian Additive Regression Trees |
+| `gp` | `gp(y ~ x, df)` | Gaussian Process Regression (Kriging) |
 | `hausman` | `hausman(m_fe, m_re)` | Hausman specification test |
 | `lincom` | `lincom(m, expr)` | Linear combination of coefficients |
 | `bootstrap` | `bootstrap(est, formula, df, n=)` | Generic bootstrap |

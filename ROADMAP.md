@@ -133,12 +133,12 @@ reporta o p-value do coeficiente de ŷ².
 
 ## Pendente
 
-- **Transformer** — attention mechanism para series. +0,05 pp.
+- **TMLE** — Targeted maximum likelihood. +0,05 pp.
 
-- **Double robustness DR-learner** — nuisance estimation. +0,05 pp.
+- **Orthogonal random forest** — ORF para CATE. +0,05 pp.
 
-- **BART** — Bayesian additive regression trees. +0,05 pp.
+- **Spectral clustering** — clustering via graph Laplacian. +0,05 pp.
 
-- **Gaussian process regression** — Kriging. +0,05 pp.
+- **Isotonic regression** — monotone regression. +0,05 pp.
 
-**Cobertura atual: 99,05%.**
+**Cobertura atual: 99,25%.**

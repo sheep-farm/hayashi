@@ -12018,3 +12018,148 @@ conformal(y ~ x1 + x2, df, alpha=0.1, calib=0.3)
         "Conformal Prediction",
     );
 }
+
+#[test]
+fn transformer_basic() {
+    assert_ok_contains(
+        "transformer",
+        r#"
+input df
+y
+10
+12
+15
+18
+20
+22
+25
+28
+30
+32
+35
+38
+40
+42
+45
+48
+50
+52
+55
+58
+60
+62
+65
+68
+70
+end
+transformer(df, y, d_model=4, seqlen=5, lr=0.001, epochs=20, forecast=3)
+"#,
+        "Transformer",
+    );
+}
+
+#[test]
+fn dr_learner_basic() {
+    assert_ok_contains(
+        "dr_learner",
+        r#"
+input df
+y treated x1 x2
+10 1 5 2
+12 1 6 3
+15 0 7 4
+18 1 8 5
+20 0 9 6
+22 1 10 7
+25 0 11 8
+28 1 12 9
+30 0 13 10
+32 1 14 11
+35 0 15 12
+38 1 16 13
+40 0 17 14
+42 1 18 15
+45 0 19 16
+48 1 20 17
+50 0 21 18
+52 1 22 19
+55 0 23 20
+58 1 24 21
+60 0 25 22
+62 1 26 23
+65 0 27 24
+68 1 28 25
+70 0 29 26
+72 1 30 27
+75 0 31 28
+78 1 32 29
+80 0 33 30
+82 1 34 31
+85 0 35 32
+88 1 36 33
+end
+dr_learner(y ~ treated, df, x="x1,x2", folds=3)
+"#,
+        "DR-Learner",
+    );
+}
+
+#[test]
+fn bart_basic() {
+    assert_ok_contains(
+        "bart",
+        r#"
+input df
+y x1 x2
+10 1.0 5
+12 2.0 6
+15 3.0 7
+18 4.0 8
+20 5.0 9
+22 6.0 10
+25 7.0 11
+28 8.0 12
+30 9.0 13
+32 10.0 14
+35 11.0 15
+38 12.0 16
+40 13.0 17
+42 14.0 18
+45 15.0 19
+48 16.0 20
+end
+bart(y ~ x1 + x2, df, trees=10, depth=3, iter=20, burnin=5)
+"#,
+        "BART",
+    );
+}
+
+#[test]
+fn gp_basic() {
+    assert_ok_contains(
+        "gp",
+        r#"
+input df
+y x1 x2
+10 1.0 5
+12 2.0 6
+15 3.0 7
+18 4.0 8
+20 5.0 9
+22 6.0 10
+25 7.0 11
+28 8.0 12
+30 9.0 13
+32 10.0 14
+35 11.0 15
+38 12.0 16
+40 13.0 17
+42 14.0 18
+45 15.0 19
+48 16.0 20
+end
+gp(y ~ x1 + x2, df)
+"#,
+        "Gaussian Process",
+    );
+}

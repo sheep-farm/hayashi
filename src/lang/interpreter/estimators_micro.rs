@@ -4373,6 +4373,218 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── Transformer Time Series ────────────────────────────────────
+            // transformer(df, var [, d_model=8, seqlen=10, lr=0.001, epochs=100, forecast=5])
+            "transformer" | "transformer_ts" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(format!(
+                        "{func}() requires (df, var)"
+                    )));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(format!(
+                            "{func}: first arg must be DataFrame"
+                        )))
+                    }
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
+                };
+                let y_var = match &args[1] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(format!(
+                            "{func}: var must be identifier"
+                        )))
+                    }
+                };
+
+                let d_model = match opt_map.get("d_model") {
+                    Some(Value::Int(v)) => Some(*v as usize),
+                    Some(Value::Float(v)) => Some(*v as usize),
+                    _ => None,
+                };
+                let seq_len = match opt_map.get("seqlen") {
+                    Some(Value::Int(v)) => Some(*v as usize),
+                    Some(Value::Float(v)) => Some(*v as usize),
+                    _ => None,
+                };
+                let lr = match opt_map.get("lr") {
+                    Some(Value::Float(v)) => Some(*v),
+                    Some(Value::Int(v)) => Some(*v as f64),
+                    _ => None,
+                };
+                let n_epochs = match opt_map.get("epochs") {
+                    Some(Value::Int(v)) => Some(*v as usize),
+                    Some(Value::Float(v)) => Some(*v as usize),
+                    _ => None,
+                };
+                let n_forecast = match opt_map.get("forecast") {
+                    Some(Value::Int(v)) => Some(*v as usize),
+                    Some(Value::Float(v)) => Some(*v as usize),
+                    _ => None,
+                };
+
+                let y_col = df
+                    .get_column(y_var.as_str())
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let y_vals = y_col.as_float().ok_or_else(|| {
+                    HayashiError::Runtime(format!("{func}: '{y_var}' must be numeric"))
+                })?;
+                let y_arr = ndarray::Array1::from_vec(y_vals.to_vec());
+
+                let result =
+                    greeners::Transformer::fit(&y_arr, d_model, seq_len, lr, n_epochs, n_forecast)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── DR-Learner ────────────────────────────────────────────────
+            // dr_learner(y ~ treated, df, x="x1,x2", folds=3)
+            "dr_learner" | "drlearner" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let y_var = g_formula.dependent.clone();
+                let t_var = g_formula
+                    .independents
+                    .first()
+                    .ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: need treatment variable"))
+                    })?
+                    .clone();
+
+                let x_str = match opt_map.get("x") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires x=\"x1,x2\" option (features)"
+                        )))
+                    }
+                };
+                let x_vars: Vec<String> = x_str.split(',').map(|s| s.trim().to_string()).collect();
+                let n_folds = match opt_map.get("folds") {
+                    Some(Value::Int(v)) => Some(*v as usize),
+                    Some(Value::Float(v)) => Some(*v as usize),
+                    _ => None,
+                };
+
+                let n = df.n_rows();
+                let y_col = df
+                    .get_column(y_var.as_str())
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let y_vals = y_col.as_float().ok_or_else(|| {
+                    HayashiError::Runtime(format!("{func}: '{y_var}' must be numeric"))
+                })?;
+                let y_arr = ndarray::Array1::from_vec(y_vals.to_vec());
+
+                let t_col = df
+                    .get_column(t_var.as_str())
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let t_vec: Vec<bool> = if let Some(b) = t_col.as_bool() {
+                    b.to_vec()
+                } else if let Some(i) = t_col.as_int() {
+                    i.iter().map(|&v| v != 0).collect()
+                } else if let Some(f) = t_col.as_float() {
+                    f.iter().map(|&v| v != 0.0).collect()
+                } else {
+                    return Err(HayashiError::Runtime(format!(
+                        "{func}: '{t_var}' must be boolean or numeric"
+                    )));
+                };
+
+                let k = x_vars.len();
+                let mut x_mat = ndarray::Array2::<f64>::zeros((n, k));
+                for (j, xname) in x_vars.iter().enumerate() {
+                    let col = df
+                        .get_column(xname.as_str())
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let vals = col.as_float().ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: '{xname}' must be numeric"))
+                    })?;
+                    for i in 0..n {
+                        x_mat[(i, j)] = vals[i];
+                    }
+                }
+
+                let result =
+                    greeners::DRLearner::fit(&y_arr, &t_vec, &x_mat, n_folds, Some(x_vars))
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── BART ──────────────────────────────────────────────────────
+            // bart(y ~ x1 + x2, df, trees=20, depth=3, iter=100, burnin=20)
+            "bart" | "bayesian_trees" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let n_trees = match opt_map.get("trees") {
+                    Some(Value::Int(v)) => Some(*v as usize),
+                    Some(Value::Float(v)) => Some(*v as usize),
+                    _ => None,
+                };
+                let max_depth = match opt_map.get("depth") {
+                    Some(Value::Int(v)) => Some(*v as usize),
+                    Some(Value::Float(v)) => Some(*v as usize),
+                    _ => None,
+                };
+                let n_iter = match opt_map.get("iter") {
+                    Some(Value::Int(v)) => Some(*v as usize),
+                    Some(Value::Float(v)) => Some(*v as usize),
+                    _ => None,
+                };
+                let burn_in = match opt_map.get("burnin") {
+                    Some(Value::Int(v)) => Some(*v as usize),
+                    Some(Value::Float(v)) => Some(*v as usize),
+                    _ => None,
+                };
+
+                let (y_arr, x_arr) = df
+                    .to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = g_formula.independents.clone();
+
+                let result = greeners::BART::fit(
+                    &y_arr,
+                    &x_arr,
+                    n_trees,
+                    max_depth,
+                    n_iter,
+                    burn_in,
+                    Some(var_names),
+                )
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── Gaussian Process Regression ───────────────────────────────
+            // gp(y ~ x1 + x2, df)
+            "gp" | "gaussian_process" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let (y_arr, x_arr) = df
+                    .to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = g_formula.independents.clone();
+
+                let result = greeners::GaussianProcess::fit(&y_arr, &x_arr, Some(var_names))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
             // ── Spatial econometrics ────────────────────────────────────────
             // spatial_sar(y ~ x1 + x2, df, w=W_matrix)
             // spatial_sem(y ~ x1 + x2, df, w=W_matrix)
