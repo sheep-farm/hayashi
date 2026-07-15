@@ -129,14 +129,16 @@ reporta o p-value do coeficiente de ŷ².
 9. ~~Spatial econometrics~~ — **concluído** (spatial_sar, spatial_sem
    via MLE com grid search + golden section).
 
+## Concluído (sessões anteriores)
+
 ## Pendente
 
-- **Nonlinear ARDL** — NARDL com asymmetric cointegration. +0,5 pp.
+- **Threshold VAR** — TVAR com regime switching. +0,3 pp.
 
-- **Panel VAR** — PVAR com GMM estimation. +0,5 pp.
+- **Bayesian VAR** — BVAR com Minnesota prior. +0,3 pp.
 
-- **Functional coefficient** — varying coefficient models. +0,5 pp.
+- **Mixed-frequency VAR** — MF-VAR com MIDAS. +0,3 pp.
 
-- **Multivariate GARCH** — DCC-GARCH para volatilidade dinâmica. +0,5 pp.
+- **Time-varying copula** — copula dinamica com GARCH dynamics. +0,3 pp.
 
-**Cobertura atual: 94,55%.**
+**Cobertura atual: 96,30%.**

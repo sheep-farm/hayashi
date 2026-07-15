@@ -208,6 +208,10 @@ Covariance options (where applicable): `cov=nonrobust|HC1|HC2|HC3|HC4|robust`, `
 | `pstr` | `pstr(y ~ x, df, q="var", id="e")` | Panel Smooth Transition |
 | `modwt` | `modwt(df, var, scales=4)` | Wavelet decomposition (MODWT) |
 | `copula` | `copula(y1 ~ y2, df, type="gaussian")` | Copula dependence |
+| `nardl` | `nardl(y ~ x, df, lags=1)` | Nonlinear ARDL (asymmetric cointegration) |
+| `pvar` | `pvar(y1 ~ y2, df, id="e", lags=1)` | Panel VAR (GMM) |
+| `fcoef` | `fcoef(y ~ x, df, z="mod", points=20)` | Functional coefficient (varying coef.) |
+| `dcc_garch` | `dcc_garch(y1 ~ y2, df)` | DCC-GARCH (dynamic correlation) |
 | `hausman` | `hausman(m_fe, m_re)` | Hausman specification test |
 | `lincom` | `lincom(m, expr)` | Linear combination of coefficients |
 | `bootstrap` | `bootstrap(est, formula, df, n=)` | Generic bootstrap |

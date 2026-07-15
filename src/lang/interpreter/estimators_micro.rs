@@ -2816,6 +2816,184 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── NARDL (Nonlinear ARDL) ─────────────────────────────────────
+            // nardl(y ~ x, df, lags=1)
+            "nardl" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let lags = match opt_map.get("lags") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 1,
+                };
+
+                if g_formula.independents.len() != 1 {
+                    return Err(HayashiError::Runtime(format!(
+                        "{func}: requires exactly one regressor (y ~ x)"
+                    )));
+                }
+                let x_name = &g_formula.independents[0];
+                let y_col = df
+                    .get_column(&g_formula.dependent)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let y_vals = y_col.as_float().ok_or_else(|| {
+                    HayashiError::Runtime(format!("{func}: dependent must be numeric"))
+                })?;
+                let x_col = df
+                    .get_column(x_name)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let x_vals = x_col.as_float().ok_or_else(|| {
+                    HayashiError::Runtime(format!("{func}: regressor '{x_name}' must be numeric"))
+                })?;
+
+                let y_arr = ndarray::Array1::from_vec(y_vals.to_vec());
+                let x_vec = ndarray::Array1::from_vec(x_vals.to_vec());
+
+                let result = greeners::NARDL::fit(&y_arr, &x_vec, lags)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── Panel VAR (PVAR) ───────────────────────────────────────────
+            // pvar(y1 ~ y2, df, id="entity", lags=1)
+            "pvar" | "panel_var" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let lags = match opt_map.get("lags") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 1,
+                };
+                let id_col = match opt_map.get("id") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires id=\"column\" option"
+                        )))
+                    }
+                };
+
+                let mut all_cols: Vec<String> = vec![g_formula.dependent.clone()];
+                all_cols.extend(g_formula.independents.iter().cloned());
+                let n_vars = all_cols.len();
+                let n = df.n_rows();
+                let mut y_mat = ndarray::Array2::<f64>::zeros((n, n_vars));
+                for (j, name) in all_cols.iter().enumerate() {
+                    let col = df
+                        .get_column(name)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let vals = col.as_float().ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: column '{name}' must be numeric"))
+                    })?;
+                    for i in 0..n {
+                        y_mat[(i, j)] = vals[i];
+                    }
+                }
+
+                let entity_ids: Vec<i64> = {
+                    let col = df
+                        .get_column(id_col.as_str())
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    if let Some(i) = col.as_int() {
+                        i.to_vec()
+                    } else if let Some(f) = col.as_float() {
+                        f.iter().map(|v| *v as i64).collect()
+                    } else {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}: id column '{id_col}' must be numeric"
+                        )));
+                    }
+                };
+
+                let result = greeners::PanelVAR::fit(&y_mat, &entity_ids, lags, Some(all_cols))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── Functional coefficient model ───────────────────────────────
+            // fcoef(y ~ x1 + x2, df, z="moderator", points=20)
+            "fcoef" | "functional_coef" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let z_col = match opt_map.get("z") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires z=\"moderator\" option"
+                        )))
+                    }
+                };
+                let n_points = match opt_map.get("points") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 20,
+                };
+
+                let (y_arr, x_arr) = df
+                    .to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = g_formula.independents.clone();
+
+                let z_col_data = df
+                    .get_column(z_col.as_str())
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let z_vals = z_col_data.as_float().ok_or_else(|| {
+                    HayashiError::Runtime(format!("{func}: moderator '{z_col}' must be numeric"))
+                })?;
+                let z_arr = ndarray::Array1::from_vec(z_vals.to_vec());
+
+                let result = greeners::FunctionalCoef::fit(
+                    &y_arr,
+                    &x_arr,
+                    &z_arr,
+                    None,
+                    n_points,
+                    Some(var_names),
+                    Some(z_col),
+                )
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── DCC-GARCH ──────────────────────────────────────────────────
+            // dcc_garch(y1 ~ y2, df)
+            "dcc_garch" | "dcc" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let mut all_cols: Vec<String> = vec![g_formula.dependent.clone()];
+                all_cols.extend(g_formula.independents.iter().cloned());
+                let n_vars = all_cols.len();
+                let n = df.n_rows();
+                let mut r_mat = ndarray::Array2::<f64>::zeros((n, n_vars));
+                for (j, name) in all_cols.iter().enumerate() {
+                    let col = df
+                        .get_column(name)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let vals = col.as_float().ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: column '{name}' must be numeric"))
+                    })?;
+                    for i in 0..n {
+                        r_mat[(i, j)] = vals[i];
+                    }
+                }
+
+                let result = greeners::DCCGARCH::fit(&r_mat, Some(all_cols))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
             // ── Spatial econometrics ────────────────────────────────────────
             // spatial_sar(y ~ x1 + x2, df, w=W_matrix)
             // spatial_sem(y ~ x1 + x2, df, w=W_matrix)

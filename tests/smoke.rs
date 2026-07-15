@@ -11244,3 +11244,134 @@ copula(y1 ~ y2, df, type="gaussian")
         "Copula",
     );
 }
+
+#[test]
+fn nardl_basic() {
+    assert_ok_contains(
+        "nardl",
+        r#"
+input df
+y x
+10 5
+12 6
+15 7
+18 8
+20 9
+22 10
+25 11
+28 12
+30 13
+32 14
+35 15
+38 16
+40 17
+42 18
+45 19
+48 20
+end
+nardl(y ~ x, df, lags=1)
+"#,
+        "NARDL",
+    );
+}
+
+#[test]
+fn pvar_basic() {
+    assert_ok_contains(
+        "pvar",
+        r#"
+input df
+entity y1 y2
+1 10 5
+1 12 6
+1 15 7
+1 18 8
+1 20 9
+1 22 10
+2 8 4
+2 10 5
+2 13 6
+2 16 7
+2 18 8
+2 20 9
+3 11 6
+3 14 7
+3 17 8
+3 20 9
+3 23 10
+3 26 11
+end
+pvar(y1 ~ y2, df, id="entity", lags=1)
+"#,
+        "Panel VAR",
+    );
+}
+
+#[test]
+fn fcoef_basic() {
+    assert_ok_contains(
+        "fcoef",
+        r#"
+input df
+y x z
+10 1.0 5
+12 2.0 6
+15 3.0 7
+18 4.0 8
+20 5.0 9
+22 6.0 10
+25 7.0 11
+28 8.0 12
+30 9.0 13
+32 10.0 14
+35 11.0 15
+38 12.0 16
+40 13.0 17
+42 14.0 18
+45 15.0 19
+48 16.0 20
+end
+fcoef(y ~ x, df, z="z", points=10)
+"#,
+        "Functional Coefficient",
+    );
+}
+
+#[test]
+fn dcc_garch_basic() {
+    assert_ok_contains(
+        "dcc_garch",
+        r#"
+input df
+r1 r2
+0.1 0.05
+0.2 0.1
+-0.1 -0.05
+0.15 0.08
+0.3 0.2
+-0.2 -0.1
+0.1 0.05
+0.25 0.15
+-0.15 -0.08
+0.2 0.1
+0.1 0.05
+0.2 0.1
+-0.1 -0.05
+0.15 0.08
+0.3 0.2
+-0.2 -0.1
+0.1 0.05
+0.25 0.15
+-0.15 -0.08
+0.2 0.1
+0.1 0.05
+0.2 0.1
+-0.1 -0.05
+0.15 0.08
+0.3 0.2
+end
+dcc_garch(r1 ~ r2, df)
+"#,
+        "DCC-GARCH",
+    );
+}
