@@ -11003,3 +11003,128 @@ johansen_break(y1 ~ y2, df, lags=1, breaks=[10])
         "Johansen",
     );
 }
+
+#[test]
+fn tvp_var_basic() {
+    assert_ok_contains(
+        "tvp_var",
+        r#"
+input df
+y1 y2
+10 5
+12 6
+15 7
+18 8
+20 9
+22 10
+25 11
+28 12
+30 13
+32 14
+35 15
+38 16
+40 17
+42 18
+45 19
+48 20
+end
+tvp_var(y1 ~ y2, df, lags=1)
+"#,
+        "TVP-VAR",
+    );
+}
+
+#[test]
+fn spatial_durbin_error_basic() {
+    assert_ok_contains(
+        "spatial_durbin_error",
+        r#"
+input df
+entity y x
+1 10 1.0
+1 12 2.0
+1 15 3.0
+2 8 0.8
+2 10 1.8
+2 13 2.8
+3 11 1.2
+3 14 2.2
+3 17 3.2
+4 9 0.9
+4 11 1.9
+4 14 2.9
+end
+let W = [[0, 0.5, 0.3, 0.2],
+         [0.5, 0, 0.3, 0.2],
+         [0.3, 0.3, 0, 0.4],
+         [0.2, 0.2, 0.4, 0]]
+spatial_durbin_error(y ~ x, df, w=W, id="entity")
+"#,
+        "Spatial Durbin Error",
+    );
+}
+
+#[test]
+fn fmols_basic() {
+    assert_ok_contains(
+        "fmols",
+        r#"
+input df
+y x
+10 5
+11 5.5
+12 6
+13 6.5
+14 7
+15 7.5
+16 8
+17 8.5
+18 9
+19 9.5
+20 10
+21 10.5
+22 11
+23 11.5
+24 12
+25 12.5
+26 13
+27 13.5
+28 14
+29 14.5
+30 15
+end
+fmols(y ~ x, df)
+"#,
+        "FMOLS",
+    );
+}
+
+#[test]
+fn qvar_basic() {
+    assert_ok_contains(
+        "qvar",
+        r#"
+input df
+y1 y2
+10 5
+12 6
+15 7
+18 8
+20 9
+22 10
+25 11
+28 12
+30 13
+32 14
+35 15
+38 16
+40 17
+42 18
+45 19
+48 20
+end
+qvar(y1 ~ y2, df, lags=1, tau=0.5, boot=20)
+"#,
+        "Quantile VAR",
+    );
+}

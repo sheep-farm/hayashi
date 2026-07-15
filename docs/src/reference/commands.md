@@ -201,6 +201,10 @@ Covariance options (where applicable): `cov=nonrobust|HC1|HC2|HC3|HC4|robust`, `
 | `favar` | `favar(y1 ~ y2 + y3, df, observed="r", factors=2)` | Factor-Augmented VAR |
 | `spatial_durbin` | `spatial_durbin(y ~ x, df, w=W, id="e")` | Spatial Durbin (panel FE) |
 | `johansen_break` | `johansen_break(y1 ~ y2, df, lags=1, breaks=[50])` | Johansen with breaks |
+| `tvp_var` | `tvp_var(y1 ~ y2, df, lags=1)` | Time-Varying Parameter VAR |
+| `spatial_durbin_error` | `spatial_durbin_error(y ~ x, df, w=W, id="e")` | Spatial Durbin Error (panel FE) |
+| `fmols` | `fmols(y ~ x, df)` | Fully Modified OLS (cointegration) |
+| `qvar` | `qvar(y1 ~ y2, df, lags=1, tau=0.5)` | Quantile VAR |
 | `hausman` | `hausman(m_fe, m_re)` | Hausman specification test |
 | `lincom` | `lincom(m, expr)` | Linear combination of coefficients |
 | `bootstrap` | `bootstrap(est, formula, df, n=)` | Generic bootstrap |

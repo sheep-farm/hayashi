@@ -131,12 +131,13 @@ reporta o p-value do coeficiente de ŷ².
 
 ## Pendente
 
-- **TVP-VAR** — time-varying parameter VAR via Kalman filter. +0,5 pp.
+- **Dynamic factor model** — DFM com state-space + EM. +0,5 pp.
 
-- **Panel spatial error Durbin** — SDEM com efeitos fixos. +0,5 pp.
+- **Panel smooth transition** — PSTR com múltiplos regimes. +0,5 pp.
 
-- **Nonparametric cointegration** — Phillips-Hansen FMOLS. +0,5 pp.
+- **Wavelet decomposition** — MODWT para análise multi-escala. +0,5 pp.
 
-- **Quantile VAR** — quantile regression em sistema VAR. +0,5 pp.
+- **Copula-based dependence** — Vine copulas para dependência
+  multivariada não-linear. +0,5 pp.
 
-**Cobertura atual: 91,80%.**
+**Cobertura atual: 93,25%.**

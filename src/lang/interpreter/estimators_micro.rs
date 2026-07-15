@@ -2479,6 +2479,189 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── TVP-VAR (Time-Varying Parameter VAR) ─────────────────────────
+            // tvp_var(y1 ~ y2, df, lags=1)
+            "tvp_var" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let lags = match opt_map.get("lags") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 1,
+                };
+
+                let mut all_cols: Vec<String> = vec![g_formula.dependent.clone()];
+                all_cols.extend(g_formula.independents.iter().cloned());
+                let n_vars = all_cols.len();
+                let n = df.n_rows();
+                let mut y_mat = ndarray::Array2::<f64>::zeros((n, n_vars));
+                for (j, name) in all_cols.iter().enumerate() {
+                    let col = df
+                        .get_column(name)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let vals = col.as_float().ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: column '{name}' must be numeric"))
+                    })?;
+                    for i in 0..n {
+                        y_mat[(i, j)] = vals[i];
+                    }
+                }
+
+                let result = greeners::TvpVar::fit(&y_mat, lags, Some(all_cols))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── Spatial Durbin Error Model (SDEM) ───────────────────────────
+            // spatial_durbin_error(y ~ x1 + x2, df, w=W, id="entity")
+            "spatial_durbin_error" | "sdem" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let id_col = match opt_map.get("id") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires id=\"column\" option"
+                        )))
+                    }
+                };
+
+                let w_mat = match opt_map.get("w") {
+                    Some(Value::List(rows)) => {
+                        let n_rows = rows.len();
+                        let mut w = ndarray::Array2::<f64>::zeros((n_rows, n_rows));
+                        for (i, row) in rows.iter().enumerate() {
+                            match row {
+                                Value::List(cols) => {
+                                    if cols.len() != n_rows {
+                                        return Err(HayashiError::Runtime(format!(
+                                            "{func}: W must be square, row {i} has {} cols, expected {n_rows}",
+                                            cols.len()
+                                        )));
+                                    }
+                                    for (j, val) in cols.iter().enumerate() {
+                                        w[(i, j)] = match val {
+                                            Value::Float(f) => *f,
+                                            Value::Int(v) => *v as f64,
+                                            _ => return Err(HayashiError::Runtime(
+                                                format!("{func}: W matrix contains non-numeric values")
+                                            )),
+                                        };
+                                    }
+                                }
+                                _ => return Err(HayashiError::Runtime(
+                                    format!("{func}: W must be a list of lists (matrix)")
+                                )),
+                            }
+                        }
+                        w
+                    }
+                    _ => return Err(HayashiError::Runtime(
+                        format!("{func}() requires w=W option with a spatial weights matrix (list of lists)")
+                    )),
+                };
+
+                let (y_arr, x_arr) = df
+                    .to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = g_formula.independents.clone();
+
+                let entity_ids: Vec<i64> = {
+                    let col = df
+                        .get_column(id_col.as_str())
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    if let Some(i) = col.as_int() {
+                        i.to_vec()
+                    } else if let Some(f) = col.as_float() {
+                        f.iter().map(|v| *v as i64).collect()
+                    } else {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}: id column '{id_col}' must be numeric"
+                        )));
+                    }
+                };
+
+                let result = greeners::SpatialDurbinError::fit(
+                    &y_arr,
+                    &x_arr,
+                    &w_mat,
+                    &entity_ids,
+                    Some(var_names),
+                )
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── FMOLS (Fully Modified OLS) ─────────────────────────────────
+            // fmols(y ~ x1 + x2, df)
+            "fmols" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let (y_arr, x_arr) = df
+                    .to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = g_formula.independents.clone();
+
+                let result = greeners::FMOLS::fit(&y_arr, &x_arr, Some(var_names))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── Quantile VAR ───────────────────────────────────────────────
+            // qvar(y1 ~ y2, df, lags=1, tau=0.5, boot=100)
+            "qvar" | "quantile_var" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let lags = match opt_map.get("lags") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 1,
+                };
+                let tau = match opt_map.get("tau") {
+                    Some(Value::Float(v)) => *v,
+                    Some(Value::Int(v)) => *v as f64,
+                    _ => 0.5,
+                };
+                let n_boot = match opt_map.get("boot") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 100,
+                };
+
+                let mut all_cols: Vec<String> = vec![g_formula.dependent.clone()];
+                all_cols.extend(g_formula.independents.iter().cloned());
+                let n_vars = all_cols.len();
+                let n = df.n_rows();
+                let mut y_mat = ndarray::Array2::<f64>::zeros((n, n_vars));
+                for (j, name) in all_cols.iter().enumerate() {
+                    let col = df
+                        .get_column(name)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let vals = col.as_float().ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: column '{name}' must be numeric"))
+                    })?;
+                    for i in 0..n {
+                        y_mat[(i, j)] = vals[i];
+                    }
+                }
+
+                let result = greeners::QuantileVAR::fit(&y_mat, lags, tau, n_boot, Some(all_cols))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
             // ── Spatial econometrics ────────────────────────────────────────
             // spatial_sar(y ~ x1 + x2, df, w=W_matrix)
             // spatial_sem(y ~ x1 + x2, df, w=W_matrix)
