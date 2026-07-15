@@ -10201,3 +10201,78 @@ linktest(m)
         "Linktest",
     );
 }
+
+#[test]
+fn xtlogit_panel() {
+    assert_ok_contains(
+        "xtlogit_panel",
+        r#"
+input df
+id y x1 x2
+1 0 1.0 2.0
+1 1 1.5 2.5
+1 0 2.0 3.0
+1 1 2.5 3.5
+2 0 3.0 1.0
+2 0 3.5 1.5
+2 1 4.0 2.0
+2 1 4.5 2.5
+3 1 5.0 4.0
+3 1 5.5 4.5
+3 1 6.0 5.0
+3 1 6.5 5.5
+end
+xtlogit(y ~ x1 + x2, df, id="id")
+"#,
+        "Generalized Estimating",
+    );
+}
+
+#[test]
+fn xtpoisson_panel() {
+    assert_ok_contains(
+        "xtpoisson_panel",
+        r#"
+input df
+id y x1
+1 2 1.0
+1 3 1.5
+1 4 2.0
+2 1 0.5
+2 2 1.0
+2 3 1.5
+3 5 2.0
+3 6 2.5
+3 7 3.0
+end
+xtpoisson(y ~ x1, df, id="id")
+"#,
+        "Generalized Estimating",
+    );
+}
+
+#[test]
+fn eventstudy_basic() {
+    assert_ok_contains(
+        "eventstudy_basic",
+        r#"
+input df
+y etime
+10 -2
+12 -1
+15 0
+18 1
+20 2
+22 3
+8 -2
+10 -1
+14 0
+17 1
+19 2
+21 3
+end
+eventstudy(y ~ etime, df, ref=-1, min=-2, max=3)
+"#,
+        "Event Study",
+    );
+}

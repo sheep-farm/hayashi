@@ -186,3 +186,30 @@ display m
   verifique a ausência de efeitos pré-tratamento como teste de
   tendências paralelas.
 \end{nota}
+
+\section{Event study (DiD dinâmico)}
+
+\index{eventstudy@\texttt{eventstudy()}}
+\index{event study}
+
+O comando \texttt{eventstudy} estima um DiD dinâmico com leads e lags,
+construindo dummies de tempo de evento para cada período relativo ao
+evento (excluindo o período de referência):
+
+\begin{lstlisting}
+eventstudy(y ~ event_time + controles, df, ref=-1, min=-5, max=5, cov=HC1)
+\end{lstlisting}
+
+\begin{itemize}
+  \item \texttt{event\_time}: variável com o tempo relativo ao evento
+    ($\ldots, -2, -1, 0, 1, 2, \ldots$)
+  \item \texttt{ref}: período de referência omitido (padrão $-1$)
+  \item \texttt{min}, \texttt{max}: limites inferior e superior dos
+    tempos de evento incluídos (padrão $-5$ e $5$)
+  \item Controles opcionais são incluídos após \texttt{event\_time}
+\end{itemize}
+
+O resultado reporta coeficientes, erros-padrão, estatísticas $t$ e
+$p$-values para cada tempo de evento. Os coeficientes dos leads
+($t < 0$) testam a hipótese de tendências paralelas: se
+estatisticamente significativos, indicam violação do pressuposto.

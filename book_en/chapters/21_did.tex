@@ -185,3 +185,30 @@ display m
   verify the absence of pre-treatment effects as a test of
   parallel trends.
 \end{nota}
+
+\section{Event study (dynamic DiD)}
+
+\index{eventstudy@\texttt{eventstudy()}}
+\index{event study}
+
+The \texttt{eventstudy} command estimates a dynamic DiD with leads and
+lags, constructing event-time dummies for each period relative to the
+event (excluding the reference period):
+
+\begin{lstlisting}
+eventstudy(y ~ event_time + controls, df, ref=-1, min=-5, max=5, cov=HC1)
+\end{lstlisting}
+
+\begin{itemize}
+  \item \texttt{event\_time}: variable with time relative to the event
+    ($\ldots, -2, -1, 0, 1, 2, \ldots$)
+  \item \texttt{ref}: reference period omitted (default $-1$)
+  \item \texttt{min}, \texttt{max}: lower and upper bounds of event
+    times included (default $-5$ and $5$)
+  \item Optional controls are included after \texttt{event\_time}
+\end{itemize}
+
+The output reports coefficients, standard errors, $t$-statistics, and
+$p$-values for each event time. Lead coefficients ($t < 0$) test the
+parallel trends assumption: if statistically significant, they indicate
+a violation of the identifying assumption.

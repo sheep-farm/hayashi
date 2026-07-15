@@ -172,6 +172,10 @@ Covariance options (where applicable): `cov=nonrobust|HC1|HC2|HC3|HC4|robust`, `
 | `lroc` | `lroc(model)` | ROC curve and AUC (logit/probit) |
 | `estat_gof` | `estat_gof(model, groups=10)` | Hosmer-Lemeshow goodness-of-fit |
 | `linktest` | `linktest(model)` | Specification test (logit/probit) |
+| `xtlogit` | `xtlogit(y ~ x, df, id="g")` | Panel logit (GEE) |
+| `xtprobit` | `xtprobit(y ~ x, df, id="g")` | Panel probit (GEE) |
+| `xtpoisson` | `xtpoisson(y ~ x, df, id="g")` | Panel Poisson (GEE) |
+| `eventstudy` | `eventstudy(y ~ etime + x, df, ref=-1, min=-5, max=5)` | Event study (dynamic DiD) |
 | `hausman` | `hausman(m_fe, m_re)` | Hausman specification test |
 | `lincom` | `lincom(m, expr)` | Linear combination of coefficients |
 | `bootstrap` | `bootstrap(est, formula, df, n=)` | Generic bootstrap |

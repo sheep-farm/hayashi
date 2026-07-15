@@ -1476,6 +1476,88 @@ impl Interpreter {
                 Ok(Value::DidResult(Rc::new(result)))
             }
 
+            // ── Event Study (dynamic DiD with leads and lags) ───────────────
+            // eventstudy(y ~ event_time + x1 + x2, df, ref=-1, min=-5, max=5, cov=HC1)
+            "eventstudy" | "event_study" | "es" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "eventstudy(y ~ event_time + controls, df) requires formula and DataFrame"
+                            .into(),
+                    ));
+                }
+                let formula_ast = self.resolve_formula(&args[0])?;
+                let df = match self.eval_expr(&args[1])? {
+                    Value::DataFrame(d) => d,
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "eventstudy(): second argument must be DataFrame".into(),
+                        ))
+                    }
+                };
+                let rhs_vars: Vec<String> = formula_ast
+                    .rhs
+                    .iter()
+                    .filter_map(|t| t.as_var().map(|s| s.to_string()))
+                    .collect();
+                if rhs_vars.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "eventstudy(): formula must have at least event_time on RHS".into(),
+                    ));
+                }
+                let event_col = &rhs_vars[0];
+                let y = get_col_f64(&df, &formula_ast.lhs)?;
+                let event_vals = get_col_f64(&df, event_col)?;
+                let event_time: Vec<i64> = event_vals.iter().map(|&v| v as i64).collect();
+
+                // Controls: remaining RHS vars
+                let n = y.len();
+                let control_vars = &rhs_vars[1..];
+                let x_controls = if control_vars.is_empty() {
+                    ndarray::Array2::zeros((n, 0))
+                } else {
+                    let mut x = ndarray::Array2::zeros((n, control_vars.len()));
+                    for (j, v) in control_vars.iter().enumerate() {
+                        let col = get_col_f64(&df, v)?;
+                        for i in 0..n {
+                            x[(i, j)] = col[i];
+                        }
+                    }
+                    x
+                };
+
+                let reference = match opt_map.get("ref") {
+                    Some(Value::Int(v)) => *v,
+                    Some(Value::Float(v)) => *v as i64,
+                    None => -1,
+                    _ => -1,
+                };
+                let min_t = match opt_map.get("min") {
+                    Some(Value::Int(v)) => *v,
+                    Some(Value::Float(v)) => *v as i64,
+                    None => -5,
+                    _ => -5,
+                };
+                let max_t = match opt_map.get("max") {
+                    Some(Value::Int(v)) => *v,
+                    Some(Value::Float(v)) => *v as i64,
+                    None => 5,
+                    _ => 5,
+                };
+                let cov = resolve_cov_full(opt_map, &df)?;
+                let result = greeners::EventStudy::fit(
+                    &y,
+                    &event_time,
+                    &x_controls,
+                    reference,
+                    min_t,
+                    max_t,
+                    cov,
+                )
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
             // ── Quantile Regression ───────────────────────────────────────────
             // qreg(y ~ x1 + x2, df, tau=0.5, boot=200)
             "qreg" => {
@@ -1699,6 +1781,91 @@ impl Interpreter {
                     .formula_var_names(&g_formula)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 // convert id column to group indices (usize)
+                let id_vals = get_col_f64(&df, &id_col)?;
+                let mut id_map: std::collections::HashMap<i64, usize> =
+                    std::collections::HashMap::new();
+                let mut next_id = 0usize;
+                let groups: ndarray::Array1<usize> = id_vals
+                    .iter()
+                    .map(|&v| {
+                        let key = v as i64;
+                        *id_map.entry(key).or_insert_with(|| {
+                            let id = next_id;
+                            next_id += 1;
+                            id
+                        })
+                    })
+                    .collect();
+                let result = greeners::GEE::fit_with_names(
+                    &y_vec,
+                    &x_mat,
+                    &groups,
+                    &family,
+                    &link,
+                    &corr,
+                    Some(var_names),
+                )
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                Ok(Value::GeeResult(Rc::new(result)))
+            }
+
+            // ── Panel nonlinear: xtlogit, xtprobit, xtpoisson ──────────────
+            // Convenience wrappers over gee() with pre-set family/link
+            "xtlogit" | "xtprobit" | "xtpoisson" | "xtgee" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let id_col = match opt_map.get("id") {
+                    Some(Value::Str(s)) => s.clone(),
+                    None => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{}() requires id=group_column option",
+                            func
+                        )))
+                    }
+                    _ => return Err(HayashiError::Type("id= must be string".into())),
+                };
+                let (family, link) = match func {
+                    "xtlogit" => (greeners::Family::Binomial, greeners::Link::Logit),
+                    "xtprobit" => (greeners::Family::Binomial, greeners::Link::Probit),
+                    "xtpoisson" => (greeners::Family::Poisson, greeners::Link::Log),
+                    _ => {
+                        // xtgee — use family= option
+                        let family_str = match opt_map.get("family") {
+                            None => "gaussian",
+                            Some(Value::Str(s)) => s.as_str(),
+                            _ => "gaussian",
+                        };
+                        match family_str {
+                            "binomial" | "logit" => {
+                                (greeners::Family::Binomial, greeners::Link::Logit)
+                            }
+                            "poisson" => (greeners::Family::Poisson, greeners::Link::Log),
+                            _ => (greeners::Family::Gaussian, greeners::Link::Identity),
+                        }
+                    }
+                };
+                let corr_str = match opt_map.get("corr") {
+                    None => "exchangeable",
+                    Some(Value::Str(s)) => s.as_str(),
+                    _ => "exchangeable",
+                };
+                let corr = match corr_str {
+                    "independence" | "ind" => greeners::CorrStructure::Independence,
+                    "exchangeable" | "exch" => greeners::CorrStructure::Exchangeable,
+                    "ar1" | "ar(1)" => greeners::CorrStructure::AR1,
+                    "unstructured" | "uns" => greeners::CorrStructure::Unstructured,
+                    other => {
+                        return Err(HayashiError::Runtime(format!(
+                            "corr='{other}' unknown — use: independence, exchangeable, ar1, unstructured"
+                        )))
+                    }
+                };
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+                let (y_vec, x_mat) = df
+                    .to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = df
+                    .formula_var_names(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let id_vals = get_col_f64(&df, &id_col)?;
                 let mut id_map: std::collections::HashMap<i64, usize> =
                     std::collections::HashMap::new();

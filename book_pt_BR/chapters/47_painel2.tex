@@ -110,3 +110,34 @@ clogit(yb ~ x, df, group="unit")          // logit condicional
   automaticamente descartados porque não contribuem para a verossimilhança
   condicional. Isso reduz a amostra efetiva, mas é teoricamente correto.
 \end{nota}
+
+\section{Painel não-linear via GEE}
+
+\index{xtlogit@\texttt{xtlogit()}}
+\index{xtprobit@\texttt{xtprobit()}}
+\index{xtpoisson@\texttt{xtpoisson()}}
+\index{GEE!painel não-linear}
+
+Para modelos não-lineares em painel (logit, probit, Poisson), Hayashi
+oferece wrappers sobre GEE (Generalized Estimating Equations), que
+estimam modelos population-averaged com correlação intra-grupo
+flexível:
+
+\begin{lstlisting}
+xtlogit(yb ~ x1 + x2, df, id="firm", corr="exchangeable")
+xtprobit(yb ~ x1 + x2, df, id="firm", corr="exchangeable")
+xtpoisson(y ~ x1 + x2, df, id="firm", corr="exchangeable")
+\end{lstlisting}
+
+Estruturas de correlação disponíveis:
+\begin{itemize}
+  \item \texttt{independence} — correlação intra-grupo zero
+  \item \texttt{exchangeable} — simetria composta (padrão)
+  \item \texttt{ar1} — autoregressivo de primeira ordem
+  \item \texttt{unstructured} — matriz não-estruturada
+\end{itemize}
+
+\begin{nota}
+  GEE estima efeitos populacionais (marginais), não efeitos condicionais
+  aos efeitos fixos. Para logit com efeitos fixos, use \texttt{clogit}.
+\end{nota}

@@ -143,6 +143,24 @@ linktest(m_logit)
 
 Stata's `linktest` for specification error detection. Re-estimates the model using the linear predictor ŷ = Xβ and ŷ² as the only regressors. If the coefficient on ŷ² is statistically significant (p < 0.05), there is a specification error — either the link function is inadequate or the functional form is wrong. H0: the model is correctly specified (coefficient of ŷ² = 0).
 
+### Event study (dynamic DiD)
+
+```
+eventstudy(y ~ event_time + controls, df, ref=-1, min=-5, max=5, cov=HC1)
+```
+
+Estimates dynamic treatment effects by constructing event-time dummies for each period relative to the event (from `min` to `max`, excluding the `ref`erence period) and running OLS. Reports coefficients, standard errors, t-stats, and p-values for each event time. The reference period (default -1) is omitted to serve as the baseline. Controls can be included as additional RHS variables after `event_time`. Aliases: `event_study`, `es`.
+
+## Panel nonlinear models
+
+```
+xtlogit(y ~ x1 + x2, df, id="firm", corr="exchangeable")
+xtprobit(y ~ x1 + x2, df, id="firm", corr="exchangeable")
+xtpoisson(y ~ x1 + x2, df, id="firm", corr="exchangeable")
+```
+
+Panel logit, probit, and Poisson estimation via Generalized Estimating Equations (GEE, population-averaged). The `id=` option specifies the group/panel identifier column. Correlation structures: `independence`, `exchangeable` (default), `ar1`, `unstructured`. These are convenience wrappers over `gee()` with pre-set family/link combinations.
+
 ## Coefficient plot
 
 ```

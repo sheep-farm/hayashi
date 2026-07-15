@@ -110,3 +110,33 @@ clogit(yb ~ x, df, group="unit")          // conditional logit
   automatically dropped because they do not contribute to the conditional
   likelihood. This reduces the effective sample, but is theoretically correct.
 \end{nota}
+
+\section{Panel nonlinear models via GEE}
+
+\index{xtlogit@\texttt{xtlogit()}}
+\index{xtprobit@\texttt{xtprobit()}}
+\index{xtpoisson@\texttt{xtpoisson()}}
+\index{GEE!panel nonlinear}
+
+For nonlinear panel models (logit, probit, Poisson), Hayashi offers
+wrappers over GEE (Generalized Estimating Equations), which estimate
+population-averaged models with flexible intra-group correlation:
+
+\begin{lstlisting}
+xtlogit(yb ~ x1 + x2, df, id="firm", corr="exchangeable")
+xtprobit(yb ~ x1 + x2, df, id="firm", corr="exchangeable")
+xtpoisson(y ~ x1 + x2, df, id="firm", corr="exchangeable")
+\end{lstlisting}
+
+Available correlation structures:
+\begin{itemize}
+  \item \texttt{independence} — zero intra-group correlation
+  \item \texttt{exchangeable} — compound symmetry (default)
+  \item \texttt{ar1} — first-order autoregressive
+  \item \texttt{unstructured} — unstructured matrix
+\end{itemize}
+
+\begin{nota}
+  GEE estimates population (marginal) effects, not effects conditional
+  on fixed effects. For logit with fixed effects, use \texttt{clogit}.
+\end{nota}
