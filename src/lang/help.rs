@@ -442,6 +442,7 @@ fn legacy_help_text(topic: &str) -> Option<&'static str> {
         "estat_classification" | "classification" => "estat_classification(model [, threshold=0.5])\n  Classification table for logit/probit.\n  Reports sensitivity, specificity, and correct rate.\n\n  estat_classification(m_logit)\n  estat_classification(m_logit, threshold=0.3)\n",
         "lroc" | "roc" => "lroc(model)\n  ROC curve and AUC for logit/probit.\n  AUC > 0.5 indicates discrimination power.\n\n  lroc(m_logit)\n",
         "estat_gof" | "hosmer_lemeshow" => "estat_gof(model [, groups=10])\n  Hosmer-Lemeshow goodness-of-fit test for logit/probit.\n  H0: model fits the data adequately.\n\n  estat_gof(m_logit)\n  estat_gof(m_logit, groups=5)\n",
+        "linktest" => "linktest(model)\n  Specification test for logit/probit.\n  Re-estimates the model using ŷ and ŷ² as regressors.\n  H0: model is correctly specified (coef of ŷ² = 0).\n  If ŷ² is significant, there is a specification error.\n\n  linktest(m_logit)\n",
         "qqplot" => "qqplot(df, var)\n  Q-Q plot (ASCII).\n\n  qqplot(df, residuals)\n",
         "corrplot" => "corrplot(df, var1, var2 [, ...])\n  Correlation heatmap (ASCII).\n\n  corrplot(df, price, mpg, weight)\n",
         "adf" | "adtest" => "adf(df, var [, lags=auto])\n  Augmented Dickey-Fuller unit root test.\n\n  adf(df, gdp)\n",

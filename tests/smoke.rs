@@ -10171,3 +10171,33 @@ estat_gof(m)
         "Hosmer-Lemeshow",
     );
 }
+
+#[test]
+fn logit_linktest() {
+    assert_ok_contains(
+        "logit_linktest",
+        r#"
+input df
+y x1 x2
+0 1.2 2.1
+0 2.3 3.2
+0 3.1 1.5
+1 3.8 4.9
+1 5.1 6.2
+1 6.2 4.1
+1 7.3 7.1
+0 2.1 1.8
+1 5.5 5.3
+1 6.1 6.5
+0 1.8 2.8
+0 2.8 3.5
+1 4.2 5.5
+1 5.8 6.8
+0 3.5 2.2
+end
+let m = logit(y ~ x1 + x2, df)
+linktest(m)
+"#,
+        "Linktest",
+    );
+}

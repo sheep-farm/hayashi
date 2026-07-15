@@ -203,3 +203,16 @@ Teste de goodness-of-fit de Hosmer-Lemeshow. Divide as observações em
 \textit{groups} decilas (padrão 10) pela probabilidade prevista e
 compara observado vs esperado via $\chi^2(g-2)$. $H_0$: o modelo ajusta
 adequadamente. Rejeitar $H_0$ ($p < 0{,}05$) indica mau ajuste.
+
+\subsection{Linktest}
+
+\begin{lstlisting}
+linktest(m)
+\end{lstlisting}
+
+Teste de erro de especificação (Stata \texttt{linktest}). Reestima o
+modelo usando $\hat{y} = X\hat{\beta}$ (preditor linear) e $\hat{y}^2$
+como únicos regressores. $H_0$: o modelo está corretamente especificado
+(coeficiente de $\hat{y}^2 = 0$). Se $\hat{y}^2$ for significativo
+($p < 0{,}05$), há erro de especificação --- função de ligação
+inadequada ou forma funcional incorreta.

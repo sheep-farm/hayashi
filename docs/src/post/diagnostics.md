@@ -135,6 +135,14 @@ estat_gof(m_logit, groups=5)
 
 Hosmer-Lemeshow goodness-of-fit test. Divides observations into `groups` deciles (default 10) based on predicted probabilities and compares observed vs expected counts via a chi-squared statistic. H0: the model fits adequately. If rejected (p < 0.05), the model does not fit well.
 
+### Linktest (specification error detection)
+
+```
+linktest(m_logit)
+```
+
+Stata's `linktest` for specification error detection. Re-estimates the model using the linear predictor ŷ = Xβ and ŷ² as the only regressors. If the coefficient on ŷ² is statistically significant (p < 0.05), there is a specification error — either the link function is inadequate or the functional form is wrong. H0: the model is correctly specified (coefficient of ŷ² = 0).
+
 ## Coefficient plot
 
 ```

@@ -99,6 +99,11 @@ reporta o p-value do coeficiente de ŷ².
   `estat_gof(model, groups=10)`. χ²(g-2) comparando observado vs esperado
   por decil de probabilidade prevista.
 
+- ~~`linktest`~~ — implementado em `Greeners/src/binary_diagnostics.rs`
+  como `BinaryDiagnostics::linktest()`. Exposto em Hayashi como
+  `linktest(model)`. Reestima o modelo com ŷ e ŷ²; se ŷ² for
+  significativo, há erro de especificação.
+
 ---
 
 ## Priorização sugerida
@@ -107,4 +112,6 @@ reporta o p-value do coeficiente de ŷ².
 
 2. ~~Logit: classification + ROC + Hosmer-Lemeshow~~ — **concluído**.
 
-3. **`linktest`** — útil mas mais nicho. Único item restante.
+3. ~~`linktest`~~ — **concluído**.
+
+**Todos os itens do ROADMAP estão implementados.**

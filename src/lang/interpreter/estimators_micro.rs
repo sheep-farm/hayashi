@@ -876,6 +876,22 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // linktest(model) — specification error detection
+            "linktest" => {
+                if args.is_empty() {
+                    return Err(self.rt_err("linktest(model) requires a logit/probit model"));
+                }
+                let v = self.eval_expr(&args[0])?;
+                let model = match &v {
+                    Value::BinaryResult(m) => m.clone(),
+                    _ => return Err(self.rt_err("linktest: argument must be a logit/probit model")),
+                };
+                let result = BinaryDiagnostics::linktest(&model.y, &model.x, &model.result.params)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
             // ── Logit ─────────────────────────────────────────────────────────
             "logit" => {
                 let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;

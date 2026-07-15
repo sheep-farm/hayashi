@@ -151,6 +151,7 @@ pub const BUILTIN_NAMES: &[&str] = &[
     "estat_classification",
     "lroc",
     "estat_gof",
+    "linktest",
     "histogram",
     "boxplot",
     "kdensity",
