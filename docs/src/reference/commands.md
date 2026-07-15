@@ -216,6 +216,10 @@ Covariance options (where applicable): `cov=nonrobust|HC1|HC2|HC3|HC4|robust`, `
 | `bvar` | `bvar(y1 ~ y2, df, lags=1, lambda1=0.1)` | Bayesian VAR (Minnesota prior) |
 | `mfvar` | `mfvar(df_l, y_l, df_h, y_h, agg=3)` | Mixed-Frequency VAR (MIDAS) |
 | `tvcopula` | `tvcopula(y1 ~ y2, df, type="gaussian")` | Time-varying copula |
+| `sv` | `sv(df, var, iter=100)` | Stochastic Volatility (MCMC) |
+| `fapanel` | `fapanel(y ~ x, df, aux="df", id="e", period="p")` | Factor-augmented panel |
+| `hawkes` | `hawkes(df, time_var, T=100)` | Hawkes self-exciting process |
+| `rf` | `rf(y ~ x1 + x2, df, trees=100, depth=10)` | Random Forest regression |
 | `hausman` | `hausman(m_fe, m_re)` | Hausman specification test |
 | `lincom` | `lincom(m, expr)` | Linear combination of coefficients |
 | `bootstrap` | `bootstrap(est, formula, df, n=)` | Generic bootstrap |

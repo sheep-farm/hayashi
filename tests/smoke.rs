@@ -11524,3 +11524,131 @@ tvcopula(y1 ~ y2, df, type="gaussian")
         "Time-Varying Copula",
     );
 }
+
+#[test]
+fn sv_basic() {
+    assert_ok_contains(
+        "sv",
+        r#"
+input df
+r
+0.1
+0.2
+-0.1
+0.15
+0.3
+-0.2
+0.1
+0.25
+-0.15
+0.2
+0.1
+0.2
+-0.1
+0.15
+0.3
+-0.2
+0.1
+0.25
+-0.15
+0.2
+0.1
+0.2
+-0.1
+0.15
+0.3
+end
+sv(df, r, iter=20)
+"#,
+        "Stochastic Volatility",
+    );
+}
+
+#[test]
+fn fapanel_basic() {
+    assert_ok_contains(
+        "fapanel",
+        r#"
+input df
+entity period y x
+1 1 10 1.0
+1 2 12 2.0
+1 3 15 3.0
+2 1 8 0.8
+2 2 10 1.8
+2 3 13 2.8
+3 1 11 1.2
+3 2 14 2.2
+3 3 17 3.2
+end
+input aux_df
+f1 f2
+1.0 0.5
+1.5 0.8
+2.0 1.2
+end
+fapanel(y ~ x, df, aux="aux_df", id="entity", period="period", factors=1)
+"#,
+        "Factor-Augmented Panel",
+    );
+}
+
+#[test]
+fn hawkes_basic() {
+    assert_ok_contains(
+        "hawkes",
+        r#"
+input df
+t
+1.0
+2.5
+3.0
+5.0
+5.5
+7.0
+8.0
+10.0
+11.0
+12.5
+13.0
+15.0
+16.0
+17.5
+18.0
+20.0
+end
+hawkes(df, t, T=20)
+"#,
+        "Hawkes Process",
+    );
+}
+
+#[test]
+fn rf_basic() {
+    assert_ok_contains(
+        "rf",
+        r#"
+input df
+y x1 x2
+10 1.0 5
+12 2.0 6
+15 3.0 7
+18 4.0 8
+20 5.0 9
+22 6.0 10
+25 7.0 11
+28 8.0 12
+30 9.0 13
+32 10.0 14
+35 11.0 15
+38 12.0 16
+40 13.0 17
+42 14.0 18
+45 15.0 19
+48 16.0 20
+end
+rf(y ~ x1 + x2, df, trees=10, depth=5)
+"#,
+        "Random Forest",
+    );
+}

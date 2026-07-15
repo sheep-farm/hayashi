@@ -133,12 +133,12 @@ reporta o p-value do coeficiente de ŷ².
 
 ## Pendente
 
-- **Stochastic Volatility** — SV com MCMC. +0,2 pp.
+- **Gradient boosting** — XGBoost-style tree boosting. +0,2 pp.
 
-- **Factor-augmented panel** — panel com fatores comuns. +0,2 pp.
+- **Neural network** — MLP para regressao. +0,2 pp.
 
-- **Hawkes process** — self-exciting point process. +0,2 pp.
+- **Synthetic DiD** — Arkhangelsky et al. 2021. +0,2 pp.
 
-- **Random forest** — tree ensemble para regressao. +0,2 pp.
+- **CUPED** — Controlled-experiment using pre-experiment data. +0,2 pp.
 
-**Cobertura atual: 96,80%.**
+**Cobertura atual: 97,35%.**

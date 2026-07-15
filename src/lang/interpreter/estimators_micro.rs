@@ -3273,6 +3273,237 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── Stochastic Volatility (SV) ─────────────────────────────────
+            // sv(df, var, iter=100)
+            "sv" | "stochastic_vol" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime("sv(df, var, iter=100)".into()));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("sv: first arg must be DataFrame".into())),
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
+                };
+                let var_name = match &args[1] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "sv: second arg must be variable name".into(),
+                        ))
+                    }
+                };
+                let n_iter = match opt_map.get("iter") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 100,
+                };
+
+                let col = df
+                    .get_column(var_name.as_str())
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let vals = col.as_float().ok_or_else(|| {
+                    HayashiError::Runtime(format!("{func}: '{var_name}' must be numeric"))
+                })?;
+                let y_arr = ndarray::Array1::from_vec(vals.to_vec());
+
+                let result = greeners::SV::fit(&y_arr, n_iter, Some(var_name))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── Factor-augmented panel ─────────────────────────────────────
+            // fapanel(y ~ x1 + x2, df, aux=aux_df, id="entity", period="period", factors=2)
+            "fapanel" | "fa_panel" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let aux_name = match opt_map.get("aux") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires aux=\"aux_df\" option"
+                        )))
+                    }
+                };
+                let id_col = match opt_map.get("id") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires id=\"column\" option"
+                        )))
+                    }
+                };
+                let period_col = match opt_map.get("period") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires period=\"column\" option"
+                        )))
+                    }
+                };
+                let n_factors = match opt_map.get("factors") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 2,
+                };
+
+                let aux_df = match self.env.get(&aux_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(self.rt_err(format!("'{aux_name}' is not a DataFrame"))),
+                };
+
+                let (y_arr, x_arr) = df
+                    .to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = g_formula.independents.clone();
+
+                // Build aux matrix (T x n_aux)
+                let n_aux_cols = aux_df.n_cols();
+                let n_aux_rows = aux_df.n_rows();
+                let mut aux_mat = ndarray::Array2::<f64>::zeros((n_aux_rows, n_aux_cols));
+                let aux_col_names: Vec<String> = aux_df.column_names();
+                for (j, cname) in aux_col_names.iter().enumerate() {
+                    if let Ok(col) = aux_df.get_column(cname) {
+                        if let Some(vals) = col.as_float() {
+                            for i in 0..n_aux_rows {
+                                aux_mat[(i, j)] = vals[i];
+                            }
+                        }
+                    }
+                }
+
+                // Extract entity and period IDs
+                let entity_ids: Vec<i64> = {
+                    let col = df
+                        .get_column(id_col.as_str())
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    if let Some(i) = col.as_int() {
+                        i.to_vec()
+                    } else if let Some(f) = col.as_float() {
+                        f.iter().map(|v| *v as i64).collect()
+                    } else {
+                        return Err(HayashiError::Runtime(format!("{func}: id must be numeric")));
+                    }
+                };
+                let period_ids: Vec<i64> = {
+                    let col = df
+                        .get_column(period_col.as_str())
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    if let Some(i) = col.as_int() {
+                        i.to_vec()
+                    } else if let Some(f) = col.as_float() {
+                        f.iter().map(|v| *v as i64).collect()
+                    } else {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}: period must be numeric"
+                        )));
+                    }
+                };
+
+                let result = greeners::FAPanel::fit(
+                    &y_arr,
+                    &x_arr,
+                    &aux_mat,
+                    &entity_ids,
+                    &period_ids,
+                    n_factors,
+                    Some(var_names),
+                )
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── Hawkes process ─────────────────────────────────────────────
+            // hawkes(df, time_var, T=100)
+            "hawkes" => {
+                if args.len() < 2 {
+                    return Err(HayashiError::Runtime(
+                        "hawkes(df, time_var [, T=100])".into(),
+                    ));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "hawkes: first arg must be DataFrame".into(),
+                        ))
+                    }
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
+                };
+                let var_name = match &args[1] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "hawkes: second arg must be variable name".into(),
+                        ))
+                    }
+                };
+                let t_window = match opt_map.get("T") {
+                    Some(Value::Float(v)) => Some(*v),
+                    Some(Value::Int(v)) => Some(*v as f64),
+                    _ => None,
+                };
+
+                let col = df
+                    .get_column(var_name.as_str())
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let vals = col.as_float().ok_or_else(|| {
+                    HayashiError::Runtime(format!("{func}: '{var_name}' must be numeric"))
+                })?;
+                let event_times: Vec<f64> = vals.to_vec();
+
+                let result = greeners::Hawkes::fit(&event_times, t_window)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── Random Forest regression ───────────────────────────────────
+            // rf(y ~ x1 + x2, df, trees=100, depth=10)
+            "rf" | "random_forest" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let n_trees = match opt_map.get("trees") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 100,
+                };
+                let max_depth = match opt_map.get("depth") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 10,
+                };
+
+                let (y_arr, x_arr) = df
+                    .to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = g_formula.independents.clone();
+
+                let result = greeners::RandomForest::fit(
+                    &y_arr,
+                    &x_arr,
+                    n_trees,
+                    max_depth,
+                    Some(var_names),
+                )
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
             // ── Spatial econometrics ────────────────────────────────────────
             // spatial_sar(y ~ x1 + x2, df, w=W_matrix)
             // spatial_sem(y ~ x1 + x2, df, w=W_matrix)
