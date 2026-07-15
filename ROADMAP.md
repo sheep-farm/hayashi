@@ -133,12 +133,12 @@ reporta o p-value do coeficiente de ŷ².
 
 ## Pendente
 
-- **Quantile regression forest** — QRF para intervalos. +0,1 pp.
+- **LSTM** — recurrent neural network para series. +0,05 pp.
 
-- **XGBoost** — XGBoost com regularizacao L1/L2. +0,1 pp.
+- **Causal forest** — Wager-Athey para heterogeneous effects. +0,05 pp.
 
-- **Double ML cross-fitting** — DML com sample splitting. +0,1 pp.
+- **Generalized random forest** — GRF para treatment effects. +0,05 pp.
 
-- **Bayesian synthetic control** — SC com priors. +0,1 pp.
+- **Conformal prediction** — distribution-free uncertainty. +0,05 pp.
 
-**Cobertura atual: 98,35%.**
+**Cobertura atual: 98,85%.**

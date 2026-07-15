@@ -11765,3 +11765,119 @@ cuped(y_post ~ y_pre, df, treated="treated")
         "CUPED",
     );
 }
+
+#[test]
+fn qrf_basic() {
+    assert_ok_contains(
+        "qrf",
+        r#"
+input df
+y x1 x2
+10 1.0 5
+12 2.0 6
+15 3.0 7
+18 4.0 8
+20 5.0 9
+22 6.0 10
+25 7.0 11
+28 8.0 12
+30 9.0 13
+32 10.0 14
+35 11.0 15
+38 12.0 16
+40 13.0 17
+42 14.0 18
+45 15.0 19
+48 16.0 20
+end
+qrf(y ~ x1 + x2, df, quantiles="0.1,0.5,0.9", trees=10, depth=5)
+"#,
+        "Quantile Regression Forest",
+    );
+}
+
+#[test]
+fn xgboost_basic() {
+    assert_ok_contains(
+        "xgboost",
+        r#"
+input df
+y x1 x2
+10 1.0 5
+12 2.0 6
+15 3.0 7
+18 4.0 8
+20 5.0 9
+22 6.0 10
+25 7.0 11
+28 8.0 12
+30 9.0 13
+32 10.0 14
+35 11.0 15
+38 12.0 16
+40 13.0 17
+42 14.0 18
+45 15.0 19
+48 16.0 20
+end
+xgboost(y ~ x1 + x2, df, trees=20, lr=0.3, depth=3, lambda=1.0)
+"#,
+        "XGBoost",
+    );
+}
+
+#[test]
+fn dml_crossfit_basic() {
+    assert_ok_contains(
+        "dml_crossfit",
+        r#"
+input df
+y d x1 x2
+10 1 5 2
+12 1 6 3
+15 0 7 4
+18 1 8 5
+20 0 9 6
+22 1 10 7
+25 0 11 8
+28 1 12 9
+30 0 13 10
+32 1 14 11
+35 0 15 12
+38 1 16 13
+40 0 17 14
+42 1 18 15
+45 0 19 16
+48 1 20 17
+50 0 21 18
+52 1 22 19
+55 0 23 20
+58 1 24 21
+end
+dml_crossfit(y ~ d, df, x="x1,x2", folds=4)
+"#,
+        "Double ML",
+    );
+}
+
+#[test]
+fn bsc_basic() {
+    assert_ok_contains(
+        "bsc",
+        r#"
+input df
+y_treated c1 c2
+10 8 9
+12 9 10
+15 11 12
+18 13 14
+22 15 16
+25 17 18
+28 19 20
+30 21 22
+end
+bsc(df, y_treated, "c1,c2", 4, prior=1.0)
+"#,
+        "Bayesian Synthetic Control",
+    );
+}

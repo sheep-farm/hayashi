@@ -224,6 +224,10 @@ Covariance options (where applicable): `cov=nonrobust|HC1|HC2|HC3|HC4|robust`, `
 | `mlp` | `mlp(y ~ x1 + x2, df, hidden=10, lr=0.01)` | Neural Network (MLP) regression |
 | `synthdid` | `synthdid(df, y, treated, period, unit="u", period="p")` | Synthetic DiD (Arkhangelsky 2021) |
 | `cuped` | `cuped(y ~ x, df, treated="var")` | CUPED variance reduction |
+| `qrf` | `qrf(y ~ x, df, quantiles="0.1,0.5,0.9")` | Quantile Regression Forest |
+| `xgboost` | `xgboost(y ~ x, df, trees=100, lr=0.3, lambda=1.0)` | XGBoost (L1/L2 regularized) |
+| `dml_crossfit` | `dml_crossfit(y ~ d, df, x="x1,x2", folds=5)` | Double ML with cross-fitting |
+| `bsc` | `bsc(df, y, "c1,c2", period, prior=1.0)` | Bayesian Synthetic Control |
 | `hausman` | `hausman(m_fe, m_re)` | Hausman specification test |
 | `lincom` | `lincom(m, expr)` | Linear combination of coefficients |
 | `bootstrap` | `bootstrap(est, formula, df, n=)` | Generic bootstrap |

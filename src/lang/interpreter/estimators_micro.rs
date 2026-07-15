@@ -3820,6 +3820,283 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── Quantile Regression Forest ─────────────────────────────────
+            // qrf(y ~ x1 + x2, df, quantiles="0.1,0.5,0.9", trees=100, depth=10)
+            "qrf" | "quantile_forest" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let quantiles_str = match opt_map.get("quantiles") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => "0.1,0.5,0.9".to_string(),
+                };
+                let quantiles: Vec<f64> = quantiles_str
+                    .split(',')
+                    .filter_map(|s| s.trim().parse::<f64>().ok())
+                    .filter(|q| *q > 0.0 && *q < 1.0)
+                    .collect();
+                if quantiles.is_empty() {
+                    return Err(HayashiError::Runtime(format!(
+                        "{func}: quantiles must be comma-separated values in (0,1)"
+                    )));
+                }
+
+                let n_trees = match opt_map.get("trees") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 100,
+                };
+                let max_depth = match opt_map.get("depth") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 10,
+                };
+
+                let (y_arr, x_arr) = df
+                    .to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = g_formula.independents.clone();
+
+                let result = greeners::QRF::fit(
+                    &y_arr,
+                    &x_arr,
+                    quantiles,
+                    n_trees,
+                    max_depth,
+                    Some(var_names),
+                )
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── XGBoost ───────────────────────────────────────────────────
+            // xgboost(y ~ x1 + x2, df, trees=100, lr=0.3, depth=6, lambda=1.0, alpha=0.0, gamma=0.0)
+            "xgboost" | "xgb" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let n_trees = match opt_map.get("trees") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 100,
+                };
+                let lr = match opt_map.get("lr") {
+                    Some(Value::Float(v)) => Some(*v),
+                    Some(Value::Int(v)) => Some(*v as f64),
+                    _ => None,
+                };
+                let max_depth = match opt_map.get("depth") {
+                    Some(Value::Int(v)) => Some(*v as usize),
+                    Some(Value::Float(v)) => Some(*v as usize),
+                    _ => None,
+                };
+                let lambda = match opt_map.get("lambda") {
+                    Some(Value::Float(v)) => Some(*v),
+                    Some(Value::Int(v)) => Some(*v as f64),
+                    _ => None,
+                };
+                let alpha = match opt_map.get("alpha") {
+                    Some(Value::Float(v)) => Some(*v),
+                    Some(Value::Int(v)) => Some(*v as f64),
+                    _ => None,
+                };
+                let gamma = match opt_map.get("gamma") {
+                    Some(Value::Float(v)) => Some(*v),
+                    Some(Value::Int(v)) => Some(*v as f64),
+                    _ => None,
+                };
+                let subsample = match opt_map.get("subsample") {
+                    Some(Value::Float(v)) => Some(*v),
+                    Some(Value::Int(v)) => Some(*v as f64),
+                    _ => None,
+                };
+                let colsample = match opt_map.get("colsample") {
+                    Some(Value::Float(v)) => Some(*v),
+                    Some(Value::Int(v)) => Some(*v as f64),
+                    _ => None,
+                };
+
+                let (y_arr, x_arr) = df
+                    .to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = g_formula.independents.clone();
+
+                let result = greeners::XGBoost::fit(
+                    &y_arr,
+                    &x_arr,
+                    n_trees,
+                    lr,
+                    max_depth,
+                    lambda,
+                    alpha,
+                    gamma,
+                    subsample,
+                    colsample,
+                    Some(var_names),
+                )
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── Double ML with cross-fitting ──────────────────────────────
+            // dml_crossfit(y ~ d, df, x="x1,x2", folds=5)
+            "dml_crossfit" | "dml_cf" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                // y = dependent, d = first independent (treatment)
+                let y_var = g_formula.dependent.clone();
+                let d_var = g_formula
+                    .independents
+                    .first()
+                    .ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: need treatment variable"))
+                    })?
+                    .clone();
+
+                // Confounders from x option
+                let x_str = match opt_map.get("x") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires x=\"x1,x2\" option (confounders)"
+                        )))
+                    }
+                };
+                let x_vars: Vec<String> = x_str.split(',').map(|s| s.trim().to_string()).collect();
+                let n_folds = match opt_map.get("folds") {
+                    Some(Value::Int(v)) => Some(*v as usize),
+                    Some(Value::Float(v)) => Some(*v as usize),
+                    _ => None,
+                };
+
+                let n = df.n_rows();
+                let y_col = df
+                    .get_column(y_var.as_str())
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let y_vals = y_col.as_float().ok_or_else(|| {
+                    HayashiError::Runtime(format!("{func}: '{y_var}' must be numeric"))
+                })?;
+                let y_arr = ndarray::Array1::from_vec(y_vals.to_vec());
+
+                let d_col = df
+                    .get_column(d_var.as_str())
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let d_vals = d_col.as_float().ok_or_else(|| {
+                    HayashiError::Runtime(format!("{func}: '{d_var}' must be numeric"))
+                })?;
+                let d_arr = ndarray::Array1::from_vec(d_vals.to_vec());
+
+                let k = x_vars.len();
+                let mut x_mat = ndarray::Array2::<f64>::zeros((n, k));
+                for (j, xname) in x_vars.iter().enumerate() {
+                    let col = df
+                        .get_column(xname.as_str())
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let vals = col.as_float().ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: '{xname}' must be numeric"))
+                    })?;
+                    for i in 0..n {
+                        x_mat[(i, j)] = vals[i];
+                    }
+                }
+
+                let result = greeners::DMLCrossfit::fit(&y_arr, &d_arr, &x_mat, n_folds)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── Bayesian Synthetic Control ────────────────────────────────
+            // bsc(y_treated, y_controls_matrix, treatment_period, prior=1.0)
+            // bsc(df, y_var, control_vars_str, treatment_period, prior=1.0)
+            "bsc" | "bayesian_sc" => {
+                if args.len() < 4 {
+                    return Err(HayashiError::Runtime(
+                        "bsc(df, y_var, control_vars, treatment_period [, prior=1.0])".into(),
+                    ));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "bsc: first arg must be DataFrame".into(),
+                        ))
+                    }
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
+                };
+                let y_var = match &args[1] {
+                    Expr::Var(n) | Expr::Str(n) => n.clone(),
+                    _ => return Err(HayashiError::Type("bsc: y_var must be identifier".into())),
+                };
+                let control_vars_str = match &args[2] {
+                    Expr::Str(s) => s.clone(),
+                    Expr::Var(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "bsc: control_vars must be string".into(),
+                        ))
+                    }
+                };
+                let treatment_period = match &args[3] {
+                    Expr::Int(v) => *v as usize,
+                    Expr::Float(v) => *v as usize,
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "bsc: treatment_period must be integer".into(),
+                        ))
+                    }
+                };
+                let prior = match opt_map.get("prior") {
+                    Some(Value::Float(v)) => Some(*v),
+                    Some(Value::Int(v)) => Some(*v as f64),
+                    _ => None,
+                };
+
+                let control_vars: Vec<String> = control_vars_str
+                    .split(',')
+                    .map(|s| s.trim().to_string())
+                    .collect();
+                let n = df.n_rows();
+                let n_controls = control_vars.len();
+
+                let y_col = df
+                    .get_column(y_var.as_str())
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let y_vals = y_col.as_float().ok_or_else(|| {
+                    HayashiError::Runtime(format!("{func}: '{y_var}' must be numeric"))
+                })?;
+                let y_arr = ndarray::Array1::from_vec(y_vals.to_vec());
+
+                let mut y_controls = ndarray::Array2::<f64>::zeros((n, n_controls));
+                for (j, cname) in control_vars.iter().enumerate() {
+                    let col = df
+                        .get_column(cname.as_str())
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let vals = col.as_float().ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: '{cname}' must be numeric"))
+                    })?;
+                    for i in 0..n {
+                        y_controls[(i, j)] = vals[i];
+                    }
+                }
+
+                let result =
+                    greeners::BayesianSC::fit(&y_arr, &y_controls, treatment_period, prior)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
             // ── Spatial econometrics ────────────────────────────────────────
             // spatial_sar(y ~ x1 + x2, df, w=W_matrix)
             // spatial_sem(y ~ x1 + x2, df, w=W_matrix)
