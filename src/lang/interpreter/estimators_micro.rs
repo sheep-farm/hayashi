@@ -2994,6 +2994,285 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── Threshold VAR (TVAR) ───────────────────────────────────────
+            // tvar(y1 ~ y2, df, q="threshold_var", lags=1, delay=1)
+            "tvar" | "threshold_var" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let lags = match opt_map.get("lags") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 1,
+                };
+                let max_delay = match opt_map.get("delay") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 1,
+                };
+                let q_col = match opt_map.get("q") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires q=\"threshold_var\" option"
+                        )))
+                    }
+                };
+
+                let mut all_cols: Vec<String> = vec![g_formula.dependent.clone()];
+                all_cols.extend(g_formula.independents.iter().cloned());
+                let n_vars = all_cols.len();
+                let n = df.n_rows();
+                let mut y_mat = ndarray::Array2::<f64>::zeros((n, n_vars));
+                for (j, name) in all_cols.iter().enumerate() {
+                    let col = df
+                        .get_column(name)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let vals = col.as_float().ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: column '{name}' must be numeric"))
+                    })?;
+                    for i in 0..n {
+                        y_mat[(i, j)] = vals[i];
+                    }
+                }
+
+                let q_col_data = df
+                    .get_column(q_col.as_str())
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let q_vals = q_col_data.as_float().ok_or_else(|| {
+                    HayashiError::Runtime(format!(
+                        "{func}: threshold variable '{q_col}' must be numeric"
+                    ))
+                })?;
+                let q_arr = ndarray::Array1::from_vec(q_vals.to_vec());
+
+                let result = greeners::TVAR::fit(&y_mat, &q_arr, lags, max_delay, Some(all_cols))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── Bayesian VAR (BVAR) ────────────────────────────────────────
+            // bvar(y1 ~ y2, df, lags=1, lambda1=0.1, lambda2=0.2, lambda3=1.0)
+            "bvar" | "bayesian_var" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let lags = match opt_map.get("lags") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 1,
+                };
+                let lambda1 = match opt_map.get("lambda1") {
+                    Some(Value::Float(v)) => Some(*v),
+                    Some(Value::Int(v)) => Some(*v as f64),
+                    _ => None,
+                };
+                let lambda2 = match opt_map.get("lambda2") {
+                    Some(Value::Float(v)) => Some(*v),
+                    Some(Value::Int(v)) => Some(*v as f64),
+                    _ => None,
+                };
+                let lambda3 = match opt_map.get("lambda3") {
+                    Some(Value::Float(v)) => Some(*v),
+                    Some(Value::Int(v)) => Some(*v as f64),
+                    _ => None,
+                };
+
+                let mut all_cols: Vec<String> = vec![g_formula.dependent.clone()];
+                all_cols.extend(g_formula.independents.iter().cloned());
+                let n_vars = all_cols.len();
+                let n = df.n_rows();
+                let mut y_mat = ndarray::Array2::<f64>::zeros((n, n_vars));
+                for (j, name) in all_cols.iter().enumerate() {
+                    let col = df
+                        .get_column(name)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let vals = col.as_float().ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: column '{name}' must be numeric"))
+                    })?;
+                    for i in 0..n {
+                        y_mat[(i, j)] = vals[i];
+                    }
+                }
+
+                let result =
+                    greeners::BVAR::fit(&y_mat, lags, lambda1, lambda2, lambda3, Some(all_cols))
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── Mixed-Frequency VAR (MF-VAR) ───────────────────────────────
+            // mfvar(df_low, y_low1, y_low2, df_high, y_high1, agg=3, lags=1)
+            "mfvar" | "mixed_freq_var" => {
+                if args.len() < 4 {
+                    return Err(HayashiError::Runtime(
+                        "mfvar(df_low, y_low1, ..., df_high, y_high1, ..., agg=3, lags=1)".into(),
+                    ));
+                }
+                let df_low_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "mfvar: first arg must be DataFrame".into(),
+                        ))
+                    }
+                };
+                let df_low = match self.env.get(&df_low_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(self.rt_err(format!("'{df_low_name}' is not a DataFrame"))),
+                };
+
+                // Find second DataFrame in args
+                let mut df_high_name = String::new();
+                let mut df_high_idx = 0;
+                for (i, a) in args.iter().enumerate().skip(1) {
+                    if let Expr::Var(n) = a {
+                        if let Some(Value::DataFrame(_)) = self.env.get(n) {
+                            if n != &df_low_name {
+                                df_high_name = n.clone();
+                                df_high_idx = i;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if df_high_name.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "mfvar: need second DataFrame for high-freq".into(),
+                    ));
+                }
+                let df_high = match self.env.get(&df_high_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(self.rt_err(format!("'{df_high_name}' is not a DataFrame"))),
+                };
+
+                // Low-freq variables: args[1..df_high_idx]
+                let low_vars: Vec<String> = args[1..df_high_idx]
+                    .iter()
+                    .map(|a| match a {
+                        Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
+                        _ => Err(HayashiError::Type(
+                            "mfvar: variables must be identifiers".into(),
+                        )),
+                    })
+                    .collect::<Result<_>>()?;
+
+                // High-freq variables: args[df_high_idx+1..]
+                let high_vars: Vec<String> = args[df_high_idx + 1..]
+                    .iter()
+                    .map(|a| match a {
+                        Expr::Var(n) | Expr::Str(n) => Ok(n.clone()),
+                        _ => Err(HayashiError::Type(
+                            "mfvar: variables must be identifiers".into(),
+                        )),
+                    })
+                    .collect::<Result<_>>()?;
+
+                let agg_ratio = match opt_map.get("agg") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 3,
+                };
+                let lags = match opt_map.get("lags") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 1,
+                };
+
+                // Build matrices
+                let n_low = df_low.n_rows();
+                let n_high = df_high.n_rows();
+                let k_low = low_vars.len();
+                let k_high = high_vars.len();
+
+                let mut y_low = ndarray::Array2::<f64>::zeros((n_low, k_low));
+                for (j, vname) in low_vars.iter().enumerate() {
+                    let col = df_low
+                        .get_column(vname)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let vals = col.as_float().ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: '{vname}' must be numeric"))
+                    })?;
+                    for i in 0..n_low {
+                        y_low[(i, j)] = vals[i];
+                    }
+                }
+
+                let mut y_high = ndarray::Array2::<f64>::zeros((n_high, k_high));
+                for (j, vname) in high_vars.iter().enumerate() {
+                    let col = df_high
+                        .get_column(vname)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let vals = col.as_float().ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: '{vname}' must be numeric"))
+                    })?;
+                    for i in 0..n_high {
+                        y_high[(i, j)] = vals[i];
+                    }
+                }
+
+                let result = greeners::MFVAR::fit(
+                    &y_low,
+                    &y_high,
+                    agg_ratio,
+                    lags,
+                    Some(low_vars),
+                    Some(high_vars),
+                )
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── Time-varying copula ────────────────────────────────────────
+            // tvcopula(y1 ~ y2, df, type="gaussian")
+            "tvcopula" | "tv_copula" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let copula_type = match opt_map.get("type") {
+                    Some(Value::Str(s)) => match s.as_str() {
+                        "gaussian" | "normal" => greeners::TvCopulaType::Gaussian,
+                        "clayton" => greeners::TvCopulaType::Clayton,
+                        "gumbel" => greeners::TvCopulaType::Gumbel,
+                        _ => {
+                            return Err(HayashiError::Runtime(format!(
+                                "{func}: type must be gaussian, clayton, or gumbel"
+                            )))
+                        }
+                    },
+                    _ => greeners::TvCopulaType::Gaussian,
+                };
+
+                let mut all_cols: Vec<String> = vec![g_formula.dependent.clone()];
+                all_cols.extend(g_formula.independents.iter().cloned());
+                let n_vars = all_cols.len();
+                let n = df.n_rows();
+                let mut x_mat = ndarray::Array2::<f64>::zeros((n, n_vars));
+                for (j, name) in all_cols.iter().enumerate() {
+                    let col = df
+                        .get_column(name)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let vals = col.as_float().ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: column '{name}' must be numeric"))
+                    })?;
+                    for i in 0..n {
+                        x_mat[(i, j)] = vals[i];
+                    }
+                }
+
+                let result = greeners::TvCopula::fit(&x_mat, copula_type, Some(all_cols))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
             // ── Spatial econometrics ────────────────────────────────────────
             // spatial_sar(y ~ x1 + x2, df, w=W_matrix)
             // spatial_sem(y ~ x1 + x2, df, w=W_matrix)

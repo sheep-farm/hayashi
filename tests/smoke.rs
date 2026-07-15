@@ -11375,3 +11375,152 @@ dcc_garch(r1 ~ r2, df)
         "DCC-GARCH",
     );
 }
+
+#[test]
+fn tvar_basic() {
+    assert_ok_contains(
+        "tvar",
+        r#"
+input df
+y1 y2 q
+10 5 1
+12 6 2
+15 7 3
+18 8 4
+20 9 5
+22 10 6
+25 11 7
+28 12 8
+30 13 9
+32 14 10
+35 15 11
+38 16 12
+40 17 13
+42 18 14
+45 19 15
+48 20 16
+end
+tvar(y1 ~ y2, df, q="q", lags=1, delay=1)
+"#,
+        "Threshold VAR",
+    );
+}
+
+#[test]
+fn bvar_basic() {
+    assert_ok_contains(
+        "bvar",
+        r#"
+input df
+y1 y2
+10 5
+12 6
+15 7
+18 8
+20 9
+22 10
+25 11
+28 12
+30 13
+32 14
+35 15
+38 16
+40 17
+42 18
+45 19
+48 20
+end
+bvar(y1 ~ y2, df, lags=1, lambda1=0.1, lambda2=0.2)
+"#,
+        "Bayesian VAR",
+    );
+}
+
+#[test]
+fn mfvar_basic() {
+    assert_ok_contains(
+        "mfvar",
+        r#"
+input df_q
+gdp
+100
+102
+105
+108
+110
+112
+115
+118
+end
+input df_m
+cpi
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+end
+mfvar(df_q, gdp, df_m, cpi, agg=3, lags=1)
+"#,
+        "Mixed-Frequency VAR",
+    );
+}
+
+#[test]
+fn tvcopula_basic() {
+    assert_ok_contains(
+        "tvcopula",
+        r#"
+input df
+y1 y2
+0.1 0.05
+0.2 0.1
+-0.1 -0.05
+0.15 0.08
+0.3 0.2
+-0.2 -0.1
+0.1 0.05
+0.25 0.15
+-0.15 -0.08
+0.2 0.1
+0.1 0.05
+0.2 0.1
+-0.1 -0.05
+0.15 0.08
+0.3 0.2
+-0.2 -0.1
+0.1 0.05
+0.25 0.15
+-0.15 -0.08
+0.2 0.1
+0.1 0.05
+0.2 0.1
+-0.1 -0.05
+0.15 0.08
+0.3 0.2
+end
+tvcopula(y1 ~ y2, df, type="gaussian")
+"#,
+        "Time-Varying Copula",
+    );
+}

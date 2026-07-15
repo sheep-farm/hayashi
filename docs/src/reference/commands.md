@@ -212,6 +212,10 @@ Covariance options (where applicable): `cov=nonrobust|HC1|HC2|HC3|HC4|robust`, `
 | `pvar` | `pvar(y1 ~ y2, df, id="e", lags=1)` | Panel VAR (GMM) |
 | `fcoef` | `fcoef(y ~ x, df, z="mod", points=20)` | Functional coefficient (varying coef.) |
 | `dcc_garch` | `dcc_garch(y1 ~ y2, df)` | DCC-GARCH (dynamic correlation) |
+| `tvar` | `tvar(y1 ~ y2, df, q="var", lags=1)` | Threshold VAR (regime switching) |
+| `bvar` | `bvar(y1 ~ y2, df, lags=1, lambda1=0.1)` | Bayesian VAR (Minnesota prior) |
+| `mfvar` | `mfvar(df_l, y_l, df_h, y_h, agg=3)` | Mixed-Frequency VAR (MIDAS) |
+| `tvcopula` | `tvcopula(y1 ~ y2, df, type="gaussian")` | Time-varying copula |
 | `hausman` | `hausman(m_fe, m_re)` | Hausman specification test |
 | `lincom` | `lincom(m, expr)` | Linear combination of coefficients |
 | `bootstrap` | `bootstrap(est, formula, df, n=)` | Generic bootstrap |

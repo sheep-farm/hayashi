@@ -133,12 +133,12 @@ reporta o p-value do coeficiente de ŷ².
 
 ## Pendente
 
-- **Threshold VAR** — TVAR com regime switching. +0,3 pp.
+- **Stochastic Volatility** — SV com MCMC. +0,2 pp.
 
-- **Bayesian VAR** — BVAR com Minnesota prior. +0,3 pp.
+- **Factor-augmented panel** — panel com fatores comuns. +0,2 pp.
 
-- **Mixed-frequency VAR** — MF-VAR com MIDAS. +0,3 pp.
+- **Hawkes process** — self-exciting point process. +0,2 pp.
 
-- **Time-varying copula** — copula dinamica com GARCH dynamics. +0,3 pp.
+- **Random forest** — tree ensemble para regressao. +0,2 pp.
 
-**Cobertura atual: 96,30%.**
+**Cobertura atual: 96,80%.**
