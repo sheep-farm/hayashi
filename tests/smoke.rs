@@ -3683,6 +3683,54 @@ list(combined)
     );
 }
 
+#[test]
+fn rbind_list_of_dfs() {
+    assert_ok_contains(
+        "rbind_list",
+        r#"
+input df1
+X Y
+1 10
+2 20
+end
+input df2
+X Y
+3 30
+end
+input df3
+X Y
+4 40
+5 50
+6 60
+end
+let combined = rbind([df1, df2, df3])
+list(combined)
+"#,
+        "6",
+    );
+}
+
+#[test]
+fn rbind_skips_nils() {
+    assert_ok_contains(
+        "rbind_nils",
+        r#"
+input df1
+X Y
+1 10
+2 20
+end
+input df2
+X Y
+3 30
+end
+let combined = rbind([df1, nil, df2, nil])
+list(combined)
+"#,
+        "3",
+    );
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // GENERATE EXTENSIONS — rowmean, rank, cumsum, group, rowsum
 // ══════════════════════════════════════════════════════════════════════════════
@@ -8454,6 +8502,79 @@ for i in 1..6 {
 display len(squares)
 "#,
         "5",
+    );
+}
+
+#[test]
+fn parallel_for_basic() {
+    // parallel for returns a List of the last expression values
+    assert_ok_contains(
+        "parallel_basic",
+        r#"
+let items = [1, 2, 3, 4, 5, 6]
+parallel for x in items {
+    x * x
+}
+display len(x)
+display x[0]
+display x[5]
+"#,
+        "36",
+    );
+}
+
+#[test]
+fn parallel_for_captures_outer() {
+    // Each thread captures outer variables via Arc clone
+    assert_ok_contains(
+        "parallel_capture",
+        r#"
+let mult = 10
+let items = [1, 2, 3, 4]
+parallel for x in items {
+    x * mult
+}
+display x[3]
+"#,
+        "40",
+    );
+}
+
+#[test]
+fn parallel_for_return() {
+    // Explicit return inside parallel for body
+    assert_ok_contains(
+        "parallel_return",
+        r#"
+let items = [1, 2, 3, 4, 5]
+parallel for x in items {
+    if x > 3 {
+        return x * 100
+    }
+    x
+}
+display x[3]
+display x[4]
+"#,
+        "500",
+    );
+}
+
+#[test]
+fn parallel_for_threads_option() {
+    // Optional threads=N parameter limits worker threads
+    assert_ok_contains(
+        "parallel_threads",
+        r#"
+let items = [1, 2, 3, 4, 5, 6, 7, 8]
+parallel for x in items, threads=2 {
+    x * x
+}
+display len(x)
+display x[0]
+display x[7]
+"#,
+        "64",
     );
 }
 

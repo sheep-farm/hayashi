@@ -1,3 +1,7 @@
+// `Value` uses `Arc` for DataFrame/List/Dict/Series/UserFn (to enable `parallel for`)
+// even though `Value` as a whole is not `Send+Sync` (model results use `Rc`).
+#![allow(clippy::arc_with_non_send_sync)]
+
 pub mod ast;
 pub mod commands;
 pub mod error;
@@ -125,6 +129,7 @@ fn stmt_label(s: &ast::Stmt) -> &'static str {
         ast::Stmt::Tsset { .. } => "tsset",
         ast::Stmt::If { .. } => "if",
         ast::Stmt::For { .. } => "for",
+        ast::Stmt::ParallelFor { .. } => "parallel for",
         ast::Stmt::While { .. } => "while",
         ast::Stmt::Fn { .. } => "fn",
         ast::Stmt::Return(_) => "return",

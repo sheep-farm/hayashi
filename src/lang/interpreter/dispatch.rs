@@ -1,4 +1,5 @@
 use super::*;
+use std::sync::Arc;
 
 impl Interpreter {
     pub(super) fn eval_call(&mut self, func: &str, args: &[Expr], opts: &[Opt]) -> Result<Value> {
@@ -184,7 +185,7 @@ impl Interpreter {
         &mut self,
         args: &[Expr],
         opt_map: &HashMap<String, Value>,
-    ) -> Result<(Formula, Rc<DataFrame>, String, String)> {
+    ) -> Result<(Formula, Arc<DataFrame>, String, String)> {
         if args.len() < 2 {
             return Err(HayashiError::Runtime(
                 "panel estimator requires (formula, dataframe [, id=col])".into(),

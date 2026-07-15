@@ -413,6 +413,19 @@ pub enum Stmt {
         body: Vec<Spanned>,
     },
 
+    // parallel for var in iter { ... } [, threads=N]
+    // Like `for`, but iterations run concurrently across threads.
+    // Each thread gets its own Interpreter; captured variables are Arc-cloned.
+    // Results are collected in order into a List.
+    // Optional `threads=N` limits the number of worker threads.
+    ParallelFor {
+        var: String,
+        var2: Option<String>,
+        iter: ForIter,
+        body: Vec<Spanned>,
+        threads: Option<Expr>,
+    },
+
     // while cond { ... }
     While {
         cond: Expr,

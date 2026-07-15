@@ -1,4 +1,5 @@
 use super::*;
+use std::sync::Arc;
 
 /// Result of evaluating an expression element-wise over a DataFrame.
 ///
@@ -73,7 +74,7 @@ impl Interpreter {
                 "formula must be used inside an estimator call".into(),
             )),
 
-            Expr::Closure { params, body } => Ok(Value::UserFn(Rc::new(UserFn {
+            Expr::Closure { params, body } => Ok(Value::UserFn(Arc::new(UserFn {
                 params: params.clone(),
                 defaults: vec![None; params.len()],
                 doc: None,
@@ -213,7 +214,7 @@ impl Interpreter {
                     .iter()
                     .map(|e| self.eval_expr(e))
                     .collect::<Result<_>>()?;
-                Ok(Value::List(Rc::new(vals)))
+                Ok(Value::List(Arc::new(vals)))
             }
 
             // ── Dict literal ─────────────────────────────────────────────────
@@ -233,7 +234,7 @@ impl Interpreter {
                     let val = self.eval_expr(v_expr)?;
                     map.insert(key, val);
                 }
-                Ok(Value::Dict(Rc::new(map)))
+                Ok(Value::Dict(Arc::new(map)))
             }
 
             // ── Indexing: list[idx] or dict["key"] ───────────────────────────
@@ -292,7 +293,7 @@ impl Interpreter {
                                 arr.iter().map(|dt| Value::Str(dt.to_string())).collect()
                             }
                         };
-                        Ok(Value::Series(Rc::new(Series::new(key.clone(), vals))))
+                        Ok(Value::Series(Arc::new(Series::new(key.clone(), vals))))
                     }
                     (Value::DataFrame(_), _) => Err(HayashiError::Type(
                         "DataFrame column index must be a string".into(),
@@ -360,7 +361,7 @@ impl Interpreter {
                     v.push(Value::Int(cur));
                     cur += step;
                 }
-                Ok(Value::List(Rc::new(v)))
+                Ok(Value::List(Arc::new(v)))
             }
 
             Expr::RangeInclusive(start_expr, end_expr) => {
@@ -373,7 +374,7 @@ impl Interpreter {
                     v.push(Value::Int(cur));
                     cur += step;
                 }
-                Ok(Value::List(Rc::new(v)))
+                Ok(Value::List(Arc::new(v)))
             }
 
             Expr::Block(stmts, final_expr) => {

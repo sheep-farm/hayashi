@@ -1,5 +1,6 @@
 use super::helpers::*;
 use super::*;
+use std::sync::Arc;
 
 /// ETS, panel threshold, canonical correlation, weighted statistics, tabstat,
 /// xtsum, non-parametric tests, unit-root tests, business-cycle filters,
@@ -1150,10 +1151,10 @@ impl Interpreter {
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let trend_name = format!("{var_name}_trend");
                 let cycle_name = format!("{var_name}_cycle");
-                Rc::make_mut(&mut df)
+                Arc::make_mut(&mut df)
                     .insert(trend_name.clone(), trend)
                     .map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
-                Rc::make_mut(&mut df)
+                Arc::make_mut(&mut df)
                     .insert(cycle_name.clone(), cycle)
                     .map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
                 println!(
@@ -1209,7 +1210,7 @@ impl Interpreter {
                 let cycle = greeners::TimeSeries::bk_filter(&series, low, high, k)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let cycle_name = format!("{var_name}_cycle");
-                Rc::make_mut(&mut df)
+                Arc::make_mut(&mut df)
                     .insert(cycle_name.clone(), cycle)
                     .map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
                 println!(
@@ -1261,7 +1262,7 @@ impl Interpreter {
                 let cycle = greeners::TimeSeries::cf_filter(&series, low, high, drift)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let cycle_name = format!("{var_name}_cycle");
-                Rc::make_mut(&mut df)
+                Arc::make_mut(&mut df)
                     .insert(cycle_name.clone(), cycle)
                     .map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
                 println!("cffilter: periods [{low},{high}] drift={drift}  →  {cycle_name} added to {df_name}");

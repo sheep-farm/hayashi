@@ -1,5 +1,6 @@
 use super::helpers::*;
 use super::*;
+use std::sync::Arc;
 
 mod panel_diagnostics;
 mod rolling_recursive;
@@ -2136,7 +2137,7 @@ impl Interpreter {
                 Err(_) => continue,
             };
             self.env
-                .set("__boot_df__", Value::DataFrame(Rc::new(boot_df)))?;
+                .set("__boot_df__", Value::DataFrame(Arc::new(boot_df)))?;
             if let Ok(ref result) = self.eval_call(
                 &estimator_name,
                 &[formula_expr.clone(), Expr::Var("__boot_df__".into())],

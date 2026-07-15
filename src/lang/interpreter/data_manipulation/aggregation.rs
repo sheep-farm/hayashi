@@ -1,4 +1,5 @@
 use super::*;
+use std::sync::Arc;
 
 impl Interpreter {
     /// `count(df)` / `nrow(df)` — row count as a value.
@@ -174,7 +175,7 @@ impl Interpreter {
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         println!("({} groups from {} observations)", keys.len(), n_obs);
-        Ok(Value::DataFrame(Rc::new(new_df)))
+        Ok(Value::DataFrame(Arc::new(new_df)))
     }
 
     /// `group_by(df, by_col, stat, var1, var2, ...)` — like collapse, but pipe-friendly.
@@ -313,6 +314,6 @@ impl Interpreter {
         if !self.capturing {
             println!("({} groups from {} observations)", keys.len(), n_obs);
         }
-        Ok(Value::DataFrame(Rc::new(new_df)))
+        Ok(Value::DataFrame(Arc::new(new_df)))
     }
 }

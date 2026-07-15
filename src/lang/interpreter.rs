@@ -13,6 +13,7 @@ use ndarray::{Array1, Array2, Axis};
 use statrs::distribution::{ContinuousCDF, Normal};
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
+use std::sync::Arc;
 
 /// Language automatic output: respects `quiet_mode` and `capturing`.
 /// Use for every print that is not explicit user output (print/display).
@@ -66,7 +67,7 @@ pub use env::Env;
 pub use models::{
     BinaryModel, DFMModel, DiagResult, OlsModel, PcaModel, PenalizedModel, SurModel, ThreeSLSModel,
 };
-pub use value::{ErrorValue, Series, UserFn, Value};
+pub use value::{ErrorValue, SendValue, Series, UserFn, Value};
 
 fn t_critical_95(df: f64) -> f64 {
     t_quantile(0.975, df)
@@ -375,9 +376,15 @@ impl Interpreter {
         let mut expected_len: Option<usize> = None;
 
         for (col_name, val) in map {
-            let list = match val {
-                Value::List(lst) => lst,
-                _ => return Err(self.type_err(format!("column '{col_name}' must be a list"))),
+            // Accept both List and Series as column values.
+            let list: Vec<Value> = match val {
+                Value::List(lst) => lst.as_ref().clone(),
+                Value::Series(s) => s.values.clone(),
+                _ => {
+                    return Err(
+                        self.type_err(format!("column '{col_name}' must be a list or series"))
+                    )
+                }
             };
 
             let len = list.len();
@@ -635,9 +642,9 @@ impl Interpreter {
 
     pub(super) fn maybe_filter_df(
         &mut self,
-        df: &Rc<DataFrame>,
+        df: &Arc<DataFrame>,
         opts: &[Opt],
-    ) -> Result<Rc<DataFrame>> {
+    ) -> Result<Arc<DataFrame>> {
         if let Some(if_opt) = opts.iter().find(|o| o.name == "if") {
             let mask = self.eval_col_expr(&if_opt.value, df)?;
             filter_df_by_mask(df, &mask)
@@ -683,7 +690,7 @@ impl Interpreter {
         &mut self,
         args: &[Expr],
         opts: &[Opt],
-    ) -> Result<(Formula, Rc<DataFrame>)> {
+    ) -> Result<(Formula, Arc<DataFrame>)> {
         if args.len() < 2 {
             return Err(HayashiError::Runtime(
                 "estimator requires (formula, dataframe)".into(),
@@ -716,8 +723,8 @@ impl Interpreter {
     pub(super) fn prepare_formula(
         &mut self,
         formula: &Formula,
-        df: &Rc<greeners::DataFrame>,
-    ) -> Result<(Rc<greeners::DataFrame>, GFormula, Vec<String>)> {
+        df: &Arc<greeners::DataFrame>,
+    ) -> Result<(Arc<greeners::DataFrame>, GFormula, Vec<String>)> {
         self.materialize_formula(formula, df)
     }
 
@@ -734,8 +741,8 @@ impl Interpreter {
     pub(super) fn materialize_formula(
         &mut self,
         formula: &Formula,
-        df: &Rc<greeners::DataFrame>,
-    ) -> Result<(Rc<greeners::DataFrame>, GFormula, Vec<String>)> {
+        df: &Arc<greeners::DataFrame>,
+    ) -> Result<(Arc<greeners::DataFrame>, GFormula, Vec<String>)> {
         let mut augmented: greeners::DataFrame = df.as_ref().clone();
         let mut col_names: Vec<String> = Vec::new();
         let mut display_names: Vec<String> = Vec::new();
@@ -753,7 +760,7 @@ impl Interpreter {
             intercept: true,
         };
 
-        Ok((Rc::new(augmented), g_formula, display_names))
+        Ok((Arc::new(augmented), g_formula, display_names))
     }
 
     /// Materializa um único `RhsTerm` em uma coluna do `augmented` DataFrame,
@@ -761,7 +768,7 @@ impl Interpreter {
     fn materialize_term(
         &mut self,
         term: &RhsTerm,
-        original_df: &Rc<greeners::DataFrame>,
+        original_df: &Arc<greeners::DataFrame>,
         augmented: &mut greeners::DataFrame,
         counter: &mut usize,
     ) -> Result<(String, String)> {

@@ -1,6 +1,7 @@
 use super::eval_expr::ColResult;
 use super::helpers::*;
 use super::*;
+use std::sync::Arc;
 
 mod aggregation;
 
@@ -136,7 +137,7 @@ impl Interpreter {
                 if !self.capturing {
                     println!("pivot_longer: {} → {} observations", n_i, n_long);
                 }
-                Ok(Value::DataFrame(Rc::new(new_df)))
+                Ok(Value::DataFrame(Arc::new(new_df)))
             }
 
             "pivot_wider" => {
@@ -189,36 +190,69 @@ impl Interpreter {
                     }
                 };
 
-                let id_vals = get_col_f64(&df, &i_col)?;
                 let j_strs = col_to_strings(&df, &j_col)?;
 
-                let mut unique_ids: Vec<f64> = id_vals.to_vec();
-                unique_ids.sort_by(|a, b| a.partial_cmp(b).unwrap());
-                unique_ids.dedup();
+                // Detectar se a coluna i é string: se sim, preservar como
+                // string no DataFrame resultante; se não, converter para f64.
+                let i_is_string = matches!(
+                    df.get_column(&i_col),
+                    Ok(greeners::Column::String(_) | greeners::Column::Categorical(_))
+                );
 
                 let mut unique_j: Vec<String> = j_strs.clone();
                 unique_j.sort();
                 unique_j.dedup();
 
-                let n_wide = unique_ids.len();
+                let n_wide: usize;
                 let mut builder = DataFrame::builder();
-                builder = builder.add_column(&i_col, unique_ids.clone());
 
-                for var in &val_vars {
-                    let var_data = get_col_f64(&df, var)?;
-                    for jv in &unique_j {
-                        let col_name = format!("{var}{jv}");
-                        let mut vals = vec![f64::NAN; n_wide];
-                        for (row, (id, j)) in id_vals.iter().zip(j_strs.iter()).enumerate() {
-                            if j == jv {
-                                if let Ok(pos) =
-                                    unique_ids.binary_search_by(|a| a.partial_cmp(id).unwrap())
-                                {
-                                    vals[pos] = var_data[row];
+                if i_is_string {
+                    let id_strs = col_to_strings(&df, &i_col)?;
+                    let mut unique_id_strs: Vec<String> = id_strs.clone();
+                    unique_id_strs.sort();
+                    unique_id_strs.dedup();
+                    n_wide = unique_id_strs.len();
+                    builder = builder.add_string(&i_col, unique_id_strs.clone());
+
+                    for var in &val_vars {
+                        let var_data = get_col_f64(&df, var)?;
+                        for jv in &unique_j {
+                            let col_name = format!("{var}{jv}");
+                            let mut vals = vec![f64::NAN; n_wide];
+                            for (row, (id, j)) in id_strs.iter().zip(j_strs.iter()).enumerate() {
+                                if j == jv {
+                                    if let Ok(pos) = unique_id_strs.binary_search(id) {
+                                        vals[pos] = var_data[row];
+                                    }
                                 }
                             }
+                            builder = builder.add_column(&col_name, vals);
                         }
-                        builder = builder.add_column(&col_name, vals);
+                    }
+                } else {
+                    let id_vals = get_col_f64(&df, &i_col)?;
+                    let mut unique_ids: Vec<f64> = id_vals.to_vec();
+                    unique_ids.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                    unique_ids.dedup();
+                    n_wide = unique_ids.len();
+                    builder = builder.add_column(&i_col, unique_ids.clone());
+
+                    for var in &val_vars {
+                        let var_data = get_col_f64(&df, var)?;
+                        for jv in &unique_j {
+                            let col_name = format!("{var}{jv}");
+                            let mut vals = vec![f64::NAN; n_wide];
+                            for (row, (id, j)) in id_vals.iter().zip(j_strs.iter()).enumerate() {
+                                if j == jv {
+                                    if let Ok(pos) =
+                                        unique_ids.binary_search_by(|a| a.partial_cmp(id).unwrap())
+                                    {
+                                        vals[pos] = var_data[row];
+                                    }
+                                }
+                            }
+                            builder = builder.add_column(&col_name, vals);
+                        }
                     }
                 }
 
@@ -228,7 +262,7 @@ impl Interpreter {
                 if !self.capturing {
                     println!("pivot_wider: {} → {} observations", df.n_rows(), n_wide);
                 }
-                Ok(Value::DataFrame(Rc::new(new_df)))
+                Ok(Value::DataFrame(Arc::new(new_df)))
             }
 
             // ── append ───────────────────────────────────────────────────────
@@ -331,7 +365,116 @@ impl Interpreter {
                     .build()
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 println!("({} + {} = {} observations)", n1, n2, n1 + n2);
-                Ok(Value::DataFrame(Rc::new(new_df)))
+                Ok(Value::DataFrame(Arc::new(new_df)))
+            }
+
+            // ── rbind — concatenate a list of DataFrames vertically ───────────
+            "rbind" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "rbind() requires a list of DataFrames".into(),
+                    ));
+                }
+                let dfs: Vec<Arc<DataFrame>> = match self.eval_expr(&args[0])? {
+                    Value::List(lst) => {
+                        let mut out = Vec::with_capacity(lst.len());
+                        for v in lst.iter() {
+                            match v {
+                                Value::DataFrame(d) => out.push(d.clone()),
+                                Value::Nil => {} // skip nils from parallel for
+                                _ => {
+                                    return Err(HayashiError::Type(
+                                        "rbind: list must contain only DataFrames (or nil)".into(),
+                                    ))
+                                }
+                            }
+                        }
+                        out
+                    }
+                    Value::DataFrame(d) => vec![d],
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "rbind: expected a list of DataFrames".into(),
+                        ))
+                    }
+                };
+
+                if dfs.is_empty() {
+                    let empty = DataFrame::builder()
+                        .build()
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    return Ok(Some(Value::DataFrame(Arc::new(empty))));
+                }
+
+                // Collect all column names (preserving order from first df).
+                let mut all_names = dfs[0].column_names();
+                let seen: std::collections::HashSet<String> = all_names.iter().cloned().collect();
+                let mut new_cols: Vec<String> = Vec::new();
+                for df in &dfs[1..] {
+                    for n in df.column_names() {
+                        if !seen.contains(n.as_str()) {
+                            new_cols.push(n.clone());
+                        }
+                    }
+                }
+                all_names.extend(new_cols);
+
+                let total_rows: usize = dfs.iter().map(|d| d.n_rows()).sum();
+
+                let get_num = |df: &DataFrame, col: &str, n: usize| -> Vec<f64> {
+                    use greeners::Column;
+                    match df.get_column(col) {
+                        Ok(Column::Float(a)) => a.to_vec(),
+                        Ok(Column::Int(a)) => a.iter().map(|&x| x as f64).collect(),
+                        _ => vec![f64::NAN; n],
+                    }
+                };
+                let get_str = |df: &DataFrame, col: &str, n: usize| -> Vec<String> {
+                    df.get_string(col)
+                        .map(|a| a.to_vec())
+                        .unwrap_or_else(|_| vec![String::new(); n])
+                };
+
+                let mut builder = DataFrame::builder();
+                for col in &all_names {
+                    use greeners::Column;
+                    // Determine column type from first df that has it.
+                    let is_num = dfs.iter().any(|df| {
+                        matches!(
+                            df.get_column(col),
+                            Ok(Column::Float(_)) | Ok(Column::Int(_))
+                        )
+                    });
+
+                    if is_num {
+                        let mut buf = Vec::with_capacity(total_rows);
+                        for df in &dfs {
+                            let n = df.n_rows();
+                            if df.column_names().contains(col) {
+                                buf.extend_from_slice(&get_num(df, col, n));
+                            } else {
+                                buf.extend(std::iter::repeat_n(f64::NAN, n));
+                            }
+                        }
+                        builder = builder.add_column(col, buf);
+                    } else {
+                        let mut buf = Vec::with_capacity(total_rows);
+                        for df in &dfs {
+                            let n = df.n_rows();
+                            if df.column_names().contains(col) {
+                                buf.extend_from_slice(&get_str(df, col, n));
+                            } else {
+                                buf.extend(std::iter::repeat_n(String::new(), n));
+                            }
+                        }
+                        builder = builder.add_string(col, buf);
+                    }
+                }
+
+                let new_df = builder
+                    .build()
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                Ok(Value::DataFrame(Arc::new(new_df)))
             }
 
             // ── merge ─────────────────────────────────────────────────────────
@@ -525,7 +668,7 @@ impl Interpreter {
                     "({n_matched} matched, {} not matched, {n_out} total)",
                     n_out - n_matched
                 );
-                Ok(Value::DataFrame(Rc::new(new_df)))
+                Ok(Value::DataFrame(Arc::new(new_df)))
             }
 
             // ── reshape ──────────────────────────────────────────────────────
@@ -714,7 +857,7 @@ impl Interpreter {
                             n_out,
                             new_df.column_names().len()
                         );
-                        Ok(Value::DataFrame(Rc::new(new_df)))
+                        Ok(Value::DataFrame(Arc::new(new_df)))
                     }
 
                     // ── long → wide ──────────────────────────────────────────
@@ -907,7 +1050,7 @@ impl Interpreter {
                             n_id,
                             new_df.column_names().len()
                         );
-                        Ok(Value::DataFrame(Rc::new(new_df)))
+                        Ok(Value::DataFrame(Arc::new(new_df)))
                     }
 
                     other => Err(HayashiError::Runtime(format!(
@@ -939,7 +1082,7 @@ impl Interpreter {
                                 _ => format!("{a}").cmp(&format!("{b}")),
                             }
                         });
-                        return Ok(Some(Value::List(Rc::new(new_v))));
+                        return Ok(Some(Value::List(Arc::new(new_v))));
                     }
                 }
                 if args.len() < 2 {
@@ -1034,7 +1177,7 @@ impl Interpreter {
                     .build()
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 println!("({n} observations sorted)");
-                Ok(Value::DataFrame(Rc::new(new_df)))
+                Ok(Value::DataFrame(Arc::new(new_df)))
             }
 
             // ── list ──────────────────────────────────────────────────────────
@@ -1225,7 +1368,7 @@ impl Interpreter {
                     .filter(|(a, b)| a != b)
                     .count();
 
-                Rc::make_mut(&mut df)
+                Arc::make_mut(&mut df)
                     .insert(gen_name.clone(), winsorized)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 self.env.set(&df_name, Value::DataFrame(df))?;
@@ -1273,7 +1416,7 @@ impl Interpreter {
                 let n_dummies = dummies.len();
                 let dummy_names: Vec<String> = dummies.iter().map(|(n, _)| n.clone()).collect();
                 for (col_name, vals) in dummies {
-                    Rc::make_mut(&mut df)
+                    Arc::make_mut(&mut df)
                         .insert(col_name, vals)
                         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 }
@@ -1428,7 +1571,7 @@ impl Interpreter {
                     .zip(recoded.iter())
                     .filter(|(a, b)| a != b)
                     .count();
-                Rc::make_mut(&mut df)
+                Arc::make_mut(&mut df)
                     .insert(var.clone(), ndarray::Array1::from(recoded))
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 self.env.set(&df_name, Value::DataFrame(df))?;
@@ -1524,7 +1667,7 @@ impl Interpreter {
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
                 emitln!(self, "({n_drop} observations dropped, {n_kept} remaining)");
-                Ok(Value::DataFrame(Rc::new(new_df)))
+                Ok(Value::DataFrame(Arc::new(new_df)))
             }
 
             // ── ffill ─────────────────────────────────────────────────────────
@@ -1546,7 +1689,7 @@ impl Interpreter {
                 let new_df = df
                     .fillna_ffill()
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                Ok(Value::DataFrame(Rc::new(new_df)))
+                Ok(Value::DataFrame(Arc::new(new_df)))
             }
 
             // ── filter ───────────────────────────────────────────────────────
@@ -1564,7 +1707,7 @@ impl Interpreter {
                             result.push(item.clone());
                         }
                     }
-                    return Ok(Some(Value::List(Rc::new(result))));
+                    return Ok(Some(Value::List(Arc::new(result))));
                 }
                 let df = match self.eval_expr(&args[0])? {
                     Value::DataFrame(df) => df,
@@ -1620,7 +1763,7 @@ impl Interpreter {
                     .build()
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 println!("({n_drop} observations removed, {n_kept} remaining)");
-                Ok(Value::DataFrame(Rc::new(new_df)))
+                Ok(Value::DataFrame(Arc::new(new_df)))
             }
 
             // ── encode: string → numeric ─────────────────────────────────────
@@ -1662,7 +1805,7 @@ impl Interpreter {
                     .map_err(|e| HayashiError::Runtime(format!("encode '{col_name}': {e}")))?;
 
                 let target_col = gen_name.unwrap_or_else(|| col_name.clone());
-                Rc::make_mut(&mut df)
+                Arc::make_mut(&mut df)
                     .insert(target_col.clone(), numeric)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 self.env.set(&df_name, Value::DataFrame(df))?;
@@ -1724,7 +1867,7 @@ impl Interpreter {
                         labels.get(idx).cloned().unwrap_or_else(|| format!("{v}"))
                     })
                     .collect();
-                Rc::make_mut(&mut df)
+                Arc::make_mut(&mut df)
                     .insert_column(
                         col_name.clone(),
                         greeners::Column::String(ndarray::Array1::from(str_vals)),
@@ -1791,7 +1934,7 @@ impl Interpreter {
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
                 println!("({old} → {new})");
-                Ok(Value::DataFrame(Rc::new(new_df)))
+                Ok(Value::DataFrame(Arc::new(new_df)))
             }
 
             // ── drop ─────────────────────────────────────────────────────────
@@ -1830,7 +1973,7 @@ impl Interpreter {
                     drop_names.len(),
                     keep.len()
                 );
-                Ok(Value::DataFrame(Rc::new(new_df)))
+                Ok(Value::DataFrame(Arc::new(new_df)))
             }
 
             // ── drop_collinear ────────────────────────────────────────────────
@@ -1926,7 +2069,7 @@ impl Interpreter {
                 let new_df = DataFrame::drop(&df, &omit_names)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-                Ok(Value::DataFrame(Rc::new(new_df)))
+                Ok(Value::DataFrame(Arc::new(new_df)))
             }
 
             // ── mutate / generate() ──────────────────────────────────────────
@@ -1951,14 +2094,14 @@ impl Interpreter {
                     match col_result {
                         ColResult::Float(vals) => {
                             let arr = ndarray::Array1::from(vals);
-                            Rc::make_mut(&mut df_val)
+                            Arc::make_mut(&mut df_val)
                                 .insert(o.name.clone(), arr)
                                 .map_err(|e: greeners::GreenersError| self.rt_err(e.to_string()))?;
                         }
                         ColResult::String(strs) => {
                             use greeners::Column;
                             let col = Column::String(ndarray::Array1::from(strs));
-                            Rc::make_mut(&mut df_val)
+                            Arc::make_mut(&mut df_val)
                                 .insert_column(o.name.clone(), col)
                                 .map_err(|e: greeners::GreenersError| self.rt_err(e.to_string()))?;
                         }
@@ -2006,7 +2149,7 @@ impl Interpreter {
                     refs.len(),
                     n_before - refs.len()
                 );
-                Ok(Value::DataFrame(Rc::new(new_df)))
+                Ok(Value::DataFrame(Arc::new(new_df)))
             }
 
             // ── tabulate ─────────────────────────────────────────────────────

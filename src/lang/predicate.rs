@@ -77,6 +77,18 @@ pub trait RowAccess {
     fn get_str(&self, col: &str) -> Option<&str>;
 }
 
+/// Bounds (min/max) de uma coluna dentro de um row group do Parquet.
+/// Usado pelo row group pruning — permite decidir se um row group pode
+/// conter linhas que satisfazem o predicado, sem decodificar os dados.
+pub trait GroupBounds {
+    /// `(min, max)` numéricos da coluna neste row group, ou `None` se a
+    /// coluna não existir, não tiver estatísticas, ou não for numérica.
+    fn f64_bounds(&self, col: &str) -> Option<(f64, f64)>;
+    /// `(min, max)` textuais da coluna neste row group, ou `None` se a
+    /// coluna não existir, não tiver estatísticas, ou não for string.
+    fn str_bounds(&self, col: &str) -> Option<(&str, &str)>;
+}
+
 impl RowPredicate {
     /// Parseia uma string `where="..."` usando o lexer/parser do hayashi.
     pub fn parse(s: &str) -> Result<RowPredicate> {
@@ -215,6 +227,33 @@ impl RowPredicate {
             RowPredicate::Not(p) => !p.evaluate(row),
             RowPredicate::And(ps) => ps.iter().all(|p| p.evaluate(row)),
             RowPredicate::Or(ps) => ps.iter().any(|p| p.evaluate(row)),
+        }
+    }
+
+    /// Avalia se um row group **pode** conter pelo menos uma linha que
+    /// satisfaça o predicado, dados os bounds (min/max) das colunas.
+    /// Retorna `true` em caso de dúvida (conservador — nunca poda um row
+    /// group que poderia conter dados relevantes).
+    ///
+    /// Usado pelo row group pruning do Parquet antes de decodificar os dados.
+    pub fn can_match(&self, bounds: &dyn GroupBounds) -> bool {
+        match self {
+            RowPredicate::All => true,
+            RowPredicate::Eq(col, lit) => can_match_eq(bounds, col, lit),
+            RowPredicate::Ne(col, lit) => can_match_ne(bounds, col, lit),
+            RowPredicate::Gt(col, lit) => can_match_gt(bounds, col, lit),
+            RowPredicate::Lt(col, lit) => can_match_lt(bounds, col, lit),
+            RowPredicate::Ge(col, lit) => can_match_ge(bounds, col, lit),
+            RowPredicate::Le(col, lit) => can_match_le(bounds, col, lit),
+            RowPredicate::In(col, lits) => lits.iter().any(|lit| can_match_eq(bounds, col, lit)),
+            // NOT: conservador — sempre keep, porque mesmo que o predicado
+            // interno possa matchar todas as linhas, NOT matcharia nenhuma,
+            // mas não temos garantia suficiente para podar.
+            RowPredicate::Not(_) => true,
+            // AND: todas as sub-condições devem poder matchar.
+            RowPredicate::And(ps) => ps.iter().all(|p| p.can_match(bounds)),
+            // OR: pelo menos uma sub-condição deve poder matchar.
+            RowPredicate::Or(ps) => ps.iter().any(|p| p.can_match(bounds)),
         }
     }
 
@@ -375,6 +414,155 @@ fn cmp_ord(
     }
 }
 
+// ── helpers para row group pruning (can_match) ───────────────────────────
+
+/// `col == lit`: o row group pode conter `lit` se `min <= lit <= max`.
+fn can_match_eq(bounds: &dyn GroupBounds, col: &str, lit: &Literal) -> bool {
+    match lit {
+        Literal::Str(s) => {
+            if let Some((min, max)) = bounds.str_bounds(col) {
+                s.as_str() >= min && s.as_str() <= max
+            } else {
+                true // sem bounds → conservador
+            }
+        }
+        Literal::Int(_) | Literal::Float(_) | Literal::Bool(_) => {
+            if let Some(lf) = lit.as_f64() {
+                if let Some((min, max)) = bounds.f64_bounds(col) {
+                    lf >= min && lf <= max
+                } else {
+                    // tentar como string (coluna string com literal numérico)
+                    true
+                }
+            } else {
+                true
+            }
+        }
+    }
+}
+
+/// `col != lit`: conservador — só podemos podar se todas as linhas
+/// forem iguais a `lit` (min == max == lit). Caso raro; geralmente keep.
+fn can_match_ne(bounds: &dyn GroupBounds, col: &str, lit: &Literal) -> bool {
+    match lit {
+        Literal::Str(s) => {
+            if let Some((min, max)) = bounds.str_bounds(col) {
+                // se min == max == lit, todas as linhas são iguais a lit → podar
+                !(min == max && min == s.as_str())
+            } else {
+                true
+            }
+        }
+        Literal::Int(_) | Literal::Float(_) | Literal::Bool(_) => {
+            if let Some(lf) = lit.as_f64() {
+                if let Some((min, max)) = bounds.f64_bounds(col) {
+                    !(min == max && min == lf)
+                } else {
+                    true
+                }
+            } else {
+                true
+            }
+        }
+    }
+}
+
+/// `col > lit`: pode matchar se `max > lit`.
+fn can_match_gt(bounds: &dyn GroupBounds, col: &str, lit: &Literal) -> bool {
+    match lit {
+        Literal::Str(s) => {
+            if let Some((_, max)) = bounds.str_bounds(col) {
+                max > s.as_str()
+            } else {
+                true
+            }
+        }
+        Literal::Int(_) | Literal::Float(_) | Literal::Bool(_) => {
+            if let Some(lf) = lit.as_f64() {
+                if let Some((_, max)) = bounds.f64_bounds(col) {
+                    max > lf
+                } else {
+                    true
+                }
+            } else {
+                true
+            }
+        }
+    }
+}
+
+/// `col < lit`: pode matchar se `min < lit`.
+fn can_match_lt(bounds: &dyn GroupBounds, col: &str, lit: &Literal) -> bool {
+    match lit {
+        Literal::Str(s) => {
+            if let Some((min, _)) = bounds.str_bounds(col) {
+                min < s.as_str()
+            } else {
+                true
+            }
+        }
+        Literal::Int(_) | Literal::Float(_) | Literal::Bool(_) => {
+            if let Some(lf) = lit.as_f64() {
+                if let Some((min, _)) = bounds.f64_bounds(col) {
+                    min < lf
+                } else {
+                    true
+                }
+            } else {
+                true
+            }
+        }
+    }
+}
+
+/// `col >= lit`: pode matchar se `max >= lit`.
+fn can_match_ge(bounds: &dyn GroupBounds, col: &str, lit: &Literal) -> bool {
+    match lit {
+        Literal::Str(s) => {
+            if let Some((_, max)) = bounds.str_bounds(col) {
+                max >= s.as_str()
+            } else {
+                true
+            }
+        }
+        Literal::Int(_) | Literal::Float(_) | Literal::Bool(_) => {
+            if let Some(lf) = lit.as_f64() {
+                if let Some((_, max)) = bounds.f64_bounds(col) {
+                    max >= lf
+                } else {
+                    true
+                }
+            } else {
+                true
+            }
+        }
+    }
+}
+
+/// `col <= lit`: pode matchar se `min <= lit`.
+fn can_match_le(bounds: &dyn GroupBounds, col: &str, lit: &Literal) -> bool {
+    match lit {
+        Literal::Str(s) => {
+            if let Some((min, _)) = bounds.str_bounds(col) {
+                min <= s.as_str()
+            } else {
+                true
+            }
+        }
+        Literal::Int(_) | Literal::Float(_) | Literal::Bool(_) => {
+            if let Some(lf) = lit.as_f64() {
+                if let Some((min, _)) = bounds.f64_bounds(col) {
+                    min <= lf
+                } else {
+                    true
+                }
+            } else {
+                true
+            }
+        }
+    }
+}
+
 fn binop_label(op: &BinOp) -> &'static str {
     match op {
         BinOp::Add => "+",
@@ -519,5 +707,95 @@ mod tests {
         // `price + 1 == 100` → lhs não é coluna nem literal → erro claro.
         let err = RowPredicate::parse("price + 1 == 100").unwrap_err();
         assert!(err.to_string().contains("column"));
+    }
+
+    // ── Testes de row group pruning (can_match) ──────────────────────────
+
+    struct TestBounds {
+        f64: std::collections::HashMap<String, (f64, f64)>,
+        str: std::collections::HashMap<String, (String, String)>,
+    }
+
+    impl GroupBounds for TestBounds {
+        fn f64_bounds(&self, col: &str) -> Option<(f64, f64)> {
+            self.f64.get(col).copied()
+        }
+        fn str_bounds(&self, col: &str) -> Option<(&str, &str)> {
+            self.str.get(col).map(|(a, b)| (a.as_str(), b.as_str()))
+        }
+    }
+
+    fn bounds() -> TestBounds {
+        TestBounds {
+            f64: [
+                ("price".to_string(), (10.0, 500.0)),
+                ("volume".to_string(), (0.0, 5_000_000.0)),
+            ]
+            .into_iter()
+            .collect(),
+            str: [("ticker".to_string(), ("AAA".to_string(), "ZZZ".to_string()))]
+                .into_iter()
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn prune_eq_str_inside_bounds() {
+        let p = RowPredicate::parse("ticker == \"AAPL\"").unwrap();
+        assert!(p.can_match(&bounds())); // AAPL está entre AAA..ZZZ
+    }
+
+    #[test]
+    fn prune_eq_str_outside_bounds() {
+        let p = RowPredicate::parse("ticker == \"000\"").unwrap();
+        assert!(!p.can_match(&bounds())); // 000 < AAA → poda
+    }
+
+    #[test]
+    fn prune_eq_num_inside_bounds() {
+        let p = RowPredicate::parse("price == 100").unwrap();
+        assert!(p.can_match(&bounds())); // 10 <= 100 <= 500
+    }
+
+    #[test]
+    fn prune_eq_num_outside_bounds() {
+        let p = RowPredicate::parse("price == 999").unwrap();
+        assert!(!p.can_match(&bounds())); // 999 > 500 → poda
+    }
+
+    #[test]
+    fn prune_gt_within_bounds() {
+        let p = RowPredicate::parse("price > 50").unwrap();
+        assert!(p.can_match(&bounds())); // max=500 > 50
+    }
+
+    #[test]
+    fn prune_gt_above_max() {
+        let p = RowPredicate::parse("price > 600").unwrap();
+        assert!(!p.can_match(&bounds())); // max=500 <= 600 → poda
+    }
+
+    #[test]
+    fn prune_lt_below_min() {
+        let p = RowPredicate::parse("price < 5").unwrap();
+        assert!(!p.can_match(&bounds())); // min=10 >= 5 → poda
+    }
+
+    #[test]
+    fn prune_and_one_side_cannot_match() {
+        let p = RowPredicate::parse("ticker == \"AAPL\" && price > 600").unwrap();
+        assert!(!p.can_match(&bounds())); // price > 600 impossível → poda
+    }
+
+    #[test]
+    fn prune_or_one_side_can_match() {
+        let p = RowPredicate::parse("ticker == \"000\" || price == 100").unwrap();
+        assert!(p.can_match(&bounds())); // price == 100 é possível
+    }
+
+    #[test]
+    fn prune_no_bounds_conservative() {
+        let p = RowPredicate::parse("unknown_col == 42").unwrap();
+        assert!(p.can_match(&bounds())); // sem bounds → keep
     }
 }

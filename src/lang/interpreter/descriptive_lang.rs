@@ -1,5 +1,6 @@
 use super::helpers::*;
 use super::*;
+use std::sync::Arc;
 
 /// set_seed, timer, quietly, capture, assert, preserve/restore, source, help,
 /// describe, codebook, format, duplicates, label, correlate, summarize,
@@ -684,7 +685,7 @@ impl Interpreter {
                             "duplicates drop: {n_dup} obs removed, {} remaining",
                             new_df.n_rows()
                         );
-                        self.env.set(&df_name, Value::DataFrame(Rc::new(new_df)))?;
+                        self.env.set(&df_name, Value::DataFrame(Arc::new(new_df)))?;
                         Ok(Value::Nil)
                     }
                     "tag" => {
@@ -696,7 +697,7 @@ impl Interpreter {
                             .collect();
                         let mut df_mut = df.clone();
                         let arr = ndarray::Array1::from(dup_col);
-                        Rc::make_mut(&mut df_mut)
+                        Arc::make_mut(&mut df_mut)
                             .insert("_dup".to_string(), arr)
                             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                         println!("duplicates tag: _dup column generated ({n_dup} duplicates)");
@@ -1024,13 +1025,13 @@ impl Interpreter {
                 if quiet {
                     if result_dicts.len() == 1 {
                         let (_, d) = result_dicts.into_iter().next().unwrap();
-                        Ok(Value::Dict(Rc::new(d)))
+                        Ok(Value::Dict(Arc::new(d)))
                     } else {
                         let mut outer = HashMap::new();
                         for (name, d) in result_dicts {
-                            outer.insert(name, Value::Dict(Rc::new(d)));
+                            outer.insert(name, Value::Dict(Arc::new(d)));
                         }
-                        Ok(Value::Dict(Rc::new(outer)))
+                        Ok(Value::Dict(Arc::new(outer)))
                     }
                 } else {
                     Ok(Value::Nil)

@@ -2,6 +2,7 @@ use crate::lang::ast::{Expr, Spanned};
 use crate::lang::error::HayashiError;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::sync::Arc;
 
 // ── User-defined function ──────────────────────────────────────────────────
 
@@ -186,7 +187,7 @@ pub enum Value {
     Int(i64),
     Bool(bool),
     Str(String),
-    DataFrame(Rc<greeners::DataFrame>),
+    DataFrame(Arc<greeners::DataFrame>),
     OlsResult(super::models::OlsModel),
     IvResult(Rc<greeners::iv::IvResult>),
     BinaryResult(super::models::BinaryModel),
@@ -247,10 +248,10 @@ pub enum Value {
     AutoRegResult(Rc<greeners::AutoRegResult>),
     ArdlResult(Rc<greeners::ARDLResult>),
     LocalLevelResult(Rc<greeners::LocalLevelResult>),
-    List(Rc<Vec<Value>>),
-    Dict(Rc<HashMap<String, Value>>),
-    Series(Rc<Series>),
-    UserFn(Rc<UserFn>),
+    List(Arc<Vec<Value>>),
+    Dict(Arc<HashMap<String, Value>>),
+    Series(Arc<Series>),
+    UserFn(Arc<UserFn>),
     Error(Rc<ErrorValue>),
     /// Geometria vetorial em WKT. Produzida por plugins geoespaciais.
     Geometry(String),
@@ -260,6 +261,59 @@ pub enum Value {
         format: String,
     },
     Nil,
+}
+
+// ── Send-safety for parallel for ───────────────────────────────────────────
+
+impl Value {
+    /// Returns `true` if this value contains no `Rc`-backed model results,
+    /// meaning it can safely cross a thread boundary inside `parallel for`.
+    ///
+    /// `DataFrame`, `List`, `Dict`, `Series`, `UserFn` use `Arc` (Send).
+    /// Primitive variants (`Float`, `Int`, `Bool`, `Str`, `Nil`, `Geometry`,
+    /// `Plot`) are inherently Send.  All `*Result` variants wrap `Rc` and are
+    /// NOT Send — they cannot be captured into a `parallel for` block.
+    pub fn is_send_safe(&self) -> bool {
+        match self {
+            Value::Float(_)
+            | Value::Int(_)
+            | Value::Bool(_)
+            | Value::Str(_)
+            | Value::Nil
+            | Value::Geometry(_) => true,
+            Value::DataFrame(_) => true,
+            Value::List(lst) => lst.iter().all(|v| v.is_send_safe()),
+            Value::Dict(d) => d.values().all(|v| v.is_send_safe()),
+            Value::Series(_) => true,
+            Value::UserFn(_) => true,
+            Value::Plot { .. } => true,
+            // All model result variants use Rc — not Send.
+            _ => false,
+        }
+    }
+}
+
+/// Wrapper that guarantees the inner `Value` is `Send`-safe.
+/// Constructed only via `SendValue::new` which checks `is_send_safe`.
+#[derive(Clone)]
+pub struct SendValue(pub Value);
+
+// SAFETY: SendValue is only constructed from values that pass `is_send_safe`,
+// meaning they contain no `Rc`-backed model results. Arc and primitives are Send.
+unsafe impl Send for SendValue {}
+unsafe impl Sync for SendValue {}
+
+impl SendValue {
+    /// Wraps a `Value` if it is send-safe, otherwise returns an error.
+    pub fn new(v: Value) -> std::result::Result<Self, String> {
+        if v.is_send_safe() {
+            Ok(Self(v))
+        } else {
+            Err(format!(
+                "parallel for: captured value is not thread-safe (contains model result with Rc): {v}"
+            ))
+        }
+    }
 }
 
 impl std::fmt::Display for Value {

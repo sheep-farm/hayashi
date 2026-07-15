@@ -903,6 +903,7 @@ impl Parser {
             Token::If
                 | Token::Else
                 | Token::For
+                | Token::Parallel
                 | Token::While
                 | Token::Fn
                 | Token::Let
@@ -930,6 +931,7 @@ impl Parser {
                     | Token::Else
                     | Token::Generate
                     | Token::For
+                    | Token::Parallel
                     | Token::In
                     | Token::Return
                     | Token::Break
@@ -951,6 +953,7 @@ impl Parser {
                     Token::Else => "else",
                     Token::Generate => "gen",
                     Token::For => "for",
+                    Token::Parallel => "parallel",
                     Token::In => "in",
                     Token::Return => "return",
                     Token::Break => "break",
@@ -1370,6 +1373,64 @@ impl Parser {
                     var2,
                     iter,
                     body,
+                }))
+            }
+
+            // ── parallel for var in iter { ... } ─────────────────────────────
+            // Like `for`, but iterations run concurrently.
+            Token::Parallel => {
+                self.advance();
+                // expects "for" after "parallel"
+                match self.advance().clone() {
+                    Token::For => {}
+                    t => {
+                        return Err(HayashiError::Parse {
+                            line,
+                            msg: format!("expected 'for' after 'parallel', got {t:?}"),
+                        })
+                    }
+                }
+                let var = self.expect_ident()?;
+                let var2 = if self.peek() == &Token::Comma {
+                    self.advance();
+                    Some(self.expect_ident()?)
+                } else {
+                    None
+                };
+                match self.advance().clone() {
+                    Token::In => {}
+                    t => {
+                        return Err(HayashiError::Parse {
+                            line,
+                            msg: format!("expected 'in' after for variable, got {t:?}"),
+                        })
+                    }
+                }
+                let iter = self.parse_for_iter()?;
+                // Optional: , threads=N  (before the body block)
+                let threads = if self.peek() == &Token::Comma {
+                    self.advance();
+                    let opt_name = self.expect_ident()?;
+                    if opt_name != "threads" {
+                        return Err(HayashiError::Parse {
+                            line,
+                            msg: format!(
+                                "expected 'threads' after ',' in parallel for, got '{opt_name}'"
+                            ),
+                        });
+                    }
+                    self.expect(&Token::Eq)?;
+                    Some(self.parse_expr()?)
+                } else {
+                    None
+                };
+                let body = self.parse_block()?;
+                Ok(Some(Stmt::ParallelFor {
+                    var,
+                    var2,
+                    iter,
+                    body,
+                    threads,
                 }))
             }
 

@@ -1,5 +1,6 @@
 use super::helpers::*;
 use super::*;
+use std::sync::Arc;
 
 pub const BUILTIN_NAMES: &[&str] = &[
     "mean",
@@ -110,6 +111,7 @@ pub const BUILTIN_NAMES: &[&str] = &[
     "rename",
     "merge",
     "append",
+    "rbind",
     "collapse",
     "group_by",
     "reshape",
@@ -210,13 +212,13 @@ impl Interpreter {
         let cu_col: Vec<Value> = conf_upper.iter().map(|&v| Value::Float(v)).collect();
 
         let mut map = std::collections::HashMap::new();
-        map.insert("variable".into(), Value::List(Rc::new(name_col)));
-        map.insert("coef".into(), Value::List(Rc::new(coef_col)));
-        map.insert("std_err".into(), Value::List(Rc::new(se_col)));
-        map.insert("t".into(), Value::List(Rc::new(t_col)));
-        map.insert("p_value".into(), Value::List(Rc::new(p_col)));
-        map.insert("conf_low".into(), Value::List(Rc::new(cl_col)));
-        map.insert("conf_high".into(), Value::List(Rc::new(cu_col)));
+        map.insert("variable".into(), Value::List(Arc::new(name_col)));
+        map.insert("coef".into(), Value::List(Arc::new(coef_col)));
+        map.insert("std_err".into(), Value::List(Arc::new(se_col)));
+        map.insert("t".into(), Value::List(Arc::new(t_col)));
+        map.insert("p_value".into(), Value::List(Arc::new(p_col)));
+        map.insert("conf_low".into(), Value::List(Arc::new(cl_col)));
+        map.insert("conf_high".into(), Value::List(Arc::new(cu_col)));
         map
     }
 
@@ -240,13 +242,13 @@ impl Interpreter {
         let nan_col: Vec<Value> = vec![Value::Float(f64::NAN); n];
 
         let mut map = std::collections::HashMap::new();
-        map.insert("variable".into(), Value::List(Rc::new(name_col)));
-        map.insert("coef".into(), Value::List(Rc::new(coef_col)));
-        map.insert("std_err".into(), Value::List(Rc::new(se_col)));
-        map.insert("t".into(), Value::List(Rc::new(stat_col)));
-        map.insert("p_value".into(), Value::List(Rc::new(p_col)));
-        map.insert("conf_low".into(), Value::List(Rc::new(nan_col.clone())));
-        map.insert("conf_high".into(), Value::List(Rc::new(nan_col)));
+        map.insert("variable".into(), Value::List(Arc::new(name_col)));
+        map.insert("coef".into(), Value::List(Arc::new(coef_col)));
+        map.insert("std_err".into(), Value::List(Arc::new(se_col)));
+        map.insert("t".into(), Value::List(Arc::new(stat_col)));
+        map.insert("p_value".into(), Value::List(Arc::new(p_col)));
+        map.insert("conf_low".into(), Value::List(Arc::new(nan_col.clone())));
+        map.insert("conf_high".into(), Value::List(Arc::new(nan_col)));
         map
     }
 
@@ -465,7 +467,7 @@ impl Interpreter {
                     Value::Dict(m) => {
                         let mut ks: Vec<String> = m.keys().cloned().collect();
                         ks.sort();
-                        Ok(Value::List(Rc::new(
+                        Ok(Value::List(Arc::new(
                             ks.into_iter().map(Value::Str).collect(),
                         )))
                     }
@@ -481,7 +483,7 @@ impl Interpreter {
                     Value::Dict(m) => {
                         let mut pairs: Vec<_> = m.iter().collect();
                         pairs.sort_by_key(|(k, _)| (*k).clone());
-                        Ok(Value::List(Rc::new(
+                        Ok(Value::List(Arc::new(
                             pairs.into_iter().map(|(_, v)| v.clone()).collect(),
                         )))
                     }
@@ -516,7 +518,7 @@ impl Interpreter {
                         for (k, v) in m2.iter() {
                             merged.insert(k.clone(), v.clone());
                         }
-                        Ok(Value::Dict(Rc::new(merged)))
+                        Ok(Value::Dict(Arc::new(merged)))
                     }
                     _ => Err(HayashiError::Type("dict_merge() requires two dicts".into())),
                 }
@@ -538,7 +540,7 @@ impl Interpreter {
                     Value::Dict(m) => {
                         let mut new_m = (*m).clone();
                         new_m.insert(k, v);
-                        Ok(Value::Dict(Rc::new(new_m)))
+                        Ok(Value::Dict(Arc::new(new_m)))
                     }
                     _ => Err(HayashiError::Type("dict_set() requires dict".into())),
                 }
@@ -557,7 +559,7 @@ impl Interpreter {
                     Value::Dict(m) => {
                         let mut new_m = (*m).clone();
                         new_m.remove(&k);
-                        Ok(Value::Dict(Rc::new(new_m)))
+                        Ok(Value::Dict(Arc::new(new_m)))
                     }
                     _ => Err(HayashiError::Type("dict_remove() requires dict".into())),
                 }
@@ -571,7 +573,7 @@ impl Interpreter {
                 match d {
                     Value::Dict(m) => {
                         let df = self.dict_to_dataframe(&m)?;
-                        Ok(Value::DataFrame(Rc::new(df)))
+                        Ok(Value::DataFrame(Arc::new(df)))
                     }
                     _ => Err(HayashiError::Type("dataframe() requires dict".into())),
                 }
@@ -630,10 +632,10 @@ impl Interpreter {
                                 col.1.push(Value::Float(r.params_history[[t, j]]));
                             }
                         }
-                        map.insert("date".into(), Value::List(Rc::new(date_col)));
-                        map.insert("r2".into(), Value::List(Rc::new(r2_col)));
+                        map.insert("date".into(), Value::List(Arc::new(date_col)));
+                        map.insert("r2".into(), Value::List(Arc::new(r2_col)));
                         for (name, vals) in coef_cols {
-                            map.insert(name, Value::List(Rc::new(vals)));
+                            map.insert(name, Value::List(Arc::new(vals)));
                         }
                     }
                     Value::IvResult(r) => {
@@ -840,7 +842,7 @@ impl Interpreter {
                 }
 
                 let df = self.dict_to_dataframe(&map)?;
-                Ok(Value::DataFrame(Rc::new(df)))
+                Ok(Value::DataFrame(Arc::new(df)))
             }
 
             // ── glance: model fit summary ──────────────────────────────────────
@@ -856,12 +858,12 @@ impl Interpreter {
                 match val {
                     Value::OlsResult(m) => {
                         let r = &m.result;
-                        let scalar = |v: f64| Value::List(Rc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
                         map.insert("r2".into(), scalar(r.r_squared));
                         map.insert("adj_r2".into(), scalar(r.adj_r_squared));
                         map.insert(
                             "n".into(),
-                            Value::List(Rc::new(vec![Value::Int(r.n_obs as i64)])),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
                         );
                         map.insert("f_stat".into(), scalar(r.f_statistic));
                         map.insert("prob_f".into(), scalar(r.prob_f));
@@ -871,68 +873,68 @@ impl Interpreter {
                         map.insert("sigma".into(), scalar(r.sigma));
                     }
                     Value::IvResult(r) => {
-                        let scalar = |v: f64| Value::List(Rc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
                         map.insert("r2".into(), scalar(r.r_squared));
                         map.insert(
                             "n".into(),
-                            Value::List(Rc::new(vec![Value::Int(r.n_obs as i64)])),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
                         );
                         map.insert("sigma".into(), scalar(r.sigma));
                     }
                     Value::BinaryResult(m) => {
                         let r = &m.result;
-                        let scalar = |v: f64| Value::List(Rc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
                         map.insert("pseudo_r2".into(), scalar(r.pseudo_r2));
                         map.insert("log_lik".into(), scalar(r.log_likelihood));
-                        map.insert("n".into(), Value::List(Rc::new(vec![Value::Int(0)])));
+                        map.insert("n".into(), Value::List(Arc::new(vec![Value::Int(0)])));
                         // n not stored
                     }
                     Value::PanelResult(r) => {
-                        let scalar = |v: f64| Value::List(Rc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
                         map.insert("r2".into(), scalar(r.r_squared));
                         map.insert(
                             "n".into(),
-                            Value::List(Rc::new(vec![Value::Int(r.n_obs as i64)])),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
                         );
                         map.insert(
                             "n_entities".into(),
-                            Value::List(Rc::new(vec![Value::Int(r.n_entities as i64)])),
+                            Value::List(Arc::new(vec![Value::Int(r.n_entities as i64)])),
                         );
                         map.insert("sigma".into(), scalar(r.sigma));
                     }
                     Value::ReResult(r) => {
-                        let scalar = |v: f64| Value::List(Rc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
                         map.insert("r2".into(), scalar(r.r_squared_overall));
                         map.insert("sigma_u".into(), scalar(r.sigma_u));
                         map.insert("sigma_e".into(), scalar(r.sigma_e));
                         map.insert("theta".into(), scalar(r.theta));
                     }
                     Value::GmmResult(r) => {
-                        let scalar = |v: f64| Value::List(Rc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
                         map.insert("j_stat".into(), scalar(r.j_stat));
                         map.insert("j_p_value".into(), scalar(r.j_p_value));
                         map.insert(
                             "n".into(),
-                            Value::List(Rc::new(vec![Value::Int(r.n_obs as i64)])),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
                         );
                         map.insert(
                             "df_overid".into(),
-                            Value::List(Rc::new(vec![Value::Int(r.df_overid as i64)])),
+                            Value::List(Arc::new(vec![Value::Int(r.df_overid as i64)])),
                         );
                     }
                     Value::PoissonResult(r) => {
-                        let scalar = |v: f64| Value::List(Rc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
                         map.insert("log_lik".into(), scalar(r.log_likelihood));
                         map.insert("aic".into(), scalar(r.aic));
                         map.insert("bic".into(), scalar(r.bic));
                         map.insert("pseudo_r2".into(), scalar(r.pseudo_r2));
                         map.insert(
                             "n".into(),
-                            Value::List(Rc::new(vec![Value::Int(r.n_obs as i64)])),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
                         );
                     }
                     Value::NegBinResult(r) => {
-                        let scalar = |v: f64| Value::List(Rc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
                         map.insert("log_lik".into(), scalar(r.log_likelihood));
                         map.insert("aic".into(), scalar(r.aic));
                         map.insert("bic".into(), scalar(r.bic));
@@ -940,11 +942,11 @@ impl Interpreter {
                         map.insert("alpha".into(), scalar(r.alpha));
                         map.insert(
                             "n".into(),
-                            Value::List(Rc::new(vec![Value::Int(r.n_obs as i64)])),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
                         );
                     }
                     Value::GlmResult(r) => {
-                        let scalar = |v: f64| Value::List(Rc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
                         map.insert("log_lik".into(), scalar(r.log_likelihood));
                         map.insert("aic".into(), scalar(r.aic));
                         map.insert("bic".into(), scalar(r.bic));
@@ -952,60 +954,60 @@ impl Interpreter {
                         map.insert("deviance".into(), scalar(r.deviance));
                         map.insert(
                             "n".into(),
-                            Value::List(Rc::new(vec![Value::Int(r.n_obs as i64)])),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
                         );
                     }
                     Value::QuantileResult(r) => {
-                        let scalar = |v: f64| Value::List(Rc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
                         map.insert("tau".into(), scalar(r.tau));
                         map.insert("pseudo_r2".into(), scalar(r.r_squared));
                     }
                     Value::TobitResult(r) => {
-                        let scalar = |v: f64| Value::List(Rc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
                         map.insert("log_lik".into(), scalar(r.log_likelihood));
                         map.insert(
                             "n".into(),
-                            Value::List(Rc::new(vec![Value::Int(r.n_obs as i64)])),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
                         );
                         map.insert(
                             "n_censored".into(),
-                            Value::List(Rc::new(vec![Value::Int(r.n_censored as i64)])),
+                            Value::List(Arc::new(vec![Value::Int(r.n_censored as i64)])),
                         );
                     }
                     Value::HeckmanResult(r) => {
-                        let scalar = |v: f64| Value::List(Rc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
                         map.insert("rho".into(), scalar(r.rho));
                         map.insert("delta".into(), scalar(r.delta));
                         map.insert(
                             "n".into(),
-                            Value::List(Rc::new(vec![Value::Int(r.n_obs as i64)])),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
                         );
                     }
                     Value::OrderedResult(r) => {
-                        let scalar = |v: f64| Value::List(Rc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
                         map.insert("log_lik".into(), scalar(r.log_likelihood));
                         map.insert("aic".into(), scalar(r.aic));
                         map.insert("bic".into(), scalar(r.bic));
                         map.insert("pseudo_r2".into(), scalar(r.pseudo_r2));
                     }
                     Value::PenalizedResult(m) => {
-                        let scalar = |v: f64| Value::List(Rc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
                         map.insert("r2".into(), scalar(m.r_squared));
                         map.insert(
                             "n".into(),
-                            Value::List(Rc::new(vec![Value::Int(m.n_obs as i64)])),
+                            Value::List(Arc::new(vec![Value::Int(m.n_obs as i64)])),
                         );
                         map.insert("alpha".into(), scalar(m.alpha));
                     }
                     Value::ArimaResult(r) => {
-                        let scalar = |v: f64| Value::List(Rc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
                         map.insert("aic".into(), scalar(r.aic));
                         map.insert("bic".into(), scalar(r.bic));
                         map.insert("log_lik".into(), scalar(r.log_likelihood));
                         map.insert("sigma2".into(), scalar(r.sigma2));
                     }
                     Value::GarchResult(r) => {
-                        let scalar = |v: f64| Value::List(Rc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
                         map.insert("log_lik".into(), scalar(r.log_likelihood));
                         map.insert("aic".into(), scalar(r.aic));
                         map.insert("bic".into(), scalar(r.bic));
@@ -1014,7 +1016,7 @@ impl Interpreter {
                 }
 
                 let df = self.dict_to_dataframe(&map)?;
-                Ok(Value::DataFrame(Rc::new(df)))
+                Ok(Value::DataFrame(Arc::new(df)))
             }
 
             // ── names: column names of a DataFrame ─────────────────────────────
@@ -1029,7 +1031,7 @@ impl Interpreter {
                     _ => return Err(HayashiError::Type("names() requires a DataFrame".into())),
                 };
                 let names: Vec<Value> = df.column_names().into_iter().map(Value::Str).collect();
-                Ok(Value::List(Rc::new(names)))
+                Ok(Value::List(Arc::new(names)))
             }
 
             // ── String functions ────────────────────────────────────────────
@@ -1218,7 +1220,7 @@ impl Interpreter {
                     .split(delim.as_str())
                     .map(|p| Value::Str(p.to_string()))
                     .collect();
-                Ok(Value::List(Rc::new(parts)))
+                Ok(Value::List(Arc::new(parts)))
             }
 
             // str_replace(s, from, to) — "replace" is a keyword
@@ -1612,7 +1614,7 @@ impl Interpreter {
                     }
                 };
                 match v {
-                    Value::Series(s) => Ok(Value::Series(Rc::new(s.shift(n)))),
+                    Value::Series(s) => Ok(Value::Series(Arc::new(s.shift(n)))),
                     Value::List(lst) => {
                         let shifted = if n > 0 {
                             let mut v = vec![Value::Nil; n as usize];
@@ -1626,7 +1628,7 @@ impl Interpreter {
                         } else {
                             lst.to_vec()
                         };
-                        Ok(Value::List(Rc::new(shifted)))
+                        Ok(Value::List(Arc::new(shifted)))
                     }
                     other => {
                         Err(self.type_err(format!("shift() requires series or list, got {other}")))
@@ -1844,7 +1846,7 @@ impl Interpreter {
                     Value::List(v) => {
                         let mut new_v = (*v).clone();
                         new_v.push(item);
-                        self.env.set(&var_name, Value::List(Rc::new(new_v)))?;
+                        self.env.set(&var_name, Value::List(Arc::new(new_v)))?;
                         Ok(Value::Nil)
                     }
                     _ => Err(HayashiError::Type("push() requires list".into())),
@@ -1875,7 +1877,7 @@ impl Interpreter {
                         }
                         let mut new_v = (*v).clone();
                         let removed = new_v.pop().unwrap();
-                        self.env.set(&var_name, Value::List(Rc::new(new_v)))?;
+                        self.env.set(&var_name, Value::List(Arc::new(new_v)))?;
                         Ok(removed)
                     }
                     _ => Err(HayashiError::Type("pop() requires list".into())),
@@ -1903,7 +1905,7 @@ impl Interpreter {
                             )));
                         }
                         new_v.insert(idx, item);
-                        Ok(Value::List(Rc::new(new_v)))
+                        Ok(Value::List(Arc::new(new_v)))
                     }
                     _ => Err(HayashiError::Type("insert() requires list".into())),
                 }
@@ -1929,7 +1931,7 @@ impl Interpreter {
                         }
                         let mut new_v = (*v).clone();
                         new_v.remove(idx);
-                        Ok(Value::List(Rc::new(new_v)))
+                        Ok(Value::List(Arc::new(new_v)))
                     }
                     _ => Err(HayashiError::Type("remove() requires list".into())),
                 }
@@ -1940,7 +1942,7 @@ impl Interpreter {
                     return Err(HayashiError::Runtime("clear(list)".into()));
                 }
                 match self.eval_expr(&args[0])? {
-                    Value::List(_) => Ok(Value::List(Rc::new(Vec::new()))),
+                    Value::List(_) => Ok(Value::List(Arc::new(Vec::new()))),
                     _ => Err(HayashiError::Type("clear() requires list".into())),
                 }
             }
@@ -1953,7 +1955,7 @@ impl Interpreter {
                     Value::List(v) => {
                         let mut new_v = (*v).clone();
                         new_v.reverse();
-                        Ok(Value::List(Rc::new(new_v)))
+                        Ok(Value::List(Arc::new(new_v)))
                     }
                     _ => Err(HayashiError::Type("reverse() requires list".into())),
                 }
@@ -2002,7 +2004,7 @@ impl Interpreter {
                             v.len()
                         };
                         let s = start.min(v.len());
-                        Ok(Value::List(Rc::new(v[s..end].to_vec())))
+                        Ok(Value::List(Arc::new(v[s..end].to_vec())))
                     }
                     _ => Err(HayashiError::Type("slice() requires list".into())),
                 }
@@ -2048,7 +2050,7 @@ impl Interpreter {
                     let val = self.call_value_fn(&fn_val, std::slice::from_ref(item))?;
                     result.push(val);
                 }
-                Ok(Value::List(Rc::new(result)))
+                Ok(Value::List(Arc::new(result)))
             }
 
             "unique" => {
@@ -2066,7 +2068,7 @@ impl Interpreter {
                                 result.push(item.clone());
                             }
                         }
-                        Ok(Value::List(Rc::new(result)))
+                        Ok(Value::List(Arc::new(result)))
                     }
                     _ => Err(HayashiError::Type("unique() requires list".into())),
                 }
@@ -2085,7 +2087,7 @@ impl Interpreter {
                                 other => result.push(other.clone()),
                             }
                         }
-                        Ok(Value::List(Rc::new(result)))
+                        Ok(Value::List(Arc::new(result)))
                     }
                     _ => Err(HayashiError::Type("flatten() requires list".into())),
                 }
@@ -2102,7 +2104,7 @@ impl Interpreter {
                         other => return Err(self.type_mismatch("List", &other)),
                     }
                 }
-                Ok(Value::List(Rc::new(result)))
+                Ok(Value::List(Arc::new(result)))
             }
 
             "range" => {
@@ -2141,7 +2143,7 @@ impl Interpreter {
                     v.push(Value::Int(cur));
                     cur += step;
                 }
-                Ok(Value::List(Rc::new(v)))
+                Ok(Value::List(Arc::new(v)))
             }
 
             // ── list_files(dir, [pattern]) ─────────────────────────────────────
@@ -2180,7 +2182,7 @@ impl Interpreter {
                     }
                 }
                 files.sort();
-                Ok(Value::List(Rc::new(
+                Ok(Value::List(Arc::new(
                     files.into_iter().map(Value::Str).collect(),
                 )))
             }

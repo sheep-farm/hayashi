@@ -1,4 +1,5 @@
 use super::*;
+use std::sync::Arc;
 
 // ── Conversão de tipos e valores ─────────────────────────────────────────────
 
@@ -281,7 +282,7 @@ pub(super) fn resolve_cov_full(
 }
 
 /// Filters DataFrame by numeric mask (values != 0 are kept).
-pub(super) fn filter_df_by_mask(df: &DataFrame, mask: &[f64]) -> Result<Rc<DataFrame>> {
+pub(super) fn filter_df_by_mask(df: &DataFrame, mask: &[f64]) -> Result<Arc<DataFrame>> {
     let keep: Vec<usize> = mask
         .iter()
         .enumerate()
@@ -289,7 +290,7 @@ pub(super) fn filter_df_by_mask(df: &DataFrame, mask: &[f64]) -> Result<Rc<DataF
         .map(|(i, _)| i)
         .collect();
     df.iloc(Some(&keep), None)
-        .map(Rc::new)
+        .map(Arc::new)
         .map_err(|e| HayashiError::Runtime(e.to_string()))
 }
 

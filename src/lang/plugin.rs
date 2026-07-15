@@ -7,7 +7,6 @@ use arrow::ffi::{FFI_ArrowArray, FFI_ArrowSchema};
 use greeners::Column;
 use ndarray::Array1;
 use std::collections::HashMap;
-use std::rc::Rc;
 use std::sync::Arc;
 
 /// Unified Hayashi Plugin Trait
@@ -160,16 +159,16 @@ pub fn arrow_to_column(array: &ArrayRef) -> Result<Column, String> {
 /// Converte uma coluna do Greeners em um Value::List do Hayashi.
 pub fn column_to_value(col: &Column) -> Value {
     match col {
-        Column::Float(arr) => Value::List(Rc::new(arr.iter().map(|&x| Value::Float(x)).collect())),
-        Column::Int(arr) => Value::List(Rc::new(arr.iter().map(|&x| Value::Int(x)).collect())),
-        Column::Bool(arr) => Value::List(Rc::new(arr.iter().map(|&x| Value::Bool(x)).collect())),
-        Column::String(arr) => {
-            Value::List(Rc::new(arr.iter().map(|s| Value::Str(s.clone())).collect()))
-        }
-        Column::Categorical(cat) => Value::List(Rc::new(
+        Column::Float(arr) => Value::List(Arc::new(arr.iter().map(|&x| Value::Float(x)).collect())),
+        Column::Int(arr) => Value::List(Arc::new(arr.iter().map(|&x| Value::Int(x)).collect())),
+        Column::Bool(arr) => Value::List(Arc::new(arr.iter().map(|&x| Value::Bool(x)).collect())),
+        Column::String(arr) => Value::List(Arc::new(
+            arr.iter().map(|s| Value::Str(s.clone())).collect(),
+        )),
+        Column::Categorical(cat) => Value::List(Arc::new(
             cat.to_strings().into_iter().map(Value::Str).collect(),
         )),
-        Column::DateTime(arr) => Value::List(Rc::new(
+        Column::DateTime(arr) => Value::List(Arc::new(
             arr.iter().map(|dt| Value::Str(dt.to_string())).collect(),
         )),
     }
@@ -731,7 +730,7 @@ pub fn json_to_value(
                 .iter()
                 .map(|v| json_to_value(v, returned_arrow_ptrs, host_allocated))
                 .collect();
-            Value::List(Rc::new(lst))
+            Value::List(Arc::new(lst))
         }
         serde_json::Value::Object(obj) => {
             if let (Some(arr_val), Some(sch_val)) = (
@@ -753,7 +752,7 @@ pub fn json_to_value(
                                         returned_arrow_ptrs
                                             .push((arr_ptr as usize, sch_ptr as usize));
                                     }
-                                    return Value::DataFrame(Rc::new(df));
+                                    return Value::DataFrame(Arc::new(df));
                                 }
                             } else {
                                 if let Ok(col) = arrow_to_column(&array_ref) {
@@ -794,7 +793,7 @@ pub fn json_to_value(
                     json_to_value(v, returned_arrow_ptrs, host_allocated),
                 );
             }
-            Value::Dict(Rc::new(map))
+            Value::Dict(Arc::new(map))
         }
     }
 }

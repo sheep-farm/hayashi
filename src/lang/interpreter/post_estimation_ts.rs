@@ -1,5 +1,6 @@
 use super::helpers::*;
 use super::*;
+use std::sync::Arc;
 
 mod timeseries_models;
 
@@ -601,10 +602,10 @@ impl Interpreter {
                 let filt_name = format!("{var_name}_filtered");
                 let smooth_name = format!("{var_name}_smoothed");
 
-                Rc::make_mut(&mut df)
+                Arc::make_mut(&mut df)
                     .insert(filt_name.clone(), filtered)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                Rc::make_mut(&mut df)
+                Arc::make_mut(&mut df)
                     .insert(smooth_name.clone(), smoothed)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
@@ -618,10 +619,10 @@ impl Interpreter {
                     );
                     let sf_name = format!("{var_name}_slope_filtered");
                     let ss_name = format!("{var_name}_slope_smoothed");
-                    Rc::make_mut(&mut df)
+                    Arc::make_mut(&mut df)
                         .insert(sf_name.clone(), slope_filt)
                         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                    Rc::make_mut(&mut df)
+                    Arc::make_mut(&mut df)
                         .insert(ss_name.clone(), slope_smooth)
                         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                     println!(

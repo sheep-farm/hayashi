@@ -1,5 +1,17 @@
 use super::eval_expr::ColResult;
 use super::*;
+use std::sync::Arc;
+
+/// Wrapper for thread results in `parallel for` — values created inside a
+/// child thread are moved to the parent thread.  This is safe because:
+/// - Send-safe values (Arc, primitives) are genuinely Send.
+/// - Rc-backed values are created within the child thread, have refcount 1,
+///   and are moved (never cloned) to the parent.  No concurrent refcount
+///   access occurs.
+struct ThreadResult(std::result::Result<Value, HayashiError>);
+
+// SAFETY: see struct-level comment.
+unsafe impl Send for ThreadResult {}
 
 impl Interpreter {
     pub(crate) fn exec(&mut self, spanned: &Spanned) -> Result<()> {
@@ -100,14 +112,14 @@ impl Interpreter {
                 match col_result {
                     ColResult::Float(vals) => {
                         let arr = ndarray::Array1::from(vals);
-                        Rc::make_mut(&mut df_val)
+                        Arc::make_mut(&mut df_val)
                             .insert(col_name.clone(), arr)
                             .map_err(|e: greeners::GreenersError| self.rt_err(e.to_string()))?;
                     }
                     ColResult::String(strs) => {
                         use greeners::Column;
                         let col = Column::String(ndarray::Array1::from(strs));
-                        Rc::make_mut(&mut df_val)
+                        Arc::make_mut(&mut df_val)
                             .insert_column(col_name.clone(), col)
                             .map_err(|e: greeners::GreenersError| self.rt_err(e.to_string()))?;
                     }
@@ -158,7 +170,7 @@ impl Interpreter {
                 let n = sorted.n_rows();
 
                 self.ts_info.insert(df.clone(), t_var.clone());
-                self.env.set(df, Value::DataFrame(Rc::new(sorted)))?;
+                self.env.set(df, Value::DataFrame(Arc::new(sorted)))?;
 
                 println!("tsset {df}");
                 println!("  time variable : {t_var}  ({t_min} to {t_max})");
@@ -203,6 +215,26 @@ impl Interpreter {
                 body,
             } => self.exec_for(var, var2.as_deref(), iter, body)?,
 
+            // ── parallel for var in iter { ... } ──────────────────────────────
+            Stmt::ParallelFor {
+                var,
+                var2,
+                iter,
+                body,
+                threads,
+            } => {
+                let n_threads = match threads {
+                    Some(e) => match self.eval_expr(e)? {
+                        Value::Int(n) if n > 0 => Some(n as usize),
+                        Value::Float(f) if f > 0.0 => Some(f as usize),
+                        _ => None,
+                    },
+                    None => None,
+                };
+                let result = self.exec_parallel_for(var, var2.as_deref(), iter, body, n_threads)?;
+                self.env.set(var, result)?;
+            }
+
             // ── fn name(params) { body } ─────────────────────────────────────
             Stmt::Fn {
                 name,
@@ -213,7 +245,7 @@ impl Interpreter {
             } => {
                 self.env.set(
                     name,
-                    Value::UserFn(Rc::new(UserFn {
+                    Value::UserFn(Arc::new(UserFn {
                         params: params.clone(),
                         defaults: defaults.clone(),
                         doc: doc.clone(),
@@ -341,7 +373,7 @@ impl Interpreter {
             k,
             headers.join(", ")
         );
-        self.env.set(alias, Value::DataFrame(Rc::new(df)))?;
+        self.env.set(alias, Value::DataFrame(Arc::new(df)))?;
         Ok(())
     }
 
@@ -425,7 +457,7 @@ impl Interpreter {
                 };
                 let (df, n_rows) = crate::io::odbc::load_odbc(conn_str, &sql)?;
                 emitln!(self, "Loaded ODBC → {alias} ({n_rows} rows)");
-                self.env.set(alias, Value::DataFrame(Rc::new(df)))?;
+                self.env.set(alias, Value::DataFrame(Arc::new(df)))?;
             }
             #[cfg(not(feature = "odbc"))]
             {
@@ -528,7 +560,7 @@ impl Interpreter {
                 }
             };
             emitln!(self, "Loaded '{}' → {alias} ({} rows)", path_str, n_rows);
-            self.env.set(alias, Value::DataFrame(Rc::new(df)))?;
+            self.env.set(alias, Value::DataFrame(Arc::new(df)))?;
         }
         Ok(())
     }
@@ -1039,7 +1071,7 @@ impl Interpreter {
         };
 
         let arr = ndarray::Array1::from(vals);
-        Rc::make_mut(&mut df_val)
+        Arc::make_mut(&mut df_val)
             .insert(varname.to_string(), arr)
             .map_err(|e: greeners::GreenersError| self.rt_err(e.to_string()))?;
         println!(
@@ -1087,7 +1119,7 @@ impl Interpreter {
         };
 
         let arr = ndarray::Array1::from(final_vals);
-        Rc::make_mut(&mut df_val)
+        Arc::make_mut(&mut df_val)
             .insert(varname.to_string(), arr)
             .map_err(|e: greeners::GreenersError| self.rt_err(e.to_string()))?;
         self.env.set(df, Value::DataFrame(df_val))?;
@@ -1462,6 +1494,247 @@ impl Interpreter {
             }
         }
         Ok(())
+    }
+
+    // ── parallel for ──────────────────────────────────────────────────────────
+
+    /// Materializes a `ForIter` into a `Vec<Value>` on the calling thread.
+    fn materialize_iter(&mut self, iter: &ForIter) -> Result<Vec<Value>> {
+        match iter {
+            ForIter::Range(start_expr, end_expr) => {
+                let start = match self.eval_expr(start_expr)? {
+                    Value::Int(i) => i,
+                    Value::Float(f) => f as i64,
+                    v => {
+                        return Err(HayashiError::Type(format!(
+                            "for: range start must be integer, not {v}"
+                        )))
+                    }
+                };
+                let end = match self.eval_expr(end_expr)? {
+                    Value::Int(i) => i,
+                    Value::Float(f) => f as i64,
+                    v => {
+                        return Err(HayashiError::Type(format!(
+                            "for: range end must be integer, not {v}"
+                        )))
+                    }
+                };
+                let step: i64 = if start <= end { 1 } else { -1 };
+                let mut items = Vec::new();
+                let mut cur = start;
+                while if step > 0 { cur < end } else { cur > end } {
+                    items.push(Value::Int(cur));
+                    cur += step;
+                }
+                Ok(items)
+            }
+            ForIter::RangeInclusive(start_expr, end_expr) => {
+                let start = match self.eval_expr(start_expr)? {
+                    Value::Int(i) => i,
+                    Value::Float(f) => f as i64,
+                    v => {
+                        return Err(HayashiError::Type(format!(
+                            "for: range start must be integer, not {v}"
+                        )))
+                    }
+                };
+                let end = match self.eval_expr(end_expr)? {
+                    Value::Int(i) => i,
+                    Value::Float(f) => f as i64,
+                    v => {
+                        return Err(HayashiError::Type(format!(
+                            "for: range end must be integer, not {v}"
+                        )))
+                    }
+                };
+                let step: i64 = if start <= end { 1 } else { -1 };
+                let mut items = Vec::new();
+                let mut cur = start;
+                while if step > 0 { cur <= end } else { cur >= end } {
+                    items.push(Value::Int(cur));
+                    cur += step;
+                }
+                Ok(items)
+            }
+            ForIter::Items(iter_expr) => {
+                let value = self.eval_expr(iter_expr)?;
+                match value {
+                    Value::List(v) => Ok((*v).clone()),
+                    Value::Dict(d) => {
+                        let mut items = Vec::new();
+                        for (k, v) in d.iter() {
+                            let mut entry = HashMap::new();
+                            entry.insert("key".to_string(), Value::Str(k.clone()));
+                            entry.insert("value".to_string(), v.clone());
+                            items.push(Value::Dict(Arc::new(entry)));
+                        }
+                        Ok(items)
+                    }
+                    other => Err(HayashiError::Type(format!(
+                        "for: iterator must be a list or dict, not {other}"
+                    ))),
+                }
+            }
+        }
+    }
+
+    fn exec_parallel_for(
+        &mut self,
+        var: &str,
+        var2: Option<&str>,
+        iter: &ForIter,
+        body: &[Spanned],
+        max_threads: Option<usize>,
+    ) -> Result<Value> {
+        // 1. Materialize the iterator on the main thread.
+        let items = self.materialize_iter(iter)?;
+
+        // 2. Snapshot the current environment (only send-safe values).
+        let names = self.env.all_names();
+        let mut snapshot: Vec<(String, SendValue)> = Vec::with_capacity(names.len());
+        for name in &names {
+            if let Some(v) = self.env.get(name) {
+                let v = v.clone();
+                if v.is_send_safe() {
+                    snapshot.push((
+                        name.clone(),
+                        SendValue::new(v).map_err(HayashiError::Runtime)?,
+                    ));
+                }
+            }
+        }
+
+        // 3. Determine the number of threads.
+        //    Explicit `threads=N` takes precedence; otherwise use available CPUs.
+        let n_threads = max_threads
+            .unwrap_or_else(|| {
+                std::thread::available_parallelism()
+                    .map(|n| n.get())
+                    .unwrap_or(4)
+            })
+            .min(items.len().max(1));
+
+        if items.is_empty() || n_threads == 1 {
+            // Fallback: sequential execution (same semantics, no threads).
+            let mut results = Vec::with_capacity(items.len());
+            for (i, item) in items.into_iter().enumerate() {
+                self.env.push_scope();
+                self.env.set(var, item)?;
+                if let Some(v2) = var2 {
+                    self.env.set(v2, Value::Int(i as i64))?;
+                }
+                let val = self.exec_parallel_body(body)?;
+                self.env.pop_scope();
+                results.push(val);
+            }
+            return Ok(Value::List(Arc::new(results)));
+        }
+
+        // 4. Divide items into chunks (wrapped as SendValue for thread-safety).
+        let chunk_size = items.len().div_ceil(n_threads);
+        let chunks: Vec<Vec<SendValue>> = items
+            .chunks(chunk_size)
+            .map(|c| {
+                c.iter()
+                    .map(|v| SendValue::new(v.clone()).map_err(HayashiError::Runtime))
+                    .collect::<Result<Vec<_>>>()
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        // 5. Shared stdout mutex for thread-safe printing.
+        let stdout_lock = Arc::new(std::sync::Mutex::new(()));
+
+        // 6. Spawn threads via scoped threads.
+        let chunk_results: Vec<Value> = std::thread::scope(|s| {
+            let mut handles = Vec::with_capacity(chunks.len());
+            for (chunk_idx, chunk) in chunks.into_iter().enumerate() {
+                let snapshot = snapshot.clone(); // cheap: Arc clones inside
+                let body = body.to_vec();
+                let var = var.to_string();
+                let var2 = var2.map(|s| s.to_string());
+                let stdout_lock = stdout_lock.clone();
+
+                let handle = s.spawn(move || -> Vec<ThreadResult> {
+                    let _guard = stdout_lock.lock().unwrap();
+
+                    // Each thread gets a fresh interpreter.
+                    let mut interp = Interpreter::new();
+
+                    // Load the snapshot into the global scope.
+                    for (name, sv) in &snapshot {
+                        let _ = interp.env.set(name, sv.0.clone());
+                    }
+
+                    drop(_guard); // release stdout during compute
+
+                    let mut results = Vec::with_capacity(chunk.len());
+                    for (i, item) in chunk.into_iter().enumerate() {
+                        let item = item.0; // unwrap SendValue
+                        interp.env.push_scope();
+                        let _ = interp.env.set(&var, item);
+                        if let Some(ref v2) = var2 {
+                            let _ = interp.env.set(v2, Value::Int(i as i64));
+                        }
+
+                        let val = interp.exec_parallel_body(&body);
+                        interp.env.pop_scope();
+                        results.push(ThreadResult(val));
+                    }
+                    results
+                });
+                handles.push((chunk_idx, handle));
+            }
+
+            // Join in order, collect results.
+            let mut all = Vec::new();
+            for (_idx, h) in handles {
+                let chunk_results = h.join().unwrap_or_default();
+                for tr in chunk_results {
+                    match tr.0 {
+                        Ok(v) => all.push(v),
+                        Err(_e) => all.push(Value::Nil),
+                    }
+                }
+            }
+            all
+        });
+
+        Ok(Value::List(Arc::new(chunk_results)))
+    }
+
+    /// Executes the body of a `parallel for` iteration and returns the
+    /// iteration's result value.
+    ///
+    /// The result is determined by:
+    /// 1. An explicit `return expr` inside the body (captured via HayashiError::Return)
+    /// 2. Otherwise, the value of the last `Stmt::Expr` in the body
+    /// 3. Otherwise, `Value::Nil`
+    fn exec_parallel_body(&mut self, body: &[Spanned]) -> Result<Value> {
+        let mut last_expr_val = Value::Nil;
+
+        for s in body {
+            match self.exec(s) {
+                Ok(()) => {
+                    // Track the value of standalone expressions.
+                    if let Stmt::Expr(expr) = &s.0 {
+                        last_expr_val = self.eval_expr(expr)?;
+                    }
+                }
+                Err(HayashiError::Return) => {
+                    // Explicit return — use the stored return_value.
+                    let val = self.return_value.take().unwrap_or(Value::Nil);
+                    return Ok(val);
+                }
+                Err(HayashiError::Break) | Err(HayashiError::Continue) => {
+                    // break/continue skip the rest; return last expr seen.
+                    break;
+                }
+                Err(e) => return Err(e),
+            }
+        }
+
+        Ok(last_expr_val)
     }
 }
 

@@ -1,13 +1,18 @@
 use crate::lang::error::{HayashiError, Result};
-use crate::lang::predicate::{RowAccess, RowPredicate};
+use crate::lang::predicate::{GroupBounds, RowAccess, RowPredicate};
 use arrow::array::{self, Array, AsArray, BooleanArray};
 use arrow::datatypes::DataType as ArrowType;
 use arrow::record_batch::RecordBatch;
+use arrow::temporal_conversions::{
+    date32_to_datetime, date64_to_datetime, timestamp_ms_to_datetime, timestamp_ns_to_datetime,
+    timestamp_s_to_datetime, timestamp_us_to_datetime,
+};
 use greeners::DataFrame;
 use parquet::arrow::arrow_reader::{ArrowPredicateFn, ParquetRecordBatchReaderBuilder, RowFilter};
 use parquet::arrow::{ArrowWriter, ProjectionMask};
 use parquet::basic::Compression;
 use parquet::file::properties::WriterProperties;
+use parquet::file::statistics::Statistics;
 use std::collections::HashMap;
 use std::fs::File;
 use std::sync::Arc;
@@ -69,6 +74,43 @@ pub fn load_parquet(
                 )));
             }
         }
+
+        // ── Row group pruning por estatísticas (min/max). ───────────────
+        // Antes de aplicar o RowFilter (que decodifica as colunas do
+        // predicado), lemos os metadados de cada row group e pulamos os
+        // groups onde o predicado não pode casar. Isso evita ler e
+        // decodificar row groups inteiros.
+        let parquet_metadata = builder_reader.metadata().clone();
+        let row_groups = parquet_metadata.row_groups();
+        let total_rgs = row_groups.len();
+
+        // Mapear nome da coluna → índice no schema do parquet.
+        let parquet_schema = parquet_metadata.file_metadata().schema_descr();
+        let col_name_to_idx: HashMap<String, usize> = parquet_schema
+            .columns()
+            .iter()
+            .enumerate()
+            .map(|(i, c)| (c.name().to_string(), i))
+            .collect();
+
+        let mut kept_rgs: Vec<usize> = Vec::with_capacity(total_rgs);
+        let mut pruned_count: usize = 0;
+        for (rg_idx, rg) in row_groups.iter().enumerate() {
+            let bounds = RowGroupStatsLookup {
+                rg,
+                col_name_to_idx: &col_name_to_idx,
+            };
+            if pred.can_match(&bounds) {
+                kept_rgs.push(rg_idx);
+            } else {
+                pruned_count += 1;
+            }
+        }
+
+        if pruned_count > 0 {
+            builder_reader = builder_reader.with_row_groups(kept_rgs);
+        }
+
         // A máscara do predicado inclui só as colunas que ele precisa.
         let pred_cols = pred.referenced_columns();
         let pred_mask = ProjectionMask::columns(&schema_desc, pred_cols.iter().map(|s| s.as_str()));
@@ -383,6 +425,82 @@ fn append_as_string(col: &dyn Array, out: &mut Vec<String>) {
                 });
             }
         }
+        // Timestamps: formatar como ISO 8601 (YYYY-MM-DD ou YYYY-MM-DDTHH:MM:SS).
+        // O Hayashi não tem tipo Date nativo, então a melhor representação para
+        // econometria é string ISO — o usuário pode fazer substr() para extrair
+        // ano/mês/dia, ou generate para converter em numérico (dias desde epoch).
+        ArrowType::Timestamp(arrow::datatypes::TimeUnit::Second, _) => {
+            let arr = col.as_primitive::<arrow::datatypes::TimestampSecondType>();
+            for i in 0..arr.len() {
+                out.push(if arr.is_null(i) {
+                    String::new()
+                } else {
+                    timestamp_s_to_datetime(arr.value(i))
+                        .map(|dt| format_iso(&dt))
+                        .unwrap_or_default()
+                });
+            }
+        }
+        ArrowType::Timestamp(arrow::datatypes::TimeUnit::Millisecond, _) => {
+            let arr = col.as_primitive::<arrow::datatypes::TimestampMillisecondType>();
+            for i in 0..arr.len() {
+                out.push(if arr.is_null(i) {
+                    String::new()
+                } else {
+                    timestamp_ms_to_datetime(arr.value(i))
+                        .map(|dt| format_iso(&dt))
+                        .unwrap_or_default()
+                });
+            }
+        }
+        ArrowType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, _) => {
+            let arr = col.as_primitive::<arrow::datatypes::TimestampMicrosecondType>();
+            for i in 0..arr.len() {
+                out.push(if arr.is_null(i) {
+                    String::new()
+                } else {
+                    timestamp_us_to_datetime(arr.value(i))
+                        .map(|dt| format_iso(&dt))
+                        .unwrap_or_default()
+                });
+            }
+        }
+        ArrowType::Timestamp(arrow::datatypes::TimeUnit::Nanosecond, _) => {
+            let arr = col.as_primitive::<arrow::datatypes::TimestampNanosecondType>();
+            for i in 0..arr.len() {
+                out.push(if arr.is_null(i) {
+                    String::new()
+                } else {
+                    timestamp_ns_to_datetime(arr.value(i))
+                        .map(|dt| format_iso(&dt))
+                        .unwrap_or_default()
+                });
+            }
+        }
+        ArrowType::Date32 => {
+            let arr = col.as_primitive::<arrow::datatypes::Date32Type>();
+            for i in 0..arr.len() {
+                out.push(if arr.is_null(i) {
+                    String::new()
+                } else {
+                    date32_to_datetime(arr.value(i))
+                        .map(|dt| format_iso(&dt))
+                        .unwrap_or_default()
+                });
+            }
+        }
+        ArrowType::Date64 => {
+            let arr = col.as_primitive::<arrow::datatypes::Date64Type>();
+            for i in 0..arr.len() {
+                out.push(if arr.is_null(i) {
+                    String::new()
+                } else {
+                    date64_to_datetime(arr.value(i))
+                        .map(|dt| format_iso(&dt))
+                        .unwrap_or_default()
+                });
+            }
+        }
         _ => {
             for i in 0..col.len() {
                 out.push(if col.is_null(i) {
@@ -395,7 +513,86 @@ fn append_as_string(col: &dyn Array, out: &mut Vec<String>) {
     }
 }
 
+/// Formata um `NaiveDateTime` como ISO 8601. Se a parte de tempo for meia-noite
+/// (00:00:00), retorna apenas a data (YYYY-MM-DD); caso contrário, retorna
+/// data e hora (YYYY-MM-DDTHH:MM:SS).
+fn format_iso(dt: &chrono::NaiveDateTime) -> String {
+    if dt.time() == chrono::NaiveTime::default() {
+        dt.format("%Y-%m-%d").to_string()
+    } else {
+        dt.format("%Y-%m-%dT%H:%M:%S").to_string()
+    }
+}
+
 // ── Suporte ao where= via RowFilter do parquet ─────────────────────────────
+
+/// Wrapper sobre um row group do Parquet para implementar `GroupBounds`.
+/// Permite avaliar `RowPredicate::can_match` contra as estatísticas
+/// (min/max) de cada coluna sem decodificar os dados.
+struct RowGroupStatsLookup<'a> {
+    rg: &'a parquet::file::metadata::RowGroupMetaData,
+    col_name_to_idx: &'a HashMap<String, usize>,
+}
+
+impl<'a> GroupBounds for RowGroupStatsLookup<'a> {
+    fn f64_bounds(&self, col: &str) -> Option<(f64, f64)> {
+        let idx = *self.col_name_to_idx.get(col)?;
+        let col_chunk = self.rg.column(idx);
+        let stats = col_chunk.statistics()?;
+        match stats {
+            Statistics::Int32(s) => {
+                let min = (*s.min_opt()?) as f64;
+                let max = (*s.max_opt()?) as f64;
+                Some((min, max))
+            }
+            Statistics::Int64(s) => {
+                let min = (*s.min_opt()?) as f64;
+                let max = (*s.max_opt()?) as f64;
+                Some((min, max))
+            }
+            Statistics::Int96(_) => None, // raro, conservador
+            Statistics::Float(s) => {
+                let min = (*s.min_opt()?) as f64;
+                let max = (*s.max_opt()?) as f64;
+                Some((min, max))
+            }
+            Statistics::Double(s) => {
+                let min = *s.min_opt()?;
+                let max = *s.max_opt()?;
+                Some((min, max))
+            }
+            Statistics::Boolean(s) => {
+                let min = if *s.min_opt()? { 1.0 } else { 0.0 };
+                let max = if *s.max_opt()? { 1.0 } else { 0.0 };
+                Some((min, max))
+            }
+            _ => None,
+        }
+    }
+
+    fn str_bounds(&self, col: &str) -> Option<(&str, &str)> {
+        let idx = *self.col_name_to_idx.get(col)?;
+        let col_chunk = self.rg.column(idx);
+        let stats = col_chunk.statistics()?;
+        match stats {
+            Statistics::ByteArray(s) => {
+                let min_bytes = s.min_bytes_opt()?;
+                let max_bytes = s.max_bytes_opt()?;
+                let min = std::str::from_utf8(min_bytes).ok()?;
+                let max = std::str::from_utf8(max_bytes).ok()?;
+                Some((min, max))
+            }
+            Statistics::FixedLenByteArray(s) => {
+                let min_bytes = s.min_bytes_opt()?;
+                let max_bytes = s.max_bytes_opt()?;
+                let min = std::str::from_utf8(min_bytes).ok()?;
+                let max = std::str::from_utf8(max_bytes).ok()?;
+                Some((min, max))
+            }
+            _ => None,
+        }
+    }
+}
 
 /// Linha de um `RecordBatch` projetada para avaliação do predicado `where`.
 struct ArrowRow<'a> {
