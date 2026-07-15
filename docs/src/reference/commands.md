@@ -244,6 +244,10 @@ Covariance options (where applicable): `cov=nonrobust|HC1|HC2|HC3|HC4|robust`, `
 | `mice_chained` | `mice_chained(df, vars="x1,x2", m=5, iter=10)` | MICE imputation (van Buuren 2011) |
 | `kmeans` | `kmeans(df, x="x1,x2", k=3)` | K-Means clustering (MacQueen 1967) |
 | `bayes_lm` | `bayes_lm(y ~ x, df)` | Bayesian linear regression (NIG prior) |
+| `dbscan` | `dbscan(df, x="x1,x2", eps=1.0, minpts=5)` | DBSCAN clustering (Ester 1996) |
+| `gmm_clust` | `gmm_clust(df, x="x1,x2", k=3)` | GMM clustering via EM (Dempster 1977) |
+| `reg_path` | `reg_path(y ~ x, df, type="lasso")` | Regularization path (Ridge/Lasso/ElasticNet) |
+| `qrf_inf` | `qrf_inf(y ~ x, df, q="0.1,0.5,0.9")` | QRF with bootstrap CIs (Meinshausen 2006) |
 | `hausman` | `hausman(m_fe, m_re)` | Hausman specification test |
 | `lincom` | `lincom(m, expr)` | Linear combination of coefficients |
 | `bootstrap` | `bootstrap(est, formula, df, n=)` | Generic bootstrap |

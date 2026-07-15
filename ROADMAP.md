@@ -133,12 +133,12 @@ reporta o p-value do coeficiente de ŷ².
 
 ## Pendente
 
-- **DBSCAN** — density-based clustering. +0,05 pp.
+- **Hierarchical clustering** — agglomerative. +0,05 pp.
 
-- **GMM clustering** — Gaussian mixture via EM. +0,05 pp.
+- **t-SNE** — dimensionality reduction. +0,05 pp.
 
-- **Ridge/Lasso/Elasticnet path** — regularização. +0,05 pp.
+- **UMAP** — manifold learning. +0,05 pp.
 
-- **Quantile regression forest inference** — QRF com bandas. +0,05 pp.
+- **PCA biplot** — visualização. +0,05 pp.
 
-**Cobertura atual: 99,65%.**
+**Cobertura atual: 99,80%.**

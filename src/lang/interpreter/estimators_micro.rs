@@ -5100,6 +5100,241 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── DBSCAN Clustering ─────────────────────────────────────────
+            // dbscan(df, x="x1,x2", eps=1.0, minpts=5)
+            "dbscan" | "dbscan_clust" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(format!("{func}() requires (df)")));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(format!(
+                            "{func}: first arg must be DataFrame"
+                        )))
+                    }
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
+                };
+
+                let x_str = match opt_map.get("x") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires x=\"x1,x2\" option (features)"
+                        )))
+                    }
+                };
+                let x_vars: Vec<String> = x_str.split(',').map(|s| s.trim().to_string()).collect();
+                let eps = match opt_map.get("eps") {
+                    Some(Value::Float(v)) => *v,
+                    Some(Value::Int(v)) => *v as f64,
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires eps=N option (neighborhood radius)"
+                        )))
+                    }
+                };
+                let min_pts = match opt_map.get("minpts") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires minpts=N option (min points)"
+                        )))
+                    }
+                };
+
+                let n = df.n_rows();
+                let kk = x_vars.len();
+                let mut x_mat = ndarray::Array2::<f64>::zeros((n, kk));
+                for (j, xname) in x_vars.iter().enumerate() {
+                    let col = df
+                        .get_column(xname.as_str())
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let vals = col.as_float().ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: '{xname}' must be numeric"))
+                    })?;
+                    for i in 0..n {
+                        x_mat[(i, j)] = vals[i];
+                    }
+                }
+
+                let result = greeners::DBSCAN::fit(&x_mat, eps, min_pts)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── GMM Clustering ────────────────────────────────────────────
+            // gmm_clust(df, x="x1,x2", k=3 [, iter=100, tol=1e-6])
+            "gmm_clust" | "gmm_clustering" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(format!("{func}() requires (df)")));
+                }
+                let df_name = match &args[0] {
+                    Expr::Var(n) => n.clone(),
+                    _ => {
+                        return Err(HayashiError::Type(format!(
+                            "{func}: first arg must be DataFrame"
+                        )))
+                    }
+                };
+                let df = match self.env.get(&df_name) {
+                    Some(Value::DataFrame(d)) => d.clone(),
+                    _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
+                };
+
+                let x_str = match opt_map.get("x") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires x=\"x1,x2\" option (features)"
+                        )))
+                    }
+                };
+                let x_vars: Vec<String> = x_str.split(',').map(|s| s.trim().to_string()).collect();
+                let k = match opt_map.get("k") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires k=N option (number of clusters)"
+                        )))
+                    }
+                };
+                let max_iter = match opt_map.get("iter") {
+                    Some(Value::Int(v)) => Some(*v as usize),
+                    Some(Value::Float(v)) => Some(*v as usize),
+                    _ => None,
+                };
+                let tol = match opt_map.get("tol") {
+                    Some(Value::Float(v)) => Some(*v),
+                    Some(Value::Int(v)) => Some(*v as f64),
+                    _ => None,
+                };
+
+                let n = df.n_rows();
+                let kk = x_vars.len();
+                let mut x_mat = ndarray::Array2::<f64>::zeros((n, kk));
+                for (j, xname) in x_vars.iter().enumerate() {
+                    let col = df
+                        .get_column(xname.as_str())
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let vals = col.as_float().ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: '{xname}' must be numeric"))
+                    })?;
+                    for i in 0..n {
+                        x_mat[(i, j)] = vals[i];
+                    }
+                }
+
+                let result = greeners::GmmClustering::fit(&x_mat, k, max_iter, tol)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── Regularization Path ───────────────────────────────────────
+            // reg_path(y ~ x1 + x2, df, type="lasso" [, alpha=1.0, nlambda=50])
+            "reg_path" | "regpath" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let (y_arr, x_arr) = df
+                    .to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = g_formula.independents.clone();
+
+                let reg_type = match opt_map.get("type") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => "lasso".to_string(),
+                };
+                let alpha = match opt_map.get("alpha") {
+                    Some(Value::Float(v)) => Some(*v),
+                    Some(Value::Int(v)) => Some(*v as f64),
+                    _ => None,
+                };
+                let n_lam = match opt_map.get("nlambda") {
+                    Some(Value::Int(v)) => Some(*v as usize),
+                    Some(Value::Float(v)) => Some(*v as usize),
+                    _ => None,
+                };
+
+                let result = greeners::RegPath::fit(
+                    &y_arr,
+                    &x_arr,
+                    &reg_type,
+                    alpha,
+                    n_lam,
+                    Some(var_names),
+                )
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── QRF Inference ─────────────────────────────────────────────
+            // qrf_inf(y ~ x1 + x2, df, q="0.1,0.5,0.9" [, boot=100, trees=100, depth=10, conf=0.95])
+            "qrf_inf" | "qrf_inference" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let (y_arr, x_arr) = df
+                    .to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = g_formula.independents.clone();
+
+                let q_str = match opt_map.get("q") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => "0.1,0.5,0.9".to_string(),
+                };
+                let quantiles: Vec<f64> = q_str
+                    .split(',')
+                    .map(|s| s.trim().parse::<f64>().unwrap_or(0.5))
+                    .collect();
+                let n_boot = match opt_map.get("boot") {
+                    Some(Value::Int(v)) => Some(*v as usize),
+                    Some(Value::Float(v)) => Some(*v as usize),
+                    _ => None,
+                };
+                let n_trees = match opt_map.get("trees") {
+                    Some(Value::Int(v)) => Some(*v as usize),
+                    Some(Value::Float(v)) => Some(*v as usize),
+                    _ => None,
+                };
+                let max_depth = match opt_map.get("depth") {
+                    Some(Value::Int(v)) => Some(*v as usize),
+                    Some(Value::Float(v)) => Some(*v as usize),
+                    _ => None,
+                };
+                let conf = match opt_map.get("conf") {
+                    Some(Value::Float(v)) => Some(*v),
+                    Some(Value::Int(v)) => Some(*v as f64),
+                    _ => None,
+                };
+
+                let result = greeners::QrfInference::fit(
+                    &y_arr,
+                    &x_arr,
+                    quantiles,
+                    n_boot,
+                    n_trees,
+                    max_depth,
+                    conf,
+                    Some(var_names),
+                )
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
             // ── Spatial econometrics ────────────────────────────────────────
             // spatial_sar(y ~ x1 + x2, df, w=W_matrix)
             // spatial_sem(y ~ x1 + x2, df, w=W_matrix)

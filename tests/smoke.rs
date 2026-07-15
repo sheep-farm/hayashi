@@ -12387,3 +12387,120 @@ bayes_lm(y ~ x1 + x2, df)
         "Bayesian Linear",
     );
 }
+
+#[test]
+fn dbscan_basic() {
+    assert_ok_contains(
+        "dbscan",
+        r#"
+input df
+x1 x2
+1.0 1.0
+1.1 1.1
+0.9 1.0
+1.0 0.9
+5.0 5.0
+5.1 5.1
+4.9 5.0
+5.0 4.9
+10.0 10.0
+10.1 10.1
+9.9 10.0
+10.0 9.9
+end
+dbscan(df, x="x1,x2", eps=2.0, minpts=3)
+"#,
+        "DBSCAN",
+    );
+}
+
+#[test]
+fn gmm_clust_basic() {
+    assert_ok_contains(
+        "gmm_clust",
+        r#"
+input df
+x1 x2
+1.0 1.0
+1.1 1.1
+0.9 1.0
+1.0 0.9
+5.0 5.0
+5.1 5.1
+4.9 5.0
+5.0 4.9
+10.0 10.0
+10.1 10.1
+9.9 10.0
+10.0 9.9
+end
+gmm_clust(df, x="x1,x2", k=3, iter=50)
+"#,
+        "Gaussian Mixture",
+    );
+}
+
+#[test]
+fn reg_path_basic() {
+    assert_ok_contains(
+        "reg_path",
+        r#"
+input df
+y x1 x2
+10 1.0 5
+12 2.0 6
+15 3.0 7
+18 4.0 8
+20 5.0 9
+22 6.0 10
+25 7.0 11
+28 8.0 12
+30 9.0 13
+32 10.0 14
+35 11.0 15
+38 12.0 16
+end
+reg_path(y ~ x1 + x2, df, type="lasso", nlambda=20)
+"#,
+        "Regularization Path",
+    );
+}
+
+#[test]
+fn qrf_inf_basic() {
+    assert_ok_contains(
+        "qrf_inf",
+        r#"
+input df
+y x1 x2
+10 1.0 5
+12 2.0 6
+15 3.0 7
+18 4.0 8
+20 5.0 9
+22 6.0 10
+25 7.0 11
+28 8.0 12
+30 9.0 13
+32 10.0 14
+35 11.0 15
+38 12.0 16
+40 13.0 17
+42 14.0 18
+45 15.0 19
+48 16.0 20
+50 17.0 21
+52 18.0 22
+55 19.0 23
+58 20.0 24
+60 21.0 25
+62 22.0 26
+65 23.0 27
+68 24.0 28
+70 25.0 29
+end
+qrf_inf(y ~ x1 + x2, df, q="0.1,0.5,0.9", boot=10, trees=20, depth=5)
+"#,
+        "QRF Inference",
+    );
+}
