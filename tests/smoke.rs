@@ -10081,3 +10081,93 @@ estat_endog(y ~ x, ~ z1, df)
         "Durbin-Wu-Hausman",
     );
 }
+
+#[test]
+fn logit_classification() {
+    assert_ok_contains(
+        "logit_class",
+        r#"
+input df
+y x1 x2
+0 1.2 2.1
+0 2.3 3.2
+0 3.1 1.5
+1 3.8 4.9
+1 5.1 6.2
+1 6.2 4.1
+1 7.3 7.1
+0 2.1 1.8
+1 5.5 5.3
+1 6.1 6.5
+0 1.8 2.8
+0 2.8 3.5
+1 4.2 5.5
+1 5.8 6.8
+0 3.5 2.2
+end
+let m = logit(y ~ x1 + x2, df)
+estat_classification(m)
+"#,
+        "Sensitivity",
+    );
+}
+
+#[test]
+fn logit_roc_auc() {
+    assert_ok_contains(
+        "logit_roc",
+        r#"
+input df
+y x1 x2
+0 1.2 2.1
+0 2.3 3.2
+0 3.1 1.5
+1 3.8 4.9
+1 5.1 6.2
+1 6.2 4.1
+1 7.3 7.1
+0 2.1 1.8
+1 5.5 5.3
+1 6.1 6.5
+0 1.8 2.8
+0 2.8 3.5
+1 4.2 5.5
+1 5.8 6.8
+0 3.5 2.2
+end
+let m = logit(y ~ x1 + x2, df)
+lroc(m)
+"#,
+        "AUC",
+    );
+}
+
+#[test]
+fn logit_hosmer_lemeshow() {
+    assert_ok_contains(
+        "logit_hl",
+        r#"
+input df
+y x1 x2
+0 1.2 2.1
+0 2.3 3.2
+0 3.1 1.5
+1 3.8 4.9
+1 5.1 6.2
+1 6.2 4.1
+1 7.3 7.1
+0 2.1 1.8
+1 5.5 5.3
+1 6.1 6.5
+0 1.8 2.8
+0 2.8 3.5
+1 4.2 5.5
+1 5.8 6.8
+0 3.5 2.2
+end
+let m = logit(y ~ x1 + x2, df)
+estat_gof(m)
+"#,
+        "Hosmer-Lemeshow",
+    );
+}

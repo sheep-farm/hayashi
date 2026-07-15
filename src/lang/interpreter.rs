@@ -6,8 +6,8 @@ use greeners::linalg::{LinalgEigh as _, LinalgInverse as _};
 use greeners::specification_tests::SpecificationTests;
 use greeners::{chi2_pvalue, f_pvalue, logistic, norm_pdf, t_pvalue_two, t_quantile};
 use greeners::{
-    CovarianceType, DataFrame, FixedEffects, Formula as GFormula, Logit, Probit, RandomEffects, IV,
-    OLS,
+    BinaryDiagnostics, CovarianceType, DataFrame, FixedEffects, Formula as GFormula, Logit, Probit,
+    RandomEffects, IV, OLS,
 };
 use ndarray::{Array1, Array2, Axis};
 use statrs::distribution::{ContinuousCDF, Normal};

@@ -168,6 +168,9 @@ Covariance options (where applicable): `cov=nonrobust|HC1|HC2|HC3|HC4|robust`, `
 | `weak_iv` | `weak_iv(endog_formula, instr_formula, df)` | Weak instrument test (1st-stage F, Cragg-Donald) |
 | `estat_overid` | `estat_overid(endog_formula, instr_formula, df)` | Sargan/Hansen J overidentification test |
 | `estat_endog` | `estat_endog(endog_formula, instr_formula, df)` | Durbin-Wu-Hausman endogeneity test |
+| `estat_classification` | `estat_classification(model, threshold=0.5)` | Classification table (logit/probit) |
+| `lroc` | `lroc(model)` | ROC curve and AUC (logit/probit) |
+| `estat_gof` | `estat_gof(model, groups=10)` | Hosmer-Lemeshow goodness-of-fit |
 | `hausman` | `hausman(m_fe, m_re)` | Hausman specification test |
 | `lincom` | `lincom(m, expr)` | Linear combination of coefficients |
 | `bootstrap` | `bootstrap(est, formula, df, n=)` | Generic bootstrap |

@@ -107,6 +107,34 @@ estat_endog(y ~ x1 + x_endog, ~ z1 + z2, df)
 
 Tests H0: the endogenous regressors are actually exogenous (OLS is consistent). Uses the augmented regression approach: adds first-stage residuals to the structural equation and tests their significance via an F-test. If rejected, IV is needed. If not rejected, OLS is consistent and preferred (more efficient).
 
+## Binary model diagnostics (logit / probit)
+
+### Classification table
+
+```
+estat_classification(m_logit)
+estat_classification(m_logit, threshold=0.3)
+```
+
+Computes the 2×2 classification table at the given threshold (default 0.5). Reports true positives, true negatives, false positives, false negatives, sensitivity (recall), specificity, and overall correct rate.
+
+### ROC / AUC
+
+```
+lroc(m_logit)
+```
+
+Computes the area under the ROC curve (AUC) using the rank-based Wilcoxon-Mann-Whitney statistic. Also reports the Gini coefficient (2·AUC − 1). Interpretation: AUC ≥ 0.9 excellent, ≥ 0.8 good, ≥ 0.7 acceptable, ≥ 0.6 poor, < 0.6 no discrimination.
+
+### Hosmer-Lemeshow goodness-of-fit
+
+```
+estat_gof(m_logit)
+estat_gof(m_logit, groups=5)
+```
+
+Hosmer-Lemeshow goodness-of-fit test. Divides observations into `groups` deciles (default 10) based on predicted probabilities and compares observed vs expected counts via a chi-squared statistic. H0: the model fits adequately. If rejected (p < 0.05), the model does not fit well.
+
 ## Coefficient plot
 
 ```

@@ -164,3 +164,42 @@ let yhat = predict(m, "class")  // predicted class (0 or 1)
   In imbalanced data (low prevalence), adjust the threshold with
   \lstinline{predict(m, "class", threshold=0.3)}.
 \end{nota}
+
+\section{Classification diagnostics}
+
+\subsection{Classification table}
+
+\begin{lstlisting}
+estat_classification(m)
+estat_classification(m, threshold=0.3)
+\end{lstlisting}
+
+Computes the $2\times2$ classification table at the given threshold
+(default 0{,}5). Reports true positives (TP), true negatives (TN),
+false positives (FP), false negatives (FN), sensitivity
+($\mathrm{TP}/(\mathrm{TP}+\mathrm{FN})$), specificity
+($\mathrm{TN}/(\mathrm{TN}+\mathrm{FP})$), and overall correct rate.
+
+\subsection{ROC and AUC}
+
+\begin{lstlisting}
+lroc(m)
+\end{lstlisting}
+
+Computes the area under the ROC curve (AUC) via the
+Wilcoxon-Mann-Whitney statistic. Also reports the Gini coefficient
+($2\cdot\mathrm{AUC}-1$). Interpretation: AUC $\geq 0{,}9$ excellent,
+$\geq 0{,}8$ good, $\geq 0{,}7$ acceptable, $\geq 0{,}6$ poor,
+$< 0{,}6$ no discrimination.
+
+\subsection{Hosmer-Lemeshow}
+
+\begin{lstlisting}
+estat_gof(m)
+estat_gof(m, groups=5)
+\end{lstlisting}
+
+Hosmer-Lemeshow goodness-of-fit test. Divides observations into
+\textit{groups} deciles (default 10) by predicted probability and
+compares observed vs expected via $\chi^2(g-2)$. $H_0$: the model fits
+adequately. Rejecting $H_0$ ($p < 0{,}05$) indicates poor fit.

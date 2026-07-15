@@ -164,3 +164,42 @@ let yhat = predict(m, "class")  // classe prevista (0 ou 1)
   Em dados desbalanceados (prevalência baixa), ajuste o limiar com
   \lstinline{predict(m, "class", threshold=0.3)}.
 \end{nota}
+
+\section{Diagnósticos de classificação}
+
+\subsection{Tabela de classificação}
+
+\begin{lstlisting}
+estat_classification(m)
+estat_classification(m, threshold=0.3)
+\end{lstlisting}
+
+Computa a tabela $2\times2$ de classificação no limiar dado (padrão
+0{,}5). Reporta verdadeiros positivos (TP), verdadeiros negativos (TN),
+falsos positivos (FP), falsos negativos (FN), sensibilidade
+($\mathrm{TP}/(\mathrm{TP}+\mathrm{FN})$), especificidade
+($\mathrm{TN}/(\mathrm{TN}+\mathrm{FP})$) e taxa de correção global.
+
+\subsection{ROC e AUC}
+
+\begin{lstlisting}
+lroc(m)
+\end{lstlisting}
+
+Computa a área sob a curva ROC (AUC) via estatística de
+Wilcoxon-Mann-Whitney. Também reporta o coeficiente de Gini
+($2\cdot\mathrm{AUC}-1$). Interpretação: AUC $\geq 0{,}9$ excelente,
+$\geq 0{,}8$ bom, $\geq 0{,}7$ aceitável, $\geq 0{,}6$ ruim,
+$< 0{,}6$ sem discriminação.
+
+\subsection{Hosmer-Lemeshow}
+
+\begin{lstlisting}
+estat_gof(m)
+estat_gof(m, groups=5)
+\end{lstlisting}
+
+Teste de goodness-of-fit de Hosmer-Lemeshow. Divide as observações em
+\textit{groups} decilas (padrão 10) pela probabilidade prevista e
+compara observado vs esperado via $\chi^2(g-2)$. $H_0$: o modelo ajusta
+adequadamente. Rejeitar $H_0$ ($p < 0{,}05$) indica mau ajuste.

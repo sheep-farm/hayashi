@@ -801,6 +801,81 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── Binary model diagnostics ────────────────────────────────────
+            // estat_classification(model [, threshold=0.5])
+            "estat_classification" | "classification" => {
+                if args.is_empty() {
+                    return Err(
+                        self.rt_err("estat_classification(model) requires a logit/probit model")
+                    );
+                }
+                let v = self.eval_expr(&args[0])?;
+                let model = match &v {
+                    Value::BinaryResult(m) => m.clone(),
+                    _ => {
+                        return Err(self
+                            .rt_err("estat_classification: argument must be a logit/probit model"))
+                    }
+                };
+                let threshold = match opt_map.get("threshold") {
+                    Some(Value::Float(v)) => *v,
+                    Some(Value::Int(v)) => *v as f64,
+                    _ => 0.5,
+                };
+                let probs = model.result.predict_proba(&model.x);
+                let y_slice: Vec<f64> = model.y.to_vec();
+                let probs_slice: Vec<f64> = probs.to_vec();
+                let result = BinaryDiagnostics::classification(&y_slice, &probs_slice, threshold)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // lroc(model) / roc(model) — ROC curve and AUC
+            "lroc" | "roc" | "estat_roc" => {
+                if args.is_empty() {
+                    return Err(self.rt_err("lroc(model) requires a logit/probit model"));
+                }
+                let v = self.eval_expr(&args[0])?;
+                let model = match &v {
+                    Value::BinaryResult(m) => m.clone(),
+                    _ => return Err(self.rt_err("lroc: argument must be a logit/probit model")),
+                };
+                let probs = model.result.predict_proba(&model.x);
+                let y_slice: Vec<f64> = model.y.to_vec();
+                let probs_slice: Vec<f64> = probs.to_vec();
+                let result = BinaryDiagnostics::roc(&y_slice, &probs_slice)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // estat_gof(model [, groups=10]) — Hosmer-Lemeshow
+            "estat_gof" | "hosmer_lemeshow" | "hltest" => {
+                if args.is_empty() {
+                    return Err(self.rt_err("estat_gof(model) requires a logit/probit model"));
+                }
+                let v = self.eval_expr(&args[0])?;
+                let model = match &v {
+                    Value::BinaryResult(m) => m.clone(),
+                    _ => {
+                        return Err(self.rt_err("estat_gof: argument must be a logit/probit model"))
+                    }
+                };
+                let n_groups = match opt_map.get("groups") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 10,
+                };
+                let probs = model.result.predict_proba(&model.x);
+                let y_slice: Vec<f64> = model.y.to_vec();
+                let probs_slice: Vec<f64> = probs.to_vec();
+                let result = BinaryDiagnostics::hosmer_lemeshow(&y_slice, &probs_slice, n_groups)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
             // ── Logit ─────────────────────────────────────────────────────────
             "logit" => {
                 let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;

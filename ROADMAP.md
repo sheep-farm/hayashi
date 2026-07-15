@@ -83,15 +83,28 @@ reporta o p-value do coeficiente de ŷ².
   instrument_formula, df)`. Testa se regressores são exógenos via regressão
   augmentada (Hausman).
 
+- ~~Logit/Probit: classification table~~ — implementado em
+  `Greeners/src/binary_diagnostics.rs` como `BinaryDiagnostics::classification()`.
+  Exposto em Hayashi como `estat_classification(model, threshold=0.5)`.
+  Reporta sensibilidade, especificidade, taxa de correção.
+
+- ~~Logit/Probit: ROC / AUC~~ — implementado em
+  `Greeners/src/binary_diagnostics.rs` como `BinaryDiagnostics::roc()`.
+  Exposto em Hayashi como `lroc(model)`. AUC via estatística
+  Wilcoxon-Mann-Whitney; também reporta Gini.
+
+- ~~Logit/Probit: Hosmer-Lemeshow~~ — implementado em
+  `Greeners/src/binary_diagnostics.rs` como
+  `BinaryDiagnostics::hosmer_lemeshow()`. Exposto em Hayashi como
+  `estat_gof(model, groups=10)`. χ²(g-2) comparando observado vs esperado
+  por decil de probabilidade prevista.
+
 ---
 
 ## Priorização sugerida
 
-1. **IV: first-stage F, Sargan/J, endogeneity** — sem isso, IV é
-   inutilizável para pesquisa séria. Prioridade máxima.
+1. ~~IV: first-stage F, Sargan/J, endogeneity~~ — **concluído**.
 
-2. **Logit: classification + ROC + Hosmer-Lemeshow** — avaliação de
-   qualidade de previsão binária. Importante para aplicações
-   aplicadas (credit scoring, choice models).
+2. ~~Logit: classification + ROC + Hosmer-Lemeshow~~ — **concluído**.
 
-3. **`linktest`** — útil mas mais nicho. Pode ficar por último.
+3. **`linktest`** — útil mas mais nicho. Único item restante.
