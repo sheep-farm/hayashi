@@ -2229,6 +2229,256 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            // ── MS-VAR (Markov-Switching VAR) ────────────────────────────────
+            // msvar(y1 + y2, df, regimes=2, lags=1)
+            "msvar" | "ms_var" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let n_regimes = match opt_map.get("regimes") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 2,
+                };
+                let lags = match opt_map.get("lags") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 1,
+                };
+
+                // Build Y matrix from all variables (dependent + independents)
+                let mut all_cols: Vec<String> = vec![g_formula.dependent.clone()];
+                all_cols.extend(g_formula.independents.iter().cloned());
+                let n_vars = all_cols.len();
+                let n = df.n_rows();
+                let mut y_mat = ndarray::Array2::<f64>::zeros((n, n_vars));
+                for (j, name) in all_cols.iter().enumerate() {
+                    let col = df
+                        .get_column(name)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let vals = col.as_float().ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: column '{name}' must be numeric"))
+                    })?;
+                    for i in 0..n {
+                        y_mat[(i, j)] = vals[i];
+                    }
+                }
+
+                let result = greeners::MSVAR::fit(&y_mat, n_regimes, lags, Some(all_cols))
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── FAVAR (Factor-Augmented VAR) ────────────────────────────────
+            // favar(y1 + y2 + y3, df, observed="rate", factors=2, lags=1, irf=0)
+            "favar" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let n_factors = match opt_map.get("factors") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 2,
+                };
+                let lags = match opt_map.get("lags") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 1,
+                };
+                let irf_steps = match opt_map.get("irf") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 0,
+                };
+                let observed_col = match opt_map.get("observed") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires observed=\"column\" option"
+                        )))
+                    }
+                };
+
+                // X = all formula variables, observed = separate column
+                let mut x_cols: Vec<String> = vec![g_formula.dependent.clone()];
+                x_cols.extend(g_formula.independents.iter().cloned());
+                let n = df.n_rows();
+                let n_x = x_cols.len();
+                let mut x_mat = ndarray::Array2::<f64>::zeros((n, n_x));
+                for (j, name) in x_cols.iter().enumerate() {
+                    let col = df
+                        .get_column(name)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let vals = col.as_float().ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: column '{name}' must be numeric"))
+                    })?;
+                    for i in 0..n {
+                        x_mat[(i, j)] = vals[i];
+                    }
+                }
+
+                let obs_col = df
+                    .get_column(&observed_col)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let obs_vals = obs_col.as_float().ok_or_else(|| {
+                    HayashiError::Runtime(format!(
+                        "{func}: observed column '{observed_col}' must be numeric"
+                    ))
+                })?;
+                let obs_mat = ndarray::Array2::from_shape_vec((n, 1), obs_vals.to_vec())
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                let result = greeners::FAVAR::fit(
+                    &x_mat,
+                    &obs_mat,
+                    n_factors,
+                    lags,
+                    irf_steps,
+                    None,
+                    Some(vec![observed_col.clone()]),
+                )
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── Spatial Durbin Model (panel) ────────────────────────────────
+            // spatial_durbin(y ~ x1 + x2, df, w=W, id="entity")
+            "spatial_durbin" | "sdm" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let id_col = match opt_map.get("id") {
+                    Some(Value::Str(s)) => s.clone(),
+                    _ => {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}() requires id=\"column\" option"
+                        )))
+                    }
+                };
+
+                // Extract W matrix
+                let w_mat = match opt_map.get("w") {
+                    Some(Value::List(rows)) => {
+                        let n_rows = rows.len();
+                        let mut w = ndarray::Array2::<f64>::zeros((n_rows, n_rows));
+                        for (i, row) in rows.iter().enumerate() {
+                            match row {
+                                Value::List(cols) => {
+                                    if cols.len() != n_rows {
+                                        return Err(HayashiError::Runtime(format!(
+                                            "{func}: W must be square, row {i} has {} cols, expected {n_rows}",
+                                            cols.len()
+                                        )));
+                                    }
+                                    for (j, val) in cols.iter().enumerate() {
+                                        w[(i, j)] = match val {
+                                            Value::Float(f) => *f,
+                                            Value::Int(v) => *v as f64,
+                                            _ => return Err(HayashiError::Runtime(
+                                                format!("{func}: W matrix contains non-numeric values")
+                                            )),
+                                        };
+                                    }
+                                }
+                                _ => return Err(HayashiError::Runtime(
+                                    format!("{func}: W must be a list of lists (matrix)")
+                                )),
+                            }
+                        }
+                        w
+                    }
+                    _ => return Err(HayashiError::Runtime(
+                        format!("{func}() requires w=W option with a spatial weights matrix (list of lists)")
+                    )),
+                };
+
+                let (y_arr, x_arr) = df
+                    .to_design_matrix(&g_formula)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let var_names = g_formula.independents.clone();
+
+                let entity_ids: Vec<i64> = {
+                    let col = df
+                        .get_column(id_col.as_str())
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    if let Some(i) = col.as_int() {
+                        i.to_vec()
+                    } else if let Some(f) = col.as_float() {
+                        f.iter().map(|v| *v as i64).collect()
+                    } else {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}: id column '{id_col}' must be numeric"
+                        )));
+                    }
+                };
+
+                let result = greeners::SpatialDurbin::fit(
+                    &y_arr,
+                    &x_arr,
+                    &w_mat,
+                    &entity_ids,
+                    Some(var_names),
+                )
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
+            // ── Johansen with structural breaks ─────────────────────────────
+            // johansen_break(y1 + y2, df, lags=1, breaks=[50])
+            "johansen_break" => {
+                let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+                let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+                let lags = match opt_map.get("lags") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 1,
+                };
+
+                // Build Y matrix from all variables
+                let mut all_cols: Vec<String> = vec![g_formula.dependent.clone()];
+                all_cols.extend(g_formula.independents.iter().cloned());
+                let n_vars = all_cols.len();
+                let n = df.n_rows();
+                let mut y_mat = ndarray::Array2::<f64>::zeros((n, n_vars));
+                for (j, name) in all_cols.iter().enumerate() {
+                    let col = df
+                        .get_column(name)
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                    let vals = col.as_float().ok_or_else(|| {
+                        HayashiError::Runtime(format!("{func}: column '{name}' must be numeric"))
+                    })?;
+                    for i in 0..n {
+                        y_mat[(i, j)] = vals[i];
+                    }
+                }
+
+                // Parse break points from breaks= option (list of ints)
+                let break_points: Vec<usize> = match opt_map.get("breaks") {
+                    Some(Value::List(items)) => items
+                        .iter()
+                        .filter_map(|v| match v {
+                            Value::Int(i) => Some(*i as usize),
+                            Value::Float(f) => Some(*f as usize),
+                            _ => None,
+                        })
+                        .collect(),
+                    _ => vec![],
+                };
+
+                let result = greeners::JohansenBreak::fit(&y_mat, lags, &break_points)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+                print!("{result}");
+                Ok(Value::Nil)
+            }
+
             // ── Spatial econometrics ────────────────────────────────────────
             // spatial_sar(y ~ x1 + x2, df, w=W_matrix)
             // spatial_sem(y ~ x1 + x2, df, w=W_matrix)

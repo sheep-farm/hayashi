@@ -131,12 +131,12 @@ reporta o p-value do coeficiente de ŷ².
 
 ## Pendente
 
-- **MS-VAR** — Markov-switching VAR com múltiplos regimes. +0,5 pp.
+- **TVP-VAR** — time-varying parameter VAR via Kalman filter. +0,5 pp.
 
-- **FAVAR** — Factor-augmented VAR. +0,5 pp.
+- **Panel spatial error Durbin** — SDEM com efeitos fixos. +0,5 pp.
 
-- **Panel spatial Durbin** — SDM com efeitos fixos. +0,5 pp.
+- **Nonparametric cointegration** — Phillips-Hansen FMOLS. +0,5 pp.
 
-- **Cointegration testing** — Johansen com structural breaks. +0,5 pp.
+- **Quantile VAR** — quantile regression em sistema VAR. +0,5 pp.
 
-**Cobertura atual: 90,05%.**
+**Cobertura atual: 91,80%.**

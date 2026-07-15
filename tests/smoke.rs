@@ -10882,3 +10882,124 @@ panel_qreg(y ~ x, df, id="firm", tau=0.5)
         "Panel Quantile",
     );
 }
+
+#[test]
+fn msvar_basic() {
+    assert_ok_contains(
+        "msvar",
+        r#"
+input df
+y1 y2
+10 5
+12 6
+15 7
+18 8
+20 9
+22 10
+25 11
+28 12
+30 13
+32 14
+35 15
+38 16
+40 17
+42 18
+45 19
+48 20
+end
+msvar(y1 ~ y2, df, regimes=2, lags=1)
+"#,
+        "MS-VAR",
+    );
+}
+
+#[test]
+fn favar_basic() {
+    assert_ok_contains(
+        "favar",
+        r#"
+input df
+ip cpi emp rate
+100 50 30 2
+102 51 31 2
+101 50 29 2.5
+105 53 33 2.5
+108 55 35 3
+110 56 36 3
+112 58 38 3.5
+115 60 40 3.5
+113 59 39 3
+118 62 42 3.5
+120 63 43 4
+122 65 45 4
+end
+favar(ip ~ cpi + emp, df, observed="rate", factors=1, lags=1)
+"#,
+        "FAVAR",
+    );
+}
+
+#[test]
+fn spatial_durbin_basic() {
+    assert_ok_contains(
+        "spatial_durbin",
+        r#"
+input df
+entity y x
+1 10 1.0
+1 12 2.0
+1 15 3.0
+2 8 0.8
+2 10 1.8
+2 13 2.8
+3 11 1.2
+3 14 2.2
+3 17 3.2
+4 9 0.9
+4 11 1.9
+4 14 2.9
+end
+let W = [[0, 0.5, 0.3, 0.2],
+         [0.5, 0, 0.3, 0.2],
+         [0.3, 0.3, 0, 0.4],
+         [0.2, 0.2, 0.4, 0]]
+spatial_durbin(y ~ x, df, w=W, id="entity")
+"#,
+        "Spatial Durbin",
+    );
+}
+
+#[test]
+fn johansen_break_basic() {
+    assert_ok_contains(
+        "johansen_break",
+        r#"
+input df
+y1 y2
+10 5
+11 5.5
+12 6
+13 6.5
+14 7
+15 7.5
+16 8
+17 8.5
+18 9
+19 9.5
+20 10
+21 10.5
+22 11
+23 11.5
+24 12
+25 12.5
+26 13
+27 13.5
+28 14
+29 14.5
+30 15
+end
+johansen_break(y1 ~ y2, df, lags=1, breaks=[10])
+"#,
+        "Johansen",
+    );
+}
