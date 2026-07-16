@@ -276,7 +276,7 @@ n = 753
         case["id"] = case_id
         case["reference_scripts"]["R"] = f"cases/{case_id}/reference/run.R"
 
-        def fake_run_command(cmd, cwd=None):
+        def fake_run_command(cmd, cwd=None, quiet=False):
             if cmd[0] == "Rscript":
                 stdout = '{"coefficients": {"x": 1.0}}\n'
             elif cmd[0] in {"python", "python3"}:
