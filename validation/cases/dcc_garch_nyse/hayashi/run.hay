@@ -1,0 +1,9 @@
+// Load the NYSE dataset from CSV.
+// The reference script writes columns 'ret' and 'return_1'.
+load "validation/cases/dcc_garch_nyse/data/nyse.csv" as df
+
+// Remove rows with missing values.
+let df2 = dropna(df)
+
+// Run DCC-GARCH on returns and lagged returns.
+dcc_garch(ret ~ return_1, df2)

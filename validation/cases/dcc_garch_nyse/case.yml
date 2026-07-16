@@ -1,0 +1,41 @@
+id: dcc_garch_nyse
+title: DCC-GARCH on NYSE returns
+estimator_family: dcc_garch
+status: active
+dimension: numerical
+dataset:
+  name: wooldridge::nyse
+  source: R package wooldridge / Python wooldridge-python
+  licence: public teaching dataset
+references:
+- R
+- Python
+comparison:
+  quantities:
+  - dcc_alpha
+  - dcc_beta
+  - ret_omega
+  - ret_alpha
+  - ret_beta
+  - return_1_omega
+  - return_1_alpha
+  - return_1_beta
+  tolerances:
+    dcc_alpha: 1e-5
+    dcc_beta: 1e-5
+    ret_omega: 1e-5
+    ret_alpha: 1e-5
+    ret_beta: 1e-5
+    return_1_omega: 1e-5
+    return_1_alpha: 1e-5
+    return_1_beta: 1e-5
+output_format: txt
+hayashi_script: cases/dcc_garch_nyse/hayashi/run.hay
+reference_scripts:
+  R: cases/dcc_garch_nyse/reference/run.R
+  Python: cases/dcc_garch_nyse/reference/run.py
+notes: DCC-GARCH (Dynamic Conditional Correlation GARCH) on NYSE returns. Uses simplified DCC-GARCH(1,1) model.
+result:
+  summary: ''
+  known_differences: []
+  issues_opened: []

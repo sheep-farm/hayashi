@@ -1,0 +1,37 @@
+id: causal_impact_simulated
+title: Causal Impact on simulated time series
+estimator_family: causal_impact
+status: active
+dimension: numerical
+dataset:
+  name: simulated_causal_impact
+  source: Simulated DGP following Brodersen et al. (2015)
+  licence: MIT
+references:
+- R
+- Python
+comparison:
+  quantities:
+  - avg_effect
+  - avg_effect_lower
+  - avg_effect_upper
+  - total_effect
+  - total_effect_lower
+  - total_effect_upper
+  tolerances:
+    avg_effect: 5e-1
+    avg_effect_lower: 5e-1
+    avg_effect_upper: 5e-1
+    total_effect: 50
+    total_effect_lower: 50
+    total_effect_upper: 50
+output_format: txt
+hayashi_script: cases/causal_impact_simulated/hayashi/run.hay
+reference_scripts:
+  R: cases/causal_impact_simulated/reference/run.R
+  Python: cases/causal_impact_simulated/reference/run.py
+notes: Bayesian structural time series for counterfactual inference (Brodersen 2015). Uses simulated data with known treatment effect.
+result:
+  summary: ''
+  known_differences: []
+  issues_opened: []

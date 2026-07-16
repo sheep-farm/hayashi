@@ -1,0 +1,31 @@
+id: panel_heckman_simulated
+title: Panel Heckman selection model on simulated data
+estimator_family: panel_heckman
+status: active
+dimension: numerical
+dataset:
+  name: simulated_panel_heckman
+  source: Simulated panel DGP with selection equation
+  licence: MIT
+references:
+- R
+- Python
+comparison:
+  quantities:
+  - selection_coefficients
+  - outcome_coefficients
+  - inverse_mills_ratio
+  tolerances:
+    selection_coefficients: 1e-2
+    outcome_coefficients: 1e-2
+    inverse_mills_ratio: 5e-2
+output_format: txt
+hayashi_script: cases/panel_heckman_simulated/hayashi/run.hay
+reference_scripts:
+  R: cases/panel_heckman_simulated/reference/run.R
+  Python: cases/panel_heckman_simulated/reference/run.py
+notes: Panel Heckman selection model (two-step) with selection equation and outcome equation. Uses simulated panel data with known selection mechanism.
+result:
+  summary: ''
+  known_differences: []
+  issues_opened: []

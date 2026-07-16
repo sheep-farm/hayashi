@@ -1,0 +1,33 @@
+id: ftest_robust_wooldridge_wage1
+title: Robust F-test on Wooldridge wage1
+estimator_family: ftest_robust
+status: active
+dimension: numerical
+dataset:
+  name: wooldridge::wage1
+  source: R package wooldridge / Python wooldridge-python
+  licence: public teaching dataset
+references:
+- R
+- Python
+comparison:
+  quantities:
+  - test_statistic
+  - p_value
+  - degrees_of_freedom_num
+  - degrees_of_freedom_denom
+  tolerances:
+    test_statistic: 1e-3
+    p_value: 1e-3
+    degrees_of_freedom_num: 0
+    degrees_of_freedom_denom: 0
+output_format: txt
+hayashi_script: cases/ftest_robust_wooldridge_wage1/hayashi/run.hay
+reference_scripts:
+  R: cases/ftest_robust_wooldridge_wage1/reference/run.R
+  Python: cases/ftest_robust_wooldridge_wage1/reference/run.py
+notes: Robust F-test (Wooldridge 2010) with cluster-robust covariance for joint significance test.
+result:
+  summary: ''
+  known_differences: []
+  issues_opened: []

@@ -1,0 +1,29 @@
+id: mice_chained_simulated
+title: MICE chained equations on simulated data with missing values
+estimator_family: mice_chained
+status: active
+dimension: numerical
+dataset:
+  name: simulated_mice
+  source: Simulated data with MCAR missing values
+  licence: MIT
+references:
+- R
+- Python
+comparison:
+  quantities:
+  - imputed_means
+  - imputed_stds
+  tolerances:
+    imputed_means: 5e-2
+    imputed_stds: 2e-1
+output_format: txt
+hayashi_script: cases/mice_chained_simulated/hayashi/run.hay
+reference_scripts:
+  R: cases/mice_chained_simulated/reference/run.R
+  Python: cases/mice_chained_simulated/reference/run.py
+notes: MICE (Multiple Imputation by Chained Equations, van Buuren 2011) with m=5, iter=10. Uses simulated data with MCAR missing values.
+result:
+  summary: ''
+  known_differences: []
+  issues_opened: []

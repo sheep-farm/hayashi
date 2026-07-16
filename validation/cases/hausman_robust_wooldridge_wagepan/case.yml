@@ -1,0 +1,31 @@
+id: hausman_robust_wooldridge_wagepan
+title: Robust Hausman test on Wooldridge wagepan
+estimator_family: hausman_robust
+status: active
+dimension: numerical
+dataset:
+  name: wooldridge::wagepan
+  source: R package wooldridge / Python wooldridge-python
+  licence: public teaching dataset
+references:
+- R
+- Python
+comparison:
+  quantities:
+  - test_statistic
+  - p_value
+  - degrees_of_freedom
+  tolerances:
+    test_statistic: 5e-1
+    p_value: 1e-2
+    degrees_of_freedom: 0
+output_format: txt
+hayashi_script: cases/hausman_robust_wooldridge_wagepan/hayashi/run.hay
+reference_scripts:
+  R: cases/hausman_robust_wooldridge_wagepan/reference/run.R
+  Python: cases/hausman_robust_wooldridge_wagepan/reference/run.py
+notes: Robust Hausman test (Cameron-Trivedi 2005, Wooldridge 2010) with cluster-robust covariance.
+result:
+  summary: ''
+  known_differences: []
+  issues_opened: []

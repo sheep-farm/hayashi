@@ -418,3 +418,39 @@ cases:
   notes: ZIP model of number of affairs on demographic predictors.
   dimension: numerical
   status: pass
+- id: hausman_robust_wooldridge_wagepan
+  notes: Robust Hausman test (Cameron-Trivedi 2005, Wooldridge 2010) with cluster-robust covariance.
+  dimension: numerical
+  status: not-started
+- id: ftest_robust_wooldridge_wage1
+  notes: Robust F-test (Wooldridge 2010) with cluster-robust covariance for joint significance test.
+  dimension: numerical
+  status: not-started
+- id: causal_impact_simulated
+  notes: Bayesian structural time series for counterfactual inference (Brodersen 2015). Uses simulated data with known treatment effect.
+  dimension: numerical
+  status: not-started
+- id: kmeans_simulated
+  notes: K-Means clustering (MacQueen 1967) with k-means++ initialization. Uses simulated 2D data with 3 Gaussian clusters.
+  dimension: numerical
+  status: not-started
+- id: mice_chained_simulated
+  notes: MICE (Multiple Imputation by Chained Equations, van Buuren 2011) with m=5, iter=10. Uses simulated data with MCAR missing values.
+  dimension: numerical
+  status: not-started
+- id: dcc_garch_nyse
+  notes: DCC-GARCH (Dynamic Conditional Correlation GARCH) on NYSE returns. Uses simplified DCC-GARCH(1,1) model.
+  dimension: numerical
+  status: not-started
+- id: double_ml_simulated
+  notes: Double Machine Learning (Chernozhukov et al. 2018) for heterogeneous treatment effects. Uses simulated data with known treatment effect.
+  dimension: numerical
+  status: not-started
+- id: spatial_durbin_simulated
+  notes: Spatial Durbin model with spatial lag of dependent variable and spatially lagged independent variables. Uses simulated spatial data with known spatial weights matrix.
+  dimension: numerical
+  status: not-started
+- id: panel_heckman_simulated
+  notes: Panel Heckman selection model (two-step) with selection equation and outcome equation. Uses simulated panel data with known selection mechanism.
+  dimension: numerical
+  status: not-started

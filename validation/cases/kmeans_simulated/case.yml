@@ -1,0 +1,35 @@
+id: kmeans_simulated
+title: K-Means clustering on simulated data
+estimator_family: kmeans
+status: active
+dimension: numerical
+dataset:
+  name: simulated_kmeans
+  source: Simulated 2D Gaussian clusters
+  licence: MIT
+references:
+- R
+- Python
+comparison:
+  quantities:
+  - inertia
+  - between_ss
+  - total_ss
+  - pct_explained
+  - cluster_centers
+  tolerances:
+    inertia: 1e-3
+    between_ss: 1e-3
+    total_ss: 1e-3
+    pct_explained: 1e-2
+    cluster_centers: 1e-2
+output_format: txt
+hayashi_script: cases/kmeans_simulated/hayashi/run.hay
+reference_scripts:
+  R: cases/kmeans_simulated/reference/run.R
+  Python: cases/kmeans_simulated/reference/run.py
+notes: K-Means clustering (MacQueen 1967) with k-means++ initialization. Uses simulated 2D data with 3 Gaussian clusters.
+result:
+  summary: ''
+  known_differences: []
+  issues_opened: []

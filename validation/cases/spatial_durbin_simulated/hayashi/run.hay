@@ -1,0 +1,5 @@
+// Load the simulated Spatial Durbin dataset.
+load "validation/cases/spatial_durbin_simulated/data/spatial_durbin.csv" as df
+
+// Validate data generation structure by estimating OLS with spatial lags.
+ols(y ~ x1 + x2 + wx1 + wx2, df)

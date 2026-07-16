@@ -1,0 +1,29 @@
+id: double_ml_simulated
+title: Double Machine Learning on simulated data
+estimator_family: double_ml
+status: active
+dimension: numerical
+dataset:
+  name: simulated_double_ml
+  source: Simulated DGP following Chernozhukov et al. (2018)
+  licence: MIT
+references:
+- R
+- Python
+comparison:
+  quantities:
+  - ate_coefficient
+  - ate_standard_error
+  tolerances:
+    ate_coefficient: 0.05
+    ate_standard_error: 0.05
+output_format: txt
+hayashi_script: cases/double_ml_simulated/hayashi/run.hay
+reference_scripts:
+  R: cases/double_ml_simulated/reference/run.R
+  Python: cases/double_ml_simulated/reference/run.py
+notes: Double Machine Learning (Chernozhukov et al. 2018) for heterogeneous treatment effects. Uses simulated data with known treatment effect.
+result:
+  summary: ''
+  known_differences: []
+  issues_opened: []

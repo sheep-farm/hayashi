@@ -1,0 +1,27 @@
+id: spatial_durbin_simulated
+title: Spatial Durbin model on simulated spatial data
+estimator_family: spatial
+status: active
+dimension: numerical
+dataset:
+  name: simulated_spatial_durbin
+  source: Simulated spatial DGP with SAR structure
+  licence: MIT
+references:
+- R
+- Python
+comparison:
+  quantities:
+  - coefficients
+  tolerances:
+    coefficients: 1e-3
+output_format: txt
+hayashi_script: cases/spatial_durbin_simulated/hayashi/run.hay
+reference_scripts:
+  R: cases/spatial_durbin_simulated/reference/run.R
+  Python: cases/spatial_durbin_simulated/reference/run.py
+notes: Spatial Durbin model with spatial lag of dependent variable and spatially lagged independent variables. Uses simulated spatial data with known spatial weights matrix.
+result:
+  summary: ''
+  known_differences: []
+  issues_opened: []

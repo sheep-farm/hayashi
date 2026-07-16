@@ -1,0 +1,5 @@
+// Load the simulated K-Means dataset.
+load "validation/cases/kmeans_simulated/data/kmeans.csv" as df
+
+// Run K-Means clustering with k=3.
+kmeans(df, x="x,y", k=3)
