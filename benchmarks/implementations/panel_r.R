@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Benchmark Fixed Effects panel com plm()
+# Fixed Effects panel benchmark with R plm()
 
 args <- commandArgs(trailingOnly = TRUE)
 path <- args[1]

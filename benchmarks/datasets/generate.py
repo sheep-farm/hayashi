@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Gera datasets sintéticos para benchmarks do Hayashi."""
+"""Generate synthetic datasets for Hayashi benchmarks."""
 
 import argparse
 import os
@@ -50,7 +50,7 @@ def garch_data(n: int, seed: int = 42) -> pd.DataFrame:
 
 def panel_data(n: int, seed: int = 42) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
-    # n total = n_firms * t
+    # total n = n_firms * t
     t = 10
     n_firms = max(1, n // t)
     rows = []
@@ -62,7 +62,7 @@ def panel_data(n: int, seed: int = 42) -> pd.DataFrame:
             y = alpha + 1.0 + 2.0 * x + eps
             rows.append({"firm": firm, "year": year, "y": y, "x": x})
     df = pd.DataFrame(rows)
-    # garante tamanho próximo de n
+    # keep size close to n
     if len(df) > n:
         df = df.iloc[:n].reset_index(drop=True)
     return df

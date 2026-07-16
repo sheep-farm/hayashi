@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Benchmark Fixed Effects panel com linearmodels."""
+"""Fixed Effects panel benchmark with linearmodels."""
 
 import json
 import statistics

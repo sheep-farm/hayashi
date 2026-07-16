@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Gera tabela Markdown e gráficos a partir dos resultados JSON do benchmark."""
+"""Generate Markdown table and plots from benchmark JSON results."""
 
 import json
 import sys
@@ -10,7 +10,7 @@ RESULTS_DIR = Path(__file__).resolve().parent.parent / "results"
 
 
 def load_results() -> list[dict]:
-    """Carrega o resultado mais recente por (estimator, n, language)."""
+    """Load the most recent result per (estimator, n, language)."""
     records = []
     for path in sorted(RESULTS_DIR.glob("*.json")):
         mtime = path.stat().st_mtime
@@ -49,14 +49,14 @@ def build_table(results: list[dict]) -> str:
 
 
 def build_speedup_table(results: list[dict]) -> str:
-    """Tabela de speedup do Hayashi vs cada linguagem por estimador/n."""
+    """Hayashi speedup table vs each language per estimator/n."""
     grouped = defaultdict(list)
     for r in results:
         grouped[(r["estimator"], r["n"])].append(r)
 
     lines = [
         "",
-        "## Speedup Hayashi vs concorrentes",
+        "## Speedup Hayashi vs competitors",
         "",
         "| Estimator | n | vs Python | vs R |",
         "|---|---|---:|---:|",

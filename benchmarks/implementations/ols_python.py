@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Benchmark OLS com statsmodels."""
+"""OLS benchmark with statsmodels."""
 
 import json
 import sys

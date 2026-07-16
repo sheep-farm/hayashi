@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Benchmark GARCH(1,1) com arch."""
+"""GARCH(1,1) benchmark with arch."""
 
 import json
 import statistics

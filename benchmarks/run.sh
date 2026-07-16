@@ -3,7 +3,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-# Garante binario release do Hayashi
+# Ensure Hayashi release binary is built
 if [ ! -f "../target/release/hay" ]; then
     echo "Building Hayashi release binary..."
     (cd .. && cargo build --release)

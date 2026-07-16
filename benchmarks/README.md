@@ -1,80 +1,78 @@
 # Hayashi Benchmarks
 
-Benchmarks honestos do Hayashi/Greeners contra R e Python para estimadores
-econométricos comuns.
+Honest Hayashi/Greeners benchmarks against R and Python for common
+econometric estimators.
 
-## Objetivo
+## Goal
 
-Medir tempo de execução de forma reproducível, mostrando tanto as vitórias
-quanto as derrotas do Hayashi. Nenhum cherry-picking.
+Measure execution time reproducibly, showing both Hayashi wins and losses.
+No cherry-picking.
 
-## Estimadores cobertos
+## Covered estimators
 
 - `ols` — Ordinary Least Squares
-- `logit` — Logit binário
+- `logit` — Binary logit
 - `arima` — AR(1) via `arima(df, y, p=1, d=0, q=0)`
 - `garch` — GARCH(1,1)
-- `panel` — Fixed-effects panel (`plm`/`linearmodels`)
+- `panel` — Fixed-effects panel (`plm` / `linearmodels`)
 
-## Concorrentes
+## Competitors
 
 - **R:** `lm`, `glm`, `arima`, `rugarch`, `plm`
 - **Python:** `statsmodels`, `linearmodels`, `arch`
 - **Hayashi:** `ols`, `logit`, `arima`, `garch`, `fe`
 
-## Metodologia
+## Methodology
 
-1. Cada estimador roda sobre datasets sintéticos de tamanhos crescentes.
-2. Cada combinação (estimador × linguagem × tamanho) roda várias vezes.
-3. Descarta-se a primeira execução (warmup) quando aplicável.
-4. Reporta-se média e desvio-padrão do tempo de parede (wall-clock).
-5. Datasets e scripts são versionados; resultados brutos ficam em
-   `results/` e não são commitados.
+1. Each estimator runs on synthetic datasets of increasing size.
+2. Each combination (estimator × language × size) runs several times.
+3. The first run is discarded as warmup when applicable.
+4. Mean and standard deviation of wall-clock time are reported.
+5. Datasets and scripts are versioned; raw results are kept in `results/`
+   and are not committed.
 
-## Uso
+## Usage
 
 ```bash
 cd benchmarks
 ./run.sh
 ```
 
-Ou, com controle fino:
+Or, with fine control:
 
 ```bash
 python scripts/run.py --estimator ols --sizes 1000,10000,100000 --reps 10
 ```
 
-## Interpretação honesta / caveats
+## Honest interpretation / caveats
 
-- Hayashi pode perder em datasets pequenos devido ao tempo de compilação/
-  carregamento do binário.
-- Hayashi tende a ganhar em datasets grandes e loops repetidos graças ao
+- Hayashi may lose on small datasets because of compilation / binary load time.
+- Hayashi tends to win on large datasets and repeated loops thanks to
   Rust/LLVM.
-- Os concorrentes calculam mais coisas por padrão (matriz de covariância,
-  testes, influence). Este benchmark mede o tempo do comando padrão, não de
-  uma implementação minimamente equivalente.
-- `statsmodels` em particular faz muito trabalho extra no `fit()` padrão,
-  por isso pode parecer mais lento do que realmente é para uma tarefa
-  equivalente.
-- R e Python possuem ecossistemas maduros; este benchmark mede velocidade
-  bruta de estimação, não produtividade geral.
+- Competitors compute more by default (covariance matrix, tests, influence).
+  This benchmark measures the default command time, not a minimally
+  equivalent implementation.
+- `statsmodels` in particular does a lot of extra work in the default
+  `fit()`, so it may look slower than it really is for an equivalent task.
+- R and Python have mature ecosystems; this benchmark measures raw
+  estimation speed, not overall productivity.
 
-## Gerar tabela e gráficos resumidos
+## Generate summary table and plots
 
-Depois de rodar os benchmarks:
+After running benchmarks:
 
 ```bash
 python scripts/summarize.py
 ```
 
-Gera:
+Generates:
 
-- `results/summary.md` — tabela Markdown com speedups
-- `results/summary.png` — gráfico log-log por estimador
+- `results/summary.md` — Markdown table with speedups
+- `results/summary.png` — log-log plot per estimator
 
-Requer `matplotlib` instalado (opcional).
+Requires `matplotlib` installed (optional).
 
-## Resultados
+## Results
 
-Resultados brutos são escritos em `results/<estimator>_YYYYMMDD_HHMMSS.json`.
-Eles são ignorados pelo git e devem ser regenerados localmente.
+Raw results are written to `results/<estimator>_YYYYMMDD_HHMMSS.json`.
+They are git-ignored and should be regenerated locally.

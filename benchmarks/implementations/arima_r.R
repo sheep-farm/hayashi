@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Benchmark ARIMA com arima() do R
+# ARIMA benchmark with R arima()
 
 args <- commandArgs(trailingOnly = TRUE)
 path <- args[1]

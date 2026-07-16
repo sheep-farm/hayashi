@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Benchmark Logit com glm()
+# Logit benchmark with R glm()
 
 args <- commandArgs(trailingOnly = TRUE)
 path <- args[1]

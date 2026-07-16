@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Benchmark OLS com lm() do R
+# OLS benchmark with R lm()
 
 args <- commandArgs(trailingOnly = TRUE)
 path <- args[1]

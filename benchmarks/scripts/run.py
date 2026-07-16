@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Orquestrador de benchmarks Hayashi vs R/Python."""
+"""Hayashi benchmark orchestrator against R/Python."""
 
 import argparse
 import json
@@ -80,7 +80,7 @@ def run_r(estimator: str, dataset: Path, reps: int) -> dict:
 
 
 def _read_rss_kb(pid: int) -> int:
-    """Lê VmRSS de /proc/<pid>/status em KB."""
+    """Read VmRSS from /proc/<pid>/status in KB."""
     try:
         with open(f"/proc/{pid}/status") as f:
             for line in f:
@@ -92,7 +92,7 @@ def _read_rss_kb(pid: int) -> int:
 
 
 def _find_child_pids(ppid: int) -> list[int]:
-    """Retorna PIDs cujo PPid é ppid."""
+    """Return PIDs whose PPid is ppid."""
     children = []
     for entry in Path("/proc").glob("[0-9]*"):
         try:
@@ -111,7 +111,7 @@ def _find_child_pids(ppid: int) -> list[int]:
 
 
 def _sample_memory_kb(pid: int) -> int:
-    """Soma RSS do processo principal + filhos."""
+    """Sum RSS of the main process plus children."""
     total = _read_rss_kb(pid)
     for child in _find_child_pids(pid):
         total += _read_rss_kb(child)
@@ -119,9 +119,9 @@ def _sample_memory_kb(pid: int) -> int:
 
 
 def _measure_command(cmd: list[str], reps: int, warmup: bool = True) -> dict:
-    """Roda o comando varias vezes, descarta warmup, retorna estatisticas."""
+    """Run the command several times, discard warmup, return statistics."""
     if warmup:
-        # primeira execucao descartada para cache/startup
+        # first run discarded for cache/startup
         subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
 
     times = []
@@ -212,7 +212,7 @@ def main():
     out = save_results(results, args.estimator)
     print(f"\nResults written to {out}")
 
-    # tabela resumo
+    # summary table
     print("\nSummary:")
     print(f"{'estimator':<12} {'n':>10} {'language':>10} {'mean_s':>12} {'std_s':>12} {'mem_mb':>12}")
     for r in results:

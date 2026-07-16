@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Benchmark Logit com statsmodels."""
+"""Logit benchmark with statsmodels."""
 
 import json
 import statistics

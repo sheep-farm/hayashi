@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Benchmark GARCH(1,1) com rugarch
+# GARCH(1,1) benchmark with rugarch
 
 args <- commandArgs(trailingOnly = TRUE)
 path <- args[1]

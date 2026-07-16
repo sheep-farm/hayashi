@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Benchmark ARIMA com statsmodels."""
+"""ARIMA benchmark with statsmodels."""
 
 import json
 import statistics
