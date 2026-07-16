@@ -1182,18 +1182,17 @@ def run_case(case: dict[str, Any], quiet: bool = False) -> tuple[str, list[str],
             detail = f" ({info['detail']})" if info.get("detail") else ""
             log(f"    {name}: {info['status']}{detail}")
 
-    # ── Strict policy: every declared reference must pass ────────────
+    # ── Use every reference that passes; block only when none pass ────
     available_refs = [name for name, info in ref_report.items() if info["status"] == "passed"]
     failed_refs = [name for name, info in ref_report.items() if info["status"] in ("failed", "missing")]
 
-    if failed_refs:
-        msgs = []
-        for name in failed_refs:
-            info = ref_report[name]
-            msgs.append(f"{name}: {info['status']} ({info['detail']})")
-        return "blocked", msgs, ref_report
-
     if not available_refs:
+        if failed_refs:
+            msgs = []
+            for name in failed_refs:
+                info = ref_report[name]
+                msgs.append(f"{name}: {info['status']} ({info['detail']})")
+            return "blocked", msgs, ref_report
         return "blocked", ["No reference implementation could run."], ref_report
 
     # Run Hayashi script. Prefer the binary built in this repo (debug or
@@ -1318,13 +1317,17 @@ def run_case(case: dict[str, Any], quiet: bool = False) -> tuple[str, list[str],
         ref_report[reference_name]["used"] = True
         if reference_failures:
             ref_report[reference_name]["detail"] = "; ".join(reference_failures)
-    status = "fail" if failures else "pass"
-
     if failures:
+        status = "fail"
         if not quiet:
             for f in failures:
                 log(f"  FAIL: {f}")
+    elif failed_refs:
+        status = "partial"
+        if not quiet:
+            log(f"  PARTIAL: Hayashi matches {', '.join(reference_outputs)}; {', '.join(failed_refs)} reference(s) unavailable")
     else:
+        status = "pass"
         if not quiet:
             log(f"  PASS (compared against {', '.join(reference_outputs)})")
 
@@ -1363,15 +1366,17 @@ def render_matrix_md(cases: list[dict[str, Any]]) -> str:
         "",
         "## Status legend",
         "",
-        "- `pass` — Hayashi matches reference within declared tolerances.",
-        "- `fail` — Hayashi differs from reference beyond tolerances.",
-        "- `blocked` — cannot run because of a missing feature or bug.",
+        "- `pass` — Hayashi matches all available references within declared tolerances.",
+        "- `partial` — Hayashi matches at least one reference, but other declared references failed or are missing.",
+        "- `fail` — Hayashi differs from at least one reference beyond tolerances.",
+        "- `blocked` — no declared reference could run; the case cannot be judged.",
         "- `not-supported` — estimator/workflow not supported yet.",
         "- `not-started` — registered but not implemented.",
         "",
         "The Reference column shows per-reference status as `name:status`,",
         "where `*` marks the reference used for comparison. A declared",
-        "reference that fails or is missing blocks the case.",
+        "reference that fails or is missing no longer blocks the case; it is",
+        "reported in the Reference column while any passing reference is used.",
         "",
         "This matrix is generated from `validation/matrix.yml` by `validation/run.py`.",
         "",
@@ -1647,6 +1652,8 @@ def run_cases(cases: list[dict[str, Any]], only_blocked: bool = False) -> str:
                         log(f"  BLOCKED: {f}")
                     if not failures:
                         log(f"  BLOCKED")
+                elif status == "partial":
+                    log(f"  PARTIAL")
                 elif status == "fail":
                     for f in failures:
                         log(f"  FAIL: {f}")
@@ -1658,7 +1665,16 @@ def run_cases(cases: list[dict[str, Any]], only_blocked: bool = False) -> str:
             overall_status = "fail"
         elif status == "blocked" and overall_status != "fail":
             overall_status = "blocked"
-        summary = "; ".join(failures) if failures else case.get("result", {}).get("summary", "matches reference")
+        elif status == "partial" and overall_status not in ("fail", "blocked"):
+            overall_status = "partial"
+        if failures:
+            summary = "; ".join(failures)
+        elif status == "partial" and ref_report:
+            passed = [n for n, info in ref_report.items() if info["status"] == "passed"]
+            unavailable = [n for n, info in ref_report.items() if info["status"] in ("failed", "missing")]
+            summary = f"matches {', '.join(passed)}; {', '.join(f'{n} unavailable' for n in unavailable)}"
+        else:
+            summary = case.get("result", {}).get("summary", "matches reference")
         case.setdefault("result", {})["summary"] = summary
     return overall_status
 
