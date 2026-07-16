@@ -9,5 +9,11 @@ if [ ! -f "../target/release/hay" ]; then
     (cd .. && cargo build --release)
 fi
 
-echo "Running OLS benchmark"
-python3 scripts/run.py --estimator ols --sizes 1000,10000,100000 --reps 5
+ESTIMATORS=(ols logit arima garch panel)
+SIZES="1000,10000"
+REPS=5
+
+for est in "${ESTIMATORS[@]}"; do
+    echo "=== Benchmarking $est ==="
+    python3 scripts/run.py --estimator "$est" --sizes "$SIZES" --reps "$REPS"
+done

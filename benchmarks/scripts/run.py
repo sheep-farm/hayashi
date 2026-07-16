@@ -19,6 +19,34 @@ DATASETS_DIR = BENCH_DIR / "datasets" / "generated"
 RESULTS_DIR = BENCH_DIR / "results"
 TMP_DIR = BENCH_DIR / ".tmp"
 
+ESTIMATORS = {
+    "ols": {
+        "hay": 'load "{dataset}" as df\nfor i in 1..{reps} {{\n    let m = ols(y ~ x1 + x2 + x3, df)\n}}\nprint("done")\n',
+        "python": "ols_python.py",
+        "r": "ols_r.R",
+    },
+    "logit": {
+        "hay": 'load "{dataset}" as df\nfor i in 1..{reps} {{\n    let m = logit(y ~ x1 + x2, df)\n}}\nprint("done")\n',
+        "python": "logit_python.py",
+        "r": "logit_r.R",
+    },
+    "arima": {
+        "hay": 'load "{dataset}" as df\nfor i in 1..{reps} {{\n    let m = arima(df, y, p=1, d=0, q=0)\n}}\nprint("done")\n',
+        "python": "arima_python.py",
+        "r": "arima_r.R",
+    },
+    "garch": {
+        "hay": 'load "{dataset}" as df\nfor i in 1..{reps} {{\n    let m = garch(df, y, p=1, q=1)\n}}\nprint("done")\n',
+        "python": "garch_python.py",
+        "r": "garch_r.R",
+    },
+    "panel": {
+        "hay": 'load "{dataset}" as df\nfor i in 1..{reps} {{\n    let m = fe(y ~ x, df, id=firm)\n}}\nprint("done")\n',
+        "python": "panel_python.py",
+        "r": "panel_r.R",
+    },
+}
+
 
 def generate_datasets(estimator: str, sizes: list[int]) -> list[Path]:
     gen = BENCH_DIR / "datasets" / "generate.py"
@@ -30,37 +58,23 @@ def generate_datasets(estimator: str, sizes: list[int]) -> list[Path]:
     return [DATASETS_DIR / f"{estimator}_n{n}.csv" for n in sizes]
 
 
-def run_hayashi_ols(dataset: Path, reps: int) -> dict:
-    """Benchmark OLS no Hayashi."""
-    script = TMP_DIR / f"ols_hayashi_{dataset.stem}.hay"
+def run_hayashi(estimator: str, dataset: Path, reps: int) -> dict:
+    config = ESTIMATORS[estimator]
+    script = TMP_DIR / f"{estimator}_hayashi_{dataset.stem}.hay"
     script.parent.mkdir(parents=True, exist_ok=True)
-    script.write_text(
-        f'load "{dataset}" as df\n'
-        f"for i in 1..{reps} {{\n"
-        f"    let m = ols(y ~ x1 + x2 + x3, df)\n"
-        f"}}\n"
-        f'print("done")\n'
-    )
+    script.write_text(config["hay"].format(dataset=dataset, reps=reps))
     cmd = [str(HAY_EXE), str(script)]
     return _measure_command(cmd, reps, warmup=True)
 
 
-def run_python_ols(dataset: Path, reps: int) -> dict:
-    script = BENCH_DIR / "implementations" / "ols_python.py"
-    return _run_python_script(script, dataset, reps)
-
-
-def run_r_ols(dataset: Path, reps: int) -> dict:
-    script = BENCH_DIR / "implementations" / "ols_r.R"
-    return _run_r_script(script, dataset, reps)
-
-
-def _run_python_script(script: Path, dataset: Path, reps: int) -> dict:
+def run_python(estimator: str, dataset: Path, reps: int) -> dict:
+    script = BENCH_DIR / "implementations" / ESTIMATORS[estimator]["python"]
     cmd = [sys.executable, str(script), str(dataset), str(reps)]
     return _measure_command(cmd, reps, warmup=True)
 
 
-def _run_r_script(script: Path, dataset: Path, reps: int) -> dict:
+def run_r(estimator: str, dataset: Path, reps: int) -> dict:
+    script = BENCH_DIR / "implementations" / ESTIMATORS[estimator]["r"]
     cmd = ["Rscript", str(script), str(dataset), str(reps)]
     return _measure_command(cmd, reps, warmup=True)
 
@@ -97,7 +111,7 @@ def save_results(results: list[dict], estimator: str) -> Path:
 
 def main():
     parser = argparse.ArgumentParser(description="Run Hayashi benchmarks")
-    parser.add_argument("--estimator", default="ols", choices=["ols"], help="estimator to benchmark")
+    parser.add_argument("--estimator", default="ols", choices=list(ESTIMATORS.keys()), help="estimator to benchmark")
     parser.add_argument("--sizes", default="1000,10000,100000", help="comma-separated dataset sizes")
     parser.add_argument("--reps", type=int, default=5, help="repetitions per size")
     parser.add_argument("--lang", default="hayashi,python,r", help="languages to benchmark")
@@ -114,9 +128,9 @@ def main():
     datasets = generate_datasets(args.estimator, sizes)
 
     runners = {
-        "hayashi": run_hayashi_ols,
-        "python": run_python_ols,
-        "r": run_r_ols,
+        "hayashi": run_hayashi,
+        "python": run_python,
+        "r": run_r,
     }
 
     results = []
@@ -129,7 +143,7 @@ def main():
                 continue
             print(f"  running {lang}...", end="", flush=True)
             try:
-                stats = runners[lang](dataset, args.reps)
+                stats = runners[lang](args.estimator, dataset, args.reps)
                 stats["estimator"] = args.estimator
                 stats["language"] = lang
                 stats["n"] = n
