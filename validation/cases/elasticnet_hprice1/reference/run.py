@@ -1,11 +1,15 @@
 # Reference implementation in Python for the Elastic Net hprice1 case.
+#
+# Replicates Hayashi's elasticnet() coordinate descent with alpha=0.1 and
+# l1_ratio=0.5.  y and X are centered and standardized, the intercept is
+# unpenalised, and the penalty is alpha * n_obs * (l1_ratio*|beta|_1 +
+# (1-l1_ratio)/2 * ||beta||_2^2).
 
 import json
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import ElasticNet
 
 CASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = CASE_DIR / "data"
@@ -28,33 +32,54 @@ else:
     df = pd.read_csv(CSV_PATH)
 
 predictors = ["llotsize", "lsqrft", "bdrms", "colonial"]
-X = df[predictors].astype(float)
-y = df["lprice"].astype(float)
+X = df[predictors].astype(float).to_numpy()
+y = df["lprice"].astype(float).to_numpy()
 
-# Match Hayashi's ElasticNet formulation: standardise X, centre y, do not
-# penalise the intercept, then transform the slopes back to the original scale.
-x_mean = X.mean().to_numpy()
-x_std = X.std().to_numpy()
-y_mean = y.mean()
 
-X_std = ((X - x_mean) / x_std).to_numpy()
-y_c = (y - y_mean).to_numpy()
+def _elasticnet_cd(x, y, alpha=0.1, l1_ratio=0.5, max_iter=10000, tol=1e-6):
+    """Coordinate descent matching Hayashi's elasticnet() implementation."""
+    n, p = x.shape
+    y_mean = y.mean()
+    y_c = y - y_mean
 
-model = ElasticNet(
-    alpha=0.1, l1_ratio=0.5, max_iter=10000, tol=1e-6, fit_intercept=False
-).fit(X_std, y_c)
+    col_mean = x.mean(axis=0)
+    col_std = x.std(axis=0, ddof=0)
+    col_std[col_std < 1e-12] = 1.0
+    x_std = (x - col_mean) / col_std
 
-beta_std = model.coef_
-beta_orig = beta_std / x_std
-intercept = float(y_mean - np.sum(beta_orig * x_mean))
+    beta = np.zeros(p)
+    xx_diag = np.sum(x_std ** 2, axis=0)
+    l1 = alpha * l1_ratio * n
+    l2 = alpha * (1.0 - l1_ratio) * n
 
-coefs = {"Intercept": intercept}
-for name, val in zip(predictors, beta_orig):
+    for _ in range(max_iter):
+        xb = x_std @ beta
+        r = y_c - xb
+        max_delta = 0.0
+        for j in range(p):
+            denom = xx_diag[j] + l2
+            rho_j = x_std[:, j].dot(r) + xx_diag[j] * beta[j]
+            new_b = np.sign(rho_j) * max(abs(rho_j) - l1, 0.0) / denom
+            max_delta = max(max_delta, abs(new_b - beta[j]))
+            beta[j] = new_b
+        if max_delta < tol:
+            break
+
+    beta_orig = beta / col_std
+    intercept = y_mean - beta_orig.dot(col_mean)
+    return np.concatenate([[intercept], beta_orig])
+
+
+params = _elasticnet_cd(X, y, alpha=0.1, l1_ratio=0.5)
+coefs = {"Intercept": float(params[0])}
+for name, val in zip(predictors, params[1:]):
     coefs[name] = float(val)
+
+std_errors = {name: 0.0 for name in coefs}
 
 result = {
     "coefficients": coefs,
-    "standard_errors": {name: 0.0 for name in coefs},
+    "standard_errors": std_errors,
 }
 
 out_dir = CASE_DIR / "reference"

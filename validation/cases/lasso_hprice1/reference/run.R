@@ -23,6 +23,7 @@ model <- glmnet(X, y, alpha = 1, lambda = 1.0, standardize = TRUE)
 
 coefs <- as.numeric(coef(model))
 names(coefs) <- rownames(coef(model))
+names(coefs)[names(coefs) == "(Intercept)"] <- "Intercept"
 
 # glmnet does not provide analytical standard errors for Lasso.
 std_errors <- as.numeric(rep(0.0, length(coefs)))

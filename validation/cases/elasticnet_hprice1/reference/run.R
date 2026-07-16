@@ -16,11 +16,12 @@ predictors <- c("llotsize", "lsqrft", "bdrms", "colonial")
 X <- as.matrix(df[, predictors])
 y <- df$lprice
 
-# Elastic Net with alpha=0.5 and lambda=0.1 (matching the Hayashi parameterisation).
-model <- glmnet(X, y, alpha = 0.5, lambda = 0.1, standardize = FALSE)
+# Elastic Net with alpha=0.5 and lambda=0.1, standardised internally like Hayashi.
+model <- glmnet(X, y, alpha = 0.5, lambda = 0.1, standardize = TRUE)
 
 coefs <- as.numeric(coef(model))
 names(coefs) <- rownames(coef(model))
+names(coefs)[names(coefs) == "(Intercept)"] <- "Intercept"
 
 std_errors <- as.numeric(rep(0.0, length(coefs)))
 names(std_errors) <- names(coefs)
