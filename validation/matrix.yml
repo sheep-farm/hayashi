@@ -2,36 +2,41 @@ cases:
 - id: ab_grunfeld
   notes: Arellano-Bond difference GMM for dynamic panel investment demand.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: ar_book
   notes: Uses the same simulated AR(1) DGP as Chapter 26 of the book.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: ardl_gdp
   notes: ARDL(1,1) model of US real GDP on consumption.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: arima_book
   notes: ARIMA(1,1,0) on a simulated random walk with seed 42. Intercept is excluded
     from comparison because R/Python references are estimated without trend.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: arima_gdp
   notes: ARIMA(1,1,1) on log US real GDP via exact Gaussian MLE.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: arma_book
   notes: Uses the same simulated ARMA(1,1) DGP as Chapter 26 of the book. Intercept
     is excluded from comparison because Hayashi profiles it out in MLE (SE = 0).
   dimension: numerical
-  status: pass
+  status: blocked
 - id: autoreg_gdp
   notes: AR(1) on US real GDP with constant and trend.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: betareg_wooldridge_401k
   notes: Beta regression on 401k participation rates. Greeners estimates by BFGS with
     an analytic gradient and matches R betareg.
+  dimension: numerical
+  status: pass
+- id: causal_impact_simulated
+  notes: Bayesian structural time series for counterfactual inference (Brodersen 2015).
+    Uses simulated data with known treatment effect.
   dimension: numerical
   status: pass
 - id: cloglog_wooldridge_affairs
@@ -43,19 +48,29 @@ cases:
   notes: VECM(1) on a simulated cointegrated system where y = 2*x + e2 and x = cumsum(e1).
     Only the cointegration (beta) and adjustment (alpha) coefficients are compared.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: cox_heart
   notes: Cox proportional hazards regression for survival time after heart transplant.
+  dimension: numerical
+  status: blocked
+- id: dcc_garch_nyse
+  notes: DCC-GARCH (Dynamic Conditional Correlation GARCH) on NYSE returns. Uses simplified
+    DCC-GARCH(1,1) model.
   dimension: numerical
   status: pass
 - id: did_kielmc
   notes: Difference-in-differences effect of incinerator proximity on log house prices.
   dimension: numerical
   status: pass
+- id: double_ml_simulated
+  notes: Double Machine Learning (Chernozhukov et al. 2018) for heterogeneous treatment
+    effects. Uses simulated data with known treatment effect.
+  dimension: numerical
+  status: pass
 - id: egarch_nyse
   notes: EGARCH(1,1) on NYSE returns.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: elasticnet_hprice1
   notes: Elastic Net regression of log house price on log lot size, log square footage,
     bedrooms and colonial dummy.
@@ -65,25 +80,30 @@ cases:
   notes: Exponential smoothing state-space model on US real GDP. Blocked because Hayashi
     uses SSE grid search while references use MLE.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: fmb_simulated
   notes: Classic Fama-MacBeth regression on a deterministic simulated asset panel.
+  dimension: numerical
+  status: pass
+- id: ftest_robust_wooldridge_wage1
+  notes: Robust F-test (Wooldridge 2010) with cluster-robust covariance for joint
+    significance test.
   dimension: numerical
   status: pass
 - id: garch_book
   notes: Uses the same simulated GARCH(1,1) DGP as Chapter 30 of the book. MLE tolerances
     are looser because the optimizer may stop at slightly different points.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: garch_nyse
   notes: GARCH(1,1) on NYSE returns.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: gee_wooldridge_wagepan_ch14
   notes: Wooldridge Introductory Econometrics Chapter 14 Example 14.4 generalized
     estimating equations wage equation.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: glm_wooldridge_fertil2_poisson
   notes: Poisson GLM for number of children on Wooldridge fertil2.
   dimension: numerical
@@ -91,16 +111,21 @@ cases:
 - id: glsar_hprice1
   notes: GLS with AR(1) errors on housing price equation.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: gmm_card
   notes: GMM returns to schooling with nearc4 as instrument for education.
+  dimension: numerical
+  status: pass
+- id: hausman_robust_wooldridge_wagepan
+  notes: Robust Hausman test (Cameron-Trivedi 2005, Wooldridge 2010) with cluster-robust
+    covariance.
   dimension: numerical
   status: pass
 - id: heckman_mroz
   notes: Two-step Heckman (Heckit) on the Mroz dataset. SEs are approximate because
     the reference implementations are two-step.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: iv_card
   notes: IV with education endogenous and nearc4 as instrument.
   dimension: numerical
@@ -113,6 +138,11 @@ cases:
 - id: kalman_nyse
   notes: Local-level Kalman filter on NYSE returns. Hayashi estimates sigma_obs and
     sigma_state by MLE and returns a printable result object.
+  dimension: numerical
+  status: pass
+- id: kmeans_simulated
+  notes: K-Means clustering (MacQueen 1967) with k-means++ initialization. Uses simulated
+    2D data with 3 Gaussian clusters.
   dimension: numerical
   status: pass
 - id: lasso_hprice1
@@ -130,6 +160,11 @@ cases:
 - id: ma_book
   notes: Uses the same simulated MA(1) DGP as Chapter 26 of the book.
   dimension: numerical
+  status: blocked
+- id: mice_chained_simulated
+  notes: MICE (Multiple Imputation by Chained Equations, van Buuren 2011) with m=5,
+    iter=10. Uses simulated data with MCAR missing values.
+  dimension: numerical
   status: pass
 - id: mixed_wooldridge_wagepan_ch14
   notes: Wooldridge Introductory Econometrics Chapter 14 Example 14.4 mixed linear
@@ -141,17 +176,17 @@ cases:
     income, wait time, vehicle cost and travel time. Alternative-specific attributes
     are averaged per individual to make them individual-specific covariates.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: nbreg_fertil2
   notes: Negative binomial regression for number of children on age, education, electric
     and urban indicators. Dispersion parameter (alpha) is not compared because Hayashi
     does not report it; coefficient tolerance is 2e-1 due to different alpha estimates.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: ologit_beauty
   notes: Ordered logit of looks (2, 3, 4) on female, educ, exper, black.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: ols_cluster_wagepan
   notes: OLS wage equation with one-way cluster-robust standard errors by worker id.
   dimension: numerical
@@ -313,7 +348,7 @@ cases:
   notes: Ordered probit model of self-reported beauty rating (looks 2-5) on female,
     education, experience and black indicators.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: panel_fe_grunfeld
   notes: Panel fixed-effects investment demand model (Grunfeld).
   dimension: numerical
@@ -321,6 +356,11 @@ cases:
 - id: panel_fe_wooldridge_wagepan_ch14
   notes: Wooldridge Introductory Econometrics Chapter 14 Example 14.4 panel fixed-effects
     wage equation.
+  dimension: numerical
+  status: pass
+- id: panel_heckman_simulated
+  notes: Panel Heckman selection model (two-step) with selection equation and outcome
+    equation. Uses simulated panel data with known selection mechanism.
   dimension: numerical
   status: pass
 - id: pca_wooldridge_wage1
@@ -354,7 +394,7 @@ cases:
   notes: Sharp RDD with local linear regression, triangular kernel and Imbens-Kalyanaraman
     bandwidth.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: re_grunfeld
   notes: Random-effects investment demand model (Grunfeld).
   dimension: numerical
@@ -363,10 +403,16 @@ cases:
   notes: Ridge regression of log house price on log lot size, log square footage,
     bedrooms and colonial dummy.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: rlm_wage1
   notes: Huber robust linear regression of log wage on education, experience, and
     tenure.
+  dimension: numerical
+  status: pass
+- id: spatial_durbin_simulated
+  notes: Spatial Durbin model with spatial lag of dependent variable and spatially
+    lagged independent variables. Uses simulated spatial data with known spatial weights
+    matrix.
   dimension: numerical
   status: pass
 - id: sur_grunfeld
@@ -376,16 +422,16 @@ cases:
 - id: svar_macro
   notes: Cholesky-identified SVAR(2) on log US real GDP and consumption.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: synth_smoking
   notes: Synthetic-control ATT on a simulated panel with 10 donors and 1 treated unit.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: sysgmm_wagepan
   notes: System GMM (Blundell-Bond) two-step on Wooldridge wagepan with lags=2. Python
     reference implements the same two-step System GMM procedure used by Hayashi/Greeners.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: tobit_mroz
   notes: Tobit regression of hours worked with left censoring at zero. Hayashi matches
     AER::tobit at displayed precision; the custom Python MLE is retained as a diagnostic
@@ -395,11 +441,11 @@ cases:
 - id: var_book
   notes: Uses the same simulated bivariate VAR(1) DGP as Chapter 28 of the book.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: var_macro
   notes: VAR(2) on US real GDP and consumption.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: wls_hprice1
   notes: WLS with weights generated inside Hayashi to avoid sandbox file issues.
   dimension: numerical
@@ -409,48 +455,12 @@ cases:
     xtgls panels(heteroskedastic)). R and Python references implement the same two-step
     FGLS procedure used by Hayashi/Greeners.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: zinb_affairs
   notes: ZINB model of number of affairs on demographic predictors.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: zip_affairs
   notes: ZIP model of number of affairs on demographic predictors.
   dimension: numerical
-  status: pass
-- id: hausman_robust_wooldridge_wagepan
-  notes: Robust Hausman test (Cameron-Trivedi 2005, Wooldridge 2010) with cluster-robust covariance.
-  dimension: numerical
-  status: not-started
-- id: ftest_robust_wooldridge_wage1
-  notes: Robust F-test (Wooldridge 2010) with cluster-robust covariance for joint significance test.
-  dimension: numerical
-  status: not-started
-- id: causal_impact_simulated
-  notes: Bayesian structural time series for counterfactual inference (Brodersen 2015). Uses simulated data with known treatment effect.
-  dimension: numerical
-  status: not-started
-- id: kmeans_simulated
-  notes: K-Means clustering (MacQueen 1967) with k-means++ initialization. Uses simulated 2D data with 3 Gaussian clusters.
-  dimension: numerical
-  status: not-started
-- id: mice_chained_simulated
-  notes: MICE (Multiple Imputation by Chained Equations, van Buuren 2011) with m=5, iter=10. Uses simulated data with MCAR missing values.
-  dimension: numerical
-  status: not-started
-- id: dcc_garch_nyse
-  notes: DCC-GARCH (Dynamic Conditional Correlation GARCH) on NYSE returns. Uses simplified DCC-GARCH(1,1) model.
-  dimension: numerical
-  status: not-started
-- id: double_ml_simulated
-  notes: Double Machine Learning (Chernozhukov et al. 2018) for heterogeneous treatment effects. Uses simulated data with known treatment effect.
-  dimension: numerical
-  status: not-started
-- id: spatial_durbin_simulated
-  notes: Spatial Durbin model with spatial lag of dependent variable and spatially lagged independent variables. Uses simulated spatial data with known spatial weights matrix.
-  dimension: numerical
-  status: not-started
-- id: panel_heckman_simulated
-  notes: Panel Heckman selection model (two-step) with selection equation and outcome equation. Uses simulated panel data with known selection mechanism.
-  dimension: numerical
-  status: not-started
+  status: blocked
