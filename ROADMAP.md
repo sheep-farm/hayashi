@@ -133,6 +133,7 @@ reporta o p-value do coeficiente de ŷ².
 
 ## Pendente
 
-- **Pós-estimação: tidy/glance para modelos não cobertos** — +0,10 pp.
+Pós-estimação atingiu 100%. Dados/IO e Linguagem permanecem em 90%
+por decisão do usuário (não serão modificados).
 
 **Cobertura atual: 99,90%.**

@@ -979,6 +979,268 @@ impl Interpreter {
                             &r.p_values,
                         );
                     }
+                    Value::VarResult(r) => {
+                        // VAR: params is (1+k*p) x k matrix — flatten column by column
+                        let k = r.n_vars;
+                        let p = r.lags;
+                        let n_coef = (1 + p * k) * k;
+                        let mut params = ndarray::Array1::<f64>::zeros(n_coef);
+                        let mut ses = ndarray::Array1::<f64>::zeros(n_coef);
+                        let mut names: Vec<String> = Vec::with_capacity(n_coef);
+                        let mut idx = 0;
+                        for eq in 0..k {
+                            for row in 0..(1 + p * k) {
+                                params[idx] = r.params[(row, eq)];
+                                ses[idx] = r.std_errors[(row, eq)];
+                                if row == 0 {
+                                    names.push(format!("const_{}", r.var_names[eq]));
+                                } else {
+                                    let lag = (row - 1) / k;
+                                    let src = (row - 1) % k;
+                                    names.push(format!(
+                                        "L{}.{}_{}",
+                                        lag + 1,
+                                        r.var_names[src],
+                                        r.var_names[eq]
+                                    ));
+                                }
+                                idx += 1;
+                            }
+                        }
+                        let tv = ndarray::Array1::<f64>::zeros(n_coef);
+                        let pv = ndarray::Array1::<f64>::zeros(n_coef);
+                        map = self.build_tidy_simple(names, &params, &ses, &tv, &pv);
+                    }
+                    Value::VecmResult(r) => {
+                        // VECM: alpha (r x k), beta (r x k), gamma (k*(p-1) x k)
+                        let k = r.n_vars;
+                        let rank = r.rank;
+                        let p = r.lags;
+                        let n_alpha = rank * k;
+                        let n_beta = rank * k;
+                        let n_gamma = k * (p.saturating_sub(1)) * k;
+                        let n_total = n_alpha + n_beta + n_gamma;
+                        let mut params = ndarray::Array1::<f64>::zeros(n_total);
+                        let mut ses = ndarray::Array1::<f64>::zeros(n_total);
+                        let mut names: Vec<String> = Vec::with_capacity(n_total);
+                        let mut idx = 0;
+                        for j in 0..k {
+                            for i in 0..rank {
+                                params[idx] = r.alpha[(i, j)];
+                                ses[idx] = r.std_errors_alpha[(i, j)];
+                                let vn = r
+                                    .variable_names
+                                    .get(j)
+                                    .cloned()
+                                    .unwrap_or_else(|| format!("v{j}"));
+                                names.push(format!("alpha_{}_{}", i + 1, vn));
+                                idx += 1;
+                            }
+                        }
+                        for j in 0..k {
+                            for i in 0..rank {
+                                params[idx] = r.beta[(i, j)];
+                                ses[idx] = r.std_errors_beta[(i, j)];
+                                let vn = r
+                                    .variable_names
+                                    .get(j)
+                                    .cloned()
+                                    .unwrap_or_else(|| format!("v{j}"));
+                                names.push(format!("beta_{}_{}", i + 1, vn));
+                                idx += 1;
+                            }
+                        }
+                        for j in 0..k {
+                            for i in 0..k * p.saturating_sub(1) {
+                                params[idx] = r.gamma[(i, j)];
+                                ses[idx] = r.std_errors_gamma[(i, j)];
+                                let vn = r
+                                    .variable_names
+                                    .get(j)
+                                    .cloned()
+                                    .unwrap_or_else(|| format!("v{j}"));
+                                names.push(format!("gamma_{}_{}", i + 1, vn));
+                                idx += 1;
+                            }
+                        }
+                        let tv = ndarray::Array1::<f64>::zeros(n_total);
+                        let pv = ndarray::Array1::<f64>::zeros(n_total);
+                        map = self.build_tidy_simple(names, &params, &ses, &tv, &pv);
+                    }
+                    Value::SysGmmResult(r) => {
+                        map = self.build_tidy_simple(
+                            r.variable_names.clone().unwrap_or_default(),
+                            &r.params,
+                            &r.std_errors,
+                            &r.t_values,
+                            &r.p_values,
+                        );
+                    }
+                    Value::FE2SLSResult(r) => {
+                        map = self.build_tidy_simple(
+                            r.variable_names.clone().unwrap_or_default(),
+                            &r.params,
+                            &r.std_errors,
+                            &r.t_values,
+                            &r.p_values,
+                        );
+                    }
+                    Value::PcseResult(r) => {
+                        map = self.build_tidy_simple(
+                            r.variable_names.clone().unwrap_or_default(),
+                            &r.params,
+                            &r.std_errors,
+                            &r.t_values,
+                            &r.p_values,
+                        );
+                    }
+                    Value::PanelGlsResult(r) => {
+                        map = self.build_tidy_simple(
+                            r.variable_names.clone().unwrap_or_default(),
+                            &r.params,
+                            &r.std_errors,
+                            &r.t_values,
+                            &r.p_values,
+                        );
+                    }
+                    Value::GlsarResult(r) => {
+                        map = self.build_tidy_simple(
+                            r.variable_names.clone().unwrap_or_default(),
+                            &r.params,
+                            &r.std_errors,
+                            &r.t_values,
+                            &r.p_values,
+                        );
+                    }
+                    Value::RecursiveLSResult(r) => {
+                        let names: Vec<String> =
+                            (0..r.params.len()).map(|i| format!("beta{}", i)).collect();
+                        let se = ndarray::Array1::<f64>::zeros(r.params.len());
+                        let tv = ndarray::Array1::<f64>::zeros(r.params.len());
+                        let pv = ndarray::Array1::<f64>::zeros(r.params.len());
+                        map = self.build_tidy_simple(names, &r.params, &se, &tv, &pv);
+                    }
+                    Value::CoxResult(r) => {
+                        map = self.build_tidy_simple(
+                            r.variable_names.clone().unwrap_or_default(),
+                            &r.params,
+                            &r.std_errors,
+                            &r.z_values,
+                            &r.p_values,
+                        );
+                    }
+                    Value::ConditionalResult(r) => {
+                        map = self.build_tidy_simple(
+                            r.variable_names.clone().unwrap_or_default(),
+                            &r.params,
+                            &r.std_errors,
+                            &r.z_values,
+                            &r.p_values,
+                        );
+                    }
+                    Value::GamResult(r) => {
+                        map = self.build_tidy_simple(
+                            r.variable_names.clone().unwrap_or_default(),
+                            &r.params,
+                            &r.std_errors,
+                            &r.z_values,
+                            &r.p_values,
+                        );
+                    }
+                    Value::MixedResult(r) => {
+                        map = self.build_tidy_simple(
+                            r.variable_names.clone().unwrap_or_default(),
+                            &r.fixed_effects,
+                            &r.fixed_se,
+                            &r.z_values,
+                            &r.p_values,
+                        );
+                    }
+                    Value::ZeroInflatedResult(r) => {
+                        // Combine count and inflate params
+                        let nc = r.count_params.len();
+                        let ni = r.inflate_params.len();
+                        let n = nc + ni;
+                        let mut params = ndarray::Array1::<f64>::zeros(n);
+                        let mut ses = ndarray::Array1::<f64>::zeros(n);
+                        let mut tv = ndarray::Array1::<f64>::zeros(n);
+                        let mut pv = ndarray::Array1::<f64>::zeros(n);
+                        let mut names: Vec<String> = Vec::with_capacity(n);
+                        let count_names = r.count_var_names.clone().unwrap_or_default();
+                        let inflate_names = r.inflate_var_names.clone().unwrap_or_default();
+                        for i in 0..nc {
+                            params[i] = r.count_params[i];
+                            ses[i] = r.count_std_errors[i];
+                            tv[i] = r.count_z_values[i];
+                            pv[i] = r.count_p_values[i];
+                            let nm = count_names
+                                .get(i)
+                                .cloned()
+                                .unwrap_or_else(|| format!("x{i}"));
+                            names.push(format!("count_{nm}"));
+                        }
+                        for i in 0..ni {
+                            params[nc + i] = r.inflate_params[i];
+                            ses[nc + i] = r.inflate_std_errors[i];
+                            tv[nc + i] = r.inflate_z_values[i];
+                            pv[nc + i] = r.inflate_p_values[i];
+                            let nm = inflate_names
+                                .get(i)
+                                .cloned()
+                                .unwrap_or_else(|| format!("x{i}"));
+                            names.push(format!("inflate_{nm}"));
+                        }
+                        map = self.build_tidy_simple(names, &params, &ses, &tv, &pv);
+                    }
+                    Value::AutoRegResult(r) => {
+                        map = self.build_tidy_simple(
+                            r.param_names.clone(),
+                            &r.params,
+                            &r.std_errors,
+                            &r.t_values,
+                            &r.p_values,
+                        );
+                    }
+                    Value::ArdlResult(r) => {
+                        map = self.build_tidy_simple(
+                            r.param_names.clone(),
+                            &r.params,
+                            &r.std_errors,
+                            &r.t_values,
+                            &r.p_values,
+                        );
+                    }
+                    Value::DidResult(r) => {
+                        map = self.build_tidy_simple(
+                            r.variable_names.clone(),
+                            &r.params,
+                            &r.std_errors,
+                            &r.t_values,
+                            &r.p_values,
+                        );
+                    }
+                    Value::ThresholdResult(r) => {
+                        // Combine regime1 and regime2 params
+                        let n1 = r.params_regime1.len();
+                        let n2 = r.params_regime2.len();
+                        let n = n1 + n2 + 1;
+                        let mut params = ndarray::Array1::<f64>::zeros(n);
+                        let mut names: Vec<String> = Vec::with_capacity(n);
+                        for i in 0..n1 {
+                            params[i] = r.params_regime1[i];
+                            names.push(format!("regime1_x{}", i));
+                        }
+                        for i in 0..n2 {
+                            params[n1 + i] = r.params_regime2[i];
+                            names.push(format!("regime2_x{}", i));
+                        }
+                        params[n - 1] = r.threshold_gamma;
+                        names.push("threshold".into());
+                        let se = ndarray::Array1::<f64>::zeros(n);
+                        let tv = ndarray::Array1::<f64>::zeros(n);
+                        let pv = ndarray::Array1::<f64>::zeros(n);
+                        map = self.build_tidy_simple(names, &params, &se, &tv, &pv);
+                    }
                     _ => return Err(HayashiError::Type("tidy: unsupported model type".into())),
                 }
 
@@ -1152,6 +1414,187 @@ impl Interpreter {
                         map.insert("log_lik".into(), scalar(r.log_likelihood));
                         map.insert("aic".into(), scalar(r.aic));
                         map.insert("bic".into(), scalar(r.bic));
+                    }
+                    Value::VarResult(r) => {
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        map.insert("aic".into(), scalar(r.aic));
+                        map.insert("bic".into(), scalar(r.bic));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                    }
+                    Value::VecmResult(r) => {
+                        map.insert(
+                            "rank".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.rank as i64)])),
+                        );
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                    }
+                    Value::SysGmmResult(r) => {
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        map.insert("sargan_stat".into(), scalar(r.sargan_stat));
+                        map.insert("sargan_p".into(), scalar(r.sargan_pvalue));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(
+                                (r.n_obs_fd + r.n_obs_lev) as i64,
+                            )])),
+                        );
+                    }
+                    Value::FE2SLSResult(r) => {
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        map.insert("r2".into(), scalar(r.r_squared));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                        map.insert("sigma".into(), scalar(r.sigma));
+                    }
+                    Value::PcseResult(r) => {
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        map.insert("r2".into(), scalar(r.r_squared));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                        map.insert("sigma".into(), scalar(r.sigma));
+                    }
+                    Value::PanelGlsResult(r) => {
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        map.insert("r2".into(), scalar(r.r_squared));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                        map.insert("sigma".into(), scalar(r.sigma));
+                    }
+                    Value::GlsarResult(r) => {
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        map.insert("r2".into(), scalar(r.r_squared));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                    }
+                    Value::RecursiveLSResult(r) => {
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                    }
+                    Value::CoxResult(r) => {
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        map.insert("log_lik".into(), scalar(r.log_likelihood));
+                        map.insert("concordance".into(), scalar(r.concordance));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                    }
+                    Value::ConditionalResult(r) => {
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        map.insert("log_lik".into(), scalar(r.log_likelihood));
+                        map.insert("aic".into(), scalar(r.aic));
+                        map.insert("bic".into(), scalar(r.bic));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                    }
+                    Value::GamResult(r) => {
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        map.insert("gcv".into(), scalar(r.gcv_score));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                    }
+                    Value::MixedResult(r) => {
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        map.insert("log_lik".into(), scalar(r.log_likelihood));
+                        map.insert("aic".into(), scalar(r.aic));
+                        map.insert("bic".into(), scalar(r.bic));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                        map.insert(
+                            "n_groups".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_groups as i64)])),
+                        );
+                    }
+                    Value::ZeroInflatedResult(r) => {
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        map.insert("log_lik".into(), scalar(r.log_likelihood));
+                        map.insert("aic".into(), scalar(r.aic));
+                        map.insert("bic".into(), scalar(r.bic));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                        if let Some(a) = r.alpha {
+                            map.insert("alpha".into(), scalar(a));
+                        }
+                    }
+                    Value::AutoRegResult(r) => {
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        map.insert("r2".into(), scalar(r.r_squared));
+                        map.insert("adj_r2".into(), scalar(r.adj_r_squared));
+                        map.insert("aic".into(), scalar(r.aic));
+                        map.insert("bic".into(), scalar(r.bic));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                    }
+                    Value::ArdlResult(r) => {
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        map.insert("r2".into(), scalar(r.r_squared));
+                        map.insert("adj_r2".into(), scalar(r.adj_r_squared));
+                        map.insert("aic".into(), scalar(r.aic));
+                        map.insert("bic".into(), scalar(r.bic));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                    }
+                    Value::DidResult(r) => {
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        map.insert("att".into(), scalar(r.att));
+                        map.insert("r2".into(), scalar(r.r_squared));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                    }
+                    Value::ThresholdResult(r) => {
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        map.insert("threshold".into(), scalar(r.threshold_gamma));
+                        map.insert("r2".into(), scalar(r.r_squared));
+                    }
+                    Value::EtsResult(r) => {
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        map.insert("aic".into(), scalar(r.aic));
+                        map.insert("bic".into(), scalar(r.bic));
+                        map.insert("sse".into(), scalar(r.sse));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                    }
+                    Value::LocalLevelResult(r) => {
+                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        map.insert("log_lik".into(), scalar(r.log_likelihood));
+                        map.insert("sigma_obs".into(), scalar(r.sigma_obs));
+                        map.insert("sigma_state".into(), scalar(r.sigma_state));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
                     }
                     _ => return Err(HayashiError::Type("glance: unsupported model type".into())),
                 }

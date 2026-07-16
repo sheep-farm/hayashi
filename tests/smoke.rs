@@ -12666,3 +12666,167 @@ hausman_robust(mfe, mre)
         "Robust Hausman",
     );
 }
+
+#[test]
+fn tidy_var_basic() {
+    assert_ok_contains(
+        "tidy_var",
+        r#"
+input df
+y1 y2
+1.0 3.0
+1.5 2.8
+2.0 3.2
+2.5 2.9
+3.0 3.5
+3.5 3.1
+4.0 3.8
+4.5 3.3
+5.0 4.0
+5.5 3.6
+6.0 4.2
+6.5 3.7
+end
+let m = var(df, y1, y2, lags=1)
+tidy(m)
+"#,
+        "variable",
+    );
+}
+
+#[test]
+fn glance_var_basic() {
+    assert_ok_contains(
+        "glance_var",
+        r#"
+input df
+y1 y2
+1.0 3.0
+1.5 2.8
+2.0 3.2
+2.5 2.9
+3.0 3.5
+3.5 3.1
+4.0 3.8
+4.5 3.3
+5.0 4.0
+5.5 3.6
+6.0 4.2
+6.5 3.7
+end
+let m = var(df, y1, y2, lags=1)
+glance(m)
+"#,
+        "aic",
+    );
+}
+
+#[test]
+fn tidy_autoreg_basic() {
+    assert_ok_contains(
+        "tidy_autoreg",
+        r#"
+input df
+y
+1.0
+1.5
+2.0
+2.5
+3.0
+3.5
+4.0
+4.5
+5.0
+5.5
+6.0
+6.5
+7.0
+7.5
+8.0
+end
+let m = autoreg(df, "y", lags=2)
+tidy(m)
+"#,
+        "variable",
+    );
+}
+
+#[test]
+fn glance_autoreg_basic() {
+    assert_ok_contains(
+        "glance_autoreg",
+        r#"
+input df
+y
+1.0
+1.5
+2.0
+2.5
+3.0
+3.5
+4.0
+4.5
+5.0
+5.5
+6.0
+6.5
+7.0
+7.5
+8.0
+end
+let m = autoreg(df, "y", lags=2)
+glance(m)
+"#,
+        "aic",
+    );
+}
+
+#[test]
+fn tidy_glsar_basic() {
+    assert_ok_contains(
+        "tidy_glsar",
+        r#"
+input df
+y x1
+10 1.0
+12 2.0
+15 3.0
+18 4.0
+20 5.0
+22 6.0
+25 7.0
+28 8.0
+30 9.0
+32 10.0
+end
+let m = glsar(y ~ x1, df, ar=1)
+tidy(m)
+"#,
+        "variable",
+    );
+}
+
+#[test]
+fn glance_glsar_basic() {
+    assert_ok_contains(
+        "glance_glsar",
+        r#"
+input df
+y x1
+10 1.0
+12 2.0
+15 3.0
+18 4.0
+20 5.0
+22 6.0
+25 7.0
+28 8.0
+30 9.0
+32 10.0
+end
+let m = glsar(y ~ x1, df, ar=1)
+glance(m)
+"#,
+        "r2",
+    );
+}
