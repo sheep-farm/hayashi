@@ -134,10 +134,14 @@ supported options of a specific estimator.
 
 | Command | Description |
 |---------|-------------|
+| `tidy(m)` | Tidy coefficient table (variable, coef, std_err, t/z, p_value, conf_low, conf_high) |
+| `glance(m)` | Model fit statistics (r2, adj_r2, AIC, BIC, log_lik, n, sigma, etc.) |
 | `esttab(m1, m2, ...)` | Side-by-side estimation table |
 | `predict df var = m [, "kind"]` | Fitted values, residuals, probabilities |
 | `margins(m, type=ame)` | Average marginal effects |
 | `hausman(m_fe, m_re)` | Hausman specification test |
+| `hausman_robust(m_fe, m_re)` | Robust Hausman test (Wooldridge 2010) |
+| `ftest_robust(m [, vars=])` | Robust F-test (Wooldridge 2010) |
 | `irf(v, ...)` | Impulse response functions |
 | `johansen(...)` | Johansen cointegration test |
 | `testparm(m, vars)` | Joint significance test |

@@ -92,6 +92,23 @@ hausman(m_fe, m_re)
 
 Tests H0: RE is consistent (individual effects uncorrelated with regressors). If rejected, use FE. Requires both an FE and an RE model.
 
+### Robust Hausman (FE vs RE)
+
+```
+hausman_robust(m_fe, m_re)
+```
+
+Robust version of the Hausman test (Cameron & Trivedi 2005; Wooldridge 2010). Uses the robust covariance of the coefficient differences instead of the classical variance comparison. Valid under heteroskedasticity and clustering — situations where the standard Hausman test is unreliable.
+
+Reports the Chi-squared statistic, degrees of freedom, p-value, and the per-variable beta differences (FE minus RE). Alias: `hausman_r`.
+
+```
+xtset(panel, firm, year)
+let mfe = fe(output ~ capital + labor, panel)
+let mre = re(output ~ capital + labor, panel)
+hausman_robust(mfe, mre)
+```
+
 ### Wooldridge serial correlation
 
 ```
@@ -143,6 +160,24 @@ let m1 = ols(Y ~ X1, df)
 let m2 = ols(Y ~ X1 + X2, df)
 lrtest(m1, m2)
 ```
+
+## Robust F-test (Wald)
+
+```
+ftest_robust(m)
+ftest_robust(m, vars="x1,x2")
+```
+
+Robust joint significance test (Wooldridge 2010). Tests H0: all specified coefficients are jointly zero, using a Wald statistic built from the robust covariance matrix. Valid under heteroskedasticity and clustering.
+
+By default, tests all slope coefficients (excludes the intercept). Use `vars=` to test a subset:
+
+```
+let m = ols(y ~ x1 + x2 + x3, df, cov=robust)
+ftest_robust(m, vars="x1,x2")
+```
+
+Reports the Wald Chi-squared statistic, F-statistic, and both p-values (F and Chi2). Supports OLS, FE, and RE models. Alias: `f_robust`.
 
 ## Notes
 

@@ -29,6 +29,7 @@
 
 # Post-Estimation
 
+- [Tidy & Glance](./post/tidy-glance.md)
 - [Hypothesis Tests](./post/tests.md)
 - [Comparison Tables](./post/esttab.md)
 - [Margins & Predictions](./post/margins.md)

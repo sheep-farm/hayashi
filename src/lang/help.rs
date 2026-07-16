@@ -422,6 +422,8 @@ fn legacy_help_text(topic: &str) -> Option<&'static str> {
         "glsar" => "glsar(formula, df [, lags=1])\n  GLS with AR errors.\n\n  let m = glsar(Y ~ X1 + X2, df, lags=2)\n",
         "km" | "kaplan_meier" => "km(df, time=var, event=var [, by=group])\n  Kaplan-Meier survival curve.\n\n  km(df, time=studytime, event=died, by=drug)\n",
         "hausman" => "hausman(m_fe, m_re)\n  Hausman specification test (FE vs RE).\n\n  hausman(m_fe, m_re)\n",
+        "tidy" => "tidy(model)\n  Tidy coefficient table: variable, coef, std_err, t/z, p_value, conf_low, conf_high.\n  Supports all model types (OLS, IV, logit, probit, panel, GMM, ARIMA, GARCH, VAR, etc.).\n\n  let m = ols(Y ~ X1 + X2, df)\n  tidy(m)\n",
+        "glance" => "glance(model)\n  Model fit statistics as a one-row DataFrame.\n  Keys vary by model: r2, adj_r2, pseudo_r2, n, aic, bic, log_lik, sigma, etc.\n  Supports all model types.\n\n  let m = ols(Y ~ X1 + X2, df)\n  glance(m)\n",
         "lincom" => "lincom(model, expr)\n  Linear combination of coefficients.\n\n  lincom(m, X1 + X2)\n",
         "vif" => "vif(model)\n  Variance inflation factors.\n\n  vif(m)\n",
         "influence" => "influence(model)\n  Influence diagnostics: DFFITS, Cook's D, leverage.\n\n  influence(m)\n",

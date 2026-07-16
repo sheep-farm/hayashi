@@ -254,6 +254,8 @@ Covariance options (where applicable): `cov=nonrobust|HC1|HC2|HC3|HC4|robust`, `
 | `biplot` | `biplot(df, x="x1,x2,x3", type="symmetric")` | PCA biplot (Gabriel 1971) |
 | `hausman_robust` | `hausman_robust(fe, re)` | Robust Hausman test (Wooldridge 2010) |
 | `ftest_robust` | `ftest_robust(model, vars="x1,x2")` | Robust F-test (Wooldridge 2010) |
+| `tidy` | `tidy(model)` | Tidy coefficient table (variable, coef, std_err, t/z, p_value, conf_low, conf_high) |
+| `glance` | `glance(model)` | Model fit statistics (r2, adj_r2, AIC, BIC, log_lik, n, sigma, etc.) |
 | `hausman` | `hausman(m_fe, m_re)` | Hausman specification test |
 | `lincom` | `lincom(m, expr)` | Linear combination of coefficients |
 | `bootstrap` | `bootstrap(est, formula, df, n=)` | Generic bootstrap |
