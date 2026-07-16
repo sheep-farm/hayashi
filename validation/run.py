@@ -36,8 +36,9 @@ def _is_number(token: str) -> bool:
         return False
 
 
-def run_command(cmd: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
-    log(f"  $ {' '.join(cmd)}")
+def run_command(cmd: list[str], cwd: Path | None = None, quiet: bool = False) -> subprocess.CompletedProcess[str]:
+    if not quiet:
+        log(f"  $ {' '.join(cmd)}")
     return subprocess.run(
         cmd,
         cwd=cwd or ROOT_DIR,
@@ -295,16 +296,19 @@ def parse_reference_json(stdout: str) -> dict[str, Any] | None:
 
 def normalise_intercept(data: dict[str, Any]) -> dict[str, Any]:
     """Rename intercept labels ('const', '_cons' or '(Intercept)') to 'Intercept' and clean up Heckman lambda label."""
-    for key in ("coefficients", "standard_errors"):
-        if key not in data:
+    for key, d in list(data.items()):
+        if not isinstance(d, dict):
             continue
-        d = data[key]
-        for src in ("const", "_cons", "(Intercept)"):
-            if src in d:
-                d["Intercept"] = d.pop(src)
-        # Hayashi prints the inverse Mills ratio as "lambda (IMR)".
-        if "lambda (IMR)" in d:
-            d["lambda_IMR"] = d.pop("lambda (IMR)")
+        # Apply to any nested dictionary that looks like a coefficient table.
+        if "coefficient" in key or key == "standard_errors":
+            for src in ("const", "_cons", "(Intercept)"):
+                if src in d:
+                    d["Intercept"] = d.pop(src)
+            # Hayashi prints the inverse Mills ratio as "lambda (IMR)".
+            if "lambda (IMR)" in d:
+                d["lambda_IMR"] = d.pop("lambda (IMR)")
+            if "lambda" in d:
+                d["lambda_IMR"] = d.pop("lambda")
     return data
 
 
@@ -624,6 +628,305 @@ def parse_hayashi_zip(text: str) -> dict[str, dict[str, float]]:
     return result
 
 
+def _extract_scalar(text: str, label: str) -> float | None:
+    """Extract a scalar labelled 'Label:' or 'Label (units):' from Hayashi text output."""
+    import re
+
+    # Allow optional suffix in parentheses and trailing units like '(post-treatment):'
+    pattern = re.compile(rf"{re.escape(label)}\s*(?:\([^)]*\))?\s*:\s*([-\+]?(?:\d*\.\d+|\d+)(?:[eE][-\+]?\d+)?)")
+    m = pattern.search(text)
+    if not m:
+        return None
+    return float(m.group(1))
+
+
+def parse_hayashi_hausman(text: str) -> dict[str, float]:
+    """Parse a robust Hausman test summary."""
+    result: dict[str, float] = {}
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("Chi2:"):
+            result["test_statistic"] = float(stripped.split(":", 1)[1].strip())
+        elif stripped.startswith("P-value:"):
+            result["p_value"] = float(stripped.split(":", 1)[1].strip())
+        elif stripped.startswith("df:"):
+            result["degrees_of_freedom"] = float(stripped.split(":", 1)[1].strip())
+    if "test_statistic" not in result:
+        raise ValueError(f"Could not parse Hausman output: {text[:200]!r}")
+    return result
+
+
+def parse_hayashi_ftest(text: str) -> dict[str, float]:
+    """Parse a robust F-test summary."""
+    result: dict[str, float] = {}
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("F-stat:"):
+            result["test_statistic"] = float(stripped.split(":", 1)[1].strip())
+        elif stripped.startswith("P-value (F):"):
+            result["p_value"] = float(stripped.split(":", 1)[1].strip())
+        elif stripped.startswith("df (num):"):
+            result["degrees_of_freedom_num"] = float(stripped.split(":", 1)[1].strip())
+        elif stripped.startswith("df (denom):"):
+            result["degrees_of_freedom_denom"] = float(stripped.split(":", 1)[1].strip())
+    if "test_statistic" not in result:
+        raise ValueError(f"Could not parse F-test output: {text[:200]!r}")
+    return result
+
+
+def parse_hayashi_causal_impact(text: str) -> dict[str, float]:
+    """Parse Causal Impact average and cumulative effect summaries."""
+    import re
+
+    result: dict[str, float] = {}
+    lines = text.splitlines()
+    section: str | None = None
+    for line in lines:
+        stripped = line.strip()
+        if "Average effect" in stripped and "post-treatment" in stripped:
+            section = "avg"
+            continue
+        if "Cumulative effect" in stripped:
+            section = "cum"
+            continue
+
+        m = re.match(r"Posterior mean:\s*([-+]?\d+\.?\d*(?:[eE][-+]?\d+)?)", stripped)
+        if m and section == "avg":
+            result["avg_effect"] = float(m.group(1))
+            continue
+
+        m = re.match(r"Total:\s*([-+]?\d+\.?\d*(?:[eE][-+]?\d+)?)", stripped)
+        if m and section == "cum":
+            result["total_effect"] = float(m.group(1))
+            continue
+
+        m = re.match(r"SD:\s*([-+]?\d+\.?\d*(?:[eE][-+]?\d+)?)", stripped)
+        if m:
+            if section == "avg":
+                result["avg_effect_sd"] = float(m.group(1))
+            elif section == "cum":
+                result["total_effect_sd"] = float(m.group(1))
+            continue
+
+        m = re.search(r"95% CI:\s*\[\s*([^,\]]+)\s*,\s*([^\]]+)\s*\]", stripped)
+        if m:
+            lower = float(m.group(1).strip())
+            upper = float(m.group(2).strip())
+            if section == "avg":
+                result["avg_effect_lower"] = lower
+                result["avg_effect_upper"] = upper
+            elif section == "cum":
+                result["total_effect_lower"] = lower
+                result["total_effect_upper"] = upper
+
+    for key in ("avg_effect", "total_effect"):
+        if key not in result:
+            raise ValueError(f"Could not parse Causal Impact output: {text[:200]!r}")
+    return result
+
+
+def parse_hayashi_dcc_garch(text: str) -> dict[str, float]:
+    """Parse DCC-GARCH scalar summary and per-series GARCH parameters."""
+    result: dict[str, float] = {}
+    lines = text.splitlines()
+    scalar = _extract_scalar(text, "DCC alpha")
+    if scalar is not None:
+        result["dcc_alpha"] = scalar
+    scalar = _extract_scalar(text, "DCC beta")
+    if scalar is not None:
+        result["dcc_beta"] = scalar
+    scalar = _extract_scalar(text, "Log-likelihood")
+    if scalar is not None:
+        result["log_likelihood"] = scalar
+    scalar = _extract_scalar(text, "AIC")
+    if scalar is not None:
+        result["aic"] = scalar
+    scalar = _extract_scalar(text, "BIC")
+    if scalar is not None:
+        result["bic"] = scalar
+
+    # Parse per-series GARCH parameters table.
+    in_table = False
+    for line in lines:
+        stripped = line.strip()
+        if "Univariate GARCH" in stripped:
+            in_table = True
+            continue
+        if not in_table:
+            continue
+        if stripped.startswith("-") or stripped.startswith("=") or not stripped:
+            continue
+        if "Series" in stripped and "omega" in stripped:
+            continue
+        parts = stripped.split()
+        if len(parts) >= 4:
+            name = parts[0]
+            try:
+                omega = float(parts[-3])
+                alpha = float(parts[-2])
+                beta = float(parts[-1])
+                result[f"{name}_omega"] = omega
+                result[f"{name}_alpha"] = alpha
+                result[f"{name}_beta"] = beta
+            except ValueError:
+                continue
+    if not result:
+        raise ValueError(f"Could not parse DCC-GARCH output: {text[:200]!r}")
+    return result
+
+
+def parse_hayashi_kmeans(text: str) -> dict[str, Any]:
+    """Parse K-Means clustering summary."""
+    result: dict[str, Any] = {}
+    scalar = _extract_scalar(text, "Inertia (WCSS)")
+    if scalar is not None:
+        result["inertia"] = scalar
+    scalar = _extract_scalar(text, "Between SS")
+    if scalar is not None:
+        result["between_ss"] = scalar
+    scalar = _extract_scalar(text, "Total SS")
+    if scalar is not None:
+        result["total_ss"] = scalar
+    scalar = _extract_scalar(text, "% explained")
+    if scalar is not None:
+        result["pct_explained"] = scalar
+
+    # Parse cluster sizes and centroids.
+    in_sizes = False
+    in_centroids = False
+    sizes: dict[str, float] = {}
+    centroids: list[float] = []
+    withinss: list[float] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if "Cluster sizes:" in stripped:
+            in_sizes = True
+            in_centroids = False
+            continue
+        if "Centroids:" in stripped:
+            in_sizes = False
+            in_centroids = True
+            continue
+        if in_sizes and stripped and not stripped.startswith("-") and not stripped.startswith("="):
+            parts = stripped.split()
+            if len(parts) >= 2:
+                try:
+                    sizes[parts[0]] = float(parts[-1])
+                except ValueError:
+                    continue
+        if in_centroids and stripped and not stripped.startswith("-") and not stripped.startswith("="):
+            parts = stripped.split()
+            if len(parts) >= 3:
+                try:
+                    # First token is cluster id, remaining are coordinate values.
+                    centroids.append([float(p) for p in parts[1:]])
+                except ValueError:
+                    continue
+    if centroids:
+        # Order clusters by the first coordinate to make comparison deterministic.
+        centroids.sort(key=lambda row: row[0])
+        result["cluster_centers"] = [v for row in centroids for v in row]
+    return result
+
+
+def parse_hayashi_mice(text: str) -> dict[str, Any]:
+    """Parse MICE chained-equations per-variable summary."""
+    result: dict[str, list[float]] = {"imputed_means": [], "imputed_stds": []}
+    in_table = False
+    for line in text.splitlines():
+        stripped = line.strip()
+        if "Variable" in stripped and "Mean" in stripped and "Variance" in stripped:
+            in_table = True
+            continue
+        if in_table and stripped and not stripped.startswith("-") and not stripped.startswith("="):
+            parts = stripped.split()
+            if len(parts) >= 4:
+                try:
+                    mean = float(parts[-3])
+                    var = float(parts[-2])
+                    result["imputed_means"].append(mean)
+                    result["imputed_stds"].append(var**0.5)
+                except ValueError:
+                    continue
+    if not result["imputed_means"]:
+        raise ValueError(f"Could not parse MICE output: {text[:200]!r}")
+    return result
+
+
+def parse_hayashi_panel_heckman(text: str) -> dict[str, Any]:
+    """Parse Panel Heckman selection and outcome coefficient tables."""
+    import re
+
+    result: dict[str, Any] = {"selection_coefficients": {}, "outcome_coefficients": {}, "standard_errors": {}}
+    section: str | None = None
+    for line in text.splitlines():
+        stripped = line.strip()
+        lower = stripped.lower()
+        if "selection equation" in lower:
+            section = "selection"
+            continue
+        if "outcome equation" in lower:
+            section = "outcome"
+            continue
+        if stripped.startswith("-") or stripped.startswith("=") or not stripped:
+            continue
+        # Skip headers
+        if "variable" in lower and "coef" in lower:
+            continue
+        # Skip section titles and scalar lines
+        if ":" in stripped and len(stripped.split(":")) == 2:
+            # Capture the IMR mean printed as a scalar summary line.
+            m = re.match(r"IMR mean:\s*([-+]?\d+\.?\d*(?:[eE][-+]?\d+)?)", stripped, re.IGNORECASE)
+            if m:
+                result["inverse_mills_ratio"] = float(m.group(1))
+            continue
+        parts = stripped.split()
+        if len(parts) < 3:
+            continue
+        # Find where numbers start
+        i = 0
+        while i < len(parts) and not _is_number(parts[i]):
+            i += 1
+        if i == 0 or i + 2 > len(parts):
+            continue
+        var = " ".join(parts[:i])
+        try:
+            coef = float(parts[i])
+        except ValueError:
+            continue
+        if section == "selection":
+            result["selection_coefficients"][var] = coef
+        elif section == "outcome":
+            result["outcome_coefficients"][var] = coef
+    # Normalize intercept / lambda labels to match reference conventions.
+    for key in ("selection_coefficients", "outcome_coefficients"):
+        d = result[key]
+        for src in ("const", "_cons", "(Intercept)"):
+            if src in d:
+                d["Intercept"] = d.pop(src)
+        if "lambda" in d:
+            d["lambda_IMR"] = d.pop("lambda")
+    if not result["outcome_coefficients"]:
+        raise ValueError(f"Could not parse Panel Heckman output: {text[:200]!r}")
+    return normalise_intercept(result)
+
+
+def parse_hayashi_double_ml(text: str) -> dict[str, float]:
+    """Parse Double/Debiased ML treatment effect summary."""
+    import re
+
+    result: dict[str, float] = {}
+    pattern = re.compile(
+        r"theta\s*\(treatment\)\s+([-+]?\d+\.?\d*(?:[eE][-+]?\d+)?)\s+([-+]?\d+\.?\d*(?:[eE][-+]?\d+)?)"
+    )
+    m = pattern.search(text)
+    if not m:
+        raise ValueError(f"Could not parse Double ML output: {text[:200]!r}")
+    result["ate_coefficient"] = float(m.group(1))
+    result["ate_standard_error"] = float(m.group(2))
+    return result
+
+
 def parse_hayashi_mlogit(text: str) -> dict[str, dict[str, float]]:
     """Parse a multinomial-logit coefficient table with per-category sections.
 
@@ -756,6 +1059,17 @@ def compare_quantities(
                     failures.append(
                         f"{quantity}.{key}: {hay_val[key]} vs {ref_val[key]} (tol={tol})"
                     )
+        elif isinstance(ref_val, list):
+            if not isinstance(hay_val, list) or len(hay_val) != len(ref_val):
+                failures.append(
+                    f"{quantity}: length mismatch hayashi={hay_val} reference={ref_val}"
+                )
+                continue
+            for idx, (h, r) in enumerate(zip(hay_val, ref_val)):
+                if not approx_equal(float(h), float(r), tol):
+                    failures.append(
+                        f"{quantity}[{idx}]: {h} vs {r} (tol={tol})"
+                    )
         elif isinstance(ref_val, (int, float)):
             if not approx_equal(float(hay_val), float(ref_val), tol):
                 failures.append(
@@ -787,18 +1101,21 @@ def compare_against_references(
     return failures, failures_by_reference
 
 
-def run_case(case: dict[str, Any]) -> tuple[str, list[str], dict[str, dict]]:
+def run_case(case: dict[str, Any], quiet: bool = False) -> tuple[str, list[str], dict[str, dict]]:
     """Run a single validation case.
 
     Returns (status, failures, ref_report) where ref_report maps each declared
     reference name to ``{"status": ..., "detail": ..., "used": bool}``.
+
+    When ``quiet`` is True, no per-case progress messages are printed.
     """
     case_id = case["id"]
     case_dir = VALIDATION_DIR / "cases" / case_id
     hayashi_dir = case_dir / "hayashi"
     data_dir = case_dir / "data"
 
-    log(f"\n[case] {case_id}: {case['title']}")
+    if not quiet:
+        log(f"\n[case] {case_id}: {case['title']}")
 
     # Ensure data directory exists.
     data_dir.mkdir(parents=True, exist_ok=True)
@@ -820,7 +1137,7 @@ def run_case(case: dict[str, Any]) -> tuple[str, list[str], dict[str, dict]]:
                 ref_report[ref_name] = {"status": "missing", "detail": "Rscript not found", "used": False}
                 continue
             r_script = str(VALIDATION_DIR / reference_scripts["R"])
-            res = run_command(["Rscript", r_script])
+            res = run_command(["Rscript", r_script], quiet=quiet)
             ref_results["R"] = res
             if res.returncode == 0:
                 ref_report[ref_name] = {"status": "passed", "detail": "", "used": False}
@@ -834,7 +1151,7 @@ def run_case(case: dict[str, Any]) -> tuple[str, list[str], dict[str, dict]]:
                 ref_report[ref_name] = {"status": "missing", "detail": "python not found", "used": False}
                 continue
             py_script = str(VALIDATION_DIR / reference_scripts["Python"])
-            res = run_command([py_exe, py_script])
+            res = run_command([py_exe, py_script], quiet=quiet)
             ref_results["Python"] = res
             if res.returncode == 0:
                 ref_report[ref_name] = {"status": "passed", "detail": "", "used": False}
@@ -847,7 +1164,7 @@ def run_case(case: dict[str, Any]) -> tuple[str, list[str], dict[str, dict]]:
                 ref_report[ref_name] = {"status": "missing", "detail": "stata not found", "used": False}
                 continue
             st_script = str(VALIDATION_DIR / reference_scripts["Stata"])
-            res = run_command(["stata", "-b", "do", st_script])
+            res = run_command(["stata", "-b", "do", st_script], quiet=quiet)
             ref_results["Stata"] = res
             if res.returncode == 0:
                 ref_report[ref_name] = {"status": "passed", "detail": "", "used": False}
@@ -858,11 +1175,12 @@ def run_case(case: dict[str, Any]) -> tuple[str, list[str], dict[str, dict]]:
             ref_report[ref_name] = {"status": "missing", "detail": f"unknown reference '{ref_name}'", "used": False}
 
     # ── Print per-reference status ───────────────────────────────────
-    log("  References:")
-    for name in references:
-        info = ref_report.get(name, {"status": "unknown", "detail": ""})
-        detail = f" ({info['detail']})" if info.get("detail") else ""
-        log(f"    {name}: {info['status']}{detail}")
+    if not quiet:
+        log("  References:")
+        for name in references:
+            info = ref_report.get(name, {"status": "unknown", "detail": ""})
+            detail = f" ({info['detail']})" if info.get("detail") else ""
+            log(f"    {name}: {info['status']}{detail}")
 
     # ── Strict policy: every declared reference must pass ────────────
     available_refs = [name for name, info in ref_report.items() if info["status"] == "passed"]
@@ -878,14 +1196,17 @@ def run_case(case: dict[str, Any]) -> tuple[str, list[str], dict[str, dict]]:
     if not available_refs:
         return "blocked", ["No reference implementation could run."], ref_report
 
-    # Run Hayashi script.
-    if not check_executable("hay"):
+    # Run Hayashi script. Prefer the binary built in this repo (debug or
+    # release) over a globally installed `hay`, so that local changes are
+    # actually validated.
+    hay_exe = str(ROOT_DIR / "target" / "debug" / "hay")
+    if not Path(hay_exe).exists():
         hay_exe = str(ROOT_DIR / "target" / "release" / "hay")
-    else:
+    if not Path(hay_exe).exists() and check_executable("hay"):
         hay_exe = "hay"
 
     hay_script = str(VALIDATION_DIR / case.get("hayashi_script", f"cases/{case_id}/hayashi/run.hay"))
-    hay_res = run_command([hay_exe, hay_script])
+    hay_res = run_command([hay_exe, hay_script], quiet=quiet)
     if hay_res.returncode != 0:
         return "blocked", [f"Hayashi script failed:\n{hay_res.stderr}"], ref_report
 
@@ -928,6 +1249,22 @@ def run_case(case: dict[str, Any]) -> tuple[str, list[str], dict[str, dict]]:
                 hayashi = normalise_intercept(parse_hayashi_svar(hay_res.stdout))
             elif family == "pcse":
                 hayashi = normalise_intercept(parse_hayashi_pcse(hay_res.stdout))
+            elif family == "ftest_robust":
+                hayashi = parse_hayashi_ftest(hay_res.stdout)
+            elif family == "hausman_robust":
+                hayashi = parse_hayashi_hausman(hay_res.stdout)
+            elif family == "causal_impact":
+                hayashi = parse_hayashi_causal_impact(hay_res.stdout)
+            elif family == "dcc_garch":
+                hayashi = parse_hayashi_dcc_garch(hay_res.stdout)
+            elif family == "kmeans":
+                hayashi = parse_hayashi_kmeans(hay_res.stdout)
+            elif family == "mice_chained":
+                hayashi = parse_hayashi_mice(hay_res.stdout)
+            elif family == "panel_heckman":
+                hayashi = parse_hayashi_panel_heckman(hay_res.stdout)
+            elif family == "double_ml":
+                hayashi = parse_hayashi_double_ml(hay_res.stdout)
             elif output_format == "margins":
                 hayashi = normalise_intercept(parse_hayashi_margins(hay_res.stdout))
             elif output_format == "txt":
@@ -984,10 +1321,12 @@ def run_case(case: dict[str, Any]) -> tuple[str, list[str], dict[str, dict]]:
     status = "fail" if failures else "pass"
 
     if failures:
-        for f in failures:
-            log(f"  FAIL: {f}")
+        if not quiet:
+            for f in failures:
+                log(f"  FAIL: {f}")
     else:
-        log(f"  PASS (compared against {', '.join(reference_outputs)})")
+        if not quiet:
+            log(f"  PASS (compared against {', '.join(reference_outputs)})")
 
     return status, failures, ref_report
 
@@ -1196,6 +1535,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         action="store_true",
         help="Check validation metadata consistency without running validation cases.",
     )
+    parser.add_argument(
+        "--only-blocked",
+        dest="only_blocked",
+        action="store_true",
+        help="Only show cases that fail or are blocked; passing cases are run silently.",
+    )
     return parser.parse_args(argv)
 
 
@@ -1271,9 +1616,11 @@ def select_cases(cases: list[dict[str, Any]], case_ids: list[str]) -> list[dict[
     return selected
 
 
-def run_cases(cases: list[dict[str, Any]]) -> str:
+def run_cases(cases: list[dict[str, Any]], only_blocked: bool = False) -> str:
     overall_status = "pass"
     for case in cases:
+        case_id = case["id"]
+        title = case.get("title", "")
         declared_status = case.get("status", "not-started")
         if declared_status in ("blocked", "not-supported"):
             # Keep the declared status and skip execution; the case files
@@ -1281,15 +1628,28 @@ def run_cases(cases: list[dict[str, Any]]) -> str:
             status = declared_status
             failures = []
             summary = case.get("result", {}).get("summary", "")
-            log(f"\n[case] {case['id']}: {case.get('title', '')}")
-            log(f"  {declared_status.upper()}: {summary}")
+            if not (only_blocked and status == "pass"):
+                log(f"\n[case] {case_id}: {title}")
+                log(f"  {declared_status.upper()}: {summary}")
         else:
-            status, failures, ref_report = run_case(case)
-            if status == "blocked":
-                for f in failures:
-                    log(f"  BLOCKED: {f}")
-                if not failures:
-                    log(f"  BLOCKED")
+            status, failures, ref_report = run_case(case, quiet=only_blocked)
+            if status != "pass":
+                if only_blocked:
+                    log(f"\n[case] {case_id}: {title}")
+                    if ref_report:
+                        log("  References:")
+                        for name in case.get("references", []):
+                            info = ref_report.get(name, {"status": "unknown", "detail": ""})
+                            detail = f" ({info['detail']})" if info.get("detail") else ""
+                            log(f"    {name}: {info['status']}{detail}")
+                if status == "blocked":
+                    for f in failures:
+                        log(f"  BLOCKED: {f}")
+                    if not failures:
+                        log(f"  BLOCKED")
+                elif status == "fail":
+                    for f in failures:
+                        log(f"  FAIL: {f}")
             # Store per-reference report in the case result for audit trail.
             if ref_report:
                 case.setdefault("result", {})["references"] = ref_report
@@ -1365,7 +1725,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.case_ids:
         log(f"Selected {len(selected_cases)} validation case(s)")
 
-    overall_status = run_cases(selected_cases)
+    overall_status = run_cases(selected_cases, only_blocked=args.only_blocked)
 
     if args.no_write:
         log("Skipping matrix update (--no-write)")
