@@ -1422,6 +1422,13 @@ def matrix_md_metadata_matches(cases: list[dict[str, Any]], text: str) -> bool:
         actual_rows.append((family, dataset, status, issue, notes))
 
     expected_rows = [_case_matrix_metadata(case) for case in cases]
+    if actual_rows != expected_rows:
+        for i, (a, e) in enumerate(zip(actual_rows, expected_rows)):
+            if a != e:
+                log(f"MATRIX.md mismatch at row {i}: actual={a}, expected={e}")
+                break
+        if len(actual_rows) != len(expected_rows):
+            log(f"MATRIX.md length mismatch: actual={len(actual_rows)}, expected={len(expected_rows)}")
     return actual_rows == expected_rows
 
 
