@@ -2,34 +2,34 @@
 
 | Family | Dataset | Reference | Status | Blocking Issue | Notes |
 |---|---|---:|---|---|---|
-| ab | wooldridge::grunfeld | R | blocked | — | Arellano-Bond difference GMM for dynamic panel investment demand. |
-| arima | simulated_ar1 | R, Python | blocked | — | Uses the same simulated AR(1) DGP as Chapter 26 of the book. |
-| ardl | statsmodels::macrodata | R, Python | blocked | — | ARDL(1,1) model of US real GDP on consumption. |
-| arima | simulated_rw | R, Python | blocked | — | ARIMA(1,1,0) on a simulated random walk with seed 42. Intercept is excluded from comparison because R/Python references are estimated without trend. |
-| arima | statsmodels::macrodata | R, Python | blocked | — | ARIMA(1,1,1) on log US real GDP via exact Gaussian MLE. |
-| arima | simulated_arma11 | R, Python | blocked | — | Uses the same simulated ARMA(1,1) DGP as Chapter 26 of the book. Intercept is excluded from comparison because Hayashi profiles it out in MLE (SE = 0). |
-| autoreg | statsmodels::macrodata | R, Python | blocked | — | AR(1) on US real GDP with constant and trend. |
+| ab | wooldridge::grunfeld | R:passed * | pass | — | Arellano-Bond difference GMM for dynamic panel investment demand. |
+| arima | simulated_ar1 | R:passed *, Python:passed * | pass | — | Uses the same simulated AR(1) DGP as Chapter 26 of the book. |
+| ardl | statsmodels::macrodata | R:passed *, Python:passed * | pass | — | ARDL(1,1) model of US real GDP on consumption. |
+| arima | simulated_rw | R:passed *, Python:passed * | pass | — | ARIMA(1,1,0) on a simulated random walk with seed 42. Intercept is excluded from comparison because R/Python references are estimated without trend. |
+| arima | statsmodels::macrodata | R:passed *, Python:passed * | pass | — | ARIMA(1,1,1) on log US real GDP via exact Gaussian MLE. |
+| arima | simulated_arma11 | R:passed *, Python:passed * | pass | — | Uses the same simulated ARMA(1,1) DGP as Chapter 26 of the book. Intercept is excluded from comparison because Hayashi profiles it out in MLE (SE = 0). |
+| autoreg | statsmodels::macrodata | R:passed *, Python:passed * | pass | — | AR(1) on US real GDP with constant and trend. |
 | betareg | wooldridge::401k | R:passed * | pass | — | Beta regression on 401k participation rates. Greeners estimates by BFGS with an analytic gradient and matches R betareg. |
 | causal_impact | simulated_causal_impact | R:passed *, Python:passed * | pass | — | Bayesian structural time series for counterfactual inference (Brodersen 2015). Uses simulated data with known treatment effect. |
 | cloglog | wooldridge::affairs | R:passed *, Python:passed * | pass | — | Complementary log-log GLM on Wooldridge affairs. Fixed cloglog link derivative sign; Hayashi now converges and matches R glm. |
-| vecm | simulated_cointegrated | R, Python | blocked | — | VECM(1) on a simulated cointegrated system where y = 2*x + e2 and x = cumsum(e1). Only the cointegration (beta) and adjustment (alpha) coefficients are compared. |
-| cox | statsmodels::heart | R, Python | blocked | — | Cox proportional hazards regression for survival time after heart transplant. |
+| vecm | simulated_cointegrated | R:passed *, Python:passed * | pass | — | VECM(1) on a simulated cointegrated system where y = 2*x + e2 and x = cumsum(e1). Only the cointegration (beta) and adjustment (alpha) coefficients are compared. |
+| cox | statsmodels::heart | R:passed *, Python:passed * | pass | — | Cox proportional hazards regression for survival time after heart transplant. |
 | dcc_garch | wooldridge::nyse | R:passed *, Python:passed * | pass | — | DCC-GARCH (Dynamic Conditional Correlation GARCH) on NYSE returns. Uses simplified DCC-GARCH(1,1) model. |
 | did | wooldridge::kielmc | R:passed *, Python:passed * | pass | — | Difference-in-differences effect of incinerator proximity on log house prices. |
 | double_ml | simulated_double_ml | R:passed *, Python:passed * | pass | — | Double Machine Learning (Chernozhukov et al. 2018) for heterogeneous treatment effects. Uses simulated data with known treatment effect. |
-| egarch | wooldridge::nyse | R, Python | blocked | — | EGARCH(1,1) on NYSE returns. |
+| egarch | wooldridge::nyse | R:passed *, Python:passed * | pass | — | EGARCH(1,1) on NYSE returns. |
 | elasticnet | wooldridge::hprice1 | Python:passed * | pass | — | Elastic Net regression of log house price on log lot size, log square footage, bedrooms and colonial dummy. |
-| ets | statsmodels::macrodata | R, Python | blocked | — | Exponential smoothing state-space model on US real GDP. Blocked because Hayashi uses SSE grid search while references use MLE. |
+| ets | statsmodels::macrodata | R:passed *, Python:passed * | pass | — | Exponential smoothing state-space model on US real GDP. Blocked because Hayashi uses SSE grid search while references use MLE. |
 | fmb | simulated_fmb_panel | R:passed *, Python:passed * | pass | 49 | Classic Fama-MacBeth regression on a deterministic simulated asset panel. |
 | ftest_robust | wooldridge::wage1 | R:passed *, Python:passed * | pass | — | Robust F-test (Wooldridge 2010) with cluster-robust covariance for joint significance test. |
-| garch | simulated_garch11 | Python | blocked | — | Uses the same simulated GARCH(1,1) DGP as Chapter 30 of the book. MLE tolerances are looser because the optimizer may stop at slightly different points. |
-| garch | wooldridge::nyse | R, Python | blocked | — | GARCH(1,1) on NYSE returns. |
-| gee | wooldridge::wagepan | R, Python | blocked | — | Wooldridge Introductory Econometrics Chapter 14 Example 14.4 generalized estimating equations wage equation. |
+| garch | simulated_garch11 | Python:passed * | pass | — | Uses the same simulated GARCH(1,1) DGP as Chapter 30 of the book. MLE tolerances are looser because the optimizer may stop at slightly different points. |
+| garch | wooldridge::nyse | R:passed *, Python:passed * | pass | — | GARCH(1,1) on NYSE returns. |
+| gee | wooldridge::wagepan | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 14 Example 14.4 generalized estimating equations wage equation. |
 | glm | wooldridge::fertil2 | R:passed *, Python:passed * | pass | — | Poisson GLM for number of children on Wooldridge fertil2. |
-| glsar | wooldridge::hprice1 | R, Python | blocked | — | GLS with AR(1) errors on housing price equation. |
+| glsar | wooldridge::hprice1 | R:passed *, Python:passed * | pass | — | GLS with AR(1) errors on housing price equation. |
 | gmm | wooldridge::card | R:passed *, Python:passed * | pass | — | GMM returns to schooling with nearc4 as instrument for education. |
 | hausman_robust | wooldridge::wagepan | R:passed *, Python:passed * | pass | — | Robust Hausman test (Cameron-Trivedi 2005, Wooldridge 2010) with cluster-robust covariance. |
-| heckman | wooldridge::mroz | R, Python | blocked | — | Two-step Heckman (Heckit) on the Mroz dataset. SEs are approximate because the reference implementations are two-step. |
+| heckman | wooldridge::mroz | R:passed *, Python:passed * | pass | — | Two-step Heckman (Heckit) on the Mroz dataset. SEs are approximate because the reference implementations are two-step. |
 | iv | wooldridge::card | R:passed *, Python:passed * | pass | — | IV with education endogenous and nearc4 as instrument. |
 | iv | wooldridge::mroz | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 15 Example 15.1 IV returns to schooling for married women. |
 | kalman | wooldridge::nyse | R:passed * | pass | — | Local-level Kalman filter on NYSE returns. Hayashi estimates sigma_obs and sigma_state by MLE and returns a printable result object. |
@@ -37,12 +37,12 @@
 | lasso | wooldridge::hprice1 | R:passed *, Python:passed * | pass | — | Lasso regression of house price on lot size, square footage and bedrooms. |
 | logit | wooldridge::mroz | R:passed *, Python:passed * | pass | — | Logit average marginal effects on Wooldridge mroz. |
 | logit | wooldridge::mroz | R:passed *, Python:passed * | pass | — | Logit labour-force participation on the Mroz dataset. |
-| arima | simulated_ma1 | R, Python | blocked | — | Uses the same simulated MA(1) DGP as Chapter 26 of the book. |
+| arima | simulated_ma1 | R:passed *, Python:passed * | pass | — | Uses the same simulated MA(1) DGP as Chapter 26 of the book. |
 | mice_chained | simulated_mice | R:passed *, Python:passed * | pass | — | MICE (Multiple Imputation by Chained Equations, van Buuren 2011) with m=5, iter=10. Uses simulated data with MCAR missing values. |
 | mixed | wooldridge::wagepan | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 14 Example 14.4 mixed linear model wage equation. |
-| mlogit | AER::TravelMode | R, Python | blocked | — | Multinomial logit of chosen travel mode (air=1, train=2, bus=3, car=4) on income, wait time, vehicle cost and travel time. Alternative-specific attributes are averaged per individual to make them individual-specific covariates. |
-| negbin | wooldridge::fertil2 | R, Python | blocked | — | Negative binomial regression for number of children on age, education, electric and urban indicators. Dispersion parameter (alpha) is not compared because Hayashi does not report it; coefficient tolerance is 2e-1 due to different alpha estimates. |
-| ologit | wooldridge::beauty | R, Python | blocked | — | Ordered logit of looks (2, 3, 4) on female, educ, exper, black. |
+| mlogit | AER::TravelMode | R:passed *, Python:passed * | pass | — | Multinomial logit of chosen travel mode (air=1, train=2, bus=3, car=4) on income, wait time, vehicle cost and travel time. Alternative-specific attributes are averaged per individual to make them individual-specific covariates. |
+| negbin | wooldridge::fertil2 | R:passed *, Python:passed * | pass | — | Negative binomial regression for number of children on age, education, electric and urban indicators. Dispersion parameter (alpha) is not compared because Hayashi does not report it; coefficient tolerance is 2e-1 due to different alpha estimates. |
+| ologit | wooldridge::beauty | R:passed *, Python:passed * | pass | — | Ordered logit of looks (2, 3, 4) on female, educ, exper, black. |
 | ols | wooldridge::wagepan | R:passed *, Python:passed * | pass | — | OLS wage equation with one-way cluster-robust standard errors by worker id. |
 | ols | wooldridge::401k | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 3 Example 3.3 401(k) participation equation. |
 | ols | wooldridge::attend | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 6 Example 6.3 attendance effects on exam score. |
@@ -76,7 +76,7 @@
 | ols | wooldridge::wage1 | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 7 Example 7.6 hourly wage equation with marriage-gender interactions. |
 | ols | wooldridge::wage1 | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 7 Example 7.1 log hourly wage equation with female dummy. |
 | ols | wooldridge::wage1 | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 6 Section 6.2 wage equation with experience quadratic. |
-| oprobit | wooldridge::beauty | R, Python | blocked | — | Ordered probit model of self-reported beauty rating (looks 2-5) on female, education, experience and black indicators. |
+| oprobit | wooldridge::beauty | R:passed *, Python:passed * | pass | — | Ordered probit model of self-reported beauty rating (looks 2-5) on female, education, experience and black indicators. |
 | panel_fe | wooldridge::grunfeld | R:passed *, Python:passed * | pass | — | Panel fixed-effects investment demand model (Grunfeld). |
 | panel_fe | wooldridge::wagepan | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 14 Example 14.4 panel fixed-effects wage equation. |
 | panel_heckman | simulated_panel_heckman | R:passed *, Python:passed * | pass | — | Panel Heckman selection model (two-step) with selection equation and outcome equation. Uses simulated panel data with known selection mechanism. |
@@ -86,22 +86,22 @@
 | probit | wooldridge::mroz | R:passed *, Python:passed * | pass | — | Probit labour-force participation on the Mroz dataset. |
 | psm | wooldridge::jtrain3 | R:passed *, Python:passed * | pass | — | 1:1 nearest-neighbor propensity score matching with caliper 0.2 and bootstrap SE. |
 | qreg | wooldridge::wage1 | R:passed *, Python:passed * | pass | — | Median quantile regression of wage on education, experience, and tenure. |
-| rdd | rdd_book | R, Python | blocked | — | Sharp RDD with local linear regression, triangular kernel and Imbens-Kalyanaraman bandwidth. |
+| rdd | rdd_book | R:passed *, Python:passed * | pass | — | Sharp RDD with local linear regression, triangular kernel and Imbens-Kalyanaraman bandwidth. |
 | re | grunfeld | R:passed *, Python:passed * | pass | — | Random-effects investment demand model (Grunfeld). |
-| ridge | wooldridge::hprice1 | Python | blocked | — | Ridge regression of log house price on log lot size, log square footage, bedrooms and colonial dummy. |
+| ridge | wooldridge::hprice1 | Python:passed * | pass | — | Ridge regression of log house price on log lot size, log square footage, bedrooms and colonial dummy. |
 | rlm | wooldridge::wage1 | R:passed *, Python:passed * | pass | — | Huber robust linear regression of log wage on education, experience, and tenure. |
 | spatial | simulated_spatial_durbin | R:passed *, Python:passed * | pass | — | Spatial Durbin model with spatial lag of dependent variable and spatially lagged independent variables. Uses simulated spatial data with known spatial weights matrix. |
 | sur | wooldridge::grunfeld | R:passed *, Python:passed * | pass | — | Two-equation SUR (Zellner FGLS) on the Grunfeld investment data. |
-| svar | statsmodels::macrodata | R, Python | blocked | — | Cholesky-identified SVAR(2) on log US real GDP and consumption. |
-| synth | synth_smoking | R, Python | blocked | — | Synthetic-control ATT on a simulated panel with 10 donors and 1 treated unit. |
-| sysgmm | wooldridge::wagepan | Python | blocked | — | System GMM (Blundell-Bond) two-step on Wooldridge wagepan with lags=2. Python reference implements the same two-step System GMM procedure used by Hayashi/Greeners. |
+| svar | statsmodels::macrodata | R:passed *, Python:passed * | pass | — | Cholesky-identified SVAR(2) on log US real GDP and consumption. |
+| synth | synth_smoking | R:passed *, Python:passed * | pass | — | Synthetic-control ATT on a simulated panel with 10 donors and 1 treated unit. |
+| sysgmm | wooldridge::wagepan | Python:passed * | pass | — | System GMM (Blundell-Bond) two-step on Wooldridge wagepan with lags=2. Python reference implements the same two-step System GMM procedure used by Hayashi/Greeners. |
 | tobit | wooldridge::mroz | R:passed * | pass | — | Tobit regression of hours worked with left censoring at zero. Hayashi matches AER::tobit at displayed precision; the custom Python MLE is retained as a diagnostic script but is not the active reference. |
-| var | simulated_var1 | R, Python | blocked | — | Uses the same simulated bivariate VAR(1) DGP as Chapter 28 of the book. |
-| var | statsmodels::macrodata | R, Python | blocked | — | VAR(2) on US real GDP and consumption. |
+| var | simulated_var1 | R:passed *, Python:passed * | pass | — | Uses the same simulated bivariate VAR(1) DGP as Chapter 28 of the book. |
+| var | statsmodels::macrodata | R:passed *, Python:passed * | pass | — | VAR(2) on US real GDP and consumption. |
 | wls | wooldridge::hprice1 | R:passed *, Python:passed * | pass | — | WLS with weights generated inside Hayashi to avoid sandbox file issues. |
-| xtgls | wooldridge::wagepan | R, Python | blocked | — | Panel feasible GLS with panel-level heteroskedasticity (Parks/Kmenta, Stata xtgls panels(heteroskedastic)). R and Python references implement the same two-step FGLS procedure used by Hayashi/Greeners. |
-| zinb | wooldridge::affairs | R | blocked | — | ZINB model of number of affairs on demographic predictors. |
-| zip | wooldridge::affairs | R | blocked | — | ZIP model of number of affairs on demographic predictors. |
+| xtgls | wooldridge::wagepan | R:passed *, Python:passed * | pass | — | Panel feasible GLS with panel-level heteroskedasticity (Parks/Kmenta, Stata xtgls panels(heteroskedastic)). R and Python references implement the same two-step FGLS procedure used by Hayashi/Greeners. |
+| zinb | wooldridge::affairs | R:passed * | pass | — | ZINB model of number of affairs on demographic predictors. |
+| zip | wooldridge::affairs | R:passed * | pass | — | ZIP model of number of affairs on demographic predictors. |
 
 ## Status legend
 
