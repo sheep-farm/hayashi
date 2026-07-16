@@ -1,0 +1,19 @@
+// Benchmark OLS no Hayashi
+// Uso: hay ols_hayashi.hay <csv_path> <reps>
+
+let args = env("args")
+let path = args[0] or "../datasets/generated/ols_n1000.csv"
+let reps = int(args[1] or "10")
+
+load path as df
+
+// warmup
+let _ = ols(y ~ x1 + x2 + x3, df)
+
+let start = now()
+for i in 1..reps {
+    let m = ols(y ~ x1 + x2 + x3, df)
+}
+let elapsed = now() - start
+
+print(elapsed / reps)

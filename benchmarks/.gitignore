@@ -1,0 +1,4 @@
+# Benchmark generated artifacts
+results/
+datasets/generated/
+.tmp/
