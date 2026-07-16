@@ -390,6 +390,25 @@ Análise fatorial  & \texttt{factor(df, v1, v2, ..., n=2, rotation=varimax)} \\
 Correlação canôn. & \texttt{cancorr(df, xvars=["v1","v2"], yvars=["v3","v4"])} \\
 MANOVA            & \texttt{manova(df, y1, y2, by="grupo")} \\
 KDE               & \texttt{kde(df, var, bwidth=0.5)} \\
+Biplot PCA        & \texttt{biplot(df, x="v1,v2,v3", type="symmetric")} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Agrupamento e redução de dimensionalidade}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Método} & \textbf{Sintaxe} \\
+\midrule
+K-Means           & \texttt{kmeans(df, x="v1,v2", k=3)} \\
+DBSCAN            & \texttt{dbscan(df, x="v1,v2", eps=1.0, minpts=5)} \\
+GMM (EM)          & \texttt{gmm\_clust(df, x="v1,v2", k=3)} \\
+Espectral         & \texttt{spectral(df, x="v1,v2", k=3)} \\
+Hierárquico       & \texttt{hclust(df, x="v1,v2", linkage="ward")} \\
+t-SNE             & \texttt{tsne(df, x="v1,v2", perplexity=30)} \\
+UMAP              & \texttt{umap(df, x="v1,v2", neighbors=15)} \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -411,6 +430,8 @@ Normalidade (SW)    & \texttt{swilk(df, var)} \\
 Normalidade (SF)    & \texttt{sfrancia(df, var)} \\
 Homocedasticidade   & \texttt{vif(m\_ols)} \\
 Hausman             & \texttt{hausman(m\_fe, m\_re)} \\
+Hausman robusto     & \texttt{hausman\_robust(m\_fe, m\_re)} \\
+F-test robusto      & \texttt{ftest\_robust(m, vars="x1,x2")} \\
 Teste linear        & \texttt{test(m, "x1 = x2")} \\
 Teste conjunto      & \texttt{testparm(m, ["x1", "x2"])} \\
 Combinação linear   & \texttt{lincom(m, "x1 + x2")} \\

@@ -210,6 +210,13 @@ linha por janela com colunas \texttt{date}, \texttt{r2} e uma coluna de
 coeficiente por variável. \texttt{glance} retorna um resumo de uma
 linha com estatísticas de ajuste.
 
+Ambas as funções suportam todos os tipos de modelo: OLS, IV, logit,
+probit, ordenado, multinomial, painel (FE, RE, PCSE, GLS, GLSAR,
+Arellano-Bond, SystemGMM), séries temporais (ARIMA, AutoReg, ARDL,
+GARCH, VAR, VECM, VARMA, ETS, Kalman), sobrevivência (Cox, KM), causal
+(DiD, Threshold), multivariada (SUR, 3SLS), regularização (ridge, lasso,
+elasticnet), entre outros.
+
 \begin{lstlisting}[caption={Tidy e glance}]
 let m = ols(y ~ x1 + x2, df)
 let coefs = tidy(m)

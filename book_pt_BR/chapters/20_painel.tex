@@ -103,6 +103,28 @@ A estatística é:
 
 Rejeitar $H_0$ indica que RE é inconsistente — use FE.
 
+\subsection{Hausman robusto}
+
+O teste de Hausman clássico requer que o estimador RE seja eficiente sob
+$H_0$. Sob heterocedasticidade ou clustering, isso falha e a estatística
+pode ser negativa ou enganosa. A versão robusta
+(Cameron \& Trivedi 2005; Wooldridge 2010) usa a covariância robusta das
+diferenças dos coeficientes:
+
+\[
+  H_{\mathrm{robust}} = (\hat\beta_{\mathrm{FE}} - \hat\beta_{\mathrm{RE}})'
+      \bigl[\widehat{\mathrm{Var}}_{\mathrm{robust}}(\hat\beta_{\mathrm{FE}} -
+             \hat\beta_{\mathrm{RE}})\bigr]^{-1}
+      (\hat\beta_{\mathrm{FE}} - \hat\beta_{\mathrm{RE}})
+  \;\xrightarrow{d}\; \chi^2(k)
+\]
+
+\begin{lstlisting}[caption={Teste de Hausman robusto}]
+hausman_robust(m_fe, m_re)
+\end{lstlisting}
+
+Alias: \texttt{hausman\_r}.
+
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Verificação por DGP}
 

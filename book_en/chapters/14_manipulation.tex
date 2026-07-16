@@ -209,6 +209,12 @@ intervals. For \texttt{rolling} models it returns one row per window
 with columns \texttt{date}, \texttt{r2}, and one coefficient column per
 variable. \texttt{glance} returns a one-row summary with fit statistics.
 
+Both functions support all model types: OLS, IV, logit, probit, ordered,
+multinomial, panel (FE, RE, PCSE, GLS, GLSAR, Arellano-Bond, SystemGMM),
+time series (ARIMA, AutoReg, ARDL, GARCH, VAR, VECM, VARMA, ETS, Kalman),
+survival (Cox, KM), causal (DiD, Threshold), multivariate (SUR, 3SLS),
+regularization (ridge, lasso, elasticnet), and more.
+
 \begin{lstlisting}[caption={Tidy and glance}]
 let m = ols(y ~ x1 + x2, df)
 let coefs = tidy(m)
