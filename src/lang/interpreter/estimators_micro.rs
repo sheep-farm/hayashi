@@ -2979,9 +2979,7 @@ impl Interpreter {
                     let col = df
                         .get_column(name)
                         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                    let vals = col.as_float().ok_or_else(|| {
-                        HayashiError::Runtime(format!("{func}: column '{name}' must be numeric"))
-                    })?;
+                    let vals = col.to_float();
                     for i in 0..n {
                         r_mat[(i, j)] = vals[i];
                     }
@@ -5002,16 +5000,9 @@ impl Interpreter {
                     let col = df
                         .get_column(vname.as_str())
                         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                    let vals = col.as_float();
-                    if let Some(v) = vals {
-                        for i in 0..n {
-                            data_mat[(i, j)] = v[i];
-                        }
-                    } else {
-                        // Fill with NaN for missing (non-numeric or null)
-                        for i in 0..n {
-                            data_mat[(i, j)] = f64::NAN;
-                        }
+                    let vals = col.to_float();
+                    for i in 0..n {
+                        data_mat[(i, j)] = vals[i];
                     }
                 }
 

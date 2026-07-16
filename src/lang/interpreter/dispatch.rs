@@ -32,7 +32,7 @@ impl Interpreter {
         let is_mutate = func == "mutate" || func == "generate";
         let opt_map: HashMap<String, Value> = opts
             .iter()
-            .filter(|o| o.name != "if" && o.name != "vars" && o.name != "dydx" && !is_mutate)
+            .filter(|o| o.name != "if" && o.name != "dydx" && !is_mutate)
             .map(|o| {
                 let val = self.eval_expr(&o.value).or_else(|e| {
                     if let Expr::Var(name) = &o.value {
