@@ -79,6 +79,45 @@ def run_r(estimator: str, dataset: Path, reps: int) -> dict:
     return _measure_command(cmd, reps, warmup=True)
 
 
+def _read_rss_kb(pid: int) -> int:
+    """Lê VmRSS de /proc/<pid>/status em KB."""
+    try:
+        with open(f"/proc/{pid}/status") as f:
+            for line in f:
+                if line.startswith("VmRSS:"):
+                    return int(line.split()[1])  # KB
+    except Exception:
+        pass
+    return 0
+
+
+def _find_child_pids(ppid: int) -> list[int]:
+    """Retorna PIDs cujo PPid é ppid."""
+    children = []
+    for entry in Path("/proc").glob("[0-9]*"):
+        try:
+            pid = int(entry.name)
+            if pid == ppid:
+                continue
+            with open(f"/proc/{pid}/status") as f:
+                for line in f:
+                    if line.startswith("PPid:"):
+                        if int(line.split()[1]) == ppid:
+                            children.append(pid)
+                        break
+        except Exception:
+            continue
+    return children
+
+
+def _sample_memory_kb(pid: int) -> int:
+    """Soma RSS do processo principal + filhos."""
+    total = _read_rss_kb(pid)
+    for child in _find_child_pids(pid):
+        total += _read_rss_kb(child)
+    return total
+
+
 def _measure_command(cmd: list[str], reps: int, warmup: bool = True) -> dict:
     """Roda o comando varias vezes, descarta warmup, retorna estatisticas."""
     if warmup:
@@ -86,11 +125,24 @@ def _measure_command(cmd: list[str], reps: int, warmup: bool = True) -> dict:
         subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
 
     times = []
+    memory_peaks_kb = []
     for _ in range(reps):
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        peak_kb = 0
         t0 = time.perf_counter()
-        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        while proc.poll() is None:
+            peak_kb = max(peak_kb, _sample_memory_kb(proc.pid))
+            time.sleep(0.01)
+        stdout, stderr = proc.communicate()
         t1 = time.perf_counter()
+        if proc.returncode != 0:
+            raise subprocess.CalledProcessError(proc.returncode, cmd, stdout, stderr)
         times.append(t1 - t0)
+        memory_peaks_kb.append(peak_kb)
 
     return {
         "mean": sum(times) / len(times),
@@ -98,6 +150,9 @@ def _measure_command(cmd: list[str], reps: int, warmup: bool = True) -> dict:
         "min": min(times),
         "max": max(times),
         "raw": times,
+        "memory_kb_mean": sum(memory_peaks_kb) / len(memory_peaks_kb),
+        "memory_kb_max": max(memory_peaks_kb),
+        "memory_kb_std": statistics.stdev(memory_peaks_kb) if len(memory_peaks_kb) > 1 else 0.0,
     }
 
 
@@ -149,7 +204,8 @@ def main():
                 stats["n"] = n
                 stats["dataset"] = str(dataset)
                 results.append(stats)
-                print(f" mean={stats['mean']:.4f}s std={stats['std']:.4f}s")
+                mem_mb = stats['memory_kb_mean'] / 1024
+                print(f" mean={stats['mean']:.4f}s std={stats['std']:.4f}s mem={mem_mb:.1f}MB")
             except Exception as e:
                 print(f" ERROR: {e}")
 
@@ -158,9 +214,10 @@ def main():
 
     # tabela resumo
     print("\nSummary:")
-    print(f"{'estimator':<12} {'n':>10} {'language':>10} {'mean_s':>12} {'std_s':>12}")
+    print(f"{'estimator':<12} {'n':>10} {'language':>10} {'mean_s':>12} {'std_s':>12} {'mem_mb':>12}")
     for r in results:
-        print(f"{r['estimator']:<12} {r['n']:>10} {r['language']:>10} {r['mean']:>12.4f} {r['std']:>12.4f}")
+        mem_mb = r['memory_kb_mean'] / 1024
+        print(f"{r['estimator']:<12} {r['n']:>10} {r['language']:>10} {r['mean']:>12.4f} {r['std']:>12.4f} {mem_mb:>12.1f}")
 
 
 if __name__ == "__main__":

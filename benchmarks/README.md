@@ -59,6 +59,22 @@ python scripts/run.py --estimator ols --sizes 1000,10000,100000 --reps 10
 - R e Python possuem ecossistemas maduros; este benchmark mede velocidade
   bruta de estimação, não produtividade geral.
 
+## Gerar tabela e gráficos resumidos
+
+Depois de rodar os benchmarks:
+
+```bash
+python scripts/summarize.py
+```
+
+Gera:
+
+- `results/summary.md` — tabela Markdown com speedups
+- `results/summary.png` — gráfico log-log por estimador
+
+Requer `matplotlib` instalado (opcional).
+
 ## Resultados
 
-Resultados são escritos em `results/<estimator>_YYYYMMDD_HHMMSS.json`.
+Resultados brutos são escritos em `results/<estimator>_YYYYMMDD_HHMMSS.json`.
+Eles são ignorados pelo git e devem ser regenerados localmente.
