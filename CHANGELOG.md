@@ -7,6 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- **VS Code debugger: structured model expansion**. When debugging a `.hay` script, model results now expand in the Variables panel with a short summary and child nodes: `coefficients` (DataFrame), `fit` (Dict), and per-parameter Series (`params`, `std_errors`, `test_values`, `p_values`, `conf_lower`, `conf_upper`). Supported for OLS, IV/2SLS, panel estimators (`fe`, `re`, `pcse`, `xtgls`, `feiv`), binary choice (`logit`, `probit`), count data (`poisson`, `nbreg`), `tobit`, `ordered`, `mnlogit`, `zip`/`zinb`, `glm`, `rlm`, `qreg`, `gmm`, `ab`, `sysgmm`, `glsar`, `mixed`, `sur`, and `3sls`. Requires the VS Code extension and `hay dap` in `PATH`.
 - **`acf()` / `pacf()`**: return autocorrelation / partial autocorrelation values as a list. Accept a DataFrame + column name, or a model (OLS/GARCH/ARIMA — uses residuals). Complements the existing `acfplot`/`pacfplot` ASCII visualizations.
 - **`cusumtest(model)`**: CUSUM test for structural stability (Brown, Durbin, Evans 1975). Uses recursive residuals and checks if the cumulative sum stays within 5% significance bounds. Supports OLS models.
 - **`akaike_weights(m1, m2, ...)`**: returns Akaike weights as a dict `{model_name: weight}` for programmatic model comparison. Supports OLS, logit/probit, Poisson, NegBin, Tobit, Ordered, Mixed, and Zero-Inflated models. Prints a summary table with AIC, ΔAIC, and weights.

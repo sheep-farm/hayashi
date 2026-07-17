@@ -38,6 +38,21 @@ Requires the `hay` binary in `PATH` (run `cargo build --release` first).
 
 Open a `.hay` file, go to the **Run and Debug** panel, and select the **"Debug Hayashi script"** configuration. Set breakpoints and start debugging.
 
+### Inspecting model results
+
+When paused on a breakpoint, model results expand in the Variables panel with a short summary and structured children:
+
+- `coefficients` — coefficient table as a `DataFrame` (`variable`, `coef`, `std_err`, `t`/`z`, `p_value`, `conf_low`, `conf_high`)
+- `fit` — model fit statistics as a `Dict`
+- `params`, `std_errors`, `test_values`, `p_values`, `conf_lower`, `conf_upper` — per-parameter `Series`
+- OLS also shows `residuals` and `fitted_values`
+
+For zero-inflated models you get `count_coefficients` and `inflate_coefficients`; for mixed models you get `fixed_effects` and `random_effects`; for `sur` and `3sls` each equation is a child node.
+
+Supported: OLS, IV/2SLS, `fe`/`re`/`pcse`/`xtgls`/`feiv`, `logit`/`probit`, `poisson`/`nbreg`/`zip`/`zinb`, `tobit`, `ordered`, `mnlogit`, `glm`, `rlm`, `qreg`, `gmm`, `ab`, `sysgmm`, `glsar`, `mixed`, `sur`, `3sls`.
+
+See the full debugging guide in the [Hayashi book](https://haylang.dev/debugging.html).
+
 ## Settings
 
 - `hayashi.format.indentSize`: spaces per indent level (default: 2)

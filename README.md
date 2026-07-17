@@ -58,6 +58,20 @@ hay --help           # list commands
 
 REPL features: tab completion for keywords + variables, syntax highlighting (keywords blue, strings green, numbers yellow), history hints (fish-style).
 
+## Debugging
+
+The VS Code extension supports breakpoints, stepping, and variable inspection via the Debug Adapter Protocol (`hay dap`). Model objects expand in the Variables panel with a concise summary and structured children:
+
+```
+result: OLS(k=2, n=10000), R2=1.0000
+  coefficients    DataFrame(2 rows, 7 cols)
+  fit             Dict(13 entries)
+  params          Series(params: 2 values)
+  ...
+```
+
+See the [debugging guide](docs/src/debugging.md) and the [VS Code extension README](editors/vscode/README.md) for details.
+
 ## Quick start
 
 ```

@@ -45,6 +45,10 @@
 - [Namespaces & Modules](./language/namespaces.md)
 - [Date & Time](./language/datetime.md)
 
+# Debugging
+
+- [Debugging Hayashi Scripts](./debugging.md)
+
 # Reference
 
 - [Command Reference](./reference/commands.md)
