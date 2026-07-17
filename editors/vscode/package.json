@@ -64,6 +64,11 @@
         "path": "./snippets/hayashi.json"
       }
     ],
+    "breakpoints": [
+      {
+        "language": "hayashi"
+      }
+    ],
     "commands": [
       {
         "command": "hayashi.runFile",
