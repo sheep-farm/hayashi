@@ -84,7 +84,6 @@ pub enum DebugAction {
     Pause,
 }
 
-#[derive(Debug)]
 pub struct DebugState {
     pub current_file: std::path::PathBuf,
     pub breakpoints: HashSet<(std::path::PathBuf, usize)>,
@@ -92,6 +91,8 @@ pub struct DebugState {
     pub step_target_depth: Option<usize>,
     pub pending_command: Option<DebugCommand>,
     pub initialized_sent: bool,
+    pub variable_refs: HashMap<i64, Value>,
+    pub next_var_ref: i64,
     pub event_tx: std::sync::mpsc::Sender<DebugEvent>,
     pub control_rx: std::sync::mpsc::Receiver<ControlMessage>,
 }
@@ -145,6 +146,8 @@ impl DebugState {
             step_target_depth: None,
             pending_command: None,
             initialized_sent: false,
+            variable_refs: HashMap::new(),
+            next_var_ref: 1000,
             event_tx,
             control_rx,
         }
@@ -571,32 +574,7 @@ impl Interpreter {
                     .and_then(|a| a.get("variablesReference"))
                     .and_then(|v| v.as_i64())
                     .unwrap_or(0);
-                let is_global = reference % 2 == 0;
-                let names = if is_global {
-                    self.env.global_scope_names()
-                } else {
-                    self.env.current_scope_names()
-                };
-                let variables: Vec<Variable> = names
-                    .iter()
-                    .filter_map(|name| {
-                        self.env.get(name).map(|v| {
-                            let (value, type_name, child_count) = value_to_variable_parts(v);
-                            let mut var = Variable {
-                                name: name.clone(),
-                                value,
-                                type_field: Some(type_name),
-                                variables_reference: 0,
-                                named_variables: None,
-                                indexed_variables: None,
-                            };
-                            if child_count > 0 {
-                                var.variables_reference = next_variable_reference();
-                            }
-                            var
-                        })
-                    })
-                    .collect();
+                let variables = self.variables_for_reference(reference);
                 Response::ok(0, req.seq, &req.command).with_body(json!({ "variables": variables }))
             }
             "evaluate" => {
@@ -1326,48 +1304,131 @@ impl Interpreter {
     // ── Statement execution ─────────────────────────────────────────────────
 }
 
-pub(crate) fn value_to_variable_parts(v: &Value) -> (String, String, usize) {
-    match v {
-        Value::Float(f) => (format!("{f}"), "Float".into(), 0),
-        Value::Int(i) => (format!("{i}"), "Int".into(), 0),
-        Value::Bool(b) => (format!("{b}"), "Bool".into(), 0),
-        Value::Str(s) => (s.clone(), "String".into(), 0),
-        Value::Nil => ("nil".into(), "Nil".into(), 0),
-        Value::DataFrame(df) => (
-            format!(
-                "DataFrame({} rows, {} cols)",
-                df.n_rows(),
-                df.column_names().len()
+impl Interpreter {
+    fn variable_for_value(&mut self, name: impl Into<String>, v: &Value) -> Variable {
+        let name = name.into();
+        let (value, type_name, child_count) = match v {
+            Value::Float(f) => (format!("{f}"), "Float", 0usize),
+            Value::Int(i) => (format!("{i}"), "Int", 0),
+            Value::Bool(b) => (format!("{b}"), "Bool", 0),
+            Value::Str(s) => (s.clone(), "String", 0),
+            Value::Nil => ("nil".into(), "Nil", 0),
+            Value::DataFrame(df) => (
+                format!("DataFrame({} rows, {} cols)", df.n_rows(), df.column_names().len()),
+                "DataFrame",
+                df.column_names().len(),
             ),
-            "DataFrame".into(),
-            df.column_names().len(),
-        ),
-        Value::List(lst) => (
-            format!("List({} items)", lst.len()),
-            "List".into(),
-            lst.len().min(100),
-        ),
-        Value::Dict(d) => (
-            format!("Dict({} entries)", d.len()),
-            "Dict".into(),
-            d.len().min(100),
-        ),
-        Value::Series(s) => (
-            format!("Series({}: {} values)", s.name, s.len()),
-            "Series".into(),
-            s.len().min(100),
-        ),
-        Value::UserFn(f) => (
-            format!("<fn({})>", f.params.join(", ")),
-            "Function".into(),
-            0,
-        ),
-        _ => (format!("{v}"), "Model".into(), 0),
+            Value::List(lst) => (format!("List({} items)", lst.len()), "List", lst.len().min(100)),
+            Value::Dict(d) => (format!("Dict({} entries)", d.len()), "Dict", d.len().min(100)),
+            Value::Series(s) => (
+                format!("Series({}: {} values)", s.name, s.len()),
+                "Series",
+                s.len().min(100),
+            ),
+            Value::UserFn(f) => (format!("<fn({})>", f.params.join(", ")), "Function", 0),
+            _ => (format!("{v}"), "Model", 0),
+        };
+        let mut var = Variable {
+            name,
+            value,
+            type_field: Some(type_name.into()),
+            variables_reference: 0,
+            named_variables: None,
+            indexed_variables: None,
+        };
+        if child_count > 0 {
+            if let Some(ds) = self.debug_state.as_mut() {
+                let reference = ds.next_var_ref;
+                ds.next_var_ref += 1;
+                ds.variable_refs.insert(reference, v.clone());
+                var.variables_reference = reference;
+                var.named_variables = Some(child_count as i64);
+            }
+        }
+        var
+    }
+
+    fn variables_for_reference(&mut self, reference: i64) -> Vec<Variable> {
+        if reference <= 2 {
+            let is_global = reference % 2 == 0;
+            let names = if is_global {
+                self.env.global_scope_names()
+            } else {
+                self.env.current_scope_names()
+            };
+            let values: Vec<(String, Value)> = names
+                .iter()
+                .filter_map(|name| self.env.get(name).map(|v| (name.clone(), v.clone())))
+                .collect();
+            return values
+                .iter()
+                .map(|(name, v)| self.variable_for_value(name, v))
+                .collect();
+        }
+        let v = self
+            .debug_state
+            .as_ref()
+            .and_then(|ds| ds.variable_refs.get(&reference))
+            .cloned();
+        if let Some(v) = v {
+            self.children_of_value(&v)
+        } else {
+            Vec::new()
+        }
+    }
+
+    fn children_of_value(&mut self, v: &Value) -> Vec<Variable> {
+        match v {
+            Value::DataFrame(df) => df
+                .column_names()
+                .iter()
+                .filter_map(|name| {
+                    df.get_column(name)
+                        .ok()
+                        .map(|col| self.variable_for_value(name, &column_to_value(name, col)))
+                })
+                .collect(),
+            Value::List(lst) => lst
+                .iter()
+                .take(100)
+                .enumerate()
+                .map(|(i, v)| self.variable_for_value(format!("[{i}]"), v))
+                .collect(),
+            Value::Dict(d) => d
+                .iter()
+                .take(100)
+                .map(|(k, v)| self.variable_for_value(k, v))
+                .collect(),
+            Value::Series(s) => s
+                .values
+                .iter()
+                .take(100)
+                .enumerate()
+                .map(|(i, v)| self.variable_for_value(format!("[{i}]"), v))
+                .collect(),
+            _ => Vec::new(),
+        }
     }
 }
 
-pub(crate) fn next_variable_reference() -> i64 {
-    use std::sync::atomic::{AtomicI64, Ordering};
-    static COUNTER: AtomicI64 = AtomicI64::new(1000);
-    COUNTER.fetch_add(1, Ordering::Relaxed)
+fn column_to_value(name: &str, column: &greeners::Column) -> Value {
+    use chrono::Timelike;
+    let values: Vec<Value> = match column {
+        greeners::Column::Float(arr) => arr.iter().map(|&v| Value::Float(v)).collect(),
+        greeners::Column::Int(arr) => arr.iter().map(|&v| Value::Int(v)).collect(),
+        greeners::Column::Bool(arr) => arr.iter().map(|&v| Value::Bool(v)).collect(),
+        greeners::Column::String(arr) => arr.iter().cloned().map(Value::Str).collect(),
+        greeners::Column::DateTime(arr) => arr
+            .iter()
+            .map(|dt| Value::Str(format!("{} {:02}:{:02}:{:02}", dt.date(), dt.hour(), dt.minute(), dt.second())))
+            .collect(),
+        greeners::Column::Categorical(cat) => (0..cat.len())
+            .map(|i| {
+                cat.get_string(i)
+                    .map(|s| Value::Str(s.to_string()))
+                    .unwrap_or(Value::Nil)
+            })
+            .collect(),
+    };
+    Value::Series(Arc::new(Series::new(name, values)))
 }
