@@ -1337,6 +1337,19 @@ impl Interpreter {
                 "Series",
                 s.len().min(100),
             ),
+            Value::OlsResult(m) => {
+                let r = &m.result;
+                (
+                    format!(
+                        "OLS(k={}, n={}), R2={:.4}",
+                        r.params.len(),
+                        r.n_obs,
+                        r.r_squared
+                    ),
+                    "OlsResult",
+                    9,
+                )
+            }
             Value::UserFn(f) => (format!("<fn({})>", f.params.join(", ")), "Function", 0),
             _ => (format!("{v}"), "Model", 0),
         };
@@ -1418,8 +1431,126 @@ impl Interpreter {
                 .enumerate()
                 .map(|(i, v)| self.variable_for_value(format!("[{i}]"), v))
                 .collect(),
+            Value::OlsResult(m) => self.ols_model_children(m),
             _ => Vec::new(),
         }
+    }
+
+    fn ols_model_children(&mut self, m: &OlsModel) -> Vec<Variable> {
+        let mut vars = Vec::new();
+
+        let r = &m.result;
+        let names = r.variable_names.clone().unwrap_or_default();
+        let coef_df = Self::coef_dataframe(
+            &names,
+            &r.params,
+            &r.std_errors,
+            &r.t_values,
+            &r.p_values,
+            &r.conf_lower,
+            &r.conf_upper,
+        );
+        vars.push(self.variable_for_value("coefficients", &coef_df));
+
+        let fit = Self::fit_dict(r);
+        vars.push(self.variable_for_value("fit", &fit));
+
+        if !m.residuals.is_empty() {
+            vars.push(self.variable_for_value(
+                "residuals",
+                &Self::array1_to_series("residuals", &m.residuals),
+            ));
+        }
+
+        if !m.x.is_empty() {
+            let fitted = m.x.dot(&r.params);
+            vars.push(self.variable_for_value(
+                "fitted_values",
+                &Self::array1_to_series("fitted_values", &fitted),
+            ));
+        }
+
+        vars.push(self.variable_for_value("params", &Self::array1_to_series("params", &r.params)));
+        vars.push(self.variable_for_value(
+            "std_errors",
+            &Self::array1_to_series("std_errors", &r.std_errors),
+        ));
+        vars.push(
+            self.variable_for_value("t_values", &Self::array1_to_series("t_values", &r.t_values)),
+        );
+        vars.push(
+            self.variable_for_value("p_values", &Self::array1_to_series("p_values", &r.p_values)),
+        );
+        vars.push(self.variable_for_value(
+            "conf_lower",
+            &Self::array1_to_series("conf_lower", &r.conf_lower),
+        ));
+        vars.push(self.variable_for_value(
+            "conf_upper",
+            &Self::array1_to_series("conf_upper", &r.conf_upper),
+        ));
+
+        vars
+    }
+
+    fn array1_to_series(name: &str, arr: &Array1<f64>) -> Value {
+        let values: Vec<Value> = arr.iter().map(|&v| Value::Float(v)).collect();
+        Value::Series(Arc::new(Series::new(name, values)))
+    }
+
+    fn coef_dataframe(
+        names: &[String],
+        params: &Array1<f64>,
+        std_errors: &Array1<f64>,
+        t_values: &Array1<f64>,
+        p_values: &Array1<f64>,
+        conf_lower: &Array1<f64>,
+        conf_upper: &Array1<f64>,
+    ) -> Value {
+        let n = params.len();
+        let mut columns: indexmap::IndexMap<String, greeners::Column> = indexmap::IndexMap::new();
+
+        let name_col: Vec<String> = (0..n)
+            .map(|i| names.get(i).cloned().unwrap_or_else(|| format!("x{i}")))
+            .collect();
+        columns.insert("variable".into(), greeners::Column::from_strings(name_col));
+        columns.insert("coef".into(), Self::f64_array_column(params));
+        columns.insert("std_err".into(), Self::f64_array_column(std_errors));
+        columns.insert("t".into(), Self::f64_array_column(t_values));
+        columns.insert("p_value".into(), Self::f64_array_column(p_values));
+        columns.insert("conf_low".into(), Self::f64_array_column(conf_lower));
+        columns.insert("conf_high".into(), Self::f64_array_column(conf_upper));
+
+        Value::DataFrame(Arc::new(
+            greeners::DataFrame::from_columns(columns).unwrap_or_else(|_| {
+                greeners::DataFrame::from_columns(indexmap::IndexMap::new()).unwrap()
+            }),
+        ))
+    }
+
+    fn fit_dict(r: &greeners::OlsResult) -> Value {
+        let mut map = HashMap::new();
+        map.insert("r2".into(), Value::Float(r.r_squared));
+        map.insert("adj_r2".into(), Value::Float(r.adj_r_squared));
+        map.insert("f_stat".into(), Value::Float(r.f_statistic));
+        map.insert("prob_f".into(), Value::Float(r.prob_f));
+        map.insert("aic".into(), Value::Float(r.aic));
+        map.insert("bic".into(), Value::Float(r.bic));
+        map.insert("log_lik".into(), Value::Float(r.log_likelihood));
+        map.insert("sigma".into(), Value::Float(r.sigma));
+        map.insert("n_obs".into(), Value::Int(r.n_obs as i64));
+        map.insert("df_model".into(), Value::Int(r.df_model as i64));
+        map.insert("df_resid".into(), Value::Int(r.df_resid as i64));
+        map.insert("cov_type".into(), Value::Str(format!("{:?}", r.cov_type)));
+        map.insert(
+            "inference".into(),
+            Value::Str(format!("{:?}", r.inference_type)),
+        );
+        Value::Dict(Arc::new(map))
+    }
+
+    fn f64_array_column(arr: &Array1<f64>) -> greeners::Column {
+        greeners::Column::Float(Array1::from(arr.iter().copied().collect::<Vec<_>>()))
     }
 }
 
