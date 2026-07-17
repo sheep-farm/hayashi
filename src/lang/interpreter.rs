@@ -1314,12 +1314,24 @@ impl Interpreter {
             Value::Str(s) => (s.clone(), "String", 0),
             Value::Nil => ("nil".into(), "Nil", 0),
             Value::DataFrame(df) => (
-                format!("DataFrame({} rows, {} cols)", df.n_rows(), df.column_names().len()),
+                format!(
+                    "DataFrame({} rows, {} cols)",
+                    df.n_rows(),
+                    df.column_names().len()
+                ),
                 "DataFrame",
                 df.column_names().len(),
             ),
-            Value::List(lst) => (format!("List({} items)", lst.len()), "List", lst.len().min(100)),
-            Value::Dict(d) => (format!("Dict({} entries)", d.len()), "Dict", d.len().min(100)),
+            Value::List(lst) => (
+                format!("List({} items)", lst.len()),
+                "List",
+                lst.len().min(100),
+            ),
+            Value::Dict(d) => (
+                format!("Dict({} entries)", d.len()),
+                "Dict",
+                d.len().min(100),
+            ),
             Value::Series(s) => (
                 format!("Series({}: {} values)", s.name, s.len()),
                 "Series",
@@ -1420,7 +1432,15 @@ fn column_to_value(name: &str, column: &greeners::Column) -> Value {
         greeners::Column::String(arr) => arr.iter().cloned().map(Value::Str).collect(),
         greeners::Column::DateTime(arr) => arr
             .iter()
-            .map(|dt| Value::Str(format!("{} {:02}:{:02}:{:02}", dt.date(), dt.hour(), dt.minute(), dt.second())))
+            .map(|dt| {
+                Value::Str(format!(
+                    "{} {:02}:{:02}:{:02}",
+                    dt.date(),
+                    dt.hour(),
+                    dt.minute(),
+                    dt.second()
+                ))
+            })
             .collect(),
         greeners::Column::Categorical(cat) => (0..cat.len())
             .map(|i| {
