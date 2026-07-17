@@ -399,6 +399,10 @@ impl Interpreter {
         map
     }
 
+    fn gf(&self, v: f64) -> Value {
+        Value::List(Arc::new(vec![Value::Float(v)]))
+    }
+
     pub(super) fn eval_call_builtins(
         &mut self,
         func: &str,
@@ -1247,6 +1251,482 @@ impl Interpreter {
                         let pv = ndarray::Array1::<f64>::zeros(n);
                         map = self.build_tidy_simple(names, &params, &se, &tv, &pv);
                     }
+                    Value::RdResult(r) => {
+                        let mut var = vec!["tau".to_string()];
+                        let mut coef = vec![r.tau];
+                        let mut se = vec![r.se];
+                        let mut t = vec![r.z];
+                        let mut p = vec![r.p_value];
+                        let mut cl = vec![r.ci_lower];
+                        let mut cu = vec![r.ci_upper];
+                        if r.is_fuzzy {
+                            if let Some(ft) = r.first_stage_tau {
+                                var.push("first_stage_tau".into());
+                                coef.push(ft);
+                                se.push(r.first_stage_se.unwrap_or(f64::NAN));
+                                t.push(f64::NAN);
+                                p.push(f64::NAN);
+                                cl.push(f64::NAN);
+                                cu.push(f64::NAN);
+                            }
+                        }
+                        let params = ndarray::Array1::from_vec(coef);
+                        let se = ndarray::Array1::from_vec(se);
+                        let t = ndarray::Array1::from_vec(t);
+                        let p = ndarray::Array1::from_vec(p);
+                        let cl = ndarray::Array1::from_vec(cl);
+                        let cu = ndarray::Array1::from_vec(cu);
+                        map = self.build_tidy_coef_map(var, &params, &se, &t, &p, &cl, &cu);
+                    }
+                    Value::SynthResult(r) => {
+                        let mut var = Vec::new();
+                        let mut coef = Vec::new();
+                        for (id, w) in &r.weights {
+                            var.push(id.clone());
+                            coef.push(*w);
+                        }
+                        let n = coef.len();
+                        let params = ndarray::Array1::from_vec(coef);
+                        let se = ndarray::Array1::from_vec(vec![f64::NAN; n]);
+                        let t = ndarray::Array1::from_vec(vec![f64::NAN; n]);
+                        let p = ndarray::Array1::from_vec(vec![f64::NAN; n]);
+                        let names: Vec<String> = var.clone();
+                        map = self.build_tidy_simple(names, &params, &se, &t, &p);
+                    }
+                    Value::PsmResult(r) => {
+                        let mut cov = Vec::new();
+                        let mut mt = Vec::new();
+                        let mut mcr = Vec::new();
+                        let mut mcm = Vec::new();
+                        let mut smdb = Vec::new();
+                        let mut smda = Vec::new();
+                        for b in &r.balance {
+                            cov.push(Value::Str(b.covariate.clone()));
+                            mt.push(Value::Float(b.mean_treated));
+                            mcr.push(Value::Float(b.mean_control_raw));
+                            mcm.push(Value::Float(b.mean_control_matched));
+                            smdb.push(Value::Float(b.smd_before));
+                            smda.push(Value::Float(b.smd_after));
+                        }
+                        map.insert("covariate".into(), Value::List(Arc::new(cov)));
+                        map.insert("mean_treated".into(), Value::List(Arc::new(mt)));
+                        map.insert("mean_control_raw".into(), Value::List(Arc::new(mcr)));
+                        map.insert("mean_control_matched".into(), Value::List(Arc::new(mcm)));
+                        map.insert("smd_before".into(), Value::List(Arc::new(smdb)));
+                        map.insert("smd_after".into(), Value::List(Arc::new(smda)));
+                    }
+                    Value::MNLogitResult(r) => {
+                        let k = r.params.nrows();
+                        let j = r.params.ncols();
+                        let mut var = Vec::new();
+                        let mut outcome = Vec::new();
+                        let mut coef = Vec::new();
+                        let mut se = Vec::new();
+                        let mut z = Vec::new();
+                        let mut p = Vec::new();
+                        let vnames = r.variable_names.clone().unwrap_or_default();
+                        for col in 0..j {
+                            let out = r
+                                .category_labels
+                                .get(col)
+                                .map(|v| format!("{v:.0}"))
+                                .unwrap_or_else(|| format!("cat{col}"));
+                            for row in 0..k {
+                                let name = vnames
+                                    .get(row)
+                                    .cloned()
+                                    .unwrap_or_else(|| format!("x{row}"));
+                                var.push(name);
+                                outcome.push(out.clone());
+                                coef.push(r.params[[row, col]]);
+                                se.push(r.std_errors[[row, col]]);
+                                z.push(r.z_values[[row, col]]);
+                                p.push(r.p_values[[row, col]]);
+                            }
+                        }
+                        let n = coef.len();
+                        map.insert(
+                            "variable".into(),
+                            Value::List(Arc::new(var.into_iter().map(Value::Str).collect())),
+                        );
+                        map.insert(
+                            "outcome".into(),
+                            Value::List(Arc::new(outcome.into_iter().map(Value::Str).collect())),
+                        );
+                        map.insert(
+                            "coef".into(),
+                            Value::List(Arc::new(coef.into_iter().map(Value::Float).collect())),
+                        );
+                        map.insert(
+                            "std_err".into(),
+                            Value::List(Arc::new(se.into_iter().map(Value::Float).collect())),
+                        );
+                        map.insert(
+                            "z".into(),
+                            Value::List(Arc::new(z.into_iter().map(Value::Float).collect())),
+                        );
+                        map.insert(
+                            "p_value".into(),
+                            Value::List(Arc::new(p.into_iter().map(Value::Float).collect())),
+                        );
+                        let nan_col = vec![Value::Float(f64::NAN); n];
+                        map.insert("conf_low".into(), Value::List(Arc::new(nan_col.clone())));
+                        map.insert("conf_high".into(), Value::List(Arc::new(nan_col)));
+                    }
+                    Value::KMResult(r) => {
+                        let n = r.times.len();
+                        let mut time = Vec::new();
+                        let mut surv = Vec::new();
+                        let mut se = Vec::new();
+                        let mut cl = Vec::new();
+                        let mut cu = Vec::new();
+                        for i in 0..n {
+                            time.push(Value::Float(r.times[i]));
+                            surv.push(Value::Float(r.survival_probs[i]));
+                            se.push(Value::Float(r.std_errors[i]));
+                            cl.push(Value::Float(r.conf_lower[i]));
+                            cu.push(Value::Float(r.conf_upper[i]));
+                        }
+                        map.insert("time".into(), Value::List(Arc::new(time)));
+                        map.insert("survival".into(), Value::List(Arc::new(surv)));
+                        map.insert("std_err".into(), Value::List(Arc::new(se)));
+                        map.insert("conf_low".into(), Value::List(Arc::new(cl)));
+                        map.insert("conf_high".into(), Value::List(Arc::new(cu)));
+                    }
+                    Value::SurResult(m) => {
+                        let r = &m.result;
+                        let mut eq_vec = Vec::new();
+                        let mut var = Vec::new();
+                        let mut coef = Vec::new();
+                        let mut se = Vec::new();
+                        let mut t = Vec::new();
+                        let mut p = Vec::new();
+                        for (ei, eq) in r.equations.iter().enumerate() {
+                            let names = m.eq_var_names.get(ei).cloned().unwrap_or_default();
+                            for i in 0..eq.params.len() {
+                                eq_vec.push(eq.name.clone());
+                                var.push(names.get(i).cloned().unwrap_or_else(|| format!("x{i}")));
+                                coef.push(eq.params[i]);
+                                se.push(eq.std_errors[i]);
+                                t.push(eq.t_values[i]);
+                                p.push(eq.p_values[i]);
+                            }
+                        }
+                        let n = coef.len();
+                        map.insert(
+                            "equation".into(),
+                            Value::List(Arc::new(eq_vec.into_iter().map(Value::Str).collect())),
+                        );
+                        map.insert(
+                            "variable".into(),
+                            Value::List(Arc::new(var.into_iter().map(Value::Str).collect())),
+                        );
+                        map.insert(
+                            "coef".into(),
+                            Value::List(Arc::new(coef.into_iter().map(Value::Float).collect())),
+                        );
+                        map.insert(
+                            "std_err".into(),
+                            Value::List(Arc::new(se.into_iter().map(Value::Float).collect())),
+                        );
+                        map.insert(
+                            "t".into(),
+                            Value::List(Arc::new(t.into_iter().map(Value::Float).collect())),
+                        );
+                        map.insert(
+                            "p_value".into(),
+                            Value::List(Arc::new(p.into_iter().map(Value::Float).collect())),
+                        );
+                        let nan_col = vec![Value::Float(f64::NAN); n];
+                        map.insert("conf_low".into(), Value::List(Arc::new(nan_col.clone())));
+                        map.insert("conf_high".into(), Value::List(Arc::new(nan_col)));
+                    }
+                    Value::ThreeSLSResult(m) => {
+                        let r = &m.result;
+                        let mut eq_vec = Vec::new();
+                        let mut var = Vec::new();
+                        let mut coef = Vec::new();
+                        let mut se = Vec::new();
+                        let mut t = Vec::new();
+                        let mut p = Vec::new();
+                        for (ei, eq) in r.equations.iter().enumerate() {
+                            let names = m.eq_var_names.get(ei).cloned().unwrap_or_default();
+                            for i in 0..eq.params.len() {
+                                eq_vec.push(eq.name.clone());
+                                var.push(names.get(i).cloned().unwrap_or_else(|| format!("x{i}")));
+                                coef.push(eq.params[i]);
+                                se.push(eq.std_errors[i]);
+                                t.push(eq.t_values[i]);
+                                p.push(eq.p_values[i]);
+                            }
+                        }
+                        let n = coef.len();
+                        map.insert(
+                            "equation".into(),
+                            Value::List(Arc::new(eq_vec.into_iter().map(Value::Str).collect())),
+                        );
+                        map.insert(
+                            "variable".into(),
+                            Value::List(Arc::new(var.into_iter().map(Value::Str).collect())),
+                        );
+                        map.insert(
+                            "coef".into(),
+                            Value::List(Arc::new(coef.into_iter().map(Value::Float).collect())),
+                        );
+                        map.insert(
+                            "std_err".into(),
+                            Value::List(Arc::new(se.into_iter().map(Value::Float).collect())),
+                        );
+                        map.insert(
+                            "t".into(),
+                            Value::List(Arc::new(t.into_iter().map(Value::Float).collect())),
+                        );
+                        map.insert(
+                            "p_value".into(),
+                            Value::List(Arc::new(p.into_iter().map(Value::Float).collect())),
+                        );
+                        let nan_col = vec![Value::Float(f64::NAN); n];
+                        map.insert("conf_low".into(), Value::List(Arc::new(nan_col.clone())));
+                        map.insert("conf_high".into(), Value::List(Arc::new(nan_col)));
+                    }
+                    Value::SVarResult(r) => {
+                        let mut matrix = Vec::new();
+                        let mut row = Vec::new();
+                        let mut col = Vec::new();
+                        let mut value = Vec::new();
+                        let k = r.a_matrix.nrows();
+                        let vnames = r.var_result.var_names.clone();
+                        for i in 0..k {
+                            for j in 0..k {
+                                matrix.push(Value::Str("A".into()));
+                                row.push(Value::Str(
+                                    vnames.get(i).cloned().unwrap_or_else(|| format!("v{i}")),
+                                ));
+                                col.push(Value::Str(
+                                    vnames.get(j).cloned().unwrap_or_else(|| format!("v{j}")),
+                                ));
+                                value.push(Value::Float(r.a_matrix[[i, j]]));
+                            }
+                        }
+                        for i in 0..r.b_matrix.nrows() {
+                            for j in 0..r.b_matrix.ncols() {
+                                matrix.push(Value::Str("B".into()));
+                                row.push(Value::Str(
+                                    vnames.get(i).cloned().unwrap_or_else(|| format!("v{i}")),
+                                ));
+                                col.push(Value::Str(
+                                    vnames.get(j).cloned().unwrap_or_else(|| format!("v{j}")),
+                                ));
+                                value.push(Value::Float(r.b_matrix[[i, j]]));
+                            }
+                        }
+                        let n = value.len();
+                        map.insert("matrix".into(), Value::List(Arc::new(matrix)));
+                        map.insert("row".into(), Value::List(Arc::new(row)));
+                        map.insert("col".into(), Value::List(Arc::new(col)));
+                        map.insert("value".into(), Value::List(Arc::new(value)));
+                        let nan_col = vec![Value::Float(f64::NAN); n];
+                        map.insert("conf_low".into(), Value::List(Arc::new(nan_col.clone())));
+                        map.insert("conf_high".into(), Value::List(Arc::new(nan_col)));
+                    }
+                    Value::VarmaResult(r) => {
+                        let mut type_vec = Vec::new();
+                        let mut lag_vec = Vec::new();
+                        let mut from_vec = Vec::new();
+                        let mut to_vec = Vec::new();
+                        let mut value_vec = Vec::new();
+                        let k = r.n_vars;
+                        let vnames: Vec<String> = (0..k).map(|i| format!("y{}", i + 1)).collect();
+                        // AR: rows 0..1+p*k, cols 0..k
+                        for (col, _vn) in vnames.iter().enumerate().take(k) {
+                            type_vec.push(Value::Str("const".into()));
+                            lag_vec.push(Value::Int(0));
+                            from_vec.push(Value::Str("-".into()));
+                            to_vec.push(Value::Str(vnames[col].clone()));
+                            value_vec.push(Value::Float(r.ar_params[[0, col]]));
+                        }
+                        for l in 0..r.p_lags {
+                            for src in 0..k {
+                                for (col, _vn) in vnames.iter().enumerate().take(k) {
+                                    let row = 1 + l * k + src;
+                                    type_vec.push(Value::Str("AR".into()));
+                                    lag_vec.push(Value::Int((l + 1) as i64));
+                                    from_vec.push(Value::Str(vnames[src].clone()));
+                                    to_vec.push(Value::Str(vnames[col].clone()));
+                                    value_vec.push(Value::Float(r.ar_params[[row, col]]));
+                                }
+                            }
+                        }
+                        for l in 0..r.q_lags {
+                            for src in 0..k {
+                                for (col, _vn) in vnames.iter().enumerate().take(k) {
+                                    let row = l * k + src;
+                                    type_vec.push(Value::Str("MA".into()));
+                                    lag_vec.push(Value::Int((l + 1) as i64));
+                                    from_vec.push(Value::Str(vnames[src].clone()));
+                                    to_vec.push(Value::Str(vnames[col].clone()));
+                                    value_vec.push(Value::Float(r.ma_params[[row, col]]));
+                                }
+                            }
+                        }
+                        if let Some(ex) = &r.exog_params {
+                            for ex_i in 0..ex.nrows() {
+                                for (col, _vn) in vnames.iter().enumerate().take(k) {
+                                    type_vec.push(Value::Str("exog".into()));
+                                    lag_vec.push(Value::Int(0));
+                                    from_vec.push(Value::Str(format!("ex{ex_i}")));
+                                    to_vec.push(Value::Str(vnames[col].clone()));
+                                    value_vec.push(Value::Float(ex[[ex_i, col]]));
+                                }
+                            }
+                        }
+                        let n = value_vec.len();
+                        map.insert("type".into(), Value::List(Arc::new(type_vec)));
+                        map.insert("lag".into(), Value::List(Arc::new(lag_vec)));
+                        map.insert("from".into(), Value::List(Arc::new(from_vec)));
+                        map.insert("to".into(), Value::List(Arc::new(to_vec)));
+                        map.insert("value".into(), Value::List(Arc::new(value_vec)));
+                        let nan_col = vec![Value::Float(f64::NAN); n];
+                        map.insert("conf_low".into(), Value::List(Arc::new(nan_col.clone())));
+                        map.insert("conf_high".into(), Value::List(Arc::new(nan_col)));
+                    }
+                    Value::MarkovResult(r) => {
+                        let mut regime = Vec::new();
+                        let mut parameter = Vec::new();
+                        let mut value = Vec::new();
+                        for (i, params) in r.regime_params.iter().enumerate() {
+                            for (j, &v) in params.iter().enumerate() {
+                                regime.push(Value::Int((i + 1) as i64));
+                                parameter.push(Value::Str(if j == 0 {
+                                    "intercept".into()
+                                } else {
+                                    format!("ar{}", j - 1)
+                                }));
+                                value.push(Value::Float(v));
+                            }
+                            regime.push(Value::Int((i + 1) as i64));
+                            parameter.push(Value::Str("variance".into()));
+                            value.push(Value::Float(r.regime_variances[i]));
+                        }
+                        let n = value.len();
+                        map.insert("regime".into(), Value::List(Arc::new(regime)));
+                        map.insert("parameter".into(), Value::List(Arc::new(parameter)));
+                        map.insert("value".into(), Value::List(Arc::new(value)));
+                        let nan_col = vec![Value::Float(f64::NAN); n];
+                        map.insert("conf_low".into(), Value::List(Arc::new(nan_col.clone())));
+                        map.insert("conf_high".into(), Value::List(Arc::new(nan_col)));
+                    }
+                    Value::MSARResult(r) => {
+                        let mut regime = Vec::new();
+                        let mut parameter = Vec::new();
+                        let mut value = Vec::new();
+                        for i in 0..r.k_regimes {
+                            regime.push(Value::Int((i + 1) as i64));
+                            parameter.push(Value::Str("intercept".into()));
+                            value.push(Value::Float(r.regime_means[i]));
+                            for p in 0..r.ar_order {
+                                regime.push(Value::Int((i + 1) as i64));
+                                parameter.push(Value::Str(format!("ar{}", p + 1)));
+                                value.push(Value::Float(r.ar_params[[i, p]]));
+                            }
+                            regime.push(Value::Int((i + 1) as i64));
+                            parameter.push(Value::Str("sigma".into()));
+                            value.push(Value::Float(r.regime_sigmas[i]));
+                        }
+                        let n = value.len();
+                        map.insert("regime".into(), Value::List(Arc::new(regime)));
+                        map.insert("parameter".into(), Value::List(Arc::new(parameter)));
+                        map.insert("value".into(), Value::List(Arc::new(value)));
+                        let nan_col = vec![Value::Float(f64::NAN); n];
+                        map.insert("conf_low".into(), Value::List(Arc::new(nan_col.clone())));
+                        map.insert("conf_high".into(), Value::List(Arc::new(nan_col)));
+                    }
+                    Value::PcaResult(m) => {
+                        let r = &m.result;
+                        let mut var = Vec::new();
+                        let mut pc = Vec::new();
+                        let mut loading = Vec::new();
+                        let k = m.var_names.len();
+                        let c = r.n_components;
+                        for j in 0..c {
+                            for i in 0..k {
+                                var.push(Value::Str(m.var_names[i].clone()));
+                                pc.push(Value::Str(format!("PC{}", j + 1)));
+                                loading.push(Value::Float(r.loadings[[i, j]]));
+                            }
+                        }
+                        let n = loading.len();
+                        map.insert("variable".into(), Value::List(Arc::new(var)));
+                        map.insert("component".into(), Value::List(Arc::new(pc)));
+                        map.insert("loading".into(), Value::List(Arc::new(loading)));
+                        let nan_col = vec![Value::Float(f64::NAN); n];
+                        map.insert("conf_low".into(), Value::List(Arc::new(nan_col.clone())));
+                        map.insert("conf_high".into(), Value::List(Arc::new(nan_col)));
+                    }
+                    Value::FactorResult(m) => {
+                        let r = &m.result;
+                        let mut var = Vec::new();
+                        let mut factor = Vec::new();
+                        let mut loading = Vec::new();
+                        let mut comm = Vec::new();
+                        let mut uniq = Vec::new();
+                        let k = m.var_names.len();
+                        let f = r.n_factors;
+                        for j in 0..f {
+                            for i in 0..k {
+                                var.push(Value::Str(m.var_names[i].clone()));
+                                factor.push(Value::Str(format!("F{}", j + 1)));
+                                loading.push(Value::Float(r.loadings[[i, j]]));
+                                comm.push(Value::Float(r.communalities[i]));
+                                uniq.push(Value::Float(r.uniquenesses[i]));
+                            }
+                        }
+                        let n = loading.len();
+                        map.insert("variable".into(), Value::List(Arc::new(var)));
+                        map.insert("factor".into(), Value::List(Arc::new(factor)));
+                        map.insert("loading".into(), Value::List(Arc::new(loading)));
+                        map.insert("communality".into(), Value::List(Arc::new(comm)));
+                        map.insert("uniqueness".into(), Value::List(Arc::new(uniq)));
+                        let nan_col = vec![Value::Float(f64::NAN); n];
+                        map.insert("conf_low".into(), Value::List(Arc::new(nan_col.clone())));
+                        map.insert("conf_high".into(), Value::List(Arc::new(nan_col)));
+                    }
+                    Value::DFMResult(m) => {
+                        let r = &m.result;
+                        let mut var = Vec::new();
+                        let mut factor = Vec::new();
+                        let mut loading = Vec::new();
+                        let k = m.var_names.len();
+                        let f = r.n_factors;
+                        for j in 0..f {
+                            for i in 0..k {
+                                var.push(Value::Str(m.var_names[i].clone()));
+                                factor.push(Value::Str(format!("F{}", j + 1)));
+                                loading.push(Value::Float(r.factor_loadings[[i, j]]));
+                            }
+                        }
+                        let n = loading.len();
+                        map.insert("variable".into(), Value::List(Arc::new(var)));
+                        map.insert("factor".into(), Value::List(Arc::new(factor)));
+                        map.insert("loading".into(), Value::List(Arc::new(loading)));
+                        let nan_col = vec![Value::Float(f64::NAN); n];
+                        map.insert("conf_low".into(), Value::List(Arc::new(nan_col.clone())));
+                        map.insert("conf_high".into(), Value::List(Arc::new(nan_col)));
+                    }
+                    Value::DecompResult(_)
+                    | Value::MstlResult(_)
+                    | Value::UCResult(_)
+                    | Value::MiceResult(_)
+                    | Value::LowessResult(_) => {
+                        // No coefficient-like parameters; return empty tidy table
+                        map.insert("variable".into(), Value::List(Arc::new(Vec::new())));
+                        map.insert("coef".into(), Value::List(Arc::new(Vec::new())));
+                        map.insert("std_err".into(), Value::List(Arc::new(Vec::new())));
+                        map.insert("t".into(), Value::List(Arc::new(Vec::new())));
+                        map.insert("p_value".into(), Value::List(Arc::new(Vec::new())));
+                        map.insert("conf_low".into(), Value::List(Arc::new(Vec::new())));
+                        map.insert("conf_high".into(), Value::List(Arc::new(Vec::new())));
+                    }
                     _ => return Err(HayashiError::Type("tidy: unsupported model type".into())),
                 }
 
@@ -1267,7 +1747,7 @@ impl Interpreter {
                 match val {
                     Value::OlsResult(m) => {
                         let r = &m.result;
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("r2".into(), scalar(r.r_squared));
                         map.insert("adj_r2".into(), scalar(r.adj_r_squared));
                         map.insert(
@@ -1282,7 +1762,7 @@ impl Interpreter {
                         map.insert("sigma".into(), scalar(r.sigma));
                     }
                     Value::IvResult(r) => {
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("r2".into(), scalar(r.r_squared));
                         map.insert(
                             "n".into(),
@@ -1292,14 +1772,14 @@ impl Interpreter {
                     }
                     Value::BinaryResult(m) => {
                         let r = &m.result;
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("pseudo_r2".into(), scalar(r.pseudo_r2));
                         map.insert("log_lik".into(), scalar(r.log_likelihood));
                         map.insert("n".into(), Value::List(Arc::new(vec![Value::Int(0)])));
                         // n not stored
                     }
                     Value::PanelResult(r) => {
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("r2".into(), scalar(r.r_squared));
                         map.insert(
                             "n".into(),
@@ -1312,14 +1792,14 @@ impl Interpreter {
                         map.insert("sigma".into(), scalar(r.sigma));
                     }
                     Value::ReResult(r) => {
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("r2".into(), scalar(r.r_squared_overall));
                         map.insert("sigma_u".into(), scalar(r.sigma_u));
                         map.insert("sigma_e".into(), scalar(r.sigma_e));
                         map.insert("theta".into(), scalar(r.theta));
                     }
                     Value::GmmResult(r) => {
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("j_stat".into(), scalar(r.j_stat));
                         map.insert("j_p_value".into(), scalar(r.j_p_value));
                         map.insert(
@@ -1332,7 +1812,7 @@ impl Interpreter {
                         );
                     }
                     Value::PoissonResult(r) => {
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("log_lik".into(), scalar(r.log_likelihood));
                         map.insert("aic".into(), scalar(r.aic));
                         map.insert("bic".into(), scalar(r.bic));
@@ -1343,7 +1823,7 @@ impl Interpreter {
                         );
                     }
                     Value::NegBinResult(r) => {
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("log_lik".into(), scalar(r.log_likelihood));
                         map.insert("aic".into(), scalar(r.aic));
                         map.insert("bic".into(), scalar(r.bic));
@@ -1355,7 +1835,7 @@ impl Interpreter {
                         );
                     }
                     Value::GlmResult(r) => {
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("log_lik".into(), scalar(r.log_likelihood));
                         map.insert("aic".into(), scalar(r.aic));
                         map.insert("bic".into(), scalar(r.bic));
@@ -1367,12 +1847,12 @@ impl Interpreter {
                         );
                     }
                     Value::QuantileResult(r) => {
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("tau".into(), scalar(r.tau));
                         map.insert("pseudo_r2".into(), scalar(r.r_squared));
                     }
                     Value::TobitResult(r) => {
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("log_lik".into(), scalar(r.log_likelihood));
                         map.insert(
                             "n".into(),
@@ -1384,7 +1864,7 @@ impl Interpreter {
                         );
                     }
                     Value::HeckmanResult(r) => {
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("rho".into(), scalar(r.rho));
                         map.insert("delta".into(), scalar(r.delta));
                         map.insert(
@@ -1393,14 +1873,14 @@ impl Interpreter {
                         );
                     }
                     Value::OrderedResult(r) => {
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("log_lik".into(), scalar(r.log_likelihood));
                         map.insert("aic".into(), scalar(r.aic));
                         map.insert("bic".into(), scalar(r.bic));
                         map.insert("pseudo_r2".into(), scalar(r.pseudo_r2));
                     }
                     Value::PenalizedResult(m) => {
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("r2".into(), scalar(m.r_squared));
                         map.insert(
                             "n".into(),
@@ -1409,20 +1889,20 @@ impl Interpreter {
                         map.insert("alpha".into(), scalar(m.alpha));
                     }
                     Value::ArimaResult(r) => {
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("aic".into(), scalar(r.aic));
                         map.insert("bic".into(), scalar(r.bic));
                         map.insert("log_lik".into(), scalar(r.log_likelihood));
                         map.insert("sigma2".into(), scalar(r.sigma2));
                     }
                     Value::GarchResult(r) => {
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("log_lik".into(), scalar(r.log_likelihood));
                         map.insert("aic".into(), scalar(r.aic));
                         map.insert("bic".into(), scalar(r.bic));
                     }
                     Value::VarResult(r) => {
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("aic".into(), scalar(r.aic));
                         map.insert("bic".into(), scalar(r.bic));
                         map.insert(
@@ -1441,7 +1921,7 @@ impl Interpreter {
                         );
                     }
                     Value::SysGmmResult(r) => {
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("sargan_stat".into(), scalar(r.sargan_stat));
                         map.insert("sargan_p".into(), scalar(r.sargan_pvalue));
                         map.insert(
@@ -1452,7 +1932,7 @@ impl Interpreter {
                         );
                     }
                     Value::FE2SLSResult(r) => {
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("r2".into(), scalar(r.r_squared));
                         map.insert(
                             "n".into(),
@@ -1461,7 +1941,7 @@ impl Interpreter {
                         map.insert("sigma".into(), scalar(r.sigma));
                     }
                     Value::PcseResult(r) => {
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("r2".into(), scalar(r.r_squared));
                         map.insert(
                             "n".into(),
@@ -1470,7 +1950,7 @@ impl Interpreter {
                         map.insert("sigma".into(), scalar(r.sigma));
                     }
                     Value::PanelGlsResult(r) => {
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("r2".into(), scalar(r.r_squared));
                         map.insert(
                             "n".into(),
@@ -1479,7 +1959,7 @@ impl Interpreter {
                         map.insert("sigma".into(), scalar(r.sigma));
                     }
                     Value::GlsarResult(r) => {
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("r2".into(), scalar(r.r_squared));
                         map.insert(
                             "n".into(),
@@ -1493,7 +1973,7 @@ impl Interpreter {
                         );
                     }
                     Value::CoxResult(r) => {
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("log_lik".into(), scalar(r.log_likelihood));
                         map.insert("concordance".into(), scalar(r.concordance));
                         map.insert(
@@ -1502,7 +1982,7 @@ impl Interpreter {
                         );
                     }
                     Value::ConditionalResult(r) => {
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("log_lik".into(), scalar(r.log_likelihood));
                         map.insert("aic".into(), scalar(r.aic));
                         map.insert("bic".into(), scalar(r.bic));
@@ -1512,7 +1992,7 @@ impl Interpreter {
                         );
                     }
                     Value::GamResult(r) => {
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("gcv".into(), scalar(r.gcv_score));
                         map.insert(
                             "n".into(),
@@ -1520,7 +2000,7 @@ impl Interpreter {
                         );
                     }
                     Value::MixedResult(r) => {
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("log_lik".into(), scalar(r.log_likelihood));
                         map.insert("aic".into(), scalar(r.aic));
                         map.insert("bic".into(), scalar(r.bic));
@@ -1534,7 +2014,7 @@ impl Interpreter {
                         );
                     }
                     Value::ZeroInflatedResult(r) => {
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("log_lik".into(), scalar(r.log_likelihood));
                         map.insert("aic".into(), scalar(r.aic));
                         map.insert("bic".into(), scalar(r.bic));
@@ -1547,7 +2027,7 @@ impl Interpreter {
                         }
                     }
                     Value::AutoRegResult(r) => {
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("r2".into(), scalar(r.r_squared));
                         map.insert("adj_r2".into(), scalar(r.adj_r_squared));
                         map.insert("aic".into(), scalar(r.aic));
@@ -1558,7 +2038,7 @@ impl Interpreter {
                         );
                     }
                     Value::ArdlResult(r) => {
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("r2".into(), scalar(r.r_squared));
                         map.insert("adj_r2".into(), scalar(r.adj_r_squared));
                         map.insert("aic".into(), scalar(r.aic));
@@ -1569,7 +2049,7 @@ impl Interpreter {
                         );
                     }
                     Value::DidResult(r) => {
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("att".into(), scalar(r.att));
                         map.insert("r2".into(), scalar(r.r_squared));
                         map.insert(
@@ -1578,12 +2058,12 @@ impl Interpreter {
                         );
                     }
                     Value::ThresholdResult(r) => {
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("threshold".into(), scalar(r.threshold_gamma));
                         map.insert("r2".into(), scalar(r.r_squared));
                     }
                     Value::EtsResult(r) => {
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("aic".into(), scalar(r.aic));
                         map.insert("bic".into(), scalar(r.bic));
                         map.insert("sse".into(), scalar(r.sse));
@@ -1593,7 +2073,7 @@ impl Interpreter {
                         );
                     }
                     Value::LocalLevelResult(r) => {
-                        let scalar = |v: f64| Value::List(Arc::new(vec![Value::Float(v)]));
+                        let scalar = |v: f64| self.gf(v);
                         map.insert("log_lik".into(), scalar(r.log_likelihood));
                         map.insert("sigma_obs".into(), scalar(r.sigma_obs));
                         map.insert("sigma_state".into(), scalar(r.sigma_state));
@@ -1601,6 +2081,337 @@ impl Interpreter {
                             "n".into(),
                             Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
                         );
+                    }
+                    Value::BetaResult(r) => {
+                        let scalar = |v: f64| self.gf(v);
+                        map.insert("log_lik".into(), scalar(r.log_likelihood));
+                        map.insert("aic".into(), scalar(r.aic));
+                        map.insert("bic".into(), scalar(r.bic));
+                        map.insert("pseudo_r2".into(), scalar(r.pseudo_r2));
+                        map.insert("precision".into(), scalar(r.precision_param));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                    }
+                    Value::GeeResult(r) => {
+                        let scalar = |v: f64| self.gf(v);
+                        map.insert("scale".into(), scalar(r.scale));
+                        map.insert("qic".into(), scalar(r.qic));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                        map.insert(
+                            "n_groups".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_groups as i64)])),
+                        );
+                    }
+                    Value::RlmResult(r) => {
+                        let scalar = |v: f64| self.gf(v);
+                        map.insert("scale".into(), scalar(r.scale));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                        map.insert(
+                            "converged".into(),
+                            Value::List(Arc::new(vec![Value::Bool(r.converged)])),
+                        );
+                    }
+                    Value::AbResult(r) => {
+                        let scalar = |v: f64| self.gf(v);
+                        map.insert("sargan_stat".into(), scalar(r.sargan_stat));
+                        map.insert("sargan_p".into(), scalar(r.sargan_pvalue));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                        map.insert(
+                            "n_entities".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_entities as i64)])),
+                        );
+                        map.insert(
+                            "n_instruments".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_instruments as i64)])),
+                        );
+                    }
+                    Value::RollingResult(r) => {
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                        map.insert(
+                            "window".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.window as i64)])),
+                        );
+                    }
+                    Value::RdResult(r) => {
+                        let scalar = |v: f64| self.gf(v);
+                        map.insert("tau".into(), scalar(r.tau));
+                        map.insert("se".into(), scalar(r.se));
+                        map.insert("p_value".into(), scalar(r.p_value));
+                        map.insert("bandwidth".into(), scalar(r.bandwidth));
+                        map.insert("cutoff".into(), scalar(r.cutoff));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_total as i64)])),
+                        );
+                        map.insert(
+                            "n_left".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_left as i64)])),
+                        );
+                        map.insert(
+                            "n_right".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_right as i64)])),
+                        );
+                        map.insert(
+                            "is_fuzzy".into(),
+                            Value::List(Arc::new(vec![Value::Bool(r.is_fuzzy)])),
+                        );
+                    }
+                    Value::PsmResult(r) => {
+                        let scalar = |v: f64| self.gf(v);
+                        map.insert("att".into(), scalar(r.att));
+                        map.insert("se".into(), scalar(r.se));
+                        map.insert("p_value".into(), scalar(r.p_value));
+                        map.insert(
+                            "n_treated".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_treated as i64)])),
+                        );
+                        map.insert(
+                            "n_control".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_control as i64)])),
+                        );
+                        map.insert(
+                            "n_matched_treated".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_matched_treated as i64)])),
+                        );
+                        map.insert(
+                            "k".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.k as i64)])),
+                        );
+                    }
+                    Value::MNLogitResult(r) => {
+                        let scalar = |v: f64| self.gf(v);
+                        map.insert("log_lik".into(), scalar(r.log_likelihood));
+                        map.insert("aic".into(), scalar(r.aic));
+                        map.insert("bic".into(), scalar(r.bic));
+                        map.insert("pseudo_r2".into(), scalar(r.pseudo_r2));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                        map.insert(
+                            "n_categories".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_categories as i64)])),
+                        );
+                    }
+                    Value::SurResult(m) => {
+                        let r = &m.result;
+                        let scalar = |v: f64| self.gf(v);
+                        map.insert("system_r2".into(), scalar(r.system_r2));
+                        map.insert(
+                            "n_equations".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.equations.len() as i64)])),
+                        );
+                    }
+                    Value::ThreeSLSResult(m) => {
+                        let r = &m.result;
+                        let scalar = |v: f64| self.gf(v);
+                        map.insert("system_r2".into(), scalar(r.system_r2));
+                        map.insert(
+                            "n_equations".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.equations.len() as i64)])),
+                        );
+                    }
+                    Value::SVarResult(r) => {
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.var_result.n_obs as i64)])),
+                        );
+                        map.insert(
+                            "n_vars".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.var_result.n_vars as i64)])),
+                        );
+                        map.insert(
+                            "lags".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.var_result.lags as i64)])),
+                        );
+                        map.insert(
+                            "identification".into(),
+                            Value::List(Arc::new(vec![Value::Str(r.identification.clone())])),
+                        );
+                    }
+                    Value::VarmaResult(r) => {
+                        let scalar = |v: f64| self.gf(v);
+                        map.insert("aic".into(), scalar(r.aic));
+                        map.insert("bic".into(), scalar(r.bic));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                        map.insert(
+                            "n_vars".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_vars as i64)])),
+                        );
+                        map.insert(
+                            "p_lags".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.p_lags as i64)])),
+                        );
+                        map.insert(
+                            "q_lags".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.q_lags as i64)])),
+                        );
+                    }
+                    Value::MarkovResult(r) => {
+                        let scalar = |v: f64| self.gf(v);
+                        map.insert("log_lik".into(), scalar(r.log_likelihood));
+                        map.insert("aic".into(), scalar(r.aic));
+                        map.insert("bic".into(), scalar(r.bic));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                        map.insert(
+                            "n_regimes".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_regimes as i64)])),
+                        );
+                    }
+                    Value::MSARResult(r) => {
+                        let scalar = |v: f64| self.gf(v);
+                        map.insert("log_lik".into(), scalar(r.log_likelihood));
+                        map.insert("aic".into(), scalar(r.aic));
+                        map.insert("bic".into(), scalar(r.bic));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                        map.insert(
+                            "k_regimes".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.k_regimes as i64)])),
+                        );
+                        map.insert(
+                            "ar_order".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.ar_order as i64)])),
+                        );
+                    }
+                    Value::PcaResult(m) => {
+                        let r = &m.result;
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                        map.insert(
+                            "n_components".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_components as i64)])),
+                        );
+                        map.insert(
+                            "n_variables".into(),
+                            Value::List(Arc::new(vec![Value::Int(m.var_names.len() as i64)])),
+                        );
+                    }
+                    Value::FactorResult(m) => {
+                        let r = &m.result;
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                        map.insert(
+                            "n_factors".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_factors as i64)])),
+                        );
+                        map.insert(
+                            "n_variables".into(),
+                            Value::List(Arc::new(vec![Value::Int(m.var_names.len() as i64)])),
+                        );
+                    }
+                    Value::DFMResult(m) => {
+                        let r = &m.result;
+                        let scalar = |v: f64| self.gf(v);
+                        map.insert("log_lik".into(), scalar(r.log_likelihood));
+                        map.insert("aic".into(), scalar(r.aic));
+                        map.insert("bic".into(), scalar(r.bic));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                        map.insert(
+                            "n_vars".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_vars as i64)])),
+                        );
+                        map.insert(
+                            "n_factors".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_factors as i64)])),
+                        );
+                        map.insert(
+                            "factor_order".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.factor_order as i64)])),
+                        );
+                    }
+                    Value::DecompResult(r) => {
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.observed.len() as i64)])),
+                        );
+                        map.insert(
+                            "model".into(),
+                            Value::List(Arc::new(vec![Value::Str(r.model.clone())])),
+                        );
+                    }
+                    Value::MstlResult(r) => {
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                        map.insert(
+                            "n_periods".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.periods.len() as i64)])),
+                        );
+                    }
+                    Value::UCResult(r) => {
+                        let scalar = |v: f64| self.gf(v);
+                        map.insert("log_lik".into(), scalar(r.log_likelihood));
+                        map.insert("aic".into(), scalar(r.aic));
+                        map.insert("bic".into(), scalar(r.bic));
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                    }
+                    Value::MiceResult(r) => {
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                        map.insert(
+                            "n_vars".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_vars as i64)])),
+                        );
+                        map.insert(
+                            "n_imputations".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_imputations as i64)])),
+                        );
+                    }
+                    Value::LowessResult(r) => {
+                        let scalar = |v: f64| self.gf(v);
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                        map.insert("frac".into(), scalar(r.frac));
+                    }
+                    Value::KMResult(r) => {
+                        let scalar = |v: f64| self.gf(v);
+                        map.insert(
+                            "n".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_obs as i64)])),
+                        );
+                        map.insert(
+                            "n_events".into(),
+                            Value::List(Arc::new(vec![Value::Int(r.n_events as i64)])),
+                        );
+                        map.insert("median_survival".into(), scalar(r.median_survival));
                     }
                     _ => return Err(HayashiError::Type("glance: unsupported model type".into())),
                 }
