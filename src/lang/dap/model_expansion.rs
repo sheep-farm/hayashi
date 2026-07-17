@@ -16,6 +16,7 @@ pub struct RegressionCtx<'a> {
     pub conf_upper: Option<&'a Array1<f64>>,
     pub fit: Value,
     pub residuals: Option<&'a Array1<f64>>,
+    pub fitted_values: Option<&'a Array1<f64>>,
     pub x: Option<&'a Array2<f64>>,
 }
 
@@ -65,6 +66,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             conf_upper: Some(&m.result.conf_upper),
             fit: ols_fit_dict(&m.result),
             residuals: Some(&m.residuals),
+            fitted_values: None,
             x: Some(&m.x),
         }),
         Value::IvResult(r) => regression_children(RegressionCtx {
@@ -77,6 +79,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             conf_upper: None,
             fit: iv_fit_dict(r),
             residuals: None,
+            fitted_values: None,
             x: None,
         }),
         Value::PanelResult(r) => regression_children(RegressionCtx {
@@ -89,6 +92,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             conf_upper: None,
             fit: panel_fit_dict(r),
             residuals: None,
+            fitted_values: None,
             x: None,
         }),
         Value::ReResult(r) => regression_children(RegressionCtx {
@@ -101,6 +105,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             conf_upper: None,
             fit: re_fit_dict(r),
             residuals: None,
+            fitted_values: None,
             x: None,
         }),
         Value::BinaryResult(m) => regression_children(RegressionCtx {
@@ -113,6 +118,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             conf_upper: None,
             fit: binary_fit_dict(&m.result),
             residuals: None,
+            fitted_values: None,
             x: None,
         }),
         Value::QuantileResult(r) => regression_children(RegressionCtx {
@@ -125,6 +131,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             conf_upper: None,
             fit: quantile_fit_dict(r),
             residuals: None,
+            fitted_values: None,
             x: None,
         }),
         Value::TobitResult(r) => regression_children(RegressionCtx {
@@ -137,6 +144,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             conf_upper: None,
             fit: tobit_fit_dict(r),
             residuals: None,
+            fitted_values: None,
             x: None,
         }),
         Value::PoissonResult(r) => regression_children(RegressionCtx {
@@ -149,6 +157,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             conf_upper: Some(&r.conf_upper),
             fit: poisson_fit_dict(r),
             residuals: None,
+            fitted_values: None,
             x: None,
         }),
         Value::NegBinResult(r) => regression_children(RegressionCtx {
@@ -161,6 +170,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             conf_upper: Some(&r.conf_upper),
             fit: negbin_fit_dict(r),
             residuals: None,
+            fitted_values: None,
             x: None,
         }),
         Value::GlmResult(r) => regression_children(RegressionCtx {
@@ -173,6 +183,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             conf_upper: Some(&r.conf_upper),
             fit: glm_fit_dict(r),
             residuals: None,
+            fitted_values: None,
             x: None,
         }),
         Value::RlmResult(r) => regression_children(RegressionCtx {
@@ -185,6 +196,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             conf_upper: Some(&r.conf_upper),
             fit: rlm_fit_dict(r),
             residuals: None,
+            fitted_values: None,
             x: None,
         }),
         Value::BetaResult(r) => regression_children(RegressionCtx {
@@ -197,6 +209,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             conf_upper: None,
             fit: beta_fit_dict(r),
             residuals: None,
+            fitted_values: None,
             x: None,
         }),
         Value::GmmResult(r) => regression_children(RegressionCtx {
@@ -209,6 +222,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             conf_upper: None,
             fit: gmm_fit_dict(r),
             residuals: None,
+            fitted_values: None,
             x: None,
         }),
         Value::AbResult(r) => regression_children(RegressionCtx {
@@ -221,6 +235,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             conf_upper: None,
             fit: ab_fit_dict(r),
             residuals: None,
+            fitted_values: None,
             x: None,
         }),
         Value::SysGmmResult(r) => regression_children(RegressionCtx {
@@ -233,6 +248,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             conf_upper: None,
             fit: sysgmm_fit_dict(r),
             residuals: None,
+            fitted_values: None,
             x: None,
         }),
         Value::PcseResult(r) => regression_children(RegressionCtx {
@@ -245,6 +261,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             conf_upper: None,
             fit: pcse_fit_dict(r),
             residuals: None,
+            fitted_values: None,
             x: None,
         }),
         Value::PanelGlsResult(r) => regression_children(RegressionCtx {
@@ -257,6 +274,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             conf_upper: None,
             fit: panel_gls_fit_dict(r),
             residuals: None,
+            fitted_values: None,
             x: None,
         }),
         Value::FE2SLSResult(r) => regression_children(RegressionCtx {
@@ -269,6 +287,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             conf_upper: None,
             fit: fe2sls_fit_dict(r),
             residuals: None,
+            fitted_values: None,
             x: None,
         }),
         Value::OrderedResult(r) => regression_children(RegressionCtx {
@@ -281,6 +300,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             conf_upper: None,
             fit: ordered_fit_dict(r),
             residuals: None,
+            fitted_values: None,
             x: None,
         }),
         Value::ZeroInflatedResult(r) => zero_inflated_children(r),
@@ -295,11 +315,21 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             conf_upper: None,
             fit: glsar_fit_dict(r),
             residuals: None,
+            fitted_values: None,
             x: None,
         }),
         Value::SurResult(m) => sur_children(m),
         Value::ThreeSLSResult(m) => three_sls_children(m),
         Value::MNLogitResult(r) => mnlogit_children(r),
+        Value::ArimaResult(r) => arima_children(r),
+        Value::GarchResult(r) => garch_children(r),
+        Value::EtsResult(r) => ets_children(r),
+        Value::MstlResult(r) => mstl_children(r),
+        Value::UCResult(r) => uc_children(r),
+        Value::LocalLevelResult(r) => local_level_children(r),
+        Value::AutoRegResult(r) => autoreg_children(r),
+        Value::ArdlResult(r) => ardl_children(r),
+        Value::ThresholdResult(r) => threshold_children(r),
         _ => Vec::new(),
     }
 }
@@ -550,6 +580,66 @@ fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "MNLogitResult",
         ),
+        Value::ArimaResult(r) => (
+            format!(
+                "ARIMA(p={},d={},q={}), n={}, logLik={:.4}",
+                r.order.p, r.order.d, r.order.q, r.n_obs, r.log_likelihood
+            ),
+            "ArimaResult",
+        ),
+        Value::GarchResult(r) => (
+            format!(
+                "GARCH(p={},q={}), n={}, logLik={:.4}",
+                r.p, r.q, r.n_obs, r.log_likelihood
+            ),
+            "GarchResult",
+        ),
+        Value::EtsResult(r) => (
+            format!(
+                "ETS({},{}), n={}, sse={:.4}",
+                r.trend_type, r.seasonal_type, r.n_obs, r.sse
+            ),
+            "EtsResult",
+        ),
+        Value::MstlResult(r) => (
+            format!("MSTL(periods={:?}), n={}", r.periods, r.n_obs),
+            "MstlResult",
+        ),
+        Value::UCResult(r) => (
+            format!(
+                "UC(level={:?}, seasonal={:?}), n={}, logLik={:.4}",
+                r.level_type, r.seasonal_type, r.n_obs, r.log_likelihood
+            ),
+            "UCResult",
+        ),
+        Value::LocalLevelResult(r) => (
+            format!(
+                "LocalLevel(n={}, sigma_obs={:.4}, sigma_state={:.4})",
+                r.n_obs, r.sigma_obs, r.sigma_state
+            ),
+            "LocalLevelResult",
+        ),
+        Value::AutoRegResult(r) => (
+            format!(
+                "AutoReg(lags={}), n={}, R2={:.4}",
+                r.lags, r.n_obs, r.r_squared
+            ),
+            "AutoRegResult",
+        ),
+        Value::ArdlResult(r) => (
+            format!(
+                "ARDL(y_lags={}, x_lags={}), n={}, R2={:.4}",
+                r.y_lags, r.x_lags, r.n_obs, r.r_squared
+            ),
+            "ArdlResult",
+        ),
+        Value::ThresholdResult(r) => (
+            format!(
+                "PanelThreshold(gamma={:.4}), R2={:.4}",
+                r.threshold_gamma, r.r_squared
+            ),
+            "ThresholdResult",
+        ),
         Value::UserFn(f) => (format!("<fn({})>", f.params.join(", ")), "Function"),
         _ => (v.to_string(), "Model"),
     }
@@ -575,7 +665,14 @@ fn regression_children<'a>(ctx: RegressionCtx<'a>) -> Vec<(String, Value)> {
             vars.push(("residuals".into(), array1_to_series("residuals", resid)));
         }
     }
-    if let Some(x) = ctx.x {
+    if let Some(fitted) = ctx.fitted_values {
+        if !fitted.is_empty() {
+            vars.push((
+                "fitted_values".into(),
+                array1_to_series("fitted_values", fitted),
+            ));
+        }
+    } else if let Some(x) = ctx.x {
         if !x.is_empty() {
             let fitted = x.dot(ctx.params);
             vars.push((
@@ -1118,6 +1215,371 @@ fn mnlogit_fit_dict(r: &greeners::MNLogitResult) -> Value {
         ("n_categories", Value::Int(r.n_categories as i64)),
         ("iterations", Value::Int(r.iterations as i64)),
         ("converged", Value::Bool(r.converged)),
+    ])
+}
+
+fn arima_children(r: &greeners::ArimaResult) -> Vec<(String, Value)> {
+    let mut params = vec![r.intercept];
+    params.extend(r.ar_params.iter());
+    params.extend(r.ma_params.iter());
+    params.extend(r.seasonal_ar_params.iter());
+    params.extend(r.seasonal_ma_params.iter());
+    if let Some(exog) = &r.exog_params {
+        params.extend(exog.iter());
+    }
+    let params = Array1::from_vec(params);
+    let names = r.param_names.clone();
+    regression_children(RegressionCtx {
+        names,
+        params: &params,
+        std_errors: &r.std_errors,
+        test_values: &r.t_values,
+        p_values: &r.p_values,
+        conf_lower: Some(&r.conf_lower),
+        conf_upper: Some(&r.conf_upper),
+        fit: arima_fit_dict(r),
+        residuals: Some(&r.residuals),
+        fitted_values: None,
+        x: None,
+    })
+}
+
+fn arima_fit_dict(r: &greeners::ArimaResult) -> Value {
+    let mut entries = vec![
+        ("sigma2", Value::Float(r.sigma2)),
+        ("aic", Value::Float(r.aic)),
+        ("bic", Value::Float(r.bic)),
+        ("log_lik", Value::Float(r.log_likelihood)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("df_model", Value::Int(r.df_model as i64)),
+        ("df_resid", Value::Int(r.df_resid as i64)),
+        ("p", Value::Int(r.order.p as i64)),
+        ("d", Value::Int(r.order.d as i64)),
+        ("q", Value::Int(r.order.q as i64)),
+        ("method", Value::Str(r.estimation_method.clone())),
+    ];
+    if let Some(so) = &r.seasonal_order {
+        entries.push(("seasonal_p", Value::Int(so.p as i64)));
+        entries.push(("seasonal_d", Value::Int(so.d as i64)));
+        entries.push(("seasonal_q", Value::Int(so.q as i64)));
+        entries.push(("seasonal_period", Value::Int(so.s as i64)));
+    }
+    fit_dict(&entries)
+}
+
+fn garch_children(r: &greeners::GarchResult) -> Vec<(String, Value)> {
+    let mut vars = regression_children(RegressionCtx {
+        names: r.variable_names.clone(),
+        params: &r.params,
+        std_errors: &r.std_errors,
+        test_values: &r.z_values,
+        p_values: &r.p_values,
+        conf_lower: Some(&r.conf_lower),
+        conf_upper: Some(&r.conf_upper),
+        fit: garch_fit_dict(r),
+        residuals: Some(&r.residuals),
+        fitted_values: None,
+        x: None,
+    });
+    vars.push((
+        "conditional_variance".into(),
+        array1_to_series("conditional_variance", &r.conditional_variance),
+    ));
+    vars.push((
+        "standardized_residuals".into(),
+        array1_to_series("standardized_residuals", &r.standardized_residuals),
+    ));
+    vars
+}
+
+fn garch_fit_dict(r: &greeners::GarchResult) -> Value {
+    fit_dict(&[
+        ("log_lik", Value::Float(r.log_likelihood)),
+        ("aic", Value::Float(r.aic)),
+        ("bic", Value::Float(r.bic)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("n_iter", Value::Int(r.n_iter as i64)),
+        ("converged", Value::Bool(r.converged)),
+        ("p", Value::Int(r.p as i64)),
+        ("q", Value::Int(r.q as i64)),
+        ("model_type", Value::Str(format!("{:?}", r.model_type))),
+        ("dist", Value::Str(format!("{:?}", r.dist))),
+    ])
+}
+
+fn ets_children(r: &greeners::ETSResult) -> Vec<(String, Value)> {
+    let mut vars = Vec::new();
+    vars.push(("level".into(), array1_to_series("level", &r.level)));
+    if !r.trend.is_empty() {
+        vars.push(("trend".into(), array1_to_series("trend", &r.trend)));
+    }
+    if !r.seasonal.is_empty() {
+        vars.push(("seasonal".into(), array1_to_series("seasonal", &r.seasonal)));
+    }
+    if !r.fitted_values.is_empty() {
+        vars.push((
+            "fitted_values".into(),
+            array1_to_series("fitted_values", &r.fitted_values),
+        ));
+    }
+    if !r.residuals.is_empty() {
+        vars.push((
+            "residuals".into(),
+            array1_to_series("residuals", &r.residuals),
+        ));
+    }
+    vars.push(("fit".into(), ets_fit_dict(r)));
+    vars
+}
+
+fn ets_fit_dict(r: &greeners::ETSResult) -> Value {
+    let mut entries = vec![
+        ("alpha", Value::Float(r.alpha)),
+        ("sse", Value::Float(r.sse)),
+        ("aic", Value::Float(r.aic)),
+        ("bic", Value::Float(r.bic)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("last_level", Value::Float(r.last_level)),
+        ("seasonal_periods", Value::Int(r.seasonal_periods as i64)),
+        ("trend_type", Value::Str(r.trend_type.clone())),
+        ("seasonal_type", Value::Str(r.seasonal_type.clone())),
+        ("damped", Value::Bool(r.damped)),
+    ];
+    if let Some(beta) = r.beta {
+        entries.push(("beta", Value::Float(beta)));
+    }
+    if let Some(gamma) = r.gamma {
+        entries.push(("gamma", Value::Float(gamma)));
+    }
+    if let Some(phi) = r.phi {
+        entries.push(("phi", Value::Float(phi)));
+    }
+    if !r.last_trend.is_nan() {
+        entries.push(("last_trend", Value::Float(r.last_trend)));
+    }
+    fit_dict(&entries)
+}
+
+fn mstl_children(r: &greeners::MSTLResult) -> Vec<(String, Value)> {
+    let mut vars = Vec::new();
+    vars.push(("trend".into(), array1_to_series("trend", &r.trend)));
+    for (i, s) in r.seasonal.iter().enumerate() {
+        let period = r.periods.get(i).copied().unwrap_or(i);
+        let name = format!("seasonal_{period}");
+        vars.push((name.clone(), array1_to_series(&name, s)));
+    }
+    if !r.resid.is_empty() {
+        vars.push(("residuals".into(), array1_to_series("residuals", &r.resid)));
+    }
+    vars.push((
+        "observed".into(),
+        array1_to_series("observed", &r.observed()),
+    ));
+    vars.push(("fit".into(), mstl_fit_dict(r)));
+    vars
+}
+
+fn mstl_fit_dict(r: &greeners::MSTLResult) -> Value {
+    fit_dict(&[
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        (
+            "periods",
+            Value::List(Arc::new(
+                r.periods.iter().map(|&p| Value::Int(p as i64)).collect(),
+            )),
+        ),
+    ])
+}
+
+fn uc_children(r: &greeners::UCResult) -> Vec<(String, Value)> {
+    let mut vars = Vec::new();
+    let n = r.params.len();
+    let params = if n > 0 {
+        Array1::from_vec(r.params.clone())
+    } else {
+        Array1::zeros(0)
+    };
+    let names = r.param_names.clone();
+    if !params.is_empty() {
+        let coef = coef_dataframe(
+            &names,
+            &params,
+            &Array1::zeros(n),
+            &Array1::zeros(n),
+            &Array1::zeros(n),
+            None,
+            None,
+        );
+        vars.push(("coefficients".into(), coef));
+    }
+    if !r.level.is_empty() {
+        vars.push(("level".into(), array1_to_series("level", &r.level)));
+    }
+    if let Some(trend) = &r.trend {
+        if !trend.is_empty() {
+            vars.push(("trend".into(), array1_to_series("trend", trend)));
+        }
+    }
+    if let Some(seasonal) = &r.seasonal {
+        if !seasonal.is_empty() {
+            vars.push(("seasonal".into(), array1_to_series("seasonal", seasonal)));
+        }
+    }
+    if !r.residuals.is_empty() {
+        vars.push((
+            "residuals".into(),
+            array1_to_series("residuals", &r.residuals),
+        ));
+    }
+    vars.push(("fit".into(), uc_fit_dict(r)));
+    vars
+}
+
+fn uc_fit_dict(r: &greeners::UCResult) -> Value {
+    fit_dict(&[
+        ("log_lik", Value::Float(r.log_likelihood)),
+        ("aic", Value::Float(r.aic)),
+        ("bic", Value::Float(r.bic)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("level_type", Value::Str(format!("{:?}", r.level_type))),
+        (
+            "seasonal_type",
+            Value::Str(format!("{:?}", r.seasonal_type)),
+        ),
+    ])
+}
+
+fn local_level_children(r: &greeners::LocalLevelResult) -> Vec<(String, Value)> {
+    let mut vars = Vec::new();
+    let filtered: Vec<f64> = r
+        .filtered_states
+        .iter()
+        .map(|s| s.first().copied().unwrap_or(f64::NAN))
+        .collect();
+    let smoothed: Vec<f64> = r
+        .smoothed_states
+        .iter()
+        .map(|s| s.first().copied().unwrap_or(f64::NAN))
+        .collect();
+    if !filtered.is_empty() {
+        vars.push((
+            "filtered".into(),
+            array1_to_series("filtered", &Array1::from_vec(filtered)),
+        ));
+    }
+    if !smoothed.is_empty() {
+        vars.push((
+            "smoothed".into(),
+            array1_to_series("smoothed", &Array1::from_vec(smoothed)),
+        ));
+    }
+    vars.push(("fit".into(), local_level_fit_dict(r)));
+    vars
+}
+
+fn local_level_fit_dict(r: &greeners::LocalLevelResult) -> Value {
+    fit_dict(&[
+        ("sigma_obs", Value::Float(r.sigma_obs)),
+        ("sigma_state", Value::Float(r.sigma_state)),
+        ("log_lik", Value::Float(r.log_likelihood)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+    ])
+}
+
+fn autoreg_children(r: &greeners::AutoRegResult) -> Vec<(String, Value)> {
+    regression_children(RegressionCtx {
+        names: r.param_names.clone(),
+        params: &r.params,
+        std_errors: &r.std_errors,
+        test_values: &r.t_values,
+        p_values: &r.p_values,
+        conf_lower: None,
+        conf_upper: None,
+        fit: autoreg_fit_dict(r),
+        residuals: Some(&r.residuals),
+        fitted_values: Some(&r.fitted_values),
+        x: None,
+    })
+}
+
+fn autoreg_fit_dict(r: &greeners::AutoRegResult) -> Value {
+    fit_dict(&[
+        ("r2", Value::Float(r.r_squared)),
+        ("adj_r2", Value::Float(r.adj_r_squared)),
+        ("aic", Value::Float(r.aic)),
+        ("bic", Value::Float(r.bic)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("lags", Value::Int(r.lags as i64)),
+        ("trend", Value::Str(r.trend.clone())),
+    ])
+}
+
+fn ardl_children(r: &greeners::ARDLResult) -> Vec<(String, Value)> {
+    regression_children(RegressionCtx {
+        names: r.param_names.clone(),
+        params: &r.params,
+        std_errors: &r.std_errors,
+        test_values: &r.t_values,
+        p_values: &r.p_values,
+        conf_lower: None,
+        conf_upper: None,
+        fit: ardl_fit_dict(r),
+        residuals: Some(&r.residuals),
+        fitted_values: Some(&r.fitted_values),
+        x: None,
+    })
+}
+
+fn ardl_fit_dict(r: &greeners::ARDLResult) -> Value {
+    fit_dict(&[
+        ("r2", Value::Float(r.r_squared)),
+        ("adj_r2", Value::Float(r.adj_r_squared)),
+        ("aic", Value::Float(r.aic)),
+        ("bic", Value::Float(r.bic)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("y_lags", Value::Int(r.y_lags as i64)),
+        ("x_lags", Value::Int(r.x_lags as i64)),
+    ])
+}
+
+fn threshold_children(r: &greeners::threshold::ThresholdResult) -> Vec<(String, Value)> {
+    let mut vars = Vec::new();
+    let regime1_names: Vec<String> = (0..r.params_regime1.len())
+        .map(|i| format!("x{i}"))
+        .collect();
+    let regime2_names: Vec<String> = (0..r.params_regime2.len())
+        .map(|i| format!("x{i}"))
+        .collect();
+    let r1 = coef_dataframe(
+        &regime1_names,
+        &r.params_regime1,
+        &Array1::zeros(r.params_regime1.len()),
+        &Array1::zeros(r.params_regime1.len()),
+        &Array1::zeros(r.params_regime1.len()),
+        None,
+        None,
+    );
+    let r2 = coef_dataframe(
+        &regime2_names,
+        &r.params_regime2,
+        &Array1::zeros(r.params_regime2.len()),
+        &Array1::zeros(r.params_regime2.len()),
+        &Array1::zeros(r.params_regime2.len()),
+        None,
+        None,
+    );
+    vars.push(("regime1".into(), r1));
+    vars.push(("regime2".into(), r2));
+    vars.push(("fit".into(), threshold_fit_dict(r)));
+    vars
+}
+
+fn threshold_fit_dict(r: &greeners::threshold::ThresholdResult) -> Value {
+    fit_dict(&[
+        ("threshold_gamma", Value::Float(r.threshold_gamma)),
+        ("r2", Value::Float(r.r_squared)),
+        ("ssr_min", Value::Float(r.ssr_min)),
+        ("n_search", Value::Int(r.n_search as i64)),
     ])
 }
 
