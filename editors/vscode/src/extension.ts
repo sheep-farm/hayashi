@@ -198,20 +198,21 @@ class HayashiDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory
             ? config.runtimeArgs.map(String)
             : ['dap'];
 
-        let program: string | undefined;
-        if (config.program && config.program !== '${file}') {
-            program = String(config.program);
-        } else if (vscode.window.activeTextEditor) {
-            program = vscode.window.activeTextEditor.document.uri.fsPath;
-        } else if (session.workspaceFolder) {
-            program = path.join(session.workspaceFolder.uri.fsPath, 'main.hay');
+        let program = config.program ? String(config.program) : undefined;
+        if (!program || program === '${file}') {
+            for (const editor of vscode.window.visibleTextEditors) {
+                if (editor.document.languageId === 'hayashi') {
+                    program = editor.document.uri.fsPath;
+                    break;
+                }
+            }
         }
-
-        if (!program) {
+        if (!program || program.includes('extension-output')) {
+            vscode.window.showErrorMessage('No Hayashi file selected for debugging');
             throw new Error('No Hayashi file selected for debugging');
         }
-        args.push(program);
 
+        args.push(program);
         debugChannel.appendLine(`Starting Hayashi debugger: ${executable} ${args.join(' ')}`);
         return new vscode.DebugAdapterExecutable(executable, args);
     }
@@ -219,11 +220,24 @@ class HayashiDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory
 
 class HayashiConfigurationProvider implements vscode.DebugConfigurationProvider {
     resolveDebugConfiguration(
-        _folder: vscode.WorkspaceFolder | undefined,
+        folder: vscode.WorkspaceFolder | undefined,
         config: vscode.DebugConfiguration
     ): vscode.ProviderResult<vscode.DebugConfiguration> {
+        if (!config.program || config.program === '${file}') {
+            const editor = vscode.window.activeTextEditor;
+            if (editor) {
+                config.program = editor.document.uri.fsPath;
+            }
+        }
+        if (typeof config.program === 'string' && config.program.includes('${workspaceFolder}')) {
+            const wf = folder?.uri.fsPath || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+            if (wf) {
+                config.program = config.program.replace('${workspaceFolder}', wf);
+            }
+        }
         if (!config.program) {
-            config.program = '${file}';
+            vscode.window.showErrorMessage('No Hayashi file selected for debugging');
+            return undefined;
         }
         if (!config.runtimeExecutable) {
             config.runtimeExecutable = 'hay';
