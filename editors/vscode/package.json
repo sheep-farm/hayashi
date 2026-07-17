@@ -135,8 +135,6 @@
       {
         "type": "hayashi",
         "label": "Hayashi Debug",
-        "program": "./out/extension.js",
-        "runtime": "node",
         "configurationAttributes": {
           "launch": {
             "required": [
