@@ -13,11 +13,11 @@ pub struct Request {
 }
 
 #[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct Response {
     pub seq: i64,
     #[serde(rename = "type")]
     pub type_field: &'static str,
+    #[serde(rename = "request_seq")]
     pub request_seq: i64,
     pub success: bool,
     pub command: String,
