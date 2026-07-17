@@ -1,4 +1,5 @@
 use super::*;
+use greeners::Column;
 use std::cmp::Ordering;
 use std::sync::Arc;
 
@@ -433,7 +434,7 @@ pub(super) fn col_to_strings(df: &DataFrame, name: &str) -> Result<Vec<String>> 
 }
 
 /// Frequency table (univariate).
-pub(super) fn tabulate_one(df: &DataFrame, var: &str) -> Result<()> {
+pub(super) fn tabulate_one(df: &DataFrame, var: &str) -> Result<DataFrame> {
     let vals = col_to_strings(df, var)?;
     let n = vals.len();
 
@@ -462,6 +463,11 @@ pub(super) fn tabulate_one(df: &DataFrame, var: &str) -> Result<()> {
     );
     println!("{sep}");
 
+    let mut value_vec = Vec::new();
+    let mut freq_vec = Vec::new();
+    let mut pct_vec = Vec::new();
+    let mut cum_vec = Vec::new();
+
     let mut cum = 0.0_f64;
     for key in &unique {
         let freq = counts[key];
@@ -475,6 +481,10 @@ pub(super) fn tabulate_one(df: &DataFrame, var: &str) -> Result<()> {
             cum,
             lw = label_w
         );
+        value_vec.push(key.clone());
+        freq_vec.push(freq);
+        pct_vec.push(pct);
+        cum_vec.push(cum);
     }
     println!("{sep}");
     println!(
@@ -485,7 +495,22 @@ pub(super) fn tabulate_one(df: &DataFrame, var: &str) -> Result<()> {
         lw = label_w
     );
     println!();
-    Ok(())
+
+    use indexmap::IndexMap;
+    let mut columns: IndexMap<String, Column> = IndexMap::new();
+    columns.insert(var.to_string(), Column::String(Array1::from(value_vec)));
+    columns.insert(
+        "freq".to_string(),
+        Column::Int(Array1::from(
+            freq_vec.iter().map(|&v| v as i64).collect::<Vec<_>>(),
+        )),
+    );
+    columns.insert("percent".to_string(), Column::Float(Array1::from(pct_vec)));
+    columns.insert(
+        "cum_percent".to_string(),
+        Column::Float(Array1::from(cum_vec)),
+    );
+    DataFrame::from_columns(columns).map_err(|e| HayashiError::Runtime(e.to_string()))
 }
 
 /// Cross-tabulation (bivariate, optional chi2).
@@ -494,7 +519,7 @@ pub(super) fn tabulate_two(
     row_var: &str,
     col_var: &str,
     do_chi2: bool,
-) -> Result<()> {
+) -> Result<(DataFrame, Option<HashMap<String, Value>>)> {
     let rows = col_to_strings(df, row_var)?;
     let cols = col_to_strings(df, col_var)?;
 
@@ -594,6 +619,7 @@ pub(super) fn tabulate_two(
     println!(" | {:>cw$}", n, cw = cell_w);
     println!();
 
+    let mut chi2_map = None;
     if do_chi2 {
         let mut stat = 0.0_f64;
         for (i, rv) in row_set.iter().enumerate() {
@@ -609,9 +635,57 @@ pub(super) fn tabulate_two(
         let p = chi2_pvalue(stat, df as f64);
         println!("  Pearson chi2({df}) = {stat:.4}   Pr = {p:.4}");
         println!();
+        let mut map = HashMap::new();
+        map.insert("chi2".into(), Value::Float(stat));
+        map.insert("df".into(), Value::Int(df as i64));
+        map.insert("p_value".into(), Value::Float(p));
+        chi2_map = Some(map);
     }
 
-    Ok(())
+    // Build long-format DataFrame
+    let mut row_vec = Vec::new();
+    let mut col_vec = Vec::new();
+    let mut freq_vec = Vec::new();
+    let mut row_total_vec = Vec::new();
+    let mut col_total_vec = Vec::new();
+    for rv in &row_set {
+        let rt = *row_totals
+            .iter()
+            .zip(row_set.iter())
+            .find(|(_, r)| *r == rv)
+            .map(|(t, _)| t)
+            .unwrap_or(&0);
+        for cv in &col_set {
+            let ct = *col_totals
+                .iter()
+                .zip(col_set.iter())
+                .find(|(_, c)| *c == cv)
+                .map(|(t, _)| t)
+                .unwrap_or(&0);
+            let cnt = *cell.get(&(rv.clone(), cv.clone())).unwrap_or(&0);
+            row_vec.push(rv.clone());
+            col_vec.push(cv.clone());
+            freq_vec.push(cnt as i64);
+            row_total_vec.push(rt as i64);
+            col_total_vec.push(ct as i64);
+        }
+    }
+
+    use indexmap::IndexMap;
+    let mut columns: IndexMap<String, Column> = IndexMap::new();
+    columns.insert(row_var.to_string(), Column::String(Array1::from(row_vec)));
+    columns.insert(col_var.to_string(), Column::String(Array1::from(col_vec)));
+    columns.insert("freq".to_string(), Column::Int(Array1::from(freq_vec)));
+    columns.insert(
+        "row_total".to_string(),
+        Column::Int(Array1::from(row_total_vec)),
+    );
+    columns.insert(
+        "col_total".to_string(),
+        Column::Int(Array1::from(col_total_vec)),
+    );
+    let df = DataFrame::from_columns(columns).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+    Ok((df, chi2_map))
 }
 
 // ── Ordenação de strings ──────────────────────────────────────────────────────

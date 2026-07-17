@@ -2,6 +2,32 @@ use super::helpers::*;
 use super::*;
 use std::sync::Arc;
 
+#[allow(clippy::too_many_arguments)]
+fn push_xtsum_row(
+    var_vec: &mut Vec<Value>,
+    type_vec: &mut Vec<Value>,
+    mean_vec: &mut Vec<Value>,
+    sd_vec: &mut Vec<Value>,
+    min_vec: &mut Vec<Value>,
+    max_vec: &mut Vec<Value>,
+    n_vec: &mut Vec<Value>,
+    var: &str,
+    ty: &str,
+    mean: f64,
+    sd: f64,
+    min: f64,
+    max: f64,
+    n: i64,
+) {
+    var_vec.push(Value::Str(var.into()));
+    type_vec.push(Value::Str(ty.into()));
+    mean_vec.push(Value::Float(mean));
+    sd_vec.push(Value::Float(sd));
+    min_vec.push(Value::Float(min));
+    max_vec.push(Value::Float(max));
+    n_vec.push(Value::Int(n));
+}
+
 /// ETS, panel threshold, canonical correlation, weighted statistics, tabstat,
 /// xtsum, non-parametric tests, unit-root tests, business-cycle filters,
 /// penalized regression (lasso/ridge/elasticnet), cointegration, xtset.
@@ -405,6 +431,12 @@ impl Interpreter {
                 }
                 println!();
                 println!("{}", "-".repeat(var_w + stat_list.len() * (stat_w + 2)));
+
+                let mut group_vec = Vec::new();
+                let mut var_vec = Vec::new();
+                let mut stat_vec = Vec::new();
+                let mut value_vec = Vec::new();
+
                 for grp in &groups {
                     if let Some(ref g) = grp {
                         println!("  grupo = {g}");
@@ -440,6 +472,7 @@ impl Interpreter {
                             let idx = (p / 100.0 * (n - 1.0)).round() as usize;
                             sorted[idx.min(sorted.len() - 1)]
                         };
+                        let group_label = grp.as_ref().map(|s| s.as_str()).unwrap_or("all");
                         print!("{:>var_w$}", vname);
                         for s in &stat_list {
                             let val = match s.as_str() {
@@ -471,12 +504,35 @@ impl Interpreter {
                             } else {
                                 print!("  {:>12.4}", val);
                             }
+                            group_vec.push(group_label.to_string());
+                            var_vec.push(vname.clone());
+                            stat_vec.push(s.clone());
+                            value_vec.push(val);
                         }
                         println!();
                     }
                 }
                 println!("{:=^70}", "");
-                Ok(Value::Nil)
+
+                let mut columns = HashMap::new();
+                columns.insert(
+                    "group".into(),
+                    Value::List(Arc::new(group_vec.into_iter().map(Value::Str).collect())),
+                );
+                columns.insert(
+                    "variable".into(),
+                    Value::List(Arc::new(var_vec.into_iter().map(Value::Str).collect())),
+                );
+                columns.insert(
+                    "stat".into(),
+                    Value::List(Arc::new(stat_vec.into_iter().map(Value::Str).collect())),
+                );
+                columns.insert(
+                    "value".into(),
+                    Value::List(Arc::new(value_vec.into_iter().map(Value::Float).collect())),
+                );
+                let tb_df = self.dict_to_dataframe(&columns)?;
+                Ok(Value::DataFrame(Arc::new(tb_df)))
             }
 
             // ── xtsum — within/between decomposition ───────────────────────────
@@ -536,6 +592,15 @@ impl Interpreter {
                     "Variable", "Type", "Mean", "SD", "Min", "Max", "N"
                 );
                 println!("{}", "-".repeat(78));
+
+                let mut var_vec = Vec::new();
+                let mut type_vec = Vec::new();
+                let mut mean_vec = Vec::new();
+                let mut sd_vec = Vec::new();
+                let mut min_vec = Vec::new();
+                let mut max_vec = Vec::new();
+                let mut n_vec = Vec::new();
+
                 for vname in &var_names {
                     let col = get_col_f64(&df, vname)?;
                     let vals: Vec<f64> = col.iter().cloned().collect();
@@ -550,6 +615,22 @@ impl Interpreter {
                     println!(
                         "{:<20} | {:>7} | {:>8.4} | {:>8.4} | {:>8.4} | {:>8.4} | {:>8}",
                         vname, "overall", mean_ov, sd_ov, min_ov, max_ov, n_total
+                    );
+                    push_xtsum_row(
+                        &mut var_vec,
+                        &mut type_vec,
+                        &mut mean_vec,
+                        &mut sd_vec,
+                        &mut min_vec,
+                        &mut max_vec,
+                        &mut n_vec,
+                        vname,
+                        "overall",
+                        mean_ov,
+                        sd_ov,
+                        min_ov,
+                        max_ov,
+                        n_total as i64,
                     );
                     // Between: mean by entity
                     let group_means: Vec<f64> = ids_uniq
@@ -586,6 +667,22 @@ impl Interpreter {
                         "{:<20} | {:>7} | {:>8} | {:>8.4} | {:>8.4} | {:>8.4} | {:>8}",
                         "", "between", "", sd_b, min_b, max_b, n_entities
                     );
+                    push_xtsum_row(
+                        &mut var_vec,
+                        &mut type_vec,
+                        &mut mean_vec,
+                        &mut sd_vec,
+                        &mut min_vec,
+                        &mut max_vec,
+                        &mut n_vec,
+                        vname,
+                        "between",
+                        mean_b,
+                        sd_b,
+                        min_b,
+                        max_b,
+                        n_entities as i64,
+                    );
                     // Within: deviation of each obs from its group mean
                     let within_vals: Vec<f64> = id_col
                         .iter()
@@ -614,6 +711,22 @@ impl Interpreter {
                         "{:<20} | {:>7} | {:>8} | {:>8.4} | {:>8.4} | {:>8.4} | {:>8}",
                         "", "within", "", sd_w, min_w, max_w, n_total
                     );
+                    push_xtsum_row(
+                        &mut var_vec,
+                        &mut type_vec,
+                        &mut mean_vec,
+                        &mut sd_vec,
+                        &mut min_vec,
+                        &mut max_vec,
+                        &mut n_vec,
+                        vname,
+                        "within",
+                        mean_ov,
+                        sd_w,
+                        min_w,
+                        max_w,
+                        n_total as i64,
+                    );
                 }
                 println!("{:=^78}", "");
                 println!(
@@ -621,7 +734,17 @@ impl Interpreter {
                     n_entities,
                     n_total as f64 / n_entities as f64
                 );
-                Ok(Value::Nil)
+
+                let mut columns = HashMap::new();
+                columns.insert("variable".into(), Value::List(Arc::new(var_vec)));
+                columns.insert("type".into(), Value::List(Arc::new(type_vec)));
+                columns.insert("mean".into(), Value::List(Arc::new(mean_vec)));
+                columns.insert("sd".into(), Value::List(Arc::new(sd_vec)));
+                columns.insert("min".into(), Value::List(Arc::new(min_vec)));
+                columns.insert("max".into(), Value::List(Arc::new(max_vec)));
+                columns.insert("n".into(), Value::List(Arc::new(n_vec)));
+                let df = self.dict_to_dataframe(&columns)?;
+                Ok(Value::DataFrame(Arc::new(df)))
             }
 
             // ── Non-parametric tests ───────────────────────────────────────

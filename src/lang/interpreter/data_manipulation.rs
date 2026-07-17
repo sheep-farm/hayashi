@@ -1454,7 +1454,16 @@ impl Interpreter {
                 println!("  Mean:     {mean:.6}");
                 println!("  Std. Err: {se:.6}");
                 println!("  [{:.0}% CI] [{lo:.6}, {hi:.6}]\n", level * 100.0);
-                Ok(Value::Nil)
+                let mut map = HashMap::new();
+                map.insert("variable".into(), Value::Str(var));
+                map.insert("n".into(), Value::Int(vals.len() as i64));
+                map.insert("mean".into(), Value::Float(mean));
+                map.insert("sd".into(), Value::Float(sd));
+                map.insert("std_err".into(), Value::Float(se));
+                map.insert("level".into(), Value::Float(level));
+                map.insert("ci_lower".into(), Value::Float(lo));
+                map.insert("ci_upper".into(), Value::Float(hi));
+                Ok(Value::Dict(Arc::new(map)))
             }
 
             // ── centile: arbitrary percentiles ─────────────────────────────
@@ -1493,13 +1502,21 @@ impl Interpreter {
                     _ => vec![1.0, 5.0, 10.0, 25.0, 50.0, 75.0, 90.0, 95.0, 99.0],
                 };
                 println!("\n  Variable: {var}   Obs: {n}");
+                let mut centile_vec = Vec::new();
+                let mut value_vec = Vec::new();
                 for p in &pcts {
                     let idx = (p / 100.0 * (n - 1) as f64).round() as usize;
                     let val = sorted[idx.min(n - 1)];
                     println!("    {:>5.1}%  {:>12.4}", p, val);
+                    centile_vec.push(Value::Float(*p));
+                    value_vec.push(Value::Float(val));
                 }
                 println!();
-                Ok(Value::Nil)
+                let mut columns = HashMap::new();
+                columns.insert("centile".into(), Value::List(Arc::new(centile_vec)));
+                columns.insert("value".into(), Value::List(Arc::new(value_vec)));
+                let df = self.dict_to_dataframe(&columns)?;
+                Ok(Value::DataFrame(Arc::new(df)))
             }
 
             // ── recode: recode values ─────────────────────────────────────
@@ -2173,7 +2190,8 @@ impl Interpreter {
                 };
 
                 if args.len() == 2 {
-                    tabulate_one(&df, &var1)?;
+                    let tb_df = tabulate_one(&df, &var1)?;
+                    Ok(Value::DataFrame(Arc::new(tb_df)))
                 } else {
                     let var2 = match &args[2] {
                         Expr::Var(n) | Expr::Str(n) => n.clone(),
@@ -2184,10 +2202,14 @@ impl Interpreter {
                         }
                     };
                     let do_chi2 = matches!(opt_map.get("chi2"), Some(Value::Bool(true)));
-                    tabulate_two(&df, &var1, &var2, do_chi2)?;
+                    let (tb_df, chi2_map) = tabulate_two(&df, &var1, &var2, do_chi2)?;
+                    if let Some(mut map) = chi2_map {
+                        map.insert("table".into(), Value::DataFrame(Arc::new(tb_df)));
+                        Ok(Value::Dict(Arc::new(map)))
+                    } else {
+                        Ok(Value::DataFrame(Arc::new(tb_df)))
+                    }
                 }
-
-                Ok(Value::Nil)
             }
 
             _ => return Ok(None),
@@ -2282,7 +2304,19 @@ impl Interpreter {
                 res.t_statistic, res.df, res.p_value
             );
             println!();
-            return Ok(Value::Nil);
+            let mut map = HashMap::new();
+            map.insert("test".into(), Value::Str("paired t-test".into()));
+            map.insert("var1".into(), Value::Str(var1));
+            map.insert("var2".into(), Value::Str(var2));
+            map.insert("n".into(), Value::Int(res.n as i64));
+            map.insert("mean".into(), Value::Float(res.mean));
+            map.insert("std_err".into(), Value::Float(res.std_err));
+            map.insert("ci_lower".into(), Value::Float(res.ci_lower));
+            map.insert("ci_upper".into(), Value::Float(res.ci_upper));
+            map.insert("t_stat".into(), Value::Float(res.t_statistic));
+            map.insert("df".into(), Value::Float(res.df));
+            map.insert("p_value".into(), Value::Float(res.p_value));
+            return Ok(Value::Dict(Arc::new(map)));
         }
 
         // Two groups
@@ -2343,7 +2377,33 @@ impl Interpreter {
                 t_label, res.t_statistic, res.df, res.p_value
             );
             println!();
-            return Ok(Value::Nil);
+            let mut map = HashMap::new();
+            map.insert(
+                "test".into(),
+                Value::Str(if equal_var {
+                    "two-sample t-test (equal variances)".into()
+                } else {
+                    "two-sample t-test (Welch)".into()
+                }),
+            );
+            map.insert("variable".into(), Value::Str(var1));
+            map.insert("by".into(), Value::Str(by_col));
+            map.insert("group1".into(), Value::Str(gkeys[0].clone()));
+            map.insert("group2".into(), Value::Str(gkeys[1].clone()));
+            map.insert("mean1".into(), Value::Float(res.mean1));
+            map.insert("mean2".into(), Value::Float(res.mean2));
+            map.insert("diff".into(), Value::Float(res.diff));
+            map.insert("n1".into(), Value::Int(res.n1 as i64));
+            map.insert("n2".into(), Value::Int(res.n2 as i64));
+            map.insert("std_err1".into(), Value::Float(res.std_err1));
+            map.insert("std_err2".into(), Value::Float(res.std_err2));
+            map.insert("t_stat".into(), Value::Float(res.t_statistic));
+            map.insert("df".into(), Value::Float(res.df));
+            map.insert("p_value".into(), Value::Float(res.p_value));
+            map.insert("ci_lower".into(), Value::Float(res.ci_lower));
+            map.insert("ci_upper".into(), Value::Float(res.ci_upper));
+            map.insert("equal_var".into(), Value::Bool(equal_var));
+            return Ok(Value::Dict(Arc::new(map)));
         }
 
         // One-sample
@@ -2374,6 +2434,19 @@ impl Interpreter {
             res.t_statistic, res.df, res.p_value
         );
         println!();
-        Ok(Value::Nil)
+        let mut map = HashMap::new();
+        map.insert("test".into(), Value::Str("one-sample t-test".into()));
+        map.insert("variable".into(), Value::Str(var1));
+        map.insert("mu".into(), Value::Float(mu));
+        map.insert("n".into(), Value::Int(res.n as i64));
+        map.insert("mean".into(), Value::Float(res.mean));
+        map.insert("std_dev".into(), Value::Float(res.std_dev));
+        map.insert("std_err".into(), Value::Float(res.std_err));
+        map.insert("ci_lower".into(), Value::Float(res.ci_lower));
+        map.insert("ci_upper".into(), Value::Float(res.ci_upper));
+        map.insert("t_stat".into(), Value::Float(res.t_statistic));
+        map.insert("df".into(), Value::Float(res.df));
+        map.insert("p_value".into(), Value::Float(res.p_value));
+        Ok(Value::Dict(Arc::new(map)))
     }
 }
