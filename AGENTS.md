@@ -25,6 +25,9 @@ cargo clippy -- -D warnings
 
 # Smoke tests
 cargo test --test smoke
+
+# DAP integration tests
+cargo test --test dap
 ```
 
 ## DAP debugging
