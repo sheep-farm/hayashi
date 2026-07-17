@@ -5,10 +5,13 @@ import * as fs from 'fs';
 import * as os from 'os';
 
 let outputChannel: vscode.OutputChannel;
+let debugChannel: vscode.OutputChannel;
 
 export function activate(context: vscode.ExtensionContext) {
     outputChannel = vscode.window.createOutputChannel('Hayashi');
     context.subscriptions.push(outputChannel);
+    debugChannel = vscode.window.createOutputChannel('Hayashi Debug');
+    context.subscriptions.push(debugChannel);
 
     // Formatter
     context.subscriptions.push(
@@ -194,12 +197,22 @@ class HayashiDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory
         const args: string[] = Array.isArray(config.runtimeArgs)
             ? config.runtimeArgs.map(String)
             : ['dap'];
-        const program = String(config.program || '${file}');
-        if (program && program !== '${file}') {
-            args.push(program);
-        } else if (config.program === '${file}' && vscode.window.activeTextEditor) {
-            args.push(vscode.window.activeTextEditor.document.uri.fsPath);
+
+        let program: string | undefined;
+        if (config.program && config.program !== '${file}') {
+            program = String(config.program);
+        } else if (vscode.window.activeTextEditor) {
+            program = vscode.window.activeTextEditor.document.uri.fsPath;
+        } else if (session.workspaceFolder) {
+            program = path.join(session.workspaceFolder.uri.fsPath, 'main.hay');
         }
+
+        if (!program) {
+            throw new Error('No Hayashi file selected for debugging');
+        }
+        args.push(program);
+
+        debugChannel.appendLine(`Starting Hayashi debugger: ${executable} ${args.join(' ')}`);
         return new vscode.DebugAdapterExecutable(executable, args);
     }
 }
