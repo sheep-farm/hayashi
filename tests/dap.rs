@@ -24,8 +24,7 @@ impl DapSession {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let tmp = std::env::temp_dir()
-            .join(format!("hay_dap_test_{ts}.hay"));
+        let tmp = std::env::temp_dir().join(format!("hay_dap_test_{ts}.hay"));
         std::fs::write(&tmp, script).unwrap();
 
         let bin = env!("CARGO_BIN_EXE_hay");
