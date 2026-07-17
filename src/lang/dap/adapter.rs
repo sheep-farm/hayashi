@@ -52,14 +52,21 @@ pub fn run_dap<R: Read + Send + 'static, W: Write + Send + 'static>(
     // Response writer thread: serializes responses to stdout.
     let out_responses = output.clone();
     let seq_responses = seq.clone();
+    let tx_response_event = tx_event.clone();
     let response_handle = std::thread::spawn(move || {
         while let Ok(mut resp) = rx_response.recv() {
+            let command = resp.command.clone();
             let mut guard = out_responses.lock().unwrap();
             let mut s = seq_responses.lock().unwrap();
             *s += 1;
             resp.seq = *s;
             if transport::send(&mut *guard, &resp).is_err() {
                 break;
+            }
+            drop(guard);
+            // After the initialize response, send the initialized event.
+            if command == "initialize" {
+                let _ = tx_response_event.send(DebugEvent::Initialized);
             }
         }
     });
@@ -151,6 +158,7 @@ fn handle_request(
 
 fn debug_event_to_protocol(event: &DebugEvent) -> Event {
     let (name, body) = match event {
+        DebugEvent::Initialized => ("initialized", json!({})),
         DebugEvent::Stopped {
             reason,
             description,

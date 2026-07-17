@@ -97,6 +97,7 @@ pub struct DebugState {
 
 #[derive(Debug, Clone)]
 pub enum DebugEvent {
+    Initialized,
     Stopped {
         reason: String,
         description: Option<String>,
