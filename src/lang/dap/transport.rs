@@ -1,6 +1,17 @@
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader, Read, Write};
 
+fn trace_dap(direction: &str, msg: &str) {
+    use std::io::Write;
+    let mut f = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("/tmp/hay-dap-trace.log")
+        .unwrap();
+    let _ = writeln!(f, "[{direction}] {msg}");
+    let _ = f.flush();
+}
+
 pub fn read_message<R: Read>(reader: &mut BufReader<R>) -> std::io::Result<Option<String>> {
     let mut header = String::new();
     loop {
@@ -33,7 +44,9 @@ pub fn read_message<R: Read>(reader: &mut BufReader<R>) -> std::io::Result<Optio
     let mut body = vec![0u8; content_len];
     reader.read_exact(&mut body)?;
 
-    Ok(Some(String::from_utf8_lossy(&body).to_string()))
+    let s = String::from_utf8_lossy(&body).to_string();
+    trace_dap("IN", &s);
+    Ok(Some(s))
 }
 
 pub fn write_message<W: Write>(writer: &mut W, msg: &str) -> std::io::Result<()> {
@@ -47,6 +60,7 @@ pub fn write_message<W: Write>(writer: &mut W, msg: &str) -> std::io::Result<()>
 pub fn send<W: Write, T: Serialize>(writer: &mut W, value: &T) -> std::io::Result<()> {
     let msg = serde_json::to_string(value)
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+    trace_dap("OUT", &msg);
     write_message(writer, &msg)
 }
 

@@ -8,6 +8,23 @@ use std::path::Path;
 use std::sync::mpsc::{self, Sender};
 use std::sync::{Arc, Mutex};
 
+#[allow(unused_macros)]
+macro_rules! dap_log {
+    ($($arg:tt)*) => {{
+        let msg = format!($($arg)*);
+        let _ = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("/tmp/hay-dap-adapter.log")
+            .and_then(|mut f| {
+                use std::io::Write;
+                writeln!(f, "{}", msg)
+            });
+    }};
+}
+#[allow(unused_imports)]
+pub(crate) use dap_log;
+
 /// Runs a Hayashi script under a DAP server.
 ///
 /// `input` is typically `std::io::stdin()`, `output` is typically
@@ -17,6 +34,8 @@ pub fn run_dap<R: Read + Send + 'static, W: Write + Send + 'static>(
     output: W,
     program: &Path,
 ) {
+    let _ = std::fs::remove_file("/tmp/hay-dap-adapter.log");
+    dap_log!("run_dap started for {}", program.display());
     let output = Arc::new(Mutex::new(output));
 
     let (tx_control, rx_control) = mpsc::channel::<ControlMessage>();
@@ -52,7 +71,6 @@ pub fn run_dap<R: Read + Send + 'static, W: Write + Send + 'static>(
     // Response writer thread: serializes responses to stdout.
     let out_responses = output.clone();
     let seq_responses = seq.clone();
-    let tx_response_event = tx_event.clone();
     let response_handle = std::thread::spawn(move || {
         while let Ok(mut resp) = rx_response.recv() {
             let command = resp.command.clone();
@@ -60,13 +78,16 @@ pub fn run_dap<R: Read + Send + 'static, W: Write + Send + 'static>(
             let mut s = seq_responses.lock().unwrap();
             *s += 1;
             resp.seq = *s;
+            let init = command == "initialize";
             if transport::send(&mut *guard, &resp).is_err() {
                 break;
             }
-            drop(guard);
-            // After the initialize response, send the initialized event.
-            if command == "initialize" {
-                let _ = tx_response_event.send(DebugEvent::Initialized);
+            // Send initialized event immediately after initialize response.
+            if init {
+                let mut event = Event::initialized();
+                *s += 1;
+                event.seq = *s;
+                let _ = transport::send(&mut *guard, &event);
             }
         }
     });
@@ -129,6 +150,7 @@ fn handle_request(
     tx_control: &Sender<ControlMessage>,
     tx_response: &Sender<Response>,
 ) {
+    dap_log!("handle_request: {} (seq={})", req.command, req.seq);
     match req.command.as_str() {
         "continue" => {
             let _ = tx_control.send(ControlMessage::Command(DebugCommand::Continue));
@@ -158,7 +180,6 @@ fn handle_request(
 
 fn debug_event_to_protocol(event: &DebugEvent) -> Event {
     let (name, body) = match event {
-        DebugEvent::Initialized => ("initialized", json!({})),
         DebugEvent::Stopped {
             reason,
             description,

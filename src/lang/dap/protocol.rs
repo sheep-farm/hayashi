@@ -81,6 +81,15 @@ impl Event {
             body: Some(serde_json::to_value(body).unwrap_or(Value::Null)),
         }
     }
+
+    pub fn initialized() -> Self {
+        Self {
+            seq: 0,
+            type_field: "event",
+            event: "initialized".into(),
+            body: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
