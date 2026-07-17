@@ -12,7 +12,18 @@
   "engines": {
     "vscode": "^1.75.0"
   },
-  "categories": ["Programming Languages"],
+  "categories": ["Programming Languages", "Debuggers"],
+  "activationEvents": ["onDebugResolve:hayashi", "onDebugInitialConfigurations"],
+  "main": "./out/extension.js",
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.75.0",
+    "typescript": "^5.0.0"
+  },
   "contributes": {
     "languages": [
       {
@@ -45,6 +56,46 @@
             "description": "The .hay file to run"
           }
         }
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "hayashi",
+        "label": "Hayashi Debug",
+        "program": "./out/extension.js",
+        "runtime": "node",
+        "configurationAttributes": {
+          "launch": {
+            "required": ["program"],
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "Absolute path to the Hayashi script to debug.",
+                "default": "${file}"
+              },
+              "runtimeExecutable": {
+                "type": ["string", "null"],
+                "description": "Path to the hay binary.",
+                "default": "hay"
+              },
+              "runtimeArgs": {
+                "type": "array",
+                "description": "Command-line arguments passed to the hay binary.",
+                "default": ["dap"]
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "hayashi",
+            "request": "launch",
+            "name": "Debug Hayashi script",
+            "program": "${file}",
+            "runtimeExecutable": "hay",
+            "runtimeArgs": ["dap"]
+          }
+        ]
       }
     ]
   }

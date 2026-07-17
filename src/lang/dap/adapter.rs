@@ -20,6 +20,8 @@ pub fn run_dap<R: Read + Send + 'static, W: Write + Send + 'static>(
     let output = Arc::new(Mutex::new(output));
 
     let (tx_control, rx_control) = mpsc::channel::<ControlMessage>();
+    let tx_control_reader = tx_control.clone();
+    drop(tx_control);
     let (tx_event, rx_event) = mpsc::channel::<DebugEvent>();
     let (tx_response, rx_response) = mpsc::channel::<Response>();
     let tx_response_reader = tx_response.clone();
@@ -54,12 +56,11 @@ pub fn run_dap<R: Read + Send + 'static, W: Write + Send + 'static>(
 
     // Reader thread: reads DAP requests from stdin and forwards them.
     let mut reader = BufReader::new(input);
-    let tx_control_clone = tx_control.clone();
     let reader_handle = std::thread::spawn(move || loop {
         match transport::read_message(&mut reader) {
             Ok(Some(json)) => {
                 if let Ok(req) = serde_json::from_str::<Request>(&json) {
-                    handle_request(&req, &tx_control_clone, &tx_response_reader);
+                    handle_request(&req, &tx_control_reader, &tx_response_reader);
                 }
             }
             Ok(None) => break,
