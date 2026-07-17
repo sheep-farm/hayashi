@@ -3,13 +3,15 @@ use std::io::{BufRead, BufReader, Read, Write};
 
 fn trace_dap(direction: &str, msg: &str) {
     use std::io::Write;
-    let mut f = std::fs::OpenOptions::new()
+    let path = std::env::temp_dir().join("hay-dap-trace.log");
+    if let Ok(mut f) = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
-        .open("/tmp/hay-dap-trace.log")
-        .unwrap();
-    let _ = writeln!(f, "[{direction}] {msg}");
-    let _ = f.flush();
+        .open(path)
+    {
+        let _ = writeln!(f, "[{direction}] {msg}");
+        let _ = f.flush();
+    }
 }
 
 pub fn read_message<R: Read>(reader: &mut BufReader<R>) -> std::io::Result<Option<String>> {

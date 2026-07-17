@@ -12,10 +12,11 @@ use std::sync::{Arc, Mutex};
 macro_rules! dap_log {
     ($($arg:tt)*) => {{
         let msg = format!($($arg)*);
+        let path = std::env::temp_dir().join("hay-dap-adapter.log");
         let _ = std::fs::OpenOptions::new()
             .create(true)
             .append(true)
-            .open("/tmp/hay-dap-adapter.log")
+            .open(path)
             .and_then(|mut f| {
                 use std::io::Write;
                 writeln!(f, "{}", msg)
@@ -34,7 +35,7 @@ pub fn run_dap<R: Read + Send + 'static, W: Write + Send + 'static>(
     output: W,
     program: &Path,
 ) {
-    let _ = std::fs::remove_file("/tmp/hay-dap-adapter.log");
+    let _ = std::fs::remove_file(std::env::temp_dir().join("hay-dap-adapter.log"));
     dap_log!("run_dap started for {}", program.display());
     let output = Arc::new(Mutex::new(output));
 
