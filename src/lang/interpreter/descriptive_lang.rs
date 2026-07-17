@@ -432,7 +432,7 @@ impl Interpreter {
                                 }
                             }
                         }
-                        Ok(Value::Nil)
+                        Ok(Value::DataFrame(df.clone()))
                     }
                     _ => Err(HayashiError::Type("describe() requires a DataFrame".into())),
                 }
@@ -461,6 +461,22 @@ impl Interpreter {
                 let sep = "─".repeat(76);
                 println!("\n{:═^76}", " Codebook ");
 
+                let mut var_vec = Vec::new();
+                let mut type_vec = Vec::new();
+                let mut obs_vec = Vec::new();
+                let mut missing_vec = Vec::new();
+                let mut unique_vec = Vec::new();
+                let mut mean_vec = Vec::new();
+                let mut sd_vec = Vec::new();
+                let mut min_vec = Vec::new();
+                let mut p25_vec = Vec::new();
+                let mut p50_vec = Vec::new();
+                let mut p75_vec = Vec::new();
+                let mut max_vec = Vec::new();
+                let mut trues_vec = Vec::new();
+                let mut falses_vec = Vec::new();
+                let mut values_vec = Vec::new();
+
                 for name in &requested {
                     use greeners::Column;
                     let col = df
@@ -479,6 +495,10 @@ impl Interpreter {
                                 "  {:<20} type: float    obs: {}    missing: {}",
                                 name, total, missing
                             );
+                            var_vec.push(Value::Str(name.clone()));
+                            type_vec.push(Value::Str("float".into()));
+                            obs_vec.push(Value::Int(total as i64));
+                            missing_vec.push(Value::Int(missing as i64));
                             if n > 0 {
                                 let mean = vals.iter().sum::<f64>() / n as f64;
                                 let var = vals.iter().map(|x| (x - mean).powi(2)).sum::<f64>()
@@ -508,13 +528,37 @@ impl Interpreter {
                                     pctile(0.75),
                                     max
                                 );
+                                unique_vec.push(Value::Int(unique.len() as i64));
+                                mean_vec.push(Value::Float(mean));
+                                sd_vec.push(Value::Float(sd));
+                                min_vec.push(Value::Float(min));
+                                p25_vec.push(Value::Float(pctile(0.25)));
+                                p50_vec.push(Value::Float(pctile(0.50)));
+                                p75_vec.push(Value::Float(pctile(0.75)));
+                                max_vec.push(Value::Float(max));
+                            } else {
+                                unique_vec.push(Value::Int(0));
+                                mean_vec.push(Value::Float(f64::NAN));
+                                sd_vec.push(Value::Float(f64::NAN));
+                                min_vec.push(Value::Float(f64::NAN));
+                                p25_vec.push(Value::Float(f64::NAN));
+                                p50_vec.push(Value::Float(f64::NAN));
+                                p75_vec.push(Value::Float(f64::NAN));
+                                max_vec.push(Value::Float(f64::NAN));
                             }
+                            trues_vec.push(Value::Int(0));
+                            falses_vec.push(Value::Int(0));
+                            values_vec.push(Value::Str("".into()));
                         }
                         Column::Int(arr) => {
                             let total = arr.len();
                             let vals: Vec<f64> = arr.iter().map(|&x| x as f64).collect();
                             let n = vals.len();
                             println!("  {:<20} type: int      obs: {}    missing: 0", name, total);
+                            var_vec.push(Value::Str(name.clone()));
+                            type_vec.push(Value::Str("int".into()));
+                            obs_vec.push(Value::Int(total as i64));
+                            missing_vec.push(Value::Int(0));
                             if n > 0 {
                                 let mean = vals.iter().sum::<f64>() / n as f64;
                                 let var = vals.iter().map(|x| (x - mean).powi(2)).sum::<f64>()
@@ -533,7 +577,27 @@ impl Interpreter {
                                     sd
                                 );
                                 println!("  min: {:.0}    max: {:.0}", min, max);
+                                unique_vec.push(Value::Int(unique.len() as i64));
+                                mean_vec.push(Value::Float(mean));
+                                sd_vec.push(Value::Float(sd));
+                                min_vec.push(Value::Float(min));
+                                p25_vec.push(Value::Float(f64::NAN));
+                                p50_vec.push(Value::Float(f64::NAN));
+                                p75_vec.push(Value::Float(f64::NAN));
+                                max_vec.push(Value::Float(max));
+                            } else {
+                                unique_vec.push(Value::Int(0));
+                                mean_vec.push(Value::Float(f64::NAN));
+                                sd_vec.push(Value::Float(f64::NAN));
+                                min_vec.push(Value::Float(f64::NAN));
+                                p25_vec.push(Value::Float(f64::NAN));
+                                p50_vec.push(Value::Float(f64::NAN));
+                                p75_vec.push(Value::Float(f64::NAN));
+                                max_vec.push(Value::Float(f64::NAN));
                             }
+                            trues_vec.push(Value::Int(0));
+                            falses_vec.push(Value::Int(0));
+                            values_vec.push(Value::Str("".into()));
                         }
                         Column::String(arr) => {
                             let total = arr.len();
@@ -548,9 +612,10 @@ impl Interpreter {
                                 name, total, missing
                             );
                             println!("  unique: {}", unique.len());
-                            if unique.len() <= 10 {
+                            let values = if unique.len() <= 10 {
                                 let examples: Vec<&str> = unique.iter().take(10).copied().collect();
                                 println!("  values: {}", examples.join(", "));
+                                examples.join(", ")
                             } else {
                                 let first5: Vec<&str> = unique.iter().take(5).copied().collect();
                                 println!(
@@ -558,7 +623,23 @@ impl Interpreter {
                                     first5.join(", "),
                                     unique.len() - 5
                                 );
-                            }
+                                format!("{}, ... ({} more)", first5.join(", "), unique.len() - 5)
+                            };
+                            var_vec.push(Value::Str(name.clone()));
+                            type_vec.push(Value::Str("string".into()));
+                            obs_vec.push(Value::Int(total as i64));
+                            missing_vec.push(Value::Int(missing as i64));
+                            unique_vec.push(Value::Int(unique.len() as i64));
+                            mean_vec.push(Value::Float(f64::NAN));
+                            sd_vec.push(Value::Float(f64::NAN));
+                            min_vec.push(Value::Float(f64::NAN));
+                            p25_vec.push(Value::Float(f64::NAN));
+                            p50_vec.push(Value::Float(f64::NAN));
+                            p75_vec.push(Value::Float(f64::NAN));
+                            max_vec.push(Value::Float(f64::NAN));
+                            trues_vec.push(Value::Int(0));
+                            falses_vec.push(Value::Int(0));
+                            values_vec.push(Value::Str(values));
                         }
                         Column::Bool(arr) => {
                             let total = arr.len();
@@ -566,15 +647,63 @@ impl Interpreter {
                             let falses = total - trues;
                             println!("  {:<20} type: bool     obs: {}    missing: 0", name, total);
                             println!("  true: {}    false: {}", trues, falses);
+                            var_vec.push(Value::Str(name.clone()));
+                            type_vec.push(Value::Str("bool".into()));
+                            obs_vec.push(Value::Int(total as i64));
+                            missing_vec.push(Value::Int(0));
+                            unique_vec.push(Value::Int(2));
+                            mean_vec.push(Value::Float(f64::NAN));
+                            sd_vec.push(Value::Float(f64::NAN));
+                            min_vec.push(Value::Float(f64::NAN));
+                            p25_vec.push(Value::Float(f64::NAN));
+                            p50_vec.push(Value::Float(f64::NAN));
+                            p75_vec.push(Value::Float(f64::NAN));
+                            max_vec.push(Value::Float(f64::NAN));
+                            trues_vec.push(Value::Int(trues as i64));
+                            falses_vec.push(Value::Int(falses as i64));
+                            values_vec.push(Value::Str("".into()));
                         }
                         _ => {
                             println!("  {:<20} type: other", name);
+                            var_vec.push(Value::Str(name.clone()));
+                            type_vec.push(Value::Str("other".into()));
+                            obs_vec.push(Value::Int(0));
+                            missing_vec.push(Value::Int(0));
+                            unique_vec.push(Value::Int(0));
+                            mean_vec.push(Value::Float(f64::NAN));
+                            sd_vec.push(Value::Float(f64::NAN));
+                            min_vec.push(Value::Float(f64::NAN));
+                            p25_vec.push(Value::Float(f64::NAN));
+                            p50_vec.push(Value::Float(f64::NAN));
+                            p75_vec.push(Value::Float(f64::NAN));
+                            max_vec.push(Value::Float(f64::NAN));
+                            trues_vec.push(Value::Int(0));
+                            falses_vec.push(Value::Int(0));
+                            values_vec.push(Value::Str("".into()));
                         }
                     }
                 }
                 println!("\n{sep}");
                 println!();
-                Ok(Value::Nil)
+
+                let mut columns = HashMap::new();
+                columns.insert("variable".into(), Value::List(Arc::new(var_vec)));
+                columns.insert("type".into(), Value::List(Arc::new(type_vec)));
+                columns.insert("obs".into(), Value::List(Arc::new(obs_vec)));
+                columns.insert("missing".into(), Value::List(Arc::new(missing_vec)));
+                columns.insert("unique".into(), Value::List(Arc::new(unique_vec)));
+                columns.insert("mean".into(), Value::List(Arc::new(mean_vec)));
+                columns.insert("sd".into(), Value::List(Arc::new(sd_vec)));
+                columns.insert("min".into(), Value::List(Arc::new(min_vec)));
+                columns.insert("p25".into(), Value::List(Arc::new(p25_vec)));
+                columns.insert("p50".into(), Value::List(Arc::new(p50_vec)));
+                columns.insert("p75".into(), Value::List(Arc::new(p75_vec)));
+                columns.insert("max".into(), Value::List(Arc::new(max_vec)));
+                columns.insert("true".into(), Value::List(Arc::new(trues_vec)));
+                columns.insert("false".into(), Value::List(Arc::new(falses_vec)));
+                columns.insert("values".into(), Value::List(Arc::new(values_vec)));
+                let cb_df = self.dict_to_dataframe(&columns)?;
+                Ok(Value::DataFrame(Arc::new(cb_df)))
             }
 
             // ── format: formats numeric value ──────────────────────────────
@@ -844,6 +973,10 @@ impl Interpreter {
                     }
                 };
 
+                let mut var1 = Vec::new();
+                let mut var2 = Vec::new();
+                let mut r_vec = Vec::new();
+                let mut p_vec = Vec::new();
                 for (i, row_name) in sorted_names.iter().enumerate() {
                     print!(
                         "{:>width$} |",
@@ -852,6 +985,13 @@ impl Interpreter {
                     );
                     for j in 0..=i {
                         let r = mat[[i, j]];
+                        if i >= j {
+                            var1.push(Value::Str(sorted_names[i].clone()));
+                            var2.push(Value::Str(sorted_names[j].clone()));
+                            r_vec.push(Value::Float(r));
+                            let p = if i == j { 0.0 } else { corr_pval(r) };
+                            p_vec.push(Value::Float(p));
+                        }
                         if show_stars && i != j {
                             let s = star(corr_pval(r));
                             print!(" {:>7.4}{:<3}", r, s);
@@ -865,7 +1005,14 @@ impl Interpreter {
                     println!("* p<0.10  ** p<0.05  *** p<0.01");
                 }
                 println!();
-                Ok(Value::Nil)
+
+                let mut columns = HashMap::new();
+                columns.insert("var1".into(), Value::List(Arc::new(var1)));
+                columns.insert("var2".into(), Value::List(Arc::new(var2)));
+                columns.insert("r".into(), Value::List(Arc::new(r_vec)));
+                columns.insert("p".into(), Value::List(Arc::new(p_vec)));
+                let df = self.dict_to_dataframe(&columns)?;
+                Ok(Value::DataFrame(Arc::new(df)))
             }
 
             // ── summarize ────────────────────────────────────────────────────
@@ -1026,19 +1173,15 @@ impl Interpreter {
                     println!();
                 }
 
-                if quiet {
-                    if result_dicts.len() == 1 {
-                        let (_, d) = result_dicts.into_iter().next().unwrap();
-                        Ok(Value::Dict(Arc::new(d)))
-                    } else {
-                        let mut outer = HashMap::new();
-                        for (name, d) in result_dicts {
-                            outer.insert(name, Value::Dict(Arc::new(d)));
-                        }
-                        Ok(Value::Dict(Arc::new(outer)))
-                    }
+                if result_dicts.len() == 1 {
+                    let (_, d) = result_dicts.into_iter().next().unwrap();
+                    Ok(Value::Dict(Arc::new(d)))
                 } else {
-                    Ok(Value::Nil)
+                    let mut outer = HashMap::new();
+                    for (name, d) in result_dicts {
+                        outer.insert(name, Value::Dict(Arc::new(d)));
+                    }
+                    Ok(Value::Dict(Arc::new(outer)))
                 }
             }
 

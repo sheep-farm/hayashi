@@ -79,6 +79,29 @@ impl ErrorValue {
     }
 }
 
+// ── Diagnostic test result ───────────────────────────────────────────────────
+
+#[derive(Clone)]
+pub struct DiagResult {
+    pub rendered: String,               // pre-rendered output by the test
+    pub fields: HashMap<String, Value>, // structured fields for DAP/debug
+}
+
+impl std::fmt::Debug for DiagResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DiagResult")
+            .field("rendered", &self.rendered)
+            .field("fields", &self.fields.keys().collect::<Vec<_>>())
+            .finish()
+    }
+}
+
+impl std::fmt::Display for DiagResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.rendered)
+    }
+}
+
 // ── Series ───────────────────────────────────────────────────────────────────
 
 /// Series: DataFrame column as a first-class citizen.
@@ -197,7 +220,7 @@ pub enum Value {
     VarResult(Rc<greeners::var::VarResult>),
     VecmResult(Rc<greeners::vecm::VecmResult>),
     GarchResult(Rc<greeners::GarchResult>),
-    DiagResult(Rc<super::models::DiagResult>),
+    DiagResult(Rc<DiagResult>),
     AbResult(Rc<greeners::ArellanoBondResult>),
     GmmResult(Rc<greeners::GmmResult>),
     SysGmmResult(Rc<greeners::SystemGmmResult>),

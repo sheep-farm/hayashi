@@ -62,6 +62,13 @@ impl Interpreter {
                 let sep = "─".repeat(60);
                 let sep2 = "═".repeat(60);
 
+                let mut var_vec: Vec<Value> = Vec::new();
+                let mut dy_dx_vec: Vec<Value> = Vec::new();
+                let mut se_vec: Vec<Value> = Vec::new();
+                let mut z_vec: Vec<Value> = Vec::new();
+                let mut p_vec: Vec<Value> = Vec::new();
+                let mut cat_vec: Vec<Value> = Vec::new();
+
                 match model {
                     // ── Logit / Probit ────────────────────────────────────────
                     Value::BinaryResult(bm) => {
@@ -164,6 +171,24 @@ impl Interpreter {
                             } else {
                                 println!("{:<22} {:>14.6}", name, ame_result.effects[i]);
                             }
+                            var_vec.push(Value::Str(name.clone()));
+                            dy_dx_vec.push(Value::Float(ame_result.effects[i]));
+                            se_vec.push(Value::Float(if has_se {
+                                ame_result.std_errors[i]
+                            } else {
+                                f64::NAN
+                            }));
+                            z_vec.push(Value::Float(if has_se {
+                                ame_result.z_values[i]
+                            } else {
+                                f64::NAN
+                            }));
+                            p_vec.push(Value::Float(if has_se {
+                                ame_result.p_values[i]
+                            } else {
+                                f64::NAN
+                            }));
+                            cat_vec.push(Value::Str("".into()));
                         }
                         println!("{sep}");
                         println!("n = {}", ame_result.n_obs);
@@ -207,6 +232,12 @@ impl Interpreter {
                             }
                             let ame = ame_result.effects[k_idx];
                             println!("{:<22} {:>14.6}", name, ame);
+                            var_vec.push(Value::Str(name.clone()));
+                            dy_dx_vec.push(Value::Float(ame));
+                            se_vec.push(Value::Float(f64::NAN));
+                            z_vec.push(Value::Float(f64::NAN));
+                            p_vec.push(Value::Float(f64::NAN));
+                            cat_vec.push(Value::Str("".into()));
                         }
                         println!("{sep}");
                         println!("n = {}", ame_result.n_obs);
@@ -250,6 +281,12 @@ impl Interpreter {
                             }
                             let ame = ame_result.effects[k_idx];
                             println!("{:<22} {:>14.6}", name, ame);
+                            var_vec.push(Value::Str(name.clone()));
+                            dy_dx_vec.push(Value::Float(ame));
+                            se_vec.push(Value::Float(f64::NAN));
+                            z_vec.push(Value::Float(f64::NAN));
+                            p_vec.push(Value::Float(f64::NAN));
+                            cat_vec.push(Value::Str("".into()));
                         }
                         println!("{sep}");
                         println!("n = {}   α = {:.4}", ame_result.n_obs, r.alpha);
@@ -319,6 +356,12 @@ impl Interpreter {
                                 };
                                 let ame = (f_lo - f_hi) * beta[k_idx];
                                 print!("  {:>10.5}", ame);
+                                var_vec.push(Value::Str(name.to_string()));
+                                dy_dx_vec.push(Value::Float(ame));
+                                se_vec.push(Value::Float(f64::NAN));
+                                z_vec.push(Value::Float(f64::NAN));
+                                p_vec.push(Value::Float(f64::NAN));
+                                cat_vec.push(Value::Str(format!("P(Y={})", cat_j + 1)));
                             }
                             println!();
                         }
@@ -334,7 +377,15 @@ impl Interpreter {
                         ))
                     }
                 }
-                Ok(Value::Nil)
+                let mut columns = HashMap::new();
+                columns.insert("variable".into(), Value::List(Arc::new(var_vec)));
+                columns.insert("dy_dx".into(), Value::List(Arc::new(dy_dx_vec)));
+                columns.insert("std_err".into(), Value::List(Arc::new(se_vec)));
+                columns.insert("z".into(), Value::List(Arc::new(z_vec)));
+                columns.insert("p".into(), Value::List(Arc::new(p_vec)));
+                columns.insert("category".into(), Value::List(Arc::new(cat_vec)));
+                let df = self.dict_to_dataframe(&columns)?;
+                Ok(Value::DataFrame(Arc::new(df)))
             }
 
             // ── marginsplot ─────────────────────────────────────────────────
@@ -812,6 +863,10 @@ impl Interpreter {
                     "h", "forecast", "lower", "upper"
                 );
                 println!("{sep}");
+                let mut h_vec = Vec::new();
+                let mut fc_vec = Vec::new();
+                let mut lo_vec = Vec::new();
+                let mut hi_vec = Vec::new();
                 for h in 0..steps {
                     println!(
                         "{:<6} {:>12.4} {:>12.4} {:>12.4}",
@@ -820,11 +875,24 @@ impl Interpreter {
                         lo[h],
                         hi[h]
                     );
+                    h_vec.push((h + 1) as i64);
+                    fc_vec.push(Value::Float(fc[h]));
+                    lo_vec.push(Value::Float(lo[h]));
+                    hi_vec.push(Value::Float(hi[h]));
                 }
                 println!("{sep}");
                 println!();
 
-                Ok(Value::Nil)
+                let mut columns = HashMap::new();
+                columns.insert(
+                    "h".into(),
+                    Value::List(Arc::new(h_vec.into_iter().map(Value::Int).collect())),
+                );
+                columns.insert("forecast".into(), Value::List(Arc::new(fc_vec)));
+                columns.insert("lower".into(), Value::List(Arc::new(lo_vec)));
+                columns.insert("upper".into(), Value::List(Arc::new(hi_vec)));
+                let df = self.dict_to_dataframe(&columns)?;
+                Ok(Value::DataFrame(Arc::new(df)))
             }
 
             // ── lincom ───────────────────────────────────────────────────────
@@ -1062,14 +1130,21 @@ impl Interpreter {
                     estimate, se, t, df_t, p
                 );
                 println!("{sep}");
-                println!(
-                    "95% CI: [{:.6},  {:.6}]",
-                    estimate - tc * se,
-                    estimate + tc * se
-                );
+                let ci_lower = estimate - tc * se;
+                let ci_upper = estimate + tc * se;
+                println!("95% CI: [{:.6},  {:.6}]", ci_lower, ci_upper);
                 println!();
 
-                Ok(Value::Nil)
+                let mut map = HashMap::new();
+                map.insert("estimate".into(), Value::Float(estimate));
+                map.insert("std_err".into(), Value::Float(se));
+                map.insert("t".into(), Value::Float(t));
+                map.insert("df".into(), Value::Float(df_t));
+                map.insert("p_value".into(), Value::Float(p));
+                map.insert("ci_lower".into(), Value::Float(ci_lower));
+                map.insert("ci_upper".into(), Value::Float(ci_upper));
+                map.insert("expression".into(), Value::Str(expr_label));
+                Ok(Value::Dict(Arc::new(map)))
             }
 
             _ => return Ok(None),

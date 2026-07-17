@@ -18,7 +18,15 @@ pub(super) fn nan_last_cmp(a: &f64, b: &f64) -> Ordering {
 
 /// Builds a rendered diagnostic value.
 pub(super) fn diag(rendered: String) -> Value {
-    Value::DiagResult(Rc::new(DiagResult { rendered }))
+    Value::DiagResult(Rc::new(DiagResult {
+        rendered,
+        fields: HashMap::new(),
+    }))
+}
+
+/// Builds a rendered diagnostic value with structured fields for DAP/debug.
+pub(super) fn diag_with(rendered: String, fields: HashMap<String, Value>) -> Value {
+    Value::DiagResult(Rc::new(DiagResult { rendered, fields }))
 }
 
 /// Converts `Value` to boolean permissively.

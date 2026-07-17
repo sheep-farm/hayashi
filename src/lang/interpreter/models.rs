@@ -240,16 +240,3 @@ impl std::fmt::Display for ThreeSLSModel {
         write!(f, "{}", self.result)
     }
 }
-
-// ── Diagnostic test result (print-on-demand) ───────────────────────────────
-
-#[derive(Debug, Clone)]
-pub struct DiagResult {
-    pub rendered: String, // pre-rendered output by the test
-}
-
-impl std::fmt::Display for DiagResult {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.rendered)
-    }
-}

@@ -585,6 +585,9 @@ impl Interpreter {
 
                 // ── 1st Stage F by endogenous variable (partial F on Z_excl) ──
                 let mut first_stage_lines = String::new();
+                let mut first_stage_f = Vec::new();
+                let mut first_stage_p = Vec::new();
+                let mut first_stage_names = Vec::new();
                 for j in 0..k_endog {
                     // partial F = (Π̂_Zj' Z'M Z Π̂_Zj / L) / Σ̂_vj
                     let pi_zj = pi_z.column(j);
@@ -600,6 +603,9 @@ impl Interpreter {
                     } else {
                         f64::NAN
                     };
+                    first_stage_f.push(f_j);
+                    first_stage_p.push(p_j);
+                    first_stage_names.push(x_endog_names[j].clone());
                     first_stage_lines.push_str(&format!(
                         "   {:<20} F({},{}) = {:>10.3}   p = {:.4}\n",
                         x_endog_names[j], l, df_fs, f_j, p_j
@@ -665,7 +671,32 @@ impl Interpreter {
                 out.push_str(&format!("{thin}\n"));
                 out.push_str(" Rule of thumb: F > 10 (Staiger & Stock 1997)\n");
                 out.push_str(&format!("{thick}\n"));
-                Ok(diag(out))
+                let mut fields = HashMap::new();
+                fields.insert("test".into(), Value::Str("Weak Instrument Test".into()));
+                fields.insert("n".into(), Value::Int(n as i64));
+                fields.insert("k_endog".into(), Value::Int(k_endog as i64));
+                fields.insert("n_instruments".into(), Value::Int(l as i64));
+                fields.insert("df_first_stage".into(), Value::Int(df_fs as i64));
+                fields.insert("cragg_donald_f".into(), Value::Float(cd_stat));
+                fields.insert(
+                    "first_stage_names".into(),
+                    Value::List(Arc::new(
+                        first_stage_names.into_iter().map(Value::Str).collect(),
+                    )),
+                );
+                fields.insert(
+                    "first_stage_f".into(),
+                    Value::List(Arc::new(
+                        first_stage_f.into_iter().map(Value::Float).collect(),
+                    )),
+                );
+                fields.insert(
+                    "first_stage_p".into(),
+                    Value::List(Arc::new(
+                        first_stage_p.into_iter().map(Value::Float).collect(),
+                    )),
+                );
+                Ok(diag_with(out, fields))
             }
 
             // ── Sargan / Hansen J overidentification test ───────────────────
@@ -716,7 +747,23 @@ impl Interpreter {
                 let result = IV::sargan_test(&y, &x, &z, &iv_result.params)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 print!("{result}");
-                Ok(Value::Nil)
+                let mut map = HashMap::new();
+                map.insert(
+                    "test".into(),
+                    Value::Str("Sargan / Hansen J Overidentification Test".into()),
+                );
+                map.insert("j_stat".into(), Value::Float(result.sargan_stat));
+                map.insert("df".into(), Value::Int(result.df as i64));
+                map.insert("p_value".into(), Value::Float(result.p_value));
+                map.insert(
+                    "n_instruments".into(),
+                    Value::Int(result.n_instruments as i64),
+                );
+                map.insert(
+                    "n_regressors".into(),
+                    Value::Int(result.n_regressors as i64),
+                );
+                Ok(Value::Dict(Arc::new(map)))
             }
 
             // ── Durbin-Wu-Hausman endogeneity test ──────────────────────────
@@ -6200,12 +6247,28 @@ impl Interpreter {
                         println!("{:-^62}", "");
                         println!(" F({df1}, {df2})  =  {f_stat:.4}");
                         println!(" Prob > F      =  {p_val:.4}");
-                        if p_val < 0.01       { println!(" Result: rejects H0 at 1%"); }
-                        else if p_val < 0.05  { println!(" Result: rejects H0 at 5%"); }
-                        else if p_val < 0.10  { println!(" Result: rejects H0 at 10%"); }
-                        else                  { println!(" Result: does not reject H0 at 10%"); }
+                        let verdict = if p_val < 0.01 {
+                            "rejects H0 at 1%"
+                        } else if p_val < 0.05 {
+                            "rejects H0 at 5%"
+                        } else if p_val < 0.10 {
+                            "rejects H0 at 10%"
+                        } else {
+                            "does not reject H0 at 10%"
+                        };
+                        println!(" Result: {verdict}");
                         println!("{:=^62}", "");
-                        Ok(Value::Nil)
+                        let mut map = HashMap::new();
+                        map.insert("test".into(), Value::Str("testparm — Joint F Test".into()));
+                        map.insert("f_stat".into(), Value::Float(f_stat));
+                        map.insert("df1".into(), Value::Int(df1 as i64));
+                        map.insert("df2".into(), Value::Int(df2 as i64));
+                        map.insert("p_value".into(), Value::Float(p_val));
+                        map.insert("variables".into(), Value::List(Arc::new(
+                            tested.into_iter().map(Value::Str).collect()
+                        )));
+                        map.insert("conclusion".into(), Value::Str(verdict.into()));
+                        Ok(Value::Dict(Arc::new(map)))
                     }
                     _ => Err(HayashiError::Runtime(
                         "testparm: current support only for OLS/WLS — other models use chi2; implement via wald_test()".into()
@@ -6299,7 +6362,20 @@ impl Interpreter {
                 let result = greeners::Stats::anova_oneway(&outcome, &groups)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 println!("{result}");
-                Ok(Value::Nil)
+                let mut map = HashMap::new();
+                map.insert("test".into(), Value::Str("One-Way ANOVA".into()));
+                map.insert("ss_between".into(), Value::Float(result.ss_between));
+                map.insert("ss_within".into(), Value::Float(result.ss_within));
+                map.insert("ss_total".into(), Value::Float(result.ss_total));
+                map.insert("df_between".into(), Value::Int(result.df_between as i64));
+                map.insert("df_within".into(), Value::Int(result.df_within as i64));
+                map.insert("ms_between".into(), Value::Float(result.ms_between));
+                map.insert("ms_within".into(), Value::Float(result.ms_within));
+                map.insert("f_stat".into(), Value::Float(result.f_statistic));
+                map.insert("p_value".into(), Value::Float(result.p_value));
+                map.insert("n_groups".into(), Value::Int(result.n_groups as i64));
+                map.insert("n_obs".into(), Value::Int(result.n_obs as i64));
+                Ok(Value::Dict(Arc::new(map)))
             }
 
             // ── Beta Regression ───────────────────────────────────────────────

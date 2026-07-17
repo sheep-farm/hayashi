@@ -68,9 +68,9 @@ use self::helpers::*;
 pub use builtins::BUILTIN_NAMES;
 pub use env::Env;
 pub use models::{
-    BinaryModel, DFMModel, DiagResult, OlsModel, PcaModel, PenalizedModel, SurModel, ThreeSLSModel,
+    BinaryModel, DFMModel, OlsModel, PcaModel, PenalizedModel, SurModel, ThreeSLSModel,
 };
-pub use value::{ErrorValue, SendValue, Series, UserFn, Value};
+pub use value::{DiagResult, ErrorValue, SendValue, Series, UserFn, Value};
 
 fn t_critical_95(df: f64) -> f64 {
     t_quantile(0.975, df)

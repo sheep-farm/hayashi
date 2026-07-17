@@ -1,7 +1,7 @@
 use crate::lang::interpreter::models::{
     DFMModel, FactorModel, PcaModel, PenalizedModel, SurModel, ThreeSLSModel,
 };
-use crate::lang::interpreter::{Series, Value};
+use crate::lang::interpreter::{DiagResult, Series, Value};
 use indexmap::IndexMap;
 use ndarray::{Array1, Array2};
 use std::collections::HashMap;
@@ -357,6 +357,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
         Value::RollingResult(r) => rolling_children(r),
         Value::RecursiveLSResult(r) => recursive_ls_children(r),
         Value::DecompResult(r) => decomp_children(r),
+        Value::DiagResult(r) => diag_children(r),
         _ => Vec::new(),
     }
 }
@@ -835,6 +836,10 @@ fn value_summary_and_type(v: &Value) -> (String, &'static str) {
         Value::DecompResult(r) => (
             format!("Decomp({}), n={}", r.model, r.observed.len()),
             "DecompResult",
+        ),
+        Value::DiagResult(r) => (
+            format!("Diagnostic({} fields)", r.fields.len()),
+            "DiagResult",
         ),
         Value::UserFn(f) => (format!("<fn({})>", f.params.join(", ")), "Function"),
         _ => (v.to_string(), "Model"),
@@ -2691,6 +2696,16 @@ fn decomp_children(r: &greeners::DecompositionResult) -> Vec<(String, Value)> {
 
 fn decomp_fit_dict(r: &greeners::DecompositionResult) -> Value {
     fit_dict(&[("model", Value::Str(r.model.clone()))])
+}
+
+fn diag_children(r: &DiagResult) -> Vec<(String, Value)> {
+    let mut vars: Vec<(String, Value)> = r
+        .fields
+        .iter()
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
+    vars.push(("rendered".into(), Value::Str(r.rendered.clone())));
+    vars
 }
 
 fn capitalize(s: &str) -> String {

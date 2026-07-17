@@ -316,6 +316,9 @@ impl Interpreter {
                 println!("{sep}");
                 println!("{:<20} {:>8}  Diagnostic", "Variable", "VIF");
                 println!("{sep}");
+                let mut var_vec = Vec::new();
+                let mut vif_vec = Vec::new();
+                let mut diag_vec = Vec::new();
                 for (i, &v) in vifs.iter().enumerate() {
                     let name = names.get(i).map(|s| s.as_str()).unwrap_or("?");
                     let diag = if v.is_nan() {
@@ -334,12 +337,24 @@ impl Interpreter {
                     } else {
                         println!("{:<20} {:>8.3}  {}", name, v, diag);
                     }
+                    var_vec.push(Value::Str(name.to_string()));
+                    vif_vec.push(Value::Float(if v.is_nan() || v.is_infinite() {
+                        f64::NAN
+                    } else {
+                        v
+                    }));
+                    diag_vec.push(Value::Str(diag.to_string()));
                 }
                 println!("{sep}");
                 println!("Reference: VIF<5 ok  |  5-10 moderate  |  >10 severe");
                 println!();
 
-                Ok(Value::Nil)
+                let mut columns = HashMap::new();
+                columns.insert("variable".into(), Value::List(Arc::new(var_vec)));
+                columns.insert("vif".into(), Value::List(Arc::new(vif_vec)));
+                columns.insert("diagnostic".into(), Value::List(Arc::new(diag_vec)));
+                let df = self.dict_to_dataframe(&columns)?;
+                Ok(Value::DataFrame(Arc::new(df)))
             }
 
             // condnum(model)
@@ -387,7 +402,17 @@ impl Interpreter {
                 );
                 println!();
 
-                Ok(Value::Nil)
+                let mut map = HashMap::new();
+                map.insert(
+                    "condition_number".into(),
+                    Value::Float(if kappa.is_infinite() {
+                        f64::INFINITY
+                    } else {
+                        kappa
+                    }),
+                );
+                map.insert("diagnostic".into(), Value::Str(diag.into()));
+                Ok(Value::Dict(Arc::new(map)))
             }
 
             // durbinwatson(model)
@@ -429,7 +454,10 @@ impl Interpreter {
                 println!("Reference: DW ≈ 2 (no autocorr.) | <1.5 (positive) | >2.5 (negative)");
                 println!();
 
-                Ok(Value::Nil)
+                let mut map = HashMap::new();
+                map.insert("dw".into(), Value::Float(dw));
+                map.insert("interpretation".into(), Value::Str(interpretation.into()));
+                Ok(Value::Dict(Arc::new(map)))
             }
 
             // white(model)
@@ -485,7 +513,18 @@ impl Interpreter {
                 println!("(*** p<0.01  ** p<0.05  * p<0.10)");
                 println!();
 
-                Ok(Value::Nil)
+                let mut map = HashMap::new();
+                map.insert("test".into(), Value::Str("White Test".into()));
+                map.insert("lm_stat".into(), Value::Float(lm));
+                map.insert("df".into(), Value::Int(df as i64));
+                map.insert("p_value".into(), Value::Float(p));
+                let conclusion = if p < 0.05 {
+                    "reject H0 -> heteroscedasticity present"
+                } else {
+                    "do not reject H0 -> homoscedastic"
+                };
+                map.insert("conclusion".into(), Value::Str(conclusion.into()));
+                Ok(Value::Dict(Arc::new(map)))
             }
 
             // reset(model)
@@ -553,7 +592,20 @@ impl Interpreter {
                 println!("(*** p<0.01  ** p<0.05  * p<0.10)");
                 println!();
 
-                Ok(Value::Nil)
+                let mut map = HashMap::new();
+                map.insert("test".into(), Value::Str("Ramsey RESET Test".into()));
+                map.insert("f_stat".into(), Value::Float(f));
+                map.insert("df1".into(), Value::Int(df1 as i64));
+                map.insert("df2".into(), Value::Int(df2 as i64));
+                map.insert("p_value".into(), Value::Float(p));
+                map.insert("power".into(), Value::Int(power as i64));
+                let conclusion = if p < 0.05 {
+                    "reject H0 -> misspecification"
+                } else {
+                    "do not reject H0 -> linear specification adequate"
+                };
+                map.insert("conclusion".into(), Value::Str(conclusion.into()));
+                Ok(Value::Dict(Arc::new(map)))
             }
 
             // jb(df, varname) | jb(model)
@@ -620,7 +672,19 @@ impl Interpreter {
                 println!("(*** p<0.01  ** p<0.05  * p<0.10)");
                 println!();
 
-                Ok(Value::Nil)
+                let mut map = HashMap::new();
+                map.insert("test".into(), Value::Str("Jarque-Bera Test".into()));
+                map.insert("jb_stat".into(), Value::Float(jb));
+                map.insert("df".into(), Value::Int(2));
+                map.insert("p_value".into(), Value::Float(p));
+                map.insert("n".into(), Value::Int(series.len() as i64));
+                let conclusion = if p < 0.05 {
+                    "reject H0 -> non-normal"
+                } else {
+                    "do not reject H0 -> normal"
+                };
+                map.insert("conclusion".into(), Value::Str(conclusion.into()));
+                Ok(Value::Dict(Arc::new(map)))
             }
 
             // bgodfrey(model, lags=4)
@@ -687,7 +751,19 @@ impl Interpreter {
                 println!("(*** p<0.01  ** p<0.05  * p<0.10)");
                 println!();
 
-                Ok(Value::Nil)
+                let mut map = HashMap::new();
+                map.insert("test".into(), Value::Str("Breusch-Godfrey LM Test".into()));
+                map.insert("lm_stat".into(), Value::Float(lm));
+                map.insert("df".into(), Value::Int(df as i64));
+                map.insert("p_value".into(), Value::Float(p));
+                map.insert("lags".into(), Value::Int(lags as i64));
+                let conclusion = if p < 0.05 {
+                    "reject H0 -> serial autocorrelation present"
+                } else {
+                    "do not reject H0 -> no serial autocorrelation"
+                };
+                map.insert("conclusion".into(), Value::Str(conclusion.into()));
+                Ok(Value::Dict(Arc::new(map)))
             }
 
             // aliases para bgodfrey
@@ -2371,6 +2447,10 @@ impl Interpreter {
                     "\nSVAR Structural IRF — VAR({}) — id: {} — {} passos",
                     model.var_result.lags, model.identification, steps
                 );
+                let mut h_vec = Vec::new();
+                let mut impulse_vec = Vec::new();
+                let mut response_vec = Vec::new();
+                let mut irf_vec = Vec::new();
                 for j in 0..k {
                     println!("\n  Impulso: {}", names[j]);
                     println!("  {sep}");
@@ -2383,14 +2463,29 @@ impl Interpreter {
                     println!("  {sep}");
                     for h in 0..steps {
                         let row: String = (0..k)
-                            .map(|i| format!("{:>12.4}", tensor[[h, i, j]]))
+                            .map(|i| {
+                                h_vec.push(h as i64);
+                                impulse_vec.push(Value::Str(names[j].clone()));
+                                response_vec.push(Value::Str(names[i].clone()));
+                                irf_vec.push(Value::Float(tensor[[h, i, j]]));
+                                format!("{:>12.4}", tensor[[h, i, j]])
+                            })
                             .collect::<Vec<_>>()
                             .join("");
                         println!("  {:>6}  {row}", h);
                     }
                 }
                 println!();
-                Ok(Value::Nil)
+                let mut columns = HashMap::new();
+                columns.insert(
+                    "h".into(),
+                    Value::List(Arc::new(h_vec.into_iter().map(Value::Int).collect())),
+                );
+                columns.insert("impulse".into(), Value::List(Arc::new(impulse_vec)));
+                columns.insert("response".into(), Value::List(Arc::new(response_vec)));
+                columns.insert("sirf".into(), Value::List(Arc::new(irf_vec)));
+                let df = self.dict_to_dataframe(&columns)?;
+                Ok(Value::DataFrame(Arc::new(df)))
             }
 
             // sfevd(model, steps=10) — Structural FEVD
@@ -2417,6 +2512,10 @@ impl Interpreter {
                     "\nSVAR Structural FEVD — VAR({}) — id: {}",
                     model.var_result.lags, model.identification
                 );
+                let mut h_vec = Vec::new();
+                let mut response_vec = Vec::new();
+                let mut source_vec = Vec::new();
+                let mut fevd_vec = Vec::new();
                 for i in 0..k {
                     println!("\n  Resposta: {}", names[i]);
                     println!("  {sep}");
@@ -2429,14 +2528,29 @@ impl Interpreter {
                     println!("  {sep}");
                     for h in 0..steps {
                         let row: String = (0..k)
-                            .map(|j| format!("{:>12.4}", tensor[[h, i, j]]))
+                            .map(|j| {
+                                h_vec.push(h as i64);
+                                response_vec.push(Value::Str(names[i].clone()));
+                                source_vec.push(Value::Str(names[j].clone()));
+                                fevd_vec.push(Value::Float(tensor[[h, i, j]]));
+                                format!("{:>12.4}", tensor[[h, i, j]])
+                            })
                             .collect::<Vec<_>>()
                             .join("");
                         println!("  {:>6}  {row}", h);
                     }
                 }
                 println!();
-                Ok(Value::Nil)
+                let mut columns = HashMap::new();
+                columns.insert(
+                    "h".into(),
+                    Value::List(Arc::new(h_vec.into_iter().map(Value::Int).collect())),
+                );
+                columns.insert("response".into(), Value::List(Arc::new(response_vec)));
+                columns.insert("source".into(), Value::List(Arc::new(source_vec)));
+                columns.insert("sfevd".into(), Value::List(Arc::new(fevd_vec)));
+                let df = self.dict_to_dataframe(&columns)?;
+                Ok(Value::DataFrame(Arc::new(df)))
             }
 
             // ── 3SLS — Three Stage Least Squares ──────────────────────────────

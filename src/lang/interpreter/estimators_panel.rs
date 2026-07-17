@@ -736,7 +736,17 @@ impl Interpreter {
                 let result = greeners::ModelSelection::lr_test(ll_r, ll_u, k_r, k_u)
                     .map_err(HayashiError::Runtime)?;
                 print!("{result}");
-                Ok(Value::Nil)
+                let mut map = HashMap::new();
+                map.insert("test".into(), Value::Str("Likelihood-Ratio Test".into()));
+                map.insert("lr_stat".into(), Value::Float(result.lr_stat));
+                map.insert("df".into(), Value::Int(result.df as i64));
+                map.insert("p_value".into(), Value::Float(result.p_value));
+                map.insert("ll_restricted".into(), Value::Float(result.ll_restricted));
+                map.insert(
+                    "ll_unrestricted".into(),
+                    Value::Float(result.ll_unrestricted),
+                );
+                Ok(Value::Dict(Arc::new(map)))
             }
 
             // ── Fixed Effects ─────────────────────────────────────────────────
@@ -875,7 +885,19 @@ impl Interpreter {
                 out.push_str(&format!("\n{thin}\n"));
                 out.push_str("   *** p<0.01  ** p<0.05  * p<0.10\n");
                 out.push_str(&format!("{thick}\n"));
-                Ok(diag(out))
+                let mut fields = HashMap::new();
+                fields.insert(
+                    "test".into(),
+                    Value::Str("F-test: Fixed Effects vs Pooled OLS".into()),
+                );
+                fields.insert("f_stat".into(), Value::Float(f_stat));
+                fields.insert("df_num".into(), Value::Int(df_num as i64));
+                fields.insert("df_denom".into(), Value::Int(df_denom as i64));
+                fields.insert("p_value".into(), Value::Float(p));
+                fields.insert("conclusion".into(), Value::Str(verdict.into()));
+                fields.insert("ssr_pooled".into(), Value::Float(ssr_pooled));
+                fields.insert("ssr_fe".into(), Value::Float(ssr_fe));
+                Ok(diag_with(out, fields))
             }
 
             // ── Pesaran CD: cross-sectional dependence ────────────────────────
@@ -953,7 +975,14 @@ impl Interpreter {
                 out.push_str(&format!("\n{thin}\n"));
                 out.push_str("   *** p<0.01  ** p<0.05  * p<0.10\n");
                 out.push_str(&format!("{thick}\n"));
-                Ok(diag(out))
+                let mut fields = HashMap::new();
+                fields.insert("test".into(), Value::Str("Pesaran CD Test".into()));
+                fields.insert("cd_stat".into(), Value::Float(cd));
+                fields.insert("p_value".into(), Value::Float(p));
+                fields.insert("n_entities".into(), Value::Int(n_entities as i64));
+                fields.insert("t_bar".into(), Value::Float(t_bar));
+                fields.insert("conclusion".into(), Value::Str(verdict.into()));
+                Ok(diag_with(out, fields))
             }
 
             // ── Breusch-Pagan LM test (individual effects in panel) ─────────
@@ -1034,7 +1063,15 @@ impl Interpreter {
                 out.push_str(&format!("\n{thin}\n"));
                 out.push_str("   *** p<0.01  ** p<0.05  * p<0.10\n");
                 out.push_str(&format!("{thick}\n"));
-                Ok(diag(out))
+                let mut fields = HashMap::new();
+                fields.insert("test".into(), Value::Str("Breusch-Pagan LM Test".into()));
+                fields.insert("lm_stat".into(), Value::Float(lm));
+                fields.insert("p_value".into(), Value::Float(p));
+                fields.insert("n".into(), Value::Int(n as i64));
+                fields.insert("n_entities".into(), Value::Int(n_entities as i64));
+                fields.insert("t_bar".into(), Value::Float(t_bar));
+                fields.insert("conclusion".into(), Value::Str(verdict.into()));
+                Ok(diag_with(out, fields))
             }
 
             // ── Chamberlain: period-specific correlation with individual effects
@@ -1135,7 +1172,18 @@ impl Interpreter {
                     "   More general test than Mundlak — includes values in all T periods\n",
                 );
                 out.push_str(&format!("{thick}\n"));
-                Ok(diag(out))
+                let mut fields = HashMap::new();
+                fields.insert("test".into(), Value::Str("Chamberlain Test".into()));
+                fields.insert("f_stat".into(), Value::Float(f_stat));
+                fields.insert("df_num".into(), Value::Int(df1 as i64));
+                fields.insert("df_denom".into(), Value::Int(df_denom as i64));
+                fields.insert("p_value".into(), Value::Float(p));
+                fields.insert("n_obs".into(), Value::Int(n_obs as i64));
+                fields.insert("n_entities".into(), Value::Int(n_entities as i64));
+                fields.insert("n_periods".into(), Value::Int(t_count as i64));
+                fields.insert("k_active".into(), Value::Int(k_active as i64));
+                fields.insert("conclusion".into(), Value::Str(verdict.into()));
+                Ok(diag_with(out, fields))
             }
 
             // ── Arellano-Bond Diff-GMM (OLD mundlak removed — use new mundlak above) ─
@@ -1242,7 +1290,38 @@ impl Interpreter {
                 out.push_str(&format!("\n{thin}\n"));
                 out.push_str("   *** p<0.01  ** p<0.05  * p<0.10\n");
                 out.push_str(&format!("{thick}\n"));
-                Ok(diag(out))
+                let mut fields = HashMap::new();
+                fields.insert("test".into(), Value::Str("Mundlak Test".into()));
+                fields.insert("f_stat".into(), Value::Float(f_stat));
+                fields.insert("df_num".into(), Value::Int(df1 as i64));
+                fields.insert("df_denom".into(), Value::Int(df2_exact as i64));
+                fields.insert("p_value".into(), Value::Float(p));
+                fields.insert("n_obs".into(), Value::Int(n as i64));
+                fields.insert("n_entities".into(), Value::Int(n_entities as i64));
+                fields.insert("k".into(), Value::Int(k as i64));
+                fields.insert("conclusion".into(), Value::Str(verdict.into()));
+                fields.insert(
+                    "variable".into(),
+                    Value::List(Arc::new(
+                        non_const_names
+                            .iter()
+                            .map(|s| Value::Str(s.to_string()))
+                            .collect(),
+                    )),
+                );
+                fields.insert(
+                    "gamma".into(),
+                    Value::List(Arc::new(
+                        gamma_hat.iter().map(|&v| Value::Float(v)).collect(),
+                    )),
+                );
+                fields.insert(
+                    "gamma_se".into(),
+                    Value::List(Arc::new(
+                        gamma_se.iter().map(|&v| Value::Float(v)).collect(),
+                    )),
+                );
+                Ok(diag_with(out, fields))
             }
 
             // ── Arellano-Bond Diff-GMM ────────────────────────────────────────
@@ -1741,7 +1820,23 @@ impl Interpreter {
                     "   Variance estimated via sandwich (Σ_i of cross-products by entity)\n",
                 );
                 out.push_str(&format!("{thick}\n"));
-                Ok(diag(out))
+                let mut fields = HashMap::new();
+                fields.insert("test".into(), Value::Str("Arellano-Bond Test".into()));
+                fields.insert("m1_z".into(), Value::Float(m1));
+                fields.insert("m1_p".into(), Value::Float(p1));
+                fields.insert("m2_z".into(), Value::Float(m2));
+                fields.insert("m2_p".into(), Value::Float(p2));
+                fields.insert("n_obs".into(), Value::Int(n_obs as i64));
+                fields.insert("n_entities".into(), Value::Int(n_entities as i64));
+                let verdict = if p1 < 0.05 && p2 >= 0.05 {
+                    "m1 rejects and m2 does not reject -> valid GMM"
+                } else if p1 >= 0.05 {
+                    "m1 does not reject -> check specification"
+                } else {
+                    "m2 rejects -> AR(2) detected; consider more distant lags"
+                };
+                fields.insert("conclusion".into(), Value::Str(verdict.into()));
+                Ok(diag_with(out, fields))
             }
 
             // ── wooldridge_OLD_REMOVED (replaced by the new one above) ─────────
@@ -1831,7 +1926,19 @@ impl Interpreter {
                 out.push_str("   *** p<0.01  ** p<0.05  * p<0.10\n");
                 out.push_str("   (OLS standard SE — use cluster-robust SE for formal inference)\n");
                 out.push_str(&format!("{thick}\n"));
-                Ok(diag(out))
+                let mut fields = HashMap::new();
+                fields.insert(
+                    "test".into(),
+                    Value::Str("Wooldridge Test (panel serial autocorrelation)".into()),
+                );
+                fields.insert("rho".into(), Value::Float(rho));
+                fields.insert("t_stat".into(), Value::Float(t_stat));
+                fields.insert("df".into(), Value::Int(df_t as i64));
+                fields.insert("p_value".into(), Value::Float(p));
+                fields.insert("n_entities".into(), Value::Int(n_entities as i64));
+                fields.insert("n_pairs".into(), Value::Int(n_pairs as i64));
+                fields.insert("conclusion".into(), Value::Str(verdict.into()));
+                Ok(diag_with(out, fields))
             }
 
             // ── Hausman FE vs RE ──────────────────────────────────────────────
@@ -1970,7 +2077,15 @@ impl Interpreter {
                 out.push_str(&format!("\n{thin}\n"));
                 out.push_str("   *** p<0.01  ** p<0.05  * p<0.10\n");
                 out.push_str(&format!("{thick}\n"));
-                Ok(diag(out))
+                let mut fields = HashMap::new();
+                fields.insert("test".into(), Value::Str("Hausman FE vs RE".into()));
+                fields.insert("chi2".into(), Value::Float(chi2));
+                fields.insert("df".into(), Value::Int(df as i64));
+                fields.insert("p_value".into(), Value::Float(p));
+                fields.insert("conclusion".into(), Value::Str(verdict.into()));
+                fields.insert("n_compared".into(), Value::Int(pairs.len() as i64));
+                fields.insert("n_skipped".into(), Value::Int(skipped as i64));
+                Ok(diag_with(out, fields))
             }
 
             // ── Robust Hausman Test ──────────────────────────────────────────
