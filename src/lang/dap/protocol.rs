@@ -175,11 +175,15 @@ pub struct Thread {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Breakpoint {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<i64>,
     pub line: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub verified: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<Source>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

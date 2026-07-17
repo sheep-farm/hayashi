@@ -475,15 +475,22 @@ impl Interpreter {
                 ) {
                     Ok(args) => {
                         let path = std::path::PathBuf::from(&args.source.path);
+                        let source_for_bp = Source {
+                            path: args.source.path.clone(),
+                            name: args.source.name.clone(),
+                        };
                         let lines: Vec<usize> =
                             args.breakpoints.iter().map(|b| b.line as usize).collect();
                         self.debug_set_breakpoints(path.clone(), lines.clone());
                         let breakpoints: Vec<Breakpoint> = lines
                             .iter()
-                            .map(|l| Breakpoint {
+                            .enumerate()
+                            .map(|(i, l)| Breakpoint {
+                                id: Some(i as i64),
                                 line: *l as i64,
                                 verified: Some(true),
                                 message: None,
+                                source: Some(source_for_bp.clone()),
                             })
                             .collect();
                         Response::ok(0, req.seq, &req.command)
