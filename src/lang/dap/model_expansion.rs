@@ -1,4 +1,4 @@
-use crate::lang::interpreter::models::{SurModel, ThreeSLSModel};
+use crate::lang::interpreter::models::{DFMModel, SurModel, ThreeSLSModel};
 use crate::lang::interpreter::{Series, Value};
 use indexmap::IndexMap;
 use ndarray::{Array1, Array2};
@@ -330,6 +330,13 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
         Value::AutoRegResult(r) => autoreg_children(r),
         Value::ArdlResult(r) => ardl_children(r),
         Value::ThresholdResult(r) => threshold_children(r),
+        Value::VarResult(r) => var_children(r),
+        Value::VecmResult(r) => vecm_children(r),
+        Value::VarmaResult(r) => varma_children(r),
+        Value::SVarResult(r) => svar_children(r),
+        Value::MSARResult(r) => msar_children(r),
+        Value::DFMResult(r) => dfm_children(r),
+        Value::MarkovResult(r) => markov_children(r),
         _ => Vec::new(),
     }
 }
@@ -639,6 +646,52 @@ fn value_summary_and_type(v: &Value) -> (String, &'static str) {
                 r.threshold_gamma, r.r_squared
             ),
             "ThresholdResult",
+        ),
+        Value::VarResult(r) => (
+            format!(
+                "VAR(lags={}, k={}), n={}, AIC={:.4}",
+                r.lags, r.n_vars, r.n_obs, r.aic
+            ),
+            "VarResult",
+        ),
+        Value::VecmResult(r) => (
+            format!("VECM(rank={}, lags={}), n={}", r.rank, r.lags, r.n_obs),
+            "VecmResult",
+        ),
+        Value::VarmaResult(r) => (
+            format!(
+                "VARMA({},{}), k={}, n={}",
+                r.p_lags, r.q_lags, r.n_vars, r.n_obs
+            ),
+            "VarmaResult",
+        ),
+        Value::SVarResult(r) => (
+            format!(
+                "SVAR(k={}, lags={}), id={}",
+                r.var_result.n_vars, r.var_result.lags, r.identification
+            ),
+            "SVarResult",
+        ),
+        Value::MSARResult(r) => (
+            format!(
+                "MSAR(ar={}, regimes={}), n={}",
+                r.ar_order, r.k_regimes, r.n_obs
+            ),
+            "MSARResult",
+        ),
+        Value::DFMResult(m) => (
+            format!(
+                "DFM(factors={}, series={}), n={}",
+                m.result.n_factors, m.result.n_vars, m.result.n_obs
+            ),
+            "DFMResult",
+        ),
+        Value::MarkovResult(r) => (
+            format!(
+                "MarkovSwitching(ar={}, regimes={}), n={}",
+                r.ar_order, r.n_regimes, r.n_obs
+            ),
+            "MarkovResult",
         ),
         Value::UserFn(f) => (format!("<fn({})>", f.params.join(", ")), "Function"),
         _ => (v.to_string(), "Model"),
@@ -1580,6 +1633,317 @@ fn threshold_fit_dict(r: &greeners::threshold::ThresholdResult) -> Value {
         ("r2", Value::Float(r.r_squared)),
         ("ssr_min", Value::Float(r.ssr_min)),
         ("n_search", Value::Int(r.n_search as i64)),
+    ])
+}
+
+fn array2_to_dataframe_named(arr: &Array2<f64>, col_names: &[String]) -> Value {
+    let mut columns: IndexMap<String, greeners::Column> = IndexMap::new();
+    for j in 0..arr.ncols() {
+        let name = col_names
+            .get(j)
+            .cloned()
+            .unwrap_or_else(|| format!("col{j}"));
+        let col: Vec<f64> = arr.column(j).iter().copied().collect();
+        columns.insert(name, greeners::Column::Float(Array1::from(col)));
+    }
+    Value::DataFrame(Arc::new(
+        greeners::DataFrame::from_columns(columns)
+            .unwrap_or_else(|_| greeners::DataFrame::from_columns(IndexMap::new()).unwrap()),
+    ))
+}
+
+fn var_param_names(k: usize, p: usize, var_names: &[String]) -> Vec<String> {
+    let mut names = Vec::with_capacity(1 + k * p);
+    names.push("const".into());
+    for lag in 1..=p {
+        for name in var_names.iter().take(k) {
+            names.push(format!("L{lag}.{name}"));
+        }
+    }
+    names
+}
+
+fn var_children(r: &greeners::var::VarResult) -> Vec<(String, Value)> {
+    let mut vars = Vec::new();
+    let k = r.n_vars;
+    let p = r.lags;
+    let param_names = var_param_names(k, p, &r.var_names);
+    let total_rows = r.params.nrows();
+    for i in 0..k {
+        let dep = r
+            .var_names
+            .get(i)
+            .cloned()
+            .unwrap_or_else(|| format!("var{i}"));
+        let params_col = r.params.column(i).to_owned();
+        let se_col = r.std_errors.column(i).to_owned();
+        let zeros = Array1::zeros(total_rows);
+        let coef = coef_dataframe(
+            &param_names,
+            &params_col,
+            &se_col,
+            &zeros,
+            &zeros,
+            None,
+            None,
+        );
+        let mut wrap = HashMap::new();
+        wrap.insert("coefficients".into(), coef);
+        vars.push((dep, Value::Dict(Arc::new(wrap))));
+    }
+    vars.push((
+        "sigma_u".into(),
+        array2_to_dataframe_named(&r.sigma_u, &r.var_names),
+    ));
+    vars.push(("fit".into(), var_fit_dict(r)));
+    vars
+}
+
+fn var_fit_dict(r: &greeners::var::VarResult) -> Value {
+    fit_dict(&[
+        ("aic", Value::Float(r.aic)),
+        ("bic", Value::Float(r.bic)),
+        ("lags", Value::Int(r.lags as i64)),
+        ("n_vars", Value::Int(r.n_vars as i64)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+    ])
+}
+
+fn vecm_children(r: &greeners::vecm::VecmResult) -> Vec<(String, Value)> {
+    let mut vars = Vec::new();
+    let row_labels: Vec<String> = (0..r.beta.nrows()).map(|i| format!("eq{i}")).collect();
+    let col_labels = r.variable_names.clone();
+    vars.push((
+        "beta".into(),
+        array2_to_dataframe_named(&r.beta, &col_labels),
+    ));
+    vars.push((
+        "alpha".into(),
+        array2_to_dataframe_named(&r.alpha, &col_labels),
+    ));
+    vars.push((
+        "gamma".into(),
+        array2_to_dataframe_named(&r.gamma, &row_labels),
+    ));
+    vars.push((
+        "std_errors_beta".into(),
+        array2_to_dataframe_named(&r.std_errors_beta, &col_labels),
+    ));
+    vars.push((
+        "std_errors_alpha".into(),
+        array2_to_dataframe_named(&r.std_errors_alpha, &col_labels),
+    ));
+    vars.push((
+        "std_errors_gamma".into(),
+        array2_to_dataframe_named(&r.std_errors_gamma, &row_labels),
+    ));
+    vars.push((
+        "residuals".into(),
+        array2_to_dataframe_named(&r.residuals, &col_labels),
+    ));
+    vars.push((
+        "eigenvalues".into(),
+        array1_to_series("eigenvalues", &r.eigenvalues),
+    ));
+    vars.push(("fit".into(), vecm_fit_dict(r)));
+    vars
+}
+
+fn vecm_fit_dict(r: &greeners::vecm::VecmResult) -> Value {
+    fit_dict(&[
+        ("rank", Value::Int(r.rank as i64)),
+        ("n_vars", Value::Int(r.n_vars as i64)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("lags", Value::Int(r.lags as i64)),
+    ])
+}
+
+fn varma_children(r: &greeners::varma::VarmaResult) -> Vec<(String, Value)> {
+    let mut vars = Vec::new();
+    let col_names: Vec<String> = (0..r.n_vars).map(|i| format!("var{i}")).collect();
+    let ar_col_names: Vec<String> = (0..r.ar_params.ncols())
+        .map(|i| format!("col{i}"))
+        .collect();
+    let ma_col_names: Vec<String> = (0..r.ma_params.ncols())
+        .map(|i| format!("col{i}"))
+        .collect();
+    vars.push((
+        "ar_params".into(),
+        array2_to_dataframe_named(&r.ar_params, &ar_col_names),
+    ));
+    vars.push((
+        "ma_params".into(),
+        array2_to_dataframe_named(&r.ma_params, &ma_col_names),
+    ));
+    if let Some(exog) = &r.exog_params {
+        let exog_names: Vec<String> = (0..exog.ncols()).map(|i| format!("x{i}")).collect();
+        vars.push((
+            "exog_params".into(),
+            array2_to_dataframe_named(exog, &exog_names),
+        ));
+    }
+    vars.push((
+        "sigma_u".into(),
+        array2_to_dataframe_named(&r.sigma_u, &col_names),
+    ));
+    vars.push(("fit".into(), varma_fit_dict(r)));
+    vars
+}
+
+fn varma_fit_dict(r: &greeners::varma::VarmaResult) -> Value {
+    fit_dict(&[
+        ("aic", Value::Float(r.aic)),
+        ("bic", Value::Float(r.bic)),
+        ("p_lags", Value::Int(r.p_lags as i64)),
+        ("q_lags", Value::Int(r.q_lags as i64)),
+        ("n_vars", Value::Int(r.n_vars as i64)),
+        ("n_exog", Value::Int(r.n_exog as i64)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+    ])
+}
+
+fn svar_children(r: &greeners::svar::SVarResult) -> Vec<(String, Value)> {
+    let mut vars = var_children(&r.var_result);
+    let k = r.var_result.n_vars;
+    let names: Vec<String> = (0..k).map(|i| format!("var{i}")).collect();
+    vars.push((
+        "a_matrix".into(),
+        array2_to_dataframe_named(&r.a_matrix, &names),
+    ));
+    vars.push((
+        "b_matrix".into(),
+        array2_to_dataframe_named(&r.b_matrix, &names),
+    ));
+    vars.push((
+        "identification".into(),
+        Value::Str(r.identification.clone()),
+    ));
+    vars
+}
+
+fn msar_children(r: &greeners::markov_autoreg::MarkovAutoregResult) -> Vec<(String, Value)> {
+    let mut vars = Vec::new();
+    for j in 0..r.k_regimes {
+        let regime_name = format!("regime_{j}");
+        let mut map = HashMap::new();
+        map.insert("mean".into(), Value::Float(r.regime_means[j]));
+        map.insert("sigma".into(), Value::Float(r.regime_sigmas[j]));
+        let ar_names: Vec<String> = (0..r.ar_order).map(|l| format!("AR.L{}", l + 1)).collect();
+        let ar = r.ar_params.row(j).to_owned();
+        let zeros = Array1::zeros(ar.len());
+        let ar_df = coef_dataframe(&ar_names, &ar, &zeros, &zeros, &zeros, None, None);
+        map.insert("ar_coefficients".into(), ar_df);
+        vars.push((regime_name, Value::Dict(Arc::new(map))));
+    }
+    let regime_labels: Vec<String> = (0..r.k_regimes).map(|i| format!("regime_{i}")).collect();
+    vars.push((
+        "transition_matrix".into(),
+        array2_to_dataframe_named(&r.transition_matrix, &regime_labels),
+    ));
+    vars.push((
+        "smoothed_probs".into(),
+        array2_to_dataframe_named(&r.smoothed_probs, &regime_labels),
+    ));
+    vars.push((
+        "filtered_probs".into(),
+        array2_to_dataframe_named(&r.filtered_probs, &regime_labels),
+    ));
+    vars.push(("fit".into(), msar_fit_dict(r)));
+    vars
+}
+
+fn msar_fit_dict(r: &greeners::markov_autoreg::MarkovAutoregResult) -> Value {
+    fit_dict(&[
+        ("log_lik", Value::Float(r.log_likelihood)),
+        ("aic", Value::Float(r.aic)),
+        ("bic", Value::Float(r.bic)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("k_regimes", Value::Int(r.k_regimes as i64)),
+        ("ar_order", Value::Int(r.ar_order as i64)),
+    ])
+}
+
+fn dfm_children(m: &DFMModel) -> Vec<(String, Value)> {
+    let r = &*m.result;
+    let mut vars = Vec::new();
+    let factor_names: Vec<String> = (0..r.n_factors).map(|i| format!("F{}", i + 1)).collect();
+    vars.push((
+        "factors".into(),
+        array2_to_dataframe_named(&r.factors, &factor_names),
+    ));
+    vars.push((
+        "loadings".into(),
+        array2_to_dataframe_named(&r.factor_loadings, &factor_names),
+    ));
+    let ar_names: Vec<String> = (0..r.factor_order)
+        .map(|i| format!("AR{}", i + 1))
+        .collect();
+    for (i, ar) in r.factor_ar_params.iter().enumerate() {
+        let name = ar_names.get(i).cloned().unwrap_or_else(|| format!("AR{i}"));
+        vars.push((name.clone(), array2_to_dataframe_named(ar, &factor_names)));
+    }
+    vars.push((
+        "factor_cov".into(),
+        array2_to_dataframe_named(&r.sigma_factor, &factor_names),
+    ));
+    vars.push((
+        "obs_variances".into(),
+        array1_to_series("obs_variances", &r.sigma_obs),
+    ));
+    vars.push(("fit".into(), dfm_fit_dict(r)));
+    vars
+}
+
+fn dfm_fit_dict(r: &greeners::DynamicFactorResult) -> Value {
+    fit_dict(&[
+        ("log_lik", Value::Float(r.log_likelihood)),
+        ("aic", Value::Float(r.aic)),
+        ("bic", Value::Float(r.bic)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("n_series", Value::Int(r.n_vars as i64)),
+        ("n_factors", Value::Int(r.n_factors as i64)),
+        ("factor_order", Value::Int(r.factor_order as i64)),
+    ])
+}
+
+fn markov_children(r: &greeners::markov::MarkovSwitchingResult) -> Vec<(String, Value)> {
+    let mut vars = Vec::new();
+    for j in 0..r.n_regimes {
+        let regime_name = format!("regime_{j}");
+        let mut map = HashMap::new();
+        let params = &r.regime_params[j];
+        let ar_names: Vec<String> = (0..r.ar_order).map(|l| format!("AR.L{}", l + 1)).collect();
+        let zeros = Array1::zeros(params.len());
+        let coef = coef_dataframe(&ar_names, params, &zeros, &zeros, &zeros, None, None);
+        map.insert("coefficients".into(), coef);
+        map.insert("variance".into(), Value::Float(r.regime_variances[j]));
+        vars.push((regime_name, Value::Dict(Arc::new(map))));
+    }
+    let regime_labels: Vec<String> = (0..r.n_regimes).map(|i| format!("regime_{i}")).collect();
+    vars.push((
+        "transition_matrix".into(),
+        array2_to_dataframe_named(&r.transition_matrix, &regime_labels),
+    ));
+    vars.push((
+        "smoothed_probs".into(),
+        array2_to_dataframe_named(&r.smoothed_probs, &regime_labels),
+    ));
+    vars.push((
+        "filtered_probs".into(),
+        array2_to_dataframe_named(&r.filtered_probs, &regime_labels),
+    ));
+    vars.push(("fit".into(), markov_fit_dict(r)));
+    vars
+}
+
+fn markov_fit_dict(r: &greeners::markov::MarkovSwitchingResult) -> Value {
+    fit_dict(&[
+        ("log_lik", Value::Float(r.log_likelihood)),
+        ("aic", Value::Float(r.aic)),
+        ("bic", Value::Float(r.bic)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("n_regimes", Value::Int(r.n_regimes as i64)),
+        ("ar_order", Value::Int(r.ar_order as i64)),
     ])
 }
 
