@@ -514,6 +514,19 @@ fn expr_float() {
 }
 
 #[test]
+fn round_with_digits() {
+    assert_ok_contains(
+        "round_digits",
+        r#"
+print(round(3.14159, 2))
+print(round(1234.5678, -2))
+print(round(1.2345, 3))
+"#,
+        "1.235",
+    );
+}
+
+#[test]
 fn expr_scientific_notation() {
     assert_ok_contains(
         "scientific",
