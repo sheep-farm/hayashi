@@ -514,6 +514,21 @@ fn expr_float() {
 }
 
 #[test]
+fn expr_scientific_notation() {
+    assert_ok_contains(
+        "scientific",
+        r#"
+print(1e-6)
+print(1.5E+3)
+print(2e3)
+let x = 1e-6 * 2
+print(x)
+"#,
+        "0.000002",
+    );
+}
+
+#[test]
 fn expr_comparison() {
     assert_ok_contains(
         "comparison",
