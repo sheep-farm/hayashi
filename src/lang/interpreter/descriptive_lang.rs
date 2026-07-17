@@ -1198,14 +1198,14 @@ impl Interpreter {
                     "eststo: modelo {n} armazenado ({} total)",
                     self.stored_models.len()
                 );
-                Ok(Value::Nil)
+                Ok(Value::Int(n as i64))
             }
 
             "estclear" => {
                 let n = self.stored_models.len();
                 self.stored_models.clear();
                 println!("estclear: {n} modelos removidos");
-                Ok(Value::Nil)
+                Ok(Value::Int(n as i64))
             }
 
             "esttab" => {
@@ -1764,6 +1764,34 @@ impl Interpreter {
                     }
                 }
 
+                // Build long-format table for return value
+                let mut tab_var: Vec<Value> = Vec::new();
+                let mut tab_model: Vec<Value> = Vec::new();
+                let mut tab_coef: Vec<Value> = Vec::new();
+                let mut tab_se: Vec<Value> = Vec::new();
+                let mut tab_p: Vec<Value> = Vec::new();
+                let mut tab_n: Vec<Value> = Vec::new();
+                let mut tab_r2: Vec<Value> = Vec::new();
+                let mut tab_adj_r2: Vec<Value> = Vec::new();
+                for (m_idx, mi) in models.iter().enumerate() {
+                    let model_label = format!("({}) {}", m_idx + 1, mi.label);
+                    for var in &all_vars {
+                        let row = mi.coefs.iter().find(|(nm, _, _, _)| nm == var);
+                        let (c, se, p) = match row {
+                            Some((_, c, se, p)) => (*c, *se, *p),
+                            None => (f64::NAN, None, None),
+                        };
+                        tab_var.push(Value::Str(var.clone()));
+                        tab_model.push(Value::Str(model_label.clone()));
+                        tab_coef.push(Value::Float(c));
+                        tab_se.push(Value::Float(se.unwrap_or(f64::NAN)));
+                        tab_p.push(Value::Float(p.unwrap_or(f64::NAN)));
+                        tab_n.push(Value::Int(mi.n as i64));
+                        tab_r2.push(Value::Float(mi.r2.unwrap_or(f64::NAN)));
+                        tab_adj_r2.push(Value::Float(mi.adj_r2.unwrap_or(f64::NAN)));
+                    }
+                }
+
                 let n_models = models.len();
                 let col_w = 16usize;
                 let label_w = all_vars.iter().map(|s| s.len()).max().unwrap_or(8).max(12) + 2;
@@ -1997,7 +2025,17 @@ impl Interpreter {
                     print!("\n{buf}");
                 }
 
-                Ok(Value::Nil)
+                let mut columns = HashMap::new();
+                columns.insert("variable".into(), Value::List(Arc::new(tab_var)));
+                columns.insert("model".into(), Value::List(Arc::new(tab_model)));
+                columns.insert("coef".into(), Value::List(Arc::new(tab_coef)));
+                columns.insert("se".into(), Value::List(Arc::new(tab_se)));
+                columns.insert("p".into(), Value::List(Arc::new(tab_p)));
+                columns.insert("n".into(), Value::List(Arc::new(tab_n)));
+                columns.insert("r2".into(), Value::List(Arc::new(tab_r2)));
+                columns.insert("adj_r2".into(), Value::List(Arc::new(tab_adj_r2)));
+                let df = self.dict_to_dataframe(&columns)?;
+                Ok(Value::DataFrame(Arc::new(df)))
             }
 
             _ => return Ok(None),

@@ -845,7 +845,27 @@ impl Interpreter {
                 let result = IV::endogeneity_test(&y, &x, &z, &endog_cols, endog_var_names)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 print!("{result}");
-                Ok(Value::Nil)
+                let mut map = HashMap::new();
+                map.insert(
+                    "test".into(),
+                    Value::Str("Durbin-Wu-Hausman Endogeneity Test".into()),
+                );
+                map.insert("f_stat".into(), Value::Float(result.f_stat));
+                map.insert("df".into(), Value::Int(result.df as i64));
+                map.insert("p_value".into(), Value::Float(result.p_value));
+                map.insert(
+                    "endogenous_vars".into(),
+                    Value::List(Arc::new(
+                        result.endogenous_vars.into_iter().map(Value::Str).collect(),
+                    )),
+                );
+                let conclusion = if result.p_value < 0.05 {
+                    "reject H0 -> endogeneity present, IV/2SLS preferred"
+                } else {
+                    "do not reject H0 -> OLS consistent"
+                };
+                map.insert("conclusion".into(), Value::Str(conclusion.into()));
+                Ok(Value::Dict(Arc::new(map)))
             }
 
             // ── Binary model diagnostics ────────────────────────────────────
@@ -875,7 +895,18 @@ impl Interpreter {
                 let result = BinaryDiagnostics::classification(&y_slice, &probs_slice, threshold)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 print!("{result}");
-                Ok(Value::Nil)
+                let mut map = HashMap::new();
+                map.insert("test".into(), Value::Str("Classification Table".into()));
+                map.insert("threshold".into(), Value::Float(result.threshold));
+                map.insert("tp".into(), Value::Int(result.tp as i64));
+                map.insert("tn".into(), Value::Int(result.tn as i64));
+                map.insert("fp".into(), Value::Int(result.fp as i64));
+                map.insert("fn".into(), Value::Int(result.fn_count as i64));
+                map.insert("sensitivity".into(), Value::Float(result.sensitivity));
+                map.insert("specificity".into(), Value::Float(result.specificity));
+                map.insert("correct_rate".into(), Value::Float(result.correct_rate));
+                map.insert("n".into(), Value::Int(result.n as i64));
+                Ok(Value::Dict(Arc::new(map)))
             }
 
             // lroc(model) / roc(model) — ROC curve and AUC
@@ -894,7 +925,23 @@ impl Interpreter {
                 let result = BinaryDiagnostics::roc(&y_slice, &probs_slice)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 print!("{result}");
-                Ok(Value::Nil)
+                let mut map = HashMap::new();
+                map.insert("test".into(), Value::Str("ROC / AUC".into()));
+                map.insert("auc".into(), Value::Float(result.auc));
+                map.insert("gini".into(), Value::Float(result.gini));
+                map.insert(
+                    "n_thresholds".into(),
+                    Value::Int(result.n_thresholds as i64),
+                );
+                map.insert(
+                    "fpr".into(),
+                    Value::List(Arc::new(result.fpr.into_iter().map(Value::Float).collect())),
+                );
+                map.insert(
+                    "tpr".into(),
+                    Value::List(Arc::new(result.tpr.into_iter().map(Value::Float).collect())),
+                );
+                Ok(Value::Dict(Arc::new(map)))
             }
 
             // estat_gof(model [, groups=10]) — Hosmer-Lemeshow
@@ -920,7 +967,22 @@ impl Interpreter {
                 let result = BinaryDiagnostics::hosmer_lemeshow(&y_slice, &probs_slice, n_groups)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 print!("{result}");
-                Ok(Value::Nil)
+                let mut map = HashMap::new();
+                map.insert(
+                    "test".into(),
+                    Value::Str("Hosmer-Lemeshow Goodness-of-Fit".into()),
+                );
+                map.insert("hl_stat".into(), Value::Float(result.hl_stat));
+                map.insert("p_value".into(), Value::Float(result.p_value));
+                map.insert("n_groups".into(), Value::Int(result.n_groups as i64));
+                map.insert("df".into(), Value::Int(result.df as i64));
+                let conclusion = if result.p_value < 0.05 {
+                    "reject H0 -> model does not fit adequately"
+                } else {
+                    "do not reject H0 -> model fits adequately"
+                };
+                map.insert("conclusion".into(), Value::Str(conclusion.into()));
+                Ok(Value::Dict(Arc::new(map)))
             }
 
             // linktest(model) — specification error detection
@@ -936,7 +998,27 @@ impl Interpreter {
                 let result = BinaryDiagnostics::linktest(&model.y, &model.x, &model.result.params)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 print!("{result}");
-                Ok(Value::Nil)
+                let mut map = HashMap::new();
+                map.insert(
+                    "test".into(),
+                    Value::Str("Linktest (Specification Test)".into()),
+                );
+                map.insert("n".into(), Value::Int(result.n as i64));
+                map.insert("hat_coef".into(), Value::Float(result.hat_coef));
+                map.insert("hat_se".into(), Value::Float(result.hat_se));
+                map.insert("hat_z".into(), Value::Float(result.hat_z));
+                map.insert("hat_p".into(), Value::Float(result.hat_p));
+                map.insert("hatsq_coef".into(), Value::Float(result.hatsq_coef));
+                map.insert("hatsq_se".into(), Value::Float(result.hatsq_se));
+                map.insert("hatsq_z".into(), Value::Float(result.hatsq_z));
+                map.insert("hatsq_p".into(), Value::Float(result.hatsq_p));
+                let conclusion = if result.hatsq_p < 0.05 {
+                    "reject H0 -> possible specification error (hatsq significant)"
+                } else {
+                    "do not reject H0 -> model appears correctly specified"
+                };
+                map.insert("conclusion".into(), Value::Str(conclusion.into()));
+                Ok(Value::Dict(Arc::new(map)))
             }
 
             // ── Logit ─────────────────────────────────────────────────────────
