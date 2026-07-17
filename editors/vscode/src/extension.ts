@@ -194,6 +194,12 @@ class HayashiDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory
         const args: string[] = Array.isArray(config.runtimeArgs)
             ? config.runtimeArgs.map(String)
             : ['dap'];
+        const program = String(config.program || '${file}');
+        if (program && program !== '${file}') {
+            args.push(program);
+        } else if (config.program === '${file}' && vscode.window.activeTextEditor) {
+            args.push(vscode.window.activeTextEditor.document.uri.fsPath);
+        }
         return new vscode.DebugAdapterExecutable(executable, args);
     }
 }

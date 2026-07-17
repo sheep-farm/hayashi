@@ -436,7 +436,7 @@ fn run() {
         Some(unknown) => {
             eprintln!("hay: unknown argument '{unknown}'");
             eprintln!(
-                "Usage: hay [script.hay | - | install | remove | list | update | check-plugin | validate | dist-update]"
+                "Usage: hay [script.hay | - | dap | install | remove | list | update | check-plugin | validate | dist-update]"
             );
             std::process::exit(1);
         }
@@ -1131,9 +1131,10 @@ fn print_help() {
     println!("Hayashi {VERSION}  — Applied Econometrics Language");
     println!();
     println!("USAGE:");
-    println!("    hay              Start interactive REPL (multi-line)");
-    println!("    hay script.hay    Run a script file");
-    println!("    hay --version    Print version");
+    println!("    hay                 Start interactive REPL (multi-line)");
+    println!("    hay script.hay      Run a script file");
+    println!("    hay dap script.hay  Start DAP debugger server");
+    println!("    hay --version       Print version");
     println!();
     println!("ESTIMATORS:");
     println!("    ols/reg  logit  probit  iv  poisson  nbreg  tobit  qreg");
