@@ -12,23 +12,24 @@
     { "open": "{", "close": "}" },
     { "open": "[", "close": "]" },
     { "open": "(", "close": ")" },
-    { "open": "\"", "close": "\"" }
+    { "open": "\"", "close": "\"", "notIn": ["string"] },
+    { "open": "/*", "close": " */", "notIn": ["string"] }
   ],
   "surroundingPairs": [
-    ["{", "}"],
-    ["[", "]"],
-    ["(", ")"],
-    ["\"", "\""]
+    { "open": "{", "close": "}" },
+    { "open": "[", "close": "]" },
+    { "open": "(", "close": ")" },
+    { "open": "\"", "close": "\"" }
   ],
   "folding": {
     "markers": {
-      "start": "^\\s*//\\s*──",
+      "start": "^\\s*(fn|for|while|if|else|input|match)\\b",
       "end": "^\\s*$"
     }
   },
   "indentationRules": {
-    "increaseIndentPattern": "\\{\\s*$",
-    "decreaseIndentPattern": "^\\s*\\}"
+    "increaseIndentPattern": "^\\s*(fn|for|while|if|else|else\\s+if|input|match|let\\s+\\w+\\s*=.*\\{)\\b",
+    "decreaseIndentPattern": "^\\s*(\\}|end\\b)"
   },
   "wordPattern": "[a-zA-Z_][a-zA-Z0-9_]*"
 }

@@ -7,7 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Target VS Code extension directory can be overridden with the first argument.
 VSCODE_DIR="${1:-$HOME/.vscode}"
 EXTENSIONS_DIR="$VSCODE_DIR/extensions"
-TARGET_NAME="hayashi-lang"
+TARGET_NAME="sheep-farm.hayashi-0.2.0"
 TARGET_PATH="$EXTENSIONS_DIR/$TARGET_NAME"
 
 echo "Building Hayashi VS Code extension..."
@@ -29,11 +29,13 @@ npm run compile
 # Ensure the VS Code extensions directory exists.
 mkdir -p "$EXTENSIONS_DIR"
 
-# If a previous install exists, remove it (symlink or copy).
-if [ -e "$TARGET_PATH" ] || [ -L "$TARGET_PATH" ]; then
-    echo "Removing existing extension at $TARGET_PATH"
-    rm -rf "$TARGET_PATH"
-fi
+# Remove any older Hayashi extension versions to avoid conflicts.
+for old in "$EXTENSIONS_DIR"/*hayashi*; do
+    if [ -e "$old" ] || [ -L "$old" ]; then
+        echo "Removing old Hayashi extension: $old"
+        rm -rf "$old"
+    fi
+done
 
 # Prefer a symlink so updates only require re-running 'npm run compile'.
 ln -s "$SCRIPT_DIR" "$TARGET_PATH"
