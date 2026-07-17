@@ -1,0 +1,71 @@
+\chapter{Depuração}
+
+\hayashi{} inclui um servidor do Debug Adapter Protocol (DAP) embutido. Com a extensão do VS~Code é possível definir breakpoints, executar passo a passo e inspecionar variáveis.
+
+\section{Iniciando uma sessão de debug}
+
+Certifique-se de que o binário \hay{} esteja no \texttt{PATH}. No VS~Code abra um arquivo \texttt{.hay}, vá ao painel \textbf{Run and Debug}, escolha a configuração \textbf{"Debug Hayashi script"} e inicie a depuração.
+
+Por baixo dos panos o VS~Code executa:
+
+\begin{lstlisting}[style=inline, language=sh]
+hay dap script.hay
+\end{lstlisting}
+
+O servidor DAP suporta breakpoints, \textit{step over/in/out}, \textit{continue}, escopos (Locals / Globals) e inspeção de variáveis.
+
+\section{Inspecionando resultados de modelos}
+
+Quando a execução pausa, os objetos de modelo se expandem no painel Variables com um resumo curto e filhos estruturados.
+
+\begin{lstlisting}[style=inline]
+result: OLS(k=2, n=10000), R2=1.0000
+  coefficients    DataFrame(2 rows, 7 cols)
+  fit             Dict(13 entries)
+  residuals       Series(residuals: 10000 values)
+  fitted_values   Series(fitted_values: 10000 values)
+  params          Series(params: 2 values)
+  std_errors      Series(std_errors: 2 values)
+  test_values     Series(test_values: 2 values)
+  p_values        Series(p_values: 2 values)
+  conf_lower      Series(conf_lower: 2 values)
+  conf_upper      Series(conf_upper: 2 values)
+\end{lstlisting}
+
+\subsection{Filhos}
+
+\begin{description}
+  \item[\texttt{coefficients}] Tabela de coeficientes como \texttt{DataFrame}: \texttt{variable}, \texttt{coef}, \texttt{std\_err}, \texttt{t} ou \texttt{z}, \texttt{p\_value}, \texttt{conf\_low}, \texttt{conf\_high}.
+  \item[\texttt{fit}] Estatísticas de ajuste específicas do modelo como \texttt{Dict} (R$^2$, pseudo R$^2$, log-verossimilhança, AIC/BIC, \texttt{n\_obs}, \texttt{df\_resid}, etc.).
+  \item[\texttt{params}, \texttt{std\_errors}, \texttt{test\_values}, \texttt{p\_values}] Vetores brutos de coeficientes como \texttt{Series}.
+  \item[\texttt{conf\_lower} / \texttt{conf\_upper}] Limites do intervalo de confiança, quando disponíveis.
+  \item[\texttt{residuals} / \texttt{fitted\_values}] Apenas para OLS.
+\end{description}
+
+\section{Estimadores suportados}
+
+A expansão estruturada funciona para os seguintes tipos de resultado:
+
+\begin{itemize}
+  \item Corte transversal: OLS, IV/2SLS, regressão quantílica, GMM, GLSAR
+  \item Painel: efeitos fixos, efeitos aleatórios, PCSE, PanelGLS, FE-2SLS, Arellano-Bond, system GMM
+  \item Binário: logit e probit
+  \item Contagem: Poisson, binomial negativa, ZIP/ZINB
+  \item Limitada: Tobit, logit/probit ordenado, logit multinomial
+  \item Outros GLM: GLM, RLM, regressão beta, modelos mistos / HLM
+  \item Sistemas: SUR e three-stage least squares (cada equação é um nó filho)
+\end{itemize}
+
+\begin{nota}
+  Modelos de séries temporais (ARIMA, GARCH, VAR, etc.) ainda aparecem como texto simples no debugger, sem filhos estruturados.
+\end{nota}
+
+\section{Debug pela linha de comando}
+
+Você também pode iniciar o servidor DAP manualmente para testes ou integração com outros editores:
+
+\begin{lstlisting}[style=inline, language=sh]
+hay dap script.hay
+\end{lstlisting}
+
+Ele lê mensagens DAP da \texttt{stdin} e escreve respostas na \texttt{stdout}. A extensão do VS~Code gerencia o protocolo automaticamente.
