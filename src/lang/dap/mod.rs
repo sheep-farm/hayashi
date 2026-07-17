@@ -1,4 +1,5 @@
 pub mod adapter;
+pub mod model_expansion;
 pub mod protocol;
 pub mod transport;
 

@@ -1,0 +1,1152 @@
+use crate::lang::interpreter::models::{SurModel, ThreeSLSModel};
+use crate::lang::interpreter::{Series, Value};
+use indexmap::IndexMap;
+use ndarray::{Array1, Array2};
+use std::collections::HashMap;
+use std::sync::Arc;
+
+/// Context describing a generic regression-like result for DAP expansion.
+pub struct RegressionCtx<'a> {
+    pub names: Vec<String>,
+    pub params: &'a Array1<f64>,
+    pub std_errors: &'a Array1<f64>,
+    pub test_values: &'a Array1<f64>,
+    pub p_values: &'a Array1<f64>,
+    pub conf_lower: Option<&'a Array1<f64>>,
+    pub conf_upper: Option<&'a Array1<f64>>,
+    pub fit: Value,
+    pub residuals: Option<&'a Array1<f64>>,
+    pub x: Option<&'a Array2<f64>>,
+}
+
+/// Returns (summary string, type name, expected child count) for a value.
+pub fn value_summary(v: &Value) -> (String, String, usize) {
+    let (summary, type_name) = value_summary_and_type(v);
+    (summary, type_name.to_string(), value_children(v).len())
+}
+
+/// Returns the named children of a value for DAP variable expansion.
+pub fn value_children(v: &Value) -> Vec<(String, Value)> {
+    match v {
+        Value::DataFrame(df) => df
+            .column_names()
+            .iter()
+            .filter_map(|name| {
+                df.get_column(name)
+                    .ok()
+                    .map(|col| (name.clone(), column_to_value(name, col)))
+            })
+            .collect(),
+        Value::List(lst) => lst
+            .iter()
+            .take(100)
+            .enumerate()
+            .map(|(i, item): (usize, &Value)| (format!("[{i}]"), item.clone()))
+            .collect(),
+        Value::Dict(d) => d
+            .iter()
+            .take(100)
+            .map(|(k, item): (&String, &Value)| (k.clone(), item.clone()))
+            .collect(),
+        Value::Series(s) => s
+            .values
+            .iter()
+            .take(100)
+            .enumerate()
+            .map(|(i, item): (usize, &Value)| (format!("[{i}]"), item.clone()))
+            .collect(),
+        Value::OlsResult(m) => regression_children(RegressionCtx {
+            names: m.result.variable_names.clone().unwrap_or_default(),
+            params: &m.result.params,
+            std_errors: &m.result.std_errors,
+            test_values: &m.result.t_values,
+            p_values: &m.result.p_values,
+            conf_lower: Some(&m.result.conf_lower),
+            conf_upper: Some(&m.result.conf_upper),
+            fit: ols_fit_dict(&m.result),
+            residuals: Some(&m.residuals),
+            x: Some(&m.x),
+        }),
+        Value::IvResult(r) => regression_children(RegressionCtx {
+            names: r.variable_names.clone().unwrap_or_default(),
+            params: &r.params,
+            std_errors: &r.std_errors,
+            test_values: &r.t_values,
+            p_values: &r.p_values,
+            conf_lower: None,
+            conf_upper: None,
+            fit: iv_fit_dict(r),
+            residuals: None,
+            x: None,
+        }),
+        Value::PanelResult(r) => regression_children(RegressionCtx {
+            names: r.variable_names.clone().unwrap_or_default(),
+            params: &r.params,
+            std_errors: &r.std_errors,
+            test_values: &r.t_values,
+            p_values: &r.p_values,
+            conf_lower: None,
+            conf_upper: None,
+            fit: panel_fit_dict(r),
+            residuals: None,
+            x: None,
+        }),
+        Value::ReResult(r) => regression_children(RegressionCtx {
+            names: r.variable_names.clone().unwrap_or_default(),
+            params: &r.params,
+            std_errors: &r.std_errors,
+            test_values: &r.t_values,
+            p_values: &r.p_values,
+            conf_lower: None,
+            conf_upper: None,
+            fit: re_fit_dict(r),
+            residuals: None,
+            x: None,
+        }),
+        Value::BinaryResult(m) => regression_children(RegressionCtx {
+            names: m.coef_names.clone(),
+            params: &m.result.params,
+            std_errors: &m.result.std_errors,
+            test_values: &m.result.z_values,
+            p_values: &m.result.p_values,
+            conf_lower: None,
+            conf_upper: None,
+            fit: binary_fit_dict(&m.result),
+            residuals: None,
+            x: None,
+        }),
+        Value::QuantileResult(r) => regression_children(RegressionCtx {
+            names: r.variable_names.clone().unwrap_or_default(),
+            params: &r.params,
+            std_errors: &r.std_errors,
+            test_values: &r.t_values,
+            p_values: &r.p_values,
+            conf_lower: None,
+            conf_upper: None,
+            fit: quantile_fit_dict(r),
+            residuals: None,
+            x: None,
+        }),
+        Value::TobitResult(r) => regression_children(RegressionCtx {
+            names: r.variable_names.clone().unwrap_or_default(),
+            params: &r.params,
+            std_errors: &r.std_errors,
+            test_values: &r.t_values,
+            p_values: &r.p_values,
+            conf_lower: None,
+            conf_upper: None,
+            fit: tobit_fit_dict(r),
+            residuals: None,
+            x: None,
+        }),
+        Value::PoissonResult(r) => regression_children(RegressionCtx {
+            names: r.variable_names.clone().unwrap_or_default(),
+            params: &r.params,
+            std_errors: &r.std_errors,
+            test_values: &r.z_values,
+            p_values: &r.p_values,
+            conf_lower: Some(&r.conf_lower),
+            conf_upper: Some(&r.conf_upper),
+            fit: poisson_fit_dict(r),
+            residuals: None,
+            x: None,
+        }),
+        Value::NegBinResult(r) => regression_children(RegressionCtx {
+            names: r.variable_names.clone().unwrap_or_default(),
+            params: &r.params,
+            std_errors: &r.std_errors,
+            test_values: &r.z_values,
+            p_values: &r.p_values,
+            conf_lower: Some(&r.conf_lower),
+            conf_upper: Some(&r.conf_upper),
+            fit: negbin_fit_dict(r),
+            residuals: None,
+            x: None,
+        }),
+        Value::GlmResult(r) => regression_children(RegressionCtx {
+            names: r.variable_names.clone().unwrap_or_default(),
+            params: &r.params,
+            std_errors: &r.std_errors,
+            test_values: &r.z_values,
+            p_values: &r.p_values,
+            conf_lower: Some(&r.conf_lower),
+            conf_upper: Some(&r.conf_upper),
+            fit: glm_fit_dict(r),
+            residuals: None,
+            x: None,
+        }),
+        Value::RlmResult(r) => regression_children(RegressionCtx {
+            names: r.variable_names.clone().unwrap_or_default(),
+            params: &r.params,
+            std_errors: &r.std_errors,
+            test_values: &r.t_values,
+            p_values: &r.p_values,
+            conf_lower: Some(&r.conf_lower),
+            conf_upper: Some(&r.conf_upper),
+            fit: rlm_fit_dict(r),
+            residuals: None,
+            x: None,
+        }),
+        Value::BetaResult(r) => regression_children(RegressionCtx {
+            names: r.variable_names.clone().unwrap_or_default(),
+            params: &r.params,
+            std_errors: &r.std_errors,
+            test_values: &r.z_values,
+            p_values: &r.p_values,
+            conf_lower: None,
+            conf_upper: None,
+            fit: beta_fit_dict(r),
+            residuals: None,
+            x: None,
+        }),
+        Value::GmmResult(r) => regression_children(RegressionCtx {
+            names: (0..r.params.len()).map(|i| format!("x{i}")).collect(),
+            params: &r.params,
+            std_errors: &r.std_errors,
+            test_values: &r.t_values,
+            p_values: &r.p_values,
+            conf_lower: None,
+            conf_upper: None,
+            fit: gmm_fit_dict(r),
+            residuals: None,
+            x: None,
+        }),
+        Value::AbResult(r) => regression_children(RegressionCtx {
+            names: r.variable_names.clone().unwrap_or_default(),
+            params: &r.params,
+            std_errors: &r.std_errors,
+            test_values: &r.t_values,
+            p_values: &r.p_values,
+            conf_lower: None,
+            conf_upper: None,
+            fit: ab_fit_dict(r),
+            residuals: None,
+            x: None,
+        }),
+        Value::SysGmmResult(r) => regression_children(RegressionCtx {
+            names: r.variable_names.clone().unwrap_or_default(),
+            params: &r.params,
+            std_errors: &r.std_errors,
+            test_values: &r.t_values,
+            p_values: &r.p_values,
+            conf_lower: None,
+            conf_upper: None,
+            fit: sysgmm_fit_dict(r),
+            residuals: None,
+            x: None,
+        }),
+        Value::PcseResult(r) => regression_children(RegressionCtx {
+            names: r.variable_names.clone().unwrap_or_default(),
+            params: &r.params,
+            std_errors: &r.std_errors,
+            test_values: &r.t_values,
+            p_values: &r.p_values,
+            conf_lower: None,
+            conf_upper: None,
+            fit: pcse_fit_dict(r),
+            residuals: None,
+            x: None,
+        }),
+        Value::PanelGlsResult(r) => regression_children(RegressionCtx {
+            names: r.variable_names.clone().unwrap_or_default(),
+            params: &r.params,
+            std_errors: &r.std_errors,
+            test_values: &r.t_values,
+            p_values: &r.p_values,
+            conf_lower: None,
+            conf_upper: None,
+            fit: panel_gls_fit_dict(r),
+            residuals: None,
+            x: None,
+        }),
+        Value::FE2SLSResult(r) => regression_children(RegressionCtx {
+            names: r.variable_names.clone().unwrap_or_default(),
+            params: &r.params,
+            std_errors: &r.std_errors,
+            test_values: &r.t_values,
+            p_values: &r.p_values,
+            conf_lower: None,
+            conf_upper: None,
+            fit: fe2sls_fit_dict(r),
+            residuals: None,
+            x: None,
+        }),
+        Value::OrderedResult(r) => regression_children(RegressionCtx {
+            names: r.variable_names.clone().unwrap_or_default(),
+            params: &r.params,
+            std_errors: &r.std_errors,
+            test_values: &r.z_values,
+            p_values: &r.p_values,
+            conf_lower: None,
+            conf_upper: None,
+            fit: ordered_fit_dict(r),
+            residuals: None,
+            x: None,
+        }),
+        Value::ZeroInflatedResult(r) => zero_inflated_children(r),
+        Value::MixedResult(r) => mixed_children(r),
+        Value::GlsarResult(r) => regression_children(RegressionCtx {
+            names: (0..r.params.len()).map(|i| format!("x{i}")).collect(),
+            params: &r.params,
+            std_errors: &r.std_errors,
+            test_values: &r.t_values,
+            p_values: &r.p_values,
+            conf_lower: None,
+            conf_upper: None,
+            fit: glsar_fit_dict(r),
+            residuals: None,
+            x: None,
+        }),
+        Value::SurResult(m) => sur_children(m),
+        Value::ThreeSLSResult(m) => three_sls_children(m),
+        Value::MNLogitResult(r) => mnlogit_children(r),
+        _ => Vec::new(),
+    }
+}
+
+fn value_summary_and_type(v: &Value) -> (String, &'static str) {
+    match v {
+        Value::Float(f) => (format!("{f}"), "Float"),
+        Value::Int(i) => (format!("{i}"), "Int"),
+        Value::Bool(b) => (format!("{b}"), "Bool"),
+        Value::Str(s) => (s.clone(), "String"),
+        Value::Nil => ("nil".into(), "Nil"),
+        Value::DataFrame(df) => (
+            format!(
+                "DataFrame({} rows, {} cols)",
+                df.n_rows(),
+                df.column_names().len()
+            ),
+            "DataFrame",
+        ),
+        Value::List(lst) => (format!("List({} items)", lst.len()), "List"),
+        Value::Dict(d) => (format!("Dict({} entries)", d.len()), "Dict"),
+        Value::Series(s) => (format!("Series({}: {} values)", s.name, s.len()), "Series"),
+        Value::OlsResult(m) => {
+            let r = &m.result;
+            (
+                format!(
+                    "OLS(k={}, n={}), R2={:.4}",
+                    r.params.len(),
+                    r.n_obs,
+                    r.r_squared
+                ),
+                "OlsResult",
+            )
+        }
+        Value::IvResult(r) => (
+            format!(
+                "IV(k={}, n={}), R2={:.4}",
+                r.params.len(),
+                r.n_obs,
+                r.r_squared
+            ),
+            "IvResult",
+        ),
+        Value::PanelResult(r) => (
+            format!(
+                "Panel(k={}, n={}, N={}), R2={:.4}",
+                r.params.len(),
+                r.n_obs,
+                r.n_entities,
+                r.r_squared
+            ),
+            "PanelResult",
+        ),
+        Value::ReResult(r) => (
+            format!(
+                "RE(k={}, N={}), R2={:.4}",
+                r.params.len(),
+                r.variable_names
+                    .as_ref()
+                    .map(|v: &Vec<String>| v.len())
+                    .unwrap_or(r.params.len()),
+                r.r_squared_overall
+            ),
+            "ReResult",
+        ),
+        Value::BinaryResult(m) => (
+            format!(
+                "{}(k={}), pseudoR2={:.4}",
+                m.result.model_name,
+                m.result.params.len(),
+                m.result.pseudo_r2
+            ),
+            "BinaryResult",
+        ),
+        Value::QuantileResult(r) => (
+            format!(
+                "Quantile(tau={:.2}, k={}), R2={:.4}",
+                r.tau,
+                r.params.len(),
+                r.r_squared
+            ),
+            "QuantileResult",
+        ),
+        Value::TobitResult(r) => (
+            format!(
+                "Tobit(k={}, n={}), sigma={:.4}",
+                r.params.len(),
+                r.n_obs,
+                r.sigma
+            ),
+            "TobitResult",
+        ),
+        Value::PoissonResult(r) => (
+            format!(
+                "Poisson(k={}, n={}), pseudoR2={:.4}",
+                r.params.len(),
+                r.n_obs,
+                r.pseudo_r2
+            ),
+            "PoissonResult",
+        ),
+        Value::NegBinResult(r) => (
+            format!(
+                "NegBin(k={}, n={}), alpha={:.4}",
+                r.params.len(),
+                r.n_obs,
+                r.alpha
+            ),
+            "NegBinResult",
+        ),
+        Value::GlmResult(r) => (
+            format!(
+                "GLM(k={}, n={}), pseudoR2={:.4}",
+                r.params.len(),
+                r.n_obs,
+                r.pseudo_r2
+            ),
+            "GlmResult",
+        ),
+        Value::RlmResult(r) => (
+            format!(
+                "RLM(k={}, n={}), scale={:.4}",
+                r.params.len(),
+                r.n_obs,
+                r.scale
+            ),
+            "RlmResult",
+        ),
+        Value::BetaResult(r) => (
+            format!(
+                "Beta(k={}, n={}), phi={:.4}",
+                r.params.len(),
+                r.n_obs,
+                r.precision_param
+            ),
+            "BetaResult",
+        ),
+        Value::GmmResult(r) => (
+            format!(
+                "GMM(k={}, n={}), J={:.4}",
+                r.params.len(),
+                r.n_obs,
+                r.j_stat
+            ),
+            "GmmResult",
+        ),
+        Value::AbResult(r) => (
+            format!(
+                "ArellanoBond(k={}, n={}), m1_p={:.4}",
+                r.params.len(),
+                r.n_obs,
+                r.m1_pval
+            ),
+            "AbResult",
+        ),
+        Value::SysGmmResult(r) => (
+            format!(
+                "SysGMM(k={}, n={}), Sargan={:.4}",
+                r.params.len(),
+                r.n_obs_fd,
+                r.sargan_stat
+            ),
+            "SysGmmResult",
+        ),
+        Value::PcseResult(r) => (
+            format!(
+                "PCSE(k={}, n={}), R2={:.4}",
+                r.params.len(),
+                r.n_obs,
+                r.r_squared
+            ),
+            "PcseResult",
+        ),
+        Value::PanelGlsResult(r) => (
+            format!(
+                "PanelGLS(k={}, n={}), R2={:.4}",
+                r.params.len(),
+                r.n_obs,
+                r.r_squared
+            ),
+            "PanelGlsResult",
+        ),
+        Value::FE2SLSResult(r) => (
+            format!(
+                "FE2SLS(k={}, n={}), R2={:.4}",
+                r.params.len(),
+                r.n_obs,
+                r.r_squared
+            ),
+            "FE2SLSResult",
+        ),
+        Value::OrderedResult(r) => (
+            format!(
+                "Ordered(k={}, n={}), pseudoR2={:.4}",
+                r.params.len(),
+                r.n_obs,
+                r.pseudo_r2
+            ),
+            "OrderedResult",
+        ),
+        Value::ZeroInflatedResult(r) => (
+            format!(
+                "ZeroInflated(count={}, inflate={}, n={}), logLik={:.4}",
+                r.count_params.len(),
+                r.inflate_params.len(),
+                r.n_obs,
+                r.log_likelihood
+            ),
+            "ZeroInflatedResult",
+        ),
+        Value::MixedResult(r) => (
+            format!(
+                "Mixed(fixed={}, n={}, groups={}), logLik={:.4}",
+                r.fixed_effects.len(),
+                r.n_obs,
+                r.n_groups,
+                r.log_likelihood
+            ),
+            "MixedResult",
+        ),
+        Value::GlsarResult(r) => (
+            format!(
+                "GLSAR(k={}, n={}), R2={:.4}",
+                r.params.len(),
+                r.n_obs,
+                r.r_squared
+            ),
+            "GlsarResult",
+        ),
+        Value::SurResult(m) => (
+            format!(
+                "SUR(eqs={}), sysR2={:.4}",
+                m.result.equations.len(),
+                m.result.system_r2
+            ),
+            "SurResult",
+        ),
+        Value::ThreeSLSResult(m) => (
+            format!("3SLS(eqs={})", m.result.equations.len()),
+            "ThreeSLSResult",
+        ),
+        Value::MNLogitResult(r) => (
+            format!(
+                "MNLogit(k={}, n={}), pseudoR2={:.4}",
+                r.params.nrows(),
+                r.n_obs,
+                r.pseudo_r2
+            ),
+            "MNLogitResult",
+        ),
+        Value::UserFn(f) => (format!("<fn({})>", f.params.join(", ")), "Function"),
+        _ => (v.to_string(), "Model"),
+    }
+}
+
+fn regression_children<'a>(ctx: RegressionCtx<'a>) -> Vec<(String, Value)> {
+    let mut vars = Vec::new();
+
+    let coef_df = coef_dataframe(
+        &ctx.names,
+        ctx.params,
+        ctx.std_errors,
+        ctx.test_values,
+        ctx.p_values,
+        ctx.conf_lower,
+        ctx.conf_upper,
+    );
+    vars.push(("coefficients".into(), coef_df));
+    vars.push(("fit".into(), ctx.fit));
+
+    if let Some(resid) = ctx.residuals {
+        if !resid.is_empty() {
+            vars.push(("residuals".into(), array1_to_series("residuals", resid)));
+        }
+    }
+    if let Some(x) = ctx.x {
+        if !x.is_empty() {
+            let fitted = x.dot(ctx.params);
+            vars.push((
+                "fitted_values".into(),
+                array1_to_series("fitted_values", &fitted),
+            ));
+        }
+    }
+
+    vars.push(("params".into(), array1_to_series("params", ctx.params)));
+    vars.push((
+        "std_errors".into(),
+        array1_to_series("std_errors", ctx.std_errors),
+    ));
+    vars.push((
+        "test_values".into(),
+        array1_to_series("test_values", ctx.test_values),
+    ));
+    vars.push((
+        "p_values".into(),
+        array1_to_series("p_values", ctx.p_values),
+    ));
+    if let Some(cl) = ctx.conf_lower {
+        vars.push(("conf_lower".into(), array1_to_series("conf_lower", cl)));
+    }
+    if let Some(cu) = ctx.conf_upper {
+        vars.push(("conf_upper".into(), array1_to_series("conf_upper", cu)));
+    }
+
+    vars
+}
+
+fn coef_dataframe(
+    names: &[String],
+    params: &Array1<f64>,
+    std_errors: &Array1<f64>,
+    test_values: &Array1<f64>,
+    p_values: &Array1<f64>,
+    conf_lower: Option<&Array1<f64>>,
+    conf_upper: Option<&Array1<f64>>,
+) -> Value {
+    let n = params.len();
+    let mut columns: IndexMap<String, greeners::Column> = IndexMap::new();
+
+    let name_col: Vec<String> = (0..n)
+        .map(|i| names.get(i).cloned().unwrap_or_else(|| format!("x{i}")))
+        .collect();
+    columns.insert("variable".into(), greeners::Column::from_strings(name_col));
+    columns.insert("coef".into(), f64_array_column(params));
+    columns.insert("std_err".into(), f64_array_column(std_errors));
+    columns.insert("t".into(), f64_array_column(test_values));
+    columns.insert("p_value".into(), f64_array_column(p_values));
+    if let Some(cl) = conf_lower {
+        columns.insert("conf_low".into(), f64_array_column(cl));
+    }
+    if let Some(cu) = conf_upper {
+        columns.insert("conf_high".into(), f64_array_column(cu));
+    }
+
+    Value::DataFrame(Arc::new(
+        greeners::DataFrame::from_columns(columns)
+            .unwrap_or_else(|_| greeners::DataFrame::from_columns(IndexMap::new()).unwrap()),
+    ))
+}
+
+fn array1_to_series(name: &str, arr: &Array1<f64>) -> Value {
+    let values: Vec<Value> = arr.iter().map(|&v| Value::Float(v)).collect();
+    Value::Series(Arc::new(Series::new(name, values)))
+}
+
+fn array2_to_dataframe(_name: &str, arr: &Array2<f64>) -> Value {
+    let mut columns: IndexMap<String, greeners::Column> = IndexMap::new();
+    for j in 0..arr.ncols() {
+        let col: Vec<f64> = arr.column(j).iter().copied().collect();
+        columns.insert(
+            format!("col{j}"),
+            greeners::Column::Float(Array1::from(col)),
+        );
+    }
+    Value::DataFrame(Arc::new(
+        greeners::DataFrame::from_columns(columns)
+            .unwrap_or_else(|_| greeners::DataFrame::from_columns(IndexMap::new()).unwrap()),
+    ))
+}
+
+fn f64_array_column(arr: &Array1<f64>) -> greeners::Column {
+    greeners::Column::Float(Array1::from(arr.iter().copied().collect::<Vec<_>>()))
+}
+
+fn fit_dict(entries: &[(&str, Value)]) -> Value {
+    let mut map = HashMap::new();
+    for (k, v) in entries {
+        map.insert((*k).to_string(), v.clone());
+    }
+    Value::Dict(Arc::new(map))
+}
+
+fn ols_fit_dict(r: &greeners::OlsResult) -> Value {
+    fit_dict(&[
+        ("r2", Value::Float(r.r_squared)),
+        ("adj_r2", Value::Float(r.adj_r_squared)),
+        ("f_stat", Value::Float(r.f_statistic)),
+        ("prob_f", Value::Float(r.prob_f)),
+        ("aic", Value::Float(r.aic)),
+        ("bic", Value::Float(r.bic)),
+        ("log_lik", Value::Float(r.log_likelihood)),
+        ("sigma", Value::Float(r.sigma)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("df_model", Value::Int(r.df_model as i64)),
+        ("df_resid", Value::Int(r.df_resid as i64)),
+        ("cov_type", Value::Str(format!("{:?}", r.cov_type))),
+        ("inference", Value::Str(format!("{:?}", r.inference_type))),
+    ])
+}
+
+fn iv_fit_dict(r: &greeners::iv::IvResult) -> Value {
+    fit_dict(&[
+        ("r2", Value::Float(r.r_squared)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("df_resid", Value::Int(r.df_resid as i64)),
+        ("sigma", Value::Float(r.sigma)),
+        ("cov_type", Value::Str(format!("{:?}", r.cov_type))),
+        ("inference", Value::Str(format!("{:?}", r.inference_type))),
+    ])
+}
+
+fn panel_fit_dict(r: &greeners::panel::PanelResult) -> Value {
+    fit_dict(&[
+        ("r2", Value::Float(r.r_squared)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("n_entities", Value::Int(r.n_entities as i64)),
+        ("df_resid", Value::Int(r.df_resid as i64)),
+        ("sigma", Value::Float(r.sigma)),
+        ("inference", Value::Str(format!("{:?}", r.inference_type))),
+    ])
+}
+
+fn re_fit_dict(r: &greeners::panel::RandomEffectsResult) -> Value {
+    fit_dict(&[
+        ("r2_overall", Value::Float(r.r_squared_overall)),
+        ("sigma_u", Value::Float(r.sigma_u)),
+        ("sigma_e", Value::Float(r.sigma_e)),
+        ("theta", Value::Float(r.theta)),
+        ("inference", Value::Str(format!("{:?}", r.inference_type))),
+    ])
+}
+
+fn binary_fit_dict(r: &greeners::discrete::BinaryModelResult) -> Value {
+    fit_dict(&[
+        ("model_name", Value::Str(r.model_name.clone())),
+        ("pseudo_r2", Value::Float(r.pseudo_r2)),
+        ("log_lik", Value::Float(r.log_likelihood)),
+        ("iterations", Value::Int(r.iterations as i64)),
+        ("inference", Value::Str(format!("{:?}", r.inference_type))),
+    ])
+}
+
+fn quantile_fit_dict(r: &greeners::QuantileResult) -> Value {
+    fit_dict(&[
+        ("tau", Value::Float(r.tau)),
+        ("r2", Value::Float(r.r_squared)),
+        ("iterations", Value::Int(r.iterations as i64)),
+    ])
+}
+
+fn tobit_fit_dict(r: &greeners::TobitResult) -> Value {
+    fit_dict(&[
+        ("sigma", Value::Float(r.sigma)),
+        ("log_lik", Value::Float(r.log_likelihood)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("n_censored", Value::Int(r.n_censored as i64)),
+        ("df_resid", Value::Int(r.df_resid as i64)),
+        ("iterations", Value::Int(r.iterations as i64)),
+    ])
+}
+
+fn poisson_fit_dict(r: &greeners::PoissonResult) -> Value {
+    fit_dict(&[
+        ("log_lik", Value::Float(r.log_likelihood)),
+        ("deviance", Value::Float(r.deviance)),
+        ("null_deviance", Value::Float(r.null_deviance)),
+        ("aic", Value::Float(r.aic)),
+        ("bic", Value::Float(r.bic)),
+        ("pseudo_r2", Value::Float(r.pseudo_r2)),
+        ("pearson_chi2", Value::Float(r.pearson_chi2)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("df_resid", Value::Int(r.df_resid as i64)),
+        ("df_model", Value::Int(r.df_model as i64)),
+        ("iterations", Value::Int(r.n_iter as i64)),
+        ("converged", Value::Bool(r.converged)),
+        ("inference", Value::Str(format!("{:?}", r.inference_type))),
+    ])
+}
+
+fn negbin_fit_dict(r: &greeners::NegBinResult) -> Value {
+    fit_dict(&[
+        ("log_lik", Value::Float(r.log_likelihood)),
+        ("deviance", Value::Float(r.deviance)),
+        ("null_deviance", Value::Float(r.null_deviance)),
+        ("aic", Value::Float(r.aic)),
+        ("bic", Value::Float(r.bic)),
+        ("pseudo_r2", Value::Float(r.pseudo_r2)),
+        ("pearson_chi2", Value::Float(r.pearson_chi2)),
+        ("alpha", Value::Float(r.alpha)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("df_resid", Value::Int(r.df_resid as i64)),
+        ("df_model", Value::Int(r.df_model as i64)),
+        ("iterations", Value::Int(r.n_iter as i64)),
+        ("converged", Value::Bool(r.converged)),
+        ("inference", Value::Str(format!("{:?}", r.inference_type))),
+    ])
+}
+
+fn glm_fit_dict(r: &greeners::GlmResult) -> Value {
+    fit_dict(&[
+        ("log_lik", Value::Float(r.log_likelihood)),
+        ("deviance", Value::Float(r.deviance)),
+        ("null_deviance", Value::Float(r.null_deviance)),
+        ("aic", Value::Float(r.aic)),
+        ("bic", Value::Float(r.bic)),
+        ("pseudo_r2", Value::Float(r.pseudo_r2)),
+        ("pearson_chi2", Value::Float(r.pearson_chi2)),
+        ("dispersion", Value::Float(r.dispersion)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("df_resid", Value::Int(r.df_resid as i64)),
+        ("df_model", Value::Int(r.df_model as i64)),
+        ("iterations", Value::Int(r.n_iter as i64)),
+        ("converged", Value::Bool(r.converged)),
+        ("family", Value::Str(format!("{:?}", r.family))),
+    ])
+}
+
+fn rlm_fit_dict(r: &greeners::RlmResult) -> Value {
+    fit_dict(&[
+        ("scale", Value::Float(r.scale)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("iterations", Value::Int(r.n_iter as i64)),
+        ("converged", Value::Bool(r.converged)),
+    ])
+}
+
+fn beta_fit_dict(r: &greeners::BetaResult) -> Value {
+    fit_dict(&[
+        ("precision_param", Value::Float(r.precision_param)),
+        ("log_lik", Value::Float(r.log_likelihood)),
+        ("aic", Value::Float(r.aic)),
+        ("bic", Value::Float(r.bic)),
+        ("pseudo_r2", Value::Float(r.pseudo_r2)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("iterations", Value::Int(r.n_iter as i64)),
+        ("converged", Value::Bool(r.converged)),
+    ])
+}
+
+fn gmm_fit_dict(r: &greeners::GmmResult) -> Value {
+    fit_dict(&[
+        ("j_stat", Value::Float(r.j_stat)),
+        ("j_p_value", Value::Float(r.j_p_value)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("df_model", Value::Int(r.df_model as i64)),
+        ("df_overid", Value::Int(r.df_overid as i64)),
+    ])
+}
+
+fn ab_fit_dict(r: &greeners::ArellanoBondResult) -> Value {
+    fit_dict(&[
+        ("sargan_stat", Value::Float(r.sargan_stat)),
+        ("sargan_pvalue", Value::Float(r.sargan_pvalue)),
+        ("sargan_df", Value::Int(r.sargan_df as i64)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("n_entities", Value::Int(r.n_entities as i64)),
+        ("t_bar", Value::Float(r.t_bar)),
+        ("n_instruments", Value::Int(r.n_instruments as i64)),
+        ("max_lags", Value::Int(r.max_lags as i64)),
+        ("step", Value::Int(r.step as i64)),
+        ("m1_stat", Value::Float(r.m1_stat)),
+        ("m1_pval", Value::Float(r.m1_pval)),
+        ("m2_stat", Value::Float(r.m2_stat)),
+        ("m2_pval", Value::Float(r.m2_pval)),
+    ])
+}
+
+fn sysgmm_fit_dict(r: &greeners::SystemGmmResult) -> Value {
+    fit_dict(&[
+        ("sargan_stat", Value::Float(r.sargan_stat)),
+        ("sargan_pvalue", Value::Float(r.sargan_pvalue)),
+        ("sargan_df", Value::Int(r.sargan_df as i64)),
+        ("n_obs_fd", Value::Int(r.n_obs_fd as i64)),
+        ("n_obs_lev", Value::Int(r.n_obs_lev as i64)),
+        ("n_entities", Value::Int(r.n_entities as i64)),
+        ("n_instruments", Value::Int(r.n_instruments as i64)),
+        ("max_lags", Value::Int(r.max_lags as i64)),
+        ("step", Value::Int(r.step as i64)),
+        ("m1_stat", Value::Float(r.m1_stat)),
+        ("m1_pval", Value::Float(r.m1_pval)),
+        ("m2_stat", Value::Float(r.m2_stat)),
+        ("m2_pval", Value::Float(r.m2_pval)),
+    ])
+}
+
+fn pcse_fit_dict(r: &greeners::PcseResult) -> Value {
+    fit_dict(&[
+        ("r2", Value::Float(r.r_squared)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("n_entities", Value::Int(r.n_entities as i64)),
+        ("t_periods", Value::Int(r.t_periods as i64)),
+        ("df_resid", Value::Int(r.df_resid as i64)),
+        ("sigma", Value::Float(r.sigma)),
+    ])
+}
+
+fn panel_gls_fit_dict(r: &greeners::PanelGlsResult) -> Value {
+    fit_dict(&[
+        ("r2", Value::Float(r.r_squared)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("n_entities", Value::Int(r.n_entities as i64)),
+        ("t_periods", Value::Int(r.t_periods as i64)),
+        ("df_resid", Value::Int(r.df_resid as i64)),
+        ("sigma", Value::Float(r.sigma)),
+        ("panels", Value::Str(format!("{:?}", r.panels))),
+    ])
+}
+
+fn fe2sls_fit_dict(r: &greeners::PanelIvResult) -> Value {
+    fit_dict(&[
+        ("r2", Value::Float(r.r_squared)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("n_entities", Value::Int(r.n_entities as i64)),
+        ("df_resid", Value::Int(r.df_resid as i64)),
+        ("sigma", Value::Float(r.sigma)),
+        ("inference", Value::Str(format!("{:?}", r.inference_type))),
+    ])
+}
+
+fn ordered_fit_dict(r: &greeners::OrderedResult) -> Value {
+    fit_dict(&[
+        ("model_name", Value::Str(r.model_name.clone())),
+        ("log_lik", Value::Float(r.log_likelihood)),
+        ("pseudo_r2", Value::Float(r.pseudo_r2)),
+        ("aic", Value::Float(r.aic)),
+        ("bic", Value::Float(r.bic)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("n_categories", Value::Int(r.n_categories as i64)),
+        ("iterations", Value::Int(r.iterations as i64)),
+        ("converged", Value::Bool(r.converged)),
+        ("inference", Value::Str(format!("{:?}", r.inference_type))),
+    ])
+}
+
+fn zero_inflated_children(r: &greeners::ZeroInflatedResult) -> Vec<(String, Value)> {
+    let mut vars = Vec::new();
+    let count_names = r.count_var_names.clone().unwrap_or_default();
+    let inflate_names = r.inflate_var_names.clone().unwrap_or_default();
+
+    let count_coef = coef_dataframe(
+        &count_names,
+        &r.count_params,
+        &r.count_std_errors,
+        &r.count_z_values,
+        &r.count_p_values,
+        None,
+        None,
+    );
+    vars.push(("count_coefficients".into(), count_coef));
+
+    let inflate_coef = coef_dataframe(
+        &inflate_names,
+        &r.inflate_params,
+        &r.inflate_std_errors,
+        &r.inflate_z_values,
+        &r.inflate_p_values,
+        None,
+        None,
+    );
+    vars.push(("inflate_coefficients".into(), inflate_coef));
+
+    vars.push(("fit".into(), zero_inflated_fit_dict(r)));
+    vars
+}
+
+fn zero_inflated_fit_dict(r: &greeners::ZeroInflatedResult) -> Value {
+    let mut entries: Vec<(&str, Value)> = vec![
+        ("model_name", Value::Str(r.model_name.clone())),
+        ("log_lik", Value::Float(r.log_likelihood)),
+        ("aic", Value::Float(r.aic)),
+        ("bic", Value::Float(r.bic)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("iterations", Value::Int(r.iterations as i64)),
+        ("converged", Value::Bool(r.converged)),
+        ("inference", Value::Str(format!("{:?}", r.inference_type))),
+    ];
+    if let Some(alpha) = r.alpha {
+        entries.push(("alpha", Value::Float(alpha)));
+    }
+    fit_dict(&entries)
+}
+
+fn mixed_children(r: &greeners::MixedResult) -> Vec<(String, Value)> {
+    let mut vars = Vec::new();
+    let names = r.variable_names.clone().unwrap_or_default();
+    let fixed = coef_dataframe(
+        &names,
+        &r.fixed_effects,
+        &r.fixed_se,
+        &r.z_values,
+        &r.p_values,
+        None,
+        None,
+    );
+    vars.push(("fixed_effects".into(), fixed));
+
+    let mut re_cols: IndexMap<String, greeners::Column> = IndexMap::new();
+    for (group, vals) in r.random_effects.iter() {
+        re_cols.insert(
+            format!("group_{group}"),
+            greeners::Column::Float(Array1::from(vals.iter().copied().collect::<Vec<_>>())),
+        );
+    }
+    let re_df = Value::DataFrame(Arc::new(
+        greeners::DataFrame::from_columns(re_cols)
+            .unwrap_or_else(|_| greeners::DataFrame::from_columns(IndexMap::new()).unwrap()),
+    ));
+    vars.push(("random_effects".into(), re_df));
+
+    vars.push(("fit".into(), mixed_fit_dict(r)));
+    vars
+}
+
+fn mixed_fit_dict(r: &greeners::MixedResult) -> Value {
+    fit_dict(&[
+        ("log_lik", Value::Float(r.log_likelihood)),
+        ("aic", Value::Float(r.aic)),
+        ("bic", Value::Float(r.bic)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("n_groups", Value::Int(r.n_groups as i64)),
+        ("var_resid", Value::Float(r.var_resid)),
+        ("iterations", Value::Int(r.n_iter as i64)),
+        ("converged", Value::Bool(r.converged)),
+    ])
+}
+
+fn glsar_fit_dict(r: &greeners::GlsarResult) -> Value {
+    fit_dict(&[
+        ("r2", Value::Float(r.r_squared)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("df_resid", Value::Int(r.df_resid as i64)),
+    ])
+}
+
+fn sur_children(m: &SurModel) -> Vec<(String, Value)> {
+    let r = &m.result;
+    let mut vars = Vec::new();
+    vars.push(("system_r2".into(), Value::Float(r.system_r2)));
+    vars.push((
+        "sigma_cross".into(),
+        array2_to_dataframe("sigma", &r.sigma_cross),
+    ));
+    for (i, eq) in r.equations.iter().enumerate() {
+        let name = if eq.name.is_empty() {
+            format!("equation_{i}")
+        } else {
+            eq.name.clone()
+        };
+        let eq_fit = fit_dict(&[("r2", Value::Float(eq.r_squared))]);
+        let eq_val = coef_dataframe(
+            &(0..eq.params.len())
+                .map(|j| format!("x{j}"))
+                .collect::<Vec<_>>(),
+            &eq.params,
+            &eq.std_errors,
+            &eq.t_values,
+            &eq.p_values,
+            None,
+            None,
+        );
+        let mut wrap = HashMap::new();
+        wrap.insert("coefficients".into(), eq_val);
+        wrap.insert("fit".into(), eq_fit);
+        vars.push((name, Value::Dict(Arc::new(wrap))));
+    }
+    vars
+}
+
+fn three_sls_children(m: &ThreeSLSModel) -> Vec<(String, Value)> {
+    let r = &m.result;
+    let mut vars = Vec::new();
+    for (i, eq) in r.equations.iter().enumerate() {
+        let name = m
+            .eq_var_names
+            .get(i)
+            .and_then(|v| v.first())
+            .cloned()
+            .unwrap_or_else(|| format!("equation_{i}"));
+        let eq_val = coef_dataframe(
+            &(0..eq.params.len())
+                .map(|j| format!("x{j}"))
+                .collect::<Vec<_>>(),
+            &eq.params,
+            &eq.std_errors,
+            &eq.t_values,
+            &eq.p_values,
+            None,
+            None,
+        );
+        let mut wrap = HashMap::new();
+        wrap.insert("coefficients".into(), eq_val);
+        wrap.insert(
+            "fit".into(),
+            fit_dict(&[("r2", Value::Float(eq.r_squared))]),
+        );
+        vars.push((name, Value::Dict(Arc::new(wrap))));
+    }
+    vars
+}
+
+fn mnlogit_children(r: &greeners::MNLogitResult) -> Vec<(String, Value)> {
+    let mut vars = Vec::new();
+    let names = r.variable_names.clone().unwrap_or_default();
+    let categories = &r.category_labels;
+    for (j, cat) in categories.iter().enumerate().skip(1) {
+        let cat_name = format!("category_{cat:.0}");
+        let cat_params = r.params.column(j - 1).to_owned();
+        let cat_se = r.std_errors.column(j - 1).to_owned();
+        let cat_z = r.z_values.column(j - 1).to_owned();
+        let cat_p = r.p_values.column(j - 1).to_owned();
+        let coef = coef_dataframe(&names, &cat_params, &cat_se, &cat_z, &cat_p, None, None);
+        vars.push((cat_name, coef));
+    }
+    vars.push(("fit".into(), mnlogit_fit_dict(r)));
+    vars
+}
+
+fn mnlogit_fit_dict(r: &greeners::MNLogitResult) -> Value {
+    fit_dict(&[
+        ("log_lik", Value::Float(r.log_likelihood)),
+        ("pseudo_r2", Value::Float(r.pseudo_r2)),
+        ("aic", Value::Float(r.aic)),
+        ("bic", Value::Float(r.bic)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("n_categories", Value::Int(r.n_categories as i64)),
+        ("iterations", Value::Int(r.iterations as i64)),
+        ("converged", Value::Bool(r.converged)),
+    ])
+}
+
+fn column_to_value(name: &str, column: &greeners::Column) -> Value {
+    use chrono::Timelike;
+    let values: Vec<Value> = match column {
+        greeners::Column::Float(arr) => arr.iter().map(|&v| Value::Float(v)).collect(),
+        greeners::Column::Int(arr) => arr.iter().map(|&v| Value::Int(v)).collect(),
+        greeners::Column::Bool(arr) => arr.iter().map(|&v| Value::Bool(v)).collect(),
+        greeners::Column::String(arr) => arr.iter().cloned().map(Value::Str).collect(),
+        greeners::Column::DateTime(arr) => arr
+            .iter()
+            .map(|dt| {
+                Value::Str(format!(
+                    "{} {:02}:{:02}:{:02}",
+                    dt.date(),
+                    dt.hour(),
+                    dt.minute(),
+                    dt.second()
+                ))
+            })
+            .collect(),
+        greeners::Column::Categorical(cat) => (0..cat.len())
+            .map(|i| {
+                cat.get_string(i)
+                    .map(|s| Value::Str(s.to_string()))
+                    .unwrap_or(Value::Nil)
+            })
+            .collect(),
+    };
+    Value::Series(Arc::new(Series::new(name, values)))
+}
