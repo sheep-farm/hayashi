@@ -6,11 +6,26 @@ struct DapSession {
     stdout: BufReader<ChildStdout>,
     child: Child,
     seq: i64,
+    closed: bool,
+}
+
+impl Drop for DapSession {
+    fn drop(&mut self) {
+        if !self.closed {
+            let _ = self.child.kill();
+            let _ = self.child.wait();
+        }
+    }
 }
 
 impl DapSession {
     fn spawn(script: &str) -> (Self, std::path::PathBuf) {
-        let tmp = std::env::temp_dir().join("hay_dap_test.hay");
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let tmp = std::env::temp_dir()
+            .join(format!("hay_dap_test_{ts}.hay"));
         std::fs::write(&tmp, script).unwrap();
 
         let bin = env!("CARGO_BIN_EXE_hay");
@@ -32,6 +47,7 @@ impl DapSession {
                 stdout,
                 child,
                 seq: 0,
+                closed: false,
             },
             tmp,
         )
@@ -91,9 +107,10 @@ impl DapSession {
         panic!("did not find {needle} in DAP output");
     }
 
-    fn close(mut self) {
+    fn close(&mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();
+        self.closed = true;
     }
 }
 
