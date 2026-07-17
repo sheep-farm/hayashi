@@ -1121,6 +1121,32 @@ print(g)
 }
 
 #[test]
+fn ols_field_access() {
+    assert_ok_contains(
+        "ols_field_access",
+        r#"
+input df
+Y X
+10 2
+12 3
+8 1
+15 5
+11 2
+14 4
+end
+let m = ols(Y ~ X, df)
+let b = m.params
+let r2 = m.r_squared
+let res = m.residuals
+print(b)
+print(r2)
+print(res)
+"#,
+        "coef",
+    );
+}
+
+#[test]
 fn rolling_ols_basic() {
     assert_ok_contains(
         "rolling_ols",

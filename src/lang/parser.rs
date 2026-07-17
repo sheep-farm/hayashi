@@ -815,7 +815,26 @@ impl Parser {
                     return Ok(expr);
                 }
 
-                Ok(Expr::Var(name))
+                let mut expr = Expr::Var(name);
+                while self.peek() == &Token::Dot {
+                    self.advance();
+                    let field = self.expect_ident()?;
+                    let (fargs, fopts) = if self.peek() == &Token::LParen {
+                        self.advance();
+                        let r = self.parse_call_args()?;
+                        self.expect(&Token::RParen)?;
+                        r
+                    } else {
+                        (vec![], vec![])
+                    };
+                    expr = Expr::Field {
+                        obj: Box::new(expr),
+                        field,
+                        args: fargs,
+                        opts: fopts,
+                    };
+                }
+                Ok(expr)
             }
 
             // Time-series operators: L.price, L2.price, F.gdp, D.wage
