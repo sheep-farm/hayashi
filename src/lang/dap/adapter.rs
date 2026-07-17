@@ -26,13 +26,19 @@ pub fn run_dap<R: Read + Send + 'static, W: Write + Send + 'static>(
     let (tx_response, rx_response) = mpsc::channel::<Response>();
     let tx_response_reader = tx_response.clone();
 
+    let seq = Arc::new(std::sync::Mutex::new(0i64));
+
     // Writer thread: serializes debug events to stdout.
     let out_events = output.clone();
+    let seq_events = seq.clone();
     let writer_handle = std::thread::spawn(move || {
         while let Ok(msg) = rx_event.recv() {
-            let event = debug_event_to_protocol(&msg);
+            let mut event = debug_event_to_protocol(&msg);
             {
                 let mut guard = out_events.lock().unwrap();
+                let mut s = seq_events.lock().unwrap();
+                *s += 1;
+                event.seq = *s;
                 if transport::send(&mut *guard, &event).is_err() {
                     break;
                 }
@@ -45,9 +51,13 @@ pub fn run_dap<R: Read + Send + 'static, W: Write + Send + 'static>(
 
     // Response writer thread: serializes responses to stdout.
     let out_responses = output.clone();
+    let seq_responses = seq.clone();
     let response_handle = std::thread::spawn(move || {
-        while let Ok(resp) = rx_response.recv() {
+        while let Ok(mut resp) = rx_response.recv() {
             let mut guard = out_responses.lock().unwrap();
+            let mut s = seq_responses.lock().unwrap();
+            *s += 1;
+            resp.seq = *s;
             if transport::send(&mut *guard, &resp).is_err() {
                 break;
             }
