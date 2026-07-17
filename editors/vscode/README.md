@@ -29,13 +29,22 @@ Requires the `hay` binary in `target/release/` (run `cargo build --release` firs
 
 ## Debug
 
-Build the extension:
+Install and build the extension:
 
 ```bash
 cd editors/vscode
-npm install
-npm run compile
+./install.sh
+```
+
+By default it links to `~/.vscode/extensions/hayashi-lang`. For VS Code
+Insiders or Cursor, pass the config directory:
+
+```bash
+./install.sh "$HOME/.vscode-insiders"
 ```
 
 Open a `.hay` file, go to the Run and Debug panel, and select the
 **"Debug Hayashi script"** configuration. Set breakpoints and start debugging.
+
+To update after editing `package.json` or `src/extension.ts`, rerun `npm run
+compile` inside `editors/vscode`.

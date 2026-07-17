@@ -1,4 +1,7 @@
 /target
+editors/vscode/node_modules/
+editors/vscode/out/
+editors/vscode/package-lock.json
 ROADMAP_INTERNAL.md
 .hay_history
 docs/book
