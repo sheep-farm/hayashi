@@ -33,6 +33,14 @@
       "setupCommands": [
         { "text": "-enable-pretty-printing", "ignoreFailures": true }
       ]
+    },
+    {
+      "name": "Debug Hayashi script",
+      "type": "hayashi",
+      "request": "launch",
+      "program": "${file}",
+      "runtimeExecutable": "hay",
+      "runtimeArgs": ["dap"]
     }
   ]
 }
