@@ -91,12 +91,14 @@ pub struct DebugState {
     pub action: DebugAction,
     pub step_target_depth: Option<usize>,
     pub pending_command: Option<DebugCommand>,
+    pub initialized_sent: bool,
     pub event_tx: std::sync::mpsc::Sender<DebugEvent>,
     pub control_rx: std::sync::mpsc::Receiver<ControlMessage>,
 }
 
 #[derive(Debug, Clone)]
 pub enum DebugEvent {
+    Initialized,
     Stopped {
         reason: String,
         description: Option<String>,
@@ -142,6 +144,7 @@ impl DebugState {
             action: DebugAction::Continue,
             step_target_depth: None,
             pending_command: None,
+            initialized_sent: false,
             event_tx,
             control_rx,
         }
@@ -501,6 +504,15 @@ impl Interpreter {
                     }
                 }
             }
+            "launch" => {
+                if let Some(ds) = self.debug_state.as_mut() {
+                    if !ds.initialized_sent {
+                        ds.initialized_sent = true;
+                        let _ = ds.event_tx.send(DebugEvent::Initialized);
+                    }
+                }
+                Response::ok(0, req.seq, &req.command)
+            }
             "threads" => Response::ok(0, req.seq, &req.command)
                 .with_body(json!({ "threads": [Thread { id: 1, name: "main".into() }] })),
             "stackTrace" => {
@@ -599,7 +611,7 @@ impl Interpreter {
                     None => Response::err(0, req.seq, &req.command, "missing expression"),
                 }
             }
-            "launch" | "attach" | "configurationDone" => Response::ok(0, req.seq, &req.command),
+            "attach" | "configurationDone" => Response::ok(0, req.seq, &req.command),
             _ => Response::ok(0, req.seq, &req.command),
         }
     }

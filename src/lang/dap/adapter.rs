@@ -73,21 +73,12 @@ pub fn run_dap<R: Read + Send + 'static, W: Write + Send + 'static>(
     let seq_responses = seq.clone();
     let response_handle = std::thread::spawn(move || {
         while let Ok(mut resp) = rx_response.recv() {
-            let command = resp.command.clone();
             let mut guard = out_responses.lock().unwrap();
             let mut s = seq_responses.lock().unwrap();
             *s += 1;
             resp.seq = *s;
-            let init = command == "initialize";
             if transport::send(&mut *guard, &resp).is_err() {
                 break;
-            }
-            // Send initialized event immediately after initialize response.
-            if init {
-                let mut event = Event::initialized();
-                *s += 1;
-                event.seq = *s;
-                let _ = transport::send(&mut *guard, &event);
             }
         }
     });
@@ -180,6 +171,7 @@ fn handle_request(
 
 fn debug_event_to_protocol(event: &DebugEvent) -> Event {
     let (name, body) = match event {
+        DebugEvent::Initialized => ("initialized", json!({})),
         DebugEvent::Stopped {
             reason,
             description,

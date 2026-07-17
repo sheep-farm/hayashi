@@ -136,6 +136,16 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.debug.registerDebugConfigurationProvider('hayashi', new HayashiConfigurationProvider())
     );
+    context.subscriptions.push(
+        vscode.debug.registerDebugAdapterTrackerFactory('hayashi', {
+            createDebugAdapterTracker(_session: vscode.DebugSession) {
+                return {
+                    onWillReceiveMessage: (m: any) => debugChannel.appendLine(`->DA ${JSON.stringify(m)}`),
+                    onDidSendMessage: (m: any) => debugChannel.appendLine(`DA-> ${JSON.stringify(m)}`)
+                };
+            }
+        })
+    );
 }
 
 function runHayashi(uri: vscode.Uri, code: string) {
@@ -193,6 +203,7 @@ class HayashiDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory
         _executable: vscode.DebugAdapterExecutable | undefined
     ): vscode.ProviderResult<vscode.DebugAdapterDescriptor> {
         const config = session.configuration;
+        debugChannel.appendLine(`createDebugAdapterDescriptor config: ${JSON.stringify(config)}`);
         const executable = String(config.runtimeExecutable || 'hay');
         const args: string[] = Array.isArray(config.runtimeArgs)
             ? config.runtimeArgs.map(String)
@@ -223,6 +234,7 @@ class HayashiConfigurationProvider implements vscode.DebugConfigurationProvider 
         folder: vscode.WorkspaceFolder | undefined,
         config: vscode.DebugConfiguration
     ): vscode.ProviderResult<vscode.DebugConfiguration> {
+        debugChannel.appendLine(`resolveDebugConfiguration input: ${JSON.stringify(config)}`);
         if (!config.program || config.program === '${file}') {
             const editor = vscode.window.activeTextEditor;
             if (editor) {
@@ -248,6 +260,7 @@ class HayashiConfigurationProvider implements vscode.DebugConfigurationProvider 
         if (config.type === 'hayashi' && !config.request) {
             config.request = 'launch';
         }
+        debugChannel.appendLine(`resolveDebugConfiguration output: ${JSON.stringify(config)}`);
         return config;
     }
 }
