@@ -1,4 +1,6 @@
-use crate::lang::interpreter::models::{DFMModel, SurModel, ThreeSLSModel};
+use crate::lang::interpreter::models::{
+    DFMModel, FactorModel, PcaModel, PenalizedModel, SurModel, ThreeSLSModel,
+};
 use crate::lang::interpreter::{Series, Value};
 use indexmap::IndexMap;
 use ndarray::{Array1, Array2};
@@ -344,6 +346,17 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
         Value::KMResult(r) => km_children(r),
         Value::CoxResult(r) => cox_children(r),
         Value::HeckmanResult(r) => heckman_children(r),
+        Value::GeeResult(r) => gee_children(r),
+        Value::LowessResult(r) => lowess_children(r),
+        Value::PenalizedResult(m) => penalized_children(m),
+        Value::PcaResult(m) => pca_children(m),
+        Value::FactorResult(m) => factor_children(m),
+        Value::MiceResult(r) => mice_children(r),
+        Value::GamResult(r) => gam_children(r),
+        Value::ConditionalResult(r) => conditional_children(r),
+        Value::RollingResult(r) => rolling_children(r),
+        Value::RecursiveLSResult(r) => recursive_ls_children(r),
+        Value::DecompResult(r) => decomp_children(r),
         _ => Vec::new(),
     }
 }
@@ -750,6 +763,78 @@ fn value_summary_and_type(v: &Value) -> (String, &'static str) {
                 r.n_obs, r.n_selected, r.rho
             ),
             "HeckmanResult",
+        ),
+        Value::GeeResult(r) => (
+            format!(
+                "GEE(k={}, groups={}), QIC={:.4}",
+                r.params.len(),
+                r.n_groups,
+                r.qic
+            ),
+            "GeeResult",
+        ),
+        Value::LowessResult(r) => (
+            format!("Lowess(n={}, frac={:.4})", r.n_obs, r.frac),
+            "LowessResult",
+        ),
+        Value::PenalizedResult(m) => (
+            format!(
+                "{}(n={}, alpha={:.4}), R2={:.4}",
+                capitalize(&m.kind),
+                m.n_obs,
+                m.alpha,
+                m.r_squared
+            ),
+            "PenalizedResult",
+        ),
+        Value::PcaResult(m) => (
+            format!(
+                "PCA(n={}, components={})",
+                m.result.n_obs, m.result.n_components
+            ),
+            "PcaResult",
+        ),
+        Value::FactorResult(m) => (
+            format!(
+                "Factor(n={}, factors={})",
+                m.result.n_obs, m.result.n_factors
+            ),
+            "FactorResult",
+        ),
+        Value::MiceResult(r) => (
+            format!(
+                "MICE(n={}, vars={}, m={})",
+                r.n_obs, r.n_vars, r.n_imputations
+            ),
+            "MiceResult",
+        ),
+        Value::GamResult(r) => (
+            format!(
+                "GAM(n={}, linear={}, smooth={}), GCV={:.4}",
+                r.n_obs, r.n_linear, r.n_smooth, r.gcv_score
+            ),
+            "GamResult",
+        ),
+        Value::ConditionalResult(r) => (
+            format!("{}(n={}, groups={})", r.model_name, r.n_obs, r.n_groups),
+            "ConditionalResult",
+        ),
+        Value::RollingResult(r) => (
+            format!(
+                "RollingOLS(n={}, window={}), k={}",
+                r.n_obs,
+                r.window,
+                r.params_history.ncols()
+            ),
+            "RollingResult",
+        ),
+        Value::RecursiveLSResult(r) => (
+            format!("RecursiveLS(n={}, k={})", r.n_obs, r.params_history.ncols()),
+            "RecursiveLSResult",
+        ),
+        Value::DecompResult(r) => (
+            format!("Decomp({}), n={}", r.model, r.observed.len()),
+            "DecompResult",
         ),
         Value::UserFn(f) => (format!("<fn({})>", f.params.join(", ")), "Function"),
         _ => (v.to_string(), "Model"),
@@ -2288,6 +2373,332 @@ fn heckman_fit_dict(r: &greeners::HeckmanResult) -> Value {
         ("n_obs", Value::Int(r.n_obs as i64)),
         ("n_selected", Value::Int(r.n_selected as i64)),
     ])
+}
+
+fn gee_children(r: &greeners::GeeResult) -> Vec<(String, Value)> {
+    let mut vars = Vec::new();
+    let names = r.variable_names.clone().unwrap_or_default();
+    let coef = coef_dataframe(
+        &names,
+        &r.params,
+        &r.robust_se,
+        &r.z_values,
+        &r.p_values,
+        None,
+        None,
+    );
+    vars.push(("coefficients".into(), coef));
+    let n = r.working_correlation.nrows();
+    let wc_names: Vec<String> = (0..n).map(|i| format!("g{i}")).collect();
+    vars.push((
+        "working_correlation".into(),
+        array2_to_dataframe_named(&r.working_correlation, &wc_names),
+    ));
+    vars.push(("fit".into(), gee_fit_dict(r)));
+    vars
+}
+
+fn gee_fit_dict(r: &greeners::GeeResult) -> Value {
+    fit_dict(&[
+        ("scale", Value::Float(r.scale)),
+        ("qic", Value::Float(r.qic)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("n_groups", Value::Int(r.n_groups as i64)),
+        ("n_iter", Value::Int(r.n_iter as i64)),
+        ("converged", Value::Bool(r.converged)),
+    ])
+}
+
+fn lowess_children(r: &greeners::LowessResult) -> Vec<(String, Value)> {
+    vec![
+        ("smoothed".into(), array1_to_series("smoothed", &r.smoothed)),
+        (
+            "residuals".into(),
+            array1_to_series("residuals", &r.residuals),
+        ),
+        ("fit".into(), lowess_fit_dict(r)),
+    ]
+}
+
+fn lowess_fit_dict(r: &greeners::LowessResult) -> Value {
+    fit_dict(&[
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("frac", Value::Float(r.frac)),
+    ])
+}
+
+fn penalized_children(m: &PenalizedModel) -> Vec<(String, Value)> {
+    let mut vars = Vec::new();
+    let zeros: Array1<f64> = Array1::zeros(m.params.len());
+    let coef = coef_dataframe(
+        &m.variable_names,
+        &m.params,
+        &m.std_errors,
+        &zeros,
+        &zeros,
+        None,
+        None,
+    );
+    vars.push(("coefficients".into(), coef));
+    vars.push(("fit".into(), penalized_fit_dict(m)));
+    vars
+}
+
+fn penalized_fit_dict(m: &PenalizedModel) -> Value {
+    let mut entries = vec![
+        ("kind", Value::Str(m.kind.clone())),
+        ("n_obs", Value::Int(m.n_obs as i64)),
+        ("alpha", Value::Float(m.alpha)),
+        ("r2", Value::Float(m.r_squared)),
+    ];
+    if let Some(l1r) = m.l1_ratio {
+        entries.push(("l1_ratio", Value::Float(l1r)));
+    }
+    fit_dict(&entries)
+}
+
+fn pca_children(m: &PcaModel) -> Vec<(String, Value)> {
+    let r = &*m.result;
+    let mut vars = Vec::new();
+    let comp_names: Vec<String> = (0..r.n_components)
+        .map(|i| format!("PC{}", i + 1))
+        .collect();
+    vars.push((
+        "components".into(),
+        array2_to_dataframe_named(&r.components, &comp_names),
+    ));
+    vars.push((
+        "loadings".into(),
+        array2_to_dataframe_named(&r.loadings, &comp_names),
+    ));
+    vars.push((
+        "scores".into(),
+        array2_to_dataframe_named(&r.scores, &comp_names),
+    ));
+    vars.push((
+        "explained_variance".into(),
+        array1_to_series("explained_variance", &r.explained_variance),
+    ));
+    vars.push((
+        "explained_variance_ratio".into(),
+        array1_to_series("explained_variance_ratio", &r.explained_variance_ratio),
+    ));
+    vars.push(("mean".into(), array1_to_series("mean", &r.mean)));
+    vars.push(("std".into(), array1_to_series("std", &r.std)));
+    vars.push(("fit".into(), pca_fit_dict(r)));
+    vars
+}
+
+fn pca_fit_dict(r: &greeners::PCAResult) -> Value {
+    fit_dict(&[
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("n_components", Value::Int(r.n_components as i64)),
+    ])
+}
+
+fn factor_children(m: &FactorModel) -> Vec<(String, Value)> {
+    let r = &*m.result;
+    let mut vars = Vec::new();
+    let factor_names: Vec<String> = (0..r.n_factors).map(|i| format!("F{}", i + 1)).collect();
+    vars.push((
+        "loadings".into(),
+        array2_to_dataframe_named(&r.loadings, &factor_names),
+    ));
+    vars.push((
+        "communalities".into(),
+        array1_to_series("communalities", &r.communalities),
+    ));
+    vars.push((
+        "uniquenesses".into(),
+        array1_to_series("uniquenesses", &r.uniquenesses),
+    ));
+    vars.push((
+        "eigenvalues".into(),
+        array1_to_series("eigenvalues", &r.eigenvalues),
+    ));
+    vars.push(("fit".into(), factor_fit_dict(r)));
+    vars
+}
+
+fn factor_fit_dict(r: &greeners::FactorResult) -> Value {
+    fit_dict(&[
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("n_factors", Value::Int(r.n_factors as i64)),
+    ])
+}
+
+fn mice_children(r: &greeners::MICEResult) -> Vec<(String, Value)> {
+    let mut vars = Vec::new();
+    let mut imputations = Vec::new();
+    for (i, ds) in r.datasets.iter().enumerate() {
+        let mut columns: IndexMap<String, greeners::Column> = IndexMap::new();
+        for (name, arr) in ds {
+            let col: Vec<f64> = arr.iter().copied().collect();
+            columns.insert(name.clone(), greeners::Column::Float(Array1::from(col)));
+        }
+        let df = Value::DataFrame(Arc::new(
+            greeners::DataFrame::from_columns(columns)
+                .unwrap_or_else(|_| greeners::DataFrame::from_columns(IndexMap::new()).unwrap()),
+        ));
+        imputations.push((format!("imputation_{i}"), df));
+    }
+    vars.push((
+        "imputations".into(),
+        Value::Dict(Arc::new(HashMap::from_iter(imputations))),
+    ));
+    vars.push(("fit".into(), mice_fit_dict(r)));
+    vars
+}
+
+fn mice_fit_dict(r: &greeners::MICEResult) -> Value {
+    fit_dict(&[
+        ("n_imputations", Value::Int(r.n_imputations as i64)),
+        ("n_iter", Value::Int(r.n_iter as i64)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("n_vars", Value::Int(r.n_vars as i64)),
+    ])
+}
+
+fn gam_children(r: &greeners::GamResult) -> Vec<(String, Value)> {
+    let mut vars = Vec::new();
+    let names = r.variable_names.clone().unwrap_or_default();
+    let coef = coef_dataframe(
+        &names,
+        &r.params,
+        &r.std_errors,
+        &r.z_values,
+        &r.p_values,
+        None,
+        None,
+    );
+    vars.push(("coefficients".into(), coef));
+    vars.push(("fit".into(), gam_fit_dict(r)));
+    vars
+}
+
+fn gam_fit_dict(r: &greeners::GamResult) -> Value {
+    fit_dict(&[
+        ("n_linear", Value::Int(r.n_linear as i64)),
+        ("n_smooth", Value::Int(r.n_smooth as i64)),
+        ("edf", Value::Float(r.edf)),
+        ("gcv_score", Value::Float(r.gcv_score)),
+        ("scale", Value::Float(r.scale)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("n_iter", Value::Int(r.n_iter as i64)),
+        ("converged", Value::Bool(r.converged)),
+    ])
+}
+
+fn conditional_children(r: &greeners::ConditionalResult) -> Vec<(String, Value)> {
+    let mut vars = Vec::new();
+    let names = r.variable_names.clone().unwrap_or_default();
+    let coef = coef_dataframe(
+        &names,
+        &r.params,
+        &r.std_errors,
+        &r.z_values,
+        &r.p_values,
+        None,
+        None,
+    );
+    vars.push(("coefficients".into(), coef));
+    vars.push(("fit".into(), conditional_fit_dict(r)));
+    vars
+}
+
+fn conditional_fit_dict(r: &greeners::ConditionalResult) -> Value {
+    fit_dict(&[
+        ("model_name", Value::Str(r.model_name.clone())),
+        ("log_lik", Value::Float(r.log_likelihood)),
+        ("aic", Value::Float(r.aic)),
+        ("bic", Value::Float(r.bic)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("n_groups", Value::Int(r.n_groups as i64)),
+        ("iterations", Value::Int(r.iterations as i64)),
+        ("converged", Value::Bool(r.converged)),
+        (
+            "inference_type",
+            Value::Str(format!("{:?}", r.inference_type)),
+        ),
+    ])
+}
+
+fn rolling_children(r: &greeners::RollingResult) -> Vec<(String, Value)> {
+    let mut vars = Vec::new();
+    let k = r.params_history.ncols();
+    let param_names = r
+        .variable_names
+        .clone()
+        .unwrap_or_else(|| (0..k).map(|i| format!("beta{i}")).collect());
+    vars.push((
+        "params_history".into(),
+        array2_to_dataframe_named(&r.params_history, &param_names),
+    ));
+    vars.push((
+        "r_squared_history".into(),
+        array1_to_series("r_squared_history", &r.r_squared_history),
+    ));
+    vars.push((
+        "residuals".into(),
+        array1_to_series("residuals", &r.residuals),
+    ));
+    vars.push(("fit".into(), rolling_fit_dict(r)));
+    vars
+}
+
+fn rolling_fit_dict(r: &greeners::RollingResult) -> Value {
+    fit_dict(&[
+        ("window", Value::Int(r.window as i64)),
+        ("n_obs", Value::Int(r.n_obs as i64)),
+    ])
+}
+
+fn recursive_ls_children(r: &greeners::RecursiveLSResult) -> Vec<(String, Value)> {
+    let mut vars = Vec::new();
+    let k = r.params_history.ncols();
+    let param_names: Vec<String> = (0..k).map(|i| format!("beta{i}")).collect();
+    vars.push((
+        "params_history".into(),
+        array2_to_dataframe_named(&r.params_history, &param_names),
+    ));
+    vars.push(("params".into(), array1_to_series("params", &r.params)));
+    vars.push((
+        "residuals".into(),
+        array1_to_series("residuals", &r.residuals),
+    ));
+    vars.push(("cusum".into(), array1_to_series("cusum", &r.cusum)));
+    vars.push((
+        "cusum_squares".into(),
+        array1_to_series("cusum_squares", &r.cusum_squares),
+    ));
+    vars.push(("fit".into(), recursive_ls_fit_dict(r)));
+    vars
+}
+
+fn recursive_ls_fit_dict(r: &greeners::RecursiveLSResult) -> Value {
+    fit_dict(&[("n_obs", Value::Int(r.n_obs as i64))])
+}
+
+fn decomp_children(r: &greeners::DecompositionResult) -> Vec<(String, Value)> {
+    vec![
+        ("observed".into(), array1_to_series("observed", &r.observed)),
+        ("trend".into(), array1_to_series("trend", &r.trend)),
+        ("seasonal".into(), array1_to_series("seasonal", &r.seasonal)),
+        ("residual".into(), array1_to_series("residual", &r.residual)),
+        ("fit".into(), decomp_fit_dict(r)),
+    ]
+}
+
+fn decomp_fit_dict(r: &greeners::DecompositionResult) -> Value {
+    fit_dict(&[("model", Value::Str(r.model.clone()))])
+}
+
+fn capitalize(s: &str) -> String {
+    let mut chars = s.chars();
+    match chars.next() {
+        Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
+        None => String::new(),
+    }
 }
 
 fn column_to_value(name: &str, column: &greeners::Column) -> Value {
