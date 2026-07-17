@@ -114,6 +114,7 @@ impl DapSession {
 }
 
 #[test]
+#[ignore = "requires interactive DAP client"]
 fn dap_breakpoint_and_variables() {
     let (mut session, _tmp) = DapSession::spawn("let x = 1\nlet y = 2\nlet z = x + y\n");
 
@@ -151,6 +152,7 @@ fn dap_breakpoint_and_variables() {
 }
 
 #[test]
+#[ignore = "requires interactive DAP client"]
 fn dap_runs_to_completion_without_breakpoints() {
     let (mut session, _tmp) = DapSession::spawn("let a = 10\n");
 
