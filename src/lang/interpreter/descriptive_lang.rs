@@ -154,7 +154,7 @@ impl Interpreter {
                 let src = std::fs::read_to_string(&path)
                     .map_err(|e| self.rt_err(format!("cannot read '{path}': {e}")))?;
                 println!("source {path}");
-                crate::lang::run_source(&src, self)?;
+                crate::lang::run_source_with_path(&src, self, Some(std::path::Path::new(&path)))?;
                 Ok(Value::Nil)
             }
 
@@ -255,7 +255,11 @@ impl Interpreter {
                 let before: std::collections::HashSet<String> =
                     self.env.var_names().into_iter().collect();
 
-                crate::lang::run_source(&src, self)?;
+                crate::lang::run_source_with_path(
+                    &src,
+                    self,
+                    Some(std::path::Path::new(&resolved)),
+                )?;
 
                 let new_names: Vec<String> = self
                     .env

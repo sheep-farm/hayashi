@@ -146,4 +146,28 @@ impl Env {
         }
         names
     }
+
+    pub fn scope_count(&self) -> usize {
+        self.scopes.len()
+    }
+
+    pub fn current_scope_names(&self) -> Vec<String> {
+        let mut names: Vec<String> = self
+            .scopes
+            .last()
+            .map(|s| s.vars.keys().cloned().collect())
+            .unwrap_or_default();
+        names.sort();
+        names
+    }
+
+    pub fn global_scope_names(&self) -> Vec<String> {
+        let mut names: Vec<String> = self
+            .scopes
+            .first()
+            .map(|s| s.vars.keys().cloned().collect())
+            .unwrap_or_default();
+        names.sort();
+        names
+    }
 }

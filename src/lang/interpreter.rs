@@ -1,4 +1,5 @@
 use crate::lang::ast::*;
+use crate::lang::dap::protocol::*;
 use crate::lang::error::{HayashiError, Result};
 use greeners::diagnostics::Diagnostics;
 use greeners::linalg::UPLO;
@@ -10,6 +11,7 @@ use greeners::{
     RandomEffects, IV, OLS,
 };
 use ndarray::{Array1, Array2, Axis};
+use serde_json::{json, Value as JsonValue};
 use statrs::distribution::{ContinuousCDF, Normal};
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -73,6 +75,79 @@ fn t_critical_95(df: f64) -> f64 {
     t_quantile(0.975, df)
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DebugAction {
+    Continue,
+    StepOver,
+    StepIn,
+    StepOut,
+    Pause,
+}
+
+#[derive(Debug)]
+pub struct DebugState {
+    pub current_file: std::path::PathBuf,
+    pub breakpoints: HashSet<(std::path::PathBuf, usize)>,
+    pub action: DebugAction,
+    pub step_target_depth: Option<usize>,
+    pub pending_command: Option<DebugCommand>,
+    pub event_tx: std::sync::mpsc::Sender<DebugEvent>,
+    pub control_rx: std::sync::mpsc::Receiver<ControlMessage>,
+}
+
+#[derive(Debug, Clone)]
+pub enum DebugEvent {
+    Stopped {
+        reason: String,
+        description: Option<String>,
+        thread_id: i64,
+        preserve_focus_hint: bool,
+    },
+    Output {
+        category: String,
+        output: String,
+    },
+    Terminated,
+    Exited(i64),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DebugCommand {
+    Continue,
+    StepOver,
+    StepIn,
+    StepOut,
+    Pause,
+    Disconnect,
+}
+
+#[derive(Debug, Clone)]
+pub enum ControlMessage {
+    Command(DebugCommand),
+    Request(
+        crate::lang::dap::protocol::Request,
+        std::sync::mpsc::Sender<crate::lang::dap::protocol::Response>,
+    ),
+}
+
+impl DebugState {
+    pub fn new(
+        current_file: std::path::PathBuf,
+        event_tx: std::sync::mpsc::Sender<DebugEvent>,
+        control_rx: std::sync::mpsc::Receiver<ControlMessage>,
+    ) -> Self {
+        Self {
+            current_file,
+            breakpoints: HashSet::new(),
+            action: DebugAction::Continue,
+            step_target_depth: None,
+            pending_command: None,
+            event_tx,
+            control_rx,
+        }
+    }
+}
+
 fn rd_kernel_opt(opt: Option<&Value>) -> std::result::Result<greeners::RdKernel, String> {
     match opt {
         None => Ok(greeners::RdKernel::Triangular),
@@ -112,6 +187,8 @@ pub struct Interpreter {
     pub plugins: HashMap<String, Box<dyn super::plugin::HayashiPlugin>>,
     capturing: bool,
     call_stack: Vec<(String, usize)>,
+    pub debug_state: Option<DebugState>,
+    pub current_source: std::path::PathBuf,
 }
 
 impl Default for Interpreter {
@@ -145,6 +222,378 @@ impl Interpreter {
             plugins: HashMap::new(),
             capturing: false,
             call_stack: Vec::new(),
+            debug_state: None,
+            current_source: std::path::PathBuf::new(),
+        }
+    }
+
+    pub fn set_current_source(&mut self, path: impl Into<std::path::PathBuf>) {
+        self.current_source = path.into();
+    }
+
+    pub fn enable_debug(
+        &mut self,
+        current_file: std::path::PathBuf,
+        event_tx: std::sync::mpsc::Sender<DebugEvent>,
+        control_rx: std::sync::mpsc::Receiver<ControlMessage>,
+    ) {
+        self.debug_state = Some(DebugState::new(current_file, event_tx, control_rx));
+    }
+
+    /// Blocks until the DAP client sends `configurationDone`. While waiting,
+    /// it answers `initialize`, `launch`, `setBreakpoints` and other requests.
+    pub fn debug_wait_for_start(&mut self) -> Result<()> {
+        loop {
+            let ds = self
+                .debug_state
+                .as_ref()
+                .ok_or_else(|| HayashiError::Runtime("debugger not enabled".into()))?;
+            let msg = ds.control_rx.recv();
+            match msg {
+                Ok(ControlMessage::Request(req, tx)) => {
+                    let is_start = req.command == "configurationDone";
+                    let resp = self.process_dap_request(&req);
+                    let _ = tx.send(resp);
+                    if is_start {
+                        return Ok(());
+                    }
+                }
+                Ok(ControlMessage::Command(DebugCommand::Disconnect)) => {
+                    return Err(HayashiError::Runtime("debugger disconnected".into()));
+                }
+                Ok(ControlMessage::Command(_)) => {
+                    // Ignore stray control commands before the session starts.
+                }
+                Err(_) => {
+                    return Err(HayashiError::Runtime("debugger disconnected".into()));
+                }
+            }
+        }
+    }
+
+    pub fn debug_set_breakpoints(&mut self, file: std::path::PathBuf, lines: Vec<usize>) {
+        if let Some(ds) = self.debug_state.as_mut() {
+            ds.breakpoints.retain(|(f, _)| f != &file);
+            for line in lines {
+                ds.breakpoints.insert((file.clone(), line));
+            }
+        }
+    }
+
+    pub fn debug_clear_breakpoints(&mut self) {
+        if let Some(ds) = self.debug_state.as_mut() {
+            ds.breakpoints.clear();
+        }
+    }
+
+    pub fn call_stack(&self) -> &[(String, usize)] {
+        &self.call_stack
+    }
+
+    pub fn current_line(&self) -> usize {
+        self.current_line
+    }
+
+    pub fn current_source(&self) -> &std::path::Path {
+        &self.current_source
+    }
+
+    /// Called at the start of every statement execution.
+    pub(crate) fn debug_check(&mut self, file: &std::path::Path, line: usize) -> Result<()> {
+        if self.debug_state.is_none() {
+            return Ok(());
+        }
+
+        self.current_line = line;
+        {
+            let ds = self.debug_state.as_mut().unwrap();
+            ds.current_file = file.to_path_buf();
+        }
+
+        // Non-blocking drain of any pending control messages while running.
+        self.debug_drain_pending()?;
+
+        // Apply any command that arrived before we decide whether to stop.
+        let pending = {
+            let ds = self.debug_state.as_mut().unwrap();
+            ds.pending_command.take()
+        };
+        if let Some(cmd) = pending {
+            self.apply_debug_command(cmd)?;
+        }
+
+        // Decide whether to stop using a snapshot of the debug action state.
+        let call_stack_len = self.call_stack.len();
+        let (should_stop, reason) = {
+            let ds = self.debug_state.as_ref().unwrap();
+            let mut should_stop = false;
+
+            if ds.breakpoints.contains(&(file.to_path_buf(), line))
+                && ds.action != DebugAction::StepIn
+            {
+                should_stop = true;
+            }
+
+            match ds.action {
+                DebugAction::StepIn => should_stop = true,
+                DebugAction::StepOver => {
+                    if let Some(target) = ds.step_target_depth {
+                        if call_stack_len <= target {
+                            should_stop = true;
+                        }
+                    }
+                }
+                DebugAction::StepOut => {
+                    if let Some(target) = ds.step_target_depth {
+                        if call_stack_len <= target {
+                            should_stop = true;
+                        }
+                    }
+                }
+                DebugAction::Pause => should_stop = true,
+                DebugAction::Continue => {}
+            }
+
+            let reason = match ds.action {
+                DebugAction::StepIn | DebugAction::StepOver | DebugAction::StepOut => "step",
+                DebugAction::Pause => "pause",
+                _ => "breakpoint",
+            }
+            .to_string();
+
+            (should_stop, reason)
+        };
+
+        if !should_stop {
+            return Ok(());
+        }
+
+        {
+            let ds = self.debug_state.as_mut().unwrap();
+            ds.action = DebugAction::Continue;
+            ds.step_target_depth = None;
+            ds.event_tx
+                .send(DebugEvent::Stopped {
+                    reason,
+                    description: None,
+                    thread_id: 1,
+                    preserve_focus_hint: false,
+                })
+                .ok();
+        }
+
+        loop {
+            let msg = {
+                let ds = self.debug_state.as_ref().unwrap();
+                ds.control_rx.recv()
+            };
+            match msg {
+                Ok(ControlMessage::Command(cmd)) => {
+                    self.apply_debug_command(cmd)?;
+                    break;
+                }
+                Ok(ControlMessage::Request(req, tx)) => {
+                    let resp = self.process_dap_request(&req);
+                    let _ = tx.send(resp);
+                }
+                Err(_) => {
+                    return Err(HayashiError::Runtime("debugger disconnected".into()));
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn apply_debug_command(&mut self, cmd: DebugCommand) -> Result<()> {
+        let ds = self.debug_state.as_mut().unwrap();
+        match cmd {
+            DebugCommand::Continue => {
+                ds.action = DebugAction::Continue;
+            }
+            DebugCommand::StepOver => {
+                ds.action = DebugAction::StepOver;
+                ds.step_target_depth = Some(self.call_stack.len());
+            }
+            DebugCommand::StepIn => {
+                ds.action = DebugAction::StepIn;
+            }
+            DebugCommand::StepOut => {
+                ds.action = DebugAction::StepOut;
+                ds.step_target_depth = self.call_stack.len().checked_sub(1);
+            }
+            DebugCommand::Pause => {}
+            DebugCommand::Disconnect => {
+                return Err(HayashiError::Runtime("debugger disconnected".into()));
+            }
+        }
+        Ok(())
+    }
+
+    fn debug_drain_pending(&mut self) -> Result<()> {
+        if self.debug_state.is_none() {
+            return Ok(());
+        }
+        loop {
+            let msg = {
+                let ds = self.debug_state.as_ref().unwrap();
+                ds.control_rx.try_recv()
+            };
+            match msg {
+                Ok(ControlMessage::Command(DebugCommand::Pause)) => {
+                    let ds = self.debug_state.as_mut().unwrap();
+                    ds.action = DebugAction::Pause;
+                }
+                Ok(ControlMessage::Command(DebugCommand::Disconnect)) => {
+                    return Err(HayashiError::Runtime("debugger disconnected".into()));
+                }
+                Ok(ControlMessage::Command(cmd)) => {
+                    let ds = self.debug_state.as_mut().unwrap();
+                    ds.pending_command = Some(cmd);
+                }
+                Ok(ControlMessage::Request(req, tx)) => {
+                    let resp = self.process_dap_request(&req);
+                    let _ = tx.send(resp);
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => break,
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    return Err(HayashiError::Runtime("debugger disconnected".into()));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn process_dap_request(&mut self, req: &Request) -> Response {
+        match req.command.as_str() {
+            "initialize" => {
+                Response::ok(0, req.seq, &req.command).with_body(Capabilities::default())
+            }
+            "setBreakpoints" => {
+                match serde_json::from_value::<SetBreakpointsArguments>(
+                    req.arguments.clone().unwrap_or(JsonValue::Null),
+                ) {
+                    Ok(args) => {
+                        let path = std::path::PathBuf::from(&args.source.path);
+                        let lines: Vec<usize> =
+                            args.breakpoints.iter().map(|b| b.line as usize).collect();
+                        self.debug_set_breakpoints(path.clone(), lines.clone());
+                        let breakpoints: Vec<Breakpoint> = lines
+                            .iter()
+                            .map(|l| Breakpoint {
+                                line: *l as i64,
+                                verified: Some(true),
+                                message: None,
+                            })
+                            .collect();
+                        Response::ok(0, req.seq, &req.command)
+                            .with_body(json!({ "breakpoints": breakpoints }))
+                    }
+                    Err(e) => {
+                        Response::err(0, req.seq, &req.command, format!("invalid arguments: {e}"))
+                    }
+                }
+            }
+            "threads" => Response::ok(0, req.seq, &req.command)
+                .with_body(json!({ "threads": [Thread { id: 1, name: "main".into() }] })),
+            "stackTrace" => {
+                let mut frames: Vec<StackFrame> = Vec::new();
+                let current_file = self.current_source().to_string_lossy().to_string();
+                let source = Some(Source {
+                    path: current_file.clone(),
+                    name: None,
+                });
+                frames.push(StackFrame {
+                    id: 0,
+                    name: "main".into(),
+                    source: source.clone(),
+                    line: self.current_line() as i64,
+                    column: 0,
+                });
+                for (i, (name, line)) in self.call_stack().iter().enumerate() {
+                    frames.push(StackFrame {
+                        id: (i + 1) as i64,
+                        name: name.clone(),
+                        source: source.clone(),
+                        line: *line as i64,
+                        column: 0,
+                    });
+                }
+                Response::ok(0, req.seq, &req.command)
+                    .with_body(json!({ "stackFrames": frames, "totalFrames": frames.len() as i64 }))
+            }
+            "scopes" => {
+                let frame_id = req
+                    .arguments
+                    .as_ref()
+                    .and_then(|a| a.get("frameId"))
+                    .and_then(|v| v.as_i64())
+                    .unwrap_or(0);
+                let scopes = vec![
+                    Scope {
+                        name: "Locals".into(),
+                        presentation_hint: Some("locals".into()),
+                        variables_reference: frame_id * 2 + 1,
+                        expensive: false,
+                    },
+                    Scope {
+                        name: "Globals".into(),
+                        presentation_hint: Some("globals".into()),
+                        variables_reference: frame_id * 2 + 2,
+                        expensive: false,
+                    },
+                ];
+                Response::ok(0, req.seq, &req.command).with_body(json!({ "scopes": scopes }))
+            }
+            "variables" => {
+                let reference = req
+                    .arguments
+                    .as_ref()
+                    .and_then(|a| a.get("variablesReference"))
+                    .and_then(|v| v.as_i64())
+                    .unwrap_or(0);
+                let is_global = reference % 2 == 0;
+                let names = if is_global {
+                    self.env.global_scope_names()
+                } else {
+                    self.env.current_scope_names()
+                };
+                let variables: Vec<Variable> = names
+                    .iter()
+                    .filter_map(|name| {
+                        self.env.get(name).map(|v| {
+                            let (value, type_name, child_count) = value_to_variable_parts(v);
+                            let mut var = Variable {
+                                name: name.clone(),
+                                value,
+                                type_field: Some(type_name),
+                                variables_reference: 0,
+                                named_variables: None,
+                                indexed_variables: None,
+                            };
+                            if child_count > 0 {
+                                var.variables_reference = next_variable_reference();
+                            }
+                            var
+                        })
+                    })
+                    .collect();
+                Response::ok(0, req.seq, &req.command).with_body(json!({ "variables": variables }))
+            }
+            "evaluate" => {
+                match req
+                    .arguments
+                    .as_ref()
+                    .and_then(|a| a.get("expression"))
+                    .and_then(|v| v.as_str())
+                {
+                    Some(expr) => Response::ok(0, req.seq, &req.command)
+                        .with_body(json!({ "result": expr, "variablesReference": 0 })),
+                    None => Response::err(0, req.seq, &req.command, "missing expression"),
+                }
+            }
+            "launch" | "attach" | "configurationDone" => Response::ok(0, req.seq, &req.command),
+            _ => Response::ok(0, req.seq, &req.command),
         }
     }
 
@@ -519,7 +968,7 @@ impl Interpreter {
                 }
                 if let Ok(src) = std::fs::read_to_string(&path) {
                     self.imported.insert(name);
-                    let _ = crate::lang::run_source(&src, self);
+                    let _ = crate::lang::run_source_with_path(&src, self, Some(&path));
                 }
             }
         }
@@ -856,4 +1305,50 @@ impl Interpreter {
     // ── Element-wise expression evaluation over DataFrame columns ───────────
 
     // ── Statement execution ─────────────────────────────────────────────────
+}
+
+pub(crate) fn value_to_variable_parts(v: &Value) -> (String, String, usize) {
+    match v {
+        Value::Float(f) => (format!("{f}"), "Float".into(), 0),
+        Value::Int(i) => (format!("{i}"), "Int".into(), 0),
+        Value::Bool(b) => (format!("{b}"), "Bool".into(), 0),
+        Value::Str(s) => (s.clone(), "String".into(), 0),
+        Value::Nil => ("nil".into(), "Nil".into(), 0),
+        Value::DataFrame(df) => (
+            format!(
+                "DataFrame({} rows, {} cols)",
+                df.n_rows(),
+                df.column_names().len()
+            ),
+            "DataFrame".into(),
+            df.column_names().len(),
+        ),
+        Value::List(lst) => (
+            format!("List({} items)", lst.len()),
+            "List".into(),
+            lst.len().min(100),
+        ),
+        Value::Dict(d) => (
+            format!("Dict({} entries)", d.len()),
+            "Dict".into(),
+            d.len().min(100),
+        ),
+        Value::Series(s) => (
+            format!("Series({}: {} values)", s.name, s.len()),
+            "Series".into(),
+            s.len().min(100),
+        ),
+        Value::UserFn(f) => (
+            format!("<fn({})>", f.params.join(", ")),
+            "Function".into(),
+            0,
+        ),
+        _ => (format!("{v}"), "Model".into(), 0),
+    }
+}
+
+pub(crate) fn next_variable_reference() -> i64 {
+    use std::sync::atomic::{AtomicI64, Ordering};
+    static COUNTER: AtomicI64 = AtomicI64::new(1000);
+    COUNTER.fetch_add(1, Ordering::Relaxed)
 }

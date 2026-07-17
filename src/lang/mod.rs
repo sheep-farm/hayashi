@@ -4,6 +4,7 @@
 
 pub mod ast;
 pub mod commands;
+pub mod dap;
 pub mod error;
 pub mod help;
 pub mod interpreter;
@@ -18,10 +19,26 @@ use lexer::Lexer;
 use parser::Parser;
 
 pub fn run_source(src: &str, interp: &mut Interpreter) -> Result<()> {
-    run_source_verbose(src, interp, false)
+    run_source_with_path(src, interp, None)
 }
 
-pub fn run_source_verbose(src: &str, interp: &mut Interpreter, verbose: bool) -> Result<()> {
+pub fn run_source_with_path(
+    src: &str,
+    interp: &mut Interpreter,
+    source_path: Option<&std::path::Path>,
+) -> Result<()> {
+    run_source_verbose(src, interp, false, source_path)
+}
+
+pub fn run_source_verbose(
+    src: &str,
+    interp: &mut Interpreter,
+    verbose: bool,
+    source_path: Option<&std::path::Path>,
+) -> Result<()> {
+    if let Some(path) = source_path {
+        interp.set_current_source(path);
+    }
     let mut lexer = Lexer::new(src);
     let tokens = lexer.tokenize().map_err(|e| annotate_error(src, &e))?;
     if verbose {

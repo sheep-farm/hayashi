@@ -329,7 +329,7 @@ fn run() {
                 .expect("failed to read stdin");
             let mut interp = Interpreter::new();
             interp.load_plugins();
-            if let Err(e) = lang::run_source_verbose(&src, &mut interp, verbose) {
+            if let Err(e) = lang::run_source_verbose(&src, &mut interp, verbose, None) {
                 eprintln!("error: {e}");
                 std::process::exit(1);
             }
@@ -401,6 +401,18 @@ fn run() {
             run_validation(&args_clean[2..]);
             return;
         }
+        Some("dap") => {
+            let program = args_clean.get(2).unwrap_or_else(|| {
+                eprintln!("Usage: hay dap <script.hay>");
+                std::process::exit(1);
+            });
+            hayashi_lang::lang::dap::adapter::run_dap(
+                std::io::stdin(),
+                std::io::stdout(),
+                std::path::Path::new(program),
+            );
+            return;
+        }
         Some("dist-update") => {
             dist_update(&args_clean[2..]);
             return;
@@ -444,7 +456,8 @@ fn run_script(path: &str, verbose: bool) {
     };
     let mut interp = Interpreter::new();
     interp.load_plugins();
-    if let Err(e) = lang::run_source_verbose(&src, &mut interp, verbose) {
+    let path = std::path::Path::new(path);
+    if let Err(e) = lang::run_source_verbose(&src, &mut interp, verbose, Some(path)) {
         eprintln!("error: {e}");
         std::process::exit(1);
     }

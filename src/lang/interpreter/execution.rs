@@ -17,6 +17,8 @@ impl Interpreter {
     pub(crate) fn exec(&mut self, spanned: &Spanned) -> Result<()> {
         let (stmt, line) = spanned;
         self.current_line = *line;
+        let file = self.current_source.clone();
+        self.debug_check(&file, *line)?;
         match stmt {
             Stmt::Let { name, value } => {
                 self.capturing = true;
