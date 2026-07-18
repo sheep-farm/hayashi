@@ -1,0 +1,1030 @@
+use super::super::helpers::*;
+use super::super::*;
+
+impl Interpreter {
+    pub(super) fn rd(
+        &mut self,
+        _func: &str,
+        args: &[Expr],
+        _opts: &[Opt],
+        opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        if args.len() < 3 {
+            return Err(HayashiError::Runtime(
+                "rd() requer (formula, cutoff, df [, bw=..., poly=..., kernel=...])".into(),
+            ));
+        }
+        let formula_ast = self.resolve_formula(&args[0])?;
+        let cutoff = match self.eval_expr(&args[1])? {
+            Value::Float(v) => v,
+            Value::Int(v) => v as f64,
+            _ => {
+                return Err(HayashiError::Type(
+                    "rd(): second argument must be cutoff (number)".into(),
+                ))
+            }
+        };
+        let df = match self.eval_expr(&args[2])? {
+            Value::DataFrame(df) => df,
+            _ => {
+                return Err(HayashiError::Type(
+                    "rd(): third argument must be DataFrame".into(),
+                ))
+            }
+        };
+
+        // Extract names directly from Hayashi formula AST
+        let outcome_name = formula_ast.lhs.clone();
+        let running_name = formula_ast
+            .rhs
+            .first()
+            .and_then(|t| t.as_var().map(|s| s.to_string()))
+            .ok_or_else(|| {
+                HayashiError::Runtime(
+                    "rd(): formula must have exactly one variable on the right side (running var)"
+                        .into(),
+                )
+            })?;
+
+        let y = df
+            .get(&outcome_name)
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?
+            .to_owned();
+        let x = df
+            .get(&running_name)
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?
+            .to_owned();
+
+        let bw = match opt_map.get("bw") {
+            Some(Value::Float(v)) => Some(*v),
+            Some(Value::Int(v)) => Some(*v as f64),
+            None => None,
+            _ => return Err(HayashiError::Runtime("rd: bw must be numeric".into())),
+        };
+        let poly = match opt_map.get("poly") {
+            Some(Value::Int(v)) => *v as usize,
+            Some(Value::Float(v)) => *v as usize,
+            None => 1,
+            _ => return Err(HayashiError::Runtime("rd: poly must be integer".into())),
+        };
+        let kernel = rd_kernel_opt(opt_map.get("kernel")).map_err(HayashiError::Runtime)?;
+
+        let result = greeners::RD::fit(
+            &y,
+            &x,
+            cutoff,
+            bw,
+            poly,
+            kernel,
+            Some((outcome_name, running_name)),
+        )
+        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        Ok(Value::RdResult(Rc::new(result)))
+    }
+
+    pub(super) fn fuzzy_rd(
+        &mut self,
+        _func: &str,
+        args: &[Expr],
+        _opts: &[Opt],
+        opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        if args.len() < 4 {
+            return Err(HayashiError::Runtime(
+                "fuzzy_rd() requer (formula, \"treatment\", cutoff, df [, bw=..., poly=...])"
+                    .into(),
+            ));
+        }
+        let formula_ast = self.resolve_formula(&args[0])?;
+        let treatment_name = match self.eval_expr(&args[1])? {
+            Value::Str(s) => s,
+            _ => {
+                return Err(HayashiError::Type(
+                    "fuzzy_rd(): second argument must be the treatment column name (string)".into(),
+                ))
+            }
+        };
+        let cutoff = match self.eval_expr(&args[2])? {
+            Value::Float(v) => v,
+            Value::Int(v) => v as f64,
+            _ => {
+                return Err(HayashiError::Type(
+                    "fuzzy_rd(): third argument must be cutoff (number)".into(),
+                ))
+            }
+        };
+        let df = match self.eval_expr(&args[3])? {
+            Value::DataFrame(df) => df,
+            _ => {
+                return Err(HayashiError::Type(
+                    "fuzzy_rd(): fourth argument must be DataFrame".into(),
+                ))
+            }
+        };
+
+        let outcome_name = formula_ast.lhs.clone();
+        let running_name = formula_ast.rhs.first()
+        .and_then(|t| t.as_var().map(|s| s.to_string()))
+        .ok_or_else(|| HayashiError::Runtime(
+            "fuzzy_rd(): formula must have exactly one variable on the right side (running var)".into()
+        ))?;
+
+        let y = df
+            .get(&outcome_name)
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?
+            .to_owned();
+        let d = df
+            .get(&treatment_name)
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?
+            .to_owned();
+        let x = df
+            .get(&running_name)
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?
+            .to_owned();
+
+        let bw = match opt_map.get("bw") {
+            Some(Value::Float(v)) => Some(*v),
+            Some(Value::Int(v)) => Some(*v as f64),
+            None => None,
+            _ => return Err(HayashiError::Runtime("fuzzy_rd: bw must be numeric".into())),
+        };
+        let poly = match opt_map.get("poly") {
+            Some(Value::Int(v)) => *v as usize,
+            Some(Value::Float(v)) => *v as usize,
+            None => 1,
+            _ => {
+                return Err(HayashiError::Runtime(
+                    "fuzzy_rd: poly must be integer".into(),
+                ))
+            }
+        };
+        let kernel = rd_kernel_opt(opt_map.get("kernel")).map_err(HayashiError::Runtime)?;
+
+        let result = greeners::RD::fit_fuzzy(
+            &y,
+            &d,
+            &x,
+            cutoff,
+            bw,
+            poly,
+            kernel,
+            Some((outcome_name, running_name, treatment_name)),
+        )
+        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        Ok(Value::RdResult(Rc::new(result)))
+    }
+
+    pub(super) fn psm(
+        &mut self,
+        _func: &str,
+        args: &[Expr],
+        _opts: &[Opt],
+        opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        if args.len() < 2 {
+            return Err(HayashiError::Runtime(
+                "psm() requer (formula, df [, k=..., caliper=..., replace=..., boot=...])".into(),
+            ));
+        }
+        let formula_ast = self.resolve_formula(&args[0])?;
+        let df = match self.eval_expr(&args[1])? {
+            Value::DataFrame(df) => df,
+            _ => {
+                return Err(HayashiError::Type(
+                    "psm(): second argument must be DataFrame".into(),
+                ))
+            }
+        };
+
+        let outcome_name = formula_ast.lhs.clone();
+        // First RHS = treatment; remaining = covariates
+        let mut rhs_names: Vec<String> = formula_ast
+            .rhs
+            .iter()
+            .filter_map(|t| t.as_var().map(|s| s.to_string()))
+            .collect();
+        if rhs_names.is_empty() {
+            return Err(HayashiError::Runtime(
+                "psm(): formula must have at least 'outcome ~ treatment'".into(),
+            ));
+        }
+        let treatment_name = rhs_names.remove(0);
+        let covariate_names = rhs_names;
+
+        if covariate_names.is_empty() {
+            return Err(HayashiError::Runtime(
+                "psm(): provide at least one covariate: outcome ~ treatment + cov1 + ...".into(),
+            ));
+        }
+
+        let y = df
+            .get(&outcome_name)
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?
+            .to_owned();
+        let d = df
+            .get(&treatment_name)
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?
+            .to_owned();
+
+        let x = {
+            let owned_cols: Vec<ndarray::Array1<f64>> = covariate_names
+                .iter()
+                .map(|c| {
+                    df.get(c)
+                        .map(|a| a.to_owned())
+                        .map_err(|e| HayashiError::Runtime(e.to_string()))
+                })
+                .collect::<Result<Vec<_>>>()?;
+            let views: Vec<ndarray::ArrayView1<f64>> =
+                owned_cols.iter().map(|a| a.view()).collect();
+            ndarray::stack(ndarray::Axis(1), &views)
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?
+        };
+
+        let k = match opt_map.get("k") {
+            Some(Value::Int(v)) => *v as usize,
+            Some(Value::Float(v)) => *v as usize,
+            None => 1,
+            _ => return Err(HayashiError::Runtime("psm: k must be integer".into())),
+        };
+        let caliper: Option<f64> = match opt_map.get("caliper") {
+            Some(Value::Float(v)) => Some(*v),
+            Some(Value::Int(v)) => Some(*v as f64),
+            None => None,
+            _ => return Err(HayashiError::Runtime("psm: caliper must be numeric".into())),
+        };
+        let with_replacement = match opt_map.get("replace") {
+            Some(Value::Bool(b)) => *b,
+            None => false,
+            _ => return Err(HayashiError::Runtime("psm: replace must be boolean".into())),
+        };
+        let n_boot = match opt_map.get("boot") {
+            Some(Value::Int(v)) => *v as usize,
+            Some(Value::Float(v)) => *v as usize,
+            None => 200,
+            _ => return Err(HayashiError::Runtime("psm: boot must be integer".into())),
+        };
+
+        let result = greeners::PSM::fit(
+            &y,
+            &d,
+            &x,
+            k,
+            caliper,
+            with_replacement,
+            n_boot,
+            Some((outcome_name, treatment_name, covariate_names)),
+        )
+        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        Ok(Value::PsmResult(Rc::new(result)))
+    }
+
+    pub(super) fn synth(
+        &mut self,
+        _func: &str,
+        args: &[Expr],
+        _opts: &[Opt],
+        opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        if args.len() < 4 {
+            return Err(HayashiError::Runtime(
+                "synth() requer (outcome, treated_id, t0, df, id=col, time=col [, covs=[...]])"
+                    .into(),
+            ));
+        }
+        let outcome_col = match self.eval_expr(&args[0])? {
+            Value::Str(s) => s,
+            _ => {
+                return Err(HayashiError::Type(
+                    "synth(): first argument must be outcome column name (string)".into(),
+                ))
+            }
+        };
+        let treated_unit = match self.eval_expr(&args[1])? {
+            Value::Str(s) => s,
+            Value::Int(v) => v.to_string(),
+            Value::Float(v) => (v as i64).to_string(),
+            _ => {
+                return Err(HayashiError::Type(
+                    "synth(): second argument must be treated unit ID".into(),
+                ))
+            }
+        };
+        let t0 = match self.eval_expr(&args[2])? {
+            Value::Float(v) => v,
+            Value::Int(v) => v as f64,
+            _ => {
+                return Err(HayashiError::Type(
+                    "synth(): third argument must be treatment start period (number)".into(),
+                ))
+            }
+        };
+        let df = match self.eval_expr(&args[3])? {
+            Value::DataFrame(df) => df,
+            _ => {
+                return Err(HayashiError::Type(
+                    "synth(): fourth argument must be DataFrame".into(),
+                ))
+            }
+        };
+
+        let id_col = match opt_map.get("id") {
+            Some(Value::Str(s)) => s.clone(),
+            _ => {
+                return Err(HayashiError::Runtime(
+                    "synth(): id=coluna option is required".into(),
+                ))
+            }
+        };
+        let time_col = match opt_map.get("time") {
+            Some(Value::Str(s)) => s.clone(),
+            _ => {
+                return Err(HayashiError::Runtime(
+                    "synth(): time=coluna option is required".into(),
+                ))
+            }
+        };
+        let cov_cols: Option<Vec<String>> = match opt_map.get("covs") {
+            Some(Value::List(lst)) => Some(
+                lst.iter()
+                    .map(|v| match v {
+                        Value::Str(s) => Ok(s.clone()),
+                        _ => Err(HayashiError::Type(
+                            "synth(): covs must be a list of strings".into(),
+                        )),
+                    })
+                    .collect::<Result<Vec<_>>>()?,
+            ),
+            None => None,
+            _ => return Err(HayashiError::Runtime("synth(): covs must be a list".into())),
+        };
+
+        let result = greeners::SyntheticControl::fit(
+            &outcome_col,
+            &treated_unit,
+            t0,
+            &df,
+            &id_col,
+            &time_col,
+            cov_cols.as_deref(),
+        )
+        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        Ok(Value::SynthResult(Rc::new(result)))
+    }
+
+    pub(super) fn did(
+        &mut self,
+        _func: &str,
+        args: &[Expr],
+        _opts: &[Opt],
+        opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        if args.len() < 2 {
+            return Err(HayashiError::Runtime(
+                "did(outcome ~ treated + post, df) requires formula and DataFrame".into(),
+            ));
+        }
+        let formula_ast = self.resolve_formula(&args[0])?;
+        let df = match self.eval_expr(&args[1])? {
+            Value::DataFrame(d) => d,
+            _ => {
+                return Err(HayashiError::Type(
+                    "did(): second argument must be DataFrame".into(),
+                ))
+            }
+        };
+        // formula: outcome ~ treated_col + post_col
+        let rhs_vars: Vec<String> = formula_ast
+            .rhs
+            .iter()
+            .filter_map(|t| t.as_var().map(|s| s.to_string()))
+            .collect();
+        if rhs_vars.len() < 2 {
+            return Err(HayashiError::Runtime(
+                "did(): formula must have exactly 2 variables on RHS: treated + post".into(),
+            ));
+        }
+        let y = get_col_f64(&df, &formula_ast.lhs)?;
+        let treated = get_col_f64(&df, &rhs_vars[0])?;
+        let post = get_col_f64(&df, &rhs_vars[1])?;
+        let cov = resolve_cov_full(opt_map, &df)?;
+        let result = greeners::DiffInDiff::fit(&y, &treated, &post, cov)
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        Ok(Value::DidResult(Rc::new(result)))
+    }
+
+    pub(super) fn eventstudy(
+        &mut self,
+        _func: &str,
+        args: &[Expr],
+        _opts: &[Opt],
+        opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        if args.len() < 2 {
+            return Err(HayashiError::Runtime(
+                "eventstudy(y ~ event_time + controls, df) requires formula and DataFrame".into(),
+            ));
+        }
+        let formula_ast = self.resolve_formula(&args[0])?;
+        let df = match self.eval_expr(&args[1])? {
+            Value::DataFrame(d) => d,
+            _ => {
+                return Err(HayashiError::Type(
+                    "eventstudy(): second argument must be DataFrame".into(),
+                ))
+            }
+        };
+        let rhs_vars: Vec<String> = formula_ast
+            .rhs
+            .iter()
+            .filter_map(|t| t.as_var().map(|s| s.to_string()))
+            .collect();
+        if rhs_vars.is_empty() {
+            return Err(HayashiError::Runtime(
+                "eventstudy(): formula must have at least event_time on RHS".into(),
+            ));
+        }
+        let event_col = &rhs_vars[0];
+        let y = get_col_f64(&df, &formula_ast.lhs)?;
+        let event_vals = get_col_f64(&df, event_col)?;
+        let event_time: Vec<i64> = event_vals.iter().map(|&v| v as i64).collect();
+
+        // Controls: remaining RHS vars
+        let n = y.len();
+        let control_vars = &rhs_vars[1..];
+        let x_controls = if control_vars.is_empty() {
+            ndarray::Array2::zeros((n, 0))
+        } else {
+            let mut x = ndarray::Array2::zeros((n, control_vars.len()));
+            for (j, v) in control_vars.iter().enumerate() {
+                let col = get_col_f64(&df, v)?;
+                for i in 0..n {
+                    x[(i, j)] = col[i];
+                }
+            }
+            x
+        };
+
+        let reference = match opt_map.get("ref") {
+            Some(Value::Int(v)) => *v,
+            Some(Value::Float(v)) => *v as i64,
+            None => -1,
+            _ => -1,
+        };
+        let min_t = match opt_map.get("min") {
+            Some(Value::Int(v)) => *v,
+            Some(Value::Float(v)) => *v as i64,
+            None => -5,
+            _ => -5,
+        };
+        let max_t = match opt_map.get("max") {
+            Some(Value::Int(v)) => *v,
+            Some(Value::Float(v)) => *v as i64,
+            None => 5,
+            _ => 5,
+        };
+        let cov = resolve_cov_full(opt_map, &df)?;
+        let result =
+            greeners::EventStudy::fit(&y, &event_time, &x_controls, reference, min_t, max_t, cov)
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        print!("{result}");
+        Ok(Value::Nil)
+    }
+
+    pub(super) fn double_ml(
+        &mut self,
+        _func: &str,
+        args: &[Expr],
+        opts: &[Opt],
+        opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+        let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+        // First RHS variable is treatment (d), rest are controls (x)
+        let independents = &g_formula.independents;
+        if independents.len() < 2 {
+            return Err(HayashiError::Runtime(
+                "double_ml() requires y ~ d + x1 + x2 + ... (treatment + controls)".into(),
+            ));
+        }
+        let d_var = &independents[0];
+        let x_vars = &independents[1..];
+
+        let n = df.n_rows();
+        let y_vec = get_col_f64(&df, &g_formula.dependent)?;
+        let d_vec = get_col_f64(&df, d_var)?;
+        let mut x_mat = ndarray::Array2::zeros((n, x_vars.len()));
+        for (j, v) in x_vars.iter().enumerate() {
+            let col = get_col_f64(&df, v)?;
+            for i in 0..n {
+                x_mat[(i, j)] = col[i];
+            }
+        }
+
+        let n_folds = match opt_map.get("folds") {
+            Some(Value::Int(v)) => *v as usize,
+            Some(Value::Float(v)) => *v as usize,
+            None => 5,
+            _ => 5,
+        };
+        let poly_degree = match opt_map.get("poly") {
+            Some(Value::Int(v)) => *v as usize,
+            Some(Value::Float(v)) => *v as usize,
+            None => 2,
+            _ => 2,
+        };
+
+        let result = greeners::DoubleML::fit_plr(&y_vec, &d_vec, &x_mat, n_folds, poly_degree)
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+        print!("{result}");
+        Ok(Value::Nil)
+    }
+
+    pub(super) fn synthdid(
+        &mut self,
+        func: &str,
+        args: &[Expr],
+        _opts: &[Opt],
+        opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        if args.len() < 3 {
+            return Err(HayashiError::Runtime(
+                "synthdid(df, y_var, treated_var, treatment_period)".into(),
+            ));
+        }
+        let df_name = match &args[0] {
+            Expr::Var(n) => n.clone(),
+            _ => {
+                return Err(HayashiError::Type(
+                    "synthdid: first arg must be DataFrame".into(),
+                ))
+            }
+        };
+        let df = match self.env.get(&df_name) {
+            Some(Value::DataFrame(d)) => d.clone(),
+            _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
+        };
+
+        // Parse: df, y_var, treated_var, treatment_period
+        // args[0] = df, args[1] = y_var, args[2] = treated_var, args[3] = treatment_period
+        let y_var = match &args[1] {
+            Expr::Var(n) | Expr::Str(n) => n.clone(),
+            _ => {
+                return Err(HayashiError::Type(
+                    "synthdid: y_var must be identifier".into(),
+                ))
+            }
+        };
+        let treated_var = match &args[2] {
+            Expr::Var(n) | Expr::Str(n) => n.clone(),
+            _ => {
+                return Err(HayashiError::Type(
+                    "synthdid: treated_var must be identifier".into(),
+                ))
+            }
+        };
+        let treatment_period = match &args[3] {
+            Expr::Int(v) => *v as usize,
+            Expr::Float(v) => *v as usize,
+            _ => {
+                return Err(HayashiError::Type(
+                    "synthdid: treatment_period must be integer".into(),
+                ))
+            }
+        };
+
+        // Build outcome matrix (units x periods)
+        // Need unit and period columns
+        let unit_col = match opt_map.get("unit") {
+            Some(Value::Str(s)) => s.clone(),
+            _ => {
+                return Err(HayashiError::Runtime(format!(
+                    "{func}() requires unit=\"column\" option"
+                )))
+            }
+        };
+        let period_col = match opt_map.get("period") {
+            Some(Value::Str(s)) => s.clone(),
+            _ => {
+                return Err(HayashiError::Runtime(format!(
+                    "{func}() requires period=\"column\" option"
+                )))
+            }
+        };
+
+        // Extract unique units and periods
+        let unit_col_data = df
+            .get_column(unit_col.as_str())
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let period_col_data = df
+            .get_column(period_col.as_str())
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+        let units: Vec<i64> = if let Some(i) = unit_col_data.as_int() {
+            i.to_vec()
+        } else if let Some(f) = unit_col_data.as_float() {
+            f.iter().map(|v| *v as i64).collect()
+        } else {
+            return Err(HayashiError::Runtime(format!(
+                "{func}: unit must be numeric"
+            )));
+        };
+        let periods: Vec<i64> = if let Some(i) = period_col_data.as_int() {
+            i.to_vec()
+        } else if let Some(f) = period_col_data.as_float() {
+            f.iter().map(|v| *v as i64).collect()
+        } else {
+            return Err(HayashiError::Runtime(format!(
+                "{func}: period must be numeric"
+            )));
+        };
+
+        let y_col = df
+            .get_column(y_var.as_str())
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let y_vals = y_col
+            .as_float()
+            .ok_or_else(|| HayashiError::Runtime(format!("{func}: '{y_var}' must be numeric")))?;
+
+        let treated_col = df
+            .get_column(treated_var.as_str())
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let treated_vals: Vec<bool> = if let Some(b) = treated_col.as_bool() {
+            b.to_vec()
+        } else if let Some(i) = treated_col.as_int() {
+            i.iter().map(|&v| v != 0).collect()
+        } else if let Some(f) = treated_col.as_float() {
+            f.iter().map(|&v| v != 0.0).collect()
+        } else {
+            return Err(HayashiError::Runtime(format!(
+                "{func}: '{treated_var}' must be boolean or numeric"
+            )));
+        };
+
+        // Get unique units and periods
+        let mut unique_units: Vec<i64> = units
+            .iter()
+            .copied()
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
+        unique_units.sort();
+        let mut unique_periods: Vec<i64> = periods
+            .iter()
+            .copied()
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
+        unique_periods.sort();
+
+        let n_units = unique_units.len();
+        let n_periods = unique_periods.len();
+
+        // Build outcome matrix
+        let mut y_mat = ndarray::Array2::<f64>::zeros((n_units, n_periods));
+        let mut treated_vec = vec![false; n_units];
+
+        let unit_to_idx: std::collections::HashMap<i64, usize> = unique_units
+            .iter()
+            .enumerate()
+            .map(|(i, &u)| (u, i))
+            .collect();
+        let period_to_idx: std::collections::HashMap<i64, usize> = unique_periods
+            .iter()
+            .enumerate()
+            .map(|(i, &p)| (p, i))
+            .collect();
+
+        for row in 0..df.n_rows() {
+            let ui = unit_to_idx[&units[row]];
+            let pi = period_to_idx[&periods[row]];
+            y_mat[(ui, pi)] = y_vals[row];
+            if treated_vals[row] {
+                treated_vec[ui] = true;
+            }
+        }
+
+        let result = greeners::SyntheticDiD::fit(&y_mat, &treated_vec, treatment_period)
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+        print!("{result}");
+        Ok(Value::Nil)
+    }
+
+    pub(super) fn cuped(
+        &mut self,
+        func: &str,
+        args: &[Expr],
+        opts: &[Opt],
+        opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+        let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+        let treated_col = match opt_map.get("treated") {
+            Some(Value::Str(s)) => s.clone(),
+            _ => {
+                return Err(HayashiError::Runtime(format!(
+                    "{func}() requires treated=\"column\" option"
+                )))
+            }
+        };
+
+        // y = dependent, x = pre-treatment covariate
+        let y_col = df
+            .get_column(g_formula.dependent.as_str())
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let y_vals = y_col.as_float().ok_or_else(|| {
+            HayashiError::Runtime(format!("{func}: '{}' must be numeric", g_formula.dependent))
+        })?;
+
+        let y_arr = ndarray::Array1::from_vec(y_vals.to_vec());
+
+        // Pre-treatment covariate: first independent
+        let x_var = g_formula
+            .independents
+            .first()
+            .ok_or_else(|| HayashiError::Runtime(format!("{func}: need at least 1 covariate")))?
+            .clone();
+        let x_col = df
+            .get_column(x_var.as_str())
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let x_vals = x_col
+            .as_float()
+            .ok_or_else(|| HayashiError::Runtime(format!("{func}: '{x_var}' must be numeric")))?;
+        let x_arr = ndarray::Array1::from_vec(x_vals.to_vec());
+
+        // Treatment indicator
+        let treated_data = df
+            .get_column(treated_col.as_str())
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let treated_vec: Vec<bool> = if let Some(b) = treated_data.as_bool() {
+            b.to_vec()
+        } else if let Some(i) = treated_data.as_int() {
+            i.iter().map(|&v| v != 0).collect()
+        } else if let Some(f) = treated_data.as_float() {
+            f.iter().map(|&v| v != 0.0).collect()
+        } else {
+            return Err(HayashiError::Runtime(format!(
+                "{func}: '{treated_col}' must be boolean or numeric"
+            )));
+        };
+
+        let result = greeners::CUPED::fit(&y_arr, &x_arr, &treated_vec)
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+        print!("{result}");
+        Ok(Value::Nil)
+    }
+
+    pub(super) fn dml_crossfit(
+        &mut self,
+        func: &str,
+        args: &[Expr],
+        opts: &[Opt],
+        opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+        let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+        // y = dependent, d = first independent (treatment)
+        let y_var = g_formula.dependent.clone();
+        let d_var = g_formula
+            .independents
+            .first()
+            .ok_or_else(|| HayashiError::Runtime(format!("{func}: need treatment variable")))?
+            .clone();
+
+        // Confounders from x option
+        let x_str = match opt_map.get("x") {
+            Some(Value::Str(s)) => s.clone(),
+            _ => {
+                return Err(HayashiError::Runtime(format!(
+                    "{func}() requires x=\"x1,x2\" option (confounders)"
+                )))
+            }
+        };
+        let x_vars: Vec<String> = x_str.split(',').map(|s| s.trim().to_string()).collect();
+        let n_folds = match opt_map.get("folds") {
+            Some(Value::Int(v)) => Some(*v as usize),
+            Some(Value::Float(v)) => Some(*v as usize),
+            _ => None,
+        };
+
+        let n = df.n_rows();
+        let y_col = df
+            .get_column(y_var.as_str())
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let y_vals = y_col
+            .as_float()
+            .ok_or_else(|| HayashiError::Runtime(format!("{func}: '{y_var}' must be numeric")))?;
+        let y_arr = ndarray::Array1::from_vec(y_vals.to_vec());
+
+        let d_col = df
+            .get_column(d_var.as_str())
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let d_vals = d_col
+            .as_float()
+            .ok_or_else(|| HayashiError::Runtime(format!("{func}: '{d_var}' must be numeric")))?;
+        let d_arr = ndarray::Array1::from_vec(d_vals.to_vec());
+
+        let k = x_vars.len();
+        let mut x_mat = ndarray::Array2::<f64>::zeros((n, k));
+        for (j, xname) in x_vars.iter().enumerate() {
+            let col = df
+                .get_column(xname.as_str())
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+            let vals = col.as_float().ok_or_else(|| {
+                HayashiError::Runtime(format!("{func}: '{xname}' must be numeric"))
+            })?;
+            for i in 0..n {
+                x_mat[(i, j)] = vals[i];
+            }
+        }
+
+        let result = greeners::DMLCrossfit::fit(&y_arr, &d_arr, &x_mat, n_folds)
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+        print!("{result}");
+        Ok(Value::Nil)
+    }
+
+    pub(super) fn bsc(
+        &mut self,
+        func: &str,
+        args: &[Expr],
+        _opts: &[Opt],
+        opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        if args.len() < 4 {
+            return Err(HayashiError::Runtime(
+                "bsc(df, y_var, control_vars, treatment_period [, prior=1.0])".into(),
+            ));
+        }
+        let df_name = match &args[0] {
+            Expr::Var(n) => n.clone(),
+            _ => {
+                return Err(HayashiError::Type(
+                    "bsc: first arg must be DataFrame".into(),
+                ))
+            }
+        };
+        let df = match self.env.get(&df_name) {
+            Some(Value::DataFrame(d)) => d.clone(),
+            _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
+        };
+        let y_var = match &args[1] {
+            Expr::Var(n) | Expr::Str(n) => n.clone(),
+            _ => return Err(HayashiError::Type("bsc: y_var must be identifier".into())),
+        };
+        let control_vars_str = match &args[2] {
+            Expr::Str(s) => s.clone(),
+            Expr::Var(n) => n.clone(),
+            _ => {
+                return Err(HayashiError::Type(
+                    "bsc: control_vars must be string".into(),
+                ))
+            }
+        };
+        let treatment_period = match &args[3] {
+            Expr::Int(v) => *v as usize,
+            Expr::Float(v) => *v as usize,
+            _ => {
+                return Err(HayashiError::Type(
+                    "bsc: treatment_period must be integer".into(),
+                ))
+            }
+        };
+        let prior = match opt_map.get("prior") {
+            Some(Value::Float(v)) => Some(*v),
+            Some(Value::Int(v)) => Some(*v as f64),
+            _ => None,
+        };
+
+        let control_vars: Vec<String> = control_vars_str
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .collect();
+        let n = df.n_rows();
+        let n_controls = control_vars.len();
+
+        let y_col = df
+            .get_column(y_var.as_str())
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let y_vals = y_col
+            .as_float()
+            .ok_or_else(|| HayashiError::Runtime(format!("{func}: '{y_var}' must be numeric")))?;
+        let y_arr = ndarray::Array1::from_vec(y_vals.to_vec());
+
+        let mut y_controls = ndarray::Array2::<f64>::zeros((n, n_controls));
+        for (j, cname) in control_vars.iter().enumerate() {
+            let col = df
+                .get_column(cname.as_str())
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+            let vals = col.as_float().ok_or_else(|| {
+                HayashiError::Runtime(format!("{func}: '{cname}' must be numeric"))
+            })?;
+            for i in 0..n {
+                y_controls[(i, j)] = vals[i];
+            }
+        }
+
+        let result = greeners::BayesianSC::fit(&y_arr, &y_controls, treatment_period, prior)
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+        print!("{result}");
+        Ok(Value::Nil)
+    }
+
+    pub(super) fn causal_impact(
+        &mut self,
+        func: &str,
+        args: &[Expr],
+        _opts: &[Opt],
+        opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        if args.is_empty() {
+            return Err(HayashiError::Runtime(format!(
+                "{func}() requires (df, y_var)"
+            )));
+        }
+        let df_name = match &args[0] {
+            Expr::Var(n) => n.clone(),
+            _ => {
+                return Err(HayashiError::Type(format!(
+                    "{func}: first arg must be DataFrame"
+                )))
+            }
+        };
+        let df = match self.env.get(&df_name) {
+            Some(Value::DataFrame(d)) => d.clone(),
+            _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
+        };
+        let y_var = match &args[1] {
+            Expr::Var(n) | Expr::Str(n) => n.clone(),
+            _ => {
+                return Err(HayashiError::Type(format!(
+                    "{func}: var must be identifier"
+                )))
+            }
+        };
+
+        let controls_str = match opt_map.get("controls") {
+            Some(Value::Str(s)) => s.clone(),
+            _ => {
+                return Err(HayashiError::Runtime(format!(
+                    "{func}() requires controls=\"c1,c2\" option"
+                )))
+            }
+        };
+        let control_vars: Vec<String> = controls_str
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .collect();
+        let treatment_period = match opt_map.get("period") {
+            Some(Value::Int(v)) => *v as usize,
+            Some(Value::Float(v)) => *v as usize,
+            _ => {
+                return Err(HayashiError::Runtime(format!(
+                    "{func}() requires period=N option (treatment start index)"
+                )))
+            }
+        };
+
+        let n = df.n_rows();
+        let y_col = df
+            .get_column(y_var.as_str())
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let y_vals = y_col
+            .as_float()
+            .ok_or_else(|| HayashiError::Runtime(format!("{func}: '{y_var}' must be numeric")))?;
+        let y_arr = ndarray::Array1::from_vec(y_vals.to_vec());
+
+        let kk = control_vars.len();
+        let mut controls_mat = ndarray::Array2::<f64>::zeros((n, kk));
+        for (j, cname) in control_vars.iter().enumerate() {
+            let col = df
+                .get_column(cname.as_str())
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+            let vals = col.as_float().ok_or_else(|| {
+                HayashiError::Runtime(format!("{func}: '{cname}' must be numeric"))
+            })?;
+            for i in 0..n {
+                controls_mat[(i, j)] = vals[i];
+            }
+        }
+
+        let result = greeners::CausalImpact::fit(
+            &y_arr,
+            &controls_mat,
+            treatment_period,
+            Some(control_vars),
+        )
+        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+        print!("{result}");
+        Ok(Value::Nil)
+    }
+}
