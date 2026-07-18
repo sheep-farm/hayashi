@@ -2638,7 +2638,30 @@ impl Interpreter {
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         let n = y_vec.len();
 
-        // Parse smooth= option
+        let (smooth_names, spline_df, degree, alpha_pen) =
+            self.parse_gam_options(opt_map, &x_linear)?;
+        let (x_smooth_ref, alpha_pen_used) =
+            self.build_gam_smooth_basis(&df, &smooth_names, n, spline_df, degree, alpha_pen)?;
+        let (family, link) = self.parse_gam_family_link(opt_map)?;
+
+        let result = greeners::GLMGam::fit_with_names(
+            &y_vec,
+            &x_linear,
+            &x_smooth_ref,
+            &family,
+            &link,
+            alpha_pen_used,
+            Some(linear_names),
+        )
+        .map_err(|e| self.rt_err(format!("gam: {e}")))?;
+        Ok(Value::GamResult(Rc::new(result)))
+    }
+
+    fn parse_gam_options(
+        &self,
+        opt_map: &HashMap<String, Value>,
+        x_linear: &ndarray::Array2<f64>,
+    ) -> Result<(Vec<String>, usize, usize, f64)> {
         let smooth_names: Vec<String> = match opt_map.get("smooth") {
             Some(Value::Str(s)) => vec![s.clone()],
             Some(Value::List(lst)) => lst
@@ -2680,12 +2703,23 @@ impl Interpreter {
             _ => 0.1,
         };
 
-        // Build smooth basis matrix (concatenate across all smooth vars)
+        Ok((smooth_names, spline_df, degree, alpha_pen))
+    }
+
+    fn build_gam_smooth_basis(
+        &self,
+        df: &greeners::DataFrame,
+        smooth_names: &[String],
+        n: usize,
+        spline_df: usize,
+        degree: usize,
+        alpha_pen: f64,
+    ) -> Result<(ndarray::Array2<f64>, f64)> {
         let q_per = spline_df;
         let q_total = q_per * smooth_names.len().max(1);
         let mut x_smooth = ndarray::Array2::<f64>::zeros((n, q_total));
         for (k, sname) in smooth_names.iter().enumerate() {
-            let col = ndarray::Array1::from(get_col_f64(&df, sname)?);
+            let col = ndarray::Array1::from(get_col_f64(df, sname)?);
             let basis = greeners::BSplineBasis::generate(&col, q_per, degree)
                 .map_err(|e| self.rt_err(format!("gam spline ({sname}): {e}")))?;
             for i in 0..n {
@@ -2694,20 +2728,23 @@ impl Interpreter {
                 }
             }
         }
-        // If no smooth vars, x_smooth must still be n×1 (placeholder)
         let x_smooth_ref = if smooth_names.is_empty() {
             ndarray::Array2::<f64>::zeros((n, 1))
         } else {
             x_smooth
         };
-
         let alpha_pen_used = if smooth_names.is_empty() {
             0.0
         } else {
             alpha_pen
         };
+        Ok((x_smooth_ref, alpha_pen_used))
+    }
 
-        // Parse family/link (same as GLM)
+    fn parse_gam_family_link(
+        &self,
+        opt_map: &HashMap<String, Value>,
+    ) -> Result<(greeners::Family, greeners::Link)> {
         let alpha_val = match opt_map.get("alpha") {
             Some(Value::Float(v)) => *v,
             Some(Value::Int(v)) => *v as f64,
@@ -2751,18 +2788,7 @@ impl Interpreter {
             },
             _ => greeners::Link::Identity,
         };
-
-        let result = greeners::GLMGam::fit_with_names(
-            &y_vec,
-            &x_linear,
-            &x_smooth_ref,
-            &family,
-            &link,
-            alpha_pen_used,
-            Some(linear_names),
-        )
-        .map_err(|e| self.rt_err(format!("gam: {e}")))?;
-        Ok(Value::GamResult(Rc::new(result)))
+        Ok((family, link))
     }
 
     pub(super) fn mice(
