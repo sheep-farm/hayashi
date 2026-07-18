@@ -1,6 +1,7 @@
 use super::eval_expr::ColResult;
 use super::helpers::*;
 use super::*;
+use greeners::dataframe::DataFrameBuilder;
 use std::sync::Arc;
 
 mod aggregation;
@@ -507,56 +508,25 @@ impl Interpreter {
         unique_j.sort();
         unique_j.dedup();
 
-        let n_wide: usize;
-        let mut builder = DataFrame::builder();
-
-        if i_is_string {
-            let id_strs = col_to_strings(&df, &i_col)?;
-            let mut unique_id_strs: Vec<String> = id_strs.clone();
-            unique_id_strs.sort();
-            unique_id_strs.dedup();
-            n_wide = unique_id_strs.len();
-            builder = builder.add_string(&i_col, unique_id_strs.clone());
-
-            for var in &val_vars {
-                let var_data = get_col_f64(&df, var)?;
-                for jv in &unique_j {
-                    let col_name = format!("{var}{jv}");
-                    let mut vals = vec![f64::NAN; n_wide];
-                    for (row, (id, j)) in id_strs.iter().zip(j_strs.iter()).enumerate() {
-                        if j == jv {
-                            if let Ok(pos) = unique_id_strs.binary_search(id) {
-                                vals[pos] = var_data[row];
-                            }
-                        }
-                    }
-                    builder = builder.add_column(&col_name, vals);
-                }
-            }
+        let (builder, n_wide) = if i_is_string {
+            self.pivot_wider_string_ids(
+                DataFrame::builder(),
+                &df,
+                &i_col,
+                &j_strs,
+                &unique_j,
+                &val_vars,
+            )?
         } else {
-            let id_vals = get_col_f64(&df, &i_col)?;
-            let mut unique_ids: Vec<f64> = id_vals.to_vec();
-            unique_ids.sort_by(nan_last_cmp);
-            unique_ids.dedup();
-            n_wide = unique_ids.len();
-            builder = builder.add_column(&i_col, unique_ids.clone());
-
-            for var in &val_vars {
-                let var_data = get_col_f64(&df, var)?;
-                for jv in &unique_j {
-                    let col_name = format!("{var}{jv}");
-                    let mut vals = vec![f64::NAN; n_wide];
-                    for (row, (id, j)) in id_vals.iter().zip(j_strs.iter()).enumerate() {
-                        if j == jv {
-                            if let Ok(pos) = unique_ids.binary_search_by(|a| nan_last_cmp(a, id)) {
-                                vals[pos] = var_data[row];
-                            }
-                        }
-                    }
-                    builder = builder.add_column(&col_name, vals);
-                }
-            }
-        }
+            self.pivot_wider_numeric_ids(
+                DataFrame::builder(),
+                &df,
+                &i_col,
+                &j_strs,
+                &unique_j,
+                &val_vars,
+            )?
+        };
 
         let new_df = builder
             .build()
@@ -565,6 +535,72 @@ impl Interpreter {
             println!("pivot_wider: {} → {} observations", df.n_rows(), n_wide);
         }
         Ok(Value::DataFrame(Arc::new(new_df)))
+    }
+
+    fn pivot_wider_string_ids(
+        &self,
+        mut builder: DataFrameBuilder,
+        df: &Arc<DataFrame>,
+        i_col: &str,
+        j_strs: &[String],
+        unique_j: &[String],
+        val_vars: &[String],
+    ) -> Result<(DataFrameBuilder, usize)> {
+        let id_strs = col_to_strings(df, i_col)?;
+        let mut unique_id_strs: Vec<String> = id_strs.clone();
+        unique_id_strs.sort();
+        unique_id_strs.dedup();
+        let n_wide = unique_id_strs.len();
+        builder = builder.add_string(i_col, unique_id_strs.clone());
+        for var in val_vars {
+            let var_data = get_col_f64(df, var)?;
+            for jv in unique_j {
+                let col_name = format!("{var}{jv}");
+                let mut vals = vec![f64::NAN; n_wide];
+                for (row, (id, j)) in id_strs.iter().zip(j_strs.iter()).enumerate() {
+                    if j == jv {
+                        if let Ok(pos) = unique_id_strs.binary_search(id) {
+                            vals[pos] = var_data[row];
+                        }
+                    }
+                }
+                builder = builder.add_column(&col_name, vals);
+            }
+        }
+        Ok((builder, n_wide))
+    }
+
+    fn pivot_wider_numeric_ids(
+        &self,
+        mut builder: DataFrameBuilder,
+        df: &Arc<DataFrame>,
+        i_col: &str,
+        j_strs: &[String],
+        unique_j: &[String],
+        val_vars: &[String],
+    ) -> Result<(DataFrameBuilder, usize)> {
+        let id_vals = get_col_f64(df, i_col)?;
+        let mut unique_ids: Vec<f64> = id_vals.to_vec();
+        unique_ids.sort_by(nan_last_cmp);
+        unique_ids.dedup();
+        let n_wide = unique_ids.len();
+        builder = builder.add_column(i_col, unique_ids.clone());
+        for var in val_vars {
+            let var_data = get_col_f64(df, var)?;
+            for jv in unique_j {
+                let col_name = format!("{var}{jv}");
+                let mut vals = vec![f64::NAN; n_wide];
+                for (row, (id, j)) in id_vals.iter().zip(j_strs.iter()).enumerate() {
+                    if j == jv {
+                        if let Ok(pos) = unique_ids.binary_search_by(|a| nan_last_cmp(a, id)) {
+                            vals[pos] = var_data[row];
+                        }
+                    }
+                }
+                builder = builder.add_column(&col_name, vals);
+            }
+        }
+        Ok((builder, n_wide))
     }
 
     pub(super) fn append(
