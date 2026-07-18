@@ -1108,6 +1108,18 @@ impl Interpreter {
         Ok(Value::Nil)
     }
 
+    fn sig_stars(p: f64) -> &'static str {
+        if p < 0.01 {
+            "***"
+        } else if p < 0.05 {
+            "**"
+        } else if p < 0.10 {
+            "*"
+        } else {
+            ""
+        }
+    }
+
     pub(super) fn diagnostics(
         &mut self,
         _func: &str,
@@ -1121,817 +1133,840 @@ impl Interpreter {
             ));
         }
 
-        let sig = |p: f64| -> &'static str {
-            if p < 0.01 {
-                "***"
-            } else if p < 0.05 {
-                "**"
-            } else if p < 0.10 {
-                "*"
-            } else {
-                ""
-            }
-        };
         let thick = "═".repeat(62);
         let thin = "─".repeat(62);
 
-        let mut diagnostics: HashMap<String, Value> = HashMap::new();
-
-        match self.eval_expr(&args[0])? {
-            Value::OlsResult(ols) => {
-                println!("\n{thick}");
-                println!(
-                    " DIAGNOSTICS — OLS  (n={}  k={})",
-                    ols.residuals.len(),
-                    ols.x.ncols()
-                );
-                println!("{thick}");
-
-                diagnostics.insert("model".into(), Value::Str("OLS".into()));
-                diagnostics.insert("n".into(), Value::Int(ols.residuals.len() as i64));
-                diagnostics.insert("k".into(), Value::Int(ols.x.ncols() as i64));
-
-                // ── Normalidade
-                println!("\n── Residual Normality (Jarque-Bera)");
-                match greeners::Diagnostics::jarque_bera(&ols.residuals) {
-                    Ok((jb, p)) => {
-                        println!("   JB ~ χ²(2)  = {:>9.4}   p = {:.4}  {}", jb, p, sig(p));
-                        let mut jb_map = HashMap::new();
-                        jb_map.insert("jb_stat".into(), Value::Float(jb));
-                        jb_map.insert("p_value".into(), Value::Float(p));
-                        jb_map.insert("df".into(), Value::Int(2));
-                        diagnostics.insert("jarque_bera".into(), Value::Dict(Arc::new(jb_map)));
-                    }
-                    Err(e) => {
-                        println!("   error: {e}");
-                        diagnostics.insert("jarque_bera".into(), Value::Str(format!("error: {e}")));
-                    }
-                }
-
-                // ── First-order autocorrelation
-                let dw = greeners::Diagnostics::durbin_watson(&ols.residuals);
-                let dw_label = if dw < 1.5 {
-                    "positive autocorr."
-                } else if dw > 2.5 {
-                    "negative autocorr."
-                } else {
-                    "no evident autocorr."
-                };
-                println!("\n── First-Order Autocorrelation (Durbin-Watson)");
-                println!("   DW = {:.4}  [{}]", dw, dw_label);
-                let mut dw_map = HashMap::new();
-                dw_map.insert("dw".into(), Value::Float(dw));
-                dw_map.insert("interpretation".into(), Value::Str(dw_label.into()));
-                diagnostics.insert("durbin_watson".into(), Value::Dict(Arc::new(dw_map)));
-
-                // ── Breusch-Godfrey
-                println!("\n── Serial Autocorrelation (Breusch-Godfrey, lags=4)");
-                match greeners::SpecificationTests::breusch_godfrey_test(&ols.residuals, &ols.x, 4)
-                {
-                    Ok((lm, p, df)) => {
-                        println!(
-                            "   LM ~ χ²({})   = {:>9.4}   p = {:.4}  {}",
-                            df,
-                            lm,
-                            p,
-                            sig(p)
-                        );
-                        let mut bg_map = HashMap::new();
-                        bg_map.insert("lm_stat".into(), Value::Float(lm));
-                        bg_map.insert("df".into(), Value::Int(df as i64));
-                        bg_map.insert("p_value".into(), Value::Float(p));
-                        diagnostics.insert("breusch_godfrey".into(), Value::Dict(Arc::new(bg_map)));
-                    }
-                    Err(e) => {
-                        println!("   error: {e}");
-                        diagnostics
-                            .insert("breusch_godfrey".into(), Value::Str(format!("error: {e}")));
-                    }
-                }
-
-                // ── White
-                println!("\n── Heteroscedasticidade (White)");
-                match greeners::SpecificationTests::white_test(&ols.residuals, &ols.x) {
-                    Ok((lm, p, df)) => {
-                        println!(
-                            "   LM ~ χ²({})   = {:>9.4}   p = {:.4}  {}",
-                            df,
-                            lm,
-                            p,
-                            sig(p)
-                        );
-                        let mut white_map = HashMap::new();
-                        white_map.insert("lm_stat".into(), Value::Float(lm));
-                        white_map.insert("df".into(), Value::Int(df as i64));
-                        white_map.insert("p_value".into(), Value::Float(p));
-                        diagnostics.insert("white".into(), Value::Dict(Arc::new(white_map)));
-                    }
-                    Err(e) => {
-                        println!("   error: {e}");
-                        diagnostics.insert("white".into(), Value::Str(format!("error: {e}")));
-                    }
-                }
-
-                // ── RESET
-                println!("\n── Functional Specification (RESET, power=3)");
-                let fitted = ols.result.fitted_values(&ols.x);
-                let y = &ols.residuals + &fitted;
-                match greeners::SpecificationTests::reset_test(&y, &ols.x, &fitted, 3) {
-                    Ok((f, p, df1, df2)) => {
-                        println!(
-                            "   F ~ F({},{}) = {:>9.4}   p = {:.4}  {}",
-                            df1,
-                            df2,
-                            f,
-                            p,
-                            sig(p)
-                        );
-                        let mut reset_map = HashMap::new();
-                        reset_map.insert("f_stat".into(), Value::Float(f));
-                        reset_map.insert("df1".into(), Value::Int(df1 as i64));
-                        reset_map.insert("df2".into(), Value::Int(df2 as i64));
-                        reset_map.insert("p_value".into(), Value::Float(p));
-                        diagnostics.insert("reset".into(), Value::Dict(Arc::new(reset_map)));
-                    }
-                    Err(e) => {
-                        println!("   error: {e}");
-                        diagnostics.insert("reset".into(), Value::Str(format!("error: {e}")));
-                    }
-                }
-
-                // ── VIF
-                println!("\n── Multicolinearidade (VIF)");
-                let names = ols.result.variable_names.as_deref().unwrap_or(&[]);
-                let mut vif_var = Vec::new();
-                let mut vif_val = Vec::new();
-                let mut vif_diag = Vec::new();
-                match greeners::Diagnostics::vif(&ols.x) {
-                    Ok(vifs) => {
-                        for (i, &v) in vifs.iter().enumerate() {
-                            if v.is_nan() {
-                                continue;
-                            }
-                            let name = names.get(i).map(|s| s.as_str()).unwrap_or("?");
-                            let diag = if v.is_infinite() || v > 10.0 {
-                                "grave"
-                            } else if v > 5.0 {
-                                "moderado"
-                            } else {
-                                "ok"
-                            };
-                            println!("   {:<20} VIF = {:>7.3}  [{}]", name, v, diag);
-                            vif_var.push(Value::Str(name.to_string()));
-                            vif_val.push(Value::Float(if v.is_infinite() {
-                                f64::INFINITY
-                            } else {
-                                v
-                            }));
-                            vif_diag.push(Value::Str(diag.to_string()));
-                        }
-                    }
-                    Err(e) => println!("   error: {e}"),
-                }
-                if !vif_var.is_empty() {
-                    let mut vif_columns = HashMap::new();
-                    vif_columns.insert("variable".into(), Value::List(Arc::new(vif_var)));
-                    vif_columns.insert("vif".into(), Value::List(Arc::new(vif_val)));
-                    vif_columns.insert("diagnostic".into(), Value::List(Arc::new(vif_diag)));
-                    let vif_df = self.dict_to_dataframe(&vif_columns)?;
-                    diagnostics.insert("vif".into(), Value::DataFrame(Arc::new(vif_df)));
-                }
-
-                // ── Cook's D
-                let n = ols.residuals.len();
-                let mse = ols.result.sigma * ols.result.sigma;
-                let cutoff = 4.0 / n as f64;
-                println!("\n── Influential Observations (Cook's D > {:.4})", cutoff);
-                let mut cook_obs = Vec::new();
-                let mut cook_d = Vec::new();
-                let mut cook_label = Vec::new();
-                match greeners::Diagnostics::cooks_distance(&ols.residuals, &ols.x, mse) {
-                    Ok(d) => {
-                        let flagged: Vec<(usize, f64)> = d
-                            .iter()
-                            .enumerate()
-                            .filter(|(_, &di)| di > cutoff)
-                            .map(|(i, &di)| (i + 1, di))
-                            .collect();
-                        if flagged.is_empty() {
-                            println!("   No influential observations.");
-                        } else {
-                            for (i, di) in &flagged {
-                                let label = if *di > 1.0 {
-                                    "very influential"
-                                } else {
-                                    "influential"
-                                };
-                                println!("   obs {:>4}  D = {:.4}  [{}]", i, di, label);
-                                cook_obs.push(Value::Int(*i as i64));
-                                cook_d.push(Value::Float(*di));
-                                cook_label.push(Value::Str(label.to_string()));
-                            }
-                        }
-                    }
-                    Err(e) => println!("   error: {e}"),
-                }
-                if !cook_obs.is_empty() {
-                    let mut cook_columns = HashMap::new();
-                    cook_columns.insert("observation".into(), Value::List(Arc::new(cook_obs)));
-                    cook_columns.insert("cooks_d".into(), Value::List(Arc::new(cook_d)));
-                    cook_columns.insert("label".into(), Value::List(Arc::new(cook_label)));
-                    let cook_df = self.dict_to_dataframe(&cook_columns)?;
-                    diagnostics.insert("cooks_d".into(), Value::DataFrame(Arc::new(cook_df)));
-                }
-
-                println!("\n{thin}");
-                println!("  *** p<0.01  ** p<0.05  * p<0.10");
-                println!("{thick}\n");
-            }
-
-            Value::GarchResult(m) => {
-                let model_label = match m.model_type {
-                    greeners::GarchModelType::GARCH => "GARCH",
-                    greeners::GarchModelType::EGARCH => "EGARCH",
-                    greeners::GarchModelType::GJRGARCH => "GJR-GARCH",
-                };
-                println!("\n{thick}");
-                println!(
-                    " DIAGNOSTICS — {model_label}({}, {})  (n={})",
-                    m.p, m.q, m.n_obs
-                );
-                println!("{thick}");
-
-                diagnostics.insert("model".into(), Value::Str(model_label.into()));
-                diagnostics.insert("p".into(), Value::Int(m.p as i64));
-                diagnostics.insert("q".into(), Value::Int(m.q as i64));
-                diagnostics.insert("n".into(), Value::Int(m.n_obs as i64));
-
-                let std_res = &m.standardized_residuals;
-
-                println!("\n── Autocorrelation in Standardized Residuals (Ljung-Box, lags=10)");
-                match greeners::Diagnostics::ljung_box(std_res, 10) {
-                    Ok(r) => {
-                        println!(
-                            "   Q(10) = {:>9.4}   p = {:.4}  {}",
-                            r.q_stat,
-                            r.p_value,
-                            sig(r.p_value)
-                        );
-                        let mut lb_map = HashMap::new();
-                        lb_map.insert("q_stat".into(), Value::Float(r.q_stat));
-                        lb_map.insert("p_value".into(), Value::Float(r.p_value));
-                        lb_map.insert("lags".into(), Value::Int(10));
-                        diagnostics.insert("ljung_box".into(), Value::Dict(Arc::new(lb_map)));
-                    }
-                    Err(e) => {
-                        println!("   error: {e}");
-                        diagnostics.insert("ljung_box".into(), Value::Str(format!("error: {e}")));
-                    }
-                }
-
-                println!("\n── Efeitos ARCH Residuais (Engle LM, lags=5)");
-                match greeners::Diagnostics::arch_test(std_res, 5) {
-                    Ok(r) => {
-                        println!(
-                            "   LM ~ χ²({}) = {:>9.4}   p = {:.4}  {}",
-                            r.lags,
-                            r.lm_stat,
-                            r.lm_pvalue,
-                            sig(r.lm_pvalue)
-                        );
-                        let mut arch_map = HashMap::new();
-                        arch_map.insert("lm_stat".into(), Value::Float(r.lm_stat));
-                        arch_map.insert("p_value".into(), Value::Float(r.lm_pvalue));
-                        arch_map.insert("lags".into(), Value::Int(r.lags as i64));
-                        diagnostics.insert("arch_test".into(), Value::Dict(Arc::new(arch_map)));
-                    }
-                    Err(e) => {
-                        println!("   error: {e}");
-                        diagnostics.insert("arch_test".into(), Value::Str(format!("error: {e}")));
-                    }
-                }
-
-                println!("\n── Standardized Residual Normality (Jarque-Bera)");
-                match greeners::Diagnostics::jarque_bera(std_res) {
-                    Ok((jb, p)) => {
-                        println!("   JB ~ χ²(2)  = {:>9.4}   p = {:.4}  {}", jb, p, sig(p));
-                        let mut jb_map = HashMap::new();
-                        jb_map.insert("jb_stat".into(), Value::Float(jb));
-                        jb_map.insert("p_value".into(), Value::Float(p));
-                        jb_map.insert("df".into(), Value::Int(2));
-                        diagnostics.insert("jarque_bera".into(), Value::Dict(Arc::new(jb_map)));
-                    }
-                    Err(e) => {
-                        println!("   error: {e}");
-                        diagnostics.insert("jarque_bera".into(), Value::Str(format!("error: {e}")));
-                    }
-                }
-
-                println!("\n{thin}");
-                println!("  *** p<0.01  ** p<0.05  * p<0.10");
-                println!("{thick}\n");
-            }
-
-            Value::ArimaResult(m) => {
-                println!("\n{thick}");
-                println!(" DIAGNOSTICS — ARIMA");
-                println!("{thick}");
-
-                diagnostics.insert("model".into(), Value::Str("ARIMA".into()));
-
-                let resid = Array1::from_vec(m.residuals().to_vec());
-
-                println!("\n── Autocorrelation in Residuals (Ljung-Box, lags=10)");
-                match greeners::Diagnostics::ljung_box(&resid, 10) {
-                    Ok(r) => {
-                        println!(
-                            "   Q(10) = {:>9.4}   p = {:.4}  {}",
-                            r.q_stat,
-                            r.p_value,
-                            sig(r.p_value)
-                        );
-                        let mut lb_map = HashMap::new();
-                        lb_map.insert("q_stat".into(), Value::Float(r.q_stat));
-                        lb_map.insert("p_value".into(), Value::Float(r.p_value));
-                        lb_map.insert("lags".into(), Value::Int(10));
-                        diagnostics.insert("ljung_box".into(), Value::Dict(Arc::new(lb_map)));
-                    }
-                    Err(e) => {
-                        println!("   error: {e}");
-                        diagnostics.insert("ljung_box".into(), Value::Str(format!("error: {e}")));
-                    }
-                }
-
-                println!("\n── Residual Normality (Jarque-Bera)");
-                match greeners::Diagnostics::jarque_bera(&resid) {
-                    Ok((jb, p)) => {
-                        println!("   JB ~ χ²(2)  = {:>9.4}   p = {:.4}  {}", jb, p, sig(p));
-                        let mut jb_map = HashMap::new();
-                        jb_map.insert("jb_stat".into(), Value::Float(jb));
-                        jb_map.insert("p_value".into(), Value::Float(p));
-                        jb_map.insert("df".into(), Value::Int(2));
-                        diagnostics.insert("jarque_bera".into(), Value::Dict(Arc::new(jb_map)));
-                    }
-                    Err(e) => {
-                        println!("   error: {e}");
-                        diagnostics.insert("jarque_bera".into(), Value::Str(format!("error: {e}")));
-                    }
-                }
-
-                println!("\n{thin}");
-                println!("  *** p<0.01  ** p<0.05  * p<0.10");
-                println!("{thick}\n");
-            }
-
-            Value::VarResult(m) => {
-                let k = m.n_vars;
-                println!("\n{thick}");
-                println!(" DIAGNOSTICS — VAR({})  (n={}  k={})", m.lags, m.n_obs, k);
-                println!("{thick}");
-
-                diagnostics.insert("model".into(), Value::Str("VAR".into()));
-                diagnostics.insert("lags".into(), Value::Int(m.lags as i64));
-                diagnostics.insert("n".into(), Value::Int(m.n_obs as i64));
-                diagnostics.insert("k".into(), Value::Int(k as i64));
-                diagnostics.insert("aic".into(), Value::Float(m.aic));
-                diagnostics.insert("bic".into(), Value::Float(m.bic));
-
-                // ── Residual standard deviation by equation (diagonal of Σ_u)
-                println!("\n── Residual Standard Deviation by Equation");
-                let mut sd_var = Vec::new();
-                let mut sd_val = Vec::new();
-                for (i, name) in m.var_names.iter().enumerate() {
-                    let sd = m.sigma_u[[i, i]].sqrt();
-                    println!("   {:<22} σ = {:.6}", name, sd);
-                    sd_var.push(Value::Str(name.clone()));
-                    sd_val.push(Value::Float(sd));
-                }
-                if !sd_var.is_empty() {
-                    let mut sd_columns = HashMap::new();
-                    sd_columns.insert("variable".into(), Value::List(Arc::new(sd_var)));
-                    sd_columns.insert("residual_sd".into(), Value::List(Arc::new(sd_val)));
-                    let sd_df = self.dict_to_dataframe(&sd_columns)?;
-                    diagnostics.insert("residual_sd".into(), Value::DataFrame(Arc::new(sd_df)));
-                }
-
-                // ── Residual correlation matrix (normalized Σ_u)
-                if k > 1 {
-                    println!("\n── Contemporaneous Residual Correlation");
-                    let mut corr_var1 = Vec::new();
-                    let mut corr_var2 = Vec::new();
-                    let mut corr_val = Vec::new();
-                    for i in 0..k {
-                        for j in 0..k {
-                            let r = if i == j {
-                                1.0
-                            } else {
-                                m.sigma_u[[i, j]] / (m.sigma_u[[i, i]] * m.sigma_u[[j, j]]).sqrt()
-                            };
-                            corr_var1.push(Value::Str(m.var_names[i].clone()));
-                            corr_var2.push(Value::Str(m.var_names[j].clone()));
-                            corr_val.push(Value::Float(r));
-                        }
-                    }
-                    let mut corr_columns = HashMap::new();
-                    corr_columns.insert("variable_1".into(), Value::List(Arc::new(corr_var1)));
-                    corr_columns.insert("variable_2".into(), Value::List(Arc::new(corr_var2)));
-                    corr_columns.insert("correlation".into(), Value::List(Arc::new(corr_val)));
-                    let corr_df = self.dict_to_dataframe(&corr_columns)?;
-                    diagnostics.insert(
-                        "residual_correlation".into(),
-                        Value::DataFrame(Arc::new(corr_df)),
-                    );
-                }
-
-                println!("\n── Note");
-                println!("   Residuals are not stored in VarResult — for LB/JB by equation,");
-                println!("   extract the series and run ljungbox/jb directly.");
-                println!("\n{thin}");
-                println!("{thick}\n");
-            }
-
-            Value::VecmResult(m) => {
-                let k = m.n_vars;
-                let r = m.rank;
-                let n = m.n_obs as f64;
-                let eig = &m.eigenvalues; // ordenados decrescente
-
-                println!("\n{thick}");
-                println!(" DIAGNOSTICS — VECM  (n={}  k={}  rank={})", m.n_obs, k, r);
-                println!("{thick}");
-
-                diagnostics.insert("model".into(), Value::Str("VECM".into()));
-                diagnostics.insert("n".into(), Value::Int(m.n_obs as i64));
-                diagnostics.insert("k".into(), Value::Int(k as i64));
-                diagnostics.insert("rank".into(), Value::Int(r as i64));
-
-                // ── Johansen trace test
-                // λ_trace(r₀) = -n Σ_{i=r₀}^{k-1} ln(1 - λ_i)  H₀: rank ≤ r₀
-                // CVs 5%: Osterwald-Lenum (1992) Tabela 1 — constant restrita
-                let cv_5pct: &[f64] = &[9.24, 19.96, 34.91, 53.12, 76.07, 102.56, 131.70];
-                println!("\n── Johansen Test (Trace)");
-                println!("   H₀: rank ≤ r   CVs 5%: Osterwald-Lenum (1992) Tabela 1");
-                println!(
-                    "   {:<6} {:>10} {:>12} {:>10} {:>6}",
-                    "H₀:r≤", "λ_max", "λ_trace", "CV 5%", ""
-                );
-                println!("   {}", "─".repeat(46));
-                let mut joh_h0 = Vec::new();
-                let mut joh_lam_max = Vec::new();
-                let mut joh_trace = Vec::new();
-                let mut joh_cv = Vec::new();
-                let mut joh_reject = Vec::new();
-                for r0 in 0..k {
-                    let lam_max = if r0 < eig.len() {
-                        -n * (1.0 - eig[r0]).max(1e-15).ln()
-                    } else {
-                        0.0
-                    };
-                    let trace_stat: f64 = (r0..eig.len())
-                        .map(|i| -n * (1.0 - eig[i]).max(1e-15).ln())
-                        .sum();
-                    let cv = cv_5pct.get(k - r0 - 1).copied().unwrap_or(f64::NAN);
-                    let reject = if trace_stat > cv { "*" } else { " " };
-                    println!(
-                        "   {:<6} {:>10.4} {:>12.4} {:>10.2} {:>6}",
-                        r0, lam_max, trace_stat, cv, reject
-                    );
-                    joh_h0.push(Value::Int(r0 as i64));
-                    joh_lam_max.push(Value::Float(lam_max));
-                    joh_trace.push(Value::Float(trace_stat));
-                    joh_cv.push(Value::Float(cv));
-                    joh_reject.push(Value::Str(reject.to_string()));
-                }
-                println!("   (* rejects H₀ at 5%)");
-                let mut joh_columns = HashMap::new();
-                joh_columns.insert("h0_rank".into(), Value::List(Arc::new(joh_h0)));
-                joh_columns.insert("lambda_max".into(), Value::List(Arc::new(joh_lam_max)));
-                joh_columns.insert("trace_stat".into(), Value::List(Arc::new(joh_trace)));
-                joh_columns.insert("cv_5pct".into(), Value::List(Arc::new(joh_cv)));
-                joh_columns.insert("reject".into(), Value::List(Arc::new(joh_reject)));
-                let joh_df = self.dict_to_dataframe(&joh_columns)?;
-                diagnostics.insert("johansen".into(), Value::DataFrame(Arc::new(joh_df)));
-
-                // ── Adjustment speeds (alpha): k×rank
-                println!(
-                    "\n── Adjustment Speeds (Alpha)  [negative sign = correction to equilibrium]"
-                );
-                let mut alpha_vec = Vec::new();
-                let mut alpha_eq = Vec::new();
-                let mut alpha_ec = Vec::new();
-                for ec in 0..r {
-                    println!("   EC Vector {}", ec + 1);
-                    for eq in 0..k {
-                        println!(
-                            "     equation {:>2}   α = {:>9.4}",
-                            eq + 1,
-                            m.alpha[[eq, ec]]
-                        );
-                        alpha_vec.push(Value::Float(m.alpha[[eq, ec]]));
-                        alpha_eq.push(Value::Int((eq + 1) as i64));
-                        alpha_ec.push(Value::Int((ec + 1) as i64));
-                    }
-                }
-                if !alpha_vec.is_empty() {
-                    let mut alpha_columns = HashMap::new();
-                    alpha_columns.insert("ec_vector".into(), Value::List(Arc::new(alpha_ec)));
-                    alpha_columns.insert("equation".into(), Value::List(Arc::new(alpha_eq)));
-                    alpha_columns.insert("alpha".into(), Value::List(Arc::new(alpha_vec)));
-                    let alpha_df = self.dict_to_dataframe(&alpha_columns)?;
-                    diagnostics.insert("alpha".into(), Value::DataFrame(Arc::new(alpha_df)));
-                }
-
-                // ── Cointegration vectors (beta): k×rank
-                println!("\n── Cointegration Vectors (Beta)");
-                let mut beta_vec = Vec::new();
-                let mut beta_var = Vec::new();
-                let mut beta_ec = Vec::new();
-                for ec in 0..r {
-                    println!("   EC{}:", ec + 1);
-                    for var in 0..k {
-                        println!("     var {:>2}   β = {:>9.4}", var + 1, m.beta[[var, ec]]);
-                        beta_vec.push(Value::Float(m.beta[[var, ec]]));
-                        beta_var.push(Value::Int((var + 1) as i64));
-                        beta_ec.push(Value::Int((ec + 1) as i64));
-                    }
-                }
-                if !beta_vec.is_empty() {
-                    let mut beta_columns = HashMap::new();
-                    beta_columns.insert("ec_vector".into(), Value::List(Arc::new(beta_ec)));
-                    beta_columns.insert("variable".into(), Value::List(Arc::new(beta_var)));
-                    beta_columns.insert("beta".into(), Value::List(Arc::new(beta_vec)));
-                    let beta_df = self.dict_to_dataframe(&beta_columns)?;
-                    diagnostics.insert("beta".into(), Value::DataFrame(Arc::new(beta_df)));
-                }
-
-                println!("\n── Note");
-                println!("   VecmResult does not store variable names or residuals.");
-                println!("   For names, see the order passed to vecm().");
-                println!("\n{thin}");
-                println!("{thick}\n");
-            }
-
-            Value::IvResult(iv) => {
-                let k = iv.params.len();
-                let n = iv.n_obs;
-                let df = iv.df_resid;
-                let mse = iv.sigma * iv.sigma;
-                let names = iv.variable_names.as_deref().unwrap_or(&[]);
-
-                println!("\n{thick}");
-                println!(" DIAGNOSTICS — IV/2SLS  (n={}  k={}  df={})", n, k, df);
-                println!("{thick}");
-
-                diagnostics.insert("model".into(), Value::Str("IV/2SLS".into()));
-                diagnostics.insert("n".into(), Value::Int(n as i64));
-                diagnostics.insert("k".into(), Value::Int(k as i64));
-                diagnostics.insert("df".into(), Value::Int(df as i64));
-                diagnostics.insert("r2".into(), Value::Float(iv.r_squared));
-                diagnostics.insert("sigma".into(), Value::Float(iv.sigma));
-                diagnostics.insert("mse".into(), Value::Float(mse));
-
-                println!("\n── Fit");
-                println!(
-                    "   R²  = {:.4}   σ = {:.6}   MSE = {:.6}",
-                    iv.r_squared, iv.sigma, mse
-                );
-
-                println!("\n── Coefficient Significance");
-                let sig = |p: f64| -> &'static str {
-                    if p < 0.01 {
-                        "***"
-                    } else if p < 0.05 {
-                        "**"
-                    } else if p < 0.10 {
-                        "*"
-                    } else {
-                        ""
-                    }
-                };
-                println!("   {:<22} {:>8} {:>8}", "Variable", "p-value", "");
-                println!("   {}", "─".repeat(40));
-                let mut iv_var = Vec::new();
-                let mut iv_p = Vec::new();
-                let mut iv_sig = Vec::new();
-                for i in 0..k {
-                    let name = names.get(i).map(|s| s.as_str()).unwrap_or("?");
-                    let s = sig(iv.p_values[i]);
-                    println!("   {:<22} {:>8.4} {:>4}", name, iv.p_values[i], s);
-                    iv_var.push(Value::Str(name.to_string()));
-                    iv_p.push(Value::Float(iv.p_values[i]));
-                    iv_sig.push(Value::Str(s.to_string()));
-                }
-                if !iv_var.is_empty() {
-                    let mut iv_columns = HashMap::new();
-                    iv_columns.insert("variable".into(), Value::List(Arc::new(iv_var)));
-                    iv_columns.insert("p_value".into(), Value::List(Arc::new(iv_p)));
-                    iv_columns.insert("significance".into(), Value::List(Arc::new(iv_sig)));
-                    let iv_df = self.dict_to_dataframe(&iv_columns)?;
-                    diagnostics.insert("coefficients".into(), Value::DataFrame(Arc::new(iv_df)));
-                }
-
-                println!("\n── Tests Not Available");
-                println!("   Residuals and Z matrix not stored in IvResult.");
-                println!("   • Sargan (overidentification): needs Z matrix");
-                println!("   • Endogeneity (Wu-Hausman): compare IV vs OLS manually");
-                println!("   • Weak instrument: check first-stage F (rule: F > 10)");
-                println!("\n{thin}");
-                println!("   *** p<0.01  ** p<0.05  * p<0.10");
-                println!("{thick}\n");
-            }
-
-            Value::PanelResult(fe) => {
-                let k = fe.params.len();
-                let names = fe.variable_names.as_deref().unwrap_or(&[]);
-                let sig = |p: f64| -> &'static str {
-                    if p < 0.01 {
-                        "***"
-                    } else if p < 0.05 {
-                        "**"
-                    } else if p < 0.10 {
-                        "*"
-                    } else {
-                        ""
-                    }
-                };
-
-                println!("\n{thick}");
-                println!(
-                    " DIAGNOSTICS — Fixed Effects  (n={}  N={}  T≈{:.1}  k={})",
-                    fe.n_obs,
-                    fe.n_entities,
-                    fe.n_obs as f64 / fe.n_entities.max(1) as f64,
-                    k
-                );
-                println!("{thick}");
-
-                diagnostics.insert("model".into(), Value::Str("Fixed Effects".into()));
-                diagnostics.insert("n".into(), Value::Int(fe.n_obs as i64));
-                diagnostics.insert("n_entities".into(), Value::Int(fe.n_entities as i64));
-                diagnostics.insert("k".into(), Value::Int(k as i64));
-                diagnostics.insert("r2_within".into(), Value::Float(fe.r_squared));
-                diagnostics.insert("sigma".into(), Value::Float(fe.sigma));
-                diagnostics.insert("df_resid".into(), Value::Int(fe.df_resid as i64));
-
-                println!("\n── Fit (Within)");
-                println!(
-                    "   R² within = {:.4}   σ = {:.6}   df = {}",
-                    fe.r_squared, fe.sigma, fe.df_resid
-                );
-
-                println!("\n── Coefficient Significance");
-                println!(
-                    "   {:<22} {:>10} {:>8} {:>4}",
-                    "Variable", "coef", "p-value", ""
-                );
-                println!("   {}", "─".repeat(48));
-                let mut fe_var = Vec::new();
-                let mut fe_coef = Vec::new();
-                let mut fe_p = Vec::new();
-                let mut fe_sig = Vec::new();
-                for i in 0..k {
-                    let name = names.get(i).map(|s| s.as_str()).unwrap_or("?");
-                    let s = sig(fe.p_values[i]);
-                    println!(
-                        "   {:<22} {:>10.4} {:>8.4} {:>4}",
-                        name, fe.params[i], fe.p_values[i], s
-                    );
-                    fe_var.push(Value::Str(name.to_string()));
-                    fe_coef.push(Value::Float(fe.params[i]));
-                    fe_p.push(Value::Float(fe.p_values[i]));
-                    fe_sig.push(Value::Str(s.to_string()));
-                }
-                if !fe_var.is_empty() {
-                    let mut fe_columns = HashMap::new();
-                    fe_columns.insert("variable".into(), Value::List(Arc::new(fe_var)));
-                    fe_columns.insert("coef".into(), Value::List(Arc::new(fe_coef)));
-                    fe_columns.insert("p_value".into(), Value::List(Arc::new(fe_p)));
-                    fe_columns.insert("significance".into(), Value::List(Arc::new(fe_sig)));
-                    let fe_df = self.dict_to_dataframe(&fe_columns)?;
-                    diagnostics.insert("coefficients".into(), Value::DataFrame(Arc::new(fe_df)));
-                }
-
-                println!("\n── Tests Not Available");
-                println!("   Residuals not stored in PanelResult.");
-                println!("   • Hausman FE vs RE: use hausman(fe_model, re_model)");
-                println!("   • JB / Ljung-Box: run on manually extracted residuals");
-                println!("\n{thin}");
-                println!("   *** p<0.01  ** p<0.05  * p<0.10");
-                println!("{thick}\n");
-            }
-
-            Value::ReResult(re) => {
-                let k = re.params.len();
-                let sig = |p: f64| -> &'static str {
-                    if p < 0.01 {
-                        "***"
-                    } else if p < 0.05 {
-                        "**"
-                    } else if p < 0.10 {
-                        "*"
-                    } else {
-                        ""
-                    }
-                };
-
-                // Variance decomposition
-                let var_e = re.sigma_e * re.sigma_e; // variance of individual effects
-                let var_u = re.sigma_u * re.sigma_u; // idiosyncratic variance
-                let var_tot = var_e + var_u;
-                let icc = if var_tot > 1e-15 {
-                    var_e / var_tot
-                } else {
-                    0.0
-                };
-
-                println!("\n{thick}");
-                println!(" DIAGNOSTICS — Random Effects  (k={})", k);
-                println!("{thick}");
-
-                diagnostics.insert("model".into(), Value::Str("Random Effects".into()));
-                diagnostics.insert("k".into(), Value::Int(k as i64));
-                diagnostics.insert("r2_overall".into(), Value::Float(re.r_squared_overall));
-                diagnostics.insert("sigma_e".into(), Value::Float(re.sigma_e));
-                diagnostics.insert("sigma_u".into(), Value::Float(re.sigma_u));
-                diagnostics.insert("var_e".into(), Value::Float(var_e));
-                diagnostics.insert("var_u".into(), Value::Float(var_u));
-                diagnostics.insert("icc".into(), Value::Float(icc));
-                diagnostics.insert("theta".into(), Value::Float(re.theta));
-
-                println!("\n── Fit");
-                println!("   Overall R² = {:.4}", re.r_squared_overall);
-
-                println!("\n── Variance Decomposition");
-                println!(
-                    "   σ_e  (individual effects) = {:.6}   σ_e² = {:.6}",
-                    re.sigma_e, var_e
-                );
-                println!(
-                    "   σ_u  (idiosyncratic)     = {:.6}   σ_u² = {:.6}",
-                    re.sigma_u, var_u
-                );
-                println!("   ICC  = σ_e²/(σ_e²+σ_u²)   = {:.4}   ({:.1}% of variance is between entities)",
-                icc, icc * 100.0);
-                println!(
-                    "   θ    (GLS weight)            = {:.4}   (0→OLS  1→FE)",
-                    re.theta
-                );
-
-                println!("\n── Coefficient Significance");
-                println!(
-                    "   {:<22} {:>10} {:>8} {:>4}",
-                    "Variable", "coef", "p-value", ""
-                );
-                println!("   {}", "─".repeat(48));
-                let mut re_var = Vec::new();
-                let mut re_coef = Vec::new();
-                let mut re_p = Vec::new();
-                let mut re_sig = Vec::new();
-                for i in 0..k {
-                    let name = re
-                        .variable_names
-                        .as_ref()
-                        .and_then(|v| v.get(i))
-                        .map(|s| s.as_str())
-                        .unwrap_or("const");
-                    let s = sig(re.p_values[i]);
-                    println!(
-                        "   {:<22} {:>10.4} {:>8.4} {:>4}",
-                        name, re.params[i], re.p_values[i], s
-                    );
-                    re_var.push(Value::Str(name.to_string()));
-                    re_coef.push(Value::Float(re.params[i]));
-                    re_p.push(Value::Float(re.p_values[i]));
-                    re_sig.push(Value::Str(s.to_string()));
-                }
-                if !re_var.is_empty() {
-                    let mut re_columns = HashMap::new();
-                    re_columns.insert("variable".into(), Value::List(Arc::new(re_var)));
-                    re_columns.insert("coef".into(), Value::List(Arc::new(re_coef)));
-                    re_columns.insert("p_value".into(), Value::List(Arc::new(re_p)));
-                    re_columns.insert("significance".into(), Value::List(Arc::new(re_sig)));
-                    let re_df = self.dict_to_dataframe(&re_columns)?;
-                    diagnostics.insert("coefficients".into(), Value::DataFrame(Arc::new(re_df)));
-                }
-
-                println!("\n── Tests Not Available");
-                println!("   • Hausman FE vs RE: use hausman(fe_model, re_model)");
-                println!(
-                    "   • BP LM test (H₀: sem individual effects): σ_e²/σ_u² acima sugere efeitos"
-                );
-                println!("\n{thin}");
-                println!("   *** p<0.01  ** p<0.05  * p<0.10");
-                println!("{thick}\n");
-            }
-
+        let diagnostics = match self.eval_expr(&args[0])? {
+            Value::OlsResult(ref ols) => self.diagnostics_ols(ols, &thick, &thin)?,
+            Value::GarchResult(ref m) => self.diagnostics_garch(m, &thick, &thin)?,
+            Value::ArimaResult(ref m) => self.diagnostics_arima(m, &thick, &thin)?,
+            Value::VarResult(ref m) => self.diagnostics_var(m, &thick, &thin)?,
+            Value::VecmResult(ref m) => self.diagnostics_vecm(m, &thick, &thin)?,
+            Value::IvResult(ref iv) => self.diagnostics_iv(iv, &thick, &thin)?,
+            Value::PanelResult(ref fe) => self.diagnostics_panel(fe, &thick, &thin)?,
+            Value::ReResult(ref re) => self.diagnostics_re(re, &thick, &thin)?,
             _ => {
                 return Err(HayashiError::Type(
                     "diagnostics() suporta OLS, GARCH, ARIMA, VAR, VECM, IV, FE e RE".into(),
                 ))
             }
-        }
+        };
 
         Ok(Value::Dict(Arc::new(diagnostics)))
+    }
+
+    pub(super) fn diagnostics_ols(
+        &mut self,
+        ols: &super::models::OlsModel,
+        thick: &str,
+        thin: &str,
+    ) -> Result<HashMap<String, Value>> {
+        let mut diagnostics: HashMap<String, Value> = HashMap::new();
+        println!("\n{thick}");
+        println!(
+            " DIAGNOSTICS — OLS  (n={}  k={})",
+            ols.residuals.len(),
+            ols.x.ncols()
+        );
+        println!("{thick}");
+
+        diagnostics.insert("model".into(), Value::Str("OLS".into()));
+        diagnostics.insert("n".into(), Value::Int(ols.residuals.len() as i64));
+        diagnostics.insert("k".into(), Value::Int(ols.x.ncols() as i64));
+
+        // ── Normalidade
+        println!("\n── Residual Normality (Jarque-Bera)");
+        match greeners::Diagnostics::jarque_bera(&ols.residuals) {
+            Ok((jb, p)) => {
+                println!(
+                    "   JB ~ χ²(2)  = {:>9.4}   p = {:.4}  {}",
+                    jb,
+                    p,
+                    Self::sig_stars(p)
+                );
+                let mut jb_map = HashMap::new();
+                jb_map.insert("jb_stat".into(), Value::Float(jb));
+                jb_map.insert("p_value".into(), Value::Float(p));
+                jb_map.insert("df".into(), Value::Int(2));
+                diagnostics.insert("jarque_bera".into(), Value::Dict(Arc::new(jb_map)));
+            }
+            Err(e) => {
+                println!("   error: {e}");
+                diagnostics.insert("jarque_bera".into(), Value::Str(format!("error: {e}")));
+            }
+        }
+
+        // ── First-order autocorrelation
+        let dw = greeners::Diagnostics::durbin_watson(&ols.residuals);
+        let dw_label = if dw < 1.5 {
+            "positive autocorr."
+        } else if dw > 2.5 {
+            "negative autocorr."
+        } else {
+            "no evident autocorr."
+        };
+        println!("\n── First-Order Autocorrelation (Durbin-Watson)");
+        println!("   DW = {:.4}  [{}]", dw, dw_label);
+        let mut dw_map = HashMap::new();
+        dw_map.insert("dw".into(), Value::Float(dw));
+        dw_map.insert("interpretation".into(), Value::Str(dw_label.into()));
+        diagnostics.insert("durbin_watson".into(), Value::Dict(Arc::new(dw_map)));
+
+        // ── Breusch-Godfrey
+        println!("\n── Serial Autocorrelation (Breusch-Godfrey, lags=4)");
+        match greeners::SpecificationTests::breusch_godfrey_test(&ols.residuals, &ols.x, 4) {
+            Ok((lm, p, df)) => {
+                println!(
+                    "   LM ~ χ²({})   = {:>9.4}   p = {:.4}  {}",
+                    df,
+                    lm,
+                    p,
+                    Self::sig_stars(p)
+                );
+                let mut bg_map = HashMap::new();
+                bg_map.insert("lm_stat".into(), Value::Float(lm));
+                bg_map.insert("df".into(), Value::Int(df as i64));
+                bg_map.insert("p_value".into(), Value::Float(p));
+                diagnostics.insert("breusch_godfrey".into(), Value::Dict(Arc::new(bg_map)));
+            }
+            Err(e) => {
+                println!("   error: {e}");
+                diagnostics.insert("breusch_godfrey".into(), Value::Str(format!("error: {e}")));
+            }
+        }
+
+        // ── White
+        println!("\n── Heteroscedasticidade (White)");
+        match greeners::SpecificationTests::white_test(&ols.residuals, &ols.x) {
+            Ok((lm, p, df)) => {
+                println!(
+                    "   LM ~ χ²({})   = {:>9.4}   p = {:.4}  {}",
+                    df,
+                    lm,
+                    p,
+                    Self::sig_stars(p)
+                );
+                let mut white_map = HashMap::new();
+                white_map.insert("lm_stat".into(), Value::Float(lm));
+                white_map.insert("df".into(), Value::Int(df as i64));
+                white_map.insert("p_value".into(), Value::Float(p));
+                diagnostics.insert("white".into(), Value::Dict(Arc::new(white_map)));
+            }
+            Err(e) => {
+                println!("   error: {e}");
+                diagnostics.insert("white".into(), Value::Str(format!("error: {e}")));
+            }
+        }
+
+        // ── RESET
+        println!("\n── Functional Specification (RESET, power=3)");
+        let fitted = ols.result.fitted_values(&ols.x);
+        let y = &ols.residuals + &fitted;
+        match greeners::SpecificationTests::reset_test(&y, &ols.x, &fitted, 3) {
+            Ok((f, p, df1, df2)) => {
+                println!(
+                    "   F ~ F({},{}) = {:>9.4}   p = {:.4}  {}",
+                    df1,
+                    df2,
+                    f,
+                    p,
+                    Self::sig_stars(p)
+                );
+                let mut reset_map = HashMap::new();
+                reset_map.insert("f_stat".into(), Value::Float(f));
+                reset_map.insert("df1".into(), Value::Int(df1 as i64));
+                reset_map.insert("df2".into(), Value::Int(df2 as i64));
+                reset_map.insert("p_value".into(), Value::Float(p));
+                diagnostics.insert("reset".into(), Value::Dict(Arc::new(reset_map)));
+            }
+            Err(e) => {
+                println!("   error: {e}");
+                diagnostics.insert("reset".into(), Value::Str(format!("error: {e}")));
+            }
+        }
+
+        // ── VIF
+        println!("\n── Multicolinearidade (VIF)");
+        let names = ols.result.variable_names.as_deref().unwrap_or(&[]);
+        let mut vif_var = Vec::new();
+        let mut vif_val = Vec::new();
+        let mut vif_diag = Vec::new();
+        match greeners::Diagnostics::vif(&ols.x) {
+            Ok(vifs) => {
+                for (i, &v) in vifs.iter().enumerate() {
+                    if v.is_nan() {
+                        continue;
+                    }
+                    let name = names.get(i).map(|s| s.as_str()).unwrap_or("?");
+                    let diag = if v.is_infinite() || v > 10.0 {
+                        "grave"
+                    } else if v > 5.0 {
+                        "moderado"
+                    } else {
+                        "ok"
+                    };
+                    println!("   {:<20} VIF = {:>7.3}  [{}]", name, v, diag);
+                    vif_var.push(Value::Str(name.to_string()));
+                    vif_val.push(Value::Float(if v.is_infinite() {
+                        f64::INFINITY
+                    } else {
+                        v
+                    }));
+                    vif_diag.push(Value::Str(diag.to_string()));
+                }
+            }
+            Err(e) => println!("   error: {e}"),
+        }
+        if !vif_var.is_empty() {
+            let mut vif_columns = HashMap::new();
+            vif_columns.insert("variable".into(), Value::List(Arc::new(vif_var)));
+            vif_columns.insert("vif".into(), Value::List(Arc::new(vif_val)));
+            vif_columns.insert("diagnostic".into(), Value::List(Arc::new(vif_diag)));
+            let vif_df = self.dict_to_dataframe(&vif_columns)?;
+            diagnostics.insert("vif".into(), Value::DataFrame(Arc::new(vif_df)));
+        }
+
+        // ── Cook's D
+        let n = ols.residuals.len();
+        let mse = ols.result.sigma * ols.result.sigma;
+        let cutoff = 4.0 / n as f64;
+        println!("\n── Influential Observations (Cook's D > {:.4})", cutoff);
+        let mut cook_obs = Vec::new();
+        let mut cook_d = Vec::new();
+        let mut cook_label = Vec::new();
+        match greeners::Diagnostics::cooks_distance(&ols.residuals, &ols.x, mse) {
+            Ok(d) => {
+                let flagged: Vec<(usize, f64)> = d
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, &di)| di > cutoff)
+                    .map(|(i, &di)| (i + 1, di))
+                    .collect();
+                if flagged.is_empty() {
+                    println!("   No influential observations.");
+                } else {
+                    for (i, di) in &flagged {
+                        let label = if *di > 1.0 {
+                            "very influential"
+                        } else {
+                            "influential"
+                        };
+                        println!("   obs {:>4}  D = {:.4}  [{}]", i, di, label);
+                        cook_obs.push(Value::Int(*i as i64));
+                        cook_d.push(Value::Float(*di));
+                        cook_label.push(Value::Str(label.to_string()));
+                    }
+                }
+            }
+            Err(e) => println!("   error: {e}"),
+        }
+        if !cook_obs.is_empty() {
+            let mut cook_columns = HashMap::new();
+            cook_columns.insert("observation".into(), Value::List(Arc::new(cook_obs)));
+            cook_columns.insert("cooks_d".into(), Value::List(Arc::new(cook_d)));
+            cook_columns.insert("label".into(), Value::List(Arc::new(cook_label)));
+            let cook_df = self.dict_to_dataframe(&cook_columns)?;
+            diagnostics.insert("cooks_d".into(), Value::DataFrame(Arc::new(cook_df)));
+        }
+
+        println!("\n{thin}");
+        println!("  *** p<0.01  ** p<0.05  * p<0.10");
+        println!("{thick}\n");
+        Ok(diagnostics)
+    }
+    pub(super) fn diagnostics_garch(
+        &mut self,
+        m: &greeners::GarchResult,
+        thick: &str,
+        thin: &str,
+    ) -> Result<HashMap<String, Value>> {
+        let mut diagnostics: HashMap<String, Value> = HashMap::new();
+        let model_label = match m.model_type {
+            greeners::GarchModelType::GARCH => "GARCH",
+            greeners::GarchModelType::EGARCH => "EGARCH",
+            greeners::GarchModelType::GJRGARCH => "GJR-GARCH",
+        };
+        println!("\n{thick}");
+        println!(
+            " DIAGNOSTICS — {model_label}({}, {})  (n={})",
+            m.p, m.q, m.n_obs
+        );
+        println!("{thick}");
+
+        diagnostics.insert("model".into(), Value::Str(model_label.into()));
+        diagnostics.insert("p".into(), Value::Int(m.p as i64));
+        diagnostics.insert("q".into(), Value::Int(m.q as i64));
+        diagnostics.insert("n".into(), Value::Int(m.n_obs as i64));
+
+        let std_res = &m.standardized_residuals;
+
+        println!("\n── Autocorrelation in Standardized Residuals (Ljung-Box, lags=10)");
+        match greeners::Diagnostics::ljung_box(std_res, 10) {
+            Ok(r) => {
+                println!(
+                    "   Q(10) = {:>9.4}   p = {:.4}  {}",
+                    r.q_stat,
+                    r.p_value,
+                    Self::sig_stars(r.p_value)
+                );
+                let mut lb_map = HashMap::new();
+                lb_map.insert("q_stat".into(), Value::Float(r.q_stat));
+                lb_map.insert("p_value".into(), Value::Float(r.p_value));
+                lb_map.insert("lags".into(), Value::Int(10));
+                diagnostics.insert("ljung_box".into(), Value::Dict(Arc::new(lb_map)));
+            }
+            Err(e) => {
+                println!("   error: {e}");
+                diagnostics.insert("ljung_box".into(), Value::Str(format!("error: {e}")));
+            }
+        }
+
+        println!("\n── Efeitos ARCH Residuais (Engle LM, lags=5)");
+        match greeners::Diagnostics::arch_test(std_res, 5) {
+            Ok(r) => {
+                println!(
+                    "   LM ~ χ²({}) = {:>9.4}   p = {:.4}  {}",
+                    r.lags,
+                    r.lm_stat,
+                    r.lm_pvalue,
+                    Self::sig_stars(r.lm_pvalue)
+                );
+                let mut arch_map = HashMap::new();
+                arch_map.insert("lm_stat".into(), Value::Float(r.lm_stat));
+                arch_map.insert("p_value".into(), Value::Float(r.lm_pvalue));
+                arch_map.insert("lags".into(), Value::Int(r.lags as i64));
+                diagnostics.insert("arch_test".into(), Value::Dict(Arc::new(arch_map)));
+            }
+            Err(e) => {
+                println!("   error: {e}");
+                diagnostics.insert("arch_test".into(), Value::Str(format!("error: {e}")));
+            }
+        }
+
+        println!("\n── Standardized Residual Normality (Jarque-Bera)");
+        match greeners::Diagnostics::jarque_bera(std_res) {
+            Ok((jb, p)) => {
+                println!(
+                    "   JB ~ χ²(2)  = {:>9.4}   p = {:.4}  {}",
+                    jb,
+                    p,
+                    Self::sig_stars(p)
+                );
+                let mut jb_map = HashMap::new();
+                jb_map.insert("jb_stat".into(), Value::Float(jb));
+                jb_map.insert("p_value".into(), Value::Float(p));
+                jb_map.insert("df".into(), Value::Int(2));
+                diagnostics.insert("jarque_bera".into(), Value::Dict(Arc::new(jb_map)));
+            }
+            Err(e) => {
+                println!("   error: {e}");
+                diagnostics.insert("jarque_bera".into(), Value::Str(format!("error: {e}")));
+            }
+        }
+
+        println!("\n{thin}");
+        println!("  *** p<0.01  ** p<0.05  * p<0.10");
+        println!("{thick}\n");
+        Ok(diagnostics)
+    }
+    pub(super) fn diagnostics_arima(
+        &mut self,
+        m: &greeners::ArimaResult,
+        thick: &str,
+        thin: &str,
+    ) -> Result<HashMap<String, Value>> {
+        let mut diagnostics: HashMap<String, Value> = HashMap::new();
+        println!("\n{thick}");
+        println!(" DIAGNOSTICS — ARIMA");
+        println!("{thick}");
+
+        diagnostics.insert("model".into(), Value::Str("ARIMA".into()));
+
+        let resid = Array1::from_vec(m.residuals().to_vec());
+
+        println!("\n── Autocorrelation in Residuals (Ljung-Box, lags=10)");
+        match greeners::Diagnostics::ljung_box(&resid, 10) {
+            Ok(r) => {
+                println!(
+                    "   Q(10) = {:>9.4}   p = {:.4}  {}",
+                    r.q_stat,
+                    r.p_value,
+                    Self::sig_stars(r.p_value)
+                );
+                let mut lb_map = HashMap::new();
+                lb_map.insert("q_stat".into(), Value::Float(r.q_stat));
+                lb_map.insert("p_value".into(), Value::Float(r.p_value));
+                lb_map.insert("lags".into(), Value::Int(10));
+                diagnostics.insert("ljung_box".into(), Value::Dict(Arc::new(lb_map)));
+            }
+            Err(e) => {
+                println!("   error: {e}");
+                diagnostics.insert("ljung_box".into(), Value::Str(format!("error: {e}")));
+            }
+        }
+
+        println!("\n── Residual Normality (Jarque-Bera)");
+        match greeners::Diagnostics::jarque_bera(&resid) {
+            Ok((jb, p)) => {
+                println!(
+                    "   JB ~ χ²(2)  = {:>9.4}   p = {:.4}  {}",
+                    jb,
+                    p,
+                    Self::sig_stars(p)
+                );
+                let mut jb_map = HashMap::new();
+                jb_map.insert("jb_stat".into(), Value::Float(jb));
+                jb_map.insert("p_value".into(), Value::Float(p));
+                jb_map.insert("df".into(), Value::Int(2));
+                diagnostics.insert("jarque_bera".into(), Value::Dict(Arc::new(jb_map)));
+            }
+            Err(e) => {
+                println!("   error: {e}");
+                diagnostics.insert("jarque_bera".into(), Value::Str(format!("error: {e}")));
+            }
+        }
+
+        println!("\n{thin}");
+        println!("  *** p<0.01  ** p<0.05  * p<0.10");
+        println!("{thick}\n");
+        Ok(diagnostics)
+    }
+    pub(super) fn diagnostics_var(
+        &mut self,
+        m: &greeners::var::VarResult,
+        thick: &str,
+        thin: &str,
+    ) -> Result<HashMap<String, Value>> {
+        let mut diagnostics: HashMap<String, Value> = HashMap::new();
+        let k = m.n_vars;
+        println!("\n{thick}");
+        println!(" DIAGNOSTICS — VAR({})  (n={}  k={})", m.lags, m.n_obs, k);
+        println!("{thick}");
+
+        diagnostics.insert("model".into(), Value::Str("VAR".into()));
+        diagnostics.insert("lags".into(), Value::Int(m.lags as i64));
+        diagnostics.insert("n".into(), Value::Int(m.n_obs as i64));
+        diagnostics.insert("k".into(), Value::Int(k as i64));
+        diagnostics.insert("aic".into(), Value::Float(m.aic));
+        diagnostics.insert("bic".into(), Value::Float(m.bic));
+
+        // ── Residual standard deviation by equation (diagonal of Σ_u)
+        println!("\n── Residual Standard Deviation by Equation");
+        let mut sd_var = Vec::new();
+        let mut sd_val = Vec::new();
+        for (i, name) in m.var_names.iter().enumerate() {
+            let sd = m.sigma_u[[i, i]].sqrt();
+            println!("   {:<22} σ = {:.6}", name, sd);
+            sd_var.push(Value::Str(name.clone()));
+            sd_val.push(Value::Float(sd));
+        }
+        if !sd_var.is_empty() {
+            let mut sd_columns = HashMap::new();
+            sd_columns.insert("variable".into(), Value::List(Arc::new(sd_var)));
+            sd_columns.insert("residual_sd".into(), Value::List(Arc::new(sd_val)));
+            let sd_df = self.dict_to_dataframe(&sd_columns)?;
+            diagnostics.insert("residual_sd".into(), Value::DataFrame(Arc::new(sd_df)));
+        }
+
+        // ── Residual correlation matrix (normalized Σ_u)
+        if k > 1 {
+            println!("\n── Contemporaneous Residual Correlation");
+            let mut corr_var1 = Vec::new();
+            let mut corr_var2 = Vec::new();
+            let mut corr_val = Vec::new();
+            for i in 0..k {
+                for j in 0..k {
+                    let r = if i == j {
+                        1.0
+                    } else {
+                        m.sigma_u[[i, j]] / (m.sigma_u[[i, i]] * m.sigma_u[[j, j]]).sqrt()
+                    };
+                    corr_var1.push(Value::Str(m.var_names[i].clone()));
+                    corr_var2.push(Value::Str(m.var_names[j].clone()));
+                    corr_val.push(Value::Float(r));
+                }
+            }
+            let mut corr_columns = HashMap::new();
+            corr_columns.insert("variable_1".into(), Value::List(Arc::new(corr_var1)));
+            corr_columns.insert("variable_2".into(), Value::List(Arc::new(corr_var2)));
+            corr_columns.insert("correlation".into(), Value::List(Arc::new(corr_val)));
+            let corr_df = self.dict_to_dataframe(&corr_columns)?;
+            diagnostics.insert(
+                "residual_correlation".into(),
+                Value::DataFrame(Arc::new(corr_df)),
+            );
+        }
+
+        println!("\n── Note");
+        println!("   Residuals are not stored in VarResult — for LB/JB by equation,");
+        println!("   extract the series and run ljungbox/jb directly.");
+        println!("\n{thin}");
+        println!("{thick}\n");
+        Ok(diagnostics)
+    }
+    pub(super) fn diagnostics_vecm(
+        &mut self,
+        m: &greeners::vecm::VecmResult,
+        thick: &str,
+        thin: &str,
+    ) -> Result<HashMap<String, Value>> {
+        let mut diagnostics: HashMap<String, Value> = HashMap::new();
+        let k = m.n_vars;
+        let r = m.rank;
+        let n = m.n_obs as f64;
+        let eig = &m.eigenvalues; // ordenados decrescente
+
+        println!("\n{thick}");
+        println!(" DIAGNOSTICS — VECM  (n={}  k={}  rank={})", m.n_obs, k, r);
+        println!("{thick}");
+
+        diagnostics.insert("model".into(), Value::Str("VECM".into()));
+        diagnostics.insert("n".into(), Value::Int(m.n_obs as i64));
+        diagnostics.insert("k".into(), Value::Int(k as i64));
+        diagnostics.insert("rank".into(), Value::Int(r as i64));
+
+        // ── Johansen trace test
+        // λ_trace(r₀) = -n Σ_{i=r₀}^{k-1} ln(1 - λ_i)  H₀: rank ≤ r₀
+        // CVs 5%: Osterwald-Lenum (1992) Tabela 1 — constant restrita
+        let cv_5pct: &[f64] = &[9.24, 19.96, 34.91, 53.12, 76.07, 102.56, 131.70];
+        println!("\n── Johansen Test (Trace)");
+        println!("   H₀: rank ≤ r   CVs 5%: Osterwald-Lenum (1992) Tabela 1");
+        println!(
+            "   {:<6} {:>10} {:>12} {:>10} {:>6}",
+            "H₀:r≤", "λ_max", "λ_trace", "CV 5%", ""
+        );
+        println!("   {}", "─".repeat(46));
+        let mut joh_h0 = Vec::new();
+        let mut joh_lam_max = Vec::new();
+        let mut joh_trace = Vec::new();
+        let mut joh_cv = Vec::new();
+        let mut joh_reject = Vec::new();
+        for r0 in 0..k {
+            let lam_max = if r0 < eig.len() {
+                -n * (1.0 - eig[r0]).max(1e-15).ln()
+            } else {
+                0.0
+            };
+            let trace_stat: f64 = (r0..eig.len())
+                .map(|i| -n * (1.0 - eig[i]).max(1e-15).ln())
+                .sum();
+            let cv = cv_5pct.get(k - r0 - 1).copied().unwrap_or(f64::NAN);
+            let reject = if trace_stat > cv { "*" } else { " " };
+            println!(
+                "   {:<6} {:>10.4} {:>12.4} {:>10.2} {:>6}",
+                r0, lam_max, trace_stat, cv, reject
+            );
+            joh_h0.push(Value::Int(r0 as i64));
+            joh_lam_max.push(Value::Float(lam_max));
+            joh_trace.push(Value::Float(trace_stat));
+            joh_cv.push(Value::Float(cv));
+            joh_reject.push(Value::Str(reject.to_string()));
+        }
+        println!("   (* rejects H₀ at 5%)");
+        let mut joh_columns = HashMap::new();
+        joh_columns.insert("h0_rank".into(), Value::List(Arc::new(joh_h0)));
+        joh_columns.insert("lambda_max".into(), Value::List(Arc::new(joh_lam_max)));
+        joh_columns.insert("trace_stat".into(), Value::List(Arc::new(joh_trace)));
+        joh_columns.insert("cv_5pct".into(), Value::List(Arc::new(joh_cv)));
+        joh_columns.insert("reject".into(), Value::List(Arc::new(joh_reject)));
+        let joh_df = self.dict_to_dataframe(&joh_columns)?;
+        diagnostics.insert("johansen".into(), Value::DataFrame(Arc::new(joh_df)));
+
+        // ── Adjustment speeds (alpha): k×rank
+        println!("\n── Adjustment Speeds (Alpha)  [negative sign = correction to equilibrium]");
+        let mut alpha_vec = Vec::new();
+        let mut alpha_eq = Vec::new();
+        let mut alpha_ec = Vec::new();
+        for ec in 0..r {
+            println!("   EC Vector {}", ec + 1);
+            for eq in 0..k {
+                println!(
+                    "     equation {:>2}   α = {:>9.4}",
+                    eq + 1,
+                    m.alpha[[eq, ec]]
+                );
+                alpha_vec.push(Value::Float(m.alpha[[eq, ec]]));
+                alpha_eq.push(Value::Int((eq + 1) as i64));
+                alpha_ec.push(Value::Int((ec + 1) as i64));
+            }
+        }
+        if !alpha_vec.is_empty() {
+            let mut alpha_columns = HashMap::new();
+            alpha_columns.insert("ec_vector".into(), Value::List(Arc::new(alpha_ec)));
+            alpha_columns.insert("equation".into(), Value::List(Arc::new(alpha_eq)));
+            alpha_columns.insert("alpha".into(), Value::List(Arc::new(alpha_vec)));
+            let alpha_df = self.dict_to_dataframe(&alpha_columns)?;
+            diagnostics.insert("alpha".into(), Value::DataFrame(Arc::new(alpha_df)));
+        }
+
+        // ── Cointegration vectors (beta): k×rank
+        println!("\n── Cointegration Vectors (Beta)");
+        let mut beta_vec = Vec::new();
+        let mut beta_var = Vec::new();
+        let mut beta_ec = Vec::new();
+        for ec in 0..r {
+            println!("   EC{}:", ec + 1);
+            for var in 0..k {
+                println!("     var {:>2}   β = {:>9.4}", var + 1, m.beta[[var, ec]]);
+                beta_vec.push(Value::Float(m.beta[[var, ec]]));
+                beta_var.push(Value::Int((var + 1) as i64));
+                beta_ec.push(Value::Int((ec + 1) as i64));
+            }
+        }
+        if !beta_vec.is_empty() {
+            let mut beta_columns = HashMap::new();
+            beta_columns.insert("ec_vector".into(), Value::List(Arc::new(beta_ec)));
+            beta_columns.insert("variable".into(), Value::List(Arc::new(beta_var)));
+            beta_columns.insert("beta".into(), Value::List(Arc::new(beta_vec)));
+            let beta_df = self.dict_to_dataframe(&beta_columns)?;
+            diagnostics.insert("beta".into(), Value::DataFrame(Arc::new(beta_df)));
+        }
+
+        println!("\n── Note");
+        println!("   VecmResult does not store variable names or residuals.");
+        println!("   For names, see the order passed to vecm().");
+        println!("\n{thin}");
+        println!("{thick}\n");
+        Ok(diagnostics)
+    }
+    pub(super) fn diagnostics_iv(
+        &mut self,
+        iv: &greeners::iv::IvResult,
+        thick: &str,
+        thin: &str,
+    ) -> Result<HashMap<String, Value>> {
+        let mut diagnostics: HashMap<String, Value> = HashMap::new();
+        let k = iv.params.len();
+        let n = iv.n_obs;
+        let df = iv.df_resid;
+        let mse = iv.sigma * iv.sigma;
+        let names = iv.variable_names.as_deref().unwrap_or(&[]);
+
+        println!("\n{thick}");
+        println!(" DIAGNOSTICS — IV/2SLS  (n={}  k={}  df={})", n, k, df);
+        println!("{thick}");
+
+        diagnostics.insert("model".into(), Value::Str("IV/2SLS".into()));
+        diagnostics.insert("n".into(), Value::Int(n as i64));
+        diagnostics.insert("k".into(), Value::Int(k as i64));
+        diagnostics.insert("df".into(), Value::Int(df as i64));
+        diagnostics.insert("r2".into(), Value::Float(iv.r_squared));
+        diagnostics.insert("sigma".into(), Value::Float(iv.sigma));
+        diagnostics.insert("mse".into(), Value::Float(mse));
+
+        println!("\n── Fit");
+        println!(
+            "   R²  = {:.4}   σ = {:.6}   MSE = {:.6}",
+            iv.r_squared, iv.sigma, mse
+        );
+
+        println!("\n── Coefficient Significance");
+        println!("   {:<22} {:>8} {:>8}", "Variable", "p-value", "");
+        println!("   {}", "─".repeat(40));
+        let mut iv_var = Vec::new();
+        let mut iv_p = Vec::new();
+        let mut iv_sig = Vec::new();
+        for i in 0..k {
+            let name = names.get(i).map(|s| s.as_str()).unwrap_or("?");
+            let s = Self::sig_stars(iv.p_values[i]);
+            println!("   {:<22} {:>8.4} {:>4}", name, iv.p_values[i], s);
+            iv_var.push(Value::Str(name.to_string()));
+            iv_p.push(Value::Float(iv.p_values[i]));
+            iv_sig.push(Value::Str(s.to_string()));
+        }
+        if !iv_var.is_empty() {
+            let mut iv_columns = HashMap::new();
+            iv_columns.insert("variable".into(), Value::List(Arc::new(iv_var)));
+            iv_columns.insert("p_value".into(), Value::List(Arc::new(iv_p)));
+            iv_columns.insert("significance".into(), Value::List(Arc::new(iv_sig)));
+            let iv_df = self.dict_to_dataframe(&iv_columns)?;
+            diagnostics.insert("coefficients".into(), Value::DataFrame(Arc::new(iv_df)));
+        }
+
+        println!("\n── Tests Not Available");
+        println!("   Residuals and Z matrix not stored in IvResult.");
+        println!("   • Sargan (overidentification): needs Z matrix");
+        println!("   • Endogeneity (Wu-Hausman): compare IV vs OLS manually");
+        println!("   • Weak instrument: check first-stage F (rule: F > 10)");
+        println!("\n{thin}");
+        println!("   *** p<0.01  ** p<0.05  * p<0.10");
+        println!("{thick}\n");
+        Ok(diagnostics)
+    }
+    pub(super) fn diagnostics_panel(
+        &mut self,
+        fe: &greeners::panel::PanelResult,
+        thick: &str,
+        thin: &str,
+    ) -> Result<HashMap<String, Value>> {
+        let mut diagnostics: HashMap<String, Value> = HashMap::new();
+        let k = fe.params.len();
+        let names = fe.variable_names.as_deref().unwrap_or(&[]);
+
+        println!("\n{thick}");
+        println!(
+            " DIAGNOSTICS — Fixed Effects  (n={}  N={}  T≈{:.1}  k={})",
+            fe.n_obs,
+            fe.n_entities,
+            fe.n_obs as f64 / fe.n_entities.max(1) as f64,
+            k
+        );
+        println!("{thick}");
+
+        diagnostics.insert("model".into(), Value::Str("Fixed Effects".into()));
+        diagnostics.insert("n".into(), Value::Int(fe.n_obs as i64));
+        diagnostics.insert("n_entities".into(), Value::Int(fe.n_entities as i64));
+        diagnostics.insert("k".into(), Value::Int(k as i64));
+        diagnostics.insert("r2_within".into(), Value::Float(fe.r_squared));
+        diagnostics.insert("sigma".into(), Value::Float(fe.sigma));
+        diagnostics.insert("df_resid".into(), Value::Int(fe.df_resid as i64));
+
+        println!("\n── Fit (Within)");
+        println!(
+            "   R² within = {:.4}   σ = {:.6}   df = {}",
+            fe.r_squared, fe.sigma, fe.df_resid
+        );
+
+        println!("\n── Coefficient Significance");
+        println!(
+            "   {:<22} {:>10} {:>8} {:>4}",
+            "Variable", "coef", "p-value", ""
+        );
+        println!("   {}", "─".repeat(48));
+        let mut fe_var = Vec::new();
+        let mut fe_coef = Vec::new();
+        let mut fe_p = Vec::new();
+        let mut fe_sig = Vec::new();
+        for i in 0..k {
+            let name = names.get(i).map(|s| s.as_str()).unwrap_or("?");
+            let s = Self::sig_stars(fe.p_values[i]);
+            println!(
+                "   {:<22} {:>10.4} {:>8.4} {:>4}",
+                name, fe.params[i], fe.p_values[i], s
+            );
+            fe_var.push(Value::Str(name.to_string()));
+            fe_coef.push(Value::Float(fe.params[i]));
+            fe_p.push(Value::Float(fe.p_values[i]));
+            fe_sig.push(Value::Str(s.to_string()));
+        }
+        if !fe_var.is_empty() {
+            let mut fe_columns = HashMap::new();
+            fe_columns.insert("variable".into(), Value::List(Arc::new(fe_var)));
+            fe_columns.insert("coef".into(), Value::List(Arc::new(fe_coef)));
+            fe_columns.insert("p_value".into(), Value::List(Arc::new(fe_p)));
+            fe_columns.insert("significance".into(), Value::List(Arc::new(fe_sig)));
+            let fe_df = self.dict_to_dataframe(&fe_columns)?;
+            diagnostics.insert("coefficients".into(), Value::DataFrame(Arc::new(fe_df)));
+        }
+
+        println!("\n── Tests Not Available");
+        println!("   Residuals not stored in PanelResult.");
+        println!("   • Hausman FE vs RE: use hausman(fe_model, re_model)");
+        println!("   • JB / Ljung-Box: run on manually extracted residuals");
+        println!("\n{thin}");
+        println!("   *** p<0.01  ** p<0.05  * p<0.10");
+        println!("{thick}\n");
+        Ok(diagnostics)
+    }
+    pub(super) fn diagnostics_re(
+        &mut self,
+        re: &greeners::panel::RandomEffectsResult,
+        thick: &str,
+        thin: &str,
+    ) -> Result<HashMap<String, Value>> {
+        let mut diagnostics: HashMap<String, Value> = HashMap::new();
+        let k = re.params.len();
+
+        // Variance decomposition
+        let var_e = re.sigma_e * re.sigma_e; // variance of individual effects
+        let var_u = re.sigma_u * re.sigma_u; // idiosyncratic variance
+        let var_tot = var_e + var_u;
+        let icc = if var_tot > 1e-15 {
+            var_e / var_tot
+        } else {
+            0.0
+        };
+
+        println!("\n{thick}");
+        println!(" DIAGNOSTICS — Random Effects  (k={})", k);
+        println!("{thick}");
+
+        diagnostics.insert("model".into(), Value::Str("Random Effects".into()));
+        diagnostics.insert("k".into(), Value::Int(k as i64));
+        diagnostics.insert("r2_overall".into(), Value::Float(re.r_squared_overall));
+        diagnostics.insert("sigma_e".into(), Value::Float(re.sigma_e));
+        diagnostics.insert("sigma_u".into(), Value::Float(re.sigma_u));
+        diagnostics.insert("var_e".into(), Value::Float(var_e));
+        diagnostics.insert("var_u".into(), Value::Float(var_u));
+        diagnostics.insert("icc".into(), Value::Float(icc));
+        diagnostics.insert("theta".into(), Value::Float(re.theta));
+
+        println!("\n── Fit");
+        println!("   Overall R² = {:.4}", re.r_squared_overall);
+
+        println!("\n── Variance Decomposition");
+        println!(
+            "   σ_e  (individual effects) = {:.6}   σ_e² = {:.6}",
+            re.sigma_e, var_e
+        );
+        println!(
+            "   σ_u  (idiosyncratic)     = {:.6}   σ_u² = {:.6}",
+            re.sigma_u, var_u
+        );
+        println!(
+            "   ICC  = σ_e²/(σ_e²+σ_u²)   = {:.4}   ({:.1}% of variance is between entities)",
+            icc,
+            icc * 100.0
+        );
+        println!(
+            "   θ    (GLS weight)            = {:.4}   (0→OLS  1→FE)",
+            re.theta
+        );
+
+        println!("\n── Coefficient Significance");
+        println!(
+            "   {:<22} {:>10} {:>8} {:>4}",
+            "Variable", "coef", "p-value", ""
+        );
+        println!("   {}", "─".repeat(48));
+        let mut re_var = Vec::new();
+        let mut re_coef = Vec::new();
+        let mut re_p = Vec::new();
+        let mut re_sig = Vec::new();
+        for i in 0..k {
+            let name = re
+                .variable_names
+                .as_ref()
+                .and_then(|v| v.get(i))
+                .map(|s| s.as_str())
+                .unwrap_or("const");
+            let s = Self::sig_stars(re.p_values[i]);
+            println!(
+                "   {:<22} {:>10.4} {:>8.4} {:>4}",
+                name, re.params[i], re.p_values[i], s
+            );
+            re_var.push(Value::Str(name.to_string()));
+            re_coef.push(Value::Float(re.params[i]));
+            re_p.push(Value::Float(re.p_values[i]));
+            re_sig.push(Value::Str(s.to_string()));
+        }
+        if !re_var.is_empty() {
+            let mut re_columns = HashMap::new();
+            re_columns.insert("variable".into(), Value::List(Arc::new(re_var)));
+            re_columns.insert("coef".into(), Value::List(Arc::new(re_coef)));
+            re_columns.insert("p_value".into(), Value::List(Arc::new(re_p)));
+            re_columns.insert("significance".into(), Value::List(Arc::new(re_sig)));
+            let re_df = self.dict_to_dataframe(&re_columns)?;
+            diagnostics.insert("coefficients".into(), Value::DataFrame(Arc::new(re_df)));
+        }
+
+        println!("\n── Tests Not Available");
+        println!("   • Hausman FE vs RE: use hausman(fe_model, re_model)");
+        println!("   • BP LM test (H₀: sem individual effects): σ_e²/σ_u² acima sugere efeitos");
+        println!("\n{thin}");
+        println!("   *** p<0.01  ** p<0.05  * p<0.10");
+        println!("{thick}\n");
+        Ok(diagnostics)
     }
 
     pub(super) fn varma(
