@@ -5,6 +5,29 @@ use std::sync::Arc;
 
 mod aggregation;
 
+fn df_col_f64(df: &DataFrame, col: &str) -> Vec<f64> {
+    use greeners::Column;
+    match df.get_column(col) {
+        Ok(Column::Float(a)) => a.to_vec(),
+        Ok(Column::Int(a)) => a.iter().map(|&x| x as f64).collect(),
+        _ => Vec::new(),
+    }
+}
+
+fn df_col_string(df: &DataFrame, col: &str) -> Vec<String> {
+    use greeners::Column;
+    match df.get_column(col) {
+        Ok(Column::String(a)) => a.to_vec(),
+        Ok(Column::DateTime(a)) => a
+            .iter()
+            .map(|dt| dt.format("%Y-%m-%d").to_string())
+            .collect(),
+        Ok(Column::Categorical(cat)) => cat.to_strings(),
+        Ok(Column::Bool(a)) => a.iter().map(|v| v.to_string()).collect(),
+        _ => df.get_string(col).map(|a| a.to_vec()).unwrap_or_default(),
+    }
+}
+
 /// ttest, count/nrow, collapse, group_by, pivot_longer/pivot_wider, append,
 /// merge, reshape, sort, list, winsor, tabgen, ci, centile, recode, dropna,
 /// filter, encode/decode, rename, drop, drop_collinear, mutate/generate(),
@@ -97,10 +120,6 @@ impl Interpreter {
             }
         };
 
-        use greeners::Stats;
-        use ndarray::Array1;
-
-        // Paired
         if args.len() >= 3 && matches!(opt_map.get("paired"), Some(Value::Bool(true))) {
             let var2 = match &args[2] {
                 Expr::Var(n) | Expr::Str(n) => n.clone(),
@@ -110,144 +129,165 @@ impl Interpreter {
                     ))
                 }
             };
-            let v1_vec = self.ttest_get_col_vals(&df, &var1)?;
-            let v2_vec = self.ttest_get_col_vals(&df, &var2)?;
-            let v1 = Array1::from(v1_vec);
-            let v2 = Array1::from(v2_vec);
-            let res = Stats::ttest_paired_full(&v1, &v2)
-                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-            println!("\nPaired t-test: {var1} - {var2}");
-            println!("{}", "─".repeat(62));
-            println!(
-                "{:<14} {:>6}  {:>10}  {:>10}  {:>10}",
-                "Variable", "Obs", "Mean", "Std. Err.", "[95% CI]"
-            );
-            println!("{}", "─".repeat(62));
-            println!(
-                "{:<14} {:>6.0}  {:>10.4}  {:>10.4}  [{:.4}, {:.4}]",
-                format!("{var1}-{var2}"),
-                res.n as f64,
-                res.mean,
-                res.std_err,
-                res.ci_lower,
-                res.ci_upper
-            );
-            println!("{}", "─".repeat(62));
-            println!(
-                "H0: mean(diff) = 0   t = {:.4}   df = {:.0}   p = {:.4}",
-                res.t_statistic, res.df, res.p_value
-            );
-            println!();
-            let mut map = HashMap::new();
-            map.insert("test".into(), Value::Str("paired t-test".into()));
-            map.insert("var1".into(), Value::Str(var1));
-            map.insert("var2".into(), Value::Str(var2));
-            map.insert("n".into(), Value::Int(res.n as i64));
-            map.insert("mean".into(), Value::Float(res.mean));
-            map.insert("std_err".into(), Value::Float(res.std_err));
-            map.insert("ci_lower".into(), Value::Float(res.ci_lower));
-            map.insert("ci_upper".into(), Value::Float(res.ci_upper));
-            map.insert("t_stat".into(), Value::Float(res.t_statistic));
-            map.insert("df".into(), Value::Float(res.df));
-            map.insert("p_value".into(), Value::Float(res.p_value));
-            return Ok(Value::Dict(Arc::new(map)));
+            return self.ttest_paired(&df, &var1, &var2);
         }
 
-        // Two groups
         if let Some(Value::Str(by_col)) = opt_map.get("by") {
-            let by_col = by_col.clone();
-            let vals = self.ttest_get_col_vals(&df, &var1)?;
-            let groups = col_to_strings(&df, &by_col)?;
-            let mut group_data: HashMap<String, Vec<f64>> = HashMap::new();
-            for (i, g) in groups.iter().enumerate() {
-                group_data.entry(g.clone()).or_default().push(vals[i]);
-            }
-            let mut gkeys: Vec<String> = group_data.keys().cloned().collect();
-            if gkeys.len() != 2 {
-                return Err(HayashiError::Runtime(format!(
-                    "two-sample ttest requires exactly 2 groups, got {}",
-                    gkeys.len()
-                )));
-            }
-            sort_maybe_numeric_strings(&mut gkeys);
             let equal_var = matches!(opt_map.get("unequal"), Some(Value::Bool(false)));
-            let v1 = Array1::from(group_data[&gkeys[0]].clone());
-            let v2 = Array1::from(group_data[&gkeys[1]].clone());
-            let res = Stats::compare_means(&v1, &v2, equal_var)
-                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-            let tc = t_critical_95(res.df);
-            let title = if equal_var {
-                format!("Two-sample t-test (Equal Variances): {var1} by {by_col}")
-            } else {
-                format!("Two-sample t-test (Welch): {var1} by {by_col}")
-            };
-            println!("\n{}", title);
-            println!("{}", "─".repeat(68));
-            println!(
-                "{:<10} {:>6}  {:>10}  {:>10}  {:>10}  {:>10}",
-                "Group", "Obs", "Mean", "Std. Err.", "Std. Dev.", "[95% CI]"
-            );
-            println!("{}", "─".repeat(68));
-            for (g, m, s, n, se_g) in [
-                (&gkeys[0], res.mean1, res.std_dev1, res.n1, res.std_err1),
-                (&gkeys[1], res.mean2, res.std_dev2, res.n2, res.std_err2),
-            ] {
-                println!(
-                    "{:<10} {:>6.0}  {:>10.4}  {:>10.4}  {:>10.4}  [{:.4}, {:.4}]",
-                    g,
-                    n as f64,
-                    m,
-                    se_g,
-                    s,
-                    m - tc * se_g,
-                    m + tc * se_g
-                );
-            }
-            println!("{}", "─".repeat(68));
-            println!("diff = mean({}) - mean({})", gkeys[0], gkeys[1]);
-            let t_label = if equal_var { "t" } else { "Welch's t" };
-            println!(
-                "H0: diff = 0   {} = {:.4}   df = {:.2}   p = {:.4}",
-                t_label, res.t_statistic, res.df, res.p_value
-            );
-            println!();
-            let mut map = HashMap::new();
-            map.insert(
-                "test".into(),
-                Value::Str(if equal_var {
-                    "two-sample t-test (equal variances)".into()
-                } else {
-                    "two-sample t-test (Welch)".into()
-                }),
-            );
-            map.insert("variable".into(), Value::Str(var1));
-            map.insert("by".into(), Value::Str(by_col));
-            map.insert("group1".into(), Value::Str(gkeys[0].clone()));
-            map.insert("group2".into(), Value::Str(gkeys[1].clone()));
-            map.insert("mean1".into(), Value::Float(res.mean1));
-            map.insert("mean2".into(), Value::Float(res.mean2));
-            map.insert("diff".into(), Value::Float(res.diff));
-            map.insert("n1".into(), Value::Int(res.n1 as i64));
-            map.insert("n2".into(), Value::Int(res.n2 as i64));
-            map.insert("std_err1".into(), Value::Float(res.std_err1));
-            map.insert("std_err2".into(), Value::Float(res.std_err2));
-            map.insert("t_stat".into(), Value::Float(res.t_statistic));
-            map.insert("df".into(), Value::Float(res.df));
-            map.insert("p_value".into(), Value::Float(res.p_value));
-            map.insert("ci_lower".into(), Value::Float(res.ci_lower));
-            map.insert("ci_upper".into(), Value::Float(res.ci_upper));
-            map.insert("equal_var".into(), Value::Bool(equal_var));
-            return Ok(Value::Dict(Arc::new(map)));
+            return self.ttest_two_sample(&df, &var1, by_col, equal_var);
         }
 
-        // One-sample
         let mu = match opt_map.get("mu") {
             Some(Value::Float(f)) => *f,
             Some(Value::Int(i)) => *i as f64,
             None => 0.0,
             _ => return Err(HayashiError::Type("mu= must be numeric".into())),
         };
-        let v_vec = self.ttest_get_col_vals(&df, &var1)?;
+        self.ttest_one_sample(&df, &var1, mu)
+    }
+
+    fn ttest_paired(&self, df: &DataFrame, var1: &str, var2: &str) -> Result<Value> {
+        use greeners::Stats;
+        use ndarray::Array1;
+        let v1_vec = self.ttest_get_col_vals(df, var1)?;
+        let v2_vec = self.ttest_get_col_vals(df, var2)?;
+        let v1 = Array1::from(v1_vec);
+        let v2 = Array1::from(v2_vec);
+        let res =
+            Stats::ttest_paired_full(&v1, &v2).map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        println!("\nPaired t-test: {var1} - {var2}");
+        println!("{}", "─".repeat(62));
+        println!(
+            "{:<14} {:>6}  {:>10}  {:>10}  {:>10}",
+            "Variable", "Obs", "Mean", "Std. Err.", "[95% CI]"
+        );
+        println!("{}", "─".repeat(62));
+        println!(
+            "{:<14} {:>6.0}  {:>10.4}  {:>10.4}  [{:.4}, {:.4}]",
+            format!("{var1}-{var2}"),
+            res.n as f64,
+            res.mean,
+            res.std_err,
+            res.ci_lower,
+            res.ci_upper
+        );
+        println!("{}", "─".repeat(62));
+        println!(
+            "H0: mean(diff) = 0   t = {:.4}   df = {:.0}   p = {:.4}",
+            res.t_statistic, res.df, res.p_value
+        );
+        println!();
+        let mut map = HashMap::new();
+        map.insert("test".into(), Value::Str("paired t-test".into()));
+        map.insert("var1".into(), Value::Str(var1.into()));
+        map.insert("var2".into(), Value::Str(var2.into()));
+        map.insert("n".into(), Value::Int(res.n as i64));
+        map.insert("mean".into(), Value::Float(res.mean));
+        map.insert("std_err".into(), Value::Float(res.std_err));
+        map.insert("ci_lower".into(), Value::Float(res.ci_lower));
+        map.insert("ci_upper".into(), Value::Float(res.ci_upper));
+        map.insert("t_stat".into(), Value::Float(res.t_statistic));
+        map.insert("df".into(), Value::Float(res.df));
+        map.insert("p_value".into(), Value::Float(res.p_value));
+        Ok(Value::Dict(Arc::new(map)))
+    }
+
+    fn ttest_two_sample(
+        &self,
+        df: &DataFrame,
+        var1: &str,
+        by_col: &str,
+        equal_var: bool,
+    ) -> Result<Value> {
+        use greeners::Stats;
+        use ndarray::Array1;
+        let vals = self.ttest_get_col_vals(df, var1)?;
+        let groups = col_to_strings(df, by_col)?;
+        let mut group_data: HashMap<String, Vec<f64>> = HashMap::new();
+        for (i, g) in groups.iter().enumerate() {
+            group_data.entry(g.clone()).or_default().push(vals[i]);
+        }
+        let mut gkeys: Vec<String> = group_data.keys().cloned().collect();
+        if gkeys.len() != 2 {
+            return Err(HayashiError::Runtime(format!(
+                "two-sample ttest requires exactly 2 groups, got {}",
+                gkeys.len()
+            )));
+        }
+        sort_maybe_numeric_strings(&mut gkeys);
+        let v1 = Array1::from(group_data[&gkeys[0]].clone());
+        let v2 = Array1::from(group_data[&gkeys[1]].clone());
+        let res = Stats::compare_means(&v1, &v2, equal_var)
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let tc = t_critical_95(res.df);
+        let title = if equal_var {
+            format!("Two-sample t-test (Equal Variances): {var1} by {by_col}")
+        } else {
+            format!("Two-sample t-test (Welch): {var1} by {by_col}")
+        };
+        println!("\n{}", title);
+        println!("{}", "─".repeat(68));
+        println!(
+            "{:<10} {:>6}  {:>10}  {:>10}  {:>10}  {:>10}",
+            "Group", "Obs", "Mean", "Std. Err.", "Std. Dev.", "[95% CI]"
+        );
+        println!("{}", "─".repeat(68));
+        for (g, m, s, n, se_g) in [
+            (&gkeys[0], res.mean1, res.std_dev1, res.n1, res.std_err1),
+            (&gkeys[1], res.mean2, res.std_dev2, res.n2, res.std_err2),
+        ] {
+            println!(
+                "{:<10} {:>6.0}  {:>10.4}  {:>10.4}  {:>10.4}  [{:.4}, {:.4}]",
+                g,
+                n as f64,
+                m,
+                se_g,
+                s,
+                m - tc * se_g,
+                m + tc * se_g
+            );
+        }
+        println!("{}", "─".repeat(68));
+        println!("diff = mean({}) - mean({})", gkeys[0], gkeys[1]);
+        let t_label = if equal_var { "t" } else { "Welch's t" };
+        println!(
+            "H0: diff = 0   {} = {:.4}   df = {:.2}   p = {:.4}",
+            t_label, res.t_statistic, res.df, res.p_value
+        );
+        println!();
+        let mut map = HashMap::new();
+        map.insert(
+            "test".into(),
+            Value::Str(if equal_var {
+                "two-sample t-test (equal variances)".into()
+            } else {
+                "two-sample t-test (Welch)".into()
+            }),
+        );
+        map.insert("variable".into(), Value::Str(var1.into()));
+        map.insert("by".into(), Value::Str(by_col.into()));
+        map.insert("group1".into(), Value::Str(gkeys[0].clone()));
+        map.insert("group2".into(), Value::Str(gkeys[1].clone()));
+        map.insert("mean1".into(), Value::Float(res.mean1));
+        map.insert("mean2".into(), Value::Float(res.mean2));
+        map.insert("diff".into(), Value::Float(res.diff));
+        map.insert("n1".into(), Value::Int(res.n1 as i64));
+        map.insert("n2".into(), Value::Int(res.n2 as i64));
+        map.insert("std_err1".into(), Value::Float(res.std_err1));
+        map.insert("std_err2".into(), Value::Float(res.std_err2));
+        map.insert("t_stat".into(), Value::Float(res.t_statistic));
+        map.insert("df".into(), Value::Float(res.df));
+        map.insert("p_value".into(), Value::Float(res.p_value));
+        map.insert("ci_lower".into(), Value::Float(res.ci_lower));
+        map.insert("ci_upper".into(), Value::Float(res.ci_upper));
+        map.insert("equal_var".into(), Value::Bool(equal_var));
+        Ok(Value::Dict(Arc::new(map)))
+    }
+
+    fn ttest_one_sample(&self, df: &DataFrame, var1: &str, mu: f64) -> Result<Value> {
+        use greeners::Stats;
+        use ndarray::Array1;
+        let v_vec = self.ttest_get_col_vals(df, var1)?;
         let v = Array1::from(v_vec);
         let res =
             Stats::ttest_1samp_full(&v, mu).map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -270,7 +310,7 @@ impl Interpreter {
         println!();
         let mut map = HashMap::new();
         map.insert("test".into(), Value::Str("one-sample t-test".into()));
-        map.insert("variable".into(), Value::Str(var1));
+        map.insert("variable".into(), Value::Str(var1.into()));
         map.insert("mu".into(), Value::Float(mu));
         map.insert("n".into(), Value::Int(res.n as i64));
         map.insert("mean".into(), Value::Float(res.mean));
@@ -568,20 +608,6 @@ impl Interpreter {
             }
         }
 
-        let get_num = |df: &DataFrame, col: &str, n: usize| -> Vec<f64> {
-            use greeners::Column;
-            match df.get_column(col) {
-                Ok(Column::Float(a)) => a.to_vec(),
-                Ok(Column::Int(a)) => a.iter().map(|&x| x as f64).collect(),
-                _ => vec![f64::NAN; n],
-            }
-        };
-        let get_str = |df: &DataFrame, col: &str, n: usize| -> Vec<String> {
-            df.get_string(col)
-                .map(|a| a.to_vec())
-                .unwrap_or_else(|_| vec![String::new(); n])
-        };
-
         let mut builder = DataFrame::builder();
         for col in &all_names {
             use greeners::Column;
@@ -600,24 +626,24 @@ impl Interpreter {
             };
             if is_num {
                 let p1 = if in1 {
-                    get_num(&df1, col, n1)
+                    df_col_f64(&df1, col)
                 } else {
                     vec![f64::NAN; n1]
                 };
                 let p2 = if in2 {
-                    get_num(&df2, col, n2)
+                    df_col_f64(&df2, col)
                 } else {
                     vec![f64::NAN; n2]
                 };
                 builder = builder.add_column(col, p1.into_iter().chain(p2).collect::<Vec<_>>());
             } else {
                 let p1 = if in1 {
-                    get_str(&df1, col, n1)
+                    df_col_string(&df1, col)
                 } else {
                     vec![String::new(); n1]
                 };
                 let p2 = if in2 {
-                    get_str(&df2, col, n2)
+                    df_col_string(&df2, col)
                 } else {
                     vec![String::new(); n2]
                 };
@@ -690,20 +716,6 @@ impl Interpreter {
 
         let total_rows: usize = dfs.iter().map(|d| d.n_rows()).sum();
 
-        let get_num = |df: &DataFrame, col: &str, n: usize| -> Vec<f64> {
-            use greeners::Column;
-            match df.get_column(col) {
-                Ok(Column::Float(a)) => a.to_vec(),
-                Ok(Column::Int(a)) => a.iter().map(|&x| x as f64).collect(),
-                _ => vec![f64::NAN; n],
-            }
-        };
-        let get_str = |df: &DataFrame, col: &str, n: usize| -> Vec<String> {
-            df.get_string(col)
-                .map(|a| a.to_vec())
-                .unwrap_or_else(|_| vec![String::new(); n])
-        };
-
         let mut builder = DataFrame::builder();
         for col in &all_names {
             use greeners::Column;
@@ -720,7 +732,7 @@ impl Interpreter {
                 for df in &dfs {
                     let n = df.n_rows();
                     if df.column_names().contains(col) {
-                        buf.extend_from_slice(&get_num(df, col, n));
+                        buf.extend_from_slice(&df_col_f64(df, col));
                     } else {
                         buf.extend(std::iter::repeat_n(f64::NAN, n));
                     }
@@ -731,7 +743,7 @@ impl Interpreter {
                 for df in &dfs {
                     let n = df.n_rows();
                     if df.column_names().contains(col) {
-                        buf.extend_from_slice(&get_str(df, col, n));
+                        buf.extend_from_slice(&df_col_string(df, col));
                     } else {
                         buf.extend(std::iter::repeat_n(String::new(), n));
                     }
@@ -840,28 +852,6 @@ impl Interpreter {
             })
             .collect();
 
-        let get_num = |df: &DataFrame, col: &str| -> Vec<f64> {
-            use greeners::Column;
-            match df.get_column(col) {
-                Ok(Column::Float(a)) => a.to_vec(),
-                Ok(Column::Int(a)) => a.iter().map(|&x| x as f64).collect(),
-                _ => vec![],
-            }
-        };
-        let get_str_col = |df: &DataFrame, col: &str| -> Vec<String> {
-            use greeners::Column;
-            match df.get_column(col) {
-                Ok(Column::String(a)) => a.to_vec(),
-                Ok(Column::DateTime(a)) => a
-                    .iter()
-                    .map(|dt| dt.format("%Y-%m-%d").to_string())
-                    .collect(),
-                Ok(Column::Categorical(cat)) => cat.to_strings(),
-                Ok(Column::Bool(a)) => a.iter().map(|v| v.to_string()).collect(),
-                _ => df.get_string(col).map(|a| a.to_vec()).unwrap_or_default(),
-            }
-        };
-
         let mut builder = DataFrame::builder();
 
         // columns from df1
@@ -871,7 +861,7 @@ impl Interpreter {
                 df1.get_column(col),
                 Ok(Column::Float(_)) | Ok(Column::Int(_))
             ) {
-                let src = get_num(&df1, col);
+                let src = df_col_f64(&df1, col);
                 builder = builder.add_column(
                     col,
                     result_rows
@@ -880,7 +870,7 @@ impl Interpreter {
                         .collect::<Vec<_>>(),
                 );
             } else {
-                let src = get_str_col(&df1, col);
+                let src = df_col_string(&df1, col);
                 builder = builder.add_string(
                     col,
                     result_rows
@@ -898,7 +888,7 @@ impl Interpreter {
                 df2.get_column(src_col),
                 Ok(Column::Float(_)) | Ok(Column::Int(_))
             ) {
-                let src = get_num(&df2, src_col);
+                let src = df_col_f64(&df2, src_col);
                 builder = builder.add_column(
                     out_col,
                     result_rows
@@ -907,7 +897,7 @@ impl Interpreter {
                         .collect::<Vec<_>>(),
                 );
             } else {
-                let src = get_str_col(&df2, src_col);
+                let src = df_col_string(&df2, src_col);
                 builder = builder.add_string(
                     out_col,
                     result_rows
@@ -992,345 +982,352 @@ impl Interpreter {
         };
 
         match direction.as_str() {
-            // ── wide → long ──────────────────────────────────────────
-            "long" => {
-                let stubs: Vec<String> = match opt_map.get("stubs") {
-                    Some(Value::List(lst)) => lst
-                        .iter()
-                        .map(|v| match v {
-                            Value::Str(s) => Ok(s.clone()),
-                            _ => Err(HayashiError::Type(
-                                "stubs= must be a list of strings".into(),
-                            )),
-                        })
-                        .collect::<Result<_>>()?,
-                    None => {
-                        return Err(HayashiError::Runtime(
-                            "reshape long requires option stubs=[\"var1\", \"var2\", ...]".into(),
-                        ))
-                    }
-                    _ => return Err(HayashiError::Type("stubs= must be a list".into())),
-                };
-
-                // For each stub, detect columns and extract suffixes
-                let col_names = df.column_names();
-                let mut stub_suffixes: Vec<Vec<String>> = Vec::new();
-                for stub in &stubs {
-                    let mut suffs: Vec<String> = col_names
-                        .iter()
-                        .filter(|c| c.starts_with(stub.as_str()) && *c != stub)
-                        .map(|c| c[stub.len()..].to_string())
-                        .collect();
-                    suffs.sort();
-                    if suffs.is_empty() {
-                        return Err(HayashiError::Runtime(format!(
-                            "reshape long: no column with stub '{stub}' found"
-                        )));
-                    }
-                    stub_suffixes.push(suffs);
-                }
-                // Validate that all stubs have the same suffixes
-                let all_suf = stub_suffixes[0].clone();
-                for (stub, suf) in stubs.iter().zip(stub_suffixes.iter()) {
-                    if suf != &all_suf {
-                        return Err(HayashiError::Runtime(format!(
-                            "reshape long: stub '{stub}' has different suffixes from the others"
-                        )));
-                    }
-                }
-
-                // Collect id column values
-                use greeners::Column;
-                let n_rows = df.n_rows();
-                let id_vals: Vec<String> = match df.get_column(&i_col) {
-                    Ok(Column::Float(arr)) => arr.iter().map(|v| v.to_string()).collect(),
-                    Ok(Column::Int(arr)) => arr.iter().map(|v| v.to_string()).collect(),
-                    _ => {
-                        if let Ok(arr) = df.get_string(&i_col) {
-                            arr.to_vec()
-                        } else {
-                            return Err(
-                                self.rt_err(format!("reshape: id column '{i_col}' not found"))
-                            );
-                        }
-                    }
-                };
-
-                let n_suf = all_suf.len();
-                let n_out = n_rows * n_suf;
-
-                // Determine columns that are not stubs nor id (pass through)
-                let stub_cols: std::collections::HashSet<String> = stubs
-                    .iter()
-                    .flat_map(|s| all_suf.iter().map(move |sf| format!("{s}{sf}")))
-                    .collect();
-                let passthrough: Vec<String> = col_names
-                    .iter()
-                    .filter(|c| **c != i_col && !stub_cols.contains(*c))
-                    .cloned()
-                    .collect();
-
-                let mut builder = DataFrame::builder();
-
-                // id column: repeat each value n_suf times
-                let id_out: Vec<String> = id_vals
-                    .iter()
-                    .flat_map(|v| std::iter::repeat_n(v.clone(), n_suf))
-                    .collect();
-                builder = builder.add_string(&i_col, id_out);
-
-                // j column: for each obs, cycle through suffixes
-                let j_out: Vec<String> =
-                    (0..n_rows).flat_map(|_| all_suf.iter().cloned()).collect();
-                builder = builder.add_string(&j_col, j_out);
-
-                // passthrough columns
-                for pc in &passthrough {
-                    match df.get_column(pc) {
-                        Ok(Column::Float(arr)) => {
-                            let vals: Vec<f64> = arr
-                                .iter()
-                                .flat_map(|&v| std::iter::repeat_n(v, n_suf))
-                                .collect();
-                            builder = builder.add_column(pc, vals);
-                        }
-                        Ok(Column::Int(arr)) => {
-                            let vals: Vec<f64> = arr
-                                .iter()
-                                .flat_map(|&v| std::iter::repeat_n(v as f64, n_suf))
-                                .collect();
-                            builder = builder.add_column(pc, vals);
-                        }
-                        _ => {}
-                    }
-                }
-
-                // stub columns
-                for stub in &stubs {
-                    let mut vals: Vec<f64> = Vec::with_capacity(n_out);
-                    for row in 0..n_rows {
-                        for suf in &all_suf {
-                            let col_name = format!("{stub}{suf}");
-                            let v = match df.get_column(&col_name) {
-                                Ok(Column::Float(arr)) => arr[row],
-                                Ok(Column::Int(arr)) => arr[row] as f64,
-                                _ => f64::NAN,
-                            };
-                            vals.push(v);
-                        }
-                    }
-                    builder = builder.add_column(stub, vals);
-                }
-
-                let new_df = builder
-                    .build()
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                println!(
-                    "(reshape long: {} obs × {} variables → {} obs × {} variables)",
-                    n_rows,
-                    col_names.len(),
-                    n_out,
-                    new_df.column_names().len()
-                );
-                Ok(Value::DataFrame(Arc::new(new_df)))
-            }
-
-            // ── long → wide ──────────────────────────────────────────
-            "wide" => {
-                let values: Vec<String> = match opt_map.get("values") {
-                    Some(Value::List(lst)) => lst
-                        .iter()
-                        .map(|v| match v {
-                            Value::Str(s) => Ok(s.clone()),
-                            _ => Err(HayashiError::Type(
-                                "values= must be a list of strings".into(),
-                            )),
-                        })
-                        .collect::<Result<_>>()?,
-                    None => {
-                        return Err(HayashiError::Runtime(
-                            "reshape wide requires option values=[\"var1\", \"var2\", ...]".into(),
-                        ))
-                    }
-                    _ => return Err(HayashiError::Type("values= must be a list".into())),
-                };
-
-                use greeners::Column;
-                let n_rows = df.n_rows();
-
-                // Collect unique j values (in order of appearance)
-                let j_vals: Vec<String> = {
-                    let mut seen = std::collections::HashSet::new();
-                    let mut out = Vec::new();
-                    match df.get_column(&j_col) {
-                        Ok(Column::Float(arr)) => {
-                            for &v in arr.iter() {
-                                let s = if v.fract() == 0.0 {
-                                    format!("{}", v as i64)
-                                } else {
-                                    format!("{v}")
-                                };
-                                if seen.insert(s.clone()) {
-                                    out.push(s);
-                                }
-                            }
-                        }
-                        Ok(Column::Int(arr)) => {
-                            for &v in arr.iter() {
-                                let s = v.to_string();
-                                if seen.insert(s.clone()) {
-                                    out.push(s);
-                                }
-                            }
-                        }
-                        _ => {
-                            if let Ok(arr) = df.get_string(&j_col) {
-                                for v in arr.iter() {
-                                    if seen.insert(v.clone()) {
-                                        out.push(v.clone());
-                                    }
-                                }
-                            } else {
-                                return Err(HayashiError::Runtime(format!(
-                                    "reshape wide: j column '{j_col}' not found"
-                                )));
-                            }
-                        }
-                    }
-                    out
-                };
-
-                // j label per row
-                let row_j: Vec<String> = match df.get_column(&j_col) {
-                    Ok(Column::Float(arr)) => arr
-                        .iter()
-                        .map(|&v| {
-                            if v.fract() == 0.0 {
-                                format!("{}", v as i64)
-                            } else {
-                                format!("{v}")
-                            }
-                        })
-                        .collect(),
-                    Ok(Column::Int(arr)) => arr.iter().map(|v| v.to_string()).collect(),
-                    _ => df
-                        .get_string(&j_col)
-                        .map_err(|_| {
-                            HayashiError::Runtime("reshape wide: invalid j column".into())
-                        })?
-                        .to_vec(),
-                };
-
-                // id per row
-                let row_id: Vec<String> = match df.get_column(&i_col) {
-                    Ok(Column::Float(arr)) => arr.iter().map(|v| v.to_string()).collect(),
-                    Ok(Column::Int(arr)) => arr.iter().map(|v| v.to_string()).collect(),
-                    _ => df
-                        .get_string(&i_col)
-                        .map_err(|_| {
-                            HayashiError::Runtime("reshape wide: invalid i column".into())
-                        })?
-                        .to_vec(),
-                };
-
-                // Unique id order
-                let mut seen_ids = std::collections::HashSet::new();
-                let unique_ids: Vec<String> = row_id
-                    .iter()
-                    .filter(|id| seen_ids.insert((*id).clone()))
-                    .cloned()
-                    .collect();
-                let n_id = unique_ids.len();
-
-                // id_idx[row] → index in unique_ids
-                let id_pos: std::collections::HashMap<&str, usize> = unique_ids
-                    .iter()
-                    .enumerate()
-                    .map(|(i, s)| (s.as_str(), i))
-                    .collect();
-                let j_pos: std::collections::HashMap<&str, usize> = j_vals
-                    .iter()
-                    .enumerate()
-                    .map(|(i, s)| (s.as_str(), i))
-                    .collect();
-
-                // For each value column, build matrix (n_id × n_j)
-                let mut value_mats: Vec<Vec<f64>> = values
-                    .iter()
-                    .map(|_| vec![f64::NAN; n_id * j_vals.len()])
-                    .collect();
-
-                for row in 0..n_rows {
-                    let i_idx = id_pos[row_id[row].as_str()];
-                    let j_idx = j_pos[row_j[row].as_str()];
-                    for (vi, val_col) in values.iter().enumerate() {
-                        let v = match df.get_column(val_col) {
-                            Ok(Column::Float(arr)) => arr[row],
-                            Ok(Column::Int(arr)) => arr[row] as f64,
-                            _ => f64::NAN,
-                        };
-                        value_mats[vi][i_idx * j_vals.len() + j_idx] = v;
-                    }
-                }
-
-                let col_names = df.column_names();
-                let skip: std::collections::HashSet<&str> = values
-                    .iter()
-                    .chain(std::iter::once(&j_col))
-                    .map(String::as_str)
-                    .collect();
-                let passthrough: Vec<String> = col_names
-                    .iter()
-                    .filter(|c| **c != i_col && !skip.contains(c.as_str()))
-                    .cloned()
-                    .collect();
-
-                // Take first passthrough value per id
-                let mut builder = DataFrame::builder();
-                // id column
-                builder = builder.add_string(&i_col, unique_ids.clone());
-                // passthrough: value of first row with this id
-                for pc in &passthrough {
-                    let mut vals = vec![f64::NAN; n_id];
-                    for row in 0..n_rows {
-                        let ii = id_pos[row_id[row].as_str()];
-                        if vals[ii].is_nan() {
-                            if let Ok(Column::Float(arr)) = df.get_column(pc) {
-                                vals[ii] = arr[row];
-                            } else if let Ok(Column::Int(arr)) = df.get_column(pc) {
-                                vals[ii] = arr[row] as f64;
-                            }
-                        }
-                    }
-                    builder = builder.add_column(pc, vals);
-                }
-                // value columns
-                for (vi, stub) in values.iter().enumerate() {
-                    for (ji, jv) in j_vals.iter().enumerate() {
-                        let col_name = format!("{stub}{jv}");
-                        let col_vals: Vec<f64> = (0..n_id)
-                            .map(|ii| value_mats[vi][ii * j_vals.len() + ji])
-                            .collect();
-                        builder = builder.add_column(&col_name, col_vals);
-                    }
-                }
-
-                let new_df = builder
-                    .build()
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                println!(
-                    "(reshape wide: {} obs → {} obs × {} variables)",
-                    n_rows,
-                    n_id,
-                    new_df.column_names().len()
-                );
-                Ok(Value::DataFrame(Arc::new(new_df)))
-            }
-
+            "long" => self.reshape_long(&df, &i_col, &j_col, opt_map),
+            "wide" => self.reshape_wide(&df, &i_col, &j_col, opt_map),
             other => Err(HayashiError::Runtime(format!(
                 "reshape: direction '{other}' unknown — use \"long\" or \"wide\""
             ))),
         }
+    }
+
+    fn reshape_long(
+        &self,
+        df: &greeners::DataFrame,
+        i_col: &str,
+        j_col: &str,
+        opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        use greeners::Column;
+
+        let stubs: Vec<String> = match opt_map.get("stubs") {
+            Some(Value::List(lst)) => lst
+                .iter()
+                .map(|v| match v {
+                    Value::Str(s) => Ok(s.clone()),
+                    _ => Err(HayashiError::Type(
+                        "stubs= must be a list of strings".into(),
+                    )),
+                })
+                .collect::<Result<_>>()?,
+            None => {
+                return Err(HayashiError::Runtime(
+                    "reshape long requires option stubs=[\"var1\", \"var2\", ...]".into(),
+                ))
+            }
+            _ => return Err(HayashiError::Type("stubs= must be a list".into())),
+        };
+
+        // For each stub, detect columns and extract suffixes
+        let col_names = df.column_names();
+        let mut stub_suffixes: Vec<Vec<String>> = Vec::new();
+        for stub in &stubs {
+            let mut suffs: Vec<String> = col_names
+                .iter()
+                .filter(|c| c.as_str().starts_with(stub.as_str()) && c.as_str() != stub)
+                .map(|c| c[stub.len()..].to_string())
+                .collect();
+            suffs.sort();
+            if suffs.is_empty() {
+                return Err(HayashiError::Runtime(format!(
+                    "reshape long: no column with stub '{stub}' found"
+                )));
+            }
+            stub_suffixes.push(suffs);
+        }
+        // Validate that all stubs have the same suffixes
+        let all_suf = stub_suffixes[0].clone();
+        for (stub, suf) in stubs.iter().zip(stub_suffixes.iter()) {
+            if suf != &all_suf {
+                return Err(HayashiError::Runtime(format!(
+                    "reshape long: stub '{stub}' has different suffixes from the others"
+                )));
+            }
+        }
+
+        // Collect id column values
+        let n_rows = df.n_rows();
+        let id_vals: Vec<String> = match df.get_column(i_col) {
+            Ok(Column::Float(arr)) => arr.iter().map(|v| v.to_string()).collect(),
+            Ok(Column::Int(arr)) => arr.iter().map(|v| v.to_string()).collect(),
+            _ => {
+                if let Ok(arr) = df.get_string(i_col) {
+                    arr.to_vec()
+                } else {
+                    return Err(self.rt_err(format!("reshape: id column '{i_col}' not found")));
+                }
+            }
+        };
+
+        let n_suf = all_suf.len();
+        let n_out = n_rows * n_suf;
+
+        // Determine columns that are not stubs nor id (pass through)
+        let stub_cols: std::collections::HashSet<String> = stubs
+            .iter()
+            .flat_map(|s| all_suf.iter().map(move |sf| format!("{s}{sf}")))
+            .collect();
+        let passthrough: Vec<String> = col_names
+            .iter()
+            .filter(|c| c.as_str() != i_col && !stub_cols.contains(c.as_str()))
+            .cloned()
+            .collect();
+
+        let mut builder = DataFrame::builder();
+
+        // id column: repeat each value n_suf times
+        let id_out: Vec<String> = id_vals
+            .iter()
+            .flat_map(|v| std::iter::repeat_n(v.clone(), n_suf))
+            .collect();
+        builder = builder.add_string(i_col, id_out);
+
+        // j column: for each obs, cycle through suffixes
+        let j_out: Vec<String> = (0..n_rows).flat_map(|_| all_suf.iter().cloned()).collect();
+        builder = builder.add_string(j_col, j_out);
+
+        // passthrough columns
+        for pc in &passthrough {
+            match df.get_column(pc) {
+                Ok(Column::Float(arr)) => {
+                    let vals: Vec<f64> = arr
+                        .iter()
+                        .flat_map(|&v| std::iter::repeat_n(v, n_suf))
+                        .collect();
+                    builder = builder.add_column(pc, vals);
+                }
+                Ok(Column::Int(arr)) => {
+                    let vals: Vec<f64> = arr
+                        .iter()
+                        .flat_map(|&v| std::iter::repeat_n(v as f64, n_suf))
+                        .collect();
+                    builder = builder.add_column(pc, vals);
+                }
+                _ => {}
+            }
+        }
+
+        // stub columns
+        for stub in &stubs {
+            let mut vals: Vec<f64> = Vec::with_capacity(n_out);
+            for row in 0..n_rows {
+                for suf in &all_suf {
+                    let col_name = format!("{stub}{suf}");
+                    let v = match df.get_column(&col_name) {
+                        Ok(Column::Float(arr)) => arr[row],
+                        Ok(Column::Int(arr)) => arr[row] as f64,
+                        _ => f64::NAN,
+                    };
+                    vals.push(v);
+                }
+            }
+            builder = builder.add_column(stub, vals);
+        }
+
+        let new_df = builder
+            .build()
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        println!(
+            "(reshape long: {} obs × {} variables → {} obs × {} variables)",
+            n_rows,
+            col_names.len(),
+            n_out,
+            new_df.column_names().len()
+        );
+        Ok(Value::DataFrame(Arc::new(new_df)))
+    }
+
+    fn reshape_wide(
+        &self,
+        df: &greeners::DataFrame,
+        i_col: &str,
+        j_col: &str,
+        opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        use greeners::Column;
+
+        let values: Vec<String> = match opt_map.get("values") {
+            Some(Value::List(lst)) => lst
+                .iter()
+                .map(|v| match v {
+                    Value::Str(s) => Ok(s.clone()),
+                    _ => Err(HayashiError::Type(
+                        "values= must be a list of strings".into(),
+                    )),
+                })
+                .collect::<Result<_>>()?,
+            None => {
+                return Err(HayashiError::Runtime(
+                    "reshape wide requires option values=[\"var1\", \"var2\", ...]".into(),
+                ))
+            }
+            _ => return Err(HayashiError::Type("values= must be a list".into())),
+        };
+
+        let n_rows = df.n_rows();
+
+        // Collect unique j values (in order of appearance)
+        let j_vals: Vec<String> = {
+            let mut seen = std::collections::HashSet::new();
+            let mut out = Vec::new();
+            match df.get_column(j_col) {
+                Ok(Column::Float(arr)) => {
+                    for &v in arr.iter() {
+                        let s = if v.fract() == 0.0 {
+                            format!("{}", v as i64)
+                        } else {
+                            format!("{v}")
+                        };
+                        if seen.insert(s.clone()) {
+                            out.push(s);
+                        }
+                    }
+                }
+                Ok(Column::Int(arr)) => {
+                    for &v in arr.iter() {
+                        let s = v.to_string();
+                        if seen.insert(s.clone()) {
+                            out.push(s);
+                        }
+                    }
+                }
+                _ => {
+                    if let Ok(arr) = df.get_string(j_col) {
+                        for v in arr.iter() {
+                            if seen.insert(v.clone()) {
+                                out.push(v.clone());
+                            }
+                        }
+                    } else {
+                        return Err(HayashiError::Runtime(format!(
+                            "reshape wide: j column '{j_col}' not found"
+                        )));
+                    }
+                }
+            }
+            out
+        };
+
+        // j label per row
+        let row_j: Vec<String> = match df.get_column(j_col) {
+            Ok(Column::Float(arr)) => arr
+                .iter()
+                .map(|&v| {
+                    if v.fract() == 0.0 {
+                        format!("{}", v as i64)
+                    } else {
+                        format!("{v}")
+                    }
+                })
+                .collect(),
+            Ok(Column::Int(arr)) => arr.iter().map(|v| v.to_string()).collect(),
+            _ => df
+                .get_string(j_col)
+                .map_err(|_| HayashiError::Runtime("reshape wide: invalid j column".into()))?
+                .to_vec(),
+        };
+
+        // id per row
+        let row_id: Vec<String> = match df.get_column(i_col) {
+            Ok(Column::Float(arr)) => arr.iter().map(|v| v.to_string()).collect(),
+            Ok(Column::Int(arr)) => arr.iter().map(|v| v.to_string()).collect(),
+            _ => df
+                .get_string(i_col)
+                .map_err(|_| HayashiError::Runtime("reshape wide: invalid i column".into()))?
+                .to_vec(),
+        };
+
+        // Unique id order
+        let mut seen_ids = std::collections::HashSet::new();
+        let unique_ids: Vec<String> = row_id
+            .iter()
+            .filter(|id| seen_ids.insert((*id).clone()))
+            .cloned()
+            .collect();
+        let n_id = unique_ids.len();
+
+        // id_idx[row] → index in unique_ids
+        let id_pos: std::collections::HashMap<&str, usize> = unique_ids
+            .iter()
+            .enumerate()
+            .map(|(i, s)| (s.as_str(), i))
+            .collect();
+        let j_pos: std::collections::HashMap<&str, usize> = j_vals
+            .iter()
+            .enumerate()
+            .map(|(i, s)| (s.as_str(), i))
+            .collect();
+
+        // For each value column, build matrix (n_id × n_j)
+        let mut value_mats: Vec<Vec<f64>> = values
+            .iter()
+            .map(|_| vec![f64::NAN; n_id * j_vals.len()])
+            .collect();
+
+        for row in 0..n_rows {
+            let i_idx = id_pos[row_id[row].as_str()];
+            let j_idx = j_pos[row_j[row].as_str()];
+            for (vi, val_col) in values.iter().enumerate() {
+                let v = match df.get_column(val_col) {
+                    Ok(Column::Float(arr)) => arr[row],
+                    Ok(Column::Int(arr)) => arr[row] as f64,
+                    _ => f64::NAN,
+                };
+                value_mats[vi][i_idx * j_vals.len() + j_idx] = v;
+            }
+        }
+
+        let col_names = df.column_names();
+        let skip: std::collections::HashSet<&str> = values
+            .iter()
+            .map(|s| s.as_str())
+            .chain(std::iter::once(j_col))
+            .collect();
+        let passthrough: Vec<String> = col_names
+            .iter()
+            .filter(|c| c.as_str() != i_col && !skip.contains(c.as_str()))
+            .cloned()
+            .collect();
+
+        // Take first passthrough value per id
+        let mut builder = DataFrame::builder();
+        // id column
+        builder = builder.add_string(i_col, unique_ids.clone());
+        // passthrough: value of first row with this id
+        for pc in &passthrough {
+            let mut vals = vec![f64::NAN; n_id];
+            for row in 0..n_rows {
+                let ii = id_pos[row_id[row].as_str()];
+                if vals[ii].is_nan() {
+                    if let Ok(Column::Float(arr)) = df.get_column(pc) {
+                        vals[ii] = arr[row];
+                    } else if let Ok(Column::Int(arr)) = df.get_column(pc) {
+                        vals[ii] = arr[row] as f64;
+                    }
+                }
+            }
+            builder = builder.add_column(pc, vals);
+        }
+        // value columns
+        for (vi, stub) in values.iter().enumerate() {
+            for (ji, jv) in j_vals.iter().enumerate() {
+                let col_name = format!("{stub}{jv}");
+                let col_vals: Vec<f64> = (0..n_id)
+                    .map(|ii| value_mats[vi][ii * j_vals.len() + ji])
+                    .collect();
+                builder = builder.add_column(&col_name, col_vals);
+            }
+        }
+
+        let new_df = builder
+            .build()
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        println!(
+            "(reshape wide: {} obs → {} obs × {} variables)",
+            n_rows,
+            n_id,
+            new_df.column_names().len()
+        );
+        Ok(Value::DataFrame(Arc::new(new_df)))
     }
 
     pub(super) fn sort(
