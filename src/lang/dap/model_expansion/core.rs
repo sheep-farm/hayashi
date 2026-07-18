@@ -364,6 +364,9 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
         Value::GmmClusteringResult(r) => gmm_clustering_children(r),
         Value::HierarchicalResult(r) => hierarchical_children(r),
         Value::SpectralResult(r) => spectral_children(r),
+        Value::ModelResult { fields, .. } => {
+            fields.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+        }
         _ => Vec::new(),
     }
 }
@@ -377,6 +380,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
 pub fn value_field(v: &Value, field: &str) -> Option<Value> {
     let direct = match v {
         Value::Dict(d) => d.get(field).cloned(),
+        Value::ModelResult { fields, .. } => fields.get(field).cloned(),
         Value::DataFrame(df) => df
             .get_column(field)
             .ok()
@@ -951,6 +955,9 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "SpectralResult",
         ),
+        Value::ModelResult {
+            summary, type_name, ..
+        } => (summary.clone(), *type_name),
         Value::UserFn(f) => (format!("<fn({})>", f.params.join(", ")), "Function"),
         _ => (v.to_string(), "Model"),
     }
@@ -1096,6 +1103,74 @@ pub fn array2_to_dataframe_named(arr: &Array2<f64>, col_names: &[String]) -> Val
         let col: Vec<f64> = arr.column(j).iter().copied().collect();
         columns.insert(name, greeners::Column::Float(Array1::from(col)));
     }
+    Value::DataFrame(Arc::new(
+        greeners::DataFrame::from_columns(columns)
+            .unwrap_or_else(|_| greeners::DataFrame::from_columns(IndexMap::new()).unwrap()),
+    ))
+}
+
+/// Generic first-class model result constructor.  Stores the formatted Greeners
+/// output plus a named dict of children so DAP and `var.field` can inspect it
+/// without requiring a dedicated `Value` variant for every estimator.
+pub fn model_result(
+    display: impl Into<String>,
+    summary: impl Into<String>,
+    type_name: &'static str,
+    fields: Vec<(String, Value)>,
+) -> Value {
+    let map: HashMap<String, Value> = fields.into_iter().collect();
+    Value::ModelResult {
+        display: display.into(),
+        summary: summary.into(),
+        type_name,
+        fields: Arc::new(map),
+    }
+}
+
+/// Series of integer values from a `&[usize]` (e.g. cluster labels).
+pub fn int_series(name: &str, values: &[usize]) -> Value {
+    let vals: Vec<Value> = values.iter().map(|&v| Value::Int(v as i64)).collect();
+    Value::Series(Arc::new(Series::new(name, vals)))
+}
+
+/// DataFrame with `variable` and `importance` columns from a variable-name list
+/// and an importance vector.
+pub fn feature_importance_df(names: &[String], importance: &Array1<f64>) -> Value {
+    let mut columns: IndexMap<String, greeners::Column> = IndexMap::new();
+    let var_col: Vec<String> = (0..importance.len())
+        .map(|i| names.get(i).cloned().unwrap_or_else(|| format!("x{i}")))
+        .collect();
+    columns.insert(
+        "variable".into(),
+        greeners::Column::String(ndarray::Array1::from(var_col)),
+    );
+    let imp_col: Vec<f64> = importance.iter().copied().collect();
+    columns.insert(
+        "importance".into(),
+        greeners::Column::Float(ndarray::Array1::from(imp_col)),
+    );
+    Value::DataFrame(Arc::new(
+        greeners::DataFrame::from_columns(columns)
+            .unwrap_or_else(|_| greeners::DataFrame::from_columns(IndexMap::new()).unwrap()),
+    ))
+}
+
+/// DataFrame with `variable` and `coefficient` columns for named coefficient
+/// vectors (e.g. OLS, conformal base predictor, DR-learner CATE).
+pub fn coefficients_df(names: &[String], params: &Array1<f64>) -> Value {
+    let mut columns: IndexMap<String, greeners::Column> = IndexMap::new();
+    let var_col: Vec<String> = (0..params.len())
+        .map(|i| names.get(i).cloned().unwrap_or_else(|| format!("x{i}")))
+        .collect();
+    columns.insert(
+        "variable".into(),
+        greeners::Column::String(ndarray::Array1::from(var_col)),
+    );
+    let coef_col: Vec<f64> = params.iter().copied().collect();
+    columns.insert(
+        "coefficient".into(),
+        greeners::Column::Float(ndarray::Array1::from(coef_col)),
+    );
     Value::DataFrame(Arc::new(
         greeners::DataFrame::from_columns(columns)
             .unwrap_or_else(|_| greeners::DataFrame::from_columns(IndexMap::new()).unwrap()),

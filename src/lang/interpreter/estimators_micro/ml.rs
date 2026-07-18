@@ -1,6 +1,7 @@
 use super::super::helpers::*;
 use super::super::models::FactorModel;
 use super::super::*;
+use crate::lang::dap::model_expansion;
 
 impl Interpreter {
     pub(super) fn rf(
@@ -33,8 +34,45 @@ impl Interpreter {
             greeners::RandomForest::fit(&y_arr, &x_arr, n_trees, max_depth, Some(var_names))
                 .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        let summary = format!(
+            "RandomForest(trees={}, depth={}), n={}, R2={:.4}",
+            result.n_trees, result.max_depth, result.n_obs, result.r_squared
+        );
+        let fields = vec![
+            (
+                "fitted".into(),
+                model_expansion::array1_to_series("fitted", &result.fitted),
+            ),
+            (
+                "oob_predictions".into(),
+                model_expansion::array1_to_series("oob_predictions", &result.oob_predictions),
+            ),
+            (
+                "feature_importance".into(),
+                model_expansion::feature_importance_df(
+                    &result.variable_names,
+                    &result.feature_importance,
+                ),
+            ),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("oob_r_squared", Value::Float(result.oob_r_squared)),
+                    ("r_squared", Value::Float(result.r_squared)),
+                    ("mse", Value::Float(result.mse)),
+                    ("n_trees", Value::Int(result.n_trees as i64)),
+                    ("max_depth", Value::Int(result.max_depth as i64)),
+                    ("n_obs", Value::Int(result.n_obs as i64)),
+                    ("n_features", Value::Int(result.n_features as i64)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            result.to_string(),
+            summary,
+            "RandomForestResult",
+            fields,
+        ))
     }
 
     pub(super) fn gbm(
@@ -84,8 +122,42 @@ impl Interpreter {
         )
         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        let summary = format!(
+            "GradientBoosting(trees={}, depth={}), n={}, R2={:.4}",
+            result.n_trees, result.max_depth, result.n_obs, result.r_squared
+        );
+        let fields = vec![
+            (
+                "fitted".into(),
+                model_expansion::array1_to_series("fitted", &result.fitted),
+            ),
+            (
+                "feature_importance".into(),
+                model_expansion::feature_importance_df(
+                    &result.variable_names,
+                    &result.feature_importance,
+                ),
+            ),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("init_value", Value::Float(result.init_value)),
+                    ("learning_rate", Value::Float(result.learning_rate)),
+                    ("r_squared", Value::Float(result.r_squared)),
+                    ("mse", Value::Float(result.mse)),
+                    ("n_trees", Value::Int(result.n_trees as i64)),
+                    ("max_depth", Value::Int(result.max_depth as i64)),
+                    ("n_obs", Value::Int(result.n_obs as i64)),
+                    ("n_features", Value::Int(result.n_features as i64)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            result.to_string(),
+            summary,
+            "GradientBoostingResult",
+            fields,
+        ))
     }
 
     pub(super) fn mlp(
@@ -122,8 +194,47 @@ impl Interpreter {
         let result = greeners::MLP::fit(&y_arr, &x_arr, n_hidden, lr, n_epochs, Some(var_names))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        let summary = format!(
+            "MLP(hidden={}, epochs={}), n={}, R2={:.4}",
+            result.n_hidden, result.n_epochs, result.n_obs, result.r_squared
+        );
+        let fields = vec![
+            (
+                "fitted".into(),
+                model_expansion::array1_to_series("fitted", &result.fitted),
+            ),
+            (
+                "w1".into(),
+                model_expansion::array2_to_dataframe("w1", &result.w1),
+            ),
+            (
+                "b1".into(),
+                model_expansion::array1_to_series("b1", &result.b1),
+            ),
+            (
+                "w2".into(),
+                model_expansion::array2_to_dataframe("w2", &result.w2),
+            ),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("b2", Value::Float(result.b2)),
+                    ("n_hidden", Value::Int(result.n_hidden as i64)),
+                    ("learning_rate", Value::Float(result.learning_rate)),
+                    ("n_epochs", Value::Int(result.n_epochs as i64)),
+                    ("final_mse", Value::Float(result.final_mse)),
+                    ("r_squared", Value::Float(result.r_squared)),
+                    ("n_obs", Value::Int(result.n_obs as i64)),
+                    ("n_features", Value::Int(result.n_features as i64)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            result.to_string(),
+            summary,
+            "MlpResult",
+            fields,
+        ))
     }
 
     pub(super) fn qrf(
@@ -177,8 +288,50 @@ impl Interpreter {
         )
         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        let quantile_names: Vec<String> =
+            result.quantiles.iter().map(|&q| format!("q_{q}")).collect();
+        let summary = format!(
+            "QRF(trees={}, depth={}), n={}, oob_R2={:.4}",
+            result.n_trees, result.max_depth, result.n_obs, result.oob_r_squared
+        );
+        let fields = vec![
+            (
+                "quantile_predictions".into(),
+                model_expansion::array2_to_dataframe_named(
+                    &result.quantile_predictions,
+                    &quantile_names,
+                ),
+            ),
+            (
+                "feature_importance".into(),
+                model_expansion::feature_importance_df(
+                    &result.variable_names,
+                    &result.feature_importance,
+                ),
+            ),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    (
+                        "quantiles",
+                        Value::List(Arc::new(
+                            result.quantiles.iter().map(|&q| Value::Float(q)).collect(),
+                        )),
+                    ),
+                    ("oob_r_squared", Value::Float(result.oob_r_squared)),
+                    ("n_trees", Value::Int(result.n_trees as i64)),
+                    ("max_depth", Value::Int(result.max_depth as i64)),
+                    ("n_obs", Value::Int(result.n_obs as i64)),
+                    ("n_features", Value::Int(result.n_features as i64)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            result.to_string(),
+            summary,
+            "QrfResult",
+            fields,
+        ))
     }
 
     pub(super) fn xgboost(
@@ -252,8 +405,45 @@ impl Interpreter {
         )
         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        let summary = format!(
+            "XGBoost(trees={}, depth={}), n={}, R2={:.4}",
+            result.n_trees, result.max_depth, result.n_obs, result.r_squared
+        );
+        let fields = vec![
+            (
+                "fitted".into(),
+                model_expansion::array1_to_series("fitted", &result.fitted),
+            ),
+            (
+                "feature_importance".into(),
+                model_expansion::feature_importance_df(
+                    &result.variable_names,
+                    &result.feature_importance,
+                ),
+            ),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("init_value", Value::Float(result.init_value)),
+                    ("learning_rate", Value::Float(result.learning_rate)),
+                    ("lambda", Value::Float(result.lambda)),
+                    ("alpha", Value::Float(result.alpha)),
+                    ("gamma", Value::Float(result.gamma)),
+                    ("r_squared", Value::Float(result.r_squared)),
+                    ("mse", Value::Float(result.mse)),
+                    ("n_trees", Value::Int(result.n_trees as i64)),
+                    ("max_depth", Value::Int(result.max_depth as i64)),
+                    ("n_obs", Value::Int(result.n_obs as i64)),
+                    ("n_features", Value::Int(result.n_features as i64)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            result.to_string(),
+            summary,
+            "XgboostResult",
+            fields,
+        ))
     }
 
     pub(super) fn lstm(
@@ -326,8 +516,41 @@ impl Interpreter {
         let result = greeners::LSTM::fit(&y_arr, n_hidden, seq_len, lr, n_epochs, n_forecast)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        let summary = format!(
+            "LSTM(hidden={}, seqlen={}, epochs={}), n={}, R2={:.4}",
+            result.n_hidden, result.seq_len, result.n_epochs, result.n_obs, result.r_squared
+        );
+        let fields = vec![
+            (
+                "fitted".into(),
+                model_expansion::array1_to_series("fitted", &result.fitted),
+            ),
+            (
+                "forecast".into(),
+                model_expansion::array1_to_series("forecast", &result.forecast),
+            ),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("final_hidden", Value::Float(result.final_hidden)),
+                    ("final_cell", Value::Float(result.final_cell)),
+                    ("n_hidden", Value::Int(result.n_hidden as i64)),
+                    ("seq_len", Value::Int(result.seq_len as i64)),
+                    ("learning_rate", Value::Float(result.learning_rate)),
+                    ("n_epochs", Value::Int(result.n_epochs as i64)),
+                    ("mse", Value::Float(result.mse)),
+                    ("r_squared", Value::Float(result.r_squared)),
+                    ("n_samples", Value::Int(result.n_samples as i64)),
+                    ("n_obs", Value::Int(result.n_obs as i64)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            result.to_string(),
+            summary,
+            "LstmResult",
+            fields,
+        ))
     }
 
     pub(super) fn causalforest(
@@ -409,8 +632,48 @@ impl Interpreter {
             greeners::CausalForest::fit(&y_arr, &t_vec, &x_mat, n_trees, max_depth, Some(x_vars))
                 .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        let summary = format!(
+            "CausalForest(ate={:.4}, se={:.4}), n={}",
+            result.ate, result.ate_se, result.n_obs
+        );
+        let fields = vec![
+            (
+                "treatment_effects".into(),
+                model_expansion::array1_to_series("treatment_effects", &result.treatment_effects),
+            ),
+            (
+                "feature_importance".into(),
+                model_expansion::feature_importance_df(
+                    &result.variable_names,
+                    &result.feature_importance,
+                ),
+            ),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("ate", Value::Float(result.ate)),
+                    ("ate_se", Value::Float(result.ate_se)),
+                    (
+                        "ate_ci",
+                        Value::List(Arc::new(vec![
+                            Value::Float(result.ate_ci[0]),
+                            Value::Float(result.ate_ci[1]),
+                        ])),
+                    ),
+                    ("heterogeneity", Value::Float(result.heterogeneity)),
+                    ("n_trees", Value::Int(result.n_trees as i64)),
+                    ("max_depth", Value::Int(result.max_depth as i64)),
+                    ("n_obs", Value::Int(result.n_obs as i64)),
+                    ("n_features", Value::Int(result.n_features as i64)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            result.to_string(),
+            summary,
+            "CausalForestResult",
+            fields,
+        ))
     }
 
     pub(super) fn grf(
@@ -491,8 +754,55 @@ impl Interpreter {
         let result = greeners::GRF::fit(&y_arr, &t_vec, &x_mat, n_trees, max_depth, Some(x_vars))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        let summary = format!(
+            "GRF(ate={:.4}, se={:.4}), n={}",
+            result.ate, result.ate_se, result.n_obs
+        );
+        let fields = vec![
+            (
+                "cate".into(),
+                model_expansion::array1_to_series("cate", &result.cate),
+            ),
+            (
+                "propensity".into(),
+                model_expansion::array1_to_series("propensity", &result.propensity),
+            ),
+            (
+                "outcome_reg".into(),
+                model_expansion::array1_to_series("outcome_reg", &result.outcome_reg),
+            ),
+            (
+                "feature_importance".into(),
+                model_expansion::feature_importance_df(
+                    &result.variable_names,
+                    &result.feature_importance,
+                ),
+            ),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("ate", Value::Float(result.ate)),
+                    ("ate_se", Value::Float(result.ate_se)),
+                    (
+                        "ate_ci",
+                        Value::List(Arc::new(vec![
+                            Value::Float(result.ate_ci[0]),
+                            Value::Float(result.ate_ci[1]),
+                        ])),
+                    ),
+                    ("heterogeneity", Value::Float(result.heterogeneity)),
+                    ("n_trees", Value::Int(result.n_trees as i64)),
+                    ("n_obs", Value::Int(result.n_obs as i64)),
+                    ("n_features", Value::Int(result.n_features as i64)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            result.to_string(),
+            summary,
+            "GrfResult",
+            fields,
+        ))
     }
 
     pub(super) fn conformal(
@@ -532,8 +842,53 @@ impl Interpreter {
         )
         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        let summary = format!(
+            "Conformal(alpha={:.4}, coverage={:.4}), n={}",
+            result.alpha, result.coverage, result.n_test
+        );
+        let fields = vec![
+            (
+                "predictions".into(),
+                model_expansion::array1_to_series("predictions", &result.predictions),
+            ),
+            (
+                "lower".into(),
+                model_expansion::array1_to_series("lower", &result.lower),
+            ),
+            (
+                "upper".into(),
+                model_expansion::array1_to_series("upper", &result.upper),
+            ),
+            (
+                "scores".into(),
+                model_expansion::series_from_vec("scores", &result.scores),
+            ),
+            (
+                "coefficients".into(),
+                model_expansion::coefficients_df(&result.variable_names, &result.coefficients),
+            ),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("quantile", Value::Float(result.quantile)),
+                    ("alpha", Value::Float(result.alpha)),
+                    ("coverage", Value::Float(result.coverage)),
+                    ("n_train", Value::Int(result.n_train as i64)),
+                    ("n_calib", Value::Int(result.n_calib as i64)),
+                    ("n_test", Value::Int(result.n_test as i64)),
+                    (
+                        "empirical_coverage",
+                        Value::Float(result.empirical_coverage),
+                    ),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            result.to_string(),
+            summary,
+            "ConformalResult",
+            fields,
+        ))
     }
 
     pub(super) fn transformer(
@@ -606,8 +961,40 @@ impl Interpreter {
         let result = greeners::Transformer::fit(&y_arr, d_model, seq_len, lr, n_epochs, n_forecast)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        let summary = format!(
+            "Transformer(d_model={}, seqlen={}, epochs={}), n={}, R2={:.4}",
+            result.d_model, result.seq_len, result.n_epochs, result.n_obs, result.r_squared
+        );
+        let fields = vec![
+            (
+                "fitted".into(),
+                model_expansion::array1_to_series("fitted", &result.fitted),
+            ),
+            (
+                "forecast".into(),
+                model_expansion::array1_to_series("forecast", &result.forecast),
+            ),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("n_heads", Value::Int(result.n_heads as i64)),
+                    ("d_model", Value::Int(result.d_model as i64)),
+                    ("seq_len", Value::Int(result.seq_len as i64)),
+                    ("learning_rate", Value::Float(result.learning_rate)),
+                    ("n_epochs", Value::Int(result.n_epochs as i64)),
+                    ("mse", Value::Float(result.mse)),
+                    ("r_squared", Value::Float(result.r_squared)),
+                    ("n_samples", Value::Int(result.n_samples as i64)),
+                    ("n_obs", Value::Int(result.n_obs as i64)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            result.to_string(),
+            summary,
+            "TransformerResult",
+            fields,
+        ))
     }
 
     pub(super) fn dr_learner(
@@ -683,8 +1070,51 @@ impl Interpreter {
         let result = greeners::DRLearner::fit(&y_arr, &t_vec, &x_mat, n_folds, Some(x_vars))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        let summary = format!(
+            "DRLearner(ate={:.4}, se={:.4}), n={}",
+            result.ate, result.ate_se, result.n_obs
+        );
+        let fields = vec![
+            (
+                "cate".into(),
+                model_expansion::array1_to_series("cate", &result.cate),
+            ),
+            (
+                "propensity".into(),
+                model_expansion::array1_to_series("propensity", &result.propensity),
+            ),
+            (
+                "outcome_reg".into(),
+                model_expansion::array1_to_series("outcome_reg", &result.outcome_reg),
+            ),
+            (
+                "cate_coefficients".into(),
+                model_expansion::coefficients_df(&result.variable_names, &result.cate_coefficients),
+            ),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("ate", Value::Float(result.ate)),
+                    ("ate_se", Value::Float(result.ate_se)),
+                    (
+                        "ate_ci",
+                        Value::List(Arc::new(vec![
+                            Value::Float(result.ate_ci[0]),
+                            Value::Float(result.ate_ci[1]),
+                        ])),
+                    ),
+                    ("n_folds", Value::Int(result.n_folds as i64)),
+                    ("n_obs", Value::Int(result.n_obs as i64)),
+                    ("n_features", Value::Int(result.n_features as i64)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            result.to_string(),
+            summary,
+            "DrLearnerResult",
+            fields,
+        ))
     }
 
     pub(super) fn bart(
@@ -826,8 +1256,58 @@ impl Interpreter {
         let result = greeners::TMLE::fit(&y_arr, &t_vec, &w_mat)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        let summary = format!(
+            "TMLE(ate={:.4}, se={:.4}, p={:.4}), n={}",
+            result.ate, result.se, result.p_value, result.n_obs
+        );
+        let fields = vec![
+            (
+                "propensity".into(),
+                model_expansion::array1_to_series("propensity", &result.propensity),
+            ),
+            (
+                "initial_q".into(),
+                model_expansion::array1_to_series("initial_q", &result.initial_q),
+            ),
+            (
+                "targeted_q".into(),
+                model_expansion::array1_to_series("targeted_q", &result.targeted_q),
+            ),
+            (
+                "clever_covariate".into(),
+                model_expansion::array1_to_series("clever_covariate", &result.clever_covariate),
+            ),
+            (
+                "eif".into(),
+                model_expansion::array1_to_series("eif", &result.eif),
+            ),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("ate", Value::Float(result.ate)),
+                    ("se", Value::Float(result.se)),
+                    ("t_stat", Value::Float(result.t_stat)),
+                    ("p_value", Value::Float(result.p_value)),
+                    (
+                        "ci",
+                        Value::List(Arc::new(vec![
+                            Value::Float(result.ci[0]),
+                            Value::Float(result.ci[1]),
+                        ])),
+                    ),
+                    ("epsilon", Value::Float(result.epsilon)),
+                    ("initial_ate", Value::Float(result.initial_ate)),
+                    ("n_obs", Value::Int(result.n_obs as i64)),
+                    ("n_confounders", Value::Int(result.n_confounders as i64)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            result.to_string(),
+            summary,
+            "TmleResult",
+            fields,
+        ))
     }
 
     pub(super) fn orf(
@@ -939,8 +1419,47 @@ impl Interpreter {
         )
         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        let summary = format!(
+            "ORF(ate={:.4}, se={:.4}), n={}",
+            result.ate, result.ate_se, result.n_obs
+        );
+        let fields = vec![
+            (
+                "cate".into(),
+                model_expansion::array1_to_series("cate", &result.cate),
+            ),
+            (
+                "feature_importance".into(),
+                model_expansion::feature_importance_df(
+                    &result.feature_names,
+                    &result.feature_importance,
+                ),
+            ),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("ate", Value::Float(result.ate)),
+                    ("ate_se", Value::Float(result.ate_se)),
+                    (
+                        "ate_ci",
+                        Value::List(Arc::new(vec![
+                            Value::Float(result.ate_ci[0]),
+                            Value::Float(result.ate_ci[1]),
+                        ])),
+                    ),
+                    ("n_trees", Value::Int(result.n_trees as i64)),
+                    ("max_depth", Value::Int(result.max_depth as i64)),
+                    ("n_obs", Value::Int(result.n_obs as i64)),
+                    ("n_features", Value::Int(result.n_features as i64)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            result.to_string(),
+            summary,
+            "OrfResult",
+            fields,
+        ))
     }
 
     pub(super) fn spectral(
@@ -1417,8 +1936,60 @@ impl Interpreter {
         )
         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        let quantile_names: Vec<String> =
+            result.quantiles.iter().map(|&q| format!("q_{q}")).collect();
+        let summary = format!(
+            "QRFInference(n={}, cov={:.4}, conf={:.4}), boot={}",
+            result.n_obs, result.coverage, result.confidence, result.n_bootstrap
+        );
+        let fields = vec![
+            (
+                "point_estimates".into(),
+                model_expansion::array2_to_dataframe_named(
+                    &result.point_estimates,
+                    &quantile_names,
+                ),
+            ),
+            (
+                "lower".into(),
+                model_expansion::array2_to_dataframe_named(&result.lower, &quantile_names),
+            ),
+            (
+                "upper".into(),
+                model_expansion::array2_to_dataframe_named(&result.upper, &quantile_names),
+            ),
+            (
+                "feature_importance".into(),
+                model_expansion::feature_importance_df(
+                    &result.variable_names,
+                    &result.feature_importance,
+                ),
+            ),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    (
+                        "quantiles",
+                        Value::List(Arc::new(
+                            result.quantiles.iter().map(|&q| Value::Float(q)).collect(),
+                        )),
+                    ),
+                    ("coverage", Value::Float(result.coverage)),
+                    ("confidence", Value::Float(result.confidence)),
+                    ("n_bootstrap", Value::Int(result.n_bootstrap as i64)),
+                    ("n_trees", Value::Int(result.n_trees as i64)),
+                    ("n_obs", Value::Int(result.n_obs as i64)),
+                    ("n_features", Value::Int(result.n_features as i64)),
+                    ("oob_r_squared", Value::Float(result.oob_r_squared)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            result.to_string(),
+            summary,
+            "QrfInferenceResult",
+            fields,
+        ))
     }
 
     pub(super) fn hclust(

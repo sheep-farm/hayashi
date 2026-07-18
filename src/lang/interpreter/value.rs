@@ -280,6 +280,16 @@ pub enum Value {
     GmmClusteringResult(Rc<greeners::GmmClusteringResult>),
     HierarchicalResult(Rc<greeners::HierarchicalResult>),
     SpectralResult(Rc<greeners::SpectralResult>),
+    /// Generic first-class model result: a display string plus a dict of
+    /// named children.  Used for estimators that do not yet have a dedicated
+    /// `Value` variant, while still exposing every field to DAP and to the
+    /// `var.field` / `var["field"]` syntax.
+    ModelResult {
+        display: String,
+        summary: String,
+        type_name: &'static str,
+        fields: Arc<HashMap<String, Value>>,
+    },
     List(Arc<Vec<Value>>),
     Dict(Arc<HashMap<String, Value>>),
     Series(Arc<Series>),
@@ -319,6 +329,7 @@ impl Value {
             Value::Series(_) => true,
             Value::UserFn(_) => true,
             Value::Plot { .. } => true,
+            Value::ModelResult { fields, .. } => fields.values().all(|v| v.is_send_safe()),
             // All model result variants use Rc — not Send.
             _ => false,
         }
@@ -425,6 +436,7 @@ impl std::fmt::Display for Value {
             Value::GmmClusteringResult(r) => write!(f, "{r}"),
             Value::HierarchicalResult(r) => write!(f, "{r}"),
             Value::SpectralResult(r) => write!(f, "{r}"),
+            Value::ModelResult { display, .. } => write!(f, "{display}"),
             Value::List(v) => {
                 write!(f, "[")?;
                 for (i, item) in v.iter().enumerate() {
