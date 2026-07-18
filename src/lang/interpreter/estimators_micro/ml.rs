@@ -734,8 +734,7 @@ impl Interpreter {
         )
         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        Ok(Value::BartResult(Rc::new(result)))
     }
 
     pub(super) fn gp(
@@ -756,8 +755,7 @@ impl Interpreter {
         let result = greeners::GaussianProcess::fit(&y_arr, &x_arr, Some(var_names))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        Ok(Value::GpResult(Rc::new(result)))
     }
 
     pub(super) fn tmle(
@@ -1052,8 +1050,7 @@ impl Interpreter {
         let result = greeners::IsotonicRegression::fit(&x_arr, &y_arr, !decreasing, None)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        Ok(Value::IsotonicResult(Rc::new(result)))
     }
 
     pub(super) fn mice_chained(
@@ -1807,33 +1804,8 @@ impl Interpreter {
         };
         let result = greeners::KDEUnivariate::fit(&data, bw_opt, kernel)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        let support_min = result.support.iter().cloned().fold(f64::INFINITY, f64::min);
-        let support_max = result
-            .support
-            .iter()
-            .cloned()
-            .fold(f64::NEG_INFINITY, f64::max);
-        let peak_idx = result
-            .density
-            .iter()
-            .enumerate()
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-            .map(|(i, _)| i)
-            .unwrap_or(0);
-        let peak_x = result.support[peak_idx];
-        let peak_d = result.density[peak_idx];
-        println!("\n{:=^50}", " KDE ");
-        println!("{:<20} {:>10}", "Variable:", var_name);
-        println!("{:<20} {:>10}", "Observations:", result.n_obs);
-        println!("{:<20} {:>10.6}", "Bandwidth:", result.bandwidth);
-        println!("{:<20} {:>10.4}", "Support min:", support_min);
-        println!("{:<20} {:>10.4}", "Support max:", support_max);
-        println!(
-            "{:<20} {:>10.4} @ x = {:.4}",
-            "Peak (density):", peak_d, peak_x
-        );
-        println!("{:=^50}", "");
-        Ok(Value::Nil)
+
+        Ok(Value::KdeResult(Rc::new(result)))
     }
 
     pub(super) fn pca(

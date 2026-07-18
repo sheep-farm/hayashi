@@ -357,6 +357,10 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
         Value::DiagResult(r) => diag_children(r),
         Value::KmeansResult(r) => kmeans_children(r),
         Value::DbscanResult(r) => dbscan_children(r),
+        Value::IsotonicResult(r) => isotonic_children(r),
+        Value::KdeResult(r) => kde_children(r),
+        Value::BartResult(r) => bart_children(r),
+        Value::GpResult(r) => gp_children(r),
         _ => Vec::new(),
     }
 }
@@ -890,6 +894,39 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "DbscanResult",
         ),
+        Value::IsotonicResult(r) => (
+            format!(
+                "Isotonic(n={}, increasing={}), R2={:.4}",
+                r.n_obs, r.increasing, r.r_squared
+            ),
+            "IsotonicResult",
+        ),
+        Value::KdeResult(r) => (
+            format!(
+                "KDE(n={}, bandwidth={:.4}, points={})",
+                r.n_obs,
+                r.bandwidth,
+                r.support.len()
+            ),
+            "KdeResult",
+        ),
+        Value::BartResult(r) => (
+            format!(
+                "BART(trees={}, depth={}), n={}, R2={:.4}",
+                r.n_trees, r.max_depth, r.n_obs, r.r_squared
+            ),
+            "BartResult",
+        ),
+        Value::GpResult(r) => (
+            format!(
+                "GP(n={}, l={:.4}, sigma_f={:.4}), R2={:.4}",
+                r.n_obs,
+                r.length_scale,
+                r.signal_variance.sqrt(),
+                r.r_squared
+            ),
+            "GpResult",
+        ),
         Value::UserFn(f) => (format!("<fn({})>", f.params.join(", ")), "Function"),
         _ => (v.to_string(), "Model"),
     }
@@ -990,6 +1027,11 @@ pub fn coef_dataframe(
 
 pub fn array1_to_series(name: &str, arr: &Array1<f64>) -> Value {
     let values: Vec<Value> = arr.iter().map(|&v| Value::Float(v)).collect();
+    Value::Series(Arc::new(Series::new(name, values)))
+}
+
+pub fn series_from_vec(name: &str, v: &[f64]) -> Value {
+    let values: Vec<Value> = v.iter().map(|&x| Value::Float(x)).collect();
     Value::Series(Arc::new(Series::new(name, values)))
 }
 

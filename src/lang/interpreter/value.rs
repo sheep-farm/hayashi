@@ -273,6 +273,10 @@ pub enum Value {
     LocalLevelResult(Rc<greeners::LocalLevelResult>),
     KmeansResult(Rc<greeners::KmeansResult>),
     DbscanResult(Rc<greeners::DbscanResult>),
+    IsotonicResult(Rc<greeners::IsotonicResult>),
+    KdeResult(Rc<greeners::KDEResult>),
+    BartResult(Rc<greeners::BartResult>),
+    GpResult(Rc<greeners::GpResult>),
     List(Arc<Vec<Value>>),
     Dict(Arc<HashMap<String, Value>>),
     Series(Arc<Series>),
@@ -411,6 +415,10 @@ impl std::fmt::Display for Value {
             Value::LocalLevelResult(r) => write!(f, "{r}"),
             Value::KmeansResult(r) => write!(f, "{r}"),
             Value::DbscanResult(r) => write!(f, "{r}"),
+            Value::IsotonicResult(r) => write!(f, "{r}"),
+            Value::KdeResult(r) => write!(f, "{r}"),
+            Value::BartResult(r) => write!(f, "{r}"),
+            Value::GpResult(r) => write!(f, "{r}"),
             Value::List(v) => {
                 write!(f, "[")?;
                 for (i, item) in v.iter().enumerate() {

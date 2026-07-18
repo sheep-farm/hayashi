@@ -235,3 +235,126 @@ pub fn dbscan_fit_dict(r: &greeners::DbscanResult) -> Value {
         ("min_pts", Value::Int(r.min_pts as i64)),
     ])
 }
+
+pub fn isotonic_children(r: &greeners::IsotonicResult) -> Vec<(String, Value)> {
+    vec![
+        ("x".into(), array1_to_series("x", &r.x)),
+        ("y".into(), array1_to_series("y", &r.y)),
+        ("weights".into(), array1_to_series("weights", &r.weights)),
+        ("fitted".into(), array1_to_series("fitted", &r.fitted)),
+        ("x_steps".into(), series_from_vec("x_steps", &r.x_steps)),
+        ("y_steps".into(), series_from_vec("y_steps", &r.y_steps)),
+        ("fit".into(), isotonic_fit_dict(r)),
+    ]
+}
+
+pub fn isotonic_fit_dict(r: &greeners::IsotonicResult) -> Value {
+    fit_dict(&[
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("n_blocks", Value::Int(r.n_blocks as i64)),
+        ("increasing", Value::Bool(r.increasing)),
+        ("r_squared", Value::Float(r.r_squared)),
+        ("mse", Value::Float(r.mse)),
+    ])
+}
+
+pub fn kde_children(r: &greeners::KDEResult) -> Vec<(String, Value)> {
+    vec![
+        ("support".into(), array1_to_series("support", &r.support)),
+        ("density".into(), array1_to_series("density", &r.density)),
+        ("fit".into(), kde_fit_dict(r)),
+    ]
+}
+
+pub fn kde_fit_dict(r: &greeners::KDEResult) -> Value {
+    let support_min = r.support.iter().cloned().fold(f64::INFINITY, f64::min);
+    let support_max = r.support.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    let (peak_idx, peak_density) = r
+        .density
+        .iter()
+        .enumerate()
+        .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+        .map(|(i, &v)| (i, v))
+        .unwrap_or((0, 0.0));
+    let peak_x = r.support.get(peak_idx).copied().unwrap_or(0.0);
+    fit_dict(&[
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("bandwidth", Value::Float(r.bandwidth)),
+        ("n_points", Value::Int(r.support.len() as i64)),
+        ("support_min", Value::Float(support_min)),
+        ("support_max", Value::Float(support_max)),
+        ("peak_density", Value::Float(peak_density)),
+        ("peak_x", Value::Float(peak_x)),
+    ])
+}
+
+pub fn bart_children(r: &greeners::BartResult) -> Vec<(String, Value)> {
+    let mut vars = Vec::new();
+    vars.push(("fitted".into(), array1_to_series("fitted", &r.fitted)));
+
+    let mut columns: IndexMap<String, greeners::Column> = IndexMap::new();
+    let names = r.variable_names.clone();
+    let var_col: Vec<String> = (0..r.variable_inclusion.len())
+        .map(|i| names.get(i).cloned().unwrap_or_else(|| format!("x{i}")))
+        .collect();
+    columns.insert(
+        "variable".into(),
+        greeners::Column::String(ndarray::Array1::from(var_col)),
+    );
+    let incl_col: Vec<f64> = r.variable_inclusion.iter().copied().collect();
+    columns.insert(
+        "inclusion".into(),
+        greeners::Column::Float(ndarray::Array1::from(incl_col)),
+    );
+    let var_df = Value::DataFrame(Arc::new(
+        greeners::DataFrame::from_columns(columns)
+            .unwrap_or_else(|_| greeners::DataFrame::from_columns(IndexMap::new()).unwrap()),
+    ));
+    vars.push(("variable_inclusion".into(), var_df));
+
+    let samples: Vec<Value> = r.sigma2_samples.iter().map(|&v| Value::Float(v)).collect();
+    vars.push((
+        "sigma2_samples".into(),
+        Value::Series(Arc::new(Series::new("sigma2_samples", samples))),
+    ));
+    vars.push(("fit".into(), bart_fit_dict(r)));
+    vars
+}
+
+pub fn bart_fit_dict(r: &greeners::BartResult) -> Value {
+    fit_dict(&[
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("n_features", Value::Int(r.n_features as i64)),
+        ("n_trees", Value::Int(r.n_trees as i64)),
+        ("max_depth", Value::Int(r.max_depth as i64)),
+        ("n_iter", Value::Int(r.n_iter as i64)),
+        ("burn_in", Value::Int(r.burn_in as i64)),
+        ("sigma2", Value::Float(r.sigma2)),
+        ("r_squared", Value::Float(r.r_squared)),
+        ("mse", Value::Float(r.mse)),
+    ])
+}
+
+pub fn gp_children(r: &greeners::GpResult) -> Vec<(String, Value)> {
+    vec![
+        ("fitted".into(), array1_to_series("fitted", &r.fitted)),
+        (
+            "fitted_sd".into(),
+            array1_to_series("fitted_sd", &r.fitted_sd),
+        ),
+        ("fit".into(), gp_fit_dict(r)),
+    ]
+}
+
+pub fn gp_fit_dict(r: &greeners::GpResult) -> Value {
+    fit_dict(&[
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("n_features", Value::Int(r.n_features as i64)),
+        ("length_scale", Value::Float(r.length_scale)),
+        ("signal_variance", Value::Float(r.signal_variance)),
+        ("noise_variance", Value::Float(r.noise_variance)),
+        ("log_marginal", Value::Float(r.log_marginal)),
+        ("r_squared", Value::Float(r.r_squared)),
+        ("mse", Value::Float(r.mse)),
+    ])
+}
