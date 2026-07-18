@@ -331,57 +331,67 @@ impl Interpreter {
 
         // Decide whether to stop using a snapshot of the debug action state.
         let call_stack_len = self.call_stack.len();
-        let (should_stop, reason) = {
-            let ds = self.debug_state.as_ref().unwrap();
-            let mut should_stop = false;
-
-            if ds.breakpoints.contains(&(file.to_path_buf(), line))
-                && ds.action != DebugAction::StepIn
-            {
-                should_stop = true;
-            }
-
-            match ds.action {
-                DebugAction::StepIn => should_stop = true,
-                DebugAction::StepOver => {
-                    if let Some(target) = ds.step_target_depth {
-                        if call_stack_len <= target {
-                            should_stop = true;
-                        }
-                    }
-                }
-                DebugAction::StepOut => {
-                    if let Some(target) = ds.step_target_depth {
-                        if call_stack_len <= target {
-                            should_stop = true;
-                        }
-                    }
-                }
-                DebugAction::Pause => should_stop = true,
-                DebugAction::Continue => {}
-            }
-
-            let reason = match ds.action {
-                DebugAction::StepIn | DebugAction::StepOver | DebugAction::StepOut => "step",
-                DebugAction::Pause => "pause",
-                _ => "breakpoint",
-            }
-            .to_string();
-
-            (should_stop, reason)
-        };
+        let (should_stop, reason) = self.debug_should_stop(file, line, call_stack_len);
 
         if !should_stop {
             return Ok(());
         }
 
+        self.debug_handle_stop(&reason)
+    }
+
+    fn debug_should_stop(
+        &self,
+        file: &std::path::Path,
+        line: usize,
+        call_stack_len: usize,
+    ) -> (bool, String) {
+        let ds = self.debug_state.as_ref().unwrap();
+        let mut should_stop = false;
+
+        if ds.breakpoints.contains(&(file.to_path_buf(), line)) && ds.action != DebugAction::StepIn
+        {
+            should_stop = true;
+        }
+
+        match ds.action {
+            DebugAction::StepIn => should_stop = true,
+            DebugAction::StepOver => {
+                if let Some(target) = ds.step_target_depth {
+                    if call_stack_len <= target {
+                        should_stop = true;
+                    }
+                }
+            }
+            DebugAction::StepOut => {
+                if let Some(target) = ds.step_target_depth {
+                    if call_stack_len <= target {
+                        should_stop = true;
+                    }
+                }
+            }
+            DebugAction::Pause => should_stop = true,
+            DebugAction::Continue => {}
+        }
+
+        let reason = match ds.action {
+            DebugAction::StepIn | DebugAction::StepOver | DebugAction::StepOut => "step",
+            DebugAction::Pause => "pause",
+            _ => "breakpoint",
+        }
+        .to_string();
+
+        (should_stop, reason)
+    }
+
+    fn debug_handle_stop(&mut self, reason: &str) -> Result<()> {
         {
             let ds = self.debug_state.as_mut().unwrap();
             ds.action = DebugAction::Continue;
             ds.step_target_depth = None;
             ds.event_tx
                 .send(DebugEvent::Stopped {
-                    reason,
+                    reason: reason.to_string(),
                     description: None,
                     thread_id: 1,
                     preserve_focus_hint: false,
@@ -473,126 +483,145 @@ impl Interpreter {
 
     fn process_dap_request(&mut self, req: &Request) -> Response {
         match req.command.as_str() {
-            "initialize" => {
-                Response::ok(0, req.seq, &req.command).with_body(Capabilities::default())
-            }
-            "setBreakpoints" => {
-                match serde_json::from_value::<SetBreakpointsArguments>(
-                    req.arguments.clone().unwrap_or(JsonValue::Null),
-                ) {
-                    Ok(args) => {
-                        let path = std::path::PathBuf::from(&args.source.path);
-                        let source_for_bp = Source {
-                            path: args.source.path.clone(),
-                            name: args.source.name.clone(),
-                        };
-                        let lines: Vec<usize> =
-                            args.breakpoints.iter().map(|b| b.line as usize).collect();
-                        self.debug_set_breakpoints(path.clone(), lines.clone());
-                        let breakpoints: Vec<Breakpoint> = lines
-                            .iter()
-                            .enumerate()
-                            .map(|(i, l)| Breakpoint {
-                                id: Some(i as i64),
-                                line: *l as i64,
-                                verified: Some(true),
-                                message: None,
-                                source: Some(source_for_bp.clone()),
-                            })
-                            .collect();
-                        Response::ok(0, req.seq, &req.command)
-                            .with_body(json!({ "breakpoints": breakpoints }))
-                    }
-                    Err(e) => {
-                        Response::err(0, req.seq, &req.command, format!("invalid arguments: {e}"))
-                    }
-                }
-            }
-            "launch" => {
-                if let Some(ds) = self.debug_state.as_mut() {
-                    if !ds.initialized_sent {
-                        ds.initialized_sent = true;
-                        let _ = ds.event_tx.send(DebugEvent::Initialized);
-                    }
-                }
-                Response::ok(0, req.seq, &req.command)
-            }
-            "threads" => Response::ok(0, req.seq, &req.command)
-                .with_body(json!({ "threads": [Thread { id: 1, name: "main".into() }] })),
-            "stackTrace" => {
-                let mut frames: Vec<StackFrame> = Vec::new();
-                let current_file = self.current_source().to_string_lossy().to_string();
-                let source = Some(Source {
-                    path: current_file.clone(),
-                    name: None,
-                });
-                frames.push(StackFrame {
-                    id: 0,
-                    name: "main".into(),
-                    source: source.clone(),
-                    line: self.current_line() as i64,
-                    column: 0,
-                });
-                for (i, (name, line)) in self.call_stack().iter().enumerate() {
-                    frames.push(StackFrame {
-                        id: (i + 1) as i64,
-                        name: name.clone(),
-                        source: source.clone(),
-                        line: *line as i64,
-                        column: 0,
-                    });
-                }
-                Response::ok(0, req.seq, &req.command)
-                    .with_body(json!({ "stackFrames": frames, "totalFrames": frames.len() as i64 }))
-            }
-            "scopes" => {
-                let frame_id = req
-                    .arguments
-                    .as_ref()
-                    .and_then(|a| a.get("frameId"))
-                    .and_then(|v| v.as_i64())
-                    .unwrap_or(0);
-                let scopes = vec![
-                    Scope {
-                        name: "Locals".into(),
-                        presentation_hint: Some("locals".into()),
-                        variables_reference: frame_id * 2 + 1,
-                        expensive: false,
-                    },
-                    Scope {
-                        name: "Globals".into(),
-                        presentation_hint: Some("globals".into()),
-                        variables_reference: frame_id * 2 + 2,
-                        expensive: false,
-                    },
-                ];
-                Response::ok(0, req.seq, &req.command).with_body(json!({ "scopes": scopes }))
-            }
-            "variables" => {
-                let reference = req
-                    .arguments
-                    .as_ref()
-                    .and_then(|a| a.get("variablesReference"))
-                    .and_then(|v| v.as_i64())
-                    .unwrap_or(0);
-                let variables = self.variables_for_reference(reference);
-                Response::ok(0, req.seq, &req.command).with_body(json!({ "variables": variables }))
-            }
-            "evaluate" => {
-                match req
-                    .arguments
-                    .as_ref()
-                    .and_then(|a| a.get("expression"))
-                    .and_then(|v| v.as_str())
-                {
-                    Some(expr) => Response::ok(0, req.seq, &req.command)
-                        .with_body(json!({ "result": expr, "variablesReference": 0 })),
-                    None => Response::err(0, req.seq, &req.command, "missing expression"),
-                }
-            }
-            "attach" | "configurationDone" => Response::ok(0, req.seq, &req.command),
+            "initialize" => self.dap_initialize(req),
+            "setBreakpoints" => self.dap_set_breakpoints(req),
+            "launch" => self.dap_launch(req),
+            "threads" => self.dap_threads(req),
+            "stackTrace" => self.dap_stack_trace(req),
+            "scopes" => self.dap_scopes(req),
+            "variables" => self.dap_variables(req),
+            "evaluate" => self.dap_evaluate(req),
+            "attach" | "configurationDone" => self.dap_attach_or_configuration_done(req),
             _ => Response::ok(0, req.seq, &req.command),
         }
+    }
+
+    fn dap_initialize(&mut self, req: &Request) -> Response {
+        Response::ok(0, req.seq, &req.command).with_body(Capabilities::default())
+    }
+
+    fn dap_set_breakpoints(&mut self, req: &Request) -> Response {
+        match serde_json::from_value::<SetBreakpointsArguments>(
+            req.arguments.clone().unwrap_or(JsonValue::Null),
+        ) {
+            Ok(args) => {
+                let path = std::path::PathBuf::from(&args.source.path);
+                let source_for_bp = Source {
+                    path: args.source.path.clone(),
+                    name: args.source.name.clone(),
+                };
+                let lines: Vec<usize> = args.breakpoints.iter().map(|b| b.line as usize).collect();
+                self.debug_set_breakpoints(path.clone(), lines.clone());
+                let breakpoints: Vec<Breakpoint> = lines
+                    .iter()
+                    .enumerate()
+                    .map(|(i, l)| Breakpoint {
+                        id: Some(i as i64),
+                        line: *l as i64,
+                        verified: Some(true),
+                        message: None,
+                        source: Some(source_for_bp.clone()),
+                    })
+                    .collect();
+                Response::ok(0, req.seq, &req.command)
+                    .with_body(json!({ "breakpoints": breakpoints }))
+            }
+            Err(e) => Response::err(0, req.seq, &req.command, format!("invalid arguments: {e}")),
+        }
+    }
+
+    fn dap_launch(&mut self, req: &Request) -> Response {
+        if let Some(ds) = self.debug_state.as_mut() {
+            if !ds.initialized_sent {
+                ds.initialized_sent = true;
+                let _ = ds.event_tx.send(DebugEvent::Initialized);
+            }
+        }
+        Response::ok(0, req.seq, &req.command)
+    }
+
+    fn dap_threads(&mut self, req: &Request) -> Response {
+        Response::ok(0, req.seq, &req.command)
+            .with_body(json!({ "threads": [Thread { id: 1, name: "main".into() }] }))
+    }
+
+    fn dap_stack_trace(&mut self, req: &Request) -> Response {
+        let mut frames: Vec<StackFrame> = Vec::new();
+        let current_file = self.current_source().to_string_lossy().to_string();
+        let source = Some(Source {
+            path: current_file.clone(),
+            name: None,
+        });
+        frames.push(StackFrame {
+            id: 0,
+            name: "main".into(),
+            source: source.clone(),
+            line: self.current_line() as i64,
+            column: 0,
+        });
+        for (i, (name, line)) in self.call_stack().iter().enumerate() {
+            frames.push(StackFrame {
+                id: (i + 1) as i64,
+                name: name.clone(),
+                source: source.clone(),
+                line: *line as i64,
+                column: 0,
+            });
+        }
+        Response::ok(0, req.seq, &req.command)
+            .with_body(json!({ "stackFrames": frames, "totalFrames": frames.len() as i64 }))
+    }
+
+    fn dap_scopes(&mut self, req: &Request) -> Response {
+        let frame_id = req
+            .arguments
+            .as_ref()
+            .and_then(|a| a.get("frameId"))
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0);
+        let scopes = vec![
+            Scope {
+                name: "Locals".into(),
+                presentation_hint: Some("locals".into()),
+                variables_reference: frame_id * 2 + 1,
+                expensive: false,
+            },
+            Scope {
+                name: "Globals".into(),
+                presentation_hint: Some("globals".into()),
+                variables_reference: frame_id * 2 + 2,
+                expensive: false,
+            },
+        ];
+        Response::ok(0, req.seq, &req.command).with_body(json!({ "scopes": scopes }))
+    }
+
+    fn dap_variables(&mut self, req: &Request) -> Response {
+        let reference = req
+            .arguments
+            .as_ref()
+            .and_then(|a| a.get("variablesReference"))
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0);
+        let variables = self.variables_for_reference(reference);
+        Response::ok(0, req.seq, &req.command).with_body(json!({ "variables": variables }))
+    }
+
+    fn dap_evaluate(&mut self, req: &Request) -> Response {
+        match req
+            .arguments
+            .as_ref()
+            .and_then(|a| a.get("expression"))
+            .and_then(|v| v.as_str())
+        {
+            Some(expr) => Response::ok(0, req.seq, &req.command)
+                .with_body(json!({ "result": expr, "variablesReference": 0 })),
+            None => Response::err(0, req.seq, &req.command, "missing expression"),
+        }
+    }
+
+    fn dap_attach_or_configuration_done(&mut self, req: &Request) -> Response {
+        Response::ok(0, req.seq, &req.command)
     }
 
     fn levenshtein(a: &str, b: &str) -> usize {
@@ -775,47 +804,49 @@ impl Interpreter {
 
     pub(super) fn call_value_fn(&mut self, f: &Value, args: &[Value]) -> Result<Value> {
         match f {
-            Value::UserFn(uf) => {
-                if args.len() > uf.params.len() {
-                    return Err(self.rt_err(format!(
-                        "function expects at most {} arguments, got {}",
-                        uf.params.len(),
-                        args.len()
-                    )));
-                }
-                self.env.push_scope();
-                for (param, val) in uf.params.iter().zip(args.iter()) {
-                    self.env.declare_const(param, val.clone());
-                }
-                for i in args.len()..uf.params.len() {
-                    let param = &uf.params[i];
-                    let val = if let Some(default_expr) = &uf.defaults[i] {
-                        self.eval_expr(default_expr)?
-                    } else {
-                        return Err(self.rt_err(format!("missing required argument '{param}'")));
-                    };
-                    self.env.declare_const(param, val);
-                }
-                let body = uf.body.clone();
-                let mut ret = Value::Nil;
-                for s in &body {
-                    match self.exec(s) {
-                        Ok(()) => {}
-                        Err(HayashiError::Return) => break,
-                        Err(e) => {
-                            self.env.pop_scope();
-                            return Err(e);
-                        }
-                    }
-                }
-                if let Some(rv) = self.return_value.take() {
-                    ret = rv;
-                }
-                self.env.pop_scope();
-                Ok(ret)
-            }
+            Value::UserFn(uf) => self.call_user_fn(uf, args),
             _ => Err(self.rt_err("expected a function or closure")),
         }
+    }
+
+    fn call_user_fn(&mut self, uf: &UserFn, args: &[Value]) -> Result<Value> {
+        if args.len() > uf.params.len() {
+            return Err(self.rt_err(format!(
+                "function expects at most {} arguments, got {}",
+                uf.params.len(),
+                args.len()
+            )));
+        }
+        self.env.push_scope();
+        for (param, val) in uf.params.iter().zip(args.iter()) {
+            self.env.declare_const(param, val.clone());
+        }
+        for i in args.len()..uf.params.len() {
+            let param = &uf.params[i];
+            let val = if let Some(default_expr) = &uf.defaults[i] {
+                self.eval_expr(default_expr)?
+            } else {
+                return Err(self.rt_err(format!("missing required argument '{param}'")));
+            };
+            self.env.declare_const(param, val);
+        }
+        let body = uf.body.clone();
+        let mut ret = Value::Nil;
+        for s in &body {
+            match self.exec(s) {
+                Ok(()) => {}
+                Err(HayashiError::Return) => break,
+                Err(e) => {
+                    self.env.pop_scope();
+                    return Err(e);
+                }
+            }
+        }
+        if let Some(rv) = self.return_value.take() {
+            ret = rv;
+        }
+        self.env.pop_scope();
+        Ok(ret)
     }
 
     fn dict_to_dataframe(&self, map: &HashMap<String, Value>) -> Result<greeners::DataFrame> {
@@ -846,84 +877,10 @@ impl Interpreter {
                 expected_len = Some(len);
             }
 
-            if len == 0 {
-                columns.insert(
-                    col_name.clone(),
-                    greeners::Column::Float(ndarray::Array1::from(vec![])),
-                );
-                continue;
-            }
-
-            let first = &list[0];
-            let col = match first {
-                Value::Float(_) => {
-                    let mut data = Vec::with_capacity(len);
-                    for (i, v) in list.iter().enumerate() {
-                        match v {
-                            Value::Float(f) => data.push(*f),
-                            Value::Int(i_val) => data.push(*i_val as f64),
-                            other => {
-                                return Err(self.type_err(format!(
-                                    "element at index {} of column '{}' is not numeric (got {})",
-                                    i, col_name, other
-                                )))
-                            }
-                        }
-                    }
-                    greeners::Column::Float(ndarray::Array1::from(data))
-                }
-                Value::Int(_) => {
-                    let mut data = Vec::with_capacity(len);
-                    for (i, v) in list.iter().enumerate() {
-                        match v {
-                            Value::Int(i_val) => data.push(*i_val),
-                            Value::Float(f) => data.push(*f as i64),
-                            other => {
-                                return Err(self.type_err(format!(
-                                    "element at index {} of column '{}' is not an integer (got {})",
-                                    i, col_name, other
-                                )))
-                            }
-                        }
-                    }
-                    greeners::Column::Int(ndarray::Array1::from(data))
-                }
-                Value::Bool(_) => {
-                    let mut data = Vec::with_capacity(len);
-                    for (i, v) in list.iter().enumerate() {
-                        match v {
-                            Value::Bool(b) => data.push(*b),
-                            other => {
-                                return Err(self.type_err(format!(
-                                    "element at index {} of column '{}' is not boolean (got {})",
-                                    i, col_name, other
-                                )))
-                            }
-                        }
-                    }
-                    greeners::Column::Bool(ndarray::Array1::from(data))
-                }
-                Value::Str(_) => {
-                    let mut data = Vec::with_capacity(len);
-                    for (i, v) in list.iter().enumerate() {
-                        match v {
-                            Value::Str(s) => data.push(s.clone()),
-                            other => {
-                                return Err(self.type_err(format!(
-                                    "element at index {} of column '{}' is not a string (got {})",
-                                    i, col_name, other
-                                )))
-                            }
-                        }
-                    }
-                    greeners::Column::from_strings(data)
-                }
-                other => {
-                    return Err(self.type_err(format!(
-                        "unsupported type for column '{}': {}",
-                        col_name, other
-                    )))
-                }
+            let col = if len == 0 {
+                greeners::Column::Float(ndarray::Array1::from(vec![]))
+            } else {
+                self.values_to_column(col_name, &list, len)?
             };
 
             columns.insert(col_name.clone(), col);
@@ -935,6 +892,87 @@ impl Interpreter {
 
         greeners::DataFrame::from_columns(columns)
             .map_err(|e| self.rt_err(format!("failed to create dataframe: {e}")))
+    }
+
+    fn values_to_column(
+        &self,
+        col_name: &str,
+        values: &[Value],
+        len: usize,
+    ) -> Result<greeners::Column> {
+        let first = &values[0];
+        let col = match first {
+            Value::Float(_) => {
+                let mut data = Vec::with_capacity(len);
+                for (i, v) in values.iter().enumerate() {
+                    match v {
+                        Value::Float(f) => data.push(*f),
+                        Value::Int(i_val) => data.push(*i_val as f64),
+                        other => {
+                            return Err(self.type_err(format!(
+                                "element at index {} of column '{}' is not numeric (got {})",
+                                i, col_name, other
+                            )))
+                        }
+                    }
+                }
+                greeners::Column::Float(ndarray::Array1::from(data))
+            }
+            Value::Int(_) => {
+                let mut data = Vec::with_capacity(len);
+                for (i, v) in values.iter().enumerate() {
+                    match v {
+                        Value::Int(i_val) => data.push(*i_val),
+                        Value::Float(f) => data.push(*f as i64),
+                        other => {
+                            return Err(self.type_err(format!(
+                                "element at index {} of column '{}' is not an integer (got {})",
+                                i, col_name, other
+                            )))
+                        }
+                    }
+                }
+                greeners::Column::Int(ndarray::Array1::from(data))
+            }
+            Value::Bool(_) => {
+                let mut data = Vec::with_capacity(len);
+                for (i, v) in values.iter().enumerate() {
+                    match v {
+                        Value::Bool(b) => data.push(*b),
+                        other => {
+                            return Err(self.type_err(format!(
+                                "element at index {} of column '{}' is not boolean (got {})",
+                                i, col_name, other
+                            )))
+                        }
+                    }
+                }
+                greeners::Column::Bool(ndarray::Array1::from(data))
+            }
+            Value::Str(_) => {
+                let mut data = Vec::with_capacity(len);
+                for (i, v) in values.iter().enumerate() {
+                    match v {
+                        Value::Str(s) => data.push(s.clone()),
+                        other => {
+                            return Err(self.type_err(format!(
+                                "element at index {} of column '{}' is not a string (got {})",
+                                i, col_name, other
+                            )))
+                        }
+                    }
+                }
+                greeners::Column::from_strings(data)
+            }
+            other => {
+                return Err(self.type_err(format!(
+                    "unsupported type for column '{}': {}",
+                    col_name, other
+                )))
+            }
+        };
+
+        Ok(col)
     }
 
     pub fn load_plugins(&mut self) {
@@ -991,85 +1029,8 @@ impl Interpreter {
         };
 
         for cand in &candidates {
-            let is_native_or_wasm = cand.ends_with(".wasm")
-                || cand.ends_with(".so")
-                || cand.ends_with(".dll")
-                || cand.ends_with(".dylib");
-
-            // In release builds, restrict native/WASM plugins
-            // to be loaded only from ~/.hay/packages/ or exe dir.
-            let restrict_to_packages = is_native_or_wasm && !cfg!(debug_assertions);
-
-            // 1. Current directory
-            if !restrict_to_packages && std::path::Path::new(cand).exists() {
-                return Ok(cand.to_string());
-            }
-
-            // 2. Directory of the running executable (e.g. portable Windows installs)
-            if let Ok(exe) = std::env::current_exe() {
-                if let Some(exe_dir) = exe.parent() {
-                    let p = exe_dir.join(cand);
-                    if p.exists() {
-                        return Ok(p.to_string_lossy().to_string());
-                    }
-                    // Also check exe_dir/plugins/ and exe_dir/.hay/plugins/
-                    for sub in &["plugins", ".hay/plugins"] {
-                        let p = exe_dir.join(sub).join(cand);
-                        if p.exists() {
-                            return Ok(p.to_string_lossy().to_string());
-                        }
-                    }
-                }
-            }
-
-            // 3. ~/.hay/plugins/ (or %USERPROFILE%\.hay\plugins\ on Windows)
-            if !restrict_to_packages {
-                if let Some(home) =
-                    std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE"))
-                {
-                    let plugin_path = std::path::Path::new(&home)
-                        .join(".hay")
-                        .join("plugins")
-                        .join(cand);
-                    if plugin_path.exists() {
-                        return Ok(plugin_path.to_string_lossy().to_string());
-                    }
-                }
-            }
-
-            // 4. ~/.hay/packages/ (installed packages)
-            if let Some(home) = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE"))
-            {
-                let pkg_path = std::path::Path::new(&home)
-                    .join(".hay")
-                    .join("packages")
-                    .join(cand);
-                if pkg_path.exists() {
-                    return Ok(pkg_path.to_string_lossy().to_string());
-                }
-            }
-
-            // 5. User-declared plugin_paths
-            if !restrict_to_packages {
-                for dir in &self.plugin_paths {
-                    let p = std::path::Path::new(dir).join(cand);
-                    if p.exists() {
-                        return Ok(p.to_string_lossy().to_string());
-                    }
-                }
-            }
-
-            // 6. HAYASHI_PATH env var (colon or semicolon separated)
-            if !restrict_to_packages {
-                if let Ok(paths) = std::env::var("HAYASHI_PATH") {
-                    let sep = if cfg!(windows) { ';' } else { ':' };
-                    for dir in paths.split(sep) {
-                        let p = std::path::Path::new(dir).join(cand);
-                        if p.exists() {
-                            return Ok(p.to_string_lossy().to_string());
-                        }
-                    }
-                }
+            if let Some(path) = self.resolve_import_candidate(cand) {
+                return Ok(path);
             }
         }
 
@@ -1077,6 +1038,89 @@ impl Interpreter {
             "import: module '{}' not found (searched: ./, exe dir, ~/.hay/plugins/, ~/.hay/packages/, plugin_path, $HAYASHI_PATH)",
             name
         )))
+    }
+
+    fn resolve_import_candidate(&self, cand: &str) -> Option<String> {
+        let is_native_or_wasm = cand.ends_with(".wasm")
+            || cand.ends_with(".so")
+            || cand.ends_with(".dll")
+            || cand.ends_with(".dylib");
+
+        // In release builds, restrict native/WASM plugins
+        // to be loaded only from ~/.hay/packages/ or exe dir.
+        let restrict_to_packages = is_native_or_wasm && !cfg!(debug_assertions);
+
+        // 1. Current directory
+        if !restrict_to_packages && std::path::Path::new(cand).exists() {
+            return Some(cand.to_string());
+        }
+
+        // 2. Directory of the running executable (e.g. portable Windows installs)
+        if let Ok(exe) = std::env::current_exe() {
+            if let Some(exe_dir) = exe.parent() {
+                let p = exe_dir.join(cand);
+                if p.exists() {
+                    return Some(p.to_string_lossy().to_string());
+                }
+                // Also check exe_dir/plugins/ and exe_dir/.hay/plugins/
+                for sub in &["plugins", ".hay/plugins"] {
+                    let p = exe_dir.join(sub).join(cand);
+                    if p.exists() {
+                        return Some(p.to_string_lossy().to_string());
+                    }
+                }
+            }
+        }
+
+        // 3. ~/.hay/plugins/ (or %USERPROFILE%\.hay\plugins\ on Windows)
+        if !restrict_to_packages {
+            if let Some(home) = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE"))
+            {
+                let plugin_path = std::path::Path::new(&home)
+                    .join(".hay")
+                    .join("plugins")
+                    .join(cand);
+                if plugin_path.exists() {
+                    return Some(plugin_path.to_string_lossy().to_string());
+                }
+            }
+        }
+
+        // 4. ~/.hay/packages/ (installed packages)
+        if let Some(home) = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")) {
+            let pkg_path = std::path::Path::new(&home)
+                .join(".hay")
+                .join("packages")
+                .join(cand);
+            if pkg_path.exists() {
+                return Some(pkg_path.to_string_lossy().to_string());
+            }
+        }
+
+        // 5. User-declared plugin_paths
+        if !restrict_to_packages {
+            for dir in &self.plugin_paths {
+                let p = std::path::Path::new(dir).join(cand);
+                if p.exists() {
+                    return Some(p.to_string_lossy().to_string());
+                }
+            }
+        }
+
+        // 6. HAYASHI_PATH env var (colon or semicolon separated)
+        if !restrict_to_packages {
+            if let Ok(paths) = std::env::var("HAYASHI_PATH") {
+                let sep = if cfg!(windows) { ';' } else { ':' };
+                for dir in paths.split(sep) {
+                    let p = std::path::Path::new(dir).join(cand);
+                    if p.exists() {
+                        return Some(p.to_string_lossy().to_string());
+                    }
+                }
+            }
+        }
+
+        None
     }
 
     pub fn get_rng(&mut self) -> Box<dyn rand::RngCore> {
@@ -1220,82 +1264,102 @@ impl Interpreter {
         counter: &mut usize,
     ) -> Result<(String, String)> {
         match term {
-            // Variável simples que já existe no df — sem cópia
-            RhsTerm::Expr(e) if matches!(e.as_ref(), Expr::Var(_)) => {
-                if let Expr::Var(v) = e.as_ref() {
-                    return Ok((v.clone(), v.clone()));
-                }
-                unreachable!()
-            }
-
-            // C(Var(v)) simples — delega para o Greeners (ele já expande dummies)
-            RhsTerm::Categorical(e) if matches!(e.as_ref(), Expr::Var(_)) => {
-                if let Expr::Var(v) = e.as_ref() {
-                    let col_name = format!("C({v})");
-                    let display = col_name.clone();
-                    return Ok((col_name, display));
-                }
-                unreachable!()
-            }
-
-            // Qualquer outra expressão: avalia element-wise e insere como coluna
-            RhsTerm::Expr(e) => {
-                let display = crate::lang::ast::expr_display(e);
-                let col_name = format!("__term_{counter}");
-                *counter += 1;
-                let vals = self.eval_col_expr(e, original_df)?;
-                augmented
-                    .insert(col_name.clone(), ndarray::Array1::from(vals))
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                Ok((col_name, display))
-            }
-
-            // C(expr) composta: materializa a expr, depois envolve com C(...)
+            RhsTerm::Expr(e) => self.materialize_expr_term(e, original_df, augmented, counter),
             RhsTerm::Categorical(e) => {
-                let display = format!("C({})", crate::lang::ast::expr_display(e));
-                let inner_col = format!("__cat_{counter}");
-                *counter += 1;
-                let vals = self.eval_col_expr(e, original_df)?;
-                augmented
-                    .insert(inner_col.clone(), ndarray::Array1::from(vals))
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let col_name = format!("C({inner_col})");
-                Ok((col_name, display))
+                self.materialize_categorical_term(e, original_df, augmented, counter)
             }
-
-            // Interação: materializa ambos os lados e multiplica element-wise
             RhsTerm::Interaction(lhs, rhs) => {
-                let (lcol, ldisp) = self.materialize_term(lhs, original_df, augmented, counter)?;
-                let (rcol, rdisp) = self.materialize_term(rhs, original_df, augmented, counter)?;
-
-                let col_name = format!("__inter_{counter}");
-                *counter += 1;
-                let display = format!("{ldisp}:{rdisp}");
-
-                // Produto element-wise das duas colunas já materializadas
-                // Usa get_column (que funciona tanto para colunas originais quanto
-                // para colunas inseridas via insert())
-                let lvals = augmented
-                    .get_column(&lcol)
-                    .map(|c| c.to_float().to_vec())
-                    .map_err(|e| {
-                        HayashiError::Runtime(format!("interaction: left column '{lcol}': {e}"))
-                    })?;
-                let rvals = augmented
-                    .get_column(&rcol)
-                    .map(|c| c.to_float().to_vec())
-                    .map_err(|e| {
-                        HayashiError::Runtime(format!("interaction: right column '{rcol}': {e}"))
-                    })?;
-
-                let prod: Vec<f64> = lvals.iter().zip(rvals.iter()).map(|(a, b)| a * b).collect();
-                augmented
-                    .insert(col_name.clone(), ndarray::Array1::from(prod))
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-
-                Ok((col_name, display))
+                self.materialize_interaction_term(lhs, rhs, original_df, augmented, counter)
             }
         }
+    }
+
+    fn materialize_expr_term(
+        &mut self,
+        e: &Expr,
+        original_df: &Arc<greeners::DataFrame>,
+        augmented: &mut greeners::DataFrame,
+        counter: &mut usize,
+    ) -> Result<(String, String)> {
+        // Variável simples que já existe no df — sem cópia
+        if let Expr::Var(v) = e {
+            return Ok((v.clone(), v.clone()));
+        }
+
+        // Qualquer outra expressão: avalia element-wise e insere como coluna
+        let display = crate::lang::ast::expr_display(e);
+        let col_name = format!("__term_{counter}");
+        *counter += 1;
+        let vals = self.eval_col_expr(e, original_df)?;
+        augmented
+            .insert(col_name.clone(), ndarray::Array1::from(vals))
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        Ok((col_name, display))
+    }
+
+    fn materialize_categorical_term(
+        &mut self,
+        e: &Expr,
+        original_df: &Arc<greeners::DataFrame>,
+        augmented: &mut greeners::DataFrame,
+        counter: &mut usize,
+    ) -> Result<(String, String)> {
+        // C(Var(v)) simples — delega para o Greeners (ele já expande dummies)
+        if let Expr::Var(v) = e {
+            let col_name = format!("C({v})");
+            let display = col_name.clone();
+            return Ok((col_name, display));
+        }
+
+        // C(expr) composta: materializa a expr, depois envolve com C(...)
+        let display = format!("C({})", crate::lang::ast::expr_display(e));
+        let inner_col = format!("__cat_{counter}");
+        *counter += 1;
+        let vals = self.eval_col_expr(e, original_df)?;
+        augmented
+            .insert(inner_col.clone(), ndarray::Array1::from(vals))
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let col_name = format!("C({inner_col})");
+        Ok((col_name, display))
+    }
+
+    fn materialize_interaction_term(
+        &mut self,
+        lhs: &RhsTerm,
+        rhs: &RhsTerm,
+        original_df: &Arc<greeners::DataFrame>,
+        augmented: &mut greeners::DataFrame,
+        counter: &mut usize,
+    ) -> Result<(String, String)> {
+        let (lcol, ldisp) = self.materialize_term(lhs, original_df, augmented, counter)?;
+        let (rcol, rdisp) = self.materialize_term(rhs, original_df, augmented, counter)?;
+
+        let col_name = format!("__inter_{counter}");
+        *counter += 1;
+        let display = format!("{ldisp}:{rdisp}");
+
+        // Produto element-wise das duas colunas já materializadas
+        // Usa get_column (que funciona tanto para colunas originais quanto
+        // para colunas inseridas via insert())
+        let lvals = augmented
+            .get_column(&lcol)
+            .map(|c| c.to_float().to_vec())
+            .map_err(|e| {
+                HayashiError::Runtime(format!("interaction: left column '{lcol}': {e}"))
+            })?;
+        let rvals = augmented
+            .get_column(&rcol)
+            .map(|c| c.to_float().to_vec())
+            .map_err(|e| {
+                HayashiError::Runtime(format!("interaction: right column '{rcol}': {e}"))
+            })?;
+
+        let prod: Vec<f64> = lvals.iter().zip(rvals.iter()).map(|(a, b)| a * b).collect();
+        augmented
+            .insert(col_name.clone(), ndarray::Array1::from(prod))
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+        Ok((col_name, display))
     }
 
     // ── Object methods ──────────────────────────────────────────────────────
