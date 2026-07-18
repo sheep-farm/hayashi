@@ -355,6 +355,8 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
         Value::RecursiveLSResult(r) => recursive_ls_children(r),
         Value::DecompResult(r) => decomp_children(r),
         Value::DiagResult(r) => diag_children(r),
+        Value::KmeansResult(r) => kmeans_children(r),
+        Value::DbscanResult(r) => dbscan_children(r),
         _ => Vec::new(),
     }
 }
@@ -837,6 +839,20 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
         Value::DiagResult(r) => (
             format!("Diagnostic({} fields)", r.fields.len()),
             "DiagResult",
+        ),
+        Value::KmeansResult(r) => (
+            format!(
+                "KMeans(k={}, n={}), inertia={:.4}",
+                r.n_clusters, r.n_obs, r.inertia
+            ),
+            "KmeansResult",
+        ),
+        Value::DbscanResult(r) => (
+            format!(
+                "DBSCAN(clusters={}, noise={}), n={}",
+                r.n_clusters, r.n_noise, r.n_obs
+            ),
+            "DbscanResult",
         ),
         Value::UserFn(f) => (format!("<fn({})>", f.params.join(", ")), "Function"),
         _ => (v.to_string(), "Model"),

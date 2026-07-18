@@ -271,6 +271,8 @@ pub enum Value {
     AutoRegResult(Rc<greeners::AutoRegResult>),
     ArdlResult(Rc<greeners::ARDLResult>),
     LocalLevelResult(Rc<greeners::LocalLevelResult>),
+    KmeansResult(Rc<greeners::KmeansResult>),
+    DbscanResult(Rc<greeners::DbscanResult>),
     List(Arc<Vec<Value>>),
     Dict(Arc<HashMap<String, Value>>),
     Series(Arc<Series>),
@@ -407,6 +409,8 @@ impl std::fmt::Display for Value {
             Value::AutoRegResult(r) => write!(f, "{r}"),
             Value::ArdlResult(r) => write!(f, "{r}"),
             Value::LocalLevelResult(r) => write!(f, "{r}"),
+            Value::KmeansResult(r) => write!(f, "{r}"),
+            Value::DbscanResult(r) => write!(f, "{r}"),
             Value::List(v) => {
                 write!(f, "[")?;
                 for (i, item) in v.iter().enumerate() {

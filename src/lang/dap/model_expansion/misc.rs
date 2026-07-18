@@ -161,3 +161,77 @@ pub fn gam_fit_dict(r: &greeners::GamResult) -> Value {
         ("converged", Value::Bool(r.converged)),
     ])
 }
+
+pub fn kmeans_children(r: &greeners::KmeansResult) -> Vec<(String, Value)> {
+    let mut vars = Vec::new();
+    let labels: Vec<Value> = r.labels.iter().map(|&l| Value::Int(l as i64)).collect();
+    vars.push((
+        "labels".into(),
+        Value::Series(Arc::new(Series::new("labels", labels))),
+    ));
+    vars.push((
+        "centroids".into(),
+        array2_to_dataframe("centroids", &r.centroids),
+    ));
+    let sizes: Vec<Value> = r
+        .cluster_sizes
+        .iter()
+        .map(|&s| Value::Int(s as i64))
+        .collect();
+    vars.push((
+        "cluster_sizes".into(),
+        Value::Series(Arc::new(Series::new("cluster_sizes", sizes))),
+    ));
+    vars.push(("fit".into(), kmeans_fit_dict(r)));
+    vars
+}
+
+pub fn kmeans_fit_dict(r: &greeners::KmeansResult) -> Value {
+    let pct = if r.total_ss > 1e-15 {
+        r.between_ss / r.total_ss * 100.0
+    } else {
+        0.0
+    };
+    fit_dict(&[
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("n_features", Value::Int(r.n_features as i64)),
+        ("n_clusters", Value::Int(r.n_clusters as i64)),
+        ("n_iter", Value::Int(r.n_iter as i64)),
+        ("inertia", Value::Float(r.inertia)),
+        ("between_ss", Value::Float(r.between_ss)),
+        ("total_ss", Value::Float(r.total_ss)),
+        ("pct_explained", Value::Float(pct)),
+    ])
+}
+
+pub fn dbscan_children(r: &greeners::DbscanResult) -> Vec<(String, Value)> {
+    let mut vars = Vec::new();
+    let labels: Vec<Value> = r.labels.iter().map(|&l| Value::Int(l)).collect();
+    vars.push((
+        "labels".into(),
+        Value::Series(Arc::new(Series::new("labels", labels))),
+    ));
+    let sizes: Vec<Value> = r
+        .cluster_sizes
+        .iter()
+        .map(|&s| Value::Int(s as i64))
+        .collect();
+    vars.push((
+        "cluster_sizes".into(),
+        Value::Series(Arc::new(Series::new("cluster_sizes", sizes))),
+    ));
+    vars.push(("fit".into(), dbscan_fit_dict(r)));
+    vars
+}
+
+pub fn dbscan_fit_dict(r: &greeners::DbscanResult) -> Value {
+    fit_dict(&[
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("n_features", Value::Int(r.n_features as i64)),
+        ("n_clusters", Value::Int(r.n_clusters as i64)),
+        ("n_noise", Value::Int(r.n_noise as i64)),
+        ("n_core", Value::Int(r.n_core as i64)),
+        ("eps", Value::Float(r.eps)),
+        ("min_pts", Value::Int(r.min_pts as i64)),
+    ])
+}

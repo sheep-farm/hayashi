@@ -1179,8 +1179,7 @@ impl Interpreter {
         let result = greeners::KMeans::fit(&x_mat, k, None, None)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        Ok(Value::KmeansResult(Rc::new(result)))
     }
 
     pub(super) fn dbscan(
@@ -1252,8 +1251,7 @@ impl Interpreter {
         let result = greeners::DBSCAN::fit(&x_mat, eps, min_pts)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        Ok(Value::DbscanResult(Rc::new(result)))
     }
 
     pub(super) fn gmm_clust(
