@@ -670,29 +670,7 @@ impl Parser {
             // Dict literal: {"key": value, ...} or expression block: { stmt; ...; expr }
             Token::LBrace => {
                 if self.is_dict_literal() {
-                    self.advance(); // consumes LBrace
-                                    // Increments manually: inside the dict, Newlines are ignored
-                    self.brace_depth += 1;
-                    let mut pairs = Vec::new();
-                    while !matches!(self.peek(), Token::RBrace | Token::Eof) {
-                        self.skip_newlines();
-                        if matches!(self.peek(), Token::RBrace | Token::Eof) {
-                            break;
-                        }
-                        let key = self.parse_expr()?;
-                        self.skip_newlines();
-                        self.expect(&Token::Colon)?;
-                        self.skip_newlines();
-                        let val = self.parse_expr()?;
-                        pairs.push((key, val));
-                        self.skip_newlines();
-                        if self.peek() == &Token::Comma {
-                            self.advance();
-                        }
-                    }
-                    self.brace_depth -= 1; // decrementa antes do RBrace
-                    self.expect(&Token::RBrace)?;
-                    Ok(Expr::Dict(pairs))
+                    self.parse_dict_literal_expr()
                 } else {
                     self.parse_block_expr()
                 }
@@ -736,106 +714,9 @@ impl Parser {
             // Match expression: match expr { pat => result, ... }
             // `match` is a contextual keyword: it starts a match expression only
             // when followed by a scrutinee expression and an opening brace.
-            Token::Ident(ref s) if s == "match" && self.is_match_expr() => {
-                self.advance();
-                let scrutinee = self.parse_expr()?;
-                self.expect(&Token::LBrace)?;
-                self.skip_newlines();
-                let mut arms = Vec::new();
-                while !matches!(self.peek(), Token::RBrace | Token::Eof) {
-                    let pattern = self.parse_expr()?;
-                    self.expect(&Token::FatArrow)?;
-                    let result = self.parse_expr()?;
-                    arms.push((pattern, result));
-                    if self.peek() == &Token::Comma {
-                        self.advance();
-                    }
-                    self.skip_newlines();
-                }
-                self.expect(&Token::RBrace)?;
-                Ok(Expr::Match {
-                    expr: Box::new(scrutinee),
-                    arms,
-                })
-            }
+            Token::Ident(ref s) if s == "match" && self.is_match_expr() => self.parse_match_expr(),
 
-            Token::Ident(name) => {
-                self.advance();
-
-                if self.peek() == &Token::ColonColon {
-                    self.advance();
-                    let member = self.expect_ident()?;
-                    let qualified = format!("{name}::{member}");
-                    if self.peek() == &Token::LParen {
-                        self.advance();
-                        let (args, opts) = self.parse_call_args()?;
-                        self.expect(&Token::RParen)?;
-                        return Ok(Expr::Call {
-                            func: qualified,
-                            args,
-                            opts,
-                        });
-                    }
-                    return Ok(Expr::Var(qualified));
-                }
-
-                if self.peek() == &Token::Tilde {
-                    let formula = self.parse_formula(name)?;
-                    return Ok(Expr::Formula(formula));
-                }
-
-                if self.peek() == &Token::LParen {
-                    self.advance();
-                    let (args, opts) = self.parse_call_args()?;
-                    self.expect(&Token::RParen)?;
-                    let mut expr = Expr::Call {
-                        func: name,
-                        args,
-                        opts,
-                    };
-
-                    while self.peek() == &Token::Dot {
-                        self.advance();
-                        let field = self.expect_ident()?;
-                        let (fargs, fopts) = if self.peek() == &Token::LParen {
-                            self.advance();
-                            let r = self.parse_call_args()?;
-                            self.expect(&Token::RParen)?;
-                            r
-                        } else {
-                            (vec![], vec![])
-                        };
-                        expr = Expr::Field {
-                            obj: Box::new(expr),
-                            field,
-                            args: fargs,
-                            opts: fopts,
-                        };
-                    }
-                    return Ok(expr);
-                }
-
-                let mut expr = Expr::Var(name);
-                while self.peek() == &Token::Dot {
-                    self.advance();
-                    let field = self.expect_ident()?;
-                    let (fargs, fopts) = if self.peek() == &Token::LParen {
-                        self.advance();
-                        let r = self.parse_call_args()?;
-                        self.expect(&Token::RParen)?;
-                        r
-                    } else {
-                        (vec![], vec![])
-                    };
-                    expr = Expr::Field {
-                        obj: Box::new(expr),
-                        field,
-                        args: fargs,
-                        opts: fopts,
-                    };
-                }
-                Ok(expr)
-            }
+            Token::Ident(name) => self.parse_ident_primary(name),
 
             // Time-series operators: L.price, L2.price, F.gdp, D.wage
             Token::TsLag(n) => {
@@ -931,6 +812,133 @@ impl Parser {
                 msg: format!("unexpected token {:?}", self.peek()),
             }),
         }
+    }
+
+    fn parse_dict_literal_expr(&mut self) -> Result<Expr> {
+        self.advance(); // consumes LBrace
+                        // Increments manually: inside the dict, Newlines are ignored
+        self.brace_depth += 1;
+        let mut pairs = Vec::new();
+        while !matches!(self.peek(), Token::RBrace | Token::Eof) {
+            self.skip_newlines();
+            if matches!(self.peek(), Token::RBrace | Token::Eof) {
+                break;
+            }
+            let key = self.parse_expr()?;
+            self.skip_newlines();
+            self.expect(&Token::Colon)?;
+            self.skip_newlines();
+            let val = self.parse_expr()?;
+            pairs.push((key, val));
+            self.skip_newlines();
+            if self.peek() == &Token::Comma {
+                self.advance();
+            }
+        }
+        self.brace_depth -= 1; // decrementa antes do RBrace
+        self.expect(&Token::RBrace)?;
+        Ok(Expr::Dict(pairs))
+    }
+
+    fn parse_match_expr(&mut self) -> Result<Expr> {
+        self.advance();
+        let scrutinee = self.parse_expr()?;
+        self.expect(&Token::LBrace)?;
+        self.skip_newlines();
+        let mut arms = Vec::new();
+        while !matches!(self.peek(), Token::RBrace | Token::Eof) {
+            let pattern = self.parse_expr()?;
+            self.expect(&Token::FatArrow)?;
+            let result = self.parse_expr()?;
+            arms.push((pattern, result));
+            if self.peek() == &Token::Comma {
+                self.advance();
+            }
+            self.skip_newlines();
+        }
+        self.expect(&Token::RBrace)?;
+        Ok(Expr::Match {
+            expr: Box::new(scrutinee),
+            arms,
+        })
+    }
+
+    fn parse_ident_primary(&mut self, name: String) -> Result<Expr> {
+        self.advance();
+
+        if self.peek() == &Token::ColonColon {
+            self.advance();
+            let member = self.expect_ident()?;
+            let qualified = format!("{name}::{member}");
+            if self.peek() == &Token::LParen {
+                self.advance();
+                let (args, opts) = self.parse_call_args()?;
+                self.expect(&Token::RParen)?;
+                return Ok(Expr::Call {
+                    func: qualified,
+                    args,
+                    opts,
+                });
+            }
+            return Ok(Expr::Var(qualified));
+        }
+
+        if self.peek() == &Token::Tilde {
+            let formula = self.parse_formula(name)?;
+            return Ok(Expr::Formula(formula));
+        }
+
+        if self.peek() == &Token::LParen {
+            self.advance();
+            let (args, opts) = self.parse_call_args()?;
+            self.expect(&Token::RParen)?;
+            let mut expr = Expr::Call {
+                func: name,
+                args,
+                opts,
+            };
+
+            while self.peek() == &Token::Dot {
+                self.advance();
+                let field = self.expect_ident()?;
+                let (fargs, fopts) = if self.peek() == &Token::LParen {
+                    self.advance();
+                    let r = self.parse_call_args()?;
+                    self.expect(&Token::RParen)?;
+                    r
+                } else {
+                    (vec![], vec![])
+                };
+                expr = Expr::Field {
+                    obj: Box::new(expr),
+                    field,
+                    args: fargs,
+                    opts: fopts,
+                };
+            }
+            return Ok(expr);
+        }
+
+        let mut expr = Expr::Var(name);
+        while self.peek() == &Token::Dot {
+            self.advance();
+            let field = self.expect_ident()?;
+            let (fargs, fopts) = if self.peek() == &Token::LParen {
+                self.advance();
+                let r = self.parse_call_args()?;
+                self.expect(&Token::RParen)?;
+                r
+            } else {
+                (vec![], vec![])
+            };
+            expr = Expr::Field {
+                obj: Box::new(expr),
+                field,
+                args: fargs,
+                opts: fopts,
+            };
+        }
+        Ok(expr)
     }
 
     fn is_kw_bare_arg(&mut self) -> bool {
@@ -1231,76 +1239,9 @@ impl Parser {
                 Ok(Some(Stmt::Const { name, value }))
             }
 
-            Token::Load => {
-                self.advance();
-                let path = self.parse_expr()?;
-                // as nome (opcional)
-                let alias = if let Token::Ident(kw) = self.peek().clone() {
-                    if kw == "as" {
-                        self.advance();
-                        self.expect_ident()?
-                    } else {
-                        "df".to_string()
-                    }
-                } else {
-                    "df".to_string()
-                };
-                // options: , key=value, ...
-                let mut opts = Vec::new();
-                while *self.peek() == Token::Comma {
-                    self.advance();
-                    let key = self.expect_ident()?;
-                    self.expect(&Token::Eq)?;
-                    let val = match key.as_str() {
-                        "sheet" | "table" => {
-                            if let Token::Ident(s) = self.peek().clone() {
-                                self.advance();
-                                Expr::Str(s)
-                            } else {
-                                self.parse_expr()?
-                            }
-                        }
-                        _ => self.parse_expr()?,
-                    };
-                    opts.push(Opt {
-                        name: key,
-                        value: val,
-                    });
-                }
-                Ok(Some(Stmt::Load { path, alias, opts }))
-            }
+            Token::Load => self.parse_load_stmt(),
 
-            Token::Print => {
-                self.advance();
-                self.expect(&Token::LParen)?;
-                let mut exprs = Vec::new();
-                let mut opts = Vec::new();
-                if self.peek() != &Token::RParen {
-                    loop {
-                        if let Some(Token::Ident(name)) = self.peek_raw_at(0).cloned() {
-                            if self.peek_raw_at(1) == Some(&Token::Eq) {
-                                self.advance();
-                                self.advance();
-                                let val = self.parse_expr()?;
-                                opts.push(Opt { name, value: val });
-                                if self.peek() == &Token::Comma {
-                                    self.advance();
-                                    continue;
-                                }
-                                break;
-                            }
-                        }
-                        exprs.push(self.parse_expr()?);
-                        if self.peek() == &Token::Comma {
-                            self.advance();
-                        } else {
-                            break;
-                        }
-                    }
-                }
-                self.expect(&Token::RParen)?;
-                Ok(Some(Stmt::Print(exprs, opts)))
-            }
+            Token::Print => self.parse_print_stmt(),
 
             Token::Export => {
                 self.advance();
@@ -1314,60 +1255,9 @@ impl Parser {
                 Ok(Some(Stmt::Export { value, fmt, path }))
             }
 
-            Token::Generate => {
-                if self.peek_raw_at(1) == Some(&Token::LParen) {
-                    // generate(df, col = expr) — function call form
-                    let expr = self.parse_expr()?;
-                    Ok(Some(Stmt::Expr(expr)))
-                } else {
-                    // generate df var = expr — Stata statement form
-                    // var may be an identifier or an f-string (dynamic column name)
-                    self.advance();
-                    let df = self.expect_ident()?;
-                    let varname = match self.peek().clone() {
-                        Token::Ident(n) => {
-                            self.advance();
-                            Expr::Str(n)
-                        }
-                        Token::FStringLit(s) => {
-                            let s = s.clone();
-                            self.advance();
-                            let parts = self.parse_fstring_parts(&s)?;
-                            Expr::FString(parts)
-                        }
-                        _ => {
-                            return Err(HayashiError::Parse {
-                                line: self.line(),
-                                msg: "generate: expected column name (identifier or f-string)"
-                                    .into(),
-                            })
-                        }
-                    };
-                    self.expect(&Token::Eq)?;
-                    let expr = self.parse_expr()?;
-                    Ok(Some(Stmt::Generate { df, varname, expr }))
-                }
-            }
+            Token::Generate => self.parse_generate_stmt(),
 
-            Token::Predict => {
-                self.advance();
-                let df = self.expect_ident()?;
-                let varname = self.expect_ident()?;
-                self.expect(&Token::Eq)?;
-                let model = self.parse_primary()?;
-                let kind = if self.peek() == &Token::Comma {
-                    self.advance();
-                    self.parse_expr()?
-                } else {
-                    Expr::Str("xb".to_string())
-                };
-                Ok(Some(Stmt::Predict {
-                    df,
-                    varname,
-                    model,
-                    kind,
-                }))
-            }
+            Token::Predict => self.parse_predict_stmt(),
 
             Token::Count => {
                 self.advance();
@@ -1381,92 +1271,15 @@ impl Parser {
                 Ok(Some(Stmt::Count { df, cond }))
             }
 
-            Token::Replace => {
-                self.advance();
-                let df = self.expect_ident()?;
-                let varname = self.expect_ident()?;
-                self.expect(&Token::Eq)?;
-                let expr = self.parse_expr()?;
-                // opcional: if cond_expr
-                let cond = if self.peek() == &Token::If {
-                    self.advance();
-                    Some(self.parse_expr()?)
-                } else {
-                    None
-                };
-                Ok(Some(Stmt::Replace {
-                    df,
-                    varname,
-                    expr,
-                    cond,
-                }))
-            }
+            Token::Replace => self.parse_replace_stmt(),
 
-            Token::Tsset => {
-                self.advance();
-                let df = self.expect_ident()?;
-                let t_var = self.expect_ident()?;
-                Ok(Some(Stmt::Tsset { df, t_var }))
-            }
+            Token::Tsset => self.parse_tsset_stmt(),
 
             // ── if cond { ... } [else [if cond] { ... }] ─────────────────────
-            Token::If => {
-                self.advance();
-                let cond = self.parse_expr()?;
-                let then_body = self.parse_block()?;
-                // else [if ...]
-                let else_body = if self.peek() == &Token::Else {
-                    self.advance();
-                    if self.peek() == &Token::If {
-                        let inner_line = self.line();
-                        let inner = self.parse_stmt()?.ok_or_else(|| HayashiError::Parse {
-                            line,
-                            msg: "expected statement after 'else if'".into(),
-                        })?;
-                        Some(vec![(inner, inner_line)])
-                    } else {
-                        Some(self.parse_block()?)
-                    }
-                } else {
-                    None
-                };
-                Ok(Some(Stmt::If {
-                    cond,
-                    then_body,
-                    else_body,
-                }))
-            }
+            Token::If => self.parse_if_stmt(line),
 
             // ── for var in iter { ... } ───────────────────────────────────────
-            // Also supports: for k, v in dict { ... } and for i, v in list { ... }
-            Token::For => {
-                self.advance();
-                let var = self.expect_ident()?;
-                let var2 = if self.peek() == &Token::Comma {
-                    self.advance();
-                    Some(self.expect_ident()?)
-                } else {
-                    None
-                };
-                // expects "in"
-                match self.advance().clone() {
-                    Token::In => {}
-                    t => {
-                        return Err(HayashiError::Parse {
-                            line,
-                            msg: format!("expected 'in' after for variable, got {t:?}"),
-                        })
-                    }
-                }
-                let iter = self.parse_for_iter()?;
-                let body = self.parse_block()?;
-                Ok(Some(Stmt::For {
-                    var,
-                    var2,
-                    iter,
-                    body,
-                }))
-            }
+            Token::For => self.parse_for_stmt(line),
 
             // ── parallel for var in iter { ... } ─────────────────────────────
             // Like `for`, but iterations run concurrently.
@@ -1484,36 +1297,7 @@ impl Parser {
             }
 
             // ── fn name(p1, p2) { body } ─────────────────────────────────────
-            Token::Fn => {
-                self.advance();
-                let name = self.expect_ident()?;
-                self.expect(&Token::LParen)?;
-                let mut params = Vec::new();
-                let mut defaults = Vec::new();
-                while !matches!(self.peek(), Token::RParen | Token::Eof) {
-                    let param = self.expect_ident()?;
-                    let default = if self.peek() == &Token::Eq {
-                        self.advance();
-                        Some(self.parse_expr()?)
-                    } else {
-                        None
-                    };
-                    params.push(param);
-                    defaults.push(default);
-                    if self.peek() == &Token::Comma {
-                        self.advance();
-                    }
-                }
-                self.expect(&Token::RParen)?;
-                let (doc, body) = self.parse_block_with_doc()?;
-                Ok(Some(Stmt::Fn {
-                    name,
-                    params,
-                    defaults,
-                    doc,
-                    body,
-                }))
-            }
+            Token::Fn => self.parse_fn_stmt(),
 
             // ── return [expr] ─────────────────────────────────────────────────
             Token::Return => {
@@ -1544,141 +1328,10 @@ impl Parser {
             }
 
             // ── input df \n header_row \n data_rows \n end ────────────────────
-            Token::Ident(ref s) if s == "input" => {
-                self.advance();
-                let alias = self.expect_ident()?;
-                self.skip_newlines();
-
-                // Header: variable names until newline
-                let mut headers: Vec<String> = Vec::new();
-                loop {
-                    match self.peek().clone() {
-                        Token::Newline | Token::Eof => break,
-                        Token::Ident(h) => {
-                            let h = h.clone();
-                            self.advance();
-                            headers.push(h);
-                        }
-                        _ => break,
-                    }
-                }
-                self.skip_newlines();
-
-                // Data lines until "end"
-                let mut rows: Vec<Vec<f64>> = Vec::new();
-                'outer: loop {
-                    self.skip_newlines();
-                    // Detect "end"
-                    if let Token::Ident(ref s) = self.peek().clone() {
-                        if s == "end" {
-                            self.advance();
-                            break 'outer;
-                        }
-                    }
-                    if self.peek() == &Token::Eof {
-                        break;
-                    }
-
-                    let mut row: Vec<f64> = Vec::new();
-                    loop {
-                        match self.peek().clone() {
-                            Token::Newline | Token::Eof => break,
-                            Token::Float(v) => {
-                                self.advance();
-                                row.push(v);
-                            }
-                            Token::Int(v) => {
-                                let v = v as f64;
-                                self.advance();
-                                row.push(v);
-                            }
-                            Token::Minus => {
-                                self.advance();
-                                let v = match self.peek().clone() {
-                                    Token::Float(v) => {
-                                        self.advance();
-                                        -v
-                                    }
-                                    Token::Int(v) => {
-                                        self.advance();
-                                        -(v as f64)
-                                    }
-                                    _ => {
-                                        return Err(HayashiError::Parse {
-                                            line,
-                                            msg: "expected number after '-'".into(),
-                                        })
-                                    }
-                                };
-                                row.push(v);
-                            }
-                            Token::Dot => {
-                                self.advance();
-                                row.push(f64::NAN);
-                            } // . = missing
-                            Token::Ident(ref s) | Token::StringLit(ref s) => {
-                                let s = s.clone();
-                                return Err(HayashiError::Parse {
-                                    line,
-                                    msg: format!(
-                                        "input block only accepts numeric values — \
-                                         '{s}' is not a number. \
-                                         Use '.' for missing, or load for files with text columns."
-                                    ),
-                                });
-                            }
-                            _ => {
-                                // skip unknown tokens until end of line
-                                while !matches!(self.peek(), Token::Newline | Token::Eof) {
-                                    self.advance();
-                                }
-                                break;
-                            }
-                        }
-                    }
-                    if !row.is_empty() {
-                        rows.push(row);
-                    }
-                }
-                Ok(Some(Stmt::Input {
-                    alias,
-                    headers,
-                    rows,
-                }))
-            }
+            Token::Ident(ref s) if s == "input" => self.parse_input_stmt(line),
 
             // ── try { ... } catch e { ... } [finally { ... }] ────────────────
-            Token::Ident(ref s) if s == "try" => {
-                self.advance();
-                let try_body = self.parse_block()?;
-                let catch_kw = match self.peek().clone() {
-                    Token::Ident(s) if s == "catch" => {
-                        self.advance();
-                        true
-                    }
-                    _ => false,
-                };
-                if !catch_kw {
-                    return Err(HayashiError::Parse {
-                        line,
-                        msg: "expected 'catch' after try block".into(),
-                    });
-                }
-                let error_var = self.expect_ident()?;
-                let catch_body = self.parse_block()?;
-                let finally_body = if matches!(self.peek(), Token::Ident(ref s) if s == "finally") {
-                    self.advance();
-                    self.parse_block()?
-                } else {
-                    Vec::new()
-                };
-                Ok(Some(Stmt::TryCatch {
-                    try_body,
-                    error_var,
-                    catch_body,
-                    finally_body,
-                }))
-            }
+            Token::Ident(ref s) if s == "try" => self.parse_try_catch_stmt(line),
 
             // ── display expr (without parentheses) ───────────────────────────────
             Token::Ident(ref s) if s == "display" || s == "di" => {
@@ -1697,46 +1350,29 @@ impl Parser {
             }
 
             // name = expr (assignment without let — modifies existing variable)
-            Token::Ident(ref name)
+            Token::Ident(name)
                 if self
                     .tokens
                     .get(self.pos + 1)
                     .map(|(t, _)| t == &Token::Eq)
                     .unwrap_or(false) =>
             {
-                let name = name.clone();
-                self.advance(); // ident
-                self.advance(); // =
-                let value = self.parse_expr()?;
-                Ok(Some(Stmt::Assign { name, value }))
+                self.parse_assign_stmt(name)
             }
 
             // increment/decrement: x++  x--
-            Token::Ident(ref name)
+            Token::Ident(name)
                 if self
                     .tokens
                     .get(self.pos + 1)
                     .map(|(t, _)| matches!(t, Token::PlusPlus | Token::MinusMinus))
                     .unwrap_or(false) =>
             {
-                let name = name.clone();
-                self.advance(); // ident
-                let op = match self.peek() {
-                    Token::PlusPlus => BinOp::Add,
-                    Token::MinusMinus => BinOp::Sub,
-                    _ => unreachable!(),
-                };
-                self.advance(); // ++ or --
-                let value = Expr::BinOp {
-                    op,
-                    lhs: Box::new(Expr::Var(name.clone())),
-                    rhs: Box::new(Expr::Int(1)),
-                };
-                Ok(Some(Stmt::Assign { name, value }))
+                self.parse_incdec_stmt(name)
             }
 
             // compound assignment: +=  -=  *=  /=  %=
-            Token::Ident(ref name)
+            Token::Ident(name)
                 if self
                     .tokens
                     .get(self.pos + 1)
@@ -1752,53 +1388,10 @@ impl Parser {
                     })
                     .unwrap_or(false) =>
             {
-                let name = name.clone();
-                self.advance(); // ident
-                let op = match self.peek() {
-                    Token::PlusEq => BinOp::Add,
-                    Token::MinusEq => BinOp::Sub,
-                    Token::StarEq => BinOp::Mul,
-                    Token::SlashEq => BinOp::Div,
-                    Token::PercentEq => BinOp::Mod,
-                    _ => unreachable!(),
-                };
-                self.advance(); // op=
-                let rhs = self.parse_expr()?;
-                let value = Expr::BinOp {
-                    op,
-                    lhs: Box::new(Expr::Var(name.clone())),
-                    rhs: Box::new(rhs),
-                };
-                Ok(Some(Stmt::Assign { name, value }))
+                self.parse_compound_assign_stmt(name)
             }
 
-            Token::Quietly => {
-                if self
-                    .tokens
-                    .get(self.pos + 1)
-                    .map(|(t, _)| t == &Token::LParen)
-                    .unwrap_or(false)
-                {
-                    // Obsolete functional form at statement level: quietly(expr)
-                    let expr = self.parse_expr()?;
-                    return Ok(Some(Stmt::Expr(expr)));
-                }
-                self.advance(); // consumes quietly
-                match self.peek() {
-                    Token::Ident(s) if s == "on" => {
-                        self.advance();
-                        Ok(Some(Stmt::QuietlyOn))
-                    }
-                    Token::Ident(s) if s == "off" => {
-                        self.advance();
-                        Ok(Some(Stmt::QuietlyOff))
-                    }
-                    other => Err(HayashiError::Parse {
-                        line,
-                        msg: format!("expected 'on' or 'off' after quietly, got {other:?}"),
-                    }),
-                }
-            }
+            Token::Quietly => self.parse_quietly_stmt(line),
 
             Token::Ident(_) => {
                 let expr = self.parse_expr()?;
@@ -1829,6 +1422,453 @@ impl Parser {
                 msg: format!("unexpected token at statement level: {t:?}"),
             }),
         }
+    }
+
+    fn parse_input_stmt(&mut self, line: usize) -> Result<Option<Stmt>> {
+        self.advance();
+        let alias = self.expect_ident()?;
+        self.skip_newlines();
+
+        // Header: variable names until newline
+        let mut headers: Vec<String> = Vec::new();
+        loop {
+            match self.peek().clone() {
+                Token::Newline | Token::Eof => break,
+                Token::Ident(h) => {
+                    let h = h.clone();
+                    self.advance();
+                    headers.push(h);
+                }
+                _ => break,
+            }
+        }
+        self.skip_newlines();
+
+        // Data lines until "end"
+        let mut rows: Vec<Vec<f64>> = Vec::new();
+        'outer: loop {
+            self.skip_newlines();
+            // Detect "end"
+            if let Token::Ident(ref s) = self.peek().clone() {
+                if s == "end" {
+                    self.advance();
+                    break 'outer;
+                }
+            }
+            if self.peek() == &Token::Eof {
+                break;
+            }
+
+            let mut row: Vec<f64> = Vec::new();
+            loop {
+                match self.peek().clone() {
+                    Token::Newline | Token::Eof => break,
+                    Token::Float(v) => {
+                        self.advance();
+                        row.push(v);
+                    }
+                    Token::Int(v) => {
+                        let v = v as f64;
+                        self.advance();
+                        row.push(v);
+                    }
+                    Token::Minus => {
+                        self.advance();
+                        let v = match self.peek().clone() {
+                            Token::Float(v) => {
+                                self.advance();
+                                -v
+                            }
+                            Token::Int(v) => {
+                                self.advance();
+                                -(v as f64)
+                            }
+                            _ => {
+                                return Err(HayashiError::Parse {
+                                    line,
+                                    msg: "expected number after '-'".into(),
+                                })
+                            }
+                        };
+                        row.push(v);
+                    }
+                    Token::Dot => {
+                        self.advance();
+                        row.push(f64::NAN);
+                    } // . = missing
+                    Token::Ident(ref s) | Token::StringLit(ref s) => {
+                        let s = s.clone();
+                        return Err(HayashiError::Parse {
+                            line,
+                            msg: format!(
+                                "input block only accepts numeric values — \
+                                 '{s}' is not a number. \
+                                 Use '.' for missing, or load for files with text columns."
+                            ),
+                        });
+                    }
+                    _ => {
+                        // skip unknown tokens until end of line
+                        while !matches!(self.peek(), Token::Newline | Token::Eof) {
+                            self.advance();
+                        }
+                        break;
+                    }
+                }
+            }
+            if !row.is_empty() {
+                rows.push(row);
+            }
+        }
+        Ok(Some(Stmt::Input {
+            alias,
+            headers,
+            rows,
+        }))
+    }
+
+    fn parse_try_catch_stmt(&mut self, line: usize) -> Result<Option<Stmt>> {
+        self.advance();
+        let try_body = self.parse_block()?;
+        let catch_kw = match self.peek().clone() {
+            Token::Ident(s) if s == "catch" => {
+                self.advance();
+                true
+            }
+            _ => false,
+        };
+        if !catch_kw {
+            return Err(HayashiError::Parse {
+                line,
+                msg: "expected 'catch' after try block".into(),
+            });
+        }
+        let error_var = self.expect_ident()?;
+        let catch_body = self.parse_block()?;
+        let finally_body = if matches!(self.peek(), Token::Ident(ref s) if s == "finally") {
+            self.advance();
+            self.parse_block()?
+        } else {
+            Vec::new()
+        };
+        Ok(Some(Stmt::TryCatch {
+            try_body,
+            error_var,
+            catch_body,
+            finally_body,
+        }))
+    }
+
+    fn parse_quietly_stmt(&mut self, line: usize) -> Result<Option<Stmt>> {
+        if self
+            .tokens
+            .get(self.pos + 1)
+            .map(|(t, _)| t == &Token::LParen)
+            .unwrap_or(false)
+        {
+            // Obsolete functional form at statement level: quietly(expr)
+            let expr = self.parse_expr()?;
+            return Ok(Some(Stmt::Expr(expr)));
+        }
+        self.advance(); // consumes quietly
+        match self.peek() {
+            Token::Ident(s) if s == "on" => {
+                self.advance();
+                Ok(Some(Stmt::QuietlyOn))
+            }
+            Token::Ident(s) if s == "off" => {
+                self.advance();
+                Ok(Some(Stmt::QuietlyOff))
+            }
+            other => Err(HayashiError::Parse {
+                line,
+                msg: format!("expected 'on' or 'off' after quietly, got {other:?}"),
+            }),
+        }
+    }
+
+    fn parse_assign_stmt(&mut self, name: String) -> Result<Option<Stmt>> {
+        self.advance(); // ident
+        self.advance(); // =
+        let value = self.parse_expr()?;
+        Ok(Some(Stmt::Assign { name, value }))
+    }
+
+    fn parse_incdec_stmt(&mut self, name: String) -> Result<Option<Stmt>> {
+        self.advance(); // ident
+        let op = match self.peek() {
+            Token::PlusPlus => BinOp::Add,
+            Token::MinusMinus => BinOp::Sub,
+            _ => unreachable!(),
+        };
+        self.advance(); // ++ or --
+        let value = Expr::BinOp {
+            op,
+            lhs: Box::new(Expr::Var(name.clone())),
+            rhs: Box::new(Expr::Int(1)),
+        };
+        Ok(Some(Stmt::Assign { name, value }))
+    }
+
+    fn parse_compound_assign_stmt(&mut self, name: String) -> Result<Option<Stmt>> {
+        self.advance(); // ident
+        let op = match self.peek() {
+            Token::PlusEq => BinOp::Add,
+            Token::MinusEq => BinOp::Sub,
+            Token::StarEq => BinOp::Mul,
+            Token::SlashEq => BinOp::Div,
+            Token::PercentEq => BinOp::Mod,
+            _ => unreachable!(),
+        };
+        self.advance(); // op=
+        let rhs = self.parse_expr()?;
+        let value = Expr::BinOp {
+            op,
+            lhs: Box::new(Expr::Var(name.clone())),
+            rhs: Box::new(rhs),
+        };
+        Ok(Some(Stmt::Assign { name, value }))
+    }
+
+    fn parse_fn_stmt(&mut self) -> Result<Option<Stmt>> {
+        self.advance();
+        let name = self.expect_ident()?;
+        self.expect(&Token::LParen)?;
+        let mut params = Vec::new();
+        let mut defaults = Vec::new();
+        while !matches!(self.peek(), Token::RParen | Token::Eof) {
+            let param = self.expect_ident()?;
+            let default = if self.peek() == &Token::Eq {
+                self.advance();
+                Some(self.parse_expr()?)
+            } else {
+                None
+            };
+            params.push(param);
+            defaults.push(default);
+            if self.peek() == &Token::Comma {
+                self.advance();
+            }
+        }
+        self.expect(&Token::RParen)?;
+        let (doc, body) = self.parse_block_with_doc()?;
+        Ok(Some(Stmt::Fn {
+            name,
+            params,
+            defaults,
+            doc,
+            body,
+        }))
+    }
+
+    fn parse_if_stmt(&mut self, line: usize) -> Result<Option<Stmt>> {
+        self.advance();
+        let cond = self.parse_expr()?;
+        let then_body = self.parse_block()?;
+        // else [if ...]
+        let else_body = if self.peek() == &Token::Else {
+            self.advance();
+            if self.peek() == &Token::If {
+                let inner_line = self.line();
+                let inner = self.parse_stmt()?.ok_or_else(|| HayashiError::Parse {
+                    line,
+                    msg: "expected statement after 'else if'".into(),
+                })?;
+                Some(vec![(inner, inner_line)])
+            } else {
+                Some(self.parse_block()?)
+            }
+        } else {
+            None
+        };
+        Ok(Some(Stmt::If {
+            cond,
+            then_body,
+            else_body,
+        }))
+    }
+
+    fn parse_for_stmt(&mut self, line: usize) -> Result<Option<Stmt>> {
+        // Also supports: for k, v in dict { ... } and for i, v in list { ... }
+        self.advance();
+        let var = self.expect_ident()?;
+        let var2 = if self.peek() == &Token::Comma {
+            self.advance();
+            Some(self.expect_ident()?)
+        } else {
+            None
+        };
+        // expects "in"
+        match self.advance().clone() {
+            Token::In => {}
+            t => {
+                return Err(HayashiError::Parse {
+                    line,
+                    msg: format!("expected 'in' after for variable, got {t:?}"),
+                })
+            }
+        }
+        let iter = self.parse_for_iter()?;
+        let body = self.parse_block()?;
+        Ok(Some(Stmt::For {
+            var,
+            var2,
+            iter,
+            body,
+        }))
+    }
+
+    fn parse_replace_stmt(&mut self) -> Result<Option<Stmt>> {
+        self.advance();
+        let df = self.expect_ident()?;
+        let varname = self.expect_ident()?;
+        self.expect(&Token::Eq)?;
+        let expr = self.parse_expr()?;
+        // opcional: if cond_expr
+        let cond = if self.peek() == &Token::If {
+            self.advance();
+            Some(self.parse_expr()?)
+        } else {
+            None
+        };
+        Ok(Some(Stmt::Replace {
+            df,
+            varname,
+            expr,
+            cond,
+        }))
+    }
+
+    fn parse_tsset_stmt(&mut self) -> Result<Option<Stmt>> {
+        self.advance();
+        let df = self.expect_ident()?;
+        let t_var = self.expect_ident()?;
+        Ok(Some(Stmt::Tsset { df, t_var }))
+    }
+
+    fn parse_generate_stmt(&mut self) -> Result<Option<Stmt>> {
+        if self.peek_raw_at(1) == Some(&Token::LParen) {
+            // generate(df, col = expr) — function call form
+            let expr = self.parse_expr()?;
+            Ok(Some(Stmt::Expr(expr)))
+        } else {
+            // generate df var = expr — Stata statement form
+            // var may be an identifier or an f-string (dynamic column name)
+            self.advance();
+            let df = self.expect_ident()?;
+            let varname = match self.peek().clone() {
+                Token::Ident(n) => {
+                    self.advance();
+                    Expr::Str(n)
+                }
+                Token::FStringLit(s) => {
+                    let s = s.clone();
+                    self.advance();
+                    let parts = self.parse_fstring_parts(&s)?;
+                    Expr::FString(parts)
+                }
+                _ => {
+                    return Err(HayashiError::Parse {
+                        line: self.line(),
+                        msg: "generate: expected column name (identifier or f-string)".into(),
+                    })
+                }
+            };
+            self.expect(&Token::Eq)?;
+            let expr = self.parse_expr()?;
+            Ok(Some(Stmt::Generate { df, varname, expr }))
+        }
+    }
+
+    fn parse_predict_stmt(&mut self) -> Result<Option<Stmt>> {
+        self.advance();
+        let df = self.expect_ident()?;
+        let varname = self.expect_ident()?;
+        self.expect(&Token::Eq)?;
+        let model = self.parse_primary()?;
+        let kind = if self.peek() == &Token::Comma {
+            self.advance();
+            self.parse_expr()?
+        } else {
+            Expr::Str("xb".to_string())
+        };
+        Ok(Some(Stmt::Predict {
+            df,
+            varname,
+            model,
+            kind,
+        }))
+    }
+
+    fn parse_print_stmt(&mut self) -> Result<Option<Stmt>> {
+        self.advance();
+        self.expect(&Token::LParen)?;
+        let mut exprs = Vec::new();
+        let mut opts = Vec::new();
+        if self.peek() != &Token::RParen {
+            loop {
+                if let Some(Token::Ident(name)) = self.peek_raw_at(0).cloned() {
+                    if self.peek_raw_at(1) == Some(&Token::Eq) {
+                        self.advance();
+                        self.advance();
+                        let val = self.parse_expr()?;
+                        opts.push(Opt { name, value: val });
+                        if self.peek() == &Token::Comma {
+                            self.advance();
+                            continue;
+                        }
+                        break;
+                    }
+                }
+                exprs.push(self.parse_expr()?);
+                if self.peek() == &Token::Comma {
+                    self.advance();
+                } else {
+                    break;
+                }
+            }
+        }
+        self.expect(&Token::RParen)?;
+        Ok(Some(Stmt::Print(exprs, opts)))
+    }
+
+    fn parse_load_stmt(&mut self) -> Result<Option<Stmt>> {
+        self.advance();
+        let path = self.parse_expr()?;
+        // as nome (opcional)
+        let alias = if let Token::Ident(kw) = self.peek().clone() {
+            if kw == "as" {
+                self.advance();
+                self.expect_ident()?
+            } else {
+                "df".to_string()
+            }
+        } else {
+            "df".to_string()
+        };
+        // options: , key=value, ...
+        let mut opts = Vec::new();
+        while *self.peek() == Token::Comma {
+            self.advance();
+            let key = self.expect_ident()?;
+            self.expect(&Token::Eq)?;
+            let val = match key.as_str() {
+                "sheet" | "table" => {
+                    if let Token::Ident(s) = self.peek().clone() {
+                        self.advance();
+                        Expr::Str(s)
+                    } else {
+                        self.parse_expr()?
+                    }
+                }
+                _ => self.parse_expr()?,
+            };
+            opts.push(Opt {
+                name: key,
+                value: val,
+            });
+        }
+        Ok(Some(Stmt::Load { path, alias, opts }))
     }
 
     pub fn parse_program(&mut self) -> Result<Vec<Spanned>> {
