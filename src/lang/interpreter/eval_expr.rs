@@ -96,7 +96,7 @@ impl Interpreter {
                 self.eval_range(start_expr, end_expr, true)
             }
 
-            Expr::Block(stmts, final_expr) => self.eval_block(stmts, final_expr),
+            Expr::Block(stmts, final_expr) => self.eval_block(stmts, final_expr.as_deref()),
 
             Expr::Quietly(inner) => self.eval_quietly(inner),
 
@@ -369,11 +369,11 @@ impl Interpreter {
         }
     }
 
-    fn eval_block(&mut self, stmts: &[Stmt], final_expr: &Option<Box<Expr>>) -> Result<Value> {
+    fn eval_block(&mut self, stmts: &[Spanned], final_expr: Option<&SpannedExpr>) -> Result<Value> {
         self.env.push_scope();
         let mut result = Value::Nil;
         for s in stmts {
-            match self.exec(&(s.clone(), 0)) {
+            match self.exec(s) {
                 Ok(()) => {}
                 Err(e) => {
                     self.env.pop_scope();
@@ -381,7 +381,9 @@ impl Interpreter {
                 }
             }
         }
-        if let Some(e) = final_expr {
+        if let Some((e, line)) = final_expr {
+            let file = self.current_source().to_path_buf();
+            self.debug_check(&file, *line)?;
             result = self.eval_expr(e)?;
         }
         self.env.pop_scope();

@@ -317,7 +317,7 @@ pub enum Expr {
     RangeInclusive(Box<Expr>, Box<Expr>),
 
     // expression block: { stmt; ...; expr }
-    Block(Vec<Stmt>, Option<Box<Expr>>),
+    Block(Vec<Spanned>, Option<Box<SpannedExpr>>),
 
     // parallel for as expression: returns the list of results
     ParallelFor {
@@ -329,6 +329,7 @@ pub enum Expr {
     },
 }
 
+pub type SpannedExpr = (Expr, usize);
 pub type Spanned = (Stmt, usize);
 
 /// Language commands (statements)

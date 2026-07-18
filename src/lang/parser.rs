@@ -1149,20 +1149,22 @@ impl Parser {
         self.expect(&Token::LBrace)?;
         self.brace_depth += 1;
         self.skip_newlines();
-        let mut stmts = Vec::new();
+        let mut stmts: Vec<Spanned> = Vec::new();
         while !matches!(self.peek(), Token::RBrace | Token::Eof) {
+            let line = self.line();
             if let Some(s) = self.parse_stmt()? {
-                stmts.push(s);
+                stmts.push((s, line));
             }
             self.skip_newlines();
         }
         self.brace_depth -= 1;
         self.expect(&Token::RBrace)?;
         // If the last statement is an expression, it is the return value of the block.
-        let final_expr = if let Some(Stmt::Expr(e)) = stmts.last() {
+        let final_expr = if let Some((Stmt::Expr(e), line)) = stmts.last() {
             let e = e.clone();
+            let line = *line;
             stmts.pop();
-            Some(Box::new(e))
+            Some(Box::new((e, line)))
         } else {
             None
         };

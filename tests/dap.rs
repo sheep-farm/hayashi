@@ -170,3 +170,39 @@ fn dap_runs_to_completion_without_breakpoints() {
     session.send("disconnect", "");
     session.close();
 }
+
+#[test]
+#[ignore = "requires interactive DAP client"]
+fn dap_breakpoint_inside_expression_block() {
+    let (mut session, _tmp) = DapSession::spawn("let df = {\n  raw = 1\n  raw\n}\n");
+
+    session.send("initialize", "");
+    session.send(
+        "setBreakpoints",
+        &format!(
+            "{{\"source\":{{\"path\":\"{}\"}},\"breakpoints\":[{{\"line\":3}}]}}",
+            _tmp.display()
+        ),
+    );
+    session.send(
+        "launch",
+        &format!(
+            "{{\"request\":\"launch\",\"name\":\"test\",\"program\":\"{}\"}}",
+            _tmp.display()
+        ),
+    );
+    session.send("configurationDone", "");
+
+    let stopped = session.wait_for("\"event\":\"stopped\"", 100);
+    assert!(stopped.contains("\"reason\":\"breakpoint\""));
+
+    session.send("variables", "{\"variablesReference\":1}");
+    let vars = session.wait_for("\"command\":\"variables\"", 100);
+    assert!(vars.contains("\"name\":\"raw\""));
+    assert!(vars.contains("\"value\":\"1\""));
+
+    session.send("continue", "");
+    session.wait_for("\"event\":\"terminated\"", 100);
+    session.send("disconnect", "");
+    session.close();
+}
