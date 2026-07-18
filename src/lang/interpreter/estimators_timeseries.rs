@@ -1419,7 +1419,17 @@ impl Interpreter {
         diagnostics.insert("n".into(), Value::Int(m.n_obs as i64));
 
         let std_res = &m.standardized_residuals;
+        diagnostics.insert("ljung_box".into(), self.garch_ljung_box(std_res)?);
+        diagnostics.insert("arch_test".into(), self.garch_arch_test(std_res)?);
+        diagnostics.insert("jarque_bera".into(), self.garch_jarque_bera(std_res)?);
 
+        println!("\n{thin}");
+        println!("  *** p<0.01  ** p<0.05  * p<0.10");
+        println!("{thick}\n");
+        Ok(diagnostics)
+    }
+
+    fn garch_ljung_box(&self, std_res: &ndarray::Array1<f64>) -> Result<Value> {
         println!("\n── Autocorrelation in Standardized Residuals (Ljung-Box, lags=10)");
         match greeners::Diagnostics::ljung_box(std_res, 10) {
             Ok(r) => {
@@ -1433,14 +1443,16 @@ impl Interpreter {
                 lb_map.insert("q_stat".into(), Value::Float(r.q_stat));
                 lb_map.insert("p_value".into(), Value::Float(r.p_value));
                 lb_map.insert("lags".into(), Value::Int(10));
-                diagnostics.insert("ljung_box".into(), Value::Dict(Arc::new(lb_map)));
+                Ok(Value::Dict(Arc::new(lb_map)))
             }
             Err(e) => {
                 println!("   error: {e}");
-                diagnostics.insert("ljung_box".into(), Value::Str(format!("error: {e}")));
+                Ok(Value::Str(format!("error: {e}")))
             }
         }
+    }
 
+    fn garch_arch_test(&self, std_res: &ndarray::Array1<f64>) -> Result<Value> {
         println!("\n── Efeitos ARCH Residuais (Engle LM, lags=5)");
         match greeners::Diagnostics::arch_test(std_res, 5) {
             Ok(r) => {
@@ -1455,14 +1467,16 @@ impl Interpreter {
                 arch_map.insert("lm_stat".into(), Value::Float(r.lm_stat));
                 arch_map.insert("p_value".into(), Value::Float(r.lm_pvalue));
                 arch_map.insert("lags".into(), Value::Int(r.lags as i64));
-                diagnostics.insert("arch_test".into(), Value::Dict(Arc::new(arch_map)));
+                Ok(Value::Dict(Arc::new(arch_map)))
             }
             Err(e) => {
                 println!("   error: {e}");
-                diagnostics.insert("arch_test".into(), Value::Str(format!("error: {e}")));
+                Ok(Value::Str(format!("error: {e}")))
             }
         }
+    }
 
+    fn garch_jarque_bera(&self, std_res: &ndarray::Array1<f64>) -> Result<Value> {
         println!("\n── Standardized Residual Normality (Jarque-Bera)");
         match greeners::Diagnostics::jarque_bera(std_res) {
             Ok((jb, p)) => {
@@ -1476,18 +1490,13 @@ impl Interpreter {
                 jb_map.insert("jb_stat".into(), Value::Float(jb));
                 jb_map.insert("p_value".into(), Value::Float(p));
                 jb_map.insert("df".into(), Value::Int(2));
-                diagnostics.insert("jarque_bera".into(), Value::Dict(Arc::new(jb_map)));
+                Ok(Value::Dict(Arc::new(jb_map)))
             }
             Err(e) => {
                 println!("   error: {e}");
-                diagnostics.insert("jarque_bera".into(), Value::Str(format!("error: {e}")));
+                Ok(Value::Str(format!("error: {e}")))
             }
         }
-
-        println!("\n{thin}");
-        println!("  *** p<0.01  ** p<0.05  * p<0.10");
-        println!("{thick}\n");
-        Ok(diagnostics)
     }
     pub(super) fn diagnostics_arima(
         &mut self,
@@ -1503,9 +1512,18 @@ impl Interpreter {
         diagnostics.insert("model".into(), Value::Str("ARIMA".into()));
 
         let resid = Array1::from_vec(m.residuals().to_vec());
+        diagnostics.insert("ljung_box".into(), self.arima_ljung_box(&resid)?);
+        diagnostics.insert("jarque_bera".into(), self.arima_jarque_bera(&resid)?);
 
+        println!("\n{thin}");
+        println!("  *** p<0.01  ** p<0.05  * p<0.10");
+        println!("{thick}\n");
+        Ok(diagnostics)
+    }
+
+    fn arima_ljung_box(&self, resid: &ndarray::Array1<f64>) -> Result<Value> {
         println!("\n── Autocorrelation in Residuals (Ljung-Box, lags=10)");
-        match greeners::Diagnostics::ljung_box(&resid, 10) {
+        match greeners::Diagnostics::ljung_box(resid, 10) {
             Ok(r) => {
                 println!(
                     "   Q(10) = {:>9.4}   p = {:.4}  {}",
@@ -1517,16 +1535,18 @@ impl Interpreter {
                 lb_map.insert("q_stat".into(), Value::Float(r.q_stat));
                 lb_map.insert("p_value".into(), Value::Float(r.p_value));
                 lb_map.insert("lags".into(), Value::Int(10));
-                diagnostics.insert("ljung_box".into(), Value::Dict(Arc::new(lb_map)));
+                Ok(Value::Dict(Arc::new(lb_map)))
             }
             Err(e) => {
                 println!("   error: {e}");
-                diagnostics.insert("ljung_box".into(), Value::Str(format!("error: {e}")));
+                Ok(Value::Str(format!("error: {e}")))
             }
         }
+    }
 
+    fn arima_jarque_bera(&self, resid: &ndarray::Array1<f64>) -> Result<Value> {
         println!("\n── Residual Normality (Jarque-Bera)");
-        match greeners::Diagnostics::jarque_bera(&resid) {
+        match greeners::Diagnostics::jarque_bera(resid) {
             Ok((jb, p)) => {
                 println!(
                     "   JB ~ χ²(2)  = {:>9.4}   p = {:.4}  {}",
@@ -1538,18 +1558,13 @@ impl Interpreter {
                 jb_map.insert("jb_stat".into(), Value::Float(jb));
                 jb_map.insert("p_value".into(), Value::Float(p));
                 jb_map.insert("df".into(), Value::Int(2));
-                diagnostics.insert("jarque_bera".into(), Value::Dict(Arc::new(jb_map)));
+                Ok(Value::Dict(Arc::new(jb_map)))
             }
             Err(e) => {
                 println!("   error: {e}");
-                diagnostics.insert("jarque_bera".into(), Value::Str(format!("error: {e}")));
+                Ok(Value::Str(format!("error: {e}")))
             }
         }
-
-        println!("\n{thin}");
-        println!("  *** p<0.01  ** p<0.05  * p<0.10");
-        println!("{thick}\n");
-        Ok(diagnostics)
     }
     pub(super) fn diagnostics_var(
         &mut self,
@@ -1775,7 +1790,6 @@ impl Interpreter {
         let n = iv.n_obs;
         let df = iv.df_resid;
         let mse = iv.sigma * iv.sigma;
-        let names = iv.variable_names.as_deref().unwrap_or(&[]);
 
         println!("\n{thick}");
         println!(" DIAGNOSTICS — IV/2SLS  (n={}  k={}  df={})", n, k, df);
@@ -1795,6 +1809,24 @@ impl Interpreter {
             iv.r_squared, iv.sigma, mse
         );
 
+        if let Some(coeffs) = self.iv_coefficients(iv)? {
+            diagnostics.insert("coefficients".into(), coeffs);
+        }
+
+        println!("\n── Tests Not Available");
+        println!("   Residuals and Z matrix not stored in IvResult.");
+        println!("   • Sargan (overidentification): needs Z matrix");
+        println!("   • Endogeneity (Wu-Hausman): compare IV vs OLS manually");
+        println!("   • Weak instrument: check first-stage F (rule: F > 10)");
+        println!("\n{thin}");
+        println!("   *** p<0.01  ** p<0.05  * p<0.10");
+        println!("{thick}\n");
+        Ok(diagnostics)
+    }
+
+    fn iv_coefficients(&self, iv: &greeners::iv::IvResult) -> Result<Option<Value>> {
+        let k = iv.params.len();
+        let names = iv.variable_names.as_deref().unwrap_or(&[]);
         println!("\n── Coefficient Significance");
         println!("   {:<22} {:>8} {:>8}", "Variable", "p-value", "");
         println!("   {}", "─".repeat(40));
@@ -1809,25 +1841,17 @@ impl Interpreter {
             iv_p.push(Value::Float(iv.p_values[i]));
             iv_sig.push(Value::Str(s.to_string()));
         }
-        if !iv_var.is_empty() {
-            let mut iv_columns = HashMap::new();
-            iv_columns.insert("variable".into(), Value::List(Arc::new(iv_var)));
-            iv_columns.insert("p_value".into(), Value::List(Arc::new(iv_p)));
-            iv_columns.insert("significance".into(), Value::List(Arc::new(iv_sig)));
-            let iv_df = self.dict_to_dataframe(&iv_columns)?;
-            diagnostics.insert("coefficients".into(), Value::DataFrame(Arc::new(iv_df)));
+        if iv_var.is_empty() {
+            return Ok(None);
         }
-
-        println!("\n── Tests Not Available");
-        println!("   Residuals and Z matrix not stored in IvResult.");
-        println!("   • Sargan (overidentification): needs Z matrix");
-        println!("   • Endogeneity (Wu-Hausman): compare IV vs OLS manually");
-        println!("   • Weak instrument: check first-stage F (rule: F > 10)");
-        println!("\n{thin}");
-        println!("   *** p<0.01  ** p<0.05  * p<0.10");
-        println!("{thick}\n");
-        Ok(diagnostics)
+        let mut iv_columns = HashMap::new();
+        iv_columns.insert("variable".into(), Value::List(Arc::new(iv_var)));
+        iv_columns.insert("p_value".into(), Value::List(Arc::new(iv_p)));
+        iv_columns.insert("significance".into(), Value::List(Arc::new(iv_sig)));
+        let iv_df = self.dict_to_dataframe(&iv_columns)?;
+        Ok(Some(Value::DataFrame(Arc::new(iv_df))))
     }
+
     pub(super) fn diagnostics_panel(
         &mut self,
         fe: &greeners::panel::PanelResult,
@@ -1836,7 +1860,6 @@ impl Interpreter {
     ) -> Result<HashMap<String, Value>> {
         let mut diagnostics: HashMap<String, Value> = HashMap::new();
         let k = fe.params.len();
-        let names = fe.variable_names.as_deref().unwrap_or(&[]);
 
         println!("\n{thick}");
         println!(
@@ -1862,6 +1885,23 @@ impl Interpreter {
             fe.r_squared, fe.sigma, fe.df_resid
         );
 
+        if let Some(coeffs) = self.fe_coefficients(fe)? {
+            diagnostics.insert("coefficients".into(), coeffs);
+        }
+
+        println!("\n── Tests Not Available");
+        println!("   Residuals not stored in PanelResult.");
+        println!("   • Hausman FE vs RE: use hausman(fe_model, re_model)");
+        println!("   • JB / Ljung-Box: run on manually extracted residuals");
+        println!("\n{thin}");
+        println!("   *** p<0.01  ** p<0.05  * p<0.10");
+        println!("{thick}\n");
+        Ok(diagnostics)
+    }
+
+    fn fe_coefficients(&self, fe: &greeners::panel::PanelResult) -> Result<Option<Value>> {
+        let k = fe.params.len();
+        let names = fe.variable_names.as_deref().unwrap_or(&[]);
         println!("\n── Coefficient Significance");
         println!(
             "   {:<22} {:>10} {:>8} {:>4}",
@@ -1884,25 +1924,18 @@ impl Interpreter {
             fe_p.push(Value::Float(fe.p_values[i]));
             fe_sig.push(Value::Str(s.to_string()));
         }
-        if !fe_var.is_empty() {
-            let mut fe_columns = HashMap::new();
-            fe_columns.insert("variable".into(), Value::List(Arc::new(fe_var)));
-            fe_columns.insert("coef".into(), Value::List(Arc::new(fe_coef)));
-            fe_columns.insert("p_value".into(), Value::List(Arc::new(fe_p)));
-            fe_columns.insert("significance".into(), Value::List(Arc::new(fe_sig)));
-            let fe_df = self.dict_to_dataframe(&fe_columns)?;
-            diagnostics.insert("coefficients".into(), Value::DataFrame(Arc::new(fe_df)));
+        if fe_var.is_empty() {
+            return Ok(None);
         }
-
-        println!("\n── Tests Not Available");
-        println!("   Residuals not stored in PanelResult.");
-        println!("   • Hausman FE vs RE: use hausman(fe_model, re_model)");
-        println!("   • JB / Ljung-Box: run on manually extracted residuals");
-        println!("\n{thin}");
-        println!("   *** p<0.01  ** p<0.05  * p<0.10");
-        println!("{thick}\n");
-        Ok(diagnostics)
+        let mut fe_columns = HashMap::new();
+        fe_columns.insert("variable".into(), Value::List(Arc::new(fe_var)));
+        fe_columns.insert("coef".into(), Value::List(Arc::new(fe_coef)));
+        fe_columns.insert("p_value".into(), Value::List(Arc::new(fe_p)));
+        fe_columns.insert("significance".into(), Value::List(Arc::new(fe_sig)));
+        let fe_df = self.dict_to_dataframe(&fe_columns)?;
+        Ok(Some(Value::DataFrame(Arc::new(fe_df))))
     }
+
     pub(super) fn diagnostics_re(
         &mut self,
         re: &greeners::panel::RandomEffectsResult,
@@ -1958,6 +1991,21 @@ impl Interpreter {
             re.theta
         );
 
+        if let Some(coeffs) = self.re_coefficients(re)? {
+            diagnostics.insert("coefficients".into(), coeffs);
+        }
+
+        println!("\n── Tests Not Available");
+        println!("   • Hausman FE vs RE: use hausman(fe_model, re_model)");
+        println!("   • BP LM test (H₀: sem individual effects): σ_e²/σ_u² acima sugere efeitos");
+        println!("\n{thin}");
+        println!("   *** p<0.01  ** p<0.05  * p<0.10");
+        println!("{thick}\n");
+        Ok(diagnostics)
+    }
+
+    fn re_coefficients(&self, re: &greeners::panel::RandomEffectsResult) -> Result<Option<Value>> {
+        let k = re.params.len();
         println!("\n── Coefficient Significance");
         println!(
             "   {:<22} {:>10} {:>8} {:>4}",
@@ -1985,23 +2033,16 @@ impl Interpreter {
             re_p.push(Value::Float(re.p_values[i]));
             re_sig.push(Value::Str(s.to_string()));
         }
-        if !re_var.is_empty() {
-            let mut re_columns = HashMap::new();
-            re_columns.insert("variable".into(), Value::List(Arc::new(re_var)));
-            re_columns.insert("coef".into(), Value::List(Arc::new(re_coef)));
-            re_columns.insert("p_value".into(), Value::List(Arc::new(re_p)));
-            re_columns.insert("significance".into(), Value::List(Arc::new(re_sig)));
-            let re_df = self.dict_to_dataframe(&re_columns)?;
-            diagnostics.insert("coefficients".into(), Value::DataFrame(Arc::new(re_df)));
+        if re_var.is_empty() {
+            return Ok(None);
         }
-
-        println!("\n── Tests Not Available");
-        println!("   • Hausman FE vs RE: use hausman(fe_model, re_model)");
-        println!("   • BP LM test (H₀: sem individual effects): σ_e²/σ_u² acima sugere efeitos");
-        println!("\n{thin}");
-        println!("   *** p<0.01  ** p<0.05  * p<0.10");
-        println!("{thick}\n");
-        Ok(diagnostics)
+        let mut re_columns = HashMap::new();
+        re_columns.insert("variable".into(), Value::List(Arc::new(re_var)));
+        re_columns.insert("coef".into(), Value::List(Arc::new(re_coef)));
+        re_columns.insert("p_value".into(), Value::List(Arc::new(re_p)));
+        re_columns.insert("significance".into(), Value::List(Arc::new(re_sig)));
+        let re_df = self.dict_to_dataframe(&re_columns)?;
+        Ok(Some(Value::DataFrame(Arc::new(re_df))))
     }
 
     pub(super) fn varma(
