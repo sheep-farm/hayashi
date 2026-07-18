@@ -2,6 +2,8 @@ use crate::lang::ast::*;
 use crate::lang::dap::model_expansion;
 use crate::lang::dap::protocol::*;
 use crate::lang::error::{HayashiError, Result};
+use crate::lang::lexer::Lexer;
+use crate::lang::parser::Parser;
 use greeners::diagnostics::Diagnostics;
 use greeners::linalg::UPLO;
 use greeners::linalg::{LinalgEigh as _, LinalgInverse as _};
@@ -608,16 +610,58 @@ impl Interpreter {
     }
 
     fn dap_evaluate(&mut self, req: &Request) -> Response {
-        match req
+        let expr = match req
             .arguments
             .as_ref()
             .and_then(|a| a.get("expression"))
             .and_then(|v| v.as_str())
         {
-            Some(expr) => Response::ok(0, req.seq, &req.command)
-                .with_body(json!({ "result": expr, "variablesReference": 0 })),
-            None => Response::err(0, req.seq, &req.command, "missing expression"),
+            Some(expr) => expr,
+            None => {
+                return Response::err(0, req.seq, &req.command, "missing expression");
+            }
+        };
+
+        let tokens = match Lexer::new(expr).tokenize() {
+            Ok(tokens) => tokens,
+            Err(e) => {
+                return Response::err(0, req.seq, &req.command, format!("lexer: {e}"));
+            }
+        };
+
+        let ast = match Parser::new(tokens).parse_expr() {
+            Ok(ast) => ast,
+            Err(e) => {
+                return Response::err(0, req.seq, &req.command, format!("parse: {e}"));
+            }
+        };
+
+        // Suppress debug_check while evaluating a watch/repl expression so the
+        // debugger does not stop inside the expression itself.
+        let saved = self.debug_state.take();
+        let value = match self.eval_expr(&ast) {
+            Ok(v) => v,
+            Err(e) => {
+                self.debug_state = saved;
+                return Response::err(0, req.seq, &req.command, format!("eval: {e}"));
+            }
+        };
+        self.debug_state = saved;
+
+        let var = self.variable_for_value(expr, &value);
+        let mut body = serde_json::Map::new();
+        body.insert("result".to_string(), json!(var.value));
+        if let Some(t) = &var.type_field {
+            body.insert("type".to_string(), json!(t));
         }
+        body.insert(
+            "variablesReference".to_string(),
+            json!(var.variables_reference),
+        );
+        if let Some(n) = var.named_variables {
+            body.insert("namedVariables".to_string(), json!(n));
+        }
+        Response::ok(0, req.seq, &req.command).with_body(body)
     }
 
     fn dap_attach_or_configuration_done(&mut self, req: &Request) -> Response {

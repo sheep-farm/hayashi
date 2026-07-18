@@ -145,6 +145,11 @@ fn dap_breakpoint_and_variables() {
     assert!(vars.contains("\"name\":\"y\""));
     assert!(vars.contains("\"value\":\"2\""));
 
+    session.send("evaluate", "{\"expression\":\"x + y\"}");
+    let eval = session.wait_for("\"command\":\"evaluate\"", 100);
+    assert!(eval.contains("\"result\":\"3\""));
+    assert!(eval.contains("\"type\":\"Int\""));
+
     session.send("continue", "");
     session.wait_for("\"event\":\"terminated\"", 100);
     session.send("disconnect", "");
