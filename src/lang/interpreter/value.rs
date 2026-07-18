@@ -277,6 +277,9 @@ pub enum Value {
     KdeResult(Rc<greeners::KDEResult>),
     BartResult(Rc<greeners::BartResult>),
     GpResult(Rc<greeners::GpResult>),
+    GmmClusteringResult(Rc<greeners::GmmClusteringResult>),
+    HierarchicalResult(Rc<greeners::HierarchicalResult>),
+    SpectralResult(Rc<greeners::SpectralResult>),
     List(Arc<Vec<Value>>),
     Dict(Arc<HashMap<String, Value>>),
     Series(Arc<Series>),
@@ -419,6 +422,9 @@ impl std::fmt::Display for Value {
             Value::KdeResult(r) => write!(f, "{r}"),
             Value::BartResult(r) => write!(f, "{r}"),
             Value::GpResult(r) => write!(f, "{r}"),
+            Value::GmmClusteringResult(r) => write!(f, "{r}"),
+            Value::HierarchicalResult(r) => write!(f, "{r}"),
+            Value::SpectralResult(r) => write!(f, "{r}"),
             Value::List(v) => {
                 write!(f, "[")?;
                 for (i, item) in v.iter().enumerate() {

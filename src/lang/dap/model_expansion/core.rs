@@ -361,6 +361,9 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
         Value::KdeResult(r) => kde_children(r),
         Value::BartResult(r) => bart_children(r),
         Value::GpResult(r) => gp_children(r),
+        Value::GmmClusteringResult(r) => gmm_clustering_children(r),
+        Value::HierarchicalResult(r) => hierarchical_children(r),
+        Value::SpectralResult(r) => spectral_children(r),
         _ => Vec::new(),
     }
 }
@@ -926,6 +929,27 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
                 r.r_squared
             ),
             "GpResult",
+        ),
+        Value::GmmClusteringResult(r) => (
+            format!(
+                "GMM(k={}, n={}), loglik={:.4}, converged={}",
+                r.n_clusters, r.n_obs, r.log_likelihood, r.converged
+            ),
+            "GmmClusteringResult",
+        ),
+        Value::HierarchicalResult(r) => (
+            format!(
+                "HClust(k={}, n={}), linkage={:?}",
+                r.n_clusters, r.n_obs, r.linkage
+            ),
+            "HierarchicalResult",
+        ),
+        Value::SpectralResult(r) => (
+            format!(
+                "Spectral(k={}, n={}), inertia={:.4}",
+                r.n_clusters, r.n_obs, r.inertia
+            ),
+            "SpectralResult",
         ),
         Value::UserFn(f) => (format!("<fn({})>", f.params.join(", ")), "Function"),
         _ => (v.to_string(), "Model"),

@@ -358,3 +358,135 @@ pub fn gp_fit_dict(r: &greeners::GpResult) -> Value {
         ("mse", Value::Float(r.mse)),
     ])
 }
+
+pub fn gmm_clustering_children(r: &greeners::GmmClusteringResult) -> Vec<(String, Value)> {
+    let mut vars = Vec::new();
+    let labels: Vec<Value> = r.labels.iter().map(|&l| Value::Int(l as i64)).collect();
+    vars.push((
+        "labels".into(),
+        Value::Series(Arc::new(Series::new("labels", labels))),
+    ));
+    vars.push(("means".into(), array2_to_dataframe("means", &r.means)));
+    let covariances: Vec<Value> = r
+        .covariances
+        .iter()
+        .enumerate()
+        .map(|(i, m)| array2_to_dataframe(&format!("covariance_{i}"), m))
+        .collect();
+    vars.push(("covariances".into(), Value::List(Arc::new(covariances))));
+    vars.push(("weights".into(), array1_to_series("weights", &r.weights)));
+    vars.push((
+        "responsibilities".into(),
+        array2_to_dataframe("responsibilities", &r.responsibilities),
+    ));
+    vars.push(("fit".into(), gmm_clustering_fit_dict(r)));
+    vars
+}
+
+pub fn gmm_clustering_fit_dict(r: &greeners::GmmClusteringResult) -> Value {
+    fit_dict(&[
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("n_features", Value::Int(r.n_features as i64)),
+        ("n_clusters", Value::Int(r.n_clusters as i64)),
+        ("n_iter", Value::Int(r.n_iter as i64)),
+        ("converged", Value::Bool(r.converged)),
+        ("log_likelihood", Value::Float(r.log_likelihood)),
+        ("aic", Value::Float(r.aic)),
+        ("bic", Value::Float(r.bic)),
+    ])
+}
+
+pub fn hierarchical_children(r: &greeners::HierarchicalResult) -> Vec<(String, Value)> {
+    let mut columns: IndexMap<String, greeners::Column> = IndexMap::new();
+    let cluster_a: Vec<i64> = r.merges.iter().map(|m| m.cluster_a as i64).collect();
+    let cluster_b: Vec<i64> = r.merges.iter().map(|m| m.cluster_b as i64).collect();
+    let distance: Vec<f64> = r.merges.iter().map(|m| m.distance).collect();
+    let size: Vec<i64> = r.merges.iter().map(|m| m.size as i64).collect();
+    columns.insert(
+        "cluster_a".into(),
+        greeners::Column::Int(ndarray::Array1::from(cluster_a)),
+    );
+    columns.insert(
+        "cluster_b".into(),
+        greeners::Column::Int(ndarray::Array1::from(cluster_b)),
+    );
+    columns.insert(
+        "distance".into(),
+        greeners::Column::Float(ndarray::Array1::from(distance)),
+    );
+    columns.insert(
+        "size".into(),
+        greeners::Column::Int(ndarray::Array1::from(size)),
+    );
+    let merges_df = Value::DataFrame(Arc::new(
+        greeners::DataFrame::from_columns(columns)
+            .unwrap_or_else(|_| greeners::DataFrame::from_columns(IndexMap::new()).unwrap()),
+    ));
+
+    let mut vars = Vec::new();
+    vars.push(("merges".into(), merges_df));
+    let labels: Vec<Value> = r.labels.iter().map(|&l| Value::Int(l as i64)).collect();
+    vars.push((
+        "labels".into(),
+        Value::Series(Arc::new(Series::new("labels", labels))),
+    ));
+    let sizes: Vec<Value> = r
+        .cluster_sizes
+        .iter()
+        .map(|&s| Value::Int(s as i64))
+        .collect();
+    vars.push((
+        "cluster_sizes".into(),
+        Value::Series(Arc::new(Series::new("cluster_sizes", sizes))),
+    ));
+    vars.push(("fit".into(), hierarchical_fit_dict(r)));
+    vars
+}
+
+pub fn hierarchical_fit_dict(r: &greeners::HierarchicalResult) -> Value {
+    fit_dict(&[
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("n_features", Value::Int(r.n_features as i64)),
+        ("n_clusters", Value::Int(r.n_clusters as i64)),
+        ("cut_height", Value::Float(r.cut_height)),
+        ("linkage", Value::Str(format!("{:?}", r.linkage))),
+        ("cophenetic_corr", Value::Float(r.cophenetic_corr)),
+    ])
+}
+
+pub fn spectral_children(r: &greeners::SpectralResult) -> Vec<(String, Value)> {
+    let mut vars = Vec::new();
+    let labels: Vec<Value> = r.labels.iter().map(|&l| Value::Int(l as i64)).collect();
+    vars.push((
+        "labels".into(),
+        Value::Series(Arc::new(Series::new("labels", labels))),
+    ));
+    vars.push((
+        "affinity".into(),
+        array2_to_dataframe("affinity", &r.affinity),
+    ));
+    vars.push((
+        "eigenvalues".into(),
+        array1_to_series("eigenvalues", &r.eigenvalues),
+    ));
+    vars.push((
+        "eigenvectors".into(),
+        array2_to_dataframe("eigenvectors", &r.eigenvectors),
+    ));
+    vars.push((
+        "centroids".into(),
+        array2_to_dataframe("centroids", &r.centroids),
+    ));
+    vars.push(("fit".into(), spectral_fit_dict(r)));
+    vars
+}
+
+pub fn spectral_fit_dict(r: &greeners::SpectralResult) -> Value {
+    fit_dict(&[
+        ("n_obs", Value::Int(r.n_obs as i64)),
+        ("n_features", Value::Int(r.n_features as i64)),
+        ("n_clusters", Value::Int(r.n_clusters as i64)),
+        ("sigma", Value::Float(r.sigma)),
+        ("inertia", Value::Float(r.inertia)),
+    ])
+}

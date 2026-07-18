@@ -1008,8 +1008,7 @@ impl Interpreter {
         let result = greeners::SpectralClustering::fit(&x_mat, k, sigma, None)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        Ok(Value::SpectralResult(Rc::new(result)))
     }
 
     pub(super) fn isotonic(
@@ -1321,8 +1320,7 @@ impl Interpreter {
         let result = greeners::GmmClustering::fit(&x_mat, k, max_iter, tol)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        Ok(Value::GmmClusteringResult(Rc::new(result)))
     }
 
     pub(super) fn reg_path(
@@ -1489,8 +1487,7 @@ impl Interpreter {
         let result = greeners::HierarchicalClustering::fit(&x_mat, linkage, cut_height)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        Ok(Value::HierarchicalResult(Rc::new(result)))
     }
 
     pub(super) fn tsne(
