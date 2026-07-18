@@ -2,6 +2,51 @@ use super::helpers::*;
 use super::*;
 use std::sync::Arc;
 
+struct CodebookEntry {
+    name: String,
+    type_name: &'static str,
+    obs: i64,
+    missing: i64,
+    unique: i64,
+    mean: f64,
+    sd: f64,
+    min: f64,
+    p25: f64,
+    p50: f64,
+    p75: f64,
+    max: f64,
+    trues: i64,
+    falses: i64,
+    values: String,
+}
+
+fn codebook_numeric_stats(vals: &[f64]) -> (f64, f64, f64, f64, f64, f64, f64, usize) {
+    let n = vals.len();
+    let mean = vals.iter().sum::<f64>() / n as f64;
+    let var = vals.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n as f64 - 1.0).max(1.0);
+    let sd = var.sqrt();
+    let min = vals.iter().cloned().fold(f64::INFINITY, f64::min);
+    let max = vals.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    let mut sorted = vals.to_vec();
+    sorted.sort_by(nan_last_cmp);
+    let pctile = |p: f64| -> f64 {
+        let idx = (p * (n - 1) as f64).round() as usize;
+        sorted[idx.min(n - 1)]
+    };
+    let mut unique = sorted.clone();
+    unique.dedup();
+    (
+        mean,
+        sd,
+        min,
+        pctile(0.25),
+        pctile(0.50),
+        pctile(0.75),
+        max,
+        unique.len(),
+    )
+}
+
 /// set_seed, timer, quietly, capture, assert, preserve/restore, source, help,
 /// describe, codebook, format, duplicates, label, correlate, summarize,
 /// esttab/eststo. Extracted from `eval_call` (see src/lang/interpreter.rs).
@@ -548,247 +593,292 @@ impl Interpreter {
         let sep = "─".repeat(76);
         println!("\n{:═^76}", " Codebook ");
 
-        let mut var_vec = Vec::new();
-        let mut type_vec = Vec::new();
-        let mut obs_vec = Vec::new();
-        let mut missing_vec = Vec::new();
-        let mut unique_vec = Vec::new();
-        let mut mean_vec = Vec::new();
-        let mut sd_vec = Vec::new();
-        let mut min_vec = Vec::new();
-        let mut p25_vec = Vec::new();
-        let mut p50_vec = Vec::new();
-        let mut p75_vec = Vec::new();
-        let mut max_vec = Vec::new();
-        let mut trues_vec = Vec::new();
-        let mut falses_vec = Vec::new();
-        let mut values_vec = Vec::new();
-
+        let mut rows: Vec<CodebookEntry> = Vec::new();
         for name in &requested {
             use greeners::Column;
             let col = df
                 .get_column(name)
                 .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-
             println!("\n{sep}");
-            match col {
-                Column::Float(arr) => {
-                    let total = arr.len();
-                    let vals: Vec<f64> = arr.iter().copied().filter(|x| x.is_finite()).collect();
-                    let missing = total - vals.len();
-                    let n = vals.len();
-                    println!(
-                        "  {:<20} type: float    obs: {}    missing: {}",
-                        name, total, missing
-                    );
-                    var_vec.push(Value::Str(name.clone()));
-                    type_vec.push(Value::Str("float".into()));
-                    obs_vec.push(Value::Int(total as i64));
-                    missing_vec.push(Value::Int(missing as i64));
-                    if n > 0 {
-                        let mean = vals.iter().sum::<f64>() / n as f64;
-                        let var = vals.iter().map(|x| (x - mean).powi(2)).sum::<f64>()
-                            / (n as f64 - 1.0).max(1.0);
-                        let sd = var.sqrt();
-                        let min = vals.iter().cloned().fold(f64::INFINITY, f64::min);
-                        let max = vals.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-                        let mut sorted = vals.clone();
-                        sorted.sort_by(nan_last_cmp);
-                        let pctile = |p: f64| -> f64 {
-                            let idx = (p * (n - 1) as f64).round() as usize;
-                            sorted[idx.min(n - 1)]
-                        };
-                        let mut unique = sorted.clone();
-                        unique.dedup();
-                        println!(
-                            "  unique: {}    mean: {:.4}    sd: {:.4}",
-                            unique.len(),
-                            mean,
-                            sd
-                        );
-                        println!(
-                            "  min: {:.4}    p25: {:.4}    p50: {:.4}    p75: {:.4}    max: {:.4}",
-                            min,
-                            pctile(0.25),
-                            pctile(0.50),
-                            pctile(0.75),
-                            max
-                        );
-                        unique_vec.push(Value::Int(unique.len() as i64));
-                        mean_vec.push(Value::Float(mean));
-                        sd_vec.push(Value::Float(sd));
-                        min_vec.push(Value::Float(min));
-                        p25_vec.push(Value::Float(pctile(0.25)));
-                        p50_vec.push(Value::Float(pctile(0.50)));
-                        p75_vec.push(Value::Float(pctile(0.75)));
-                        max_vec.push(Value::Float(max));
-                    } else {
-                        unique_vec.push(Value::Int(0));
-                        mean_vec.push(Value::Float(f64::NAN));
-                        sd_vec.push(Value::Float(f64::NAN));
-                        min_vec.push(Value::Float(f64::NAN));
-                        p25_vec.push(Value::Float(f64::NAN));
-                        p50_vec.push(Value::Float(f64::NAN));
-                        p75_vec.push(Value::Float(f64::NAN));
-                        max_vec.push(Value::Float(f64::NAN));
-                    }
-                    trues_vec.push(Value::Int(0));
-                    falses_vec.push(Value::Int(0));
-                    values_vec.push(Value::Str("".into()));
-                }
-                Column::Int(arr) => {
-                    let total = arr.len();
-                    let vals: Vec<f64> = arr.iter().map(|&x| x as f64).collect();
-                    let n = vals.len();
-                    println!("  {:<20} type: int      obs: {}    missing: 0", name, total);
-                    var_vec.push(Value::Str(name.clone()));
-                    type_vec.push(Value::Str("int".into()));
-                    obs_vec.push(Value::Int(total as i64));
-                    missing_vec.push(Value::Int(0));
-                    if n > 0 {
-                        let mean = vals.iter().sum::<f64>() / n as f64;
-                        let var = vals.iter().map(|x| (x - mean).powi(2)).sum::<f64>()
-                            / (n as f64 - 1.0).max(1.0);
-                        let sd = var.sqrt();
-                        let min = vals.iter().cloned().fold(f64::INFINITY, f64::min);
-                        let max = vals.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-                        let mut sorted = vals.clone();
-                        sorted.sort_by(nan_last_cmp);
-                        let mut unique = sorted.clone();
-                        unique.dedup();
-                        println!(
-                            "  unique: {}    mean: {:.4}    sd: {:.4}",
-                            unique.len(),
-                            mean,
-                            sd
-                        );
-                        println!("  min: {:.0}    max: {:.0}", min, max);
-                        unique_vec.push(Value::Int(unique.len() as i64));
-                        mean_vec.push(Value::Float(mean));
-                        sd_vec.push(Value::Float(sd));
-                        min_vec.push(Value::Float(min));
-                        p25_vec.push(Value::Float(f64::NAN));
-                        p50_vec.push(Value::Float(f64::NAN));
-                        p75_vec.push(Value::Float(f64::NAN));
-                        max_vec.push(Value::Float(max));
-                    } else {
-                        unique_vec.push(Value::Int(0));
-                        mean_vec.push(Value::Float(f64::NAN));
-                        sd_vec.push(Value::Float(f64::NAN));
-                        min_vec.push(Value::Float(f64::NAN));
-                        p25_vec.push(Value::Float(f64::NAN));
-                        p50_vec.push(Value::Float(f64::NAN));
-                        p75_vec.push(Value::Float(f64::NAN));
-                        max_vec.push(Value::Float(f64::NAN));
-                    }
-                    trues_vec.push(Value::Int(0));
-                    falses_vec.push(Value::Int(0));
-                    values_vec.push(Value::Str("".into()));
-                }
-                Column::String(arr) => {
-                    let total = arr.len();
-                    let non_empty = arr.iter().filter(|s: &&String| !s.is_empty()).count();
-                    let missing = total - non_empty;
-                    let mut unique: Vec<&str> = arr.iter().map(|s: &String| s.as_str()).collect();
-                    unique.sort();
-                    unique.dedup();
-                    println!(
-                        "  {:<20} type: string   obs: {}    missing: {}",
-                        name, total, missing
-                    );
-                    println!("  unique: {}", unique.len());
-                    let values = if unique.len() <= 10 {
-                        let examples: Vec<&str> = unique.iter().take(10).copied().collect();
-                        println!("  values: {}", examples.join(", "));
-                        examples.join(", ")
-                    } else {
-                        let first5: Vec<&str> = unique.iter().take(5).copied().collect();
-                        println!(
-                            "  values: {}, ... ({} more)",
-                            first5.join(", "),
-                            unique.len() - 5
-                        );
-                        format!("{}, ... ({} more)", first5.join(", "), unique.len() - 5)
-                    };
-                    var_vec.push(Value::Str(name.clone()));
-                    type_vec.push(Value::Str("string".into()));
-                    obs_vec.push(Value::Int(total as i64));
-                    missing_vec.push(Value::Int(missing as i64));
-                    unique_vec.push(Value::Int(unique.len() as i64));
-                    mean_vec.push(Value::Float(f64::NAN));
-                    sd_vec.push(Value::Float(f64::NAN));
-                    min_vec.push(Value::Float(f64::NAN));
-                    p25_vec.push(Value::Float(f64::NAN));
-                    p50_vec.push(Value::Float(f64::NAN));
-                    p75_vec.push(Value::Float(f64::NAN));
-                    max_vec.push(Value::Float(f64::NAN));
-                    trues_vec.push(Value::Int(0));
-                    falses_vec.push(Value::Int(0));
-                    values_vec.push(Value::Str(values));
-                }
-                Column::Bool(arr) => {
-                    let total = arr.len();
-                    let trues = arr.iter().filter(|&&b| b).count();
-                    let falses = total - trues;
-                    println!("  {:<20} type: bool     obs: {}    missing: 0", name, total);
-                    println!("  true: {}    false: {}", trues, falses);
-                    var_vec.push(Value::Str(name.clone()));
-                    type_vec.push(Value::Str("bool".into()));
-                    obs_vec.push(Value::Int(total as i64));
-                    missing_vec.push(Value::Int(0));
-                    unique_vec.push(Value::Int(2));
-                    mean_vec.push(Value::Float(f64::NAN));
-                    sd_vec.push(Value::Float(f64::NAN));
-                    min_vec.push(Value::Float(f64::NAN));
-                    p25_vec.push(Value::Float(f64::NAN));
-                    p50_vec.push(Value::Float(f64::NAN));
-                    p75_vec.push(Value::Float(f64::NAN));
-                    max_vec.push(Value::Float(f64::NAN));
-                    trues_vec.push(Value::Int(trues as i64));
-                    falses_vec.push(Value::Int(falses as i64));
-                    values_vec.push(Value::Str("".into()));
-                }
-                _ => {
-                    println!("  {:<20} type: other", name);
-                    var_vec.push(Value::Str(name.clone()));
-                    type_vec.push(Value::Str("other".into()));
-                    obs_vec.push(Value::Int(0));
-                    missing_vec.push(Value::Int(0));
-                    unique_vec.push(Value::Int(0));
-                    mean_vec.push(Value::Float(f64::NAN));
-                    sd_vec.push(Value::Float(f64::NAN));
-                    min_vec.push(Value::Float(f64::NAN));
-                    p25_vec.push(Value::Float(f64::NAN));
-                    p50_vec.push(Value::Float(f64::NAN));
-                    p75_vec.push(Value::Float(f64::NAN));
-                    max_vec.push(Value::Float(f64::NAN));
-                    trues_vec.push(Value::Int(0));
-                    falses_vec.push(Value::Int(0));
-                    values_vec.push(Value::Str("".into()));
-                }
-            }
+            rows.push(match col {
+                Column::Float(arr) => self.codebook_float(name, arr),
+                Column::Int(arr) => self.codebook_int(name, arr),
+                Column::String(arr) => self.codebook_string(name, arr),
+                Column::Bool(arr) => self.codebook_bool(name, arr),
+                _ => Self::codebook_other(name),
+            });
         }
         println!("\n{sep}");
         println!();
 
         let mut columns = HashMap::new();
-        columns.insert("variable".into(), Value::List(Arc::new(var_vec)));
-        columns.insert("type".into(), Value::List(Arc::new(type_vec)));
-        columns.insert("obs".into(), Value::List(Arc::new(obs_vec)));
-        columns.insert("missing".into(), Value::List(Arc::new(missing_vec)));
-        columns.insert("unique".into(), Value::List(Arc::new(unique_vec)));
-        columns.insert("mean".into(), Value::List(Arc::new(mean_vec)));
-        columns.insert("sd".into(), Value::List(Arc::new(sd_vec)));
-        columns.insert("min".into(), Value::List(Arc::new(min_vec)));
-        columns.insert("p25".into(), Value::List(Arc::new(p25_vec)));
-        columns.insert("p50".into(), Value::List(Arc::new(p50_vec)));
-        columns.insert("p75".into(), Value::List(Arc::new(p75_vec)));
-        columns.insert("max".into(), Value::List(Arc::new(max_vec)));
-        columns.insert("true".into(), Value::List(Arc::new(trues_vec)));
-        columns.insert("false".into(), Value::List(Arc::new(falses_vec)));
-        columns.insert("values".into(), Value::List(Arc::new(values_vec)));
+        columns.insert(
+            "variable".into(),
+            Value::List(Arc::new(
+                rows.iter().map(|r| Value::Str(r.name.clone())).collect(),
+            )),
+        );
+        columns.insert(
+            "type".into(),
+            Value::List(Arc::new(
+                rows.iter()
+                    .map(|r| Value::Str(r.type_name.into()))
+                    .collect(),
+            )),
+        );
+        columns.insert(
+            "obs".into(),
+            Value::List(Arc::new(rows.iter().map(|r| Value::Int(r.obs)).collect())),
+        );
+        columns.insert(
+            "missing".into(),
+            Value::List(Arc::new(
+                rows.iter().map(|r| Value::Int(r.missing)).collect(),
+            )),
+        );
+        columns.insert(
+            "unique".into(),
+            Value::List(Arc::new(
+                rows.iter().map(|r| Value::Int(r.unique)).collect(),
+            )),
+        );
+        columns.insert(
+            "mean".into(),
+            Value::List(Arc::new(
+                rows.iter().map(|r| Value::Float(r.mean)).collect(),
+            )),
+        );
+        columns.insert(
+            "sd".into(),
+            Value::List(Arc::new(rows.iter().map(|r| Value::Float(r.sd)).collect())),
+        );
+        columns.insert(
+            "min".into(),
+            Value::List(Arc::new(rows.iter().map(|r| Value::Float(r.min)).collect())),
+        );
+        columns.insert(
+            "p25".into(),
+            Value::List(Arc::new(rows.iter().map(|r| Value::Float(r.p25)).collect())),
+        );
+        columns.insert(
+            "p50".into(),
+            Value::List(Arc::new(rows.iter().map(|r| Value::Float(r.p50)).collect())),
+        );
+        columns.insert(
+            "p75".into(),
+            Value::List(Arc::new(rows.iter().map(|r| Value::Float(r.p75)).collect())),
+        );
+        columns.insert(
+            "max".into(),
+            Value::List(Arc::new(rows.iter().map(|r| Value::Float(r.max)).collect())),
+        );
+        columns.insert(
+            "true".into(),
+            Value::List(Arc::new(rows.iter().map(|r| Value::Int(r.trues)).collect())),
+        );
+        columns.insert(
+            "false".into(),
+            Value::List(Arc::new(
+                rows.iter().map(|r| Value::Int(r.falses)).collect(),
+            )),
+        );
+        columns.insert(
+            "values".into(),
+            Value::List(Arc::new(
+                rows.iter().map(|r| Value::Str(r.values.clone())).collect(),
+            )),
+        );
         let cb_df = self.dict_to_dataframe(&columns)?;
         Ok(Value::DataFrame(Arc::new(cb_df)))
+    }
+
+    fn codebook_float(&self, name: &str, arr: &ndarray::Array1<f64>) -> CodebookEntry {
+        let total = arr.len();
+        let vals: Vec<f64> = arr.iter().copied().filter(|x| x.is_finite()).collect();
+        let missing = total - vals.len();
+        let n = vals.len();
+        println!(
+            "  {:<20} type: float    obs: {}    missing: {}",
+            name, total, missing
+        );
+        if n == 0 {
+            return CodebookEntry {
+                name: name.to_string(),
+                type_name: "float",
+                obs: total as i64,
+                missing: missing as i64,
+                unique: 0,
+                mean: f64::NAN,
+                sd: f64::NAN,
+                min: f64::NAN,
+                p25: f64::NAN,
+                p50: f64::NAN,
+                p75: f64::NAN,
+                max: f64::NAN,
+                trues: 0,
+                falses: 0,
+                values: String::new(),
+            };
+        }
+        let (mean, sd, min, p25, p50, p75, max, unique) = codebook_numeric_stats(&vals);
+        println!("  unique: {}    mean: {:.4}    sd: {:.4}", unique, mean, sd);
+        println!(
+            "  min: {:.4}    p25: {:.4}    p50: {:.4}    p75: {:.4}    max: {:.4}",
+            min, p25, p50, p75, max
+        );
+        CodebookEntry {
+            name: name.to_string(),
+            type_name: "float",
+            obs: total as i64,
+            missing: missing as i64,
+            unique: unique as i64,
+            mean,
+            sd,
+            min,
+            p25,
+            p50,
+            p75,
+            max,
+            trues: 0,
+            falses: 0,
+            values: String::new(),
+        }
+    }
+
+    fn codebook_int(&self, name: &str, arr: &ndarray::Array1<i64>) -> CodebookEntry {
+        let total = arr.len();
+        let vals: Vec<f64> = arr.iter().map(|&x| x as f64).collect();
+        let n = vals.len();
+        println!("  {:<20} type: int      obs: {}    missing: 0", name, total);
+        if n == 0 {
+            return CodebookEntry {
+                name: name.to_string(),
+                type_name: "int",
+                obs: total as i64,
+                missing: 0,
+                unique: 0,
+                mean: f64::NAN,
+                sd: f64::NAN,
+                min: f64::NAN,
+                p25: f64::NAN,
+                p50: f64::NAN,
+                p75: f64::NAN,
+                max: f64::NAN,
+                trues: 0,
+                falses: 0,
+                values: String::new(),
+            };
+        }
+        let (mean, sd, min, _, _, _, max, unique) = codebook_numeric_stats(&vals);
+        println!("  unique: {}    mean: {:.4}    sd: {:.4}", unique, mean, sd);
+        println!("  min: {:.0}    max: {:.0}", min, max);
+        CodebookEntry {
+            name: name.to_string(),
+            type_name: "int",
+            obs: total as i64,
+            missing: 0,
+            unique: unique as i64,
+            mean,
+            sd,
+            min,
+            p25: f64::NAN,
+            p50: f64::NAN,
+            p75: f64::NAN,
+            max,
+            trues: 0,
+            falses: 0,
+            values: String::new(),
+        }
+    }
+
+    fn codebook_string(&self, name: &str, arr: &ndarray::Array1<String>) -> CodebookEntry {
+        let total = arr.len();
+        let non_empty = arr.iter().filter(|s: &&String| !s.is_empty()).count();
+        let missing = total - non_empty;
+        let mut unique: Vec<&str> = arr.iter().map(|s: &String| s.as_str()).collect();
+        unique.sort();
+        unique.dedup();
+        println!(
+            "  {:<20} type: string   obs: {}    missing: {}",
+            name, total, missing
+        );
+        println!("  unique: {}", unique.len());
+        let values = if unique.len() <= 10 {
+            let examples: Vec<&str> = unique.iter().take(10).copied().collect();
+            println!("  values: {}", examples.join(", "));
+            examples.join(", ")
+        } else {
+            let first5: Vec<&str> = unique.iter().take(5).copied().collect();
+            println!(
+                "  values: {}, ... ({} more)",
+                first5.join(", "),
+                unique.len() - 5
+            );
+            format!("{}, ... ({} more)", first5.join(", "), unique.len() - 5)
+        };
+        CodebookEntry {
+            name: name.to_string(),
+            type_name: "string",
+            obs: total as i64,
+            missing: missing as i64,
+            unique: unique.len() as i64,
+            mean: f64::NAN,
+            sd: f64::NAN,
+            min: f64::NAN,
+            p25: f64::NAN,
+            p50: f64::NAN,
+            p75: f64::NAN,
+            max: f64::NAN,
+            trues: 0,
+            falses: 0,
+            values,
+        }
+    }
+
+    fn codebook_bool(&self, name: &str, arr: &ndarray::Array1<bool>) -> CodebookEntry {
+        let total = arr.len();
+        let trues = arr.iter().filter(|&&b| b).count();
+        let falses = total - trues;
+        println!("  {:<20} type: bool     obs: {}    missing: 0", name, total);
+        println!("  true: {}    false: {}", trues, falses);
+        CodebookEntry {
+            name: name.to_string(),
+            type_name: "bool",
+            obs: total as i64,
+            missing: 0,
+            unique: 2,
+            mean: f64::NAN,
+            sd: f64::NAN,
+            min: f64::NAN,
+            p25: f64::NAN,
+            p50: f64::NAN,
+            p75: f64::NAN,
+            max: f64::NAN,
+            trues: trues as i64,
+            falses: falses as i64,
+            values: String::new(),
+        }
+    }
+
+    fn codebook_other(name: &str) -> CodebookEntry {
+        println!("  {:<20} type: other", name);
+        CodebookEntry {
+            name: name.to_string(),
+            type_name: "other",
+            obs: 0,
+            missing: 0,
+            unique: 0,
+            mean: f64::NAN,
+            sd: f64::NAN,
+            min: f64::NAN,
+            p25: f64::NAN,
+            p50: f64::NAN,
+            p75: f64::NAN,
+            max: f64::NAN,
+            trues: 0,
+            falses: 0,
+            values: String::new(),
+        }
     }
 
     pub(super) fn format(
@@ -1156,122 +1246,9 @@ impl Interpreter {
         let mut result_dicts: Vec<(String, HashMap<String, Value>)> = Vec::new();
 
         for name in &requested {
-            use greeners::Column;
-            let col = df
-                .get_column(name)
-                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-
-            let (n_total, n_missing, vals): (usize, usize, Vec<f64>) = match col {
-                Column::Float(arr) => {
-                    let total = arr.len();
-                    let vals: Vec<f64> = arr.iter().copied().filter(|x| x.is_finite()).collect();
-                    let missing = total - vals.len();
-                    (total, missing, vals)
-                }
-                Column::Int(arr) => {
-                    let vals: Vec<f64> = arr.iter().map(|&x| x as f64).collect();
-                    (vals.len(), 0, vals)
-                }
-                _ => {
-                    if !quiet {
-                        println!("{:<16} {:>9}  {:>7}", name, "(non-numeric)", "");
-                    }
-                    continue;
-                }
-            };
-
-            let n = vals.len();
-            if n == 0 {
-                if !quiet {
-                    println!("{:<16} {:>9}  {:>7}  (all missing)", name, 0, n_total);
-                }
-                continue;
+            if let Some(d) = self.summarize_variable(name, &df, detail, quiet)? {
+                result_dicts.push((name.clone(), d));
             }
-
-            let mean = vals.iter().sum::<f64>() / n as f64;
-            let variance =
-                vals.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n as f64 - 1.0).max(1.0);
-            let sd = variance.sqrt();
-            let min = vals.iter().cloned().fold(f64::INFINITY, f64::min);
-            let max = vals.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-
-            if !quiet {
-                let miss_str = if n_missing > 0 {
-                    format!("{}", n_missing)
-                } else {
-                    String::new()
-                };
-                println!(
-                    "{:<16} {:>9}  {:>7}  {:>12.4} {:>12.4} {:>12.4} {:>12.4}",
-                    name, n, miss_str, mean, sd, min, max
-                );
-            }
-
-            let mut d = HashMap::new();
-            d.insert("N".into(), Value::Int(n as i64));
-            d.insert("missing".into(), Value::Int(n_missing as i64));
-            d.insert("mean".into(), Value::Float(mean));
-            d.insert("sd".into(), Value::Float(sd));
-            d.insert("min".into(), Value::Float(min));
-            d.insert("max".into(), Value::Float(max));
-            d.insert("variance".into(), Value::Float(variance));
-
-            if detail {
-                let mut sorted = vals.clone();
-                sorted.sort_by(nan_last_cmp);
-                let pctile = |p: f64| -> f64 {
-                    let idx = (p * (n - 1) as f64).round() as usize;
-                    sorted[idx.min(n - 1)]
-                };
-                let p1 = pctile(0.01);
-                let p5 = pctile(0.05);
-                let p10 = pctile(0.10);
-                let p25 = pctile(0.25);
-                let p50 = pctile(0.50);
-                let p75 = pctile(0.75);
-                let p90 = pctile(0.90);
-                let p95 = pctile(0.95);
-                let p99 = pctile(0.99);
-                let skew = if n > 2 {
-                    let m3 = vals.iter().map(|x| ((x - mean) / sd).powi(3)).sum::<f64>();
-                    m3 * n as f64 / ((n - 1) as f64 * (n - 2) as f64)
-                } else {
-                    f64::NAN
-                };
-                let kurt = if n > 3 {
-                    let m4 = vals.iter().map(|x| ((x - mean) / sd).powi(4)).sum::<f64>() / n as f64;
-                    m4
-                } else {
-                    f64::NAN
-                };
-                if !quiet {
-                    println!("         Percentiles:");
-                    println!("          1%  {:>10.4}       Skewness  {:>10.4}", p1, skew);
-                    println!("          5%  {:>10.4}       Kurtosis  {:>10.4}", p5, kurt);
-                    println!("         10%  {:>10.4}", p10);
-                    println!(
-                        "         25%  {:>10.4}       Variance  {:>10.4}",
-                        p25, variance
-                    );
-                    println!("         50%  {:>10.4}", p50);
-                    println!("         75%  {:>10.4}", p75);
-                    println!("         90%  {:>10.4}", p90);
-                    println!("         95%  {:>10.4}", p95);
-                    println!("         99%  {:>10.4}", p99);
-                }
-                d.insert("p1".into(), Value::Float(p1));
-                d.insert("p5".into(), Value::Float(p5));
-                d.insert("p10".into(), Value::Float(p10));
-                d.insert("p25".into(), Value::Float(p25));
-                d.insert("p50".into(), Value::Float(p50));
-                d.insert("p75".into(), Value::Float(p75));
-                d.insert("p90".into(), Value::Float(p90));
-                d.insert("p95".into(), Value::Float(p95));
-                d.insert("p99".into(), Value::Float(p99));
-                d.insert("skewness".into(), Value::Float(skew));
-                d.insert("kurtosis".into(), Value::Float(kurt));
-            }
-            result_dicts.push((name.clone(), d));
         }
         if !quiet {
             println!();
@@ -1287,6 +1264,131 @@ impl Interpreter {
             }
             Ok(Value::Dict(Arc::new(outer)))
         }
+    }
+
+    fn summarize_variable(
+        &self,
+        name: &str,
+        df: &greeners::DataFrame,
+        detail: bool,
+        quiet: bool,
+    ) -> Result<Option<HashMap<String, Value>>> {
+        use greeners::Column;
+        let col = df
+            .get_column(name)
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+        let (n_total, n_missing, vals): (usize, usize, Vec<f64>) = match col {
+            Column::Float(arr) => {
+                let total = arr.len();
+                let vals: Vec<f64> = arr.iter().copied().filter(|x| x.is_finite()).collect();
+                let missing = total - vals.len();
+                (total, missing, vals)
+            }
+            Column::Int(arr) => {
+                let vals: Vec<f64> = arr.iter().map(|&x| x as f64).collect();
+                (vals.len(), 0, vals)
+            }
+            _ => {
+                if !quiet {
+                    println!("{:<16} {:>9}  {:>7}", name, "(non-numeric)", "");
+                }
+                return Ok(None);
+            }
+        };
+
+        let n = vals.len();
+        if n == 0 {
+            if !quiet {
+                println!("{:<16} {:>9}  {:>7}  (all missing)", name, 0, n_total);
+            }
+            return Ok(None);
+        }
+
+        let mean = vals.iter().sum::<f64>() / n as f64;
+        let variance =
+            vals.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n as f64 - 1.0).max(1.0);
+        let sd = variance.sqrt();
+        let min = vals.iter().cloned().fold(f64::INFINITY, f64::min);
+        let max = vals.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+
+        if !quiet {
+            let miss_str = if n_missing > 0 {
+                format!("{}", n_missing)
+            } else {
+                String::new()
+            };
+            println!(
+                "{:<16} {:>9}  {:>7}  {:>12.4} {:>12.4} {:>12.4} {:>12.4}",
+                name, n, miss_str, mean, sd, min, max
+            );
+        }
+
+        let mut d = HashMap::new();
+        d.insert("N".into(), Value::Int(n as i64));
+        d.insert("missing".into(), Value::Int(n_missing as i64));
+        d.insert("mean".into(), Value::Float(mean));
+        d.insert("sd".into(), Value::Float(sd));
+        d.insert("min".into(), Value::Float(min));
+        d.insert("max".into(), Value::Float(max));
+        d.insert("variance".into(), Value::Float(variance));
+
+        if detail {
+            let mut sorted = vals.clone();
+            sorted.sort_by(nan_last_cmp);
+            let pctile = |p: f64| -> f64 {
+                let idx = (p * (n - 1) as f64).round() as usize;
+                sorted[idx.min(n - 1)]
+            };
+            let p1 = pctile(0.01);
+            let p5 = pctile(0.05);
+            let p10 = pctile(0.10);
+            let p25 = pctile(0.25);
+            let p50 = pctile(0.50);
+            let p75 = pctile(0.75);
+            let p90 = pctile(0.90);
+            let p95 = pctile(0.95);
+            let p99 = pctile(0.99);
+            let skew = if n > 2 {
+                let m3 = vals.iter().map(|x| ((x - mean) / sd).powi(3)).sum::<f64>();
+                m3 * n as f64 / ((n - 1) as f64 * (n - 2) as f64)
+            } else {
+                f64::NAN
+            };
+            let kurt = if n > 3 {
+                let m4 = vals.iter().map(|x| ((x - mean) / sd).powi(4)).sum::<f64>() / n as f64;
+                m4
+            } else {
+                f64::NAN
+            };
+            if !quiet {
+                println!("         Percentiles:");
+                println!("          1%  {:>10.4}       Skewness  {:>10.4}", p1, skew);
+                println!("          5%  {:>10.4}       Kurtosis  {:>10.4}", p5, kurt);
+                println!("         10%  {:>10.4}", p10);
+                println!(
+                    "         25%  {:>10.4}       Variance  {:>10.4}",
+                    p25, variance
+                );
+                println!("         50%  {:>10.4}", p50);
+                println!("         75%  {:>10.4}", p75);
+                println!("         90%  {:>10.4}", p90);
+                println!("         95%  {:>10.4}", p95);
+                println!("         99%  {:>10.4}", p99);
+            }
+            d.insert("p1".into(), Value::Float(p1));
+            d.insert("p5".into(), Value::Float(p5));
+            d.insert("p10".into(), Value::Float(p10));
+            d.insert("p25".into(), Value::Float(p25));
+            d.insert("p50".into(), Value::Float(p50));
+            d.insert("p75".into(), Value::Float(p75));
+            d.insert("p90".into(), Value::Float(p90));
+            d.insert("p95".into(), Value::Float(p95));
+            d.insert("p99".into(), Value::Float(p99));
+            d.insert("skewness".into(), Value::Float(skew));
+            d.insert("kurtosis".into(), Value::Float(kurt));
+        }
+        Ok(Some(d))
     }
 
     pub(super) fn eststo(
