@@ -20,6 +20,84 @@ struct CodebookEntry {
     values: String,
 }
 
+type CoefRow = (String, f64, Option<f64>, Option<f64>);
+
+struct ModelInfo {
+    label: String,
+    coefs: Vec<CoefRow>,
+    n: usize,
+    r2: Option<f64>,
+    adj_r2: Option<f64>,
+    #[allow(dead_code)]
+    ll: Option<f64>,
+}
+
+fn esttab_stars(p: Option<f64>) -> &'static str {
+    match p {
+        Some(p) if p < 0.01 => "***",
+        Some(p) if p < 0.05 => "**",
+        Some(p) if p < 0.10 => "*",
+        _ => "",
+    }
+}
+
+fn esttab_parse_csv(csv: &str) -> Vec<CoefRow> {
+    let mut rows = Vec::new();
+    let mut first = true;
+    for line in csv.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        if first {
+            first = false;
+            continue;
+        } // header
+        let f: Vec<&str> = line.splitn(6, ',').collect();
+        if f.len() >= 5 {
+            let raw = f[0].trim().trim_matches('"');
+            let name = if raw == "const" {
+                "_cons".to_string()
+            } else {
+                raw.to_string()
+            };
+            let coef = f[1].trim().parse::<f64>().unwrap_or(f64::NAN);
+            let se = f[2].trim().parse::<f64>().unwrap_or(f64::NAN);
+            let p = f[4].trim().parse::<f64>().unwrap_or(1.0);
+            rows.push((name, coef, Some(se), Some(p)));
+        }
+    }
+    rows
+}
+
+fn esttab_extract_std(
+    label: &str,
+    vnames: &Option<Vec<String>>,
+    params: &ndarray::Array1<f64>,
+    se: &ndarray::Array1<f64>,
+    pv: &ndarray::Array1<f64>,
+    n: usize,
+) -> ModelInfo {
+    let k = params.len();
+    let fb: Vec<String> = (0..k).map(|i| format!("x{i}")).collect();
+    let nm = vnames.as_ref().unwrap_or(&fb);
+    let coefs: Vec<CoefRow> = nm
+        .iter()
+        .zip(params.iter())
+        .zip(se.iter())
+        .zip(pv.iter())
+        .map(|(((n, &c), &s), &p)| (n.clone(), c, Some(s), Some(p)))
+        .collect();
+    ModelInfo {
+        label: label.to_string(),
+        coefs,
+        n,
+        r2: None,
+        adj_r2: None,
+        ll: None,
+    }
+}
+
 fn codebook_numeric_stats(vals: &[f64]) -> (f64, f64, f64, f64, f64, f64, f64, usize) {
     let n = vals.len();
     let mean = vals.iter().sum::<f64>() / n as f64;
@@ -1448,82 +1526,7 @@ impl Interpreter {
             _ => return Err(HayashiError::Type("path= must be a string".into())),
         };
 
-        // (variable_name, coef, se_opt, pval_opt)
-        type CoefRow = (String, f64, Option<f64>, Option<f64>);
-        // (label, coefs, n_obs, fit_stats)
-        struct ModelInfo {
-            label: String,
-            coefs: Vec<CoefRow>,
-            n: usize,
-            r2: Option<f64>,
-            adj_r2: Option<f64>,
-            #[allow(dead_code)]
-            ll: Option<f64>,
-        }
-
-        // parseia CSV do OlsResult: variable,coef,se,t,p
-        let parse_csv = |csv: &str| -> Vec<CoefRow> {
-            let mut rows = Vec::new();
-            let mut first = true;
-            for line in csv.lines() {
-                let line = line.trim();
-                if line.is_empty() {
-                    continue;
-                }
-                if first {
-                    first = false;
-                    continue;
-                } // header
-                let f: Vec<&str> = line.splitn(6, ',').collect();
-                if f.len() >= 5 {
-                    let raw = f[0].trim().trim_matches('"');
-                    let name = if raw == "const" {
-                        "_cons".to_string()
-                    } else {
-                        raw.to_string()
-                    };
-                    let coef = f[1].trim().parse::<f64>().unwrap_or(f64::NAN);
-                    let se = f[2].trim().parse::<f64>().unwrap_or(f64::NAN);
-                    let p = f[4].trim().parse::<f64>().unwrap_or(1.0);
-                    rows.push((name, coef, Some(se), Some(p)));
-                }
-            }
-            rows
-        };
-
-        let stars = |p: Option<f64>| match p {
-            Some(p) if p < 0.01 => "***",
-            Some(p) if p < 0.05 => "**",
-            Some(p) if p < 0.10 => "*",
-            _ => "",
-        };
-
-        let extract_std = |label: &str,
-                           vnames: &Option<Vec<String>>,
-                           params: &ndarray::Array1<f64>,
-                           se: &ndarray::Array1<f64>,
-                           pv: &ndarray::Array1<f64>,
-                           n: usize|
-         -> ModelInfo {
-            let k = params.len();
-            let fb: Vec<String> = (0..k).map(|i| format!("x{i}")).collect();
-            let nm = vnames.as_ref().unwrap_or(&fb);
-            let coefs: Vec<CoefRow> = nm
-                .iter()
-                .zip(params.iter())
-                .zip(se.iter())
-                .zip(pv.iter())
-                .map(|(((n, &c), &s), &p)| (n.clone(), c, Some(s), Some(p)))
-                .collect();
-            ModelInfo {
-                label: label.to_string(),
-                coefs,
-                n,
-                r2: None,
-                adj_r2: None,
-                ll: None,
-            }
-        };
+        // helpers: esttab_parse_csv, esttab_stars, esttab_extract_std
 
         let mut models: Vec<ModelInfo> = Vec::new();
         let model_vals: Vec<Value> = if use_stored {
@@ -1544,7 +1547,7 @@ impl Interpreter {
             match val {
                 Value::OlsResult(m) => {
                     use greeners::ExportableResult;
-                    let coefs = parse_csv(&m.result.to_csv());
+                    let coefs = esttab_parse_csv(&m.result.to_csv());
                     let n = m.residuals.len();
                     let cov_label = match &m.result.cov_type {
                         CovarianceType::NonRobust => "",
@@ -1576,7 +1579,7 @@ impl Interpreter {
                     }
                     .to_string();
                     let n = bm.x.nrows();
-                    models.push(extract_std(
+                    models.push(esttab_extract_std(
                         &label,
                         &bm.result.variable_names,
                         &bm.result.params,
@@ -1586,7 +1589,7 @@ impl Interpreter {
                     ));
                 }
                 Value::IvResult(r) => {
-                    models.push(extract_std(
+                    models.push(esttab_extract_std(
                         "IV/2SLS",
                         &r.variable_names,
                         &r.params,
@@ -1596,7 +1599,7 @@ impl Interpreter {
                     ));
                 }
                 Value::PoissonResult(r) => {
-                    models.push(extract_std(
+                    models.push(esttab_extract_std(
                         "Poisson",
                         &r.variable_names,
                         &r.params,
@@ -1606,7 +1609,7 @@ impl Interpreter {
                     ));
                 }
                 Value::NegBinResult(r) => {
-                    models.push(extract_std(
+                    models.push(esttab_extract_std(
                         "NegBin",
                         &r.variable_names,
                         &r.params,
@@ -1616,7 +1619,7 @@ impl Interpreter {
                     ));
                 }
                 Value::OrderedResult(r) => {
-                    let mut info = extract_std(
+                    let mut info = esttab_extract_std(
                         &r.model_name,
                         &r.variable_names,
                         &r.params,
@@ -1636,7 +1639,7 @@ impl Interpreter {
                     models.push(info);
                 }
                 Value::TobitResult(r) => {
-                    let mut info = extract_std(
+                    let mut info = esttab_extract_std(
                         "Tobit",
                         &r.variable_names,
                         &r.params,
@@ -1648,7 +1651,7 @@ impl Interpreter {
                     models.push(info);
                 }
                 Value::HeckmanResult(r) => {
-                    let mut info = extract_std(
+                    let mut info = esttab_extract_std(
                         "Heckman",
                         &r.variable_names,
                         &r.params,
@@ -1671,7 +1674,7 @@ impl Interpreter {
                     models.push(info);
                 }
                 Value::PanelResult(r) => {
-                    models.push(extract_std(
+                    models.push(esttab_extract_std(
                         "FE",
                         &r.variable_names,
                         &r.params,
@@ -1681,7 +1684,7 @@ impl Interpreter {
                     ));
                 }
                 Value::ReResult(r) => {
-                    models.push(extract_std(
+                    models.push(esttab_extract_std(
                         "RE",
                         &r.variable_names,
                         &r.params,
@@ -1691,7 +1694,7 @@ impl Interpreter {
                     ));
                 }
                 Value::AbResult(r) => {
-                    models.push(extract_std(
+                    models.push(esttab_extract_std(
                         "AB-GMM",
                         &r.variable_names,
                         &r.params,
@@ -1703,7 +1706,7 @@ impl Interpreter {
                 Value::GmmResult(r) => {
                     let names: Option<Vec<String>> =
                         Some((0..r.params.len()).map(|i| format!("x{i}")).collect());
-                    models.push(extract_std(
+                    models.push(esttab_extract_std(
                         "GMM",
                         &names,
                         &r.params,
@@ -1713,7 +1716,7 @@ impl Interpreter {
                     ));
                 }
                 Value::SysGmmResult(r) => {
-                    models.push(extract_std(
+                    models.push(esttab_extract_std(
                         "SysGMM",
                         &r.variable_names,
                         &r.params,
@@ -1723,7 +1726,7 @@ impl Interpreter {
                     ));
                 }
                 Value::PcseResult(r) => {
-                    models.push(extract_std(
+                    models.push(esttab_extract_std(
                         "PCSE",
                         &r.variable_names,
                         &r.params,
@@ -1737,7 +1740,7 @@ impl Interpreter {
                         greeners::panel::GlsPanels::Hetero => "XTGLS-H",
                         greeners::panel::GlsPanels::Correlated => "XTGLS-C",
                     };
-                    models.push(extract_std(
+                    models.push(esttab_extract_std(
                         label,
                         &r.variable_names,
                         &r.params,
@@ -1747,7 +1750,7 @@ impl Interpreter {
                     ));
                 }
                 Value::FE2SLSResult(r) => {
-                    models.push(extract_std(
+                    models.push(esttab_extract_std(
                         "FE-IV",
                         &r.variable_names,
                         &r.params,
@@ -1758,7 +1761,7 @@ impl Interpreter {
                 }
                 Value::QuantileResult(r) => {
                     let label = format!("QReg(τ={:.2})", r.tau);
-                    models.push(extract_std(
+                    models.push(esttab_extract_std(
                         &label,
                         &r.variable_names,
                         &r.params,
@@ -1768,7 +1771,7 @@ impl Interpreter {
                     ));
                 }
                 Value::CoxResult(r) => {
-                    models.push(extract_std(
+                    models.push(esttab_extract_std(
                         "CoxPH",
                         &r.variable_names,
                         &r.params,
@@ -1778,7 +1781,7 @@ impl Interpreter {
                     ));
                 }
                 Value::RlmResult(r) => {
-                    models.push(extract_std(
+                    models.push(esttab_extract_std(
                         "RLM",
                         &r.variable_names,
                         &r.params,
@@ -1789,7 +1792,7 @@ impl Interpreter {
                 }
                 Value::GeeResult(r) => {
                     // GEE uses robust SE (sandwich) by default
-                    models.push(extract_std(
+                    models.push(esttab_extract_std(
                         "GEE",
                         &r.variable_names,
                         &r.params,
@@ -1799,7 +1802,7 @@ impl Interpreter {
                     ));
                 }
                 Value::BetaResult(r) => {
-                    models.push(extract_std(
+                    models.push(esttab_extract_std(
                         "BetaReg",
                         &r.variable_names,
                         &r.params,
@@ -1810,7 +1813,7 @@ impl Interpreter {
                 }
                 Value::GlmResult(r) => {
                     let family_name = format!("GLM({:?})", r.family);
-                    models.push(extract_std(
+                    models.push(esttab_extract_std(
                         &family_name,
                         &r.variable_names,
                         &r.params,
@@ -1831,7 +1834,7 @@ impl Interpreter {
                 ));
                 }
                 Value::ConditionalResult(r) => {
-                    models.push(extract_std(
+                    models.push(esttab_extract_std(
                         &r.model_name,
                         &r.variable_names,
                         &r.params,
@@ -1846,7 +1849,7 @@ impl Interpreter {
                 ));
                 }
                 Value::GlsarResult(r) => {
-                    models.push(extract_std(
+                    models.push(esttab_extract_std(
                         "GLSAR",
                         &r.variable_names,
                         &r.params,
@@ -1857,7 +1860,7 @@ impl Interpreter {
                 }
                 Value::MixedResult(r) => {
                     // esttab only displays fixed effects of MixedLM
-                    models.push(extract_std(
+                    models.push(esttab_extract_std(
                         "MixedLM",
                         &r.variable_names,
                         &r.fixed_effects,
@@ -2040,7 +2043,9 @@ impl Interpreter {
                     let coefs = &mi.coefs;
                     let row = coefs.iter().find(|(nm, _, _, _)| nm == var);
                     match row {
-                        Some((_, c, _, p)) => buf.push_str(&format!(" & {:.4}{}", c, stars(*p))),
+                        Some((_, c, _, p)) => {
+                            buf.push_str(&format!(" & {:.4}{}", c, esttab_stars(*p)))
+                        }
                         None => buf.push_str(" &"),
                     }
                 }
@@ -2073,7 +2078,9 @@ impl Interpreter {
                     let coefs = &mi.coefs;
                     let row = coefs.iter().find(|(nm, _, _, _)| nm == "_cons");
                     match row {
-                        Some((_, c, _, p)) => buf.push_str(&format!(" & {:.4}{}", c, stars(*p))),
+                        Some((_, c, _, p)) => {
+                            buf.push_str(&format!(" & {:.4}{}", c, esttab_stars(*p)))
+                        }
                         None => buf.push_str(" &"),
                     }
                 }
@@ -2153,7 +2160,7 @@ impl Interpreter {
                     let row = coefs.iter().find(|(nm, _, _, _)| nm == var);
                     match row {
                         Some((_, c, _, p)) => {
-                            let s = stars(*p);
+                            let s = esttab_stars(*p);
                             let cell = format!("{:.4}{}", c, s);
                             line.push_str(&format!(" {:>cw$}", cell, cw = col_w));
                         }
