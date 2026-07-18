@@ -1,5 +1,6 @@
 use super::super::helpers::*;
 use super::super::*;
+use crate::lang::dap::model_expansion;
 impl Interpreter {
     pub(super) fn series_methods(
         &mut self,
@@ -285,9 +286,20 @@ impl Interpreter {
                 match lst {
                     Value::List(v) => {
                         let mut new_v = (*v).clone();
-                        new_v.push(item);
-                        self.env.set(&var_name, Value::List(Arc::new(new_v)))?;
-                        Ok(Value::Nil)
+                        new_v.push(item.clone());
+                        let length = new_v.len();
+                        let list_val = Value::List(Arc::new(new_v));
+                        self.env.set(&var_name, list_val.clone())?;
+                        let display = String::new();
+                        let summary = format!("pushed item to '{var_name}' (len {length})");
+                        let fields = vec![
+                            ("list".to_string(), list_val),
+                            ("length".to_string(), Value::Int(length as i64)),
+                            ("item".to_string(), item),
+                        ];
+                        Ok(model_expansion::model_result(
+                            display, summary, "push", fields,
+                        ))
                     }
                     _ => Err(HayashiError::Type("push() requires list".into())),
                 }

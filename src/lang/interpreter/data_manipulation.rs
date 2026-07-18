@@ -1,6 +1,7 @@
 use super::eval_expr::ColResult;
 use super::helpers::*;
 use super::*;
+use crate::lang::dap::model_expansion;
 use greeners::dataframe::DataFrameBuilder;
 use std::sync::Arc;
 
@@ -1601,30 +1602,54 @@ impl Interpreter {
             .collect();
 
         // header
-        print!("{:>rw$} |", "", rw = row_num_w);
+        let mut display = String::new();
+        let mut header = String::new();
+        header.push_str(&format!("{:>rw$} |", "", rw = row_num_w));
         for (i, (name, _)) in cols_data.iter().enumerate() {
-            print!(" {:>w$}", name, w = widths[i]);
+            header.push_str(&format!(" {:>w$}", name, w = widths[i]));
         }
-        println!();
-        println!(
-            "{}-+{}",
+        header.push('\n');
+        display.push_str(&header);
+        display.push_str(&format!(
+            "{}-+{}\n",
             "-".repeat(row_num_w),
             "-".repeat(widths.iter().sum::<usize>() + widths.len())
-        );
+        ));
 
         // rows
         for r in 0..n_rows {
-            print!("{:>rw$} |", r + 1, rw = row_num_w);
+            let mut row = format!("{:>rw$} |", r + 1, rw = row_num_w);
             for (i, (_, vals)) in cols_data.iter().enumerate() {
-                print!(" {:>w$}", vals[r], w = widths[i]);
+                row.push_str(&format!(" {:>w$}", vals[r], w = widths[i]));
             }
-            println!();
+            row.push('\n');
+            display.push_str(&row);
         }
         if df.n_rows() > n_rows {
-            println!("  ({} more observations not shown)", df.n_rows() - n_rows);
+            display.push_str(&format!(
+                "  ({} more observations not shown)\n",
+                df.n_rows() - n_rows
+            ));
         }
-        println!();
-        Ok(Value::Nil)
+        display.push('\n');
+
+        let summary = format!("DataFrame preview ({} of {} rows)", n_rows, df.n_rows());
+        let fields = vec![
+            ("n_total".into(), Value::Int(df.n_rows() as i64)),
+            ("n_preview".into(), Value::Int(n_rows as i64)),
+            (
+                "columns".into(),
+                Value::List(Arc::new(
+                    col_names.iter().map(|n| Value::Str(n.clone())).collect(),
+                )),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "ListPreview",
+            fields,
+        ))
     }
 
     pub(super) fn winsor(
@@ -1685,8 +1710,25 @@ impl Interpreter {
             .insert(gen_name.clone(), winsorized)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         self.env.set(&df_name, Value::DataFrame(df))?;
-        println!("winsor {var_name} → {gen_name}  (p={p}, range=[{lo:.4}, {hi:.4}], {n_clip} obs clipped)");
-        Ok(Value::Nil)
+        let display = format!(
+            "winsor {var_name} → {gen_name}  (p={p}, range=[{lo:.4}, {hi:.4}], {n_clip} obs clipped)\n"
+        );
+        let summary = format!("Winsorized {var_name} → {gen_name}");
+        let fields = vec![
+            ("var".into(), Value::Str(var_name.clone())),
+            ("gen".into(), Value::Str(gen_name.clone())),
+            ("p".into(), Value::Float(p)),
+            ("lo".into(), Value::Float(lo)),
+            ("hi".into(), Value::Float(hi)),
+            ("n_clip".into(), Value::Int(n_clip as i64)),
+            ("n".into(), Value::Int(orig.len() as i64)),
+        ];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "WinsorResult",
+            fields,
+        ))
     }
 
     pub(super) fn tabgen(
@@ -1737,11 +1779,29 @@ impl Interpreter {
                 .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         }
         self.env.set(&df_name, Value::DataFrame(df))?;
-        println!("tabgen {var_name}: {n_dummies} dummies generated (prefix={prefix}_)");
+        let mut display =
+            format!("tabgen {var_name}: {n_dummies} dummies generated (prefix={prefix}_)\n");
         for name in &dummy_names {
-            println!("  {name}");
+            display.push_str(&format!("  {name}\n"));
         }
-        Ok(Value::Nil)
+        let summary = format!("Generated {n_dummies} dummies for {var_name}");
+        let fields = vec![
+            ("var".into(), Value::Str(var_name.clone())),
+            ("prefix".into(), Value::Str(prefix.clone())),
+            ("n_dummies".into(), Value::Int(n_dummies as i64)),
+            (
+                "dummies".into(),
+                Value::List(Arc::new(
+                    dummy_names.iter().map(|n| Value::Str(n.clone())).collect(),
+                )),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "TabgenResult",
+            fields,
+        ))
     }
 
     pub(super) fn ci(
@@ -1921,8 +1981,28 @@ impl Interpreter {
             .insert(var.clone(), ndarray::Array1::from(recoded))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         self.env.set(&df_name, Value::DataFrame(df))?;
-        println!("recode {var}: {n_changed} changes");
-        Ok(Value::Nil)
+        let display = format!("recode {var}: {n_changed} changes\n");
+        let summary = format!("Recoded {n_changed} values in {var}");
+        let fields = vec![
+            ("var".into(), Value::Str(var.clone())),
+            (
+                "from".into(),
+                Value::List(Arc::new(
+                    from_vals.iter().map(|&v| Value::Float(v)).collect(),
+                )),
+            ),
+            (
+                "to".into(),
+                Value::List(Arc::new(to_vals.iter().map(|&v| Value::Float(v)).collect())),
+            ),
+            ("n_changed".into(), Value::Int(n_changed as i64)),
+        ];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "RecodeResult",
+            fields,
+        ))
     }
 
     pub(super) fn dropna(
@@ -2167,16 +2247,37 @@ impl Interpreter {
             .map_err(|e| HayashiError::Runtime(format!("encode '{col_name}': {e}")))?;
 
         let target_col = gen_name.unwrap_or_else(|| col_name.clone());
+        let values =
+            model_expansion::series_from_vec(&target_col, numeric.as_slice().unwrap_or(&[]));
         Arc::make_mut(&mut df)
             .insert(target_col.clone(), numeric)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         self.env.set(&df_name, Value::DataFrame(df))?;
 
-        println!("encode {col_name} → {target_col}");
+        let mut display = format!("encode {col_name} → {target_col}\n");
         for (i, label) in label_map.iter().enumerate() {
-            println!("  {i} = \"{label}\"");
+            display.push_str(&format!("  {i} = \"{label}\"\n"));
         }
-        Ok(Value::Nil)
+        let n_labels = label_map.len();
+        let summary = format!("Encoded {col_name} → {target_col} ({n_labels} labels)");
+        let fields = vec![
+            ("col".into(), Value::Str(col_name.clone())),
+            ("gen".into(), Value::Str(target_col.clone())),
+            ("n_labels".into(), Value::Int(n_labels as i64)),
+            (
+                "labels".into(),
+                Value::List(Arc::new(
+                    label_map.iter().map(|l| Value::Str(l.clone())).collect(),
+                )),
+            ),
+            ("values".into(), values),
+        ];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "EncodeResult",
+            fields,
+        ))
     }
 
     pub(super) fn decode(
@@ -2233,6 +2334,10 @@ impl Interpreter {
                 labels.get(idx).cloned().unwrap_or_else(|| format!("{v}"))
             })
             .collect();
+        let values = Value::Series(Arc::new(Series::new(
+            "values",
+            str_vals.iter().map(|s| Value::Str(s.clone())).collect(),
+        )));
         Arc::make_mut(&mut df)
             .insert_column(
                 col_name.clone(),
@@ -2240,8 +2345,25 @@ impl Interpreter {
             )
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         self.env.set(&df_name, Value::DataFrame(df))?;
-        println!("decode {col_name}: {} labels applied", labels.len());
-        Ok(Value::Nil)
+        let display = format!("decode {col_name}: {} labels applied\n", labels.len());
+        let summary = format!("Decoded {col_name} with {} labels", labels.len());
+        let fields = vec![
+            ("col".into(), Value::Str(col_name.clone())),
+            ("n_labels".into(), Value::Int(labels.len() as i64)),
+            (
+                "labels".into(),
+                Value::List(Arc::new(
+                    labels.iter().map(|l| Value::Str(l.clone())).collect(),
+                )),
+            ),
+            ("values".into(), values),
+        ];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "DecodeResult",
+            fields,
+        ))
     }
 
     pub(super) fn rename(

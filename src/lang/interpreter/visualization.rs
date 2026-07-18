@@ -1,5 +1,6 @@
 use super::helpers::*;
 use super::*;
+use crate::lang::dap::model_expansion;
 
 /// ASCII visualization (acfplot/pacf/qqplot/corrplot/scatter/histogram/boxplot/kdensity)
 /// and coefplot. Extracted from `eval_call` (see src/lang/interpreter.rs).
@@ -57,8 +58,28 @@ impl Interpreter {
                     _ => format!("ACF — {var_name}"),
                 };
                 let clean: Vec<f64> = data.iter().cloned().filter(|v| !v.is_nan()).collect();
-                ascii_acf(&clean, max_lag, &title, width, false);
-                Ok(Value::Nil)
+                let display = ascii_acf(&clean, max_lag, &title, width, false);
+                let plot_lag = max_lag.min(clean.len() / 2);
+                let summary = format!("{title} ({plot_lag} lags)");
+                let fields = vec![
+                    ("var".into(), Value::Str(var_name.clone())),
+                    ("n".into(), Value::Int(clean.len() as i64)),
+                    ("max_lag".into(), Value::Int(plot_lag as i64)),
+                    ("width".into(), Value::Int(width as i64)),
+                    ("title".into(), Value::Str(title.clone())),
+                    ("partial".into(), Value::Bool(false)),
+                    (
+                        "data".into(),
+                        model_expansion::series_from_vec("data", &clean),
+                    ),
+                    (
+                        "lags".into(),
+                        model_expansion::int_series("lags", &(1..=plot_lag).collect::<Vec<_>>()),
+                    ),
+                ];
+                Ok(model_expansion::model_result(
+                    display, summary, "ACFPlot", fields,
+                ))
             }
 
             // pacfplot(df, var, lags=20, width=50, title="")
@@ -104,8 +125,28 @@ impl Interpreter {
                     _ => format!("PACF — {var_name}"),
                 };
                 let clean: Vec<f64> = data.iter().cloned().filter(|v| !v.is_nan()).collect();
-                ascii_acf(&clean, max_lag, &title, width, true);
-                Ok(Value::Nil)
+                let display = ascii_acf(&clean, max_lag, &title, width, true);
+                let plot_lag = max_lag.min(clean.len() / 2);
+                let summary = format!("{title} ({plot_lag} lags)");
+                let fields = vec![
+                    ("var".into(), Value::Str(var_name.clone())),
+                    ("n".into(), Value::Int(clean.len() as i64)),
+                    ("max_lag".into(), Value::Int(plot_lag as i64)),
+                    ("width".into(), Value::Int(width as i64)),
+                    ("title".into(), Value::Str(title.clone())),
+                    ("partial".into(), Value::Bool(true)),
+                    (
+                        "data".into(),
+                        model_expansion::series_from_vec("data", &clean),
+                    ),
+                    (
+                        "lags".into(),
+                        model_expansion::int_series("lags", &(1..=plot_lag).collect::<Vec<_>>()),
+                    ),
+                ];
+                Ok(model_expansion::model_result(
+                    display, summary, "PACFPlot", fields,
+                ))
             }
 
             // qqplot(df, var, width=50, height=20, dist="normal", title="")
@@ -151,8 +192,22 @@ impl Interpreter {
                     _ => format!("QQ-plot normal — {var_name}"),
                 };
                 let clean: Vec<f64> = data.iter().cloned().filter(|v| !v.is_nan()).collect();
-                ascii_qqplot(&clean, &title, &var_name, w, h);
-                Ok(Value::Nil)
+                let display = ascii_qqplot(&clean, &title, &var_name, w, h);
+                let summary = format!("QQ-plot normal — {var_name}");
+                let fields = vec![
+                    ("var".into(), Value::Str(var_name.clone())),
+                    ("n".into(), Value::Int(clean.len() as i64)),
+                    ("width".into(), Value::Int(w as i64)),
+                    ("height".into(), Value::Int(h as i64)),
+                    ("title".into(), Value::Str(title.clone())),
+                    (
+                        "data".into(),
+                        model_expansion::series_from_vec("data", &clean),
+                    ),
+                ];
+                Ok(model_expansion::model_result(
+                    display, summary, "QQPlot", fields,
+                ))
             }
 
             // corrplot(df, var1, var2, ...) — ASCII correlation matrix
@@ -200,8 +255,56 @@ impl Interpreter {
                     }
                     v
                 };
-                ascii_corrplot(&cols, &var_names);
-                Ok(Value::Nil)
+                let display = ascii_corrplot(&cols, &var_names);
+
+                let n = cols[0].len();
+                let means: Vec<f64> = cols
+                    .iter()
+                    .map(|c| c.iter().sum::<f64>() / n as f64)
+                    .collect();
+                let corr: Vec<Vec<f64>> = cols
+                    .iter()
+                    .enumerate()
+                    .map(|(i, col_i)| {
+                        let xi: Vec<f64> = col_i.iter().map(|x| x - means[i]).collect();
+                        let di = xi.iter().map(|a| a * a).sum::<f64>().sqrt();
+                        cols.iter()
+                            .enumerate()
+                            .map(|(j, col_j)| {
+                                let xj: Vec<f64> = col_j.iter().map(|x| x - means[j]).collect();
+                                let num: f64 = xi.iter().zip(&xj).map(|(a, b)| a * b).sum();
+                                let dj = xj.iter().map(|b| b * b).sum::<f64>().sqrt();
+                                if di * dj < 1e-15 {
+                                    0.0
+                                } else {
+                                    num / (di * dj)
+                                }
+                            })
+                            .collect()
+                    })
+                    .collect();
+                let k = var_names.len();
+                let corr_flat: Vec<f64> = corr.iter().flat_map(|r| r.iter().copied()).collect();
+                let corr_arr =
+                    ndarray::Array2::from_shape_vec((k, k), corr_flat).unwrap_or_else(|_| {
+                        ndarray::Array2::from_shape_vec((k, k), vec![0.0; k * k]).unwrap()
+                    });
+                let correlation = model_expansion::array2_to_dataframe_named(&corr_arr, &var_names);
+
+                let summary = format!("Correlation matrix ({} variables)", k);
+                let fields = vec![
+                    ("n".into(), Value::Int(n as i64)),
+                    (
+                        "variables".into(),
+                        Value::List(Arc::new(
+                            var_names.iter().map(|v| Value::Str(v.clone())).collect(),
+                        )),
+                    ),
+                    ("correlation".into(), correlation),
+                ];
+                Ok(model_expansion::model_result(
+                    display, summary, "Corrplot", fields,
+                ))
             }
 
             // ── ASCII visualization ────────────────────────────────────────────
@@ -249,8 +352,25 @@ impl Interpreter {
                     _ => format!("Histogram — {var_name}"),
                 };
                 let clean: Vec<f64> = data.iter().cloned().filter(|v| !v.is_nan()).collect();
-                ascii_histogram(&clean, bins, &title, &var_name, width);
-                Ok(Value::Nil)
+                let display = ascii_histogram(&clean, bins, &title, &var_name, width);
+                let summary = format!("Histogram of {var_name}");
+                let fields = vec![
+                    ("var".into(), Value::Str(var_name.clone())),
+                    ("n".into(), Value::Int(clean.len() as i64)),
+                    ("bins".into(), Value::Int(bins as i64)),
+                    ("width".into(), Value::Int(width as i64)),
+                    ("title".into(), Value::Str(title.clone())),
+                    (
+                        "data".into(),
+                        model_expansion::series_from_vec("data", &clean),
+                    ),
+                ];
+                Ok(model_expansion::model_result(
+                    display,
+                    summary,
+                    "HistogramPlot",
+                    fields,
+                ))
             }
 
             // scatter(df, x, y, width=60, height=20, title="")
@@ -304,8 +424,31 @@ impl Interpreter {
                     Some(Value::Str(s)) => s.clone(),
                     _ => format!("{yname} vs {xname}"),
                 };
-                ascii_scatter(&xs.to_vec(), &ys.to_vec(), &title, &xname, &yname, w, h);
-                Ok(Value::Nil)
+                let display =
+                    ascii_scatter(&xs.to_vec(), &ys.to_vec(), &title, &xname, &yname, w, h);
+                let summary = format!("{title} (n={})", xs.len());
+                let fields = vec![
+                    ("x".into(), Value::Str(xname.clone())),
+                    ("y".into(), Value::Str(yname.clone())),
+                    ("n".into(), Value::Int(xs.len() as i64)),
+                    ("width".into(), Value::Int(w as i64)),
+                    ("height".into(), Value::Int(h as i64)),
+                    ("title".into(), Value::Str(title.clone())),
+                    (
+                        "xs".into(),
+                        model_expansion::series_from_vec("xs", &xs.to_vec()),
+                    ),
+                    (
+                        "ys".into(),
+                        model_expansion::series_from_vec("ys", &ys.to_vec()),
+                    ),
+                ];
+                Ok(model_expansion::model_result(
+                    display,
+                    summary,
+                    "ScatterPlot",
+                    fields,
+                ))
             }
 
             // lineplot(df, x, y, width=60, height=20, title="")
@@ -359,8 +502,28 @@ impl Interpreter {
                     Some(Value::Str(s)) => s.clone(),
                     _ => format!("{yname} — time series"),
                 };
-                ascii_lineplot(&xs.to_vec(), &ys.to_vec(), &title, &xname, &yname, w, h);
-                Ok(Value::Nil)
+                let display =
+                    ascii_lineplot(&xs.to_vec(), &ys.to_vec(), &title, &xname, &yname, w, h);
+                let summary = format!("{title} (n={})", xs.len());
+                let fields = vec![
+                    ("x".into(), Value::Str(xname.clone())),
+                    ("y".into(), Value::Str(yname.clone())),
+                    ("n".into(), Value::Int(xs.len() as i64)),
+                    ("width".into(), Value::Int(w as i64)),
+                    ("height".into(), Value::Int(h as i64)),
+                    ("title".into(), Value::Str(title.clone())),
+                    (
+                        "xs".into(),
+                        model_expansion::series_from_vec("xs", &xs.to_vec()),
+                    ),
+                    (
+                        "ys".into(),
+                        model_expansion::series_from_vec("ys", &ys.to_vec()),
+                    ),
+                ];
+                Ok(model_expansion::model_result(
+                    display, summary, "LinePlot", fields,
+                ))
             }
 
             // boxplot(df, var, width=60, title="")
@@ -399,8 +562,21 @@ impl Interpreter {
                     _ => format!("Boxplot — {var_name}"),
                 };
                 let clean: Vec<f64> = data.iter().cloned().filter(|v| !v.is_nan()).collect();
-                ascii_boxplot(&clean, &title, &var_name, w);
-                Ok(Value::Nil)
+                let display = ascii_boxplot(&clean, &title, &var_name, w);
+                let summary = format!("Boxplot of {var_name}");
+                let fields = vec![
+                    ("var".into(), Value::Str(var_name.clone())),
+                    ("n".into(), Value::Int(clean.len() as i64)),
+                    ("width".into(), Value::Int(w as i64)),
+                    ("title".into(), Value::Str(title.clone())),
+                    (
+                        "data".into(),
+                        model_expansion::series_from_vec("data", &clean),
+                    ),
+                ];
+                Ok(model_expansion::model_result(
+                    display, summary, "Boxplot", fields,
+                ))
             }
 
             // kdensity(df, var, width=60, height=20) — KDE via ascii_scatter dos pontos da densidade
@@ -474,8 +650,21 @@ impl Interpreter {
                     Some(Value::Str(s)) => s.clone(),
                     _ => format!("KDE — {var_name}  (bw={:.4})", result.bandwidth),
                 };
-                ascii_lineplot(&xs, &ys, &title, &var_name, "density", w, h);
-                Ok(Value::Nil)
+                let display = ascii_lineplot(&xs, &ys, &title, &var_name, "density", w, h);
+                let summary = title.clone();
+                let fields = vec![
+                    ("var".into(), Value::Str(var_name.clone())),
+                    ("n".into(), Value::Int(n as i64)),
+                    ("bw".into(), Value::Float(result.bandwidth)),
+                    ("width".into(), Value::Int(w as i64)),
+                    ("height".into(), Value::Int(h as i64)),
+                    ("title".into(), Value::Str(title)),
+                    ("xs".into(), model_expansion::series_from_vec("xs", &xs)),
+                    ("ys".into(), model_expansion::series_from_vec("ys", &ys)),
+                ];
+                Ok(model_expansion::model_result(
+                    display, summary, "KDEPlot", fields,
+                ))
             }
 
             // residplot(model, width=60, height=20) — residuals vs ŷ
@@ -507,8 +696,30 @@ impl Interpreter {
                     _ => 20,
                 };
                 let title = format!("Residuals vs Ŷ — {mname}");
-                ascii_scatter(&fitted, &resids, &title, "ŷ (fitted)", "e (residual)", w, h);
-                Ok(Value::Nil)
+                let display =
+                    ascii_scatter(&fitted, &resids, &title, "ŷ (fitted)", "e (residual)", w, h);
+                let summary = title.clone();
+                let fields = vec![
+                    ("model".into(), Value::Str(mname.clone())),
+                    ("n".into(), Value::Int(fitted.len() as i64)),
+                    ("width".into(), Value::Int(w as i64)),
+                    ("height".into(), Value::Int(h as i64)),
+                    ("title".into(), Value::Str(title)),
+                    (
+                        "fitted".into(),
+                        model_expansion::series_from_vec("fitted", &fitted),
+                    ),
+                    (
+                        "residuals".into(),
+                        model_expansion::series_from_vec("residuals", &resids),
+                    ),
+                ];
+                Ok(model_expansion::model_result(
+                    display,
+                    summary,
+                    "ResidPlot",
+                    fields,
+                ))
             }
 
             // ── coefplot: ASCII coefficient chart ──────────────────────
@@ -542,8 +753,14 @@ impl Interpreter {
                     rows.push((name, *p, ci_lo, ci_hi));
                 }
                 if rows.is_empty() {
-                    println!("(no coefficients to plot)");
-                    return Ok(Some(Value::Nil));
+                    let display = "(no coefficients to plot)\n".to_string();
+                    let summary = "No coefficients to plot".to_string();
+                    return Ok(Some(model_expansion::model_result(
+                        display,
+                        summary,
+                        "CoefPlot",
+                        vec![],
+                    )));
                 }
 
                 let label_w = rows
@@ -573,7 +790,8 @@ impl Interpreter {
                 };
                 let zero_col = to_col(0.0);
 
-                println!();
+                let mut display = String::new();
+                display.push('\n');
                 for (name, coef, ci_lo, ci_hi) in &rows {
                     let c_lo = to_col(*ci_lo);
                     let c_hi = to_col(*ci_hi);
@@ -590,23 +808,72 @@ impl Interpreter {
                         line[c_pt] = '●';
                     }
                     let bar: String = line.into_iter().collect();
-                    println!("{:>lw$} │{bar}  {coef:>8.3}", name, lw = label_w);
+                    display.push_str(&format!(
+                        "{:>lw$} │{bar}  {coef:>8.3}\n",
+                        name,
+                        lw = label_w
+                    ));
                 }
                 // axis
-                print!("{:>lw$} │", "", lw = label_w);
                 let mut axis = vec![' '; width];
                 if zero_col < width {
                     axis[zero_col] = '0';
                 }
-                println!("{}", axis.iter().collect::<String>());
+                display.push_str(&format!(
+                    "{:>lw$} │{}\n",
+                    "",
+                    axis.iter().collect::<String>(),
+                    lw = label_w
+                ));
                 // range labels
                 let lo_s = format!("{:.1}", plot_lo);
                 let hi_s = format!("{:.1}", plot_hi);
                 let pad = width.saturating_sub(lo_s.len() + hi_s.len());
-                println!("{:>lw$}  {lo_s}{:>pad$}", "", hi_s, lw = label_w, pad = pad);
-                println!();
+                display.push_str(&format!(
+                    "{:>lw$}  {lo_s}{:>pad$}\n",
+                    "",
+                    hi_s,
+                    lw = label_w,
+                    pad = pad
+                ));
+                display.push('\n');
 
-                Ok(Value::Nil)
+                let mut names_vec = Vec::new();
+                let mut coefs_vec = Vec::new();
+                let mut ci_lower_vec = Vec::new();
+                let mut ci_upper_vec = Vec::new();
+                for (name, coef, ci_lo, ci_hi) in &rows {
+                    names_vec.push(name.to_string());
+                    coefs_vec.push(*coef);
+                    ci_lower_vec.push(*ci_lo);
+                    ci_upper_vec.push(*ci_hi);
+                }
+                let summary = format!("Coefficient plot ({} coefficients)", rows.len());
+                let fields = vec![
+                    ("n".into(), Value::Int(rows.len() as i64)),
+                    ("width".into(), Value::Int(width as i64)),
+                    (
+                        "names".into(),
+                        Value::List(Arc::new(
+                            names_vec.iter().map(|n| Value::Str(n.clone())).collect(),
+                        )),
+                    ),
+                    (
+                        "coefs".into(),
+                        model_expansion::series_from_vec("coefs", &coefs_vec),
+                    ),
+                    (
+                        "ci_lower".into(),
+                        model_expansion::series_from_vec("ci_lower", &ci_lower_vec),
+                    ),
+                    (
+                        "ci_upper".into(),
+                        model_expansion::series_from_vec("ci_upper", &ci_upper_vec),
+                    ),
+                ];
+                Ok(model_expansion::model_result(
+                    display, summary, "CoefPlot", fields,
+                ))
             }
 
             // ══════════════════════════════════════════════════════════════════
@@ -663,8 +930,31 @@ impl Interpreter {
                     h,
                 )
                 .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                println!("graph saved: {path}");
-                Ok(Value::Nil)
+                let display = format!("graph saved: {path}\n");
+                let summary = format!("Scatter plot saved to {path}");
+                let fields = vec![
+                    ("path".into(), Value::Str(path.clone())),
+                    ("title".into(), Value::Str(title.clone())),
+                    ("width".into(), Value::Int(w as i64)),
+                    ("height".into(), Value::Int(h as i64)),
+                    ("x".into(), Value::Str(x_name.clone())),
+                    ("y".into(), Value::Str(y_name.clone())),
+                    ("n".into(), Value::Int(x.len() as i64)),
+                    (
+                        "xs".into(),
+                        model_expansion::series_from_vec("xs", &x.to_vec()),
+                    ),
+                    (
+                        "ys".into(),
+                        model_expansion::series_from_vec("ys", &y.to_vec()),
+                    ),
+                ];
+                Ok(model_expansion::model_result(
+                    display,
+                    summary,
+                    "GraphScatter",
+                    fields,
+                ))
             }
 
             // graph_line(df, X, Y, path="plot.svg")
@@ -717,8 +1007,31 @@ impl Interpreter {
                     h,
                 )
                 .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                println!("graph saved: {path}");
-                Ok(Value::Nil)
+                let display = format!("graph saved: {path}\n");
+                let summary = format!("Line plot saved to {path}");
+                let fields = vec![
+                    ("path".into(), Value::Str(path.clone())),
+                    ("title".into(), Value::Str(title.clone())),
+                    ("width".into(), Value::Int(w as i64)),
+                    ("height".into(), Value::Int(h as i64)),
+                    ("x".into(), Value::Str(x_name.clone())),
+                    ("y".into(), Value::Str(y_name.clone())),
+                    ("n".into(), Value::Int(x.len() as i64)),
+                    (
+                        "xs".into(),
+                        model_expansion::series_from_vec("xs", &x.to_vec()),
+                    ),
+                    (
+                        "ys".into(),
+                        model_expansion::series_from_vec("ys", &y.to_vec()),
+                    ),
+                ];
+                Ok(model_expansion::model_result(
+                    display,
+                    summary,
+                    "GraphLine",
+                    fields,
+                ))
             }
 
             // graph_hist(df, var, path="hist.svg" [, bins=30])
@@ -769,8 +1082,27 @@ impl Interpreter {
                     bins,
                 )
                 .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                println!("graph saved: {path}");
-                Ok(Value::Nil)
+                let display = format!("graph saved: {path}\n");
+                let summary = format!("Histogram saved to {path}");
+                let fields = vec![
+                    ("path".into(), Value::Str(path.clone())),
+                    ("title".into(), Value::Str(title.clone())),
+                    ("width".into(), Value::Int(w as i64)),
+                    ("height".into(), Value::Int(h as i64)),
+                    ("var".into(), Value::Str(var_name.clone())),
+                    ("bins".into(), Value::Int(bins as i64)),
+                    ("n".into(), Value::Int(vals.len() as i64)),
+                    (
+                        "data".into(),
+                        model_expansion::series_from_vec("data", &vals.to_vec()),
+                    ),
+                ];
+                Ok(model_expansion::model_result(
+                    display,
+                    summary,
+                    "GraphHistogram",
+                    fields,
+                ))
             }
 
             // graph_coef(model, path="coef.svg")
@@ -825,8 +1157,39 @@ impl Interpreter {
                     h,
                 )
                 .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                println!("graph saved: {path}");
-                Ok(Value::Nil)
+                let display = format!("graph saved: {path}\n");
+                let summary = format!("Coefficient plot saved to {path}");
+                let fields = vec![
+                    ("path".into(), Value::Str(path.clone())),
+                    ("title".into(), Value::Str(title.clone())),
+                    ("width".into(), Value::Int(w as i64)),
+                    ("height".into(), Value::Int(h as i64)),
+                    ("n".into(), Value::Int(plot_names.len() as i64)),
+                    (
+                        "names".into(),
+                        Value::List(Arc::new(
+                            plot_names.iter().map(|n| Value::Str(n.clone())).collect(),
+                        )),
+                    ),
+                    (
+                        "coefs".into(),
+                        model_expansion::series_from_vec("coefs", &plot_coefs),
+                    ),
+                    (
+                        "ci_lower".into(),
+                        model_expansion::series_from_vec("ci_lower", &plot_lo),
+                    ),
+                    (
+                        "ci_upper".into(),
+                        model_expansion::series_from_vec("ci_upper", &plot_hi),
+                    ),
+                ];
+                Ok(model_expansion::model_result(
+                    display,
+                    summary,
+                    "GraphCoef",
+                    fields,
+                ))
             }
 
             _ => return Ok(None),

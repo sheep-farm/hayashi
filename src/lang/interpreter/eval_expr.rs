@@ -497,22 +497,10 @@ impl Interpreter {
                 Err(_) => model_expansion::value_field(&val, field)
                     .ok_or_else(|| self.rt_err(format!("unknown method or field '{field}'"))),
             },
-            (Value::IvResult(r), "summary") => {
-                println!("{r}");
-                Ok(Value::Nil)
-            }
-            (Value::BinaryResult(m), "summary") => {
-                println!("{m}");
-                Ok(Value::Nil)
-            }
-            (Value::PanelResult(r), "summary") => {
-                println!("{r}");
-                Ok(Value::Nil)
-            }
-            (Value::ReResult(r), "summary") => {
-                println!("{r}");
-                Ok(Value::Nil)
-            }
+            (Value::IvResult(r), "summary") => Ok(Value::Str(format!("{r}"))),
+            (Value::BinaryResult(m), "summary") => Ok(Value::Str(format!("{m}"))),
+            (Value::PanelResult(r), "summary") => Ok(Value::Str(format!("{r}"))),
+            (Value::ReResult(r), "summary") => Ok(Value::Str(format!("{r}"))),
             _ => {
                 if let Some(v) = model_expansion::value_field(&val, field) {
                     Ok(v)
@@ -580,10 +568,7 @@ impl Interpreter {
                 let lst: Vec<Value> = names.into_iter().map(Value::Str).collect();
                 Ok(Value::List(Arc::new(lst)))
             }
-            "summary" => {
-                println!("{}", m.result);
-                Ok(Value::Nil)
-            }
+            "summary" => Ok(Value::Str(format!("{}", m.result))),
             _ => Err(HayashiError::Runtime(format!(
                 "OLS result has no field '{field}'"
             ))),

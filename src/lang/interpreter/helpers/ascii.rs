@@ -8,16 +8,17 @@ pub(in crate::lang::interpreter) fn ascii_histogram(
     title: &str,
     var: &str,
     width: usize,
-) {
+) -> String {
+    let mut display = String::new();
     if data.is_empty() {
-        println!("  (no data)");
-        return;
+        display.push_str("  (no data)\n");
+        return display;
     }
     let min = data.iter().cloned().fold(f64::INFINITY, f64::min);
     let max = data.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
     if (max - min).abs() < 1e-15 {
-        println!("  (zero variance)");
-        return;
+        display.push_str("  (zero variance)\n");
+        return display;
     }
     let step = (max - min) / bins as f64;
     let mut counts = vec![0usize; bins];
@@ -31,26 +32,33 @@ pub(in crate::lang::interpreter) fn ascii_histogram(
     let n = data.len();
     let mean = data.iter().sum::<f64>() / n as f64;
     let sd = (data.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / n as f64).sqrt();
-    println!();
-    println!("{:=^width$}", format!(" {title} "), width = bar_w + 34);
-    println!("  Variable: {var}   n={n}   μ={mean:.4}   σ={sd:.4}   [{min:.4}, {max:.4}]");
-    println!("{:-^width$}", "", width = bar_w + 34);
+    display.push('\n');
+    display.push_str(&format!(
+        "{:=^width$}\n",
+        format!(" {title} "),
+        width = bar_w + 34
+    ));
+    display.push_str(&format!(
+        "  Variable: {var}   n={n}   μ={mean:.4}   σ={sd:.4}   [{min:.4}, {max:.4}]\n"
+    ));
+    display.push_str(&format!("{:-^width$}\n", "", width = bar_w + 34));
     for (i, &cnt) in counts.iter().enumerate() {
         let lo = min + i as f64 * step;
         let hi = lo + step;
         let bar_len = (cnt * bar_w).checked_div(max_count).unwrap_or(0);
         let bar: String = "█".repeat(bar_len);
-        println!(
-            "  [{:>10.4},{:>10.4})  {:>5}  {:<width$}",
+        display.push_str(&format!(
+            "  [{:>10.4},{:>10.4})  {:>5}  {:<width$}\n",
             lo,
             hi,
             cnt,
             bar,
             width = bar_w
-        );
+        ));
     }
-    println!("{:-^width$}", "", width = bar_w + 34);
-    println!();
+    display.push_str(&format!("{:-^width$}\n", "", width = bar_w + 34));
+    display.push('\n');
+    display
 }
 
 pub(in crate::lang::interpreter) fn ascii_scatter(
@@ -61,10 +69,11 @@ pub(in crate::lang::interpreter) fn ascii_scatter(
     ylab: &str,
     w: usize,
     h: usize,
-) {
+) -> String {
+    let mut display = String::new();
     if xs.is_empty() {
-        println!("  (no data)");
-        return;
+        display.push_str("  (no data)\n");
+        return display;
     }
     let xmin = xs.iter().cloned().fold(f64::INFINITY, f64::min);
     let xmax = xs.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
@@ -83,9 +92,13 @@ pub(in crate::lang::interpreter) fn ascii_scatter(
         let row = row.min(h - 1);
         grid[row][col] = '·';
     }
-    println!();
-    println!("{:=^width$}", format!(" {title} "), width = w + 18);
-    println!("  {:<10}  {:>10.4} ┐", ylab, ymax);
+    display.push('\n');
+    display.push_str(&format!(
+        "{:=^width$}\n",
+        format!(" {title} "),
+        width = w + 18
+    ));
+    display.push_str(&format!("  {:<10}  {:>10.4} ┐\n", ylab, ymax));
     for (i, row) in grid.iter().enumerate() {
         let y_val = ymax - (i as f64 / (h - 1) as f64) * yrng;
         let prefix = if i == 0 || i == h / 2 || i == h - 1 {
@@ -94,20 +107,23 @@ pub(in crate::lang::interpreter) fn ascii_scatter(
             "             │".to_string()
         };
         let line: String = row.iter().collect();
-        println!("{prefix}{line}");
+        display.push_str(&prefix);
+        display.push_str(&line);
+        display.push('\n');
     }
-    println!("             └{}", "─".repeat(w));
+    display.push_str(&format!("             └{}\n", "─".repeat(w)));
     let mid_x = xmin + xrng / 2.0;
-    println!(
-        "              {:<10.4}{:^width$.4}{:>10.4}",
+    display.push_str(&format!(
+        "              {:<10.4}{:^width$.4}{:>10.4}\n",
         xmin,
         mid_x,
         xmax,
         width = w - 20
-    );
-    println!("              {:^width$}", xlab, width = w);
-    println!("  n={}", xs.len());
-    println!();
+    ));
+    display.push_str(&format!("              {:^width$}\n", xlab, width = w));
+    display.push_str(&format!("  n={}\n", xs.len()));
+    display.push('\n');
+    display
 }
 
 pub(in crate::lang::interpreter) fn ascii_lineplot(
@@ -118,10 +134,11 @@ pub(in crate::lang::interpreter) fn ascii_lineplot(
     ylab: &str,
     w: usize,
     h: usize,
-) {
+) -> String {
+    let mut display = String::new();
     if xs.is_empty() {
-        println!("  (no data)");
-        return;
+        display.push_str("  (no data)\n");
+        return display;
     }
     let xmin = xs.iter().cloned().fold(f64::INFINITY, f64::min);
     let xmax = xs.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
@@ -158,9 +175,13 @@ pub(in crate::lang::interpreter) fn ascii_lineplot(
         grid[row][col] = '●';
         prev_col = Some((row, col));
     }
-    println!();
-    println!("{:=^width$}", format!(" {title} "), width = w + 18);
-    println!("  {:<10}  {:>10.4} ┐", ylab, ymax);
+    display.push('\n');
+    display.push_str(&format!(
+        "{:=^width$}\n",
+        format!(" {title} "),
+        width = w + 18
+    ));
+    display.push_str(&format!("  {:<10}  {:>10.4} ┐\n", ylab, ymax));
     for (i, row) in grid.iter().enumerate() {
         let y_val = ymax - (i as f64 / (h - 1) as f64) * yrng;
         let prefix = if i == 0 || i == h / 2 || i == h - 1 {
@@ -169,34 +190,43 @@ pub(in crate::lang::interpreter) fn ascii_lineplot(
             "             │".to_string()
         };
         let line: String = row.iter().collect();
-        println!("{prefix}{line}");
+        display.push_str(&prefix);
+        display.push_str(&line);
+        display.push('\n');
     }
-    println!("             └{}", "─".repeat(w));
+    display.push_str(&format!("             └{}\n", "─".repeat(w)));
     let mid_x = xmin + xrng / 2.0;
-    println!(
-        "              {:<10.4}{:^width$.4}{:>10.4}",
+    display.push_str(&format!(
+        "              {:<10.4}{:^width$.4}{:>10.4}\n",
         xmin,
         mid_x,
         xmax,
         width = w - 20
-    );
-    println!("              {:^width$}", xlab, width = w);
-    println!("  n={}", pairs.len());
-    println!();
+    ));
+    display.push_str(&format!("              {:^width$}\n", xlab, width = w));
+    display.push_str(&format!("  n={}\n", pairs.len()));
+    display.push('\n');
+    display
 }
 
-pub(in crate::lang::interpreter) fn ascii_boxplot(data: &[f64], title: &str, var: &str, w: usize) {
+pub(in crate::lang::interpreter) fn ascii_boxplot(
+    data: &[f64],
+    title: &str,
+    var: &str,
+    w: usize,
+) -> String {
+    let mut display = String::new();
     if data.is_empty() {
-        println!("  (no data)");
-        return;
+        display.push_str("  (no data)\n");
+        return display;
     }
     let mut sorted = data.to_vec();
     sorted.retain(|v| !v.is_nan());
     sorted.sort_by(nan_last_cmp);
     let n = sorted.len();
     if n < 4 {
-        println!("  (too few data for boxplot)");
-        return;
+        display.push_str("  (too few data for boxplot)\n");
+        return display;
     }
     let q = |p: f64| -> f64 {
         let idx = p * (n - 1) as f64;
@@ -251,26 +281,38 @@ pub(in crate::lang::interpreter) fn ascii_boxplot(data: &[f64], title: &str, var
         line[c] = '○';
     }
 
-    println!();
-    println!("{:=^width$}", format!(" {title} "), width = w + 18);
-    println!("  Variable: {var}   n={n}");
-    println!();
-    println!("             {}", line.iter().collect::<String>());
-    println!();
-    println!(
-        "  Min:    {:>12.4}   Q1:  {:>12.4}   Median:  {:>12.4}",
+    display.push('\n');
+    display.push_str(&format!(
+        "{:=^width$}\n",
+        format!(" {title} "),
+        width = w + 18
+    ));
+    display.push_str(&format!("  Variable: {var}   n={n}\n"));
+    display.push('\n');
+    display.push_str(&format!(
+        "             {}\n",
+        line.iter().collect::<String>()
+    ));
+    display.push('\n');
+    display.push_str(&format!(
+        "  Min:    {:>12.4}   Q1:  {:>12.4}   Median:  {:>12.4}\n",
         whisker_lo, q1, med
-    );
-    println!(
-        "  Mean:   {:>12.4}   Q3:  {:>12.4}   Max:     {:>12.4}",
+    ));
+    display.push_str(&format!(
+        "  Mean:   {:>12.4}   Q3:  {:>12.4}   Max:     {:>12.4}\n",
         mean, q3, whisker_hi
-    );
-    println!("  IQR:    {:>12.4}   Outliers: {}", iqr, outliers.len());
+    ));
+    display.push_str(&format!(
+        "  IQR:    {:>12.4}   Outliers: {}\n",
+        iqr,
+        outliers.len()
+    ));
     if !outliers.is_empty() && outliers.len() <= 10 {
         let out_str: Vec<String> = outliers.iter().map(|v| format!("{:.3}", v)).collect();
-        println!("  Values: [{}]", out_str.join(", "));
+        display.push_str(&format!("  Values: [{}]\n", out_str.join(", ")));
     }
-    println!();
+    display.push('\n');
+    display
 }
 
 /// ACF / PACF as ASCII bars.
@@ -280,17 +322,18 @@ pub(in crate::lang::interpreter) fn ascii_acf(
     title: &str,
     width: usize,
     partial: bool,
-) {
+) -> String {
+    let mut display = String::new();
     let n = data.len();
     if n < 4 {
-        println!("(insufficient data for ACF)");
-        return;
+        display.push_str("(insufficient data for ACF)\n");
+        return display;
     }
     let mean = data.iter().sum::<f64>() / n as f64;
     let var = data.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / n as f64;
     if var < 1e-15 {
-        println!("(zero variance)");
-        return;
+        display.push_str("(zero variance)\n");
+        return display;
     }
 
     let max_lag = max_lag.min(n / 2);
@@ -327,9 +370,10 @@ pub(in crate::lang::interpreter) fn ascii_acf(
     };
 
     let ci = 1.96 / (n as f64).sqrt();
-    println!("\n{:=<width$}", "");
-    println!(" {title}");
-    println!("{:=<width$}", "");
+    display.push('\n');
+    display.push_str(&format!("{:=<width$}\n", "", width = width));
+    display.push_str(&format!(" {title}\n"));
+    display.push_str(&format!("{:=<width$}\n", "", width = width));
     let half = width / 2;
     for (lag, v) in values.iter().enumerate().skip(1) {
         let bar_len = ((v.abs() * half as f64).round() as usize).min(half);
@@ -337,16 +381,17 @@ pub(in crate::lang::interpreter) fn ascii_acf(
         let bar_char = if in_ci { '─' } else { '█' };
         let bar: String = std::iter::repeat_n(bar_char, bar_len).collect();
         let (left, right) = if *v >= 0.0 {
-            (format!("{:<half$}", " "), bar.to_string())
+            (format!("{:<half$}", " ", half = half), bar.to_string())
         } else {
             let pad = half - bar_len;
-            (format!("{:>half$}", bar), " ".repeat(pad))
+            (format!("{:>half$}", bar, half = half), " ".repeat(pad))
         };
-        println!("{:3} |{}|{} {:6.3}", lag, left, right, v);
+        display.push_str(&format!("{:3} |{}|{} {:6.3}\n", lag, left, right, v));
     }
-    println!("{:=<width$}", "");
-    println!("  CI ±{:.3} (95%)  │ ── inside  █ outside", ci);
-    println!();
+    display.push_str(&format!("{:=<width$}\n", "", width = width));
+    display.push_str(&format!("  CI ±{:.3} (95%)  │ ── inside  █ outside\n", ci));
+    display.push('\n');
+    display
 }
 
 /// Normal QQ-plot ASCII.
@@ -356,13 +401,12 @@ pub(in crate::lang::interpreter) fn ascii_qqplot(
     var: &str,
     w: usize,
     h: usize,
-) {
+) -> String {
     let mut sorted = data.to_vec();
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     let n = sorted.len();
     if n < 4 {
-        println!("(insufficient data for QQ-plot)");
-        return;
+        return "(insufficient data for QQ-plot)\n".to_string();
     }
     let theoretical: Vec<f64> = (1..=n)
         .map(|i| {
@@ -437,10 +481,12 @@ pub(in crate::lang::interpreter) fn ascii_qqplot(
         .sqrt()
         .max(1e-15);
     let empirical: Vec<f64> = sorted.iter().map(|x| (x - mean_s) / std_s).collect();
-    println!("\n{:=<w$}", "");
-    println!(" {title}  (normalized)");
-    println!("{:=<w$}", "");
-    ascii_scatter(
+    let mut display = String::new();
+    display.push('\n');
+    display.push_str(&format!("{:=<w$}\n", "", w = w));
+    display.push_str(&format!(" {title}  (normalized)\n"));
+    display.push_str(&format!("{:=<w$}\n", "", w = w));
+    display.push_str(&ascii_scatter(
         &theoretical,
         &empirical,
         title,
@@ -448,12 +494,14 @@ pub(in crate::lang::interpreter) fn ascii_qqplot(
         var,
         w,
         h,
-    );
-    println!("  (ideal line: points along the diagonal)");
+    ));
+    display.push_str("  (ideal line: points along the diagonal)\n");
+    display.push('\n');
+    display
 }
 
 /// Correlation matrix as text heatmap.
-pub(in crate::lang::interpreter) fn ascii_corrplot(cols: &[Vec<f64>], names: &[String]) {
+pub(in crate::lang::interpreter) fn ascii_corrplot(cols: &[Vec<f64>], names: &[String]) -> String {
     let n = cols[0].len();
     let means: Vec<f64> = cols
         .iter()
@@ -481,17 +529,21 @@ pub(in crate::lang::interpreter) fn ascii_corrplot(cols: &[Vec<f64>], names: &[S
         })
         .collect();
     let nw = names.iter().map(|n| n.len()).max().unwrap_or(4).max(4);
-    println!("\n{:=<80}", "");
-    println!(" Correlation Matrix");
-    println!("{:=<80}", "");
-    print!("{:>nw$}", "");
+    let mut display = String::new();
+    display.push('\n');
+    display.push_str(&format!("{:=<80}\n", ""));
+    display.push_str(" Correlation Matrix\n");
+    display.push_str(&format!("{:=<80}\n", ""));
+    let mut header = format!("{:>nw$}", "", nw = nw);
     for n in names {
-        print!(" {:>7}", &n[..n.len().min(7)]);
+        let s = &n[..n.len().min(7)];
+        header.push_str(&format!(" {:>7}", s));
     }
-    println!();
+    header.push('\n');
+    display.push_str(&header);
     for (name, row) in names.iter().zip(&corr) {
         let name_disp = &name[..name.len().min(nw)];
-        print!("{:>nw$}", name_disp);
+        let mut line = format!("{:>nw$}", name_disp, nw = nw);
         for v in row {
             let shade = if v.abs() >= 0.9 {
                 "████"
@@ -505,15 +557,17 @@ pub(in crate::lang::interpreter) fn ascii_corrplot(cols: &[Vec<f64>], names: &[S
                 "    "
             };
             let sign = if *v < 0.0 { "-" } else { "+" };
-            print!(" {sign}{shade}");
+            line.push_str(&format!(" {sign}{shade}"));
         }
-        print!("   ");
+        line.push_str("   ");
         for v in row {
-            print!(" {:>6.3}", v);
+            line.push_str(&format!(" {:>6.3}", v));
         }
-        println!();
+        line.push('\n');
+        display.push_str(&line);
     }
-    println!("{:=<80}", "");
-    println!("  Scale: ████ |r|≥0.9  ▓▓▓▓ ≥0.7  ▒▒▒▒ ≥0.5  ░░░░ ≥0.3  (+neg=-)");
-    println!();
+    display.push_str(&format!("{:=<80}\n", ""));
+    display.push_str("  Scale: ████ |r|≥0.9  ▓▓▓▓ ≥0.7  ▒▒▒▒ ≥0.5  ░░░░ ≥0.3  (+neg=-)\n");
+    display.push('\n');
+    display
 }

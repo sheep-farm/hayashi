@@ -1,5 +1,6 @@
 use super::helpers::*;
 use super::*;
+use crate::lang::dap::model_expansion;
 use std::sync::Arc;
 
 struct CodebookEntry {
@@ -182,8 +183,12 @@ impl Interpreter {
         self.rng_seed = Some(s);
         use rand::SeedableRng;
         self.rng = rand::rngs::StdRng::seed_from_u64(s);
-        println!("set seed {s}");
-        Ok(Value::Nil)
+        let display = format!("set seed {s}");
+        let summary = format!("RNG seed set to {s}");
+        let fields = vec![("seed".to_string(), Value::Int(s as i64))];
+        Ok(model_expansion::model_result(
+            display, summary, "set_seed", fields,
+        ))
     }
 
     pub(super) fn timer(
@@ -217,8 +222,13 @@ impl Interpreter {
                 "quietly(expr) — evaluates without printing".into(),
             ));
         }
-        self.eval_expr(&args[0])?;
-        Ok(Value::Nil)
+        let _ = self.eval_expr(&args[0])?;
+        let display = String::new();
+        let summary = "expression evaluated quietly";
+        let fields = vec![("quiet".to_string(), Value::Bool(true))];
+        Ok(model_expansion::model_result(
+            display, summary, "quietly", fields,
+        ))
     }
 
     pub(super) fn capture(
@@ -236,8 +246,15 @@ impl Interpreter {
         match self.eval_expr(&args[0]) {
             Ok(v) => Ok(v),
             Err(e) => {
-                eprintln!("(captured: {e})");
-                Ok(Value::Nil)
+                let display = String::new();
+                let summary = format!("captured error: {e}");
+                let fields = vec![
+                    ("error".to_string(), Value::Str(e.to_string())),
+                    ("captured".to_string(), Value::Bool(true)),
+                ];
+                Ok(model_expansion::model_result(
+                    display, summary, "capture", fields,
+                ))
             }
         }
     }
@@ -266,7 +283,12 @@ impl Interpreter {
             };
             return Err(HayashiError::Runtime(msg));
         }
-        Ok(Value::Nil)
+        let display = "assertion passed".to_string();
+        let summary = "assertion passed";
+        let fields = vec![("passed".to_string(), Value::Bool(true))];
+        Ok(model_expansion::model_result(
+            display, summary, "assert", fields,
+        ))
     }
 
     pub(super) fn preserve(
@@ -295,8 +317,15 @@ impl Interpreter {
             .ok_or_else(|| self.rt_err(format!("'{name}' not found")))?
             .clone();
         self.preserved.insert(name.clone(), val);
-        println!("preserve {name}");
-        Ok(Value::Nil)
+        let display = format!("preserve {name}");
+        let summary = format!("preserved variable '{name}'");
+        let fields = vec![
+            ("name".to_string(), Value::Str(name.clone())),
+            ("preserved".to_string(), Value::Bool(true)),
+        ];
+        Ok(model_expansion::model_result(
+            display, summary, "preserve", fields,
+        ))
     }
 
     pub(super) fn restore(
@@ -324,8 +353,15 @@ impl Interpreter {
             .remove(&name)
             .ok_or_else(|| self.rt_err(format!("'{name}' was not preserved")))?;
         self.env.set(&name, val)?;
-        println!("restore {name}");
-        Ok(Value::Nil)
+        let display = format!("restore {name}");
+        let summary = format!("restored variable '{name}'");
+        let fields = vec![
+            ("name".to_string(), Value::Str(name.clone())),
+            ("restored".to_string(), Value::Bool(true)),
+        ];
+        Ok(model_expansion::model_result(
+            display, summary, "restore", fields,
+        ))
     }
 
     pub(super) fn source(
@@ -344,9 +380,16 @@ impl Interpreter {
         };
         let src = std::fs::read_to_string(&path)
             .map_err(|e| self.rt_err(format!("cannot read '{path}': {e}")))?;
-        println!("source {path}");
+        let display = format!("source {path}");
+        let summary = format!("sourced script '{path}'");
         crate::lang::run_source_with_path(&src, self, Some(std::path::Path::new(&path)))?;
-        Ok(Value::Nil)
+        let fields = vec![
+            ("path".to_string(), Value::Str(path.clone())),
+            ("sourced".to_string(), Value::Bool(true)),
+        ];
+        Ok(model_expansion::model_result(
+            display, summary, "source", fields,
+        ))
     }
 
     pub(super) fn import(
@@ -365,7 +408,15 @@ impl Interpreter {
         };
 
         if self.imported.contains(&module) {
-            return Ok(Value::Nil);
+            let display = format!("import {module} (already imported)");
+            let summary = format!("{module} already imported");
+            let fields = vec![
+                ("module".to_string(), Value::Str(module.clone())),
+                ("status".to_string(), Value::Str("already_imported".into())),
+            ];
+            return Ok(model_expansion::model_result(
+                display, summary, "import", fields,
+            ));
         }
 
         let resolved = {
@@ -424,7 +475,18 @@ impl Interpreter {
                     .map_err(|e| self.rt_err(format!("import: failed to load WASM plugin: {e}")))?;
                 self.plugins.insert(ns.clone(), Box::new(plugin));
                 self.imported.insert(module.clone());
-                return Ok(Value::Nil);
+                let display = format!("import {module} (WASM plugin)");
+                let summary = format!("loaded WASM plugin '{ns}' from {resolved}");
+                let fields = vec![
+                    ("module".to_string(), Value::Str(module.clone())),
+                    ("namespace".to_string(), Value::Str(ns.clone())),
+                    ("resolved".to_string(), Value::Str(resolved.clone())),
+                    ("plugin_type".to_string(), Value::Str("wasm".into())),
+                    ("status".to_string(), Value::Str("loaded".into())),
+                ];
+                return Ok(model_expansion::model_result(
+                    display, summary, "import", fields,
+                ));
             }
         } else if is_native {
             #[cfg(not(feature = "native"))]
@@ -437,7 +499,18 @@ impl Interpreter {
                 })?;
                 self.plugins.insert(ns.clone(), Box::new(plugin));
                 self.imported.insert(module.clone());
-                return Ok(Value::Nil);
+                let display = format!("import {module} (native plugin)");
+                let summary = format!("loaded native plugin '{ns}' from {resolved}");
+                let fields = vec![
+                    ("module".to_string(), Value::Str(module.clone())),
+                    ("namespace".to_string(), Value::Str(ns.clone())),
+                    ("resolved".to_string(), Value::Str(resolved.clone())),
+                    ("plugin_type".to_string(), Value::Str("native".into())),
+                    ("status".to_string(), Value::Str("loaded".into())),
+                ];
+                return Ok(model_expansion::model_result(
+                    display, summary, "import", fields,
+                ));
             }
         }
 
@@ -474,7 +547,24 @@ impl Interpreter {
             }
         }
 
-        Ok(Value::Nil)
+        let new_names_val = Value::List(Arc::new(
+            new_names.iter().map(|n| Value::Str(n.clone())).collect(),
+        ));
+        let display = format!("import {module}");
+        let summary = format!(
+            "loaded script '{module}' as namespace '{ns}' with {} new names",
+            new_names.len()
+        );
+        let fields = vec![
+            ("module".to_string(), Value::Str(module.clone())),
+            ("namespace".to_string(), Value::Str(ns.clone())),
+            ("resolved".to_string(), Value::Str(resolved.clone())),
+            ("new_names".to_string(), new_names_val),
+            ("status".to_string(), Value::Str("loaded".into())),
+        ];
+        Ok(model_expansion::model_result(
+            display, summary, "import", fields,
+        ))
     }
 
     pub(super) fn install(
@@ -525,7 +615,23 @@ impl Interpreter {
         #[cfg(feature = "native")]
         {
             crate::io::packages::install(&spec, version.as_deref(), force)?;
-            Ok(Value::Nil)
+            let display = format!("install {spec}");
+            let summary = format!("installed plugin '{spec}'");
+            let fields = vec![
+                ("spec".to_string(), Value::Str(spec.clone())),
+                (
+                    "version".to_string(),
+                    version
+                        .as_ref()
+                        .map(|v| Value::Str(v.clone()))
+                        .unwrap_or(Value::Nil),
+                ),
+                ("force".to_string(), Value::Bool(force)),
+                ("installed".to_string(), Value::Bool(true)),
+            ];
+            Ok(model_expansion::model_result(
+                display, summary, "install", fields,
+            ))
         }
         #[cfg(not(feature = "native"))]
         {
@@ -543,15 +649,30 @@ impl Interpreter {
         _opt_map: &HashMap<String, Value>,
     ) -> Result<Value> {
         if args.is_empty() {
+            let mut display = String::new();
             if self.plugin_paths.is_empty() {
-                println!("plugin_path: (none)");
+                display.push_str("plugin_path: (none)\n");
             } else {
                 for p in &self.plugin_paths {
-                    println!("  {p}");
+                    display.push_str(&format!("  {p}\n"));
                 }
             }
-            return Ok(Value::Nil);
+            let paths_val = Value::List(Arc::new(
+                self.plugin_paths
+                    .iter()
+                    .map(|p| Value::Str(p.clone()))
+                    .collect(),
+            ));
+            let summary = "plugin paths";
+            let fields = vec![("paths".to_string(), paths_val)];
+            return Ok(model_expansion::model_result(
+                display,
+                summary,
+                "plugin_path",
+                fields,
+            ));
         }
+        let mut added: Vec<String> = Vec::new();
         for arg in args {
             let path = match self.eval_expr(arg)? {
                 Value::Str(s) => s,
@@ -560,10 +681,28 @@ impl Interpreter {
                 }
             };
             if !self.plugin_paths.contains(&path) {
-                self.plugin_paths.push(path);
+                self.plugin_paths.push(path.clone());
             }
+            added.push(path);
         }
-        Ok(Value::Nil)
+        let display = format!("plugin_path: added {}", added.join(", "));
+        let summary = display.clone();
+        let paths_val = Value::List(Arc::new(
+            self.plugin_paths
+                .iter()
+                .map(|p| Value::Str(p.clone()))
+                .collect(),
+        ));
+        let fields = vec![
+            ("added".to_string(), Value::Str(added.join(", "))),
+            ("paths".to_string(), paths_val),
+        ];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "plugin_path",
+            fields,
+        ))
     }
 
     pub(super) fn help(
@@ -581,30 +720,58 @@ impl Interpreter {
                 _ => String::new(),
             }
         };
+        let mut display = String::new();
+        let mut found = false;
         if topic == "about" {
-            println!("{}", crate::lang::help::help_about());
+            display.push_str(&crate::lang::help::help_about());
+            found = true;
         } else if topic == "license" {
-            println!("{}", crate::lang::help::help_license());
+            display.push_str(&crate::lang::help::help_license());
+            found = true;
         } else {
             match crate::lang::help::help_text(&topic) {
-                Some(h) => println!("{h}"),
+                Some(h) => {
+                    display.push_str(&h);
+                    found = true;
+                }
                 None => {
                     if let Some(Value::UserFn(uf)) = self.env.get(&topic) {
                         if let Some(doc) = &uf.doc {
-                            println!("fn {}({})\n{}", topic, uf.params.join(", "), doc);
+                            display.push_str(&format!(
+                                "fn {}({})\n{}",
+                                topic,
+                                uf.params.join(", "),
+                                doc
+                            ));
                         } else {
-                            println!("fn {}({})\n  (no docstring)", topic, uf.params.join(", "));
+                            display.push_str(&format!(
+                                "fn {}({})\n  (no docstring)",
+                                topic,
+                                uf.params.join(", ")
+                            ));
                         }
+                        found = true;
                     } else {
-                        println!(
+                        display.push_str(&format!(
                             "help: '{}' not documented. Type help() for full list.",
                             topic
-                        );
+                        ));
                     }
                 }
             }
         }
-        Ok(Value::Nil)
+        let summary = if found {
+            format!("help topic '{topic}'")
+        } else {
+            format!("help topic '{topic}' not found")
+        };
+        let fields = vec![
+            ("topic".to_string(), Value::Str(topic.clone())),
+            ("found".to_string(), Value::Bool(found)),
+        ];
+        Ok(model_expansion::model_result(
+            display, summary, "help", fields,
+        ))
     }
 
     pub(super) fn describe(
@@ -1057,11 +1224,26 @@ impl Interpreter {
 
         match action.as_str() {
             "report" => {
-                println!("duplicates report: {var_name}");
-                println!("  observations:    {n}");
-                println!("  unique values: {n_unique}");
-                println!("  duplicates:    {n_dup}");
-                Ok(Value::Int(n_dup as i64))
+                let mut display = String::new();
+                display.push_str(&format!("duplicates report: {var_name}\n"));
+                display.push_str(&format!("  observations:    {n}\n"));
+                display.push_str(&format!("  unique values: {n_unique}\n"));
+                display.push_str(&format!("  duplicates:    {n_dup}\n"));
+                let summary = format!("duplicates report for {var_name}: {n_dup} duplicates");
+                let fields = vec![
+                    ("action".to_string(), Value::Str("report".into())),
+                    ("df".to_string(), Value::Str(df_name.clone())),
+                    ("variable".to_string(), Value::Str(var_name.clone())),
+                    ("observations".to_string(), Value::Int(n as i64)),
+                    ("unique".to_string(), Value::Int(n_unique as i64)),
+                    ("duplicates".to_string(), Value::Int(n_dup as i64)),
+                ];
+                Ok(model_expansion::model_result(
+                    display,
+                    summary,
+                    "duplicates",
+                    fields,
+                ))
             }
             "drop" => {
                 let mut seen: std::collections::HashSet<i64> = std::collections::HashSet::new();
@@ -1074,12 +1256,26 @@ impl Interpreter {
                 let new_df = df
                     .iloc(Some(&keep), None)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                println!(
-                    "duplicates drop: {n_dup} obs removed, {} remaining",
-                    new_df.n_rows()
-                );
+                let remaining = new_df.n_rows();
+                let mut display = String::new();
+                display.push_str(&format!(
+                    "duplicates drop: {n_dup} obs removed, {remaining} remaining\n"
+                ));
                 self.env.set(&df_name, Value::DataFrame(Arc::new(new_df)))?;
-                Ok(Value::Nil)
+                let summary = format!("dropped {n_dup} duplicate observations from {df_name}");
+                let fields = vec![
+                    ("action".to_string(), Value::Str("drop".into())),
+                    ("df".to_string(), Value::Str(df_name.clone())),
+                    ("variable".to_string(), Value::Str(var_name.clone())),
+                    ("removed".to_string(), Value::Int(n_dup as i64)),
+                    ("remaining".to_string(), Value::Int(remaining as i64)),
+                ];
+                Ok(model_expansion::model_result(
+                    display,
+                    summary,
+                    "duplicates",
+                    fields,
+                ))
             }
             "tag" => {
                 let dup_col: Vec<f64> = (0..n)
@@ -1093,9 +1289,25 @@ impl Interpreter {
                 Arc::make_mut(&mut df_mut)
                     .insert("_dup".to_string(), arr)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                println!("duplicates tag: _dup column generated ({n_dup} duplicates)");
+                let mut display = String::new();
+                display.push_str(&format!(
+                    "duplicates tag: _dup column generated ({n_dup} duplicates)\n"
+                ));
                 self.env.set(&df_name, Value::DataFrame(df_mut))?;
-                Ok(Value::Nil)
+                let summary = format!("tagged {n_dup} duplicates in {df_name}.{var_name}");
+                let fields = vec![
+                    ("action".to_string(), Value::Str("tag".into())),
+                    ("df".to_string(), Value::Str(df_name.clone())),
+                    ("variable".to_string(), Value::Str(var_name.clone())),
+                    ("column".to_string(), Value::Str("_dup".into())),
+                    ("duplicates".to_string(), Value::Int(n_dup as i64)),
+                ];
+                Ok(model_expansion::model_result(
+                    display,
+                    summary,
+                    "duplicates",
+                    fields,
+                ))
             }
             other => Err(HayashiError::Runtime(format!(
                 "duplicates(): action '{other}' unknown (report|drop|tag)"
@@ -1143,8 +1355,16 @@ impl Interpreter {
             .entry(df_name.clone())
             .or_default()
             .insert(var_name.clone(), description.clone());
-        println!("label {df_name}.{var_name} = \"{description}\"");
-        Ok(Value::Nil)
+        let display = format!("label {df_name}.{var_name} = \"{description}\"");
+        let summary = format!("set label for {df_name}.{var_name}");
+        let fields = vec![
+            ("df".to_string(), Value::Str(df_name.clone())),
+            ("variable".to_string(), Value::Str(var_name.clone())),
+            ("label".to_string(), Value::Str(description.clone())),
+        ];
+        Ok(model_expansion::model_result(
+            display, summary, "label", fields,
+        ))
     }
 
     pub(super) fn correlate(

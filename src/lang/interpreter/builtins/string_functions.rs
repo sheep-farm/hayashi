@@ -1,4 +1,5 @@
 use super::super::*;
+use crate::lang::dap::model_expansion;
 impl Interpreter {
     pub(super) fn string_functions(
         &mut self,
@@ -46,7 +47,15 @@ impl Interpreter {
                 };
                 std::fs::write(&path, &content)
                     .map_err(|e| HayashiError::Io(format!("Failed to write file '{path}': {e}")))?;
-                Ok(Value::Nil)
+                let display = format!("wrote {} bytes to '{path}'", content.len());
+                let summary = display.clone();
+                let fields = vec![
+                    ("path".to_string(), Value::Str(path.clone())),
+                    ("bytes".to_string(), Value::Int(content.len() as i64)),
+                ];
+                Ok(model_expansion::model_result(
+                    display, summary, "write", fields,
+                ))
             }
             "file_exists" => {
                 if args.len() != 1 {
@@ -81,7 +90,15 @@ impl Interpreter {
                 std::fs::create_dir_all(&path).map_err(|e| {
                     HayashiError::Io(format!("Failed to create directory '{path}': {e}"))
                 })?;
-                Ok(Value::Nil)
+                let display = format!("created directory '{path}'");
+                let summary = display.clone();
+                let fields = vec![("path".to_string(), Value::Str(path.clone()))];
+                Ok(model_expansion::model_result(
+                    display,
+                    summary,
+                    "ensure_dir",
+                    fields,
+                ))
             }
             "contains" => {
                 if args.len() != 2 {
