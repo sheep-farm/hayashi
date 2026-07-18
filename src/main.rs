@@ -322,69 +322,11 @@ fn run() {
             return;
         }
         Some("-") => {
-            use std::io::Read;
-            let mut src = String::new();
-            std::io::stdin()
-                .read_to_string(&mut src)
-                .expect("failed to read stdin");
-            let mut interp = Interpreter::new();
-            interp.load_plugins();
-            if let Err(e) = lang::run_source_verbose(&src, &mut interp, verbose, None) {
-                eprintln!("error: {e}");
-                std::process::exit(1);
-            }
+            run_stdin(verbose);
             return;
         }
         Some("install") => {
-            let pkg = args_clean.get(2).unwrap_or_else(|| {
-                eprintln!("Usage: hay install user/repo [version] [-y]");
-                eprintln!("       hay install --file repositories.txt [-y]");
-                std::process::exit(1);
-            });
-
-            if *pkg == "--file" {
-                let file_path = args_clean.get(3).unwrap_or_else(|| {
-                    eprintln!("Usage: hay install --file repositories.txt [-y]");
-                    std::process::exit(1);
-                });
-                if let Err(e) = packages::install_from_file(file_path, yes) {
-                    eprintln!("hay install: {e}");
-                    std::process::exit(1);
-                }
-            } else {
-                let version = args_clean.get(3).copied();
-                let (user, repo) = packages::parse_spec(pkg).unwrap_or_else(|e| {
-                    eprintln!("hay install: {e}");
-                    std::process::exit(1);
-                });
-                if !yes {
-                    if let Some(installed_path) = packages::is_pkg_installed(user, repo) {
-                        print!(
-                            "Package {}/{} is already installed at {}. Overwrite? (y/N): ",
-                            user,
-                            repo,
-                            installed_path.display()
-                        );
-                        use std::io::Write;
-                        let _ = std::io::stdout().flush();
-                        let mut input = String::new();
-                        if std::io::stdin().read_line(&mut input).is_ok() {
-                            let trimmed = input.trim().to_lowercase();
-                            if trimmed != "y" && trimmed != "yes" {
-                                println!("Installation cancelled.");
-                                return;
-                            }
-                        } else {
-                            println!("Installation cancelled.");
-                            return;
-                        }
-                    }
-                }
-                if let Err(e) = packages::install(pkg, version, true) {
-                    eprintln!("hay install: {e}");
-                    std::process::exit(1);
-                }
-            }
+            run_install_from_args(&args_clean, yes);
             return;
         }
         Some("update") => {
@@ -402,15 +344,7 @@ fn run() {
             return;
         }
         Some("dap") => {
-            let program = args_clean.get(2).unwrap_or_else(|| {
-                eprintln!("Usage: hay dap <script.hay>");
-                std::process::exit(1);
-            });
-            hayashi_lang::lang::dap::adapter::run_dap(
-                std::io::stdin(),
-                std::io::stdout(),
-                std::path::Path::new(program),
-            );
+            run_dap(&args_clean);
             return;
         }
         Some("dist-update") => {
@@ -430,7 +364,7 @@ fn run() {
             return;
         }
         Some(path) if !path.starts_with('-') => {
-            run_script(path, verbose);
+            run_script_or_repl(path, verbose);
             return;
         }
         Some(unknown) => {
@@ -461,6 +395,85 @@ fn run_script(path: &str, verbose: bool) {
         eprintln!("error: {e}");
         std::process::exit(1);
     }
+}
+
+fn run_stdin(verbose: bool) {
+    use std::io::Read;
+    let mut src = String::new();
+    std::io::stdin()
+        .read_to_string(&mut src)
+        .expect("failed to read stdin");
+    let mut interp = Interpreter::new();
+    interp.load_plugins();
+    if let Err(e) = lang::run_source_verbose(&src, &mut interp, verbose, None) {
+        eprintln!("error: {e}");
+        std::process::exit(1);
+    }
+}
+
+fn run_install_from_args(args_clean: &[&str], yes: bool) {
+    let pkg = args_clean.get(2).unwrap_or_else(|| {
+        eprintln!("Usage: hay install user/repo [version] [-y]");
+        eprintln!("       hay install --file repositories.txt [-y]");
+        std::process::exit(1);
+    });
+
+    if *pkg == "--file" {
+        let file_path = args_clean.get(3).unwrap_or_else(|| {
+            eprintln!("Usage: hay install --file repositories.txt [-y]");
+            std::process::exit(1);
+        });
+        if let Err(e) = packages::install_from_file(file_path, yes) {
+            eprintln!("hay install: {e}");
+            std::process::exit(1);
+        }
+    } else {
+        let version = args_clean.get(3).copied();
+        let (user, repo) = packages::parse_spec(pkg).unwrap_or_else(|e| {
+            eprintln!("hay install: {e}");
+            std::process::exit(1);
+        });
+        if !yes {
+            if let Some(installed_path) = packages::is_pkg_installed(user, repo) {
+                print!(
+                    "Package {}/{} is already installed at {}. Overwrite? (y/N): ",
+                    user,
+                    repo,
+                    installed_path.display()
+                );
+                use std::io::Write;
+                let _ = std::io::stdout().flush();
+                let mut input = String::new();
+                if std::io::stdin().read_line(&mut input).is_ok() {
+                    let trimmed = input.trim().to_lowercase();
+                    if trimmed != "y" && trimmed != "yes" {
+                        println!("Installation cancelled.");
+                        return;
+                    }
+                } else {
+                    println!("Installation cancelled.");
+                    return;
+                }
+            }
+        }
+        pkg_install_internal(pkg, version, true);
+    }
+}
+
+fn run_dap(args_clean: &[&str]) {
+    let program = args_clean.get(2).unwrap_or_else(|| {
+        eprintln!("Usage: hay dap <script.hay>");
+        std::process::exit(1);
+    });
+    hayashi_lang::lang::dap::adapter::run_dap(
+        std::io::stdin(),
+        std::io::stdout(),
+        std::path::Path::new(program),
+    );
+}
+
+fn run_script_or_repl(path: &str, verbose: bool) {
+    run_script(path, verbose);
 }
 
 /// Runs the empirical validation programme by invoking `validation/run.py`.
@@ -568,83 +581,61 @@ fn check_latest_release() -> Result<Option<String>, String> {
     Ok(Some(remote_version))
 }
 
-/// Download and replace the current binary with the given release version.
-fn dist_update_install(remote_version: &str) {
-    let target = packages::current_target_triple().unwrap_or_else(|e| {
-        eprintln!("hay dist-update: {e}");
-        std::process::exit(1);
-    });
-    let (asset_ext, archive_cmd) = dist_asset_kind();
-    let asset_name = format!("hay-v{remote_version}-{target}.{asset_ext}");
+/// Shared fetch/download/extract/backup/replace logic for a GitHub release.
+fn dist_replace_from_release(
+    release_url: &str,
+    asset_name: &str,
+    version_label: &str,
+) -> Result<(), String> {
+    let release_kind = if release_url.contains("tags/nightly") {
+        "nightly"
+    } else {
+        "latest"
+    };
+    let (_, archive_cmd) = dist_asset_kind();
 
-    let release_url = "https://api.github.com/repos/sheep-farm/hayashi/releases/latest";
-    let release_resp = match ureq::get(release_url)
+    let release_resp = ureq::get(release_url)
         .set("User-Agent", "hay")
         .set("Accept", "application/vnd.github.v3+json")
         .call()
-    {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("hay dist-update: cannot fetch latest release: {e}");
-            std::process::exit(1);
-        }
-    };
+        .map_err(|e| format!("cannot fetch {release_kind} release: {e}"))?;
 
     let release_body: String = release_resp.into_string().unwrap_or_default();
-    let release: packages::GhRelease = serde_json::from_str(&release_body).unwrap_or_else(|e| {
-        eprintln!("hay dist-update: cannot parse release payload: {e}");
-        std::process::exit(1);
-    });
+    let release: packages::GhRelease = serde_json::from_str(&release_body)
+        .map_err(|e| format!("cannot parse {release_kind} release payload: {e}"))?;
 
     let asset = release
         .assets
         .iter()
         .find(|a| a.name == asset_name)
-        .unwrap_or_else(|| {
-            eprintln!("hay dist-update: no asset found for {asset_name}");
-            std::process::exit(1);
-        });
+        .ok_or_else(|| format!("no {release_kind} asset found for {asset_name}"))?;
 
-    let exe_path = std::env::current_exe().unwrap_or_else(|e| {
-        eprintln!("hay dist-update: cannot locate current executable: {e}");
-        std::process::exit(1);
-    });
+    let exe_path =
+        std::env::current_exe().map_err(|e| format!("cannot locate current executable: {e}"))?;
 
-    let tmp_dir = std::env::temp_dir().join(format!("hay-dist-update-{remote_version}"));
+    let tmp_dir = std::env::temp_dir().join(format!(
+        "hay-dist-update-{}",
+        version_label.replace(' ', "-")
+    ));
     let _ = std::fs::remove_dir_all(&tmp_dir);
-    std::fs::create_dir_all(&tmp_dir).unwrap_or_else(|e| {
-        eprintln!("hay dist-update: cannot create temp dir: {e}");
-        std::process::exit(1);
-    });
+    std::fs::create_dir_all(&tmp_dir).map_err(|e| format!("cannot create temp dir: {e}"))?;
 
-    let archive_path = tmp_dir.join(&asset_name);
+    let archive_path = tmp_dir.join(asset_name);
     println!("hay dist-update: downloading {} ...", asset.name);
-    match ureq::get(&asset.browser_download_url).call() {
-        Ok(resp) => {
-            let mut reader = resp.into_reader();
-            let mut file = std::fs::File::create(&archive_path).unwrap();
-            std::io::copy(&mut reader, &mut file).unwrap_or_else(|e| {
-                eprintln!("hay dist-update: download failed: {e}");
-                std::process::exit(1);
-            });
-        }
-        Err(e) => {
-            eprintln!("hay dist-update: download failed: {e}");
-            std::process::exit(1);
-        }
-    }
+    let resp = ureq::get(&asset.browser_download_url)
+        .call()
+        .map_err(|e| format!("download failed: {e}"))?;
+    let mut reader = resp.into_reader();
+    let mut file =
+        std::fs::File::create(&archive_path).map_err(|e| format!("download failed: {e}"))?;
+    std::io::copy(&mut reader, &mut file).map_err(|e| format!("download failed: {e}"))?;
 
     let extract_dir = tmp_dir.join("extract");
-    std::fs::create_dir_all(&extract_dir).unwrap();
-    if let Err(e) = archive_cmd(&archive_path, &extract_dir) {
-        eprintln!("hay dist-update: cannot extract archive: {e}");
-        std::process::exit(1);
-    }
+    std::fs::create_dir_all(&extract_dir).map_err(|e| format!("cannot create temp dir: {e}"))?;
+    archive_cmd(&archive_path, &extract_dir).map_err(|e| format!("cannot extract archive: {e}"))?;
 
-    let new_bin = find_extracted_bin(&extract_dir).unwrap_or_else(|| {
-        eprintln!("hay dist-update: no hay binary found in downloaded archive");
-        std::process::exit(1);
-    });
+    let new_bin = find_extracted_bin(&extract_dir)
+        .ok_or_else(|| "no hay binary found in downloaded archive".to_string())?;
 
     println!("hay dist-update: replacing {} ...", exe_path.display());
 
@@ -652,16 +643,13 @@ fn dist_update_install(remote_version: &str) {
     let backup_path = exe_path.with_extension(if is_windows { "exe.old" } else { "old" });
     let _ = std::fs::remove_file(&backup_path);
 
-    std::fs::rename(&exe_path, &backup_path).unwrap_or_else(|e| {
-        eprintln!("hay dist-update: cannot backup current executable: {e}");
-        std::process::exit(1);
-    });
+    std::fs::rename(&exe_path, &backup_path)
+        .map_err(|e| format!("cannot backup current executable: {e}"))?;
 
-    std::fs::copy(&new_bin, &exe_path).unwrap_or_else(|e| {
-        eprintln!("hay dist-update: cannot install new binary: {e}");
+    std::fs::copy(&new_bin, &exe_path).map_err(|e| {
         let _ = std::fs::rename(&backup_path, &exe_path);
-        std::process::exit(1);
-    });
+        format!("cannot install new binary: {e}")
+    })?;
 
     #[cfg(unix)]
     {
@@ -673,7 +661,26 @@ fn dist_update_install(remote_version: &str) {
 
     let _ = std::fs::remove_dir_all(&tmp_dir);
 
-    if is_windows {
+    Ok(())
+}
+
+/// Download and replace the current binary with the given release version.
+fn dist_update_install(remote_version: &str) {
+    let target = packages::current_target_triple().unwrap_or_else(|e| {
+        eprintln!("hay dist-update: {e}");
+        std::process::exit(1);
+    });
+    let (asset_ext, _archive_cmd) = dist_asset_kind();
+    let asset_name = format!("hay-v{remote_version}-{target}.{asset_ext}");
+    if let Err(e) = dist_replace_from_release(
+        "https://api.github.com/repos/sheep-farm/hayashi/releases/latest",
+        &asset_name,
+        remote_version,
+    ) {
+        eprintln!("hay dist-update: {e}");
+        std::process::exit(1);
+    }
+    if std::env::consts::OS == "windows" {
         println!("hay dist-update: installed {remote_version}. Please restart hay.");
     } else {
         println!("hay dist-update: installed {remote_version}. Run `hay --version` to verify.");
@@ -686,108 +693,18 @@ fn dist_update_nightly() {
         eprintln!("hay dist-update: {e}");
         std::process::exit(1);
     });
-    let (asset_ext, archive_cmd) = dist_asset_kind();
+    let (asset_ext, _archive_cmd) = dist_asset_kind();
     let asset_name = format!("hay-nightly-{target}.{asset_ext}");
-
-    // Fetch the nightly release by tag
-    let release_url = "https://api.github.com/repos/sheep-farm/hayashi/releases/tags/nightly";
-    let release_resp = match ureq::get(release_url)
-        .set("User-Agent", "hay")
-        .set("Accept", "application/vnd.github.v3+json")
-        .call()
-    {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("hay dist-update: cannot fetch nightly release: {e}");
-            eprintln!("hay dist-update: nightly builds may not be available yet");
-            std::process::exit(1);
-        }
-    };
-
-    let release_body: String = release_resp.into_string().unwrap_or_default();
-    let release: packages::GhRelease = serde_json::from_str(&release_body).unwrap_or_else(|e| {
-        eprintln!("hay dist-update: cannot parse nightly release payload: {e}");
-        std::process::exit(1);
-    });
-
-    let asset = release
-        .assets
-        .iter()
-        .find(|a| a.name == asset_name)
-        .unwrap_or_else(|| {
-            eprintln!("hay dist-update: no nightly asset found for {asset_name}");
-            std::process::exit(1);
-        });
-
-    let exe_path = std::env::current_exe().unwrap_or_else(|e| {
-        eprintln!("hay dist-update: cannot locate current executable: {e}");
-        std::process::exit(1);
-    });
-
-    let tmp_dir = std::env::temp_dir().join("hay-dist-update-nightly");
-    let _ = std::fs::remove_dir_all(&tmp_dir);
-    std::fs::create_dir_all(&tmp_dir).unwrap_or_else(|e| {
-        eprintln!("hay dist-update: cannot create temp dir: {e}");
-        std::process::exit(1);
-    });
-
-    let archive_path = tmp_dir.join(&asset_name);
-    println!("hay dist-update: downloading {} ...", asset.name);
-    match ureq::get(&asset.browser_download_url).call() {
-        Ok(resp) => {
-            let mut reader = resp.into_reader();
-            let mut file = std::fs::File::create(&archive_path).unwrap();
-            std::io::copy(&mut reader, &mut file).unwrap_or_else(|e| {
-                eprintln!("hay dist-update: download failed: {e}");
-                std::process::exit(1);
-            });
-        }
-        Err(e) => {
-            eprintln!("hay dist-update: download failed: {e}");
-            std::process::exit(1);
-        }
-    }
-
-    let extract_dir = tmp_dir.join("extract");
-    std::fs::create_dir_all(&extract_dir).unwrap();
-    if let Err(e) = archive_cmd(&archive_path, &extract_dir) {
-        eprintln!("hay dist-update: cannot extract archive: {e}");
+    if let Err(e) = dist_replace_from_release(
+        "https://api.github.com/repos/sheep-farm/hayashi/releases/tags/nightly",
+        &asset_name,
+        "nightly build",
+    ) {
+        eprintln!("hay dist-update: {e}");
+        eprintln!("hay dist-update: nightly builds may not be available yet");
         std::process::exit(1);
     }
-
-    let new_bin = find_extracted_bin(&extract_dir).unwrap_or_else(|| {
-        eprintln!("hay dist-update: no hay binary found in downloaded archive");
-        std::process::exit(1);
-    });
-
-    println!("hay dist-update: replacing {} ...", exe_path.display());
-
-    let is_windows = std::env::consts::OS == "windows";
-    let backup_path = exe_path.with_extension(if is_windows { "exe.old" } else { "old" });
-    let _ = std::fs::remove_file(&backup_path);
-
-    std::fs::rename(&exe_path, &backup_path).unwrap_or_else(|e| {
-        eprintln!("hay dist-update: cannot backup current executable: {e}");
-        std::process::exit(1);
-    });
-
-    std::fs::copy(&new_bin, &exe_path).unwrap_or_else(|e| {
-        eprintln!("hay dist-update: cannot install new binary: {e}");
-        let _ = std::fs::rename(&backup_path, &exe_path);
-        std::process::exit(1);
-    });
-
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mut perms = std::fs::metadata(&exe_path).unwrap().permissions();
-        perms.set_mode(0o755);
-        let _ = std::fs::set_permissions(&exe_path, perms);
-    }
-
-    let _ = std::fs::remove_dir_all(&tmp_dir);
-
-    if is_windows {
+    if std::env::consts::OS == "windows" {
         println!("hay dist-update: installed nightly build. Please restart hay.");
     } else {
         println!("hay dist-update: installed nightly build. Run `hay --version` to verify.");
@@ -1015,7 +932,7 @@ fn open_depth(s: &str) -> i32 {
     depth
 }
 
-fn run_repl() {
+fn print_repl_banner() {
     println!("Hayashi version {VERSION}");
     println!("Copyright (C) 2026 Flávio de Vasconcellos Corrêa");
     println!();
@@ -1030,6 +947,74 @@ fn run_repl() {
     println!("Project website:      <https://haylang.dev>");
     println!();
     println!("In honor of Fumio Hayashi. Type 'exit' or Ctrl-D to quit.");
+}
+
+fn repl_eval_line<H: rustyline::history::History>(
+    line: &str,
+    buf: &mut String,
+    depth: &mut i32,
+    interp: &mut Interpreter,
+    rl: &mut Editor<HayHelper, H>,
+) -> bool {
+    let trimmed = line.trim();
+    if buf.is_empty() {
+        if trimmed.is_empty() {
+            return true;
+        }
+        if trimmed == "exit" || trimmed == "quit" {
+            return false;
+        }
+    }
+
+    // input block: accumulate until "end"
+    let in_input = buf.lines().any(|l| {
+        let t = l.trim();
+        t.starts_with("input ") && !buf.contains("\nend")
+    });
+    if in_input {
+        buf.push('\n');
+        buf.push_str(line);
+        if trimmed == "end" {
+            let _ = rl.add_history_entry(buf.trim());
+            match lang::run_source(buf, interp) {
+                Ok(()) => {}
+                Err(e) => eprintln!("error: {e}"),
+            }
+            buf.clear();
+            *depth = 0;
+        }
+        return true;
+    }
+
+    buf.push_str(trimmed);
+    buf.push('\n');
+    // depth tracks unclosed delimiters: {}, [], ()
+    *depth += open_depth(trimmed);
+
+    // Keep accumulating if:
+    // (a) there are open delimiters (depth > 0), OR
+    // (b) the buffer (without trailing spaces) ends with |>
+    let buf_trimmed = buf.trim_end();
+    let trailing_pipe = buf_trimmed.ends_with("|>");
+    if *depth > 0 || trailing_pipe {
+        return true;
+    }
+
+    *depth = 0;
+    let source = buf.trim().to_string();
+    if !source.is_empty() {
+        let _ = rl.add_history_entry(&source);
+        match lang::run_source(&source, interp) {
+            Ok(()) => {}
+            Err(e) => eprintln!("error: {e}"),
+        }
+    }
+    buf.clear();
+    true
+}
+
+fn run_repl() {
+    print_repl_banner();
 
     let mut interp = Interpreter::new();
     interp.load_plugins();
@@ -1049,60 +1034,9 @@ fn run_repl() {
         let prompt = if is_continuation { "      > " } else { "hay> " };
         match rl.readline(prompt) {
             Ok(line) => {
-                let trimmed = line.trim();
-                if buf.is_empty() {
-                    if trimmed.is_empty() {
-                        continue;
-                    }
-                    if trimmed == "exit" || trimmed == "quit" {
-                        break;
-                    }
+                if !repl_eval_line(&line, &mut buf, &mut depth, &mut interp, &mut rl) {
+                    break;
                 }
-
-                // input block: accumulate until "end"
-                let in_input = buf.lines().any(|l| {
-                    let t = l.trim();
-                    t.starts_with("input ") && !buf.contains("\nend")
-                });
-                if in_input {
-                    buf.push('\n');
-                    buf.push_str(&line);
-                    if trimmed == "end" {
-                        let _ = rl.add_history_entry(buf.trim());
-                        match lang::run_source(&buf, &mut interp) {
-                            Ok(()) => {}
-                            Err(e) => eprintln!("error: {e}"),
-                        }
-                        buf.clear();
-                        depth = 0;
-                    }
-                    continue;
-                }
-
-                buf.push_str(trimmed);
-                buf.push('\n');
-                // depth tracks unclosed delimiters: {}, [], ()
-                depth += open_depth(trimmed);
-
-                // Keep accumulating if:
-                // (a) there are open delimiters (depth > 0), OR
-                // (b) the buffer (without trailing spaces) ends with |>
-                let buf_trimmed = buf.trim_end();
-                let trailing_pipe = buf_trimmed.ends_with("|>");
-                if depth > 0 || trailing_pipe {
-                    continue;
-                }
-
-                depth = 0;
-                let source = buf.trim().to_string();
-                if !source.is_empty() {
-                    let _ = rl.add_history_entry(&source);
-                    match lang::run_source(&source, &mut interp) {
-                        Ok(()) => {}
-                        Err(e) => eprintln!("error: {e}"),
-                    }
-                }
-                buf.clear();
             }
             Err(ReadlineError::Interrupted) => {
                 if !buf.is_empty() {
@@ -1196,68 +1130,161 @@ fn normalize_version(v: &str) -> String {
     packages::normalize_version(v)
 }
 
-fn pkg_check_plugin(spec_opt: Option<&str>) {
-    migrate_legacy_packages();
+fn pkg_check_single(spec: &str) {
+    let (user, repo) = packages::parse_spec(spec).unwrap_or_else(|e| {
+        eprintln!("hay check-plugin: {e}");
+        std::process::exit(1);
+    });
 
-    if let Some(spec) = spec_opt {
-        let (user, repo) = packages::parse_spec(spec).unwrap_or_else(|e| {
-            eprintln!("hay check-plugin: {e}");
-            std::process::exit(1);
-        });
-
-        match packages::read_pkg_metadata(user, repo) {
-            Some(meta) => {
-                println!("Checking {}/{} ...", user, repo);
-                match check_pkg_integrity(&meta) {
-                    Ok((remote_ver, up_to_date)) => {
-                        if up_to_date {
-                            println!(
-                                "  {}/{} is UP TO DATE (version {})",
-                                user, repo, meta.version
-                            );
-                        } else {
-                            println!(
-                                "  {}/{} has updates available (local: {}, remote: {})",
-                                user, repo, meta.version, remote_ver
-                            );
-                        }
-                    }
-                    Err(e) => {
-                        println!("  {}/{} check failed: {}", user, repo, e);
-                    }
-                }
-            }
-            None => {
-                eprintln!("hay check-plugin: package '{spec}' not installed");
-                std::process::exit(1);
-            }
-        }
-    } else {
-        let pkgs = get_installed_packages();
-        if pkgs.is_empty() {
-            println!("No packages installed.");
-            return;
-        }
-
-        println!("Checking installed packages:");
-        for meta in pkgs {
-            println!("Checking {}/{} ...", meta.user, meta.repo);
+    match packages::read_pkg_metadata(user, repo) {
+        Some(meta) => {
+            println!("Checking {}/{} ...", user, repo);
             match check_pkg_integrity(&meta) {
                 Ok((remote_ver, up_to_date)) => {
                     if up_to_date {
                         println!(
                             "  {}/{} is UP TO DATE (version {})",
-                            meta.user, meta.repo, meta.version
+                            user, repo, meta.version
                         );
                     } else {
                         println!(
                             "  {}/{} has updates available (local: {}, remote: {})",
-                            meta.user, meta.repo, meta.version, remote_ver
+                            user, repo, meta.version, remote_ver
                         );
                     }
                 }
                 Err(e) => {
-                    println!("  {}/{} check failed: {}", meta.user, meta.repo, e);
+                    println!("  {}/{} check failed: {}", user, repo, e);
+                }
+            }
+        }
+        None => {
+            eprintln!("hay check-plugin: package '{spec}' not installed");
+            std::process::exit(1);
+        }
+    }
+}
+
+fn pkg_check_all() {
+    let pkgs = get_installed_packages();
+    if pkgs.is_empty() {
+        println!("No packages installed.");
+        return;
+    }
+
+    println!("Checking installed packages:");
+    for meta in pkgs {
+        pkg_check_single(&format!("{}/{}", meta.user, meta.repo));
+    }
+}
+
+fn pkg_check_plugin(spec_opt: Option<&str>) {
+    migrate_legacy_packages();
+
+    if let Some(spec) = spec_opt {
+        pkg_check_single(spec);
+    } else {
+        pkg_check_all();
+    }
+}
+
+fn prompt_confirm(prompt: &str) -> bool {
+    print!("{prompt}");
+    use std::io::{self, Write};
+    let _ = io::stdout().flush();
+    let mut input = String::new();
+    if io::stdin().read_line(&mut input).is_ok() {
+        let trimmed = input.trim().to_lowercase();
+        trimmed == "y" || trimmed == "yes"
+    } else {
+        false
+    }
+}
+
+fn pkg_update_single(spec: &str, auto_confirm: bool) {
+    let (user, repo) = packages::parse_spec(spec).unwrap_or_else(|e| {
+        eprintln!("hay update: {e}");
+        std::process::exit(1);
+    });
+
+    let meta = match packages::read_pkg_metadata(user, repo) {
+        Some(m) => m,
+        None => {
+            eprintln!("hay update: package '{spec}' not installed");
+            std::process::exit(1);
+        }
+    };
+
+    println!("Checking updates for {}/{} ...", user, repo);
+    match check_pkg_integrity(&meta) {
+        Ok((remote_ver, up_to_date)) => {
+            if up_to_date {
+                println!(
+                    "Package {}/{} is already up to date (version {}).",
+                    user, repo, meta.version
+                );
+                return;
+            }
+
+            if auto_confirm
+                || prompt_confirm(&format!(
+                    "Update package {}/{} to {}? (y/N): ",
+                    user, repo, remote_ver
+                ))
+            {
+                pkg_install_internal(spec, None, true);
+            } else {
+                println!("Update cancelled.");
+            }
+        }
+        Err(e) => {
+            println!("Check failed for {}/{}: {}", user, repo, e);
+            if auto_confirm
+                || prompt_confirm(&format!(
+                    "Attempt update for {}/{} anyway? (y/N): ",
+                    user, repo
+                ))
+            {
+                pkg_install_internal(spec, None, true);
+            } else {
+                println!("Update cancelled.");
+            }
+        }
+    }
+}
+
+fn pkg_update_all(auto_confirm: bool) {
+    let pkgs = get_installed_packages();
+    if pkgs.is_empty() {
+        println!("No packages installed.");
+        return;
+    }
+
+    println!("Checking all packages for updates vistas...");
+    for meta in pkgs {
+        println!("Checking {}/{} ...", meta.user, meta.repo);
+        match check_pkg_integrity(&meta) {
+            Ok((remote_ver, up_to_date)) => {
+                if up_to_date {
+                    println!("  {}/{} is up to date.", meta.user, meta.repo);
+                } else if auto_confirm
+                    || prompt_confirm(&format!(
+                        "  Update package {}/{} to {}? (y/N): ",
+                        meta.user, meta.repo, remote_ver
+                    ))
+                {
+                    pkg_install_internal(&format!("{}/{}", meta.user, meta.repo), None, true);
+                }
+            }
+            Err(e) => {
+                println!("  {}/{} check failed: {}", meta.user, meta.repo, e);
+                if auto_confirm
+                    || prompt_confirm(&format!(
+                        "  Attempt update for {}/{} anyway? (y/N): ",
+                        meta.user, meta.repo
+                    ))
+                {
+                    pkg_install_internal(&format!("{}/{}", meta.user, meta.repo), None, true);
                 }
             }
         }
@@ -1268,143 +1295,9 @@ fn pkg_update(spec_opt: Option<&str>, auto_confirm: bool) {
     migrate_legacy_packages();
 
     if let Some(spec) = spec_opt {
-        let (user, repo) = packages::parse_spec(spec).unwrap_or_else(|e| {
-            eprintln!("hay update: {e}");
-            std::process::exit(1);
-        });
-
-        let meta = match packages::read_pkg_metadata(user, repo) {
-            Some(m) => m,
-            None => {
-                eprintln!("hay update: package '{spec}' not installed");
-                std::process::exit(1);
-            }
-        };
-
-        println!("Checking updates for {}/{} ...", user, repo);
-        match check_pkg_integrity(&meta) {
-            Ok((remote_ver, up_to_date)) => {
-                if up_to_date {
-                    println!(
-                        "Package {}/{} is already up to date (version {}).",
-                        user, repo, meta.version
-                    );
-                    return;
-                }
-
-                let confirm = if auto_confirm {
-                    true
-                } else {
-                    print!(
-                        "Update package {}/{} to {}? (y/N): ",
-                        user, repo, remote_ver
-                    );
-                    use std::io::Write;
-                    let _ = std::io::stdout().flush();
-                    let mut input = String::new();
-                    if std::io::stdin().read_line(&mut input).is_ok() {
-                        let trimmed = input.trim().to_lowercase();
-                        trimmed == "y" || trimmed == "yes"
-                    } else {
-                        false
-                    }
-                };
-
-                if confirm {
-                    pkg_install_internal(spec, None, true);
-                } else {
-                    println!("Update cancelled.");
-                }
-            }
-            Err(e) => {
-                println!("Check failed for {}/{}: {}", user, repo, e);
-                let confirm = if auto_confirm {
-                    true
-                } else {
-                    print!("Attempt update for {}/{} anyway? (y/N): ", user, repo);
-                    use std::io::Write;
-                    let _ = std::io::stdout().flush();
-                    let mut input = String::new();
-                    if std::io::stdin().read_line(&mut input).is_ok() {
-                        let trimmed = input.trim().to_lowercase();
-                        trimmed == "y" || trimmed == "yes"
-                    } else {
-                        false
-                    }
-                };
-                if confirm {
-                    pkg_install_internal(spec, None, true);
-                } else {
-                    println!("Update cancelled.");
-                }
-            }
-        }
+        pkg_update_single(spec, auto_confirm);
     } else {
-        let pkgs = get_installed_packages();
-        if pkgs.is_empty() {
-            println!("No packages installed.");
-            return;
-        }
-
-        println!("Checking all packages for updates vistas...");
-        for meta in pkgs {
-            println!("Checking {}/{} ...", meta.user, meta.repo);
-            match check_pkg_integrity(&meta) {
-                Ok((remote_ver, up_to_date)) => {
-                    if up_to_date {
-                        println!("  {}/{} is up to date.", meta.user, meta.repo);
-                    } else {
-                        let confirm = if auto_confirm {
-                            true
-                        } else {
-                            print!(
-                                "  Update package {}/{} to {}? (y/N): ",
-                                meta.user, meta.repo, remote_ver
-                            );
-                            use std::io::Write;
-                            let _ = std::io::stdout().flush();
-                            let mut input = String::new();
-                            if std::io::stdin().read_line(&mut input).is_ok() {
-                                let trimmed = input.trim().to_lowercase();
-                                trimmed == "y" || trimmed == "yes"
-                            } else {
-                                false
-                            }
-                        };
-                        if confirm {
-                            pkg_install_internal(
-                                &format!("{}/{}", meta.user, meta.repo),
-                                None,
-                                true,
-                            );
-                        }
-                    }
-                }
-                Err(e) => {
-                    println!("  {}/{} check failed: {}", meta.user, meta.repo, e);
-                    let confirm = if auto_confirm {
-                        true
-                    } else {
-                        print!(
-                            "  Attempt update for {}/{} anyway? (y/N): ",
-                            meta.user, meta.repo
-                        );
-                        use std::io::Write;
-                        let _ = std::io::stdout().flush();
-                        let mut input = String::new();
-                        if std::io::stdin().read_line(&mut input).is_ok() {
-                            let trimmed = input.trim().to_lowercase();
-                            trimmed == "y" || trimmed == "yes"
-                        } else {
-                            false
-                        }
-                    };
-                    if confirm {
-                        pkg_install_internal(&format!("{}/{}", meta.user, meta.repo), None, true);
-                    }
-                }
-            }
-        }
+        pkg_update_all(auto_confirm);
     }
 }
 
