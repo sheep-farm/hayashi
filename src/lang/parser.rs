@@ -188,48 +188,7 @@ impl Parser {
                     lit.push('{');
                     continue;
                 }
-                // flush accumulated literal
-                if !lit.is_empty() {
-                    parts.push(FStringPart::Lit(std::mem::take(&mut lit)));
-                }
-                // collect expression (and optional format spec) until matching '}'
-                let mut expr_str = String::new();
-                let mut fmt_spec = String::new();
-                let mut in_fmt = false;
-                let mut depth: usize = 1;
-                for c2 in chars.by_ref() {
-                    if c2 == '{' {
-                        depth += 1;
-                    }
-                    if c2 == '}' {
-                        depth -= 1;
-                        if depth == 0 {
-                            break;
-                        }
-                    }
-                    if c2 == ':' && depth == 1 && !in_fmt {
-                        in_fmt = true;
-                        continue;
-                    }
-                    if in_fmt {
-                        fmt_spec.push(c2);
-                    } else {
-                        expr_str.push(c2);
-                    }
-                }
-                // parse the interpolated expression
-                let mut lexer = crate::lang::lexer::Lexer::new(&expr_str);
-                let tokens = lexer.tokenize()?;
-                let mut inner = Parser::new(tokens);
-                let expr = inner.parse_expr()?;
-                parts.push(FStringPart::Interp {
-                    expr: Box::new(expr),
-                    fmt: if fmt_spec.is_empty() {
-                        None
-                    } else {
-                        Some(fmt_spec)
-                    },
-                });
+                self.parse_fstring_interp(&mut chars, &mut lit, &mut parts)?;
             } else if c == '}' {
                 if chars.peek() == Some(&'}') {
                     // escaped brace: }} → }
@@ -244,6 +203,60 @@ impl Parser {
             parts.push(FStringPart::Lit(lit));
         }
         Ok(parts)
+    }
+
+    fn parse_fstring_interp<I>(
+        &self,
+        chars: &mut std::iter::Peekable<I>,
+        lit: &mut String,
+        parts: &mut Vec<FStringPart>,
+    ) -> crate::lang::error::Result<()>
+    where
+        I: Iterator<Item = char>,
+    {
+        // flush accumulated literal
+        if !lit.is_empty() {
+            parts.push(FStringPart::Lit(std::mem::take(lit)));
+        }
+        // collect expression (and optional format spec) until matching '}'
+        let mut expr_str = String::new();
+        let mut fmt_spec = String::new();
+        let mut in_fmt = false;
+        let mut depth: usize = 1;
+        for c2 in chars.by_ref() {
+            if c2 == '{' {
+                depth += 1;
+            }
+            if c2 == '}' {
+                depth -= 1;
+                if depth == 0 {
+                    break;
+                }
+            }
+            if c2 == ':' && depth == 1 && !in_fmt {
+                in_fmt = true;
+                continue;
+            }
+            if in_fmt {
+                fmt_spec.push(c2);
+            } else {
+                expr_str.push(c2);
+            }
+        }
+        // parse the interpolated expression
+        let mut lexer = crate::lang::lexer::Lexer::new(&expr_str);
+        let tokens = lexer.tokenize()?;
+        let mut inner = Parser::new(tokens);
+        let expr = inner.parse_expr()?;
+        parts.push(FStringPart::Interp {
+            expr: Box::new(expr),
+            fmt: if fmt_spec.is_empty() {
+                None
+            } else {
+                Some(fmt_spec)
+            },
+        });
+        Ok(())
     }
 
     // ── Formula ──────────────────────────────────────────────────────────────
@@ -670,7 +683,7 @@ impl Parser {
             // Dict literal: {"key": value, ...} or expression block: { stmt; ...; expr }
             Token::LBrace => {
                 if self.is_dict_literal() {
-                    self.parse_dict_literal_expr()
+                    self.parse_dict_literal(line)
                 } else {
                     self.parse_block_expr()
                 }
@@ -714,9 +727,11 @@ impl Parser {
             // Match expression: match expr { pat => result, ... }
             // `match` is a contextual keyword: it starts a match expression only
             // when followed by a scrutinee expression and an opening brace.
-            Token::Ident(ref s) if s == "match" && self.is_match_expr() => self.parse_match_expr(),
+            Token::Ident(ref s) if s == "match" && self.is_match_expr() => {
+                self.parse_match_expr(line)
+            }
 
-            Token::Ident(name) => self.parse_ident_primary(name),
+            Token::Ident(name) => self.parse_ident_primary(name, line),
 
             // Time-series operators: L.price, L2.price, F.gdp, D.wage
             Token::TsLag(n) => {
@@ -814,7 +829,7 @@ impl Parser {
         }
     }
 
-    fn parse_dict_literal_expr(&mut self) -> Result<Expr> {
+    fn parse_dict_literal(&mut self, _line: usize) -> Result<Expr> {
         self.advance(); // consumes LBrace
                         // Increments manually: inside the dict, Newlines are ignored
         self.brace_depth += 1;
@@ -840,7 +855,7 @@ impl Parser {
         Ok(Expr::Dict(pairs))
     }
 
-    fn parse_match_expr(&mut self) -> Result<Expr> {
+    fn parse_match_expr(&mut self, _line: usize) -> Result<Expr> {
         self.advance();
         let scrutinee = self.parse_expr()?;
         self.expect(&Token::LBrace)?;
@@ -863,7 +878,7 @@ impl Parser {
         })
     }
 
-    fn parse_ident_primary(&mut self, name: String) -> Result<Expr> {
+    fn parse_ident_primary(&mut self, name: String, _line: usize) -> Result<Expr> {
         self.advance();
 
         if self.peek() == &Token::ColonColon {
@@ -970,97 +985,101 @@ impl Parser {
         let mut opts = Vec::new();
 
         while !matches!(self.peek(), Token::RParen | Token::Eof | Token::Newline) {
-            // opt=value or normal expr
-            // Special case: keyword `if` used as option key (e.g. mean(df, y, if=x==1))
-            let is_kw_opt = matches!(
-                self.peek(),
-                Token::If
-                    | Token::Else
-                    | Token::Generate
-                    | Token::For
-                    | Token::Parallel
-                    | Token::In
-                    | Token::Return
-                    | Token::Break
-                    | Token::Continue
-                    | Token::Count
-                    | Token::Replace
-                    | Token::Load
-                    | Token::Export
-                    | Token::Print
-                    | Token::Predict
-            ) && self
-                .tokens
-                .get(self.pos + 1)
-                .map(|(t, _)| t == &Token::Eq)
-                .unwrap_or(false);
-            if is_kw_opt {
-                let kw_name = match self.peek() {
-                    Token::If => "if",
-                    Token::Else => "else",
-                    Token::Generate => "gen",
-                    Token::For => "for",
-                    Token::Parallel => "parallel",
-                    Token::In => "in",
-                    Token::Return => "return",
-                    Token::Break => "break",
-                    Token::Continue => "continue",
-                    Token::Count => "count",
-                    Token::Replace => "replace",
-                    Token::Load => "load",
-                    Token::Export => "export",
-                    Token::Print => "print",
-                    Token::Predict => "predict",
-                    _ => "?",
-                }
-                .to_string();
-                self.advance(); // keyword
-                self.advance(); // =
-                let val = self.parse_expr()?;
-                opts.push(Opt {
-                    name: kw_name,
-                    value: val,
-                });
-            } else if self.is_kw_bare_arg() {
-                // Keyword used as bare argument (e.g. help(if), help(for))
-                let kw_name = match self.peek() {
-                    Token::If => "if",
-                    Token::Else => "else",
-                    Token::For => "for",
-                    Token::While => "while",
-                    Token::Fn => "fn",
-                    Token::Let => "let",
-                    Token::Tsset => "tsset",
-                    Token::Quietly => "quietly",
-                    _ => "?",
-                }
-                .to_string();
-                self.advance();
-                args.push(Expr::Str(kw_name));
-            } else if let Token::Ident(name) = self.peek().clone() {
-                // lookahead: is it opt=val?
-                if self
-                    .tokens
-                    .get(self.pos + 1)
-                    .map(|(t, _)| t == &Token::Eq)
-                    .unwrap_or(false)
-                {
-                    self.advance(); // name
-                    self.advance(); // =
-                    let val = self.parse_expr()?;
-                    opts.push(Opt { name, value: val });
-                } else {
-                    args.push(self.parse_expr()?);
-                }
-            } else {
-                args.push(self.parse_expr()?);
-            }
-
+            self.parse_call_arg(&mut args, &mut opts)?;
             if self.peek() == &Token::Comma {
                 self.advance();
             }
         }
         Ok((args, opts))
+    }
+
+    fn parse_call_arg(&mut self, args: &mut Vec<Expr>, opts: &mut Vec<Opt>) -> Result<()> {
+        // opt=value or normal expr
+        // Special case: keyword `if` used as option key (e.g. mean(df, y, if=x==1))
+        let is_kw_opt = matches!(
+            self.peek(),
+            Token::If
+                | Token::Else
+                | Token::Generate
+                | Token::For
+                | Token::Parallel
+                | Token::In
+                | Token::Return
+                | Token::Break
+                | Token::Continue
+                | Token::Count
+                | Token::Replace
+                | Token::Load
+                | Token::Export
+                | Token::Print
+                | Token::Predict
+        ) && self
+            .tokens
+            .get(self.pos + 1)
+            .map(|(t, _)| t == &Token::Eq)
+            .unwrap_or(false);
+        if is_kw_opt {
+            let kw_name = match self.peek() {
+                Token::If => "if",
+                Token::Else => "else",
+                Token::Generate => "gen",
+                Token::For => "for",
+                Token::Parallel => "parallel",
+                Token::In => "in",
+                Token::Return => "return",
+                Token::Break => "break",
+                Token::Continue => "continue",
+                Token::Count => "count",
+                Token::Replace => "replace",
+                Token::Load => "load",
+                Token::Export => "export",
+                Token::Print => "print",
+                Token::Predict => "predict",
+                _ => "?",
+            }
+            .to_string();
+            self.advance(); // keyword
+            self.advance(); // =
+            let val = self.parse_expr()?;
+            opts.push(Opt {
+                name: kw_name,
+                value: val,
+            });
+        } else if self.is_kw_bare_arg() {
+            // Keyword used as bare argument (e.g. help(if), help(for))
+            let kw_name = match self.peek() {
+                Token::If => "if",
+                Token::Else => "else",
+                Token::For => "for",
+                Token::While => "while",
+                Token::Fn => "fn",
+                Token::Let => "let",
+                Token::Tsset => "tsset",
+                Token::Quietly => "quietly",
+                _ => "?",
+            }
+            .to_string();
+            self.advance();
+            args.push(Expr::Str(kw_name));
+        } else if let Token::Ident(name) = self.peek().clone() {
+            // lookahead: is it opt=val?
+            if self
+                .tokens
+                .get(self.pos + 1)
+                .map(|(t, _)| t == &Token::Eq)
+                .unwrap_or(false)
+            {
+                self.advance(); // name
+                self.advance(); // =
+                let val = self.parse_expr()?;
+                opts.push(Opt { name, value: val });
+            } else {
+                args.push(self.parse_expr()?);
+            }
+        } else {
+            args.push(self.parse_expr()?);
+        }
+        Ok(())
     }
 
     // ── Bloco { stmt* } ───────────────────────────────────────────────────────
@@ -1223,53 +1242,21 @@ impl Parser {
         match self.peek().clone() {
             Token::Eof => Ok(None),
 
-            Token::Let => {
-                self.advance();
-                let name = self.expect_ident()?;
-                self.expect(&Token::Eq)?;
-                let value = self.parse_expr()?;
-                Ok(Some(Stmt::Let { name, value }))
-            }
+            Token::Let => self.parse_let_stmt(),
 
-            Token::Ident(ref s) if s == "const" => {
-                self.advance();
-                let name = self.expect_ident()?;
-                self.expect(&Token::Eq)?;
-                let value = self.parse_expr()?;
-                Ok(Some(Stmt::Const { name, value }))
-            }
+            Token::Ident(ref s) if s == "const" => self.parse_const_stmt(),
 
             Token::Load => self.parse_load_stmt(),
 
             Token::Print => self.parse_print_stmt(),
 
-            Token::Export => {
-                self.advance();
-                self.expect(&Token::LParen)?;
-                let value = self.parse_expr()?;
-                self.expect(&Token::Comma)?;
-                let fmt = self.parse_expr()?;
-                self.expect(&Token::Comma)?;
-                let path = self.parse_expr()?;
-                self.expect(&Token::RParen)?;
-                Ok(Some(Stmt::Export { value, fmt, path }))
-            }
+            Token::Export => self.parse_export_stmt(),
 
             Token::Generate => self.parse_generate_stmt(),
 
             Token::Predict => self.parse_predict_stmt(),
 
-            Token::Count => {
-                self.advance();
-                let df = self.expect_ident()?;
-                let cond = if self.peek() == &Token::If {
-                    self.advance();
-                    Some(self.parse_expr()?)
-                } else {
-                    None
-                };
-                Ok(Some(Stmt::Count { df, cond }))
-            }
+            Token::Count => self.parse_count_stmt(),
 
             Token::Replace => self.parse_replace_stmt(),
 
@@ -1285,47 +1272,19 @@ impl Parser {
             // Like `for`, but iterations run concurrently.
             // As a statement: result is stored in the iteration variable.
             // As an expression (via parse_primary): result is returned.
-            Token::Parallel => {
-                let (var, var2, iter, body, threads) = self.parse_parallel_for(line)?;
-                Ok(Some(Stmt::ParallelFor {
-                    var,
-                    var2,
-                    iter,
-                    body,
-                    threads,
-                }))
-            }
+            Token::Parallel => self.parse_parallel_for_stmt(line),
 
             // ── fn name(p1, p2) { body } ─────────────────────────────────────
             Token::Fn => self.parse_fn_stmt(),
 
             // ── return [expr] ─────────────────────────────────────────────────
-            Token::Return => {
-                self.advance();
-                let expr = if matches!(self.peek(), Token::Newline | Token::RBrace | Token::Eof) {
-                    None
-                } else {
-                    Some(self.parse_expr()?)
-                };
-                Ok(Some(Stmt::Return(expr)))
-            }
+            Token::Return => self.parse_return_stmt(),
 
-            Token::Break => {
-                self.advance();
-                Ok(Some(Stmt::Break))
-            }
-            Token::Continue => {
-                self.advance();
-                Ok(Some(Stmt::Continue))
-            }
+            Token::Break => self.parse_break_stmt(),
+            Token::Continue => self.parse_continue_stmt(),
 
             // ── while cond { ... } ────────────────────────────────────────────
-            Token::While => {
-                self.advance();
-                let cond = self.parse_expr()?;
-                let body = self.parse_block()?;
-                Ok(Some(Stmt::While { cond, body }))
-            }
+            Token::While => self.parse_while_stmt(),
 
             // ── input df \n header_row \n data_rows \n end ────────────────────
             Token::Ident(ref s) if s == "input" => self.parse_input_stmt(line),
@@ -1334,20 +1293,10 @@ impl Parser {
             Token::Ident(ref s) if s == "try" => self.parse_try_catch_stmt(line),
 
             // ── display expr (without parentheses) ───────────────────────────────
-            Token::Ident(ref s) if s == "display" || s == "di" => {
-                self.advance();
-                let expr = self.parse_expr()?;
-                Ok(Some(Stmt::Display(expr)))
-            }
+            Token::Ident(ref s) if s == "display" || s == "di" => self.parse_display_stmt(),
 
             // ── scalar name = expr  (alias de let) ───────────────────────────
-            Token::Ident(ref s) if s == "scalar" => {
-                self.advance();
-                let name = self.expect_ident()?;
-                self.expect(&Token::Eq)?;
-                let value = self.parse_expr()?;
-                Ok(Some(Stmt::Let { name, value }))
-            }
+            Token::Ident(ref s) if s == "scalar" => self.parse_scalar_stmt(),
 
             // name = expr (assignment without let — modifies existing variable)
             Token::Ident(name)
@@ -1869,6 +1818,98 @@ impl Parser {
             });
         }
         Ok(Some(Stmt::Load { path, alias, opts }))
+    }
+
+    fn parse_let_stmt(&mut self) -> Result<Option<Stmt>> {
+        self.advance();
+        let name = self.expect_ident()?;
+        self.expect(&Token::Eq)?;
+        let value = self.parse_expr()?;
+        Ok(Some(Stmt::Let { name, value }))
+    }
+
+    fn parse_const_stmt(&mut self) -> Result<Option<Stmt>> {
+        self.advance();
+        let name = self.expect_ident()?;
+        self.expect(&Token::Eq)?;
+        let value = self.parse_expr()?;
+        Ok(Some(Stmt::Const { name, value }))
+    }
+
+    fn parse_export_stmt(&mut self) -> Result<Option<Stmt>> {
+        self.advance();
+        self.expect(&Token::LParen)?;
+        let value = self.parse_expr()?;
+        self.expect(&Token::Comma)?;
+        let fmt = self.parse_expr()?;
+        self.expect(&Token::Comma)?;
+        let path = self.parse_expr()?;
+        self.expect(&Token::RParen)?;
+        Ok(Some(Stmt::Export { value, fmt, path }))
+    }
+
+    fn parse_count_stmt(&mut self) -> Result<Option<Stmt>> {
+        self.advance();
+        let df = self.expect_ident()?;
+        let cond = if self.peek() == &Token::If {
+            self.advance();
+            Some(self.parse_expr()?)
+        } else {
+            None
+        };
+        Ok(Some(Stmt::Count { df, cond }))
+    }
+
+    fn parse_return_stmt(&mut self) -> Result<Option<Stmt>> {
+        self.advance();
+        let expr = if matches!(self.peek(), Token::Newline | Token::RBrace | Token::Eof) {
+            None
+        } else {
+            Some(self.parse_expr()?)
+        };
+        Ok(Some(Stmt::Return(expr)))
+    }
+
+    fn parse_break_stmt(&mut self) -> Result<Option<Stmt>> {
+        self.advance();
+        Ok(Some(Stmt::Break))
+    }
+
+    fn parse_continue_stmt(&mut self) -> Result<Option<Stmt>> {
+        self.advance();
+        Ok(Some(Stmt::Continue))
+    }
+
+    fn parse_while_stmt(&mut self) -> Result<Option<Stmt>> {
+        self.advance();
+        let cond = self.parse_expr()?;
+        let body = self.parse_block()?;
+        Ok(Some(Stmt::While { cond, body }))
+    }
+
+    fn parse_parallel_for_stmt(&mut self, line: usize) -> Result<Option<Stmt>> {
+        let (var, var2, iter, body, threads) = self.parse_parallel_for(line)?;
+        Ok(Some(Stmt::ParallelFor {
+            var,
+            var2,
+            iter,
+            body,
+            threads,
+        }))
+    }
+
+    fn parse_display_stmt(&mut self) -> Result<Option<Stmt>> {
+        self.advance();
+        let expr = self.parse_expr()?;
+        Ok(Some(Stmt::Display(expr)))
+    }
+
+    fn parse_scalar_stmt(&mut self) -> Result<Option<Stmt>> {
+        self.advance();
+        let name = self.expect_ident()?;
+        self.expect(&Token::Eq)?;
+        let value = self.parse_expr()?;
+        Ok(Some(Stmt::Let { name, value }))
     }
 
     pub fn parse_program(&mut self) -> Result<Vec<Spanned>> {
