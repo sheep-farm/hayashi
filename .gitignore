@@ -66,3 +66,11 @@ repositories.txt
 
 deploy-site.sh
 __pycache__/
+
+# Relatórios gerados manualmente
+/reports/
+/reports/*.aux
+/reports/*.log
+/reports/*.toc
+/reports/*.out
+/reports/*.synctex.gz
