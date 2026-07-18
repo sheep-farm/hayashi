@@ -176,17 +176,6 @@ impl Interpreter {
         let res = greeners::Diagnostics::ljung_box(&series, lags)
             .map_err(|e| self.rt_err(format!("ljungbox: {e}")))?;
 
-        let sig = |p: f64| {
-            if p < 0.01 {
-                "***"
-            } else if p < 0.05 {
-                "**"
-            } else if p < 0.10 {
-                "*"
-            } else {
-                ""
-            }
-        };
         let sep = "─".repeat(62);
         println!(
             "\nLjung-Box Test  —  lags = {}  n = {}",
@@ -210,7 +199,7 @@ impl Interpreter {
                 rho,
                 q_accum,
                 p_k,
-                sig(p_k)
+                Self::sig_stars(p_k)
             );
         }
         println!("{sep}");
@@ -218,7 +207,7 @@ impl Interpreter {
             "Q({lags}) = {:.4}   p = {:.4}  {}   (*** p<0.01  ** p<0.05  * p<0.10)",
             res.q_stat,
             res.p_value,
-            sig(res.p_value)
+            Self::sig_stars(res.p_value)
         );
         println!();
 
@@ -552,17 +541,6 @@ impl Interpreter {
         let (lm, p, df) = greeners::SpecificationTests::white_test(&ols.residuals, &ols.x)
             .map_err(|e| self.rt_err(format!("white: {e}")))?;
 
-        let sig = |p: f64| {
-            if p < 0.01 {
-                "***"
-            } else if p < 0.05 {
-                "**"
-            } else if p < 0.10 {
-                "*"
-            } else {
-                ""
-            }
-        };
         let sep = "─".repeat(54);
         println!("\nWhite Test (heteroscedasticidade)");
         println!("{sep}");
@@ -578,7 +556,7 @@ impl Interpreter {
             format!("LM ~ χ²({df})"),
             lm,
             p,
-            sig(p)
+            Self::sig_stars(p)
         );
         println!("{sep}");
         println!("(*** p<0.01  ** p<0.05  * p<0.10)");
@@ -632,17 +610,6 @@ impl Interpreter {
         let (f, p, df1, df2) = greeners::SpecificationTests::reset_test(&y, &ols.x, &fitted, power)
             .map_err(|e| self.rt_err(format!("reset: {e}")))?;
 
-        let sig = |p: f64| {
-            if p < 0.01 {
-                "***"
-            } else if p < 0.05 {
-                "**"
-            } else if p < 0.10 {
-                "*"
-            } else {
-                ""
-            }
-        };
         let sep = "─".repeat(54);
         println!("\nRamsey RESET Test  —  power = {power}");
         println!("{sep}");
@@ -658,7 +625,7 @@ impl Interpreter {
             format!("F ~ F({df1},{df2})"),
             f,
             p,
-            sig(p)
+            Self::sig_stars(p)
         );
         println!("{sep}");
         println!("(*** p<0.01  ** p<0.05  * p<0.10)");
@@ -718,17 +685,6 @@ impl Interpreter {
         let (jb, p) = greeners::Diagnostics::jarque_bera(&series)
             .map_err(|e| self.rt_err(format!("jb: {e}")))?;
 
-        let sig = |p: f64| {
-            if p < 0.01 {
-                "***"
-            } else if p < 0.05 {
-                "**"
-            } else if p < 0.10 {
-                "*"
-            } else {
-                ""
-            }
-        };
         let sep = "─".repeat(50);
         println!("\nJarque-Bera Test  —  n = {}", series.len());
         println!("{sep}");
@@ -741,7 +697,7 @@ impl Interpreter {
             "Jarque-Bera ~ χ²(2)",
             jb,
             p,
-            sig(p)
+            Self::sig_stars(p)
         );
         println!("{sep}");
         println!("(*** p<0.01  ** p<0.05  * p<0.10)");
@@ -794,17 +750,6 @@ impl Interpreter {
             greeners::SpecificationTests::breusch_godfrey_test(&ols.residuals, &ols.x, lags)
                 .map_err(|e| self.rt_err(format!("bgodfrey: {e}")))?;
 
-        let sig = |p: f64| {
-            if p < 0.01 {
-                "***"
-            } else if p < 0.05 {
-                "**"
-            } else if p < 0.10 {
-                "*"
-            } else {
-                ""
-            }
-        };
         let sep = "─".repeat(54);
         println!("\nBreusch-Godfrey LM Test  —  lags = {lags}");
         println!("{sep}");
@@ -820,7 +765,7 @@ impl Interpreter {
             format!("LM ~ χ²({df})"),
             lm,
             p,
-            sig(p)
+            Self::sig_stars(p)
         );
         println!("{sep}");
         println!("(*** p<0.01  ** p<0.05  * p<0.10)");
@@ -888,17 +833,6 @@ impl Interpreter {
             .map_err(|e| self.rt_err(format!("archtest: {e}")))?;
 
         let sep = "─".repeat(54);
-        let sig = |p: f64| {
-            if p < 0.01 {
-                "***"
-            } else if p < 0.05 {
-                "**"
-            } else if p < 0.10 {
-                "*"
-            } else {
-                ""
-            }
-        };
         println!(
             "\nARCH LM Test (Engle 1982)  —  lags = {}  n = {}",
             res.lags, res.n_obs
@@ -916,7 +850,7 @@ impl Interpreter {
             format!("LM  ~ χ²({})", res.lags),
             res.lm_stat,
             res.lm_pvalue,
-            sig(res.lm_pvalue)
+            Self::sig_stars(res.lm_pvalue)
         );
         println!(
             "{:<22} {:>10.4} {:>10.4} {:>8}",
@@ -927,7 +861,7 @@ impl Interpreter {
             ),
             res.f_stat,
             res.f_pvalue,
-            sig(res.f_pvalue)
+            Self::sig_stars(res.f_pvalue)
         );
         println!("{sep}");
         println!(
@@ -2275,17 +2209,6 @@ impl Interpreter {
         let (z, p) = greeners::ProportionTests::proportions_ztest_1samp(count, n, mu)
             .map_err(|e| self.rt_err(format!("proptest: {e}")))?;
         let p_hat = count as f64 / n as f64;
-        let sig = |p: f64| {
-            if p < 0.01 {
-                "***"
-            } else if p < 0.05 {
-                "**"
-            } else if p < 0.10 {
-                "*"
-            } else {
-                ""
-            }
-        };
         let sep = "─".repeat(56);
         println!("\nProportion Test (1 sample)");
         println!("{sep}");
@@ -2297,7 +2220,13 @@ impl Interpreter {
             "Test", "Statistic", "p-value", ""
         );
         println!("{sep}");
-        println!("{:<26} {:>10.4} {:>10.4} {:>4}", "z", z, p, sig(p));
+        println!(
+            "{:<26} {:>10.4} {:>10.4} {:>4}",
+            "z",
+            z,
+            p,
+            Self::sig_stars(p)
+        );
         println!("{sep}");
         println!("(*** p<0.01  ** p<0.05  * p<0.10)");
         println!();
@@ -2333,17 +2262,6 @@ impl Interpreter {
             .map_err(|e| self.rt_err(format!("proptest2: {e}")))?;
         let p1 = c1 as f64 / n1 as f64;
         let p2 = c2 as f64 / n2 as f64;
-        let sig = |p: f64| {
-            if p < 0.01 {
-                "***"
-            } else if p < 0.05 {
-                "**"
-            } else if p < 0.10 {
-                "*"
-            } else {
-                ""
-            }
-        };
         let sep = "─".repeat(56);
         println!("\nProportion Test (2 samples)");
         println!("{sep}");
@@ -2361,7 +2279,7 @@ impl Interpreter {
             "z (bicaudal)",
             z,
             p,
-            sig(p)
+            Self::sig_stars(p)
         );
         println!("{sep}");
         println!("(*** p<0.01  ** p<0.05  * p<0.10)");
@@ -2432,17 +2350,6 @@ impl Interpreter {
         let table = [[a, b], [c, d]];
         let (chi2, p) = greeners::ProportionTests::chi2_contingency(&table)
             .map_err(|e| self.rt_err(format!("chisq2x2: {e}")))?;
-        let sig = |p: f64| {
-            if p < 0.01 {
-                "***"
-            } else if p < 0.05 {
-                "**"
-            } else if p < 0.10 {
-                "*"
-            } else {
-                ""
-            }
-        };
         let sep = "─".repeat(56);
         println!("\nChi-Square Test — 2×2 Table");
         println!("{sep}");
@@ -2461,7 +2368,13 @@ impl Interpreter {
             "Test", "Statistic", "p-value", ""
         );
         println!("{sep}");
-        println!("{:<26} {:>10.4} {:>10.4} {:>4}", "χ²(1)", chi2, p, sig(p));
+        println!(
+            "{:<26} {:>10.4} {:>10.4} {:>4}",
+            "χ²(1)",
+            chi2,
+            p,
+            Self::sig_stars(p)
+        );
         println!("{sep}");
         println!("(*** p<0.01  ** p<0.05  * p<0.10)");
         println!();
