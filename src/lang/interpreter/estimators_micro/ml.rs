@@ -1630,8 +1630,59 @@ impl Interpreter {
         let result = greeners::MiceChained::fit(&data_mat, m, max_iter, Some(var_names))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        let summary = format!(
+            "MICE(m={}, iter={}), n={}, missing={}",
+            result.n_imputations, result.n_iterations, result.n_obs, result.n_missing
+        );
+        let fields = vec![
+            (
+                "imputed_data".into(),
+                model_expansion::array2_to_dataframe_named(
+                    &result.imputed_data,
+                    &result.variable_names,
+                ),
+            ),
+            (
+                "missing_per_var".into(),
+                model_expansion::int_series("missing_per_var", &result.missing_per_var),
+            ),
+            (
+                "pooled_mean".into(),
+                model_expansion::array1_to_series("pooled_mean", &result.pooled_mean),
+            ),
+            (
+                "pooled_variance".into(),
+                model_expansion::array1_to_series("pooled_variance", &result.pooled_variance),
+            ),
+            (
+                "within_variance".into(),
+                model_expansion::array1_to_series("within_variance", &result.within_variance),
+            ),
+            (
+                "between_variance".into(),
+                model_expansion::array1_to_series("between_variance", &result.between_variance),
+            ),
+            (
+                "missing_info_rate".into(),
+                model_expansion::array1_to_series("missing_info_rate", &result.missing_info_rate),
+            ),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("n_imputations", Value::Int(result.n_imputations as i64)),
+                    ("n_iterations", Value::Int(result.n_iterations as i64)),
+                    ("n_missing", Value::Int(result.n_missing as i64)),
+                    ("n_obs", Value::Int(result.n_obs as i64)),
+                    ("n_vars", Value::Int(result.n_vars as i64)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            result.to_string(),
+            summary,
+            "MiceResult",
+            fields,
+        ))
     }
 
     pub(super) fn kmeans(
@@ -1876,8 +1927,59 @@ impl Interpreter {
             greeners::RegPath::fit(&y_arr, &x_arr, &reg_type, alpha, n_lam, Some(var_names))
                 .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        let summary = format!(
+            "RegPath({}), alpha={:.2}, n={}",
+            result.reg_type, result.alpha, result.n_obs
+        );
+        let selected: Vec<Value> = result
+            .selected_vars
+            .iter()
+            .map(|s| Value::Str(s.clone()))
+            .collect();
+        let fields = vec![
+            (
+                "lambdas".into(),
+                model_expansion::array1_to_series("lambdas", &result.lambdas),
+            ),
+            (
+                "intercept_path".into(),
+                model_expansion::array1_to_series("intercept_path", &result.intercept_path),
+            ),
+            (
+                "bic_path".into(),
+                model_expansion::array1_to_series("bic_path", &result.bic_path),
+            ),
+            (
+                "coef_path".into(),
+                model_expansion::array2_to_dataframe_named(
+                    &result.coef_path,
+                    &result.variable_names,
+                ),
+            ),
+            (
+                "optimal_coefs".into(),
+                model_expansion::coefficients_df(&result.variable_names, &result.optimal_coefs),
+            ),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("optimal_lambda", Value::Float(result.optimal_lambda)),
+                    ("optimal_intercept", Value::Float(result.optimal_intercept)),
+                    ("reg_type", Value::Str(result.reg_type.clone())),
+                    ("alpha", Value::Float(result.alpha)),
+                    ("n_lambdas", Value::Int(result.n_lambdas as i64)),
+                    ("n_obs", Value::Int(result.n_obs as i64)),
+                    ("n_pred", Value::Int(result.n_pred as i64)),
+                    ("selected_vars", Value::List(Arc::new(selected))),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            result.to_string(),
+            summary,
+            "RegPathResult",
+            fields,
+        ))
     }
 
     pub(super) fn qrf_inf(
@@ -2127,8 +2229,39 @@ impl Interpreter {
         let result = greeners::TSNE::fit(&x_mat, perplexity, None, max_iter, lr)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        let dim_names: Vec<String> = vec!["dim0".into(), "dim1".into()];
+        let summary = format!(
+            "t-SNE(kl={:.4}, iter={}), n={}",
+            result.kl_divergence, result.n_iter, result.n_obs
+        );
+        let fields = vec![
+            (
+                "embedding".into(),
+                model_expansion::array2_to_dataframe_named(&result.embedding, &dim_names),
+            ),
+            (
+                "costs".into(),
+                model_expansion::series_from_vec("costs", &result.costs),
+            ),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("kl_divergence", Value::Float(result.kl_divergence)),
+                    ("n_iter", Value::Int(result.n_iter as i64)),
+                    ("perplexity", Value::Float(result.perplexity)),
+                    ("learning_rate", Value::Float(result.learning_rate)),
+                    ("n_obs", Value::Int(result.n_obs as i64)),
+                    ("n_features", Value::Int(result.n_features as i64)),
+                    ("n_components", Value::Int(result.n_components as i64)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            result.to_string(),
+            summary,
+            "TsneResult",
+            fields,
+        ))
     }
 
     pub(super) fn umap(
@@ -2192,8 +2325,39 @@ impl Interpreter {
         let result = greeners::UMAP::fit(&x_mat, n_neighbors, None, None, max_iter)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        let dim_names: Vec<String> = vec!["dim0".into(), "dim1".into()];
+        let summary = format!(
+            "UMAP(loss={:.4}, iter={}), n={}",
+            result.loss, result.n_iter, result.n_obs
+        );
+        let fields = vec![
+            (
+                "embedding".into(),
+                model_expansion::array2_to_dataframe_named(&result.embedding, &dim_names),
+            ),
+            (
+                "losses".into(),
+                model_expansion::series_from_vec("losses", &result.losses),
+            ),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("loss", Value::Float(result.loss)),
+                    ("n_iter", Value::Int(result.n_iter as i64)),
+                    ("n_neighbors", Value::Int(result.n_neighbors as i64)),
+                    ("min_dist", Value::Float(result.min_dist)),
+                    ("n_obs", Value::Int(result.n_obs as i64)),
+                    ("n_features", Value::Int(result.n_features as i64)),
+                    ("n_components", Value::Int(result.n_components as i64)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            result.to_string(),
+            summary,
+            "UmapResult",
+            fields,
+        ))
     }
 
     pub(super) fn biplot(
@@ -2255,8 +2419,59 @@ impl Interpreter {
         let result = greeners::Biplot::fit(&x_mat, bp_type, Some(x_vars))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        let dim_names: Vec<String> = vec!["dim0".into(), "dim1".into()];
+        let summary = format!(
+            "Biplot(type={:?}), n={}, vars={}",
+            result.biplot_type, result.n_obs, result.n_vars
+        );
+        let fields = vec![
+            (
+                "scores".into(),
+                model_expansion::array2_to_dataframe_named(&result.scores, &dim_names),
+            ),
+            (
+                "loadings".into(),
+                model_expansion::array2_to_dataframe_named(
+                    &result.loadings,
+                    &result.variable_names,
+                ),
+            ),
+            (
+                "explained_variance_ratio".into(),
+                model_expansion::array1_to_series(
+                    "explained_variance_ratio",
+                    &result.explained_variance_ratio,
+                ),
+            ),
+            (
+                "cumulative_variance".into(),
+                model_expansion::array1_to_series(
+                    "cumulative_variance",
+                    &result.cumulative_variance,
+                ),
+            ),
+            (
+                "ascii_biplot".into(),
+                Value::Str(result.ascii_biplot.clone()),
+            ),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    (
+                        "biplot_type",
+                        Value::Str(format!("{:?}", result.biplot_type)),
+                    ),
+                    ("n_obs", Value::Int(result.n_obs as i64)),
+                    ("n_vars", Value::Int(result.n_vars as i64)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            result.to_string(),
+            summary,
+            "BiplotResult",
+            fields,
+        ))
     }
 
     pub(super) fn lowess(
