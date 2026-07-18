@@ -211,3 +211,61 @@ fn dap_breakpoint_inside_expression_block() {
     session.send("disconnect", "");
     session.close();
 }
+
+#[test]
+#[ignore = "requires interactive DAP client"]
+fn dap_function_call_variables() {
+    let script = "fn f(val) {\n    let y = val + 1\n    return y\n}\n\nlet a = 10\nlet b = f(a)\n";
+    let (mut session, _tmp) = DapSession::spawn(script);
+
+    session.send("initialize", "");
+    session.send(
+        "setBreakpoints",
+        &format!(
+            "{{\"source\":{{\"path\":\"{}\"}},\"breakpoints\":[{{\"line\":2}}]}}",
+            _tmp.display()
+        ),
+    );
+    session.send(
+        "launch",
+        &format!(
+            "{{\"request\":\"launch\",\"name\":\"test\",\"program\":\"{}\"}}",
+            _tmp.display()
+        ),
+    );
+    session.send("configurationDone", "");
+
+    let stopped = session.wait_for("\"event\":\"stopped\"", 100);
+    assert!(stopped.contains("\"reason\":\"breakpoint\""));
+
+    // request stack trace and scopes for the function frame (id=1)
+    session.send("stackTrace", "{\"threadId\":1}");
+    let _stack = session.wait_for("\"command\":\"stackTrace\"", 100);
+
+    session.send("scopes", "{\"frameId\":1}");
+    let scopes = session.wait_for("\"command\":\"scopes\"", 100);
+    // Extract the first variablesReference (locals) from the scopes response.
+    let locals_ref = scopes
+        .split("\"variablesReference\":")
+        .nth(1)
+        .and_then(|s| s.split(',').next().or_else(|| s.split('}').next()))
+        .expect("locals variablesReference")
+        .trim_matches(|c| c == ' ' || c == '}' || c == ']' || c == '\"')
+        .parse::<i64>()
+        .expect("variablesReference is integer");
+
+    session.send(
+        "variables",
+        &format!("{{\"variablesReference\":{}}}", locals_ref),
+    );
+    let vars = session.wait_for("\"command\":\"variables\"", 100);
+    assert!(
+        vars.contains("\"name\":\"val\""),
+        "function parameter 'val' should be visible in locals: {vars}"
+    );
+
+    session.send("continue", "");
+    session.wait_for("\"event\":\"terminated\"", 100);
+    session.send("disconnect", "");
+    session.close();
+}

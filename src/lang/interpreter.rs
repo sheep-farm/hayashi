@@ -100,6 +100,10 @@ pub struct DebugState {
     pub control_rx: std::sync::mpsc::Receiver<ControlMessage>,
 }
 
+/// Child variable references in DAP start at this value.
+/// Scope references are below this threshold (e.g. frame_id * 2 + 1/2).
+const DAP_CHILD_REF_BASE: i64 = 1_000_000;
+
 #[derive(Debug, Clone)]
 pub enum DebugEvent {
     Initialized,
@@ -150,7 +154,7 @@ impl DebugState {
             pending_command: None,
             initialized_sent: false,
             variable_refs: HashMap::new(),
-            next_var_ref: 1000,
+            next_var_ref: DAP_CHILD_REF_BASE,
             event_tx,
             control_rx,
         }
@@ -195,7 +199,8 @@ pub struct Interpreter {
     plugin_paths: Vec<String>,
     pub plugins: HashMap<String, Box<dyn super::plugin::HayashiPlugin>>,
     capturing: bool,
-    call_stack: Vec<(String, usize)>,
+    // (function name, call site line, env scope depth at call)
+    call_stack: Vec<(String, usize, usize)>,
     pub debug_state: Option<DebugState>,
     pub current_source: std::path::PathBuf,
 }
@@ -295,7 +300,7 @@ impl Interpreter {
         }
     }
 
-    pub fn call_stack(&self) -> &[(String, usize)] {
+    pub fn call_stack(&self) -> &[(String, usize, usize)] {
         &self.call_stack
     }
 
@@ -561,7 +566,7 @@ impl Interpreter {
             line: self.current_line() as i64,
             column: 0,
         });
-        for (i, (name, line)) in self.call_stack().iter().enumerate() {
+        for (i, (name, line, _)) in self.call_stack().iter().enumerate() {
             frames.push(StackFrame {
                 id: (i + 1) as i64,
                 name: name.clone(),
@@ -706,7 +711,7 @@ impl Interpreter {
     #[allow(dead_code)]
     fn format_stack_trace(&self, innermost: &str, line: usize) -> String {
         let mut frames = Vec::new();
-        for (name, ln) in self.call_stack.iter().rev() {
+        for (name, ln, _) in self.call_stack.iter().rev() {
             frames.push(format!("  in {name}() at line {ln}"));
         }
         frames.push(format!("  in {innermost}() at line {line}"));
@@ -1438,17 +1443,35 @@ impl Interpreter {
     }
 
     fn variables_for_reference(&mut self, reference: i64) -> Vec<Variable> {
-        if reference <= 2 {
+        if reference > 0 && reference < DAP_CHILD_REF_BASE {
+            // Scope reference: encoded as frame_id * 2 + 1 (locals) or + 2 (globals).
+            let frame_id = ((reference as usize).saturating_sub(1)) / 2;
             let is_global = reference % 2 == 0;
-            let names = if is_global {
-                self.env.global_scope_names()
+            let values = if is_global {
+                self.env
+                    .global_scope_names()
+                    .iter()
+                    .filter_map(|name| self.env.get(name).map(|v| (name.clone(), v.clone())))
+                    .collect()
             } else {
-                self.env.current_scope_names()
+                let start = if frame_id == 0 {
+                    0
+                } else {
+                    self.call_stack
+                        .get(frame_id - 1)
+                        .map(|(_, _, d)| *d)
+                        .unwrap_or(0)
+                };
+                let end = if frame_id == self.call_stack.len() {
+                    self.env.scope_count()
+                } else {
+                    self.call_stack
+                        .get(frame_id)
+                        .map(|(_, _, d)| *d)
+                        .unwrap_or(0)
+                };
+                self.env.values_in_range(start, end)
             };
-            let values: Vec<(String, Value)> = names
-                .iter()
-                .filter_map(|name| self.env.get(name).map(|v| (name.clone(), v.clone())))
-                .collect();
             return values
                 .iter()
                 .map(|(name, v)| self.variable_for_value(name, v))

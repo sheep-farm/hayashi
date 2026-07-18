@@ -125,7 +125,9 @@ impl Interpreter {
                 .map(|e| self.eval_expr(e))
                 .collect::<Result<_>>()?;
 
-            self.call_stack.push((other.to_string(), self.current_line));
+            let call_scope_depth = self.env.scope_count();
+            self.call_stack
+                .push((other.to_string(), self.current_line, call_scope_depth));
             self.env.push_scope();
             for (param, val) in user_fn.params.iter().zip(arg_vals.iter()) {
                 self.env.declare_const(param, val.clone());
