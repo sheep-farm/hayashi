@@ -1173,8 +1173,25 @@ impl Interpreter {
         diagnostics.insert("model".into(), Value::Str("OLS".into()));
         diagnostics.insert("n".into(), Value::Int(ols.residuals.len() as i64));
         diagnostics.insert("k".into(), Value::Int(ols.x.ncols() as i64));
+        diagnostics.insert("jarque_bera".into(), self.ols_jarque_bera(ols)?);
+        diagnostics.insert("durbin_watson".into(), self.ols_durbin_watson(ols));
+        diagnostics.insert("breusch_godfrey".into(), self.ols_breusch_godfrey(ols)?);
+        diagnostics.insert("white".into(), self.ols_white(ols)?);
+        diagnostics.insert("reset".into(), self.ols_reset(ols)?);
+        if let Some(vif) = self.ols_vif(ols)? {
+            diagnostics.insert("vif".into(), vif);
+        }
+        if let Some(cooks) = self.ols_cooks(ols)? {
+            diagnostics.insert("cooks_d".into(), cooks);
+        }
 
-        // ── Normalidade
+        println!("\n{thin}");
+        println!("  *** p<0.01  ** p<0.05  * p<0.10");
+        println!("{thick}\n");
+        Ok(diagnostics)
+    }
+
+    fn ols_jarque_bera(&self, ols: &super::models::OlsModel) -> Result<Value> {
         println!("\n── Residual Normality (Jarque-Bera)");
         match greeners::Diagnostics::jarque_bera(&ols.residuals) {
             Ok((jb, p)) => {
@@ -1188,15 +1205,16 @@ impl Interpreter {
                 jb_map.insert("jb_stat".into(), Value::Float(jb));
                 jb_map.insert("p_value".into(), Value::Float(p));
                 jb_map.insert("df".into(), Value::Int(2));
-                diagnostics.insert("jarque_bera".into(), Value::Dict(Arc::new(jb_map)));
+                Ok(Value::Dict(Arc::new(jb_map)))
             }
             Err(e) => {
                 println!("   error: {e}");
-                diagnostics.insert("jarque_bera".into(), Value::Str(format!("error: {e}")));
+                Ok(Value::Str(format!("error: {e}")))
             }
         }
+    }
 
-        // ── First-order autocorrelation
+    fn ols_durbin_watson(&self, ols: &super::models::OlsModel) -> Value {
         let dw = greeners::Diagnostics::durbin_watson(&ols.residuals);
         let dw_label = if dw < 1.5 {
             "positive autocorr."
@@ -1210,9 +1228,10 @@ impl Interpreter {
         let mut dw_map = HashMap::new();
         dw_map.insert("dw".into(), Value::Float(dw));
         dw_map.insert("interpretation".into(), Value::Str(dw_label.into()));
-        diagnostics.insert("durbin_watson".into(), Value::Dict(Arc::new(dw_map)));
+        Value::Dict(Arc::new(dw_map))
+    }
 
-        // ── Breusch-Godfrey
+    fn ols_breusch_godfrey(&self, ols: &super::models::OlsModel) -> Result<Value> {
         println!("\n── Serial Autocorrelation (Breusch-Godfrey, lags=4)");
         match greeners::SpecificationTests::breusch_godfrey_test(&ols.residuals, &ols.x, 4) {
             Ok((lm, p, df)) => {
@@ -1227,15 +1246,16 @@ impl Interpreter {
                 bg_map.insert("lm_stat".into(), Value::Float(lm));
                 bg_map.insert("df".into(), Value::Int(df as i64));
                 bg_map.insert("p_value".into(), Value::Float(p));
-                diagnostics.insert("breusch_godfrey".into(), Value::Dict(Arc::new(bg_map)));
+                Ok(Value::Dict(Arc::new(bg_map)))
             }
             Err(e) => {
                 println!("   error: {e}");
-                diagnostics.insert("breusch_godfrey".into(), Value::Str(format!("error: {e}")));
+                Ok(Value::Str(format!("error: {e}")))
             }
         }
+    }
 
-        // ── White
+    fn ols_white(&self, ols: &super::models::OlsModel) -> Result<Value> {
         println!("\n── Heteroscedasticidade (White)");
         match greeners::SpecificationTests::white_test(&ols.residuals, &ols.x) {
             Ok((lm, p, df)) => {
@@ -1250,15 +1270,16 @@ impl Interpreter {
                 white_map.insert("lm_stat".into(), Value::Float(lm));
                 white_map.insert("df".into(), Value::Int(df as i64));
                 white_map.insert("p_value".into(), Value::Float(p));
-                diagnostics.insert("white".into(), Value::Dict(Arc::new(white_map)));
+                Ok(Value::Dict(Arc::new(white_map)))
             }
             Err(e) => {
                 println!("   error: {e}");
-                diagnostics.insert("white".into(), Value::Str(format!("error: {e}")));
+                Ok(Value::Str(format!("error: {e}")))
             }
         }
+    }
 
-        // ── RESET
+    fn ols_reset(&self, ols: &super::models::OlsModel) -> Result<Value> {
         println!("\n── Functional Specification (RESET, power=3)");
         let fitted = ols.result.fitted_values(&ols.x);
         let y = &ols.residuals + &fitted;
@@ -1277,15 +1298,16 @@ impl Interpreter {
                 reset_map.insert("df1".into(), Value::Int(df1 as i64));
                 reset_map.insert("df2".into(), Value::Int(df2 as i64));
                 reset_map.insert("p_value".into(), Value::Float(p));
-                diagnostics.insert("reset".into(), Value::Dict(Arc::new(reset_map)));
+                Ok(Value::Dict(Arc::new(reset_map)))
             }
             Err(e) => {
                 println!("   error: {e}");
-                diagnostics.insert("reset".into(), Value::Str(format!("error: {e}")));
+                Ok(Value::Str(format!("error: {e}")))
             }
         }
+    }
 
-        // ── VIF
+    fn ols_vif(&self, ols: &super::models::OlsModel) -> Result<Option<Value>> {
         println!("\n── Multicolinearidade (VIF)");
         let names = ols.result.variable_names.as_deref().unwrap_or(&[]);
         let mut vif_var = Vec::new();
@@ -1317,16 +1339,18 @@ impl Interpreter {
             }
             Err(e) => println!("   error: {e}"),
         }
-        if !vif_var.is_empty() {
-            let mut vif_columns = HashMap::new();
-            vif_columns.insert("variable".into(), Value::List(Arc::new(vif_var)));
-            vif_columns.insert("vif".into(), Value::List(Arc::new(vif_val)));
-            vif_columns.insert("diagnostic".into(), Value::List(Arc::new(vif_diag)));
-            let vif_df = self.dict_to_dataframe(&vif_columns)?;
-            diagnostics.insert("vif".into(), Value::DataFrame(Arc::new(vif_df)));
+        if vif_var.is_empty() {
+            return Ok(None);
         }
+        let mut vif_columns = HashMap::new();
+        vif_columns.insert("variable".into(), Value::List(Arc::new(vif_var)));
+        vif_columns.insert("vif".into(), Value::List(Arc::new(vif_val)));
+        vif_columns.insert("diagnostic".into(), Value::List(Arc::new(vif_diag)));
+        let vif_df = self.dict_to_dataframe(&vif_columns)?;
+        Ok(Some(Value::DataFrame(Arc::new(vif_df))))
+    }
 
-        // ── Cook's D
+    fn ols_cooks(&self, ols: &super::models::OlsModel) -> Result<Option<Value>> {
         let n = ols.residuals.len();
         let mse = ols.result.sigma * ols.result.sigma;
         let cutoff = 4.0 / n as f64;
@@ -1360,19 +1384,15 @@ impl Interpreter {
             }
             Err(e) => println!("   error: {e}"),
         }
-        if !cook_obs.is_empty() {
-            let mut cook_columns = HashMap::new();
-            cook_columns.insert("observation".into(), Value::List(Arc::new(cook_obs)));
-            cook_columns.insert("cooks_d".into(), Value::List(Arc::new(cook_d)));
-            cook_columns.insert("label".into(), Value::List(Arc::new(cook_label)));
-            let cook_df = self.dict_to_dataframe(&cook_columns)?;
-            diagnostics.insert("cooks_d".into(), Value::DataFrame(Arc::new(cook_df)));
+        if cook_obs.is_empty() {
+            return Ok(None);
         }
-
-        println!("\n{thin}");
-        println!("  *** p<0.01  ** p<0.05  * p<0.10");
-        println!("{thick}\n");
-        Ok(diagnostics)
+        let mut cook_columns = HashMap::new();
+        cook_columns.insert("observation".into(), Value::List(Arc::new(cook_obs)));
+        cook_columns.insert("cooks_d".into(), Value::List(Arc::new(cook_d)));
+        cook_columns.insert("label".into(), Value::List(Arc::new(cook_label)));
+        let cook_df = self.dict_to_dataframe(&cook_columns)?;
+        Ok(Some(Value::DataFrame(Arc::new(cook_df))))
     }
     pub(super) fn diagnostics_garch(
         &mut self,
@@ -1613,19 +1633,33 @@ impl Interpreter {
         let mut diagnostics: HashMap<String, Value> = HashMap::new();
         let k = m.n_vars;
         let r = m.rank;
-        let n = m.n_obs as f64;
-        let eig = &m.eigenvalues; // ordenados decrescente
+        let n = m.n_obs;
 
         println!("\n{thick}");
-        println!(" DIAGNOSTICS — VECM  (n={}  k={}  rank={})", m.n_obs, k, r);
+        println!(" DIAGNOSTICS — VECM  (n={}  k={}  rank={})", n, k, r);
         println!("{thick}");
 
         diagnostics.insert("model".into(), Value::Str("VECM".into()));
-        diagnostics.insert("n".into(), Value::Int(m.n_obs as i64));
+        diagnostics.insert("n".into(), Value::Int(n as i64));
         diagnostics.insert("k".into(), Value::Int(k as i64));
         diagnostics.insert("rank".into(), Value::Int(r as i64));
+        diagnostics.insert("johansen".into(), self.vecm_johansen(m)?);
+        diagnostics.insert("alpha".into(), self.vecm_alpha(m)?);
+        diagnostics.insert("beta".into(), self.vecm_beta(m)?);
 
-        // ── Johansen trace test
+        println!("\n── Note");
+        println!("   VecmResult does not store variable names or residuals.");
+        println!("   For names, see the order passed to vecm().");
+        println!("\n{thin}");
+        println!("{thick}\n");
+        Ok(diagnostics)
+    }
+
+    fn vecm_johansen(&self, m: &greeners::vecm::VecmResult) -> Result<Value> {
+        let k = m.n_vars;
+        let n = m.n_obs as f64;
+        let eig = &m.eigenvalues; // ordenados decrescente
+
         // λ_trace(r₀) = -n Σ_{i=r₀}^{k-1} ln(1 - λ_i)  H₀: rank ≤ r₀
         // CVs 5%: Osterwald-Lenum (1992) Tabela 1 — constant restrita
         let cv_5pct: &[f64] = &[9.24, 19.96, 34.91, 53.12, 76.07, 102.56, 131.70];
@@ -1670,9 +1704,12 @@ impl Interpreter {
         joh_columns.insert("cv_5pct".into(), Value::List(Arc::new(joh_cv)));
         joh_columns.insert("reject".into(), Value::List(Arc::new(joh_reject)));
         let joh_df = self.dict_to_dataframe(&joh_columns)?;
-        diagnostics.insert("johansen".into(), Value::DataFrame(Arc::new(joh_df)));
+        Ok(Value::DataFrame(Arc::new(joh_df)))
+    }
 
-        // ── Adjustment speeds (alpha): k×rank
+    fn vecm_alpha(&self, m: &greeners::vecm::VecmResult) -> Result<Value> {
+        let k = m.n_vars;
+        let r = m.rank;
         println!("\n── Adjustment Speeds (Alpha)  [negative sign = correction to equilibrium]");
         let mut alpha_vec = Vec::new();
         let mut alpha_eq = Vec::new();
@@ -1690,16 +1727,20 @@ impl Interpreter {
                 alpha_ec.push(Value::Int((ec + 1) as i64));
             }
         }
-        if !alpha_vec.is_empty() {
-            let mut alpha_columns = HashMap::new();
-            alpha_columns.insert("ec_vector".into(), Value::List(Arc::new(alpha_ec)));
-            alpha_columns.insert("equation".into(), Value::List(Arc::new(alpha_eq)));
-            alpha_columns.insert("alpha".into(), Value::List(Arc::new(alpha_vec)));
-            let alpha_df = self.dict_to_dataframe(&alpha_columns)?;
-            diagnostics.insert("alpha".into(), Value::DataFrame(Arc::new(alpha_df)));
+        if alpha_vec.is_empty() {
+            return Ok(Value::Nil);
         }
+        let mut alpha_columns = HashMap::new();
+        alpha_columns.insert("ec_vector".into(), Value::List(Arc::new(alpha_ec)));
+        alpha_columns.insert("equation".into(), Value::List(Arc::new(alpha_eq)));
+        alpha_columns.insert("alpha".into(), Value::List(Arc::new(alpha_vec)));
+        let alpha_df = self.dict_to_dataframe(&alpha_columns)?;
+        Ok(Value::DataFrame(Arc::new(alpha_df)))
+    }
 
-        // ── Cointegration vectors (beta): k×rank
+    fn vecm_beta(&self, m: &greeners::vecm::VecmResult) -> Result<Value> {
+        let k = m.n_vars;
+        let r = m.rank;
         println!("\n── Cointegration Vectors (Beta)");
         let mut beta_vec = Vec::new();
         let mut beta_var = Vec::new();
@@ -1713,21 +1754,15 @@ impl Interpreter {
                 beta_ec.push(Value::Int((ec + 1) as i64));
             }
         }
-        if !beta_vec.is_empty() {
-            let mut beta_columns = HashMap::new();
-            beta_columns.insert("ec_vector".into(), Value::List(Arc::new(beta_ec)));
-            beta_columns.insert("variable".into(), Value::List(Arc::new(beta_var)));
-            beta_columns.insert("beta".into(), Value::List(Arc::new(beta_vec)));
-            let beta_df = self.dict_to_dataframe(&beta_columns)?;
-            diagnostics.insert("beta".into(), Value::DataFrame(Arc::new(beta_df)));
+        if beta_vec.is_empty() {
+            return Ok(Value::Nil);
         }
-
-        println!("\n── Note");
-        println!("   VecmResult does not store variable names or residuals.");
-        println!("   For names, see the order passed to vecm().");
-        println!("\n{thin}");
-        println!("{thick}\n");
-        Ok(diagnostics)
+        let mut beta_columns = HashMap::new();
+        beta_columns.insert("ec_vector".into(), Value::List(Arc::new(beta_ec)));
+        beta_columns.insert("variable".into(), Value::List(Arc::new(beta_var)));
+        beta_columns.insert("beta".into(), Value::List(Arc::new(beta_vec)));
+        let beta_df = self.dict_to_dataframe(&beta_columns)?;
+        Ok(Value::DataFrame(Arc::new(beta_df)))
     }
     pub(super) fn diagnostics_iv(
         &mut self,
