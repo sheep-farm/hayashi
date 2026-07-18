@@ -1,4 +1,5 @@
 use super::*;
+use crate::lang::dap::model_expansion;
 use std::sync::Arc;
 
 /// Result of evaluating an expression element-wise over a DataFrame.
@@ -331,7 +332,12 @@ impl Interpreter {
             (Value::DataFrame(_), _) => Err(HayashiError::Type(
                 "DataFrame column index must be a string".into(),
             )),
-            (Value::OlsResult(m), Value::Str(key)) => self.ols_field(m, key),
+            (Value::OlsResult(m), Value::Str(key)) => match self.ols_field(m, key) {
+                Ok(v) => Ok(v),
+                Err(_) => model_expansion::value_field(&obj_val, key).ok_or_else(|| {
+                    HayashiError::Runtime(format!("OLS result has no field '{key}'"))
+                }),
+            },
             (Value::OlsResult(_), _) => Err(HayashiError::Type(
                 "OLS result index must be a string".into(),
             )),
@@ -365,7 +371,14 @@ impl Interpreter {
                 }
                 Ok(v[real as usize].clone())
             }
-            _ => Err(HayashiError::Type("indexing requires list or dict".into())),
+            _ => {
+                if let Value::Str(key) = &idx_val {
+                    if let Some(v) = model_expansion::value_field(&obj_val, key) {
+                        return Ok(v);
+                    }
+                }
+                Err(HayashiError::Type("indexing requires list or dict".into()))
+            }
         }
     }
 
@@ -477,8 +490,13 @@ impl Interpreter {
         _opts: &[Opt],
     ) -> Result<Value> {
         let val = self.eval_expr(obj)?;
+
         match (&val, field) {
-            (Value::OlsResult(m), field) => self.ols_field(m, field),
+            (Value::OlsResult(m), field) => match self.ols_field(m, field) {
+                Ok(v) => Ok(v),
+                Err(_) => model_expansion::value_field(&val, field)
+                    .ok_or_else(|| self.rt_err(format!("unknown method or field '{field}'"))),
+            },
             (Value::IvResult(r), "summary") => {
                 println!("{r}");
                 Ok(Value::Nil)
@@ -495,7 +513,13 @@ impl Interpreter {
                 println!("{r}");
                 Ok(Value::Nil)
             }
-            (_, f) => Err(self.rt_err(format!("unknown method '{f}'"))),
+            _ => {
+                if let Some(v) = model_expansion::value_field(&val, field) {
+                    Ok(v)
+                } else {
+                    Err(self.rt_err(format!("unknown method or field '{field}'")))
+                }
+            }
         }
     }
 

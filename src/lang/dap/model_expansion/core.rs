@@ -361,6 +361,42 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
     }
 }
 
+/// Looks up a named child/field on any value. Returns `None` if the field does
+/// not exist. This makes DAP-style expansion available for `.field` / `["field"]`
+/// access on model results, not only on dicts/dataframes. If the field is not a
+/// top-level child, it is also searched inside any nested `fit` dict, so scalar
+/// summaries like `m.r2` or `m.inertia` work without duplicating every scalar
+/// at the top level.
+pub fn value_field(v: &Value, field: &str) -> Option<Value> {
+    let direct = match v {
+        Value::Dict(d) => d.get(field).cloned(),
+        Value::DataFrame(df) => df
+            .get_column(field)
+            .ok()
+            .map(|col| column_to_value(field, col)),
+        Value::List(_) | Value::Series(_) => None,
+        _ => value_children(v)
+            .into_iter()
+            .find(|(name, _)| name == field)
+            .map(|(_, child)| child),
+    };
+    if direct.is_some() {
+        return direct;
+    }
+
+    // Fall back to looking inside the model's `fit` dict, if present.
+    if let Value::Dict(d) = value_children(v)
+        .into_iter()
+        .find(|(name, _)| name == "fit")
+        .map(|(_, child)| child)
+        .unwrap_or(Value::Nil)
+    {
+        return d.get(field).cloned();
+    }
+
+    None
+}
+
 pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
     match v {
         Value::Float(f) => (format!("{f}"), "Float"),
