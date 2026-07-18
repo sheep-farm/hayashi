@@ -17,6 +17,7 @@ use ndarray::{Array1, Array2, Axis};
 use serde_json::{json, Value as JsonValue};
 use statrs::distribution::{ContinuousCDF, Normal};
 use std::collections::{HashMap, HashSet};
+use std::io::{self, Write as _};
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -310,6 +311,22 @@ impl Interpreter {
 
     pub fn current_source(&self) -> &std::path::Path {
         &self.current_source
+    }
+
+    /// Writes interpreter output. In DAP mode it is sent as an `Output` event
+    /// so the client can display it line-by-line while stepping; otherwise it is
+    /// written to stdout and flushed immediately.
+    pub(crate) fn print_output(&self, output: impl AsRef<str>) {
+        let output = output.as_ref();
+        if let Some(ds) = self.debug_state.as_ref() {
+            let _ = ds.event_tx.send(DebugEvent::Output {
+                category: "stdout".into(),
+                output: output.to_string(),
+            });
+        } else {
+            let _ = io::stdout().write_all(output.as_bytes());
+            let _ = io::stdout().flush();
+        }
     }
 
     /// Called at the start of every statement execution.

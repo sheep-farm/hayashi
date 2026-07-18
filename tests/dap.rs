@@ -269,3 +269,44 @@ fn dap_function_call_variables() {
     session.send("disconnect", "");
     session.close();
 }
+
+#[test]
+#[ignore = "requires interactive DAP client"]
+fn dap_print_output_event() {
+    let script = "let a = 10\nprint(\"hello\")\nlet b = a + 1\n";
+    let (mut session, _tmp) = DapSession::spawn(script);
+
+    session.send("initialize", "");
+    session.send(
+        "setBreakpoints",
+        &format!(
+            "{{\"source\":{{\"path\":\"{}\"}},\"breakpoints\":[{{\"line\":2}}]}}",
+            _tmp.display()
+        ),
+    );
+    session.send(
+        "launch",
+        &format!(
+            "{{\"request\":\"launch\",\"name\":\"test\",\"program\":\"{}\"}}",
+            _tmp.display()
+        ),
+    );
+    session.send("configurationDone", "");
+
+    session.wait_for("\"event\":\"stopped\"", 100);
+
+    session.send("continue", "");
+    let output = session.wait_for("\"event\":\"output\"", 100);
+    assert!(
+        output.contains("\"category\":\"stdout\""),
+        "output category should be stdout: {output}"
+    );
+    assert!(
+        output.contains("hello"),
+        "output should contain 'hello': {output}"
+    );
+
+    session.wait_for("\"event\":\"terminated\"", 100);
+    session.send("disconnect", "");
+    session.close();
+}

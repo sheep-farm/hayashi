@@ -152,14 +152,16 @@ impl Interpreter {
                     Some(Value::Str(s)) => s.clone(),
                     _ => "\n".to_string(),
                 };
+                let mut output = String::new();
                 for (i, expr) in exprs.iter().enumerate() {
                     if i > 0 {
-                        print!("{sep}");
+                        output.push_str(&sep);
                     }
                     let val = self.eval_expr(expr)?;
-                    print!("{val}");
+                    output.push_str(&format!("{val}"));
                 }
-                print!("{end}");
+                output.push_str(&end);
+                self.print_output(output);
             }
 
             Stmt::Export { value, fmt, path } => self.exec_export(value, fmt, path)?,
