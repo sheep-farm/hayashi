@@ -13,6 +13,15 @@ struct ThreadResult(std::result::Result<Value, HayashiError>);
 // SAFETY: see struct-level comment.
 unsafe impl Send for ThreadResult {}
 
+struct LoadOptions {
+    sheet: Option<String>,
+    table: Option<String>,
+    query: Option<String>,
+    sep: Option<String>,
+    columns: Option<Vec<String>>,
+    predicate: Option<crate::lang::predicate::RowPredicate>,
+}
+
 impl Interpreter {
     pub(crate) fn exec(&mut self, spanned: &Spanned) -> Result<()> {
         let (stmt, line) = spanned;
@@ -379,14 +388,7 @@ impl Interpreter {
         Ok(())
     }
 
-    // ── load ─────────────────────────────────────────────────────────────────
-
-    fn exec_load(&mut self, path: &Expr, alias: &str, opts: &[Opt]) -> Result<()> {
-        let path_str = match self.eval_expr(path)? {
-            Value::Str(s) => s,
-            _ => return Err(self.type_err("load requires a string path")),
-        };
-
+    fn parse_load_options(&mut self, opts: &[Opt]) -> Result<LoadOptions> {
         let mut opt_sheet: Option<String> = None;
         let mut opt_table: Option<String> = None;
         let mut opt_query: Option<String> = None;
@@ -394,10 +396,6 @@ impl Interpreter {
         let mut opt_columns: Option<Vec<String>> = None;
         let mut opt_where: Option<String> = None;
         for o in opts {
-            // `columns=` aceita uma lista de identificadores/strings ou um
-            // único identificador/string. Extraímos os nomes diretamente da
-            // AST (sem avaliar) para que `columns=[ano, preco]` funcione com
-            // nomes de colunas que ainda não são variáveis no ambiente.
             if o.name == "columns" {
                 opt_columns = Some(extract_column_names(&o.value)?);
                 continue;
@@ -421,153 +419,795 @@ impl Interpreter {
                 }
             }
         }
-
-        // Predicado where= (parseado uma única vez aqui e reutilizado pelos
-        // loaders). Ainda não suportado para JSON.
-        let predicate: Option<crate::lang::predicate::RowPredicate> = match opt_where.as_deref() {
+        let predicate = match opt_where.as_deref() {
             Some(s) => Some(crate::lang::predicate::RowPredicate::parse(s)?),
             None => None,
         };
+        Ok(LoadOptions {
+            sheet: opt_sheet,
+            table: opt_table,
+            query: opt_query,
+            sep: opt_sep,
+            columns: opt_columns,
+            predicate,
+        })
+    }
 
-        // Combinações inválidas.
-        if opt_query.is_some() && (opt_columns.is_some() || predicate.is_some()) {
+    fn exec_load_odbc(&mut self, path_str: &str, alias: &str, options: &LoadOptions) -> Result<()> {
+        #[cfg(feature = "odbc")]
+        {
+            let conn_str = &path_str["odbc://".len()..];
+            let sql = if let Some(t) = &options.table {
+                let cols = options
+                    .columns
+                    .as_deref()
+                    .map(|c| c.join(", "))
+                    .unwrap_or_else(|| "*".to_string());
+                let mut s = format!("SELECT {cols} FROM \"{t}\"");
+                if let Some(p) = &options.predicate {
+                    s.push_str(&format!(" WHERE {}", p.to_sql()));
+                }
+                s
+            } else {
+                return Err(HayashiError::Runtime(
+                    "load odbc: requires table= (with optional columns=/where=) or query=".into(),
+                ));
+            };
+            let (df, n_rows) = crate::io::odbc::load_odbc(conn_str, &sql)?;
+            emitln!(self, "Loaded ODBC → {alias} ({n_rows} rows)");
+            self.env.set(alias, Value::DataFrame(Arc::new(df)))?;
+            Ok(())
+        }
+        #[cfg(not(feature = "odbc"))]
+        {
+            let _ = (path_str, alias, options);
+            Err(HayashiError::Runtime(
+                "ODBC support not enabled. Rebuild with: cargo build --features odbc\n\
+                 Requires: unixodbc (pacman -S unixodbc)"
+                    .into(),
+            ))
+        }
+    }
+
+    fn exec_load_file(&mut self, path_str: &str, alias: &str, options: &LoadOptions) -> Result<()> {
+        // ── File / URL ───────────────────────────────────────────
+        #[cfg(feature = "native")]
+        let _tmp;
+        #[cfg(feature = "native")]
+        let local_path: &str = if crate::io::fetch::is_url(path_str) {
+            emitln!(self, "Downloading '{}'…", path_str);
+            _tmp = crate::io::fetch::download_to_temp(path_str)?;
+            _tmp.to_str()
+                .ok_or_else(|| self.rt_err("temp path is not UTF-8"))?
+        } else {
+            path_str
+        };
+        #[cfg(not(feature = "native"))]
+        let local_path: &str = path_str;
+
+        let ext = local_path.rsplit('.').next().unwrap_or("").to_lowercase();
+
+        let (df, n_rows) = self.load_from_extension(local_path, &ext, options)?;
+        emitln!(self, "Loaded '{}' → {alias} ({} rows)", path_str, n_rows);
+        self.env.set(alias, Value::DataFrame(Arc::new(df)))?;
+        Ok(())
+    }
+
+    fn load_from_extension(
+        &mut self,
+        local_path: &str,
+        ext: &str,
+        options: &LoadOptions,
+    ) -> Result<(DataFrame, usize)> {
+        let opt_columns = options.columns.as_deref();
+        let predicate = options.predicate.as_ref();
+
+        if ext == "json" && (opt_columns.is_some() || predicate.is_some()) {
+            return Err(HayashiError::Runtime(
+                "load: columns=/where= not yet supported for JSON \
+                 (use a different format or post-load filter/keep)"
+                    .into(),
+            ));
+        }
+
+        match ext {
+            #[cfg(feature = "native")]
+            "dta" => crate::io::dta::load_dta(local_path, opt_columns, predicate),
+            "xlsx" | "xls" | "ods" => crate::io::excel::load_excel(
+                local_path,
+                options.sheet.as_deref(),
+                opt_columns,
+                predicate,
+            ),
+            #[cfg(feature = "native")]
+            "sqlite" | "sqlite3" | "db" => crate::io::sqlite::load_sqlite(
+                local_path,
+                options.table.as_deref(),
+                options.query.as_deref(),
+                opt_columns,
+                predicate,
+            ),
+            "json" => {
+                let df =
+                    DataFrame::from_json(local_path).map_err(|e| self.rt_err(e.to_string()))?;
+                let n = df.n_rows();
+                Ok((df, n))
+            }
+            "tsv" | "tab" => crate::io::dsv::load_dsv(local_path, b'\t', opt_columns, predicate),
+            "parquet" | "pq" => {
+                crate::io::parquet::load_parquet(local_path, opt_columns, predicate)
+            }
+            _ => {
+                let delim = match options.sep.as_deref() {
+                    Some("\\t") | Some("tab") => b'\t',
+                    Some(s) if s.len() == 1 => s.as_bytes()[0],
+                    Some(s) => {
+                        return Err(HayashiError::Runtime(format!(
+                            "load: sep must be a single character, got '{s}'"
+                        )))
+                    }
+                    None => b',',
+                };
+                if delim == b',' && opt_columns.is_none() && predicate.is_none() {
+                    // Caminho padrão (greeners): sem columns/where.
+                    let df =
+                        DataFrame::from_csv(local_path).map_err(|e| self.rt_err(e.to_string()))?;
+                    let n = df.n_rows();
+                    Ok((df, n))
+                } else {
+                    // Loader DSV do hayashi — suporta columns=/where=.
+                    crate::io::dsv::load_dsv(local_path, delim, opt_columns, predicate)
+                }
+            }
+        }
+    }
+
+    // ── load ─────────────────────────────────────────────────────────────────
+
+    fn exec_load(&mut self, path: &Expr, alias: &str, opts: &[Opt]) -> Result<()> {
+        let path_str = match self.eval_expr(path)? {
+            Value::Str(s) => s,
+            _ => return Err(self.type_err("load requires a string path")),
+        };
+
+        let options = self.parse_load_options(opts)?;
+
+        if options.query.is_some() && (options.columns.is_some() || options.predicate.is_some()) {
             return Err(HayashiError::Runtime(
                 "load: query= cannot be combined with columns= or where=".into(),
             ));
         }
 
-        // ── ODBC ────────────────────────────────────────────────
-        if path_str.starts_with("odbc://") {
-            #[cfg(feature = "odbc")]
-            {
-                let conn_str = &path_str["odbc://".len()..];
-                let sql = if let Some(t) = &opt_table {
-                    let cols = opt_columns
-                        .as_deref()
-                        .map(|c| c.join(", "))
-                        .unwrap_or_else(|| "*".to_string());
-                    let mut s = format!("SELECT {cols} FROM \"{t}\"");
-                    if let Some(p) = &predicate {
-                        s.push_str(&format!(" WHERE {}", p.to_sql()));
-                    }
-                    s
-                } else {
-                    return Err(HayashiError::Runtime(
-                        "load odbc: requires table= (with optional columns=/where=) or query="
-                            .into(),
-                    ));
-                };
-                let (df, n_rows) = crate::io::odbc::load_odbc(conn_str, &sql)?;
-                emitln!(self, "Loaded ODBC → {alias} ({n_rows} rows)");
-                self.env.set(alias, Value::DataFrame(Arc::new(df)))?;
-            }
-            #[cfg(not(feature = "odbc"))]
-            {
-                return Err(HayashiError::Runtime(
-                    "ODBC support not enabled. Rebuild with: cargo build --features odbc\n\
-                     Requires: unixodbc (pacman -S unixodbc)"
-                        .into(),
-                ));
-            }
+        if let Some(conn_str) = path_str.strip_prefix("odbc://") {
+            self.exec_load_odbc(conn_str, alias, &options)
         } else {
-            // ── File / URL ───────────────────────────────────────────
-            #[cfg(feature = "native")]
-            let _tmp;
-            #[cfg(feature = "native")]
-            let local_path: &str = if crate::io::fetch::is_url(&path_str) {
-                emitln!(self, "Downloading '{}'…", path_str);
-                _tmp = crate::io::fetch::download_to_temp(&path_str)?;
-                _tmp.to_str()
-                    .ok_or_else(|| self.rt_err("temp path is not UTF-8"))?
-            } else {
-                &path_str
-            };
-            #[cfg(not(feature = "native"))]
-            let local_path: &str = &path_str;
-
-            let ext = local_path.rsplit('.').next().unwrap_or("").to_lowercase();
-
-            if ext == "json" && (opt_columns.is_some() || predicate.is_some()) {
-                return Err(HayashiError::Runtime(
-                    "load: columns=/where= not yet supported for JSON \
-                     (use a different format or post-load filter/keep)"
-                        .into(),
-                ));
-            }
-
-            let (df, n_rows) = match ext.as_str() {
-                #[cfg(feature = "native")]
-                "dta" => crate::io::dta::load_dta(
-                    local_path,
-                    opt_columns.as_deref(),
-                    predicate.as_ref(),
-                )?,
-                "xlsx" | "xls" | "ods" => crate::io::excel::load_excel(
-                    local_path,
-                    opt_sheet.as_deref(),
-                    opt_columns.as_deref(),
-                    predicate.as_ref(),
-                )?,
-                #[cfg(feature = "native")]
-                "sqlite" | "sqlite3" | "db" => crate::io::sqlite::load_sqlite(
-                    local_path,
-                    opt_table.as_deref(),
-                    opt_query.as_deref(),
-                    opt_columns.as_deref(),
-                    predicate.as_ref(),
-                )?,
-                "json" => {
-                    let df =
-                        DataFrame::from_json(local_path).map_err(|e| self.rt_err(e.to_string()))?;
-                    let n = df.n_rows();
-                    (df, n)
-                }
-                "tsv" | "tab" => crate::io::dsv::load_dsv(
-                    local_path,
-                    b'\t',
-                    opt_columns.as_deref(),
-                    predicate.as_ref(),
-                )?,
-                "parquet" | "pq" => crate::io::parquet::load_parquet(
-                    local_path,
-                    opt_columns.as_deref(),
-                    predicate.as_ref(),
-                )?,
-                _ => {
-                    let delim = match opt_sep.as_deref() {
-                        Some("\\t") | Some("tab") => b'\t',
-                        Some(s) if s.len() == 1 => s.as_bytes()[0],
-                        Some(s) => {
-                            return Err(HayashiError::Runtime(format!(
-                                "load: sep must be a single character, got '{s}'"
-                            )))
-                        }
-                        None => b',',
-                    };
-                    if delim == b',' && opt_columns.is_none() && predicate.is_none() {
-                        // Caminho padrão (greeners): sem columns/where.
-                        let df = DataFrame::from_csv(local_path)
-                            .map_err(|e| self.rt_err(e.to_string()))?;
-                        let n = df.n_rows();
-                        (df, n)
-                    } else {
-                        // Loader DSV do hayashi — suporta columns=/where=.
-                        crate::io::dsv::load_dsv(
-                            local_path,
-                            delim,
-                            opt_columns.as_deref(),
-                            predicate.as_ref(),
-                        )?
-                    }
-                }
-            };
-            emitln!(self, "Loaded '{}' → {alias} ({} rows)", path_str, n_rows);
-            self.env.set(alias, Value::DataFrame(Arc::new(df)))?;
+            self.exec_load_file(&path_str, alias, &options)
         }
-        Ok(())
     }
 
     // ── predict ──────────────────────────────────────────────────────────────
+
+    fn predict_model_values(
+        &self,
+        model_val: &Value,
+        kind: &str,
+        df: &DataFrame,
+        varname: &str,
+    ) -> Result<Vec<f64>> {
+        match (model_val, kind) {
+            (Value::OlsResult(m), k) => self.predict_ols_vals(m, k),
+            (Value::BinaryResult(m), k) => self.predict_binary_vals(m, k),
+            (Value::PoissonResult(r), k) => self.predict_poisson_vals(r, k),
+            (Value::NegBinResult(r), k) => self.predict_negbin_vals(r, k),
+            (Value::OrderedResult(r), k) => self.predict_ordered_vals(r, k, df),
+            (Value::IvResult(r), k) => self.predict_iv_vals(r, k, df),
+            (Value::PanelResult(r), k) => self.predict_panel_vals(r, k, df),
+            (Value::ReResult(r), k) => self.predict_re_vals(r, k, df),
+            (Value::TobitResult(r), k) => self.predict_tobit_vals(r, k, df),
+            (Value::HeckmanResult(r), k) => self.predict_heckman_vals(r, k, df),
+            (Value::CoxResult(r), k) => self.predict_cox_vals(r, k, df),
+            (Value::QuantileResult(r), k) => self.predict_quantile_vals(r, k, df),
+            (Value::RlmResult(r), k) => self.predict_rlm_vals(r, k, df),
+            (Value::GeeResult(r), k) => self.predict_gee_vals(r, k, df),
+            (Value::BetaResult(r), k) => self.predict_beta_vals(r, k, df),
+            (Value::GlsarResult(r), k) => self.predict_glsar_vals(r, k, df, varname),
+            (Value::MixedResult(r), k) => self.predict_mixedlm_vals(r, k, df),
+            (Value::ZeroInflatedResult(r), k) => self.predict_zero_inflated_vals(r, k, df),
+            (Value::RollingResult(r), k) => self.predict_rolling_vals(r, k),
+            (Value::RecursiveLSResult(r), k) => self.predict_recursive_ls_vals(r, k),
+            (Value::GlmResult(r), k) => self.predict_glm_vals(r, k, df),
+            (Value::LowessResult(r), k) => self.predict_lowess_vals(r, k),
+            (Value::PcaResult(m), k) => self.predict_pca_vals(m, k),
+            (Value::FactorResult(_), _) => Self::unsupported_predict(
+                "Factor Analysis",
+                "scores not available via FA — use pca() for scores; FA is for loadings analysis",
+            ),
+            (Value::MarkovResult(r), k) => self.predict_markov_vals(r, k),
+            (Value::ConditionalResult(_), _) => Self::unsupported_predict(
+                "clogit/cpoisson",
+                "fixed effects absorbed — unconditional prediction not available; use β̂ coefficients for odds ratios or marginal effects",
+            ),
+            (Value::VarmaResult(_), _) => Self::unsupported_predict(
+                "varma",
+                "multivariate prediction not supported as a column — use print() for diagnostics",
+            ),
+            (Value::UCResult(r), k) => self.predict_ucm_vals(r, k),
+            (Value::GamResult(_), _) => Self::unsupported_predict(
+                "gam",
+                "fitted values are not stored — use gam() with df=dataset and compute Xβ̂ manually",
+            ),
+            (Value::MiceResult(_), _) => Self::unsupported_predict(
+                "mice",
+                "MICE returns multiple datasets; access via model pooling",
+            ),
+            (Value::SVarResult(_), _) => Self::unsupported_predict(
+                "svar",
+                "no fitted values — use sirf() and sfevd() for impulse-response analysis",
+            ),
+            (Value::ThreeSLSResult(_), _) => Self::unsupported_predict(
+                "3sls",
+                "multiple equations — use print() to see coefficients per equation",
+            ),
+            (Value::DFMResult(m), k) => self.predict_dfm_vals(m, k),
+            (Value::MSARResult(r), k) => self.predict_msar_vals(r, k),
+            (Value::DecompResult(r), k) => self.predict_decomp_vals(r, k),
+            (Value::MstlResult(r), k) => self.predict_mstl_vals(r, k),
+            (Value::EtsResult(r), k) => self.predict_ets_vals(r, k),
+            (Value::ThresholdResult(_), k) => Err(HayashiError::Runtime(format!(
+                "predict pthresh: kind '{k}' — use print() to see thresholds and coefficients"
+            ))),
+            _ => Err(HayashiError::Type("predict: model type not supported".into())),
+        }
+    }
+
+    fn linear_xb(
+        df: &DataFrame,
+        names: Option<&[String]>,
+        params: &Array1<f64>,
+    ) -> Result<Vec<f64>> {
+        let x = build_x_from_varnames(df, names.unwrap_or(&[]))?;
+        Ok(x.dot(params).to_vec())
+    }
+
+    fn predict_ols_vals(&self, m: &OlsModel, kind: &str) -> Result<Vec<f64>> {
+        match kind {
+            "xb" | "fitted" => Ok(m.x.dot(&m.result.params).to_vec()),
+            "residuals" | "resid" | "e" => Ok(m.residuals.to_vec()),
+            k => Err(HayashiError::Runtime(format!(
+                "predict OLS: kind '{k}' unknown — use: xb, residuals"
+            ))),
+        }
+    }
+
+    fn predict_binary_vals(&self, m: &BinaryModel, kind: &str) -> Result<Vec<f64>> {
+        match kind {
+            "pr" | "xb" | "fitted" => Ok(m.result.predict_proba(&m.x).to_vec()),
+            k => Err(HayashiError::Runtime(format!(
+                "predict logit/probit: kind '{k}' unknown — use: pr"
+            ))),
+        }
+    }
+
+    fn predict_poisson_vals(&self, r: &greeners::PoissonResult, kind: &str) -> Result<Vec<f64>> {
+        match kind {
+            "count" | "mu" | "fitted" => Ok(r.fitted_values().to_vec()),
+            "xb" => Ok(r.x_data().dot(&r.params).to_vec()),
+            k => Err(HayashiError::Runtime(format!(
+                "predict Poisson: kind '{k}' unknown — use: count, xb"
+            ))),
+        }
+    }
+
+    fn predict_negbin_vals(&self, r: &greeners::NegBinResult, kind: &str) -> Result<Vec<f64>> {
+        match kind {
+            "count" | "mu" | "fitted" => Ok(r.fitted_values().to_vec()),
+            "xb" => Ok(r.x_data().dot(&r.params).to_vec()),
+            k => Err(HayashiError::Runtime(format!(
+                "predict NegBin: kind '{k}' unknown — use: count, xb"
+            ))),
+        }
+    }
+
+    fn predict_ordered_vals(
+        &self,
+        r: &greeners::OrderedResult,
+        kind: &str,
+        df: &DataFrame,
+    ) -> Result<Vec<f64>> {
+        let x = build_x_from_varnames(df, r.variable_names.as_deref().unwrap_or(&[]))?;
+        match kind {
+            "xb" => Ok(x.dot(&r.params).to_vec()),
+            "yhat" => {
+                let probs = r.predict_proba(&x);
+                Ok((0..probs.nrows())
+                    .map(|i| {
+                        let row = probs.row(i);
+                        let (cat, _) = row
+                            .iter()
+                            .enumerate()
+                            .max_by(|(_, a), (_, b)| nan_last_cmp(a, b))
+                            .unwrap_or((0, &0.0));
+                        (cat + 1) as f64
+                    })
+                    .collect())
+            }
+            s if s.starts_with("pr") && s.len() > 2 => {
+                let cat: usize = s[2..].parse::<usize>().map_err(|_| {
+                    HayashiError::Runtime(format!(
+                        "predict Ordered: '{s}' — use prN where N is the category (1-indexed)"
+                    ))
+                })?;
+                if cat == 0 || cat > r.n_categories {
+                    return Err(HayashiError::Runtime(format!(
+                        "predict Ordered: category {cat} out of range 1..{}",
+                        r.n_categories
+                    )));
+                }
+                let probs = r.predict_proba(&x);
+                Ok((0..probs.nrows()).map(|i| probs[[i, cat - 1]]).collect())
+            }
+            "pr" => {
+                let probs = r.predict_proba(&x);
+                let last = r.n_categories - 1;
+                Ok((0..probs.nrows()).map(|i| probs[[i, last]]).collect())
+            }
+            k => Err(HayashiError::Runtime(format!(
+                "predict Ordered: kind '{k}' unknown — use: pr, prN, yhat, xb"
+            ))),
+        }
+    }
+
+    fn predict_iv_vals(
+        &self,
+        r: &greeners::iv::IvResult,
+        kind: &str,
+        df: &DataFrame,
+    ) -> Result<Vec<f64>> {
+        match kind {
+            "xb" | "fitted" => Self::linear_xb(df, r.variable_names.as_deref(), &r.params),
+            k => Err(HayashiError::Runtime(format!(
+                "predict IV: kind '{k}' unknown — use: xb"
+            ))),
+        }
+    }
+
+    fn predict_panel_vals(
+        &self,
+        r: &greeners::panel::PanelResult,
+        kind: &str,
+        df: &DataFrame,
+    ) -> Result<Vec<f64>> {
+        match kind {
+            "xb" | "fitted" => Self::linear_xb(df, r.variable_names.as_deref(), &r.params),
+            k => Err(HayashiError::Runtime(format!(
+                "predict FE: kind '{k}' unknown — use: xb"
+            ))),
+        }
+    }
+
+    fn predict_re_vals(
+        &self,
+        r: &greeners::panel::RandomEffectsResult,
+        kind: &str,
+        df: &DataFrame,
+    ) -> Result<Vec<f64>> {
+        match kind {
+            "xb" | "fitted" => Self::linear_xb(df, r.variable_names.as_deref(), &r.params),
+            k => Err(HayashiError::Runtime(format!(
+                "predict RE: kind '{k}' unknown — use: xb"
+            ))),
+        }
+    }
+
+    fn predict_tobit_vals(
+        &self,
+        r: &greeners::TobitResult,
+        kind: &str,
+        df: &DataFrame,
+    ) -> Result<Vec<f64>> {
+        match kind {
+            "xb" | "fitted" => Self::linear_xb(df, r.variable_names.as_deref(), &r.params),
+            k => Err(HayashiError::Runtime(format!(
+                "predict Tobit: kind '{k}' unknown — use: xb"
+            ))),
+        }
+    }
+
+    fn predict_heckman_vals(
+        &self,
+        r: &greeners::HeckmanResult,
+        kind: &str,
+        df: &DataFrame,
+    ) -> Result<Vec<f64>> {
+        match kind {
+            "xb" | "fitted" => Self::linear_xb(df, r.variable_names.as_deref(), &r.params),
+            k => Err(HayashiError::Runtime(format!(
+                "predict Heckman: kind '{k}' unknown — use: xb"
+            ))),
+        }
+    }
+
+    fn predict_cox_vals(
+        &self,
+        r: &greeners::CoxResult,
+        kind: &str,
+        df: &DataFrame,
+    ) -> Result<Vec<f64>> {
+        let names = r.variable_names.as_deref();
+        let x = build_x_from_varnames(df, names.unwrap_or(&[]))?;
+        match kind {
+            "loghr" | "xb" => Ok(r.predict_log_hazard(&x).to_vec()),
+            "hr" | "hazard" => Ok(r.predict_hazard_ratio(&x).to_vec()),
+            k => Err(HayashiError::Runtime(format!(
+                "predict Cox: kind '{k}' unknown — use: loghr, hr"
+            ))),
+        }
+    }
+
+    fn predict_quantile_vals(
+        &self,
+        r: &greeners::QuantileResult,
+        kind: &str,
+        df: &DataFrame,
+    ) -> Result<Vec<f64>> {
+        match kind {
+            "xb" | "fitted" => Self::linear_xb(df, r.variable_names.as_deref(), &r.params),
+            k => Err(HayashiError::Runtime(format!(
+                "predict QReg: kind '{k}' unknown — use: xb"
+            ))),
+        }
+    }
+
+    fn predict_rlm_vals(
+        &self,
+        r: &greeners::RlmResult,
+        kind: &str,
+        df: &DataFrame,
+    ) -> Result<Vec<f64>> {
+        match kind {
+            "xb" | "fitted" => Self::linear_xb(df, r.variable_names.as_deref(), &r.params),
+            k => Err(HayashiError::Runtime(format!(
+                "predict RLM: kind '{k}' unknown — use: xb"
+            ))),
+        }
+    }
+
+    fn predict_gee_vals(
+        &self,
+        r: &greeners::GeeResult,
+        kind: &str,
+        df: &DataFrame,
+    ) -> Result<Vec<f64>> {
+        match kind {
+            "xb" | "fitted" => Self::linear_xb(df, r.variable_names.as_deref(), &r.params),
+            k => Err(HayashiError::Runtime(format!(
+                "predict GEE: kind '{k}' unknown — use: xb"
+            ))),
+        }
+    }
+
+    fn predict_beta_vals(
+        &self,
+        r: &greeners::BetaResult,
+        kind: &str,
+        df: &DataFrame,
+    ) -> Result<Vec<f64>> {
+        let names = r.variable_names.as_deref();
+        match kind {
+            "pr" | "mu" | "fitted" => {
+                let x = build_x_from_varnames(df, names.unwrap_or(&[]))?;
+                Ok(r.predict(&x, &greeners::BetaLink::Logit).to_vec())
+            }
+            "xb" => Self::linear_xb(df, names, &r.params),
+            k => Err(HayashiError::Runtime(format!(
+                "predict BetaReg: kind '{k}' unknown — use: pr, xb"
+            ))),
+        }
+    }
+
+    fn predict_glsar_vals(
+        &self,
+        r: &greeners::GlsarResult,
+        kind: &str,
+        df: &DataFrame,
+        varname: &str,
+    ) -> Result<Vec<f64>> {
+        let names = r.variable_names.as_deref();
+        match kind {
+            "xb" | "fitted" => {
+                let x = build_x_from_varnames(df, names.unwrap_or(&[]))?;
+                Ok(r.fitted_values(&x).to_vec())
+            }
+            "residuals" | "resid" | "e" => {
+                let x = build_x_from_varnames(df, names.unwrap_or(&[]))?;
+                let y = get_col_f64(df, varname)?;
+                Ok(r.residuals(&y, &x).to_vec())
+            }
+            k => Err(HayashiError::Runtime(format!(
+                "predict GLSAR: kind '{k}' unknown — use: xb, residuals"
+            ))),
+        }
+    }
+
+    fn predict_mixedlm_vals(
+        &self,
+        r: &greeners::MixedResult,
+        kind: &str,
+        df: &DataFrame,
+    ) -> Result<Vec<f64>> {
+        match kind {
+            "xb" | "fitted" => Self::linear_xb(df, r.variable_names.as_deref(), &r.fixed_effects),
+            k => Err(HayashiError::Runtime(format!(
+                "predict MixedLM: kind '{k}' unknown — use: xb"
+            ))),
+        }
+    }
+
+    fn predict_zero_inflated_vals(
+        &self,
+        r: &greeners::ZeroInflatedResult,
+        kind: &str,
+        df: &DataFrame,
+    ) -> Result<Vec<f64>> {
+        let count_names = r.count_var_names.as_deref();
+        let inflate_names = r.inflate_var_names.as_deref().or(count_names);
+        let x_c = build_x_from_varnames(df, count_names.unwrap_or(&[]))?;
+        let x_i = build_x_from_varnames(df, inflate_names.unwrap_or(&[]))?;
+        match kind {
+            "count" | "mu" | "fitted" => Ok(r.predict_count(&x_c, &x_i).to_vec()),
+            "pr0" => Ok(r.predict_proba_zero(&x_c, &x_i).to_vec()),
+            k => Err(HayashiError::Runtime(format!(
+                "predict ZIP/ZINB: kind '{k}' unknown — use: count, pr0"
+            ))),
+        }
+    }
+
+    fn predict_rolling_vals(&self, r: &greeners::RollingResult, kind: &str) -> Result<Vec<f64>> {
+        match kind {
+            "residuals" | "resid" | "e" => Ok(r.residuals.to_vec()),
+            k => Err(HayashiError::Runtime(format!(
+                "predict RollingOLS: kind '{k}' unknown — use: residuals"
+            ))),
+        }
+    }
+
+    fn predict_recursive_ls_vals(
+        &self,
+        r: &greeners::RecursiveLSResult,
+        kind: &str,
+    ) -> Result<Vec<f64>> {
+        match kind {
+            "residuals" | "resid" | "e" => Ok(r.residuals.to_vec()),
+            "cusum" => Ok(r.cusum.to_vec()),
+            "cusum_sq" => Ok(r.cusum_squares.to_vec()),
+            k => Err(HayashiError::Runtime(format!(
+                "predict RecursiveLS: kind '{k}' unknown — use: residuals, cusum, cusum_sq"
+            ))),
+        }
+    }
+
+    fn predict_glm_vals(
+        &self,
+        r: &greeners::GlmResult,
+        kind: &str,
+        df: &DataFrame,
+    ) -> Result<Vec<f64>> {
+        let names = r.variable_names.as_deref();
+        match kind {
+            "pr" | "mu" | "fitted" => {
+                let x = build_x_from_varnames(df, names.unwrap_or(&[]))?;
+                Ok(r.predict_mean(&x).to_vec())
+            }
+            "xb" => {
+                let x = build_x_from_varnames(df, names.unwrap_or(&[]))?;
+                Ok(r.predict(&x).to_vec())
+            }
+            "residuals" | "resid" | "e" | "deviance" => Ok(r.residuals().to_vec()),
+            "pearson" => Ok(r.pearson_residuals().to_vec()),
+            "working" => Ok(r.working_residuals().to_vec()),
+            k => Err(HayashiError::Runtime(format!(
+                "predict GLM: kind '{k}' unknown — use: pr, xb, residuals, pearson, working"
+            ))),
+        }
+    }
+
+    fn predict_lowess_vals(&self, r: &greeners::LowessResult, kind: &str) -> Result<Vec<f64>> {
+        match kind {
+            "smoothed" | "yhat" | "fitted" => Ok(r.smoothed.to_vec()),
+            "residuals" | "resid" | "e" => Ok(r.residuals.to_vec()),
+            k => Err(HayashiError::Runtime(format!(
+                "predict LOWESS: kind '{k}' unknown — use: smoothed, residuals"
+            ))),
+        }
+    }
+
+    fn predict_pca_vals(&self, m: &PcaModel, kind: &str) -> Result<Vec<f64>> {
+        if kind.starts_with("pc") && kind.len() > 2 {
+            let comp: usize = kind[2..].parse::<usize>().map_err(|_| {
+                HayashiError::Runtime(format!(
+                    "predict PCA: '{kind}' invalid — use pcN where N=1..{}",
+                    m.result.n_components
+                ))
+            })?;
+            if comp == 0 || comp > m.result.n_components {
+                return Err(HayashiError::Runtime(format!(
+                    "predict PCA: component {comp} out of range 1..{}",
+                    m.result.n_components
+                )));
+            }
+            Ok(m.result.scores.column(comp - 1).to_vec())
+        } else {
+            Err(HayashiError::Runtime(format!(
+                "predict PCA: kind '{kind}' unknown — use: pc1, pc2, ..., pc{}",
+                m.result.n_components
+            )))
+        }
+    }
+
+    fn predict_markov_vals(
+        &self,
+        r: &greeners::MarkovSwitchingResult,
+        kind: &str,
+    ) -> Result<Vec<f64>> {
+        match kind {
+            "smoothed" | "regime" | "state" => Ok((0..r.smoothed_probs.nrows())
+                .map(|t| {
+                    let row = r.smoothed_probs.row(t);
+                    let (best, _) = row
+                        .iter()
+                        .enumerate()
+                        .max_by(|(_, a), (_, b)| {
+                            a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
+                        })
+                        .unwrap_or((0, &0.0));
+                    (best + 1) as f64
+                })
+                .collect()),
+            s if s.starts_with("regime") && s.len() > 6 => {
+                let idx: usize = s[6..].parse::<usize>().map_err(|_| {
+                    HayashiError::Runtime(format!(
+                        "predict MarkovSwitching: '{s}' invalid — use regimeN where N=1..{}",
+                        r.n_regimes
+                    ))
+                })?;
+                if idx == 0 || idx > r.n_regimes {
+                    return Err(HayashiError::Runtime(format!(
+                        "predict MarkovSwitching: regime {idx} out of range 1..{}",
+                        r.n_regimes
+                    )));
+                }
+                Ok(r.smoothed_probs.column(idx - 1).to_vec())
+            }
+            k => Err(HayashiError::Runtime(format!(
+                "predict MarkovSwitching: kind '{k}' unknown — use: regime, regime1, regime2, ..."
+            ))),
+        }
+    }
+
+    fn predict_ucm_vals(&self, r: &greeners::UCResult, kind: &str) -> Result<Vec<f64>> {
+        match kind {
+            "level" => Ok(r.level.to_vec()),
+            "trend" => Ok(r
+                .trend
+                .as_ref()
+                .map(|t| t.to_vec())
+                .unwrap_or_else(|| vec![f64::NAN; r.n_obs])),
+            "seasonal" => Ok(r
+                .seasonal
+                .as_ref()
+                .map(|s| s.to_vec())
+                .unwrap_or_else(|| vec![f64::NAN; r.n_obs])),
+            "residuals" | "resid" | "e" => Ok(r.residuals.to_vec()),
+            k => Err(HayashiError::Runtime(format!(
+                "predict ucm: kind '{k}' unknown — use: level, trend, seasonal, residuals"
+            ))),
+        }
+    }
+
+    fn predict_dfm_vals(&self, m: &DFMModel, kind: &str) -> Result<Vec<f64>> {
+        if let Some(rest) = kind.strip_prefix('f') {
+            let idx = rest
+                .parse::<usize>()
+                .map(|n| n.saturating_sub(1))
+                .unwrap_or(0);
+            if idx >= m.result.n_factors {
+                return Err(HayashiError::Runtime(format!(
+                    "predict dfm: factor f{} does not exist — model has {} factors",
+                    idx + 1,
+                    m.result.n_factors
+                )));
+            }
+            Ok(m.result.factors.column(idx).to_vec())
+        } else {
+            Err(HayashiError::Runtime(format!(
+                "predict dfm: kind '{kind}' unknown — use: f1, f2, ... (1-based index of latent factor)"
+            )))
+        }
+    }
+
+    fn predict_msar_vals(&self, r: &greeners::MarkovAutoregResult, kind: &str) -> Result<Vec<f64>> {
+        match kind {
+            "regime" | "state" => Ok(r.predict_regime().iter().map(|&s| (s + 1) as f64).collect()),
+            s if s.starts_with("regime") && s.len() > 6 => {
+                let idx = s["regime".len()..]
+                    .parse::<usize>()
+                    .map(|n| n.saturating_sub(1))
+                    .unwrap_or(0);
+                if idx >= r.k_regimes {
+                    return Err(HayashiError::Runtime(format!(
+                        "predict msauto: regime{} out of range 1..{}",
+                        idx + 1,
+                        r.k_regimes
+                    )));
+                }
+                Ok(r.smoothed_probs.column(idx).to_vec())
+            }
+            k => Err(HayashiError::Runtime(format!(
+                "predict msauto: kind '{k}' unknown — use: regime, regime1, regime2, ..."
+            ))),
+        }
+    }
+
+    fn predict_decomp_vals(
+        &self,
+        r: &greeners::DecompositionResult,
+        kind: &str,
+    ) -> Result<Vec<f64>> {
+        match kind {
+            "trend" => Ok(r.trend.to_vec()),
+            "seasonal" => Ok(r.seasonal.to_vec()),
+            "residual" | "resid" | "e" => Ok(r.residual.to_vec()),
+            "observed" | "fitted" => Ok(r.observed.to_vec()),
+            k => Err(HayashiError::Runtime(format!(
+                "predict decompose: kind '{k}' unknown — use: trend, seasonal, residual, observed"
+            ))),
+        }
+    }
+
+    fn predict_mstl_vals(&self, r: &greeners::MSTLResult, kind: &str) -> Result<Vec<f64>> {
+        match kind {
+            "trend" => Ok(r.trend.to_vec()),
+            "resid" | "residual" | "e" => Ok(r.resid.to_vec()),
+            s if s.starts_with("seasonal") => {
+                let idx = if s == "seasonal" {
+                    0usize
+                } else {
+                    s["seasonal".len()..]
+                        .parse::<usize>()
+                        .map(|n| n.saturating_sub(1))
+                        .unwrap_or(0)
+                };
+                if idx >= r.seasonal.len() {
+                    return Err(HayashiError::Runtime(format!(
+                        "predict mstl: seasonal{} component does not exist — model has {} periods",
+                        idx + 1,
+                        r.seasonal.len()
+                    )));
+                }
+                Ok(r.seasonal[idx].to_vec())
+            }
+            k => Err(HayashiError::Runtime(format!(
+                "predict mstl: kind '{k}' unknown — use: trend, resid, seasonal, seasonal1, seasonal2, ..."
+            ))),
+        }
+    }
+
+    fn predict_ets_vals(&self, r: &greeners::ETSResult, kind: &str) -> Result<Vec<f64>> {
+        match kind {
+            "fitted" | "yhat" | "xb" => Ok(r.fitted_values.to_vec()),
+            "residuals" | "resid" | "e" => Ok(r.residuals.to_vec()),
+            "level" => Ok(r.level.to_vec()),
+            "trend" => Ok(r.trend.to_vec()),
+            "seasonal" => Ok(r.seasonal.to_vec()),
+            k => Err(HayashiError::Runtime(format!(
+                "predict ets: kind '{k}' unknown — use: fitted, residuals, level, trend, seasonal"
+            ))),
+        }
+    }
+
+    fn unsupported_predict(model: &str, detail: &str) -> Result<Vec<f64>> {
+        Err(HayashiError::Runtime(format!("predict {model}: {detail}")))
+    }
 
     fn exec_predict(&mut self, df: &str, varname: &str, model: &Expr, kind: &Expr) -> Result<()> {
         let mut df_val = match self.env.get(df) {
@@ -584,493 +1224,7 @@ impl Interpreter {
             }
         };
 
-        let vals: Vec<f64> = match (&model_val, kind_str.as_str()) {
-            // ── OLS ──────────────────────────────────────────────────
-            (Value::OlsResult(m), "xb" | "fitted") => {
-                m.x.dot(&m.result.params).to_vec()
-            }
-            (Value::OlsResult(m), "residuals" | "resid" | "e") => {
-                m.residuals.to_vec()
-            }
-            (Value::OlsResult(_), k) => return Err(HayashiError::Runtime(
-                format!("predict OLS: kind '{k}' unknown — use: xb, residuals")
-            )),
-
-            // ── Logit / Probit ────────────────────────────────────────
-            (Value::BinaryResult(m), "pr" | "xb" | "fitted") => {
-                m.result.predict_proba(&m.x).to_vec()
-            }
-            (Value::BinaryResult(_), k) => return Err(HayashiError::Runtime(
-                format!("predict logit/probit: kind '{k}' unknown — use: pr")
-            )),
-
-            // ── Poisson / NegBin ──────────────────────────────────────
-            (Value::PoissonResult(r), "count" | "mu" | "fitted") => {
-                r.fitted_values().to_vec()
-            }
-            (Value::PoissonResult(r), "xb") => {
-                r.x_data().dot(&r.params).to_vec()
-            }
-            (Value::PoissonResult(_), k) => return Err(HayashiError::Runtime(
-                format!("predict Poisson: kind '{k}' unknown — use: count, xb")
-            )),
-            (Value::NegBinResult(r), "count" | "mu" | "fitted") => {
-                r.fitted_values().to_vec()
-            }
-            (Value::NegBinResult(r), "xb") => {
-                r.x_data().dot(&r.params).to_vec()
-            }
-            (Value::NegBinResult(_), k) => return Err(HayashiError::Runtime(
-                format!("predict NegBin: kind '{k}' unknown — use: count, xb")
-            )),
-
-            // ── Ordered Logit / Probit ────────────────────────────────
-            // "pr"   → P(Y = J) — probability of the highest category
-            // "xb"   → linear predictor Xβ
-            // "yhat" → predicted category (argmax)
-            // "prN"  → P(Y = N) for a specific category N (1-indexed)
-            (Value::OrderedResult(r), kind_s) => {
-                let x = build_x_from_varnames(&df_val,
-                    r.variable_names.as_deref().unwrap_or(&[]))?;
-                match kind_s {
-                    "xb" => x.dot(&r.params).to_vec(),
-                    "yhat" => {
-                        let probs = r.predict_proba(&x);
-                        (0..probs.nrows()).map(|i| {
-                            let row = probs.row(i);
-                            let (cat, _) = row.iter().enumerate()
-                                .max_by(|(_, a), (_, b)| nan_last_cmp(a, b))
-                                .unwrap_or((0, &0.0));
-                            (cat + 1) as f64
-                        }).collect()
-                    }
-                    s if s.starts_with("pr") && s.len() > 2 => {
-                        let cat: usize = s[2..].parse::<usize>()
-                            .map_err(|_| HayashiError::Runtime(
-                                format!("predict Ordered: '{s}' — use prN where N is the category (1-indexed)")
-                            ))?;
-                        if cat == 0 || cat > r.n_categories {
-                            return Err(HayashiError::Runtime(
-                                format!("predict Ordered: category {cat} out of range 1..{}", r.n_categories)
-                            ));
-                        }
-                        let probs = r.predict_proba(&x);
-                        (0..probs.nrows()).map(|i| probs[[i, cat - 1]]).collect()
-                    }
-                    "pr" => {
-                        let probs = r.predict_proba(&x);
-                        let last = r.n_categories - 1;
-                        (0..probs.nrows()).map(|i| probs[[i, last]]).collect()
-                    }
-                    k => return Err(HayashiError::Runtime(
-                        format!("predict Ordered: kind '{k}' unknown — use: pr, prN, yhat, xb")
-                    )),
-                }
-            }
-
-            // ── IV / 2SLS ─────────────────────────────────────────────
-            (Value::IvResult(r), "xb" | "fitted") => {
-                let names = r.variable_names.as_deref().unwrap_or(&[]);
-                let x = build_x_from_varnames(&df_val, names)?;
-                x.dot(&r.params).to_vec()
-            }
-            (Value::IvResult(_), k) => return Err(HayashiError::Runtime(
-                format!("predict IV: kind '{k}' unknown — use: xb")
-            )),
-
-            // ── Panel FE / RE ─────────────────────────────────────────
-            (Value::PanelResult(r), "xb" | "fitted") => {
-                let names = r.variable_names.as_deref().unwrap_or(&[]);
-                let x = build_x_from_varnames(&df_val, names)?;
-                x.dot(&r.params).to_vec()
-            }
-            (Value::PanelResult(_), k) => return Err(HayashiError::Runtime(
-                format!("predict FE: kind '{k}' unknown — use: xb")
-            )),
-            (Value::ReResult(r), "xb" | "fitted") => {
-                let names = r.variable_names.as_deref().unwrap_or(&[]);
-                let x = build_x_from_varnames(&df_val, names)?;
-                x.dot(&r.params).to_vec()
-            }
-            (Value::ReResult(_), k) => return Err(HayashiError::Runtime(
-                format!("predict RE: kind '{k}' unknown — use: xb")
-            )),
-
-            // ── Tobit ─────────────────────────────────────────────────
-            (Value::TobitResult(r), "xb" | "fitted") => {
-                let names = r.variable_names.as_deref().unwrap_or(&[]);
-                let x = build_x_from_varnames(&df_val, names)?;
-                x.dot(&r.params).to_vec()
-            }
-            (Value::TobitResult(_), k) => return Err(HayashiError::Runtime(
-                format!("predict Tobit: kind '{k}' unknown — use: xb")
-            )),
-
-            // ── Heckman ───────────────────────────────────────────────
-            (Value::HeckmanResult(r), "xb" | "fitted") => {
-                let names = r.variable_names.as_deref().unwrap_or(&[]);
-                let x = build_x_from_varnames(&df_val, names)?;
-                x.dot(&r.params).to_vec()
-            }
-            (Value::HeckmanResult(_), k) => return Err(HayashiError::Runtime(
-                format!("predict Heckman: kind '{k}' unknown — use: xb")
-            )),
-
-            // ── Cox PH ────────────────────────────────────────────────
-            (Value::CoxResult(r), "loghr" | "xb") => {
-                let names = r.variable_names.as_deref().unwrap_or(&[]);
-                let x = build_x_from_varnames(&df_val, names)?;
-                r.predict_log_hazard(&x).to_vec()
-            }
-            (Value::CoxResult(r), "hr" | "hazard") => {
-                let names = r.variable_names.as_deref().unwrap_or(&[]);
-                let x = build_x_from_varnames(&df_val, names)?;
-                r.predict_hazard_ratio(&x).to_vec()
-            }
-            (Value::CoxResult(_), k) => return Err(HayashiError::Runtime(
-                format!("predict Cox: kind '{k}' unknown — use: loghr, hr")
-            )),
-
-            // ── Quantile Regression ───────────────────────────────────
-            (Value::QuantileResult(r), "xb" | "fitted") => {
-                let names = r.variable_names.as_deref().unwrap_or(&[]);
-                let x = build_x_from_varnames(&df_val, names)?;
-                x.dot(&r.params).to_vec()
-            }
-            (Value::QuantileResult(_), k) => return Err(HayashiError::Runtime(
-                format!("predict QReg: kind '{k}' unknown — use: xb")
-            )),
-
-            // ── RLM ──────────────────────────────────────────────────
-            (Value::RlmResult(r), "xb" | "fitted") => {
-                let names = r.variable_names.as_deref().unwrap_or(&[]);
-                let x = build_x_from_varnames(&df_val, names)?;
-                x.dot(&r.params).to_vec()
-            }
-            (Value::RlmResult(_), k) => return Err(HayashiError::Runtime(
-                format!("predict RLM: kind '{k}' unknown — use: xb")
-            )),
-
-            // ── GEE ──────────────────────────────────────────────────
-            (Value::GeeResult(r), "xb" | "fitted") => {
-                let names = r.variable_names.as_deref().unwrap_or(&[]);
-                let x = build_x_from_varnames(&df_val, names)?;
-                x.dot(&r.params).to_vec()
-            }
-            (Value::GeeResult(_), k) => return Err(HayashiError::Runtime(
-                format!("predict GEE: kind '{k}' unknown — use: xb")
-            )),
-
-            // ── Beta Regression ───────────────────────────────────────
-            (Value::BetaResult(r), "pr" | "mu" | "fitted") => {
-                let names = r.variable_names.as_deref().unwrap_or(&[]);
-                let x = build_x_from_varnames(&df_val, names)?;
-                r.predict(&x, &greeners::BetaLink::Logit).to_vec()
-            }
-            (Value::BetaResult(r), "xb") => {
-                let names = r.variable_names.as_deref().unwrap_or(&[]);
-                let x = build_x_from_varnames(&df_val, names)?;
-                x.dot(&r.params).to_vec()
-            }
-            (Value::BetaResult(_), k) => return Err(HayashiError::Runtime(
-                format!("predict BetaReg: kind '{k}' unknown — use: pr, xb")
-            )),
-
-            // ── GLSAR ────────────────────────────────────────────────
-            (Value::GlsarResult(r), "xb" | "fitted") => {
-                let names = r.variable_names.as_deref().unwrap_or(&[]);
-                let x = build_x_from_varnames(&df_val, names)?;
-                r.fitted_values(&x).to_vec()
-            }
-            (Value::GlsarResult(r), "residuals" | "resid" | "e") => {
-                let names = r.variable_names.as_deref().unwrap_or(&[]);
-                let x = build_x_from_varnames(&df_val, names)?;
-                let y = get_col_f64(&df_val, varname)?;
-                r.residuals(&y, &x).to_vec()
-            }
-            (Value::GlsarResult(_), k) => return Err(HayashiError::Runtime(
-                format!("predict GLSAR: kind '{k}' unknown — use: xb, residuals")
-            )),
-
-            // ── MixedLM ───────────────────────────────────────────────
-            (Value::MixedResult(r), "xb" | "fitted") => {
-                let names = r.variable_names.as_deref().unwrap_or(&[]);
-                let x = build_x_from_varnames(&df_val, names)?;
-                x.dot(&r.fixed_effects).to_vec()
-            }
-            (Value::MixedResult(_), k) => return Err(HayashiError::Runtime(
-                format!("predict MixedLM: kind '{k}' unknown — use: xb")
-            )),
-
-            // ── ZIP / ZINB ────────────────────────────────────────────
-            (Value::ZeroInflatedResult(r), "count" | "mu" | "fitted") => {
-                let names = r.count_var_names.as_deref().unwrap_or(&[]);
-                let x_c = build_x_from_varnames(&df_val, names)?;
-                let inflate_names = r.inflate_var_names.as_deref().unwrap_or(names);
-                let x_i = build_x_from_varnames(&df_val, inflate_names)?;
-                r.predict_count(&x_c, &x_i).to_vec()
-            }
-            (Value::ZeroInflatedResult(r), "pr0") => {
-                let names = r.count_var_names.as_deref().unwrap_or(&[]);
-                let x_c = build_x_from_varnames(&df_val, names)?;
-                let inflate_names = r.inflate_var_names.as_deref().unwrap_or(names);
-                let x_i = build_x_from_varnames(&df_val, inflate_names)?;
-                r.predict_proba_zero(&x_c, &x_i).to_vec()
-            }
-            (Value::ZeroInflatedResult(_), k) => return Err(HayashiError::Runtime(
-                format!("predict ZIP/ZINB: kind '{k}' unknown — use: count, pr0")
-            )),
-
-            // ── Rolling OLS ───────────────────────────────────────────
-            (Value::RollingResult(r), "residuals" | "resid" | "e") => {
-                r.residuals.to_vec()
-            }
-            (Value::RollingResult(_), k) => return Err(HayashiError::Runtime(
-                format!("predict RollingOLS: kind '{k}' unknown — use: residuals")
-            )),
-
-            // ── Recursive LS ──────────────────────────────────────────
-            (Value::RecursiveLSResult(r), "residuals" | "resid" | "e") => {
-                r.residuals.to_vec()
-            }
-            (Value::RecursiveLSResult(r), "cusum") => {
-                r.cusum.to_vec()
-            }
-            (Value::RecursiveLSResult(r), "cusum_sq") => {
-                r.cusum_squares.to_vec()
-            }
-            (Value::RecursiveLSResult(_), k) => return Err(HayashiError::Runtime(
-                format!("predict RecursiveLS: kind '{k}' unknown — use: residuals, cusum, cusum_sq")
-            )),
-
-            // ── GLM ──────────────────────────────────────────────────────
-            // pr/mu/fitted → μ̂ = g⁻¹(Xβ) — predicted mean response
-            // xb → Xβ — linear predictor (link scale)
-            // residuals → deviance residuals
-            // pearson → Pearson residuals (y-μ)/√V(μ)
-            // working → IRLS working residuals
-            (Value::GlmResult(r), "pr" | "mu" | "fitted") => {
-                let names = r.variable_names.as_deref().unwrap_or(&[]);
-                let x = build_x_from_varnames(&df_val, names)?;
-                r.predict_mean(&x).to_vec()
-            }
-            (Value::GlmResult(r), "xb") => {
-                let names = r.variable_names.as_deref().unwrap_or(&[]);
-                let x = build_x_from_varnames(&df_val, names)?;
-                r.predict(&x).to_vec()
-            }
-            (Value::GlmResult(r), "residuals" | "resid" | "e" | "deviance") => {
-                r.residuals().to_vec()
-            }
-            (Value::GlmResult(r), "pearson") => {
-                r.pearson_residuals().to_vec()
-            }
-            (Value::GlmResult(r), "working") => {
-                r.working_residuals().to_vec()
-            }
-            (Value::GlmResult(_), k) => return Err(HayashiError::Runtime(
-                format!("predict GLM: kind '{k}' unknown — use: pr, xb, residuals, pearson, working")
-            )),
-
-            // ── LOWESS ───────────────────────────────────────────────────
-            // smoothed/yhat → smoothed values ŷ_i
-            // residuals → residuals y_i - ŷ_i
-            (Value::LowessResult(r), "smoothed" | "yhat" | "fitted") => {
-                r.smoothed.to_vec()
-            }
-            (Value::LowessResult(r), "residuals" | "resid" | "e") => {
-                r.residuals.to_vec()
-            }
-            (Value::LowessResult(_), k) => return Err(HayashiError::Runtime(
-                format!("predict LOWESS: kind '{k}' unknown — use: smoothed, residuals")
-            )),
-
-            // ── PCA ──────────────────────────────────────────────────────
-            // pc1, pc2, ..., pcN → scores of the N-th principal component
-            (Value::PcaResult(m), kind_s) => {
-                if kind_s.starts_with("pc") && kind_s.len() > 2 {
-                    let comp: usize = kind_s[2..].parse::<usize>()
-                        .map_err(|_| HayashiError::Runtime(
-                            format!("predict PCA: '{kind_s}' invalid — use pcN where N=1..{}", m.result.n_components)
-                        ))?;
-                    if comp == 0 || comp > m.result.n_components {
-                        return Err(HayashiError::Runtime(
-                            format!("predict PCA: component {comp} out of range 1..{}", m.result.n_components)
-                        ));
-                    }
-                    m.result.scores.column(comp - 1).to_vec()
-                } else {
-                    return Err(HayashiError::Runtime(
-                        format!("predict PCA: kind '{kind_s}' unknown — use: pc1, pc2, ..., pc{}", m.result.n_components)
-                    ));
-                }
-            }
-
-            // ── Factor Analysis ───────────────────────────────────────────
-            // Use pca() for scores; factor() is only for loadings/structure analysis
-            (Value::FactorResult(_), _) => return Err(HayashiError::Runtime(
-                "predict Factor Analysis: scores not available via FA — use pca() for scores; FA is for loadings analysis".into()
-            )),
-
-            // ── Markov Switching ──────────────────────────────────────────
-            // smoothed → most likely regime (1-indexed)
-            // regimeN  → smoothed probability of regime N
-            (Value::MarkovResult(r), "smoothed" | "regime" | "state") => {
-                (0..r.smoothed_probs.nrows()).map(|t| {
-                    let row = r.smoothed_probs.row(t);
-                    let (best, _) = row.iter().enumerate()
-                        .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-                        .unwrap_or((0, &0.0));
-                    (best + 1) as f64
-                }).collect()
-            }
-            (Value::MarkovResult(r), kind_s) if kind_s.starts_with("regime") && kind_s.len() > 6 => {
-                let idx: usize = kind_s[6..].parse::<usize>()
-                    .map_err(|_| HayashiError::Runtime(
-                        format!("predict MarkovSwitching: '{kind_s}' invalid — use regimeN where N=1..{}", r.n_regimes)
-                    ))?;
-                if idx == 0 || idx > r.n_regimes {
-                    return Err(HayashiError::Runtime(
-                        format!("predict MarkovSwitching: regime {idx} out of range 1..{}", r.n_regimes)
-                    ));
-                }
-                r.smoothed_probs.column(idx - 1).to_vec()
-            }
-            (Value::MarkovResult(_), k) => return Err(HayashiError::Runtime(
-                format!("predict MarkovSwitching: kind '{k}' unknown — use: regime, regime1, regime2, ...")
-            )),
-
-            // ── Conditional Logit / Poisson ───────────────────────────────
-            (Value::ConditionalResult(_), _) => return Err(HayashiError::Runtime(
-                "predict clogit/cpoisson: fixed effects absorbed — unconditional prediction not available; use β̂ coefficients for odds ratios or marginal effects".into()
-            )),
-
-            // ── VARMA ─────────────────────────────────────────────────────
-            (Value::VarmaResult(_), _) => return Err(HayashiError::Runtime(
-                "predict varma: multivariate prediction not supported as a column — use print() for diagnostics".into()
-            )),
-
-            // ── UCM ───────────────────────────────────────────────────────
-            (Value::UCResult(r), "level")                     => r.level.to_vec(),
-            (Value::UCResult(r), "trend")                     => r.trend.as_ref()
-                .map(|t| t.to_vec())
-                .unwrap_or_else(|| vec![f64::NAN; r.n_obs]),
-            (Value::UCResult(r), "seasonal")                  => r.seasonal.as_ref()
-                .map(|s| s.to_vec())
-                .unwrap_or_else(|| vec![f64::NAN; r.n_obs]),
-            (Value::UCResult(r), "residuals" | "resid" | "e") => r.residuals.to_vec(),
-            (Value::UCResult(_), k) => return Err(HayashiError::Runtime(
-                format!("predict ucm: kind '{k}' unknown — use: level, trend, seasonal, residuals")
-            )),
-
-            // ── GAM ───────────────────────────────────────────────────────
-            (Value::GamResult(_), _) => return Err(HayashiError::Runtime(
-                "predict gam: fitted values are not stored — use gam() with df=dataset and compute Xβ̂ manually".into()
-            )),
-
-            // ── MICE ──────────────────────────────────────────────────────
-            (Value::MiceResult(_), _) => return Err(HayashiError::Runtime(
-                "predict mice: MICE returns multiple datasets; access via model pooling".into()
-            )),
-
-            // ── SVAR ─────────────────────────────────────────────────────
-            (Value::SVarResult(_), _) => return Err(HayashiError::Runtime(
-                "predict svar: no fitted values — use sirf() and sfevd() for impulse-response analysis".into()
-            )),
-
-            // ── 3SLS ─────────────────────────────────────────────────────
-            (Value::ThreeSLSResult(_), _) => return Err(HayashiError::Runtime(
-                "predict 3sls: multiple equations — use print() to see coefficients per equation".into()
-            )),
-
-            // ── DFM ───────────────────────────────────────────────────────
-            (Value::DFMResult(m), kind_s) if kind_s.starts_with('f') => {
-                let idx = kind_s[1..].parse::<usize>()
-                    .map(|n| n.saturating_sub(1))
-                    .unwrap_or(0);
-                if idx >= m.result.n_factors {
-                    return Err(HayashiError::Runtime(format!(
-                        "predict dfm: factor f{} does not exist — model has {} factors",
-                        idx + 1, m.result.n_factors
-                    )));
-                }
-                m.result.factors.column(idx).to_vec()
-            }
-            (Value::DFMResult(_), k) => return Err(HayashiError::Runtime(
-                format!("predict dfm: kind '{k}' unknown — use: f1, f2, ... (1-based index of latent factor)")
-            )),
-
-            // ── MarkovAutoregression ───────────────────────────────────────
-            (Value::MSARResult(r), "regime" | "state") => {
-                r.predict_regime().iter().map(|&s| (s + 1) as f64).collect()
-            }
-            (Value::MSARResult(r), kind_s) if kind_s.starts_with("regime") && kind_s.len() > 6 => {
-                let idx = kind_s["regime".len()..].parse::<usize>()
-                    .map(|n| n.saturating_sub(1))
-                    .unwrap_or(0);
-                if idx >= r.k_regimes {
-                    return Err(HayashiError::Runtime(format!(
-                        "predict msauto: regime{} out of range 1..{}",
-                        idx + 1, r.k_regimes
-                    )));
-                }
-                r.smoothed_probs.column(idx).to_vec()
-            }
-            (Value::MSARResult(_), k) => return Err(HayashiError::Runtime(
-                format!("predict msauto: kind '{k}' unknown — use: regime, regime1, regime2, ...")
-            )),
-
-            // ── Seasonal decomposition ───────────────────────────────────
-            (Value::DecompResult(r), "trend")    => r.trend.to_vec(),
-            (Value::DecompResult(r), "seasonal") => r.seasonal.to_vec(),
-            (Value::DecompResult(r), "residual" | "resid" | "e") => r.residual.to_vec(),
-            (Value::DecompResult(r), "observed" | "fitted") => r.observed.to_vec(),
-            (Value::DecompResult(_), k) => return Err(HayashiError::Runtime(
-                format!("predict decompose: kind '{k}' unknown — use: trend, seasonal, residual, observed")
-            )),
-
-            // ── MSTL ─────────────────────────────────────────────────────
-            (Value::MstlResult(r), "trend") => r.trend.to_vec(),
-            (Value::MstlResult(r), "resid" | "residual" | "e") => r.resid.to_vec(),
-            (Value::MstlResult(r), kind_s) if kind_s.starts_with("seasonal") => {
-                let idx = if kind_s == "seasonal" {
-                    0usize
-                } else {
-                    kind_s["seasonal".len()..].parse::<usize>()
-                        .map(|n| n.saturating_sub(1))
-                        .unwrap_or(0)
-                };
-                if idx >= r.seasonal.len() {
-                    return Err(HayashiError::Runtime(format!(
-                        "predict mstl: seasonal{} component does not exist — model has {} periods",
-                        idx + 1, r.seasonal.len()
-                    )));
-                }
-                r.seasonal[idx].to_vec()
-            }
-            (Value::MstlResult(_), k) => return Err(HayashiError::Runtime(
-                format!("predict mstl: kind '{k}' unknown — use: trend, resid, seasonal, seasonal1, seasonal2, ...")
-            )),
-
-            // ── ETS (exponential smoothing) ───────────────────────────
-            (Value::EtsResult(r), "fitted" | "yhat" | "xb") => r.fitted_values.to_vec(),
-            (Value::EtsResult(r), "residuals" | "resid" | "e") => r.residuals.to_vec(),
-            (Value::EtsResult(r), "level")    => r.level.to_vec(),
-            (Value::EtsResult(r), "trend")    => r.trend.to_vec(),
-            (Value::EtsResult(r), "seasonal") => r.seasonal.to_vec(),
-            (Value::EtsResult(_), k) => return Err(HayashiError::Runtime(
-                format!("predict ets: kind '{k}' unknown — use: fitted, residuals, level, trend, seasonal")
-            )),
-
-            // ── PanelThreshold ────────────────────────────────────────
-            (Value::ThresholdResult(_), k) => return Err(HayashiError::Runtime(
-                format!("predict pthresh: kind '{k}' — use print() to see thresholds and coefficients")
-            )),
-
-            _ => return Err(HayashiError::Type(
-                "predict: model type not supported".into()
-            )),
-        };
+        let vals = self.predict_model_values(&model_val, &kind_str, &df_val, varname)?;
 
         let arr = ndarray::Array1::from(vals);
         Arc::make_mut(&mut df_val)
