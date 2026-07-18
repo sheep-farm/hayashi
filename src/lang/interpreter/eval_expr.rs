@@ -582,39 +582,12 @@ impl Interpreter {
     /// string functions such as `substr(date, 0, 7)` or `upper(name)`.
     pub(super) fn eval_col_expr_typed(&mut self, expr: &Expr, df: &DataFrame) -> Result<ColResult> {
         match expr {
-            Expr::Float(v) => {
-                let n = df.n_rows();
-                Ok(ColResult::Float(vec![*v; n]))
-            }
-            Expr::Int(v) => {
-                let n = df.n_rows();
-                Ok(ColResult::Float(vec![*v as f64; n]))
-            }
-            Expr::Bool(v) => {
-                let n = df.n_rows();
-                Ok(ColResult::Float(vec![if *v { 1.0 } else { 0.0 }; n]))
-            }
-            Expr::Str(s) => {
-                // String literal broadcast to a column of identical strings.
-                Ok(ColResult::String(vec![s.clone(); df.n_rows()]))
-            }
-            Expr::Nil => {
-                let n = df.n_rows();
-                Ok(ColResult::Float(vec![f64::NAN; n]))
+            Expr::Float(_) | Expr::Int(_) | Expr::Bool(_) | Expr::Str(_) | Expr::Nil => {
+                self.eval_col_literal(expr, df)
             }
             Expr::Var(name) => self.eval_col_var(name, df),
-            Expr::Neg(inner) => {
-                let vals = self.eval_col_expr(inner, df)?;
-                Ok(ColResult::Float(vals.into_iter().map(|x| -x).collect()))
-            }
-            Expr::Not(inner) => {
-                let vals = self.eval_col_expr(inner, df)?;
-                Ok(ColResult::Float(
-                    vals.into_iter()
-                        .map(|x| if x == 0.0 { 1.0 } else { 0.0 })
-                        .collect(),
-                ))
-            }
+            Expr::Neg(inner) => self.eval_col_neg(inner, df),
+            Expr::Not(inner) => self.eval_col_not(inner, df),
             Expr::BinOp { op, lhs, rhs } => self.eval_col_binop(op, lhs, rhs, df),
             Expr::Call { func, args, .. } => self.eval_col_call(func, args, df),
             // ── time-series operators ───────────────────────────────────────
@@ -630,13 +603,141 @@ impl Interpreter {
         }
     }
 
-    fn eval_col_call(&mut self, func: &str, args: &[Expr], df: &DataFrame) -> Result<ColResult> {
-        // ── string functions applied row-wise over a string column ──
-        if let Some(str_res) = self.eval_str_col_func(func, args, df)? {
-            return Ok(str_res);
+    fn eval_col_literal(&mut self, expr: &Expr, df: &DataFrame) -> Result<ColResult> {
+        let n = df.n_rows();
+        match expr {
+            Expr::Float(v) => Ok(ColResult::Float(vec![*v; n])),
+            Expr::Int(v) => Ok(ColResult::Float(vec![*v as f64; n])),
+            Expr::Bool(v) => Ok(ColResult::Float(vec![if *v { 1.0 } else { 0.0 }; n])),
+            Expr::Str(s) => Ok(ColResult::String(vec![s.clone(); df.n_rows()])),
+            Expr::Nil => Ok(ColResult::Float(vec![f64::NAN; n])),
+            _ => Err(HayashiError::Runtime(
+                "unsupported literal in generate".into(),
+            )),
+        }
+    }
+
+    fn eval_col_neg(&mut self, inner: &Expr, df: &DataFrame) -> Result<ColResult> {
+        let vals = self.eval_col_expr(inner, df)?;
+        Ok(ColResult::Float(vals.into_iter().map(|x| -x).collect()))
+    }
+
+    fn eval_col_not(&mut self, inner: &Expr, df: &DataFrame) -> Result<ColResult> {
+        let vals = self.eval_col_expr(inner, df)?;
+        Ok(ColResult::Float(
+            vals.into_iter()
+                .map(|x| if x == 0.0 { 1.0 } else { 0.0 })
+                .collect(),
+        ))
+    }
+
+    fn eval_col_run_userfn(
+        &mut self,
+        uf: Arc<UserFn>,
+        vals: &[f64],
+        mixed_fallback: bool,
+    ) -> Result<ColResult> {
+        let mut float_result: Vec<f64> = Vec::with_capacity(vals.len());
+        let mut str_result: Vec<String> = Vec::with_capacity(vals.len());
+        let mut is_str = false;
+        let mut is_float = false;
+
+        for &v in vals {
+            self.env.push_scope();
+            if let Some(p) = uf.params.first() {
+                self.env.declare_const(p, Value::Float(v));
+            }
+            let body = uf.body.clone();
+            let mut exec_err = None;
+            for s in &body {
+                match self.exec(s) {
+                    Ok(()) => {}
+                    Err(HayashiError::Return) => break,
+                    Err(e) => {
+                        exec_err = Some(e);
+                        break;
+                    }
+                }
+            }
+            self.env.pop_scope();
+            if let Some(e) = exec_err {
+                return Err(e);
+            }
+
+            match self.return_value.take().unwrap_or(Value::Float(f64::NAN)) {
+                Value::Float(f) => {
+                    float_result.push(f);
+                    is_float = true;
+                }
+                Value::Int(i) => {
+                    float_result.push(i as f64);
+                    is_float = true;
+                }
+                Value::Str(s) => {
+                    str_result.push(s);
+                    is_str = true;
+                }
+                Value::Bool(b) => {
+                    float_result.push(if b { 1.0 } else { 0.0 });
+                    is_float = true;
+                }
+                _ => {
+                    float_result.push(f64::NAN);
+                    is_float = true;
+                }
+            }
         }
 
-        // ── regex row-wise over string columns ──
+        if is_str && !is_float {
+            Ok(ColResult::String(str_result))
+        } else if is_float && !is_str {
+            Ok(ColResult::Float(float_result))
+        } else if mixed_fallback {
+            let mut combined: Vec<String> = Vec::with_capacity(vals.len());
+            for (i, v) in vals.iter().enumerate() {
+                if i < float_result.len() && (i >= str_result.len() || str_result[i].is_empty()) {
+                    combined.push(float_result[i].to_string());
+                } else if i < str_result.len() {
+                    combined.push(str_result[i].clone());
+                } else {
+                    combined.push(v.to_string());
+                }
+            }
+            Ok(ColResult::String(combined))
+        } else {
+            Ok(ColResult::Float(float_result))
+        }
+    }
+
+    fn eval_datetime_part(&self, part: &str, dt: chrono::NaiveDateTime) -> f64 {
+        use chrono::{Datelike, Timelike};
+        match part {
+            "year" => dt.year() as f64,
+            "month" => dt.month() as f64,
+            "day" => dt.day() as f64,
+            "hour" => dt.hour() as f64,
+            "minute" => dt.minute() as f64,
+            "second" => dt.second() as f64,
+            "dow" => dt.weekday().num_days_from_monday() as f64,
+            _ => f64::NAN,
+        }
+    }
+
+    fn eval_col_call_string(
+        &mut self,
+        func: &str,
+        args: &[Expr],
+        df: &DataFrame,
+    ) -> Result<Option<ColResult>> {
+        self.eval_str_col_func(func, args, df)
+    }
+
+    fn eval_col_call_regex(
+        &mut self,
+        func: &str,
+        args: &[Expr],
+        df: &DataFrame,
+    ) -> Result<Option<ColResult>> {
         if func == "regexm" && args.len() >= 2 {
             if let Expr::Var(col_name) = &args[0] {
                 if let Ok(str_col) = df.get_string(col_name) {
@@ -648,284 +749,278 @@ impl Interpreter {
                             ))
                         }
                     };
-                    return Ok(ColResult::Float(greeners::Transforms::regexm_vec(
+                    return Ok(Some(ColResult::Float(greeners::Transforms::regexm_vec(
                         &str_col.to_vec(),
                         &pattern,
-                    )));
+                    ))));
                 }
             }
         }
+        Ok(None)
+    }
 
-        // ── random generators (size = df n_rows) ──
-        if matches!(func, "uniform" | "runiform" | "rnormal" | "rbernoulli") {
-            let n = df.n_rows();
-            use rand::Rng;
-            return Ok(ColResult::Float(match func {
-                "uniform" | "runiform" => {
-                    let rng = &mut self.rng;
-                    (0..n).map(|_| rng.gen::<f64>()).collect()
-                }
-                "rnormal" => {
-                    let rng = &mut self.rng;
-                    (0..n).map(|_| standard_normal_draw(rng)).collect()
-                }
-                "rbernoulli" => {
-                    let p = if !args.is_empty() {
-                        self.eval_col_expr(&args[0], df)?[0]
-                    } else {
-                        0.5
-                    };
-                    let rng = &mut self.rng;
-                    (0..n)
-                        .map(|_| if rng.gen::<f64>() < p { 1.0 } else { 0.0 })
-                        .collect()
-                }
-                _ => unreachable!(),
-            }));
+    fn eval_col_call_random(
+        &mut self,
+        func: &str,
+        args: &[Expr],
+        df: &DataFrame,
+    ) -> Result<Option<ColResult>> {
+        if !matches!(func, "uniform" | "runiform" | "rnormal" | "rbernoulli") {
+            return Ok(None);
         }
+        let n = df.n_rows();
+        use rand::Rng;
+        Ok(Some(ColResult::Float(match func {
+            "uniform" | "runiform" => {
+                let rng = &mut self.rng;
+                (0..n).map(|_| rng.gen::<f64>()).collect()
+            }
+            "rnormal" => {
+                let rng = &mut self.rng;
+                (0..n).map(|_| standard_normal_draw(rng)).collect()
+            }
+            "rbernoulli" => {
+                let p = if !args.is_empty() {
+                    self.eval_col_expr(&args[0], df)?[0]
+                } else {
+                    0.5
+                };
+                let rng = &mut self.rng;
+                (0..n)
+                    .map(|_| if rng.gen::<f64>() < p { 1.0 } else { 0.0 })
+                    .collect()
+            }
+            _ => unreachable!(),
+        })))
+    }
 
-        // ── multi-column functions (rowmean / rowsum / rowmin / rowmax / rowtotal / rowmiss) ──
-        if matches!(
+    fn eval_col_call_rowwise(
+        &mut self,
+        func: &str,
+        args: &[Expr],
+        df: &DataFrame,
+    ) -> Result<Option<ColResult>> {
+        if !matches!(
             func,
             "rowmean" | "rowsum" | "rowmin" | "rowmax" | "rowtotal" | "rowmiss"
         ) {
-            if args.is_empty() {
-                return Err(HayashiError::Runtime(format!(
-                    "{func}() requires at least one column"
-                )));
+            return Ok(None);
+        }
+        if args.is_empty() {
+            return Err(HayashiError::Runtime(format!(
+                "{func}() requires at least one column"
+            )));
+        }
+        let cols: Vec<Vec<f64>> = args
+            .iter()
+            .map(|a| self.eval_col_expr(a, df))
+            .collect::<Result<_>>()?;
+        Ok(Some(ColResult::Float(match func {
+            "rowmean" => greeners::Transforms::row_mean(&cols),
+            "rowsum" => greeners::Transforms::row_sum(&cols),
+            "rowmin" => greeners::Transforms::row_min(&cols),
+            "rowmax" => greeners::Transforms::row_max(&cols),
+            "rowtotal" => greeners::Transforms::row_total(&cols),
+            "rowmiss" => greeners::Transforms::row_miss(&cols),
+            _ => unreachable!(),
+        })))
+    }
+
+    fn eval_col_call_aggregation(
+        &mut self,
+        func: &str,
+        args: &[Expr],
+        df: &DataFrame,
+    ) -> Result<Option<ColResult>> {
+        if args.len() != 1 {
+            return Ok(None);
+        }
+        match func {
+            "rank" => {
+                let vals = self.eval_col_expr(&args[0], df)?;
+                Ok(Some(ColResult::Float(greeners::Transforms::rank(&vals))))
             }
-            let cols: Vec<Vec<f64>> = args
-                .iter()
-                .map(|a| self.eval_col_expr(a, df))
-                .collect::<Result<_>>()?;
-            return Ok(ColResult::Float(match func {
-                "rowmean" => greeners::Transforms::row_mean(&cols),
-                "rowsum" => greeners::Transforms::row_sum(&cols),
-                "rowmin" => greeners::Transforms::row_min(&cols),
-                "rowmax" => greeners::Transforms::row_max(&cols),
-                "rowtotal" => greeners::Transforms::row_total(&cols),
-                "rowmiss" => greeners::Transforms::row_miss(&cols),
-                _ => unreachable!(),
-            }));
+            "cumsum" => {
+                let vals = self.eval_col_expr(&args[0], df)?;
+                Ok(Some(ColResult::Float(greeners::Transforms::cumsum(&vals))))
+            }
+            "std" | "standardize" | "zscore" => {
+                let vals = self.eval_col_expr(&args[0], df)?;
+                Ok(Some(ColResult::Float(greeners::Transforms::standardize(
+                    &vals,
+                ))))
+            }
+            "iqr" => {
+                let vals = self.eval_col_expr(&args[0], df)?;
+                let iqr_val = greeners::Transforms::iqr(&vals);
+                Ok(Some(ColResult::Float(vec![iqr_val; df.n_rows()])))
+            }
+            _ => Ok(None),
+        }
+    }
+
+    fn eval_col_call_datetime(
+        &mut self,
+        func: &str,
+        args: &[Expr],
+        df: &DataFrame,
+    ) -> Result<Option<ColResult>> {
+        if args.len() != 1 {
+            return Ok(None);
         }
 
-        if args.len() == 1 {
-            // ── functions that need the whole column ─────────────────
-            match func {
-                "rank" => {
-                    let vals = self.eval_col_expr(&args[0], df)?;
-                    return Ok(ColResult::Float(greeners::Transforms::rank(&vals)));
-                }
-                "cumsum" => {
-                    let vals = self.eval_col_expr(&args[0], df)?;
-                    return Ok(ColResult::Float(greeners::Transforms::cumsum(&vals)));
-                }
-                "std" | "standardize" | "zscore" => {
-                    let vals = self.eval_col_expr(&args[0], df)?;
-                    return Ok(ColResult::Float(greeners::Transforms::standardize(&vals)));
-                }
-                "iqr" => {
-                    let vals = self.eval_col_expr(&args[0], df)?;
-                    let iqr_val = greeners::Transforms::iqr(&vals);
-                    return Ok(ColResult::Float(vec![iqr_val; df.n_rows()]));
-                }
-                "group" => {
-                    let col_name = match &args[0] {
-                        Expr::Var(name) => name.clone(),
-                        _ => {
-                            return Err(HayashiError::Runtime(
-                                "group() requires a column name".into(),
-                            ))
-                        }
-                    };
-                    let strs = col_to_strings(df, &col_name)?;
-                    return Ok(ColResult::Float(greeners::Transforms::group(&strs)));
-                }
-                "date" => {
-                    let col_name = match &args[0] {
-                        Expr::Var(name) => name.clone(),
-                        _ => {
-                            return Err(HayashiError::Runtime(
-                                "date() requires a column name".into(),
-                            ))
-                        }
-                    };
-                    let strs = col_to_strings(df, &col_name)?;
-                    let result: Vec<f64> = strs
-                        .iter()
-                        .map(|s| {
-                            chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
-                                .ok()
-                                .and_then(|d| d.and_hms_opt(0, 0, 0))
-                                .map(|dt| dt.and_utc().timestamp() as f64)
-                                .unwrap_or(f64::NAN)
-                        })
-                        .collect();
-                    return Ok(ColResult::Float(result));
-                }
-                "year" | "month" | "day" | "hour" | "minute" | "second" | "dow" => {
-                    let col_name = match &args[0] {
-                        Expr::Var(name) => name.clone(),
-                        _ => {
-                            return Err(HayashiError::Runtime(format!(
-                                "{func}() requires a column name"
-                            )))
-                        }
-                    };
-                    if let Ok(arr) = df.get_datetime(&col_name) {
-                        use chrono::{Datelike, Timelike};
-                        let extract = |dt: &chrono::NaiveDateTime| -> f64 {
-                            match func {
-                                "year" => dt.year() as f64,
-                                "month" => dt.month() as f64,
-                                "day" => dt.day() as f64,
-                                "hour" => dt.hour() as f64,
-                                "minute" => dt.minute() as f64,
-                                "second" => dt.second() as f64,
-                                "dow" => dt.weekday().num_days_from_monday() as f64,
-                                _ => f64::NAN,
-                            }
-                        };
-                        return Ok(ColResult::Float(arr.iter().map(extract).collect()));
-                    }
-                    let vals = self.eval_col_expr(&args[0], df)?;
-                    use chrono::DateTime as ChronoDateTime;
-                    let result: Vec<f64> = vals
-                        .iter()
-                        .map(|&ts| {
-                            let dt =
-                                ChronoDateTime::from_timestamp(ts as i64, 0).map(|d| d.naive_utc());
-                            match dt {
-                                Some(d) => {
-                                    use chrono::{Datelike, Timelike};
-                                    match func {
-                                        "year" => d.year() as f64,
-                                        "month" => d.month() as f64,
-                                        "day" => d.day() as f64,
-                                        "hour" => d.hour() as f64,
-                                        "minute" => d.minute() as f64,
-                                        "second" => d.second() as f64,
-                                        "dow" => d.weekday().num_days_from_monday() as f64,
-                                        _ => f64::NAN,
-                                    }
-                                }
-                                None => f64::NAN,
-                            }
-                        })
-                        .collect();
-                    return Ok(ColResult::Float(result));
-                }
-                _ => {}
-            }
+        if !matches!(
+            func,
+            "group" | "date" | "year" | "month" | "day" | "hour" | "minute" | "second" | "dow"
+        ) {
+            return Ok(None);
+        }
 
-            // ── element-wise scalar functions (1-arg) ───────────────
-            let vals = self.eval_col_expr(&args[0], df)?;
-            match greeners::Transforms::apply(&vals, func) {
-                Ok(result) => Ok(ColResult::Float(result)),
-                Err(_) => {
-                    if let Some(Value::UserFn(uf)) = self.env.get(func).cloned() {
-                        let mut float_result: Vec<f64> = Vec::with_capacity(vals.len());
-                        let mut str_result: Vec<String> = Vec::with_capacity(vals.len());
-                        let mut is_str = false;
-                        let mut is_float = false;
-                        for &v in &vals {
-                            self.env.push_scope();
-                            if let Some(p) = uf.params.first() {
-                                self.env.declare_const(p, Value::Float(v));
-                            }
-                            let body = uf.body.clone();
-                            let mut exec_err = None;
-                            for s in &body {
-                                match self.exec(s) {
-                                    Ok(()) => {}
-                                    Err(HayashiError::Return) => break,
-                                    Err(e) => {
-                                        exec_err = Some(e);
-                                        break;
-                                    }
-                                }
-                            }
-                            self.env.pop_scope();
-                            if let Some(e) = exec_err {
-                                return Err(e);
-                            }
-                            match self.return_value.take().unwrap_or(Value::Float(f64::NAN)) {
-                                Value::Float(f) => {
-                                    float_result.push(f);
-                                    is_float = true;
-                                }
-                                Value::Int(i) => {
-                                    float_result.push(i as f64);
-                                    is_float = true;
-                                }
-                                Value::Str(s) => {
-                                    str_result.push(s);
-                                    is_str = true;
-                                }
-                                Value::Bool(b) => {
-                                    float_result.push(if b { 1.0 } else { 0.0 });
-                                    is_float = true;
-                                }
-                                _ => {
-                                    float_result.push(f64::NAN);
-                                    is_float = true;
-                                }
-                            }
-                        }
-                        if is_str && !is_float {
-                            Ok(ColResult::String(str_result))
-                        } else if is_float && !is_str {
-                            Ok(ColResult::Float(float_result))
-                        } else {
-                            // Mixed types in different rows — fall back to string repr.
-                            if is_str {
-                                let mut combined: Vec<String> = Vec::with_capacity(vals.len());
-                                for (i, v) in vals.iter().enumerate() {
-                                    if i < float_result.len()
-                                        && (i >= str_result.len() || str_result[i].is_empty())
-                                    {
-                                        combined.push(float_result[i].to_string());
-                                    } else if i < str_result.len() {
-                                        combined.push(str_result[i].clone());
-                                    } else {
-                                        combined.push(v.to_string());
-                                    }
-                                }
-                                Ok(ColResult::String(combined))
-                            } else {
-                                Ok(ColResult::Float(float_result))
-                            }
-                        }
-                    } else {
-                        Err(HayashiError::Runtime(format!(
-                            "unknown column function '{func}'"
-                        )))
-                    }
+        let col_name = match &args[0] {
+            Expr::Var(name) => name.clone(),
+            _ => {
+                return Err(HayashiError::Runtime(format!(
+                    "{func}() requires a column name"
+                )))
+            }
+        };
+
+        match func {
+            "group" => {
+                let strs = col_to_strings(df, &col_name)?;
+                Ok(Some(ColResult::Float(greeners::Transforms::group(&strs))))
+            }
+            "date" => {
+                let strs = col_to_strings(df, &col_name)?;
+                let result: Vec<f64> = strs
+                    .iter()
+                    .map(|s| {
+                        chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
+                            .ok()
+                            .and_then(|d| d.and_hms_opt(0, 0, 0))
+                            .map(|dt| dt.and_utc().timestamp() as f64)
+                            .unwrap_or(f64::NAN)
+                    })
+                    .collect();
+                Ok(Some(ColResult::Float(result)))
+            }
+            "year" | "month" | "day" | "hour" | "minute" | "second" | "dow" => {
+                if let Ok(arr) = df.get_datetime(&col_name) {
+                    let result: Vec<f64> = arr
+                        .iter()
+                        .map(|dt| self.eval_datetime_part(func, *dt))
+                        .collect();
+                    return Ok(Some(ColResult::Float(result)));
+                }
+                let vals = self.eval_col_expr(&args[0], df)?;
+                use chrono::DateTime as ChronoDateTime;
+                let result: Vec<f64> = vals
+                    .iter()
+                    .map(|&ts| {
+                        ChronoDateTime::from_timestamp(ts as i64, 0)
+                            .map(|d| self.eval_datetime_part(func, d.naive_utc()))
+                            .unwrap_or(f64::NAN)
+                    })
+                    .collect();
+                Ok(Some(ColResult::Float(result)))
+            }
+            _ => Ok(None),
+        }
+    }
+
+    fn eval_col_call_single_arg(
+        &mut self,
+        func: &str,
+        args: &[Expr],
+        df: &DataFrame,
+    ) -> Result<Option<ColResult>> {
+        if args.len() != 1 {
+            return Ok(None);
+        }
+        if let Some(res) = self.eval_col_call_aggregation(func, args, df)? {
+            return Ok(Some(res));
+        }
+        self.eval_col_call_datetime(func, args, df)
+    }
+
+    fn eval_col_call_elementwise_one_arg(
+        &mut self,
+        func: &str,
+        args: &[Expr],
+        df: &DataFrame,
+    ) -> Result<ColResult> {
+        let vals = self.eval_col_expr(&args[0], df)?;
+        match greeners::Transforms::apply(&vals, func) {
+            Ok(result) => Ok(ColResult::Float(result)),
+            Err(_) => {
+                if let Some(Value::UserFn(uf)) = self.env.get(func).cloned() {
+                    self.eval_col_run_userfn(uf, &vals, true)
+                } else {
+                    Err(HayashiError::Runtime(format!(
+                        "unknown column function '{func}'"
+                    )))
                 }
             }
-        } else if args.len() == 2 {
-            let a = self.eval_col_expr(&args[0], df)?;
-            let b = self.eval_col_expr(&args[1], df)?;
-            match greeners::Transforms::apply2(&a, &b, func) {
-                Ok(result) => Ok(ColResult::Float(result)),
-                Err(_) => Err(HayashiError::Runtime(format!(
-                    "function '{func}' not supported in generate"
-                ))),
-            }
-        } else if args.len() == 3 {
-            let a = self.eval_col_expr(&args[0], df)?;
-            let b = self.eval_col_expr(&args[1], df)?;
-            let c = self.eval_col_expr(&args[2], df)?;
-            match greeners::Transforms::apply3(&a, &b, &c, func) {
-                Ok(result) => Ok(ColResult::Float(result)),
-                Err(_) => Err(HayashiError::Runtime(format!(
-                    "function '{func}' not supported in generate"
-                ))),
-            }
-        } else {
-            Err(HayashiError::Runtime(format!(
+        }
+    }
+
+    fn eval_col_call_two_arg(
+        &mut self,
+        func: &str,
+        args: &[Expr],
+        df: &DataFrame,
+    ) -> Result<ColResult> {
+        let a = self.eval_col_expr(&args[0], df)?;
+        let b = self.eval_col_expr(&args[1], df)?;
+        match greeners::Transforms::apply2(&a, &b, func) {
+            Ok(result) => Ok(ColResult::Float(result)),
+            Err(_) => Err(HayashiError::Runtime(format!(
                 "function '{func}' not supported in generate"
-            )))
+            ))),
+        }
+    }
+
+    fn eval_col_call_three_arg(
+        &mut self,
+        func: &str,
+        args: &[Expr],
+        df: &DataFrame,
+    ) -> Result<ColResult> {
+        let a = self.eval_col_expr(&args[0], df)?;
+        let b = self.eval_col_expr(&args[1], df)?;
+        let c = self.eval_col_expr(&args[2], df)?;
+        match greeners::Transforms::apply3(&a, &b, &c, func) {
+            Ok(result) => Ok(ColResult::Float(result)),
+            Err(_) => Err(HayashiError::Runtime(format!(
+                "function '{func}' not supported in generate"
+            ))),
+        }
+    }
+
+    fn eval_col_call(&mut self, func: &str, args: &[Expr], df: &DataFrame) -> Result<ColResult> {
+        if let Some(str_res) = self.eval_col_call_string(func, args, df)? {
+            return Ok(str_res);
+        }
+        if let Some(res) = self.eval_col_call_regex(func, args, df)? {
+            return Ok(res);
+        }
+        if let Some(res) = self.eval_col_call_random(func, args, df)? {
+            return Ok(res);
+        }
+        if let Some(res) = self.eval_col_call_rowwise(func, args, df)? {
+            return Ok(res);
+        }
+        if let Some(res) = self.eval_col_call_single_arg(func, args, df)? {
+            return Ok(res);
+        }
+
+        match args.len() {
+            1 => self.eval_col_call_elementwise_one_arg(func, args, df),
+            2 => self.eval_col_call_two_arg(func, args, df),
+            3 => self.eval_col_call_three_arg(func, args, df),
+            _ => Err(HayashiError::Runtime(format!(
+                "function '{func}' not supported in generate"
+            ))),
         }
     }
 
@@ -1183,59 +1278,7 @@ impl Interpreter {
             }
         };
         let vals = self.eval_col_expr(&args[0], df)?;
-        let mut float_result: Vec<f64> = Vec::with_capacity(vals.len());
-        let mut str_result: Vec<String> = Vec::with_capacity(vals.len());
-        let mut is_str = false;
-        let mut is_float = false;
-        for &v in &vals {
-            self.env.push_scope();
-            if let Some(p) = uf.params.first() {
-                self.env.declare_const(p, Value::Float(v));
-            }
-            let body = uf.body.clone();
-            let mut exec_err = None;
-            for s in &body {
-                match self.exec(s) {
-                    Ok(()) => {}
-                    Err(HayashiError::Return) => break,
-                    Err(e) => {
-                        exec_err = Some(e);
-                        break;
-                    }
-                }
-            }
-            self.env.pop_scope();
-            if let Some(e) = exec_err {
-                return Err(e);
-            }
-            match self.return_value.take().unwrap_or(Value::Float(f64::NAN)) {
-                Value::Float(f) => {
-                    float_result.push(f);
-                    is_float = true;
-                }
-                Value::Int(i) => {
-                    float_result.push(i as f64);
-                    is_float = true;
-                }
-                Value::Str(s) => {
-                    str_result.push(s);
-                    is_str = true;
-                }
-                Value::Bool(b) => {
-                    float_result.push(if b { 1.0 } else { 0.0 });
-                    is_float = true;
-                }
-                _ => {
-                    float_result.push(f64::NAN);
-                    is_float = true;
-                }
-            }
-        }
-        if is_str && !is_float {
-            Ok(ColResult::String(str_result))
-        } else {
-            Ok(ColResult::Float(float_result))
-        }
+        self.eval_col_run_userfn(uf, &vals, false)
     }
 
     /// Tries to evaluate a `Call` expression as a string-column function
