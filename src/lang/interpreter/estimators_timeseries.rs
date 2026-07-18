@@ -1,5 +1,6 @@
 use super::helpers::*;
 use super::*;
+use crate::lang::dap::model_expansion;
 
 /// GARCH/EGARCH/GJR-GARCH, VARMA, seasonal decomposition, MSTL, proportion
 /// tests, multiple tests, UCM, GAM, MICE, Markov Switching, SVAR, 3SLS,
@@ -177,41 +178,68 @@ impl Interpreter {
             .map_err(|e| self.rt_err(format!("ljungbox: {e}")))?;
 
         let sep = "─".repeat(62);
-        println!(
-            "\nLjung-Box Test  —  lags = {}  n = {}",
+        let mut display = String::new();
+        display.push_str(&format!(
+            "\nLjung-Box Test  —  lags = {}  n = {}\n",
             res.lags, res.n_obs
-        );
-        println!("{sep}");
-        println!("H₀: no autocorrelation up to lag {}", res.lags);
-        println!("{sep}");
-        println!("{:<6} {:>10} {:>10} {:>8}", "lag", "ACF", "Q", "p-value");
-        println!("{sep}");
+        ));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!("H₀: no autocorrelation up to lag {}\n", res.lags));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!(
+            "{:<6} {:>10} {:>10} {:>8}\n",
+            "lag", "ACF", "Q", "p-value"
+        ));
+        display.push_str(&format!("{sep}\n"));
         let mut q_accum = 0.0_f64;
         let nf = res.n_obs as f64;
         for (i, &rho) in res.acf.iter().enumerate() {
             let k = i + 1;
             q_accum += nf * (nf + 2.0) * rho * rho / (nf - k as f64);
-            // cumulative p-value for Q up to lag k
             let p_k = greeners::chi2_pvalue(q_accum, k as f64);
-            println!(
-                "{:<6} {:>10.4} {:>10.4} {:>8.4} {:>3}",
+            display.push_str(&format!(
+                "{:<6} {:>10.4} {:>10.4} {:>8.4} {:>3}\n",
                 k,
                 rho,
                 q_accum,
                 p_k,
                 Self::sig_stars(p_k)
-            );
+            ));
         }
-        println!("{sep}");
-        println!(
-            "Q({lags}) = {:.4}   p = {:.4}  {}   (*** p<0.01  ** p<0.05  * p<0.10)",
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!(
+            "Q({lags}) = {:.4}   p = {:.4}  {}   (*** p<0.01  ** p<0.05  * p<0.10)\n",
             res.q_stat,
             res.p_value,
             Self::sig_stars(res.p_value)
-        );
-        println!();
+        ));
+        display.push('\n');
 
-        Ok(Value::Nil)
+        let summary = format!(
+            "Ljung-Box(lags={}, n={}), Q={:.4}, p={:.4}",
+            res.lags, res.n_obs, res.q_stat, res.p_value
+        );
+        let fields: Vec<(String, Value)> = vec![
+            (
+                "acf".into(),
+                model_expansion::series_from_vec("acf", &res.acf),
+            ),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("q_stat", Value::Float(res.q_stat)),
+                    ("p_value", Value::Float(res.p_value)),
+                    ("lags", Value::Int(res.lags as i64)),
+                    ("n_obs", Value::Int(res.n_obs as i64)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "LjungBoxResult",
+            fields,
+        ))
     }
 
     pub(super) fn leverage(
@@ -249,7 +277,6 @@ impl Interpreter {
         let cutoff = threshold * k as f64 / n as f64;
         let h_mean = k as f64 / n as f64;
 
-        // shows only observations above cutoff (or all if few)
         let flagged: Vec<(usize, f64)> = h
             .iter()
             .enumerate()
@@ -258,25 +285,62 @@ impl Interpreter {
             .collect();
 
         let sep = "─".repeat(46);
-        println!(
-            "\nLeverage  —  h̄ = {:.4}  cutoff = {:.4} ({}×k/n)",
+        let mut display = String::new();
+        display.push_str(&format!(
+            "\nLeverage  —  h̄ = {:.4}  cutoff = {:.4} ({}×k/n)\n",
             h_mean, cutoff, threshold
-        );
-        println!("{sep}");
+        ));
+        display.push_str(&format!("{sep}\n"));
         if flagged.is_empty() {
-            println!("No observations above cutoff.");
+            display.push_str("No observations above cutoff.\n");
         } else {
-            println!("{:<8} {:>10}  ", "obs", "h_i");
-            println!("{sep}");
+            display.push_str(&format!("{:<8} {:>10}  \n", "obs", "h_i"));
+            display.push_str(&format!("{sep}\n"));
             for (i, hi) in &flagged {
-                println!("{:<8} {:>10.4}  high leverage", i, hi);
+                display.push_str(&format!("{:<8} {:>10.4}  high leverage\n", i, hi));
             }
-            println!("{sep}");
-            println!("{} observation(s) with h_i > {:.4}", flagged.len(), cutoff);
+            display.push_str(&format!("{sep}\n"));
+            display.push_str(&format!(
+                "{} observation(s) with h_i > {:.4}\n",
+                flagged.len(),
+                cutoff
+            ));
         }
-        println!();
+        display.push('\n');
 
-        Ok(Value::Nil)
+        let obs: Vec<Value> = flagged.iter().map(|(i, _)| Value::Int(*i as i64)).collect();
+        let h_values: Vec<Value> = flagged.iter().map(|(_, hi)| Value::Float(*hi)).collect();
+        let flagged_dict = model_expansion::fit_dict(&[
+            ("obs", Value::List(Arc::new(obs))),
+            ("h_i", Value::List(Arc::new(h_values))),
+        ]);
+        let summary = format!(
+            "Leverage(n={}, k={}), cutoff={:.4}, h_mean={:.4}",
+            n, k, cutoff, h_mean
+        );
+        let fields: Vec<(String, Value)> = vec![
+            (
+                "leverage".into(),
+                model_expansion::array1_to_series("leverage", &h),
+            ),
+            ("flagged".into(), flagged_dict),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("cutoff", Value::Float(cutoff)),
+                    ("threshold", Value::Float(threshold)),
+                    ("h_mean", Value::Float(h_mean)),
+                    ("n", Value::Int(n as i64)),
+                    ("k", Value::Int(k as i64)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "LeverageResult",
+            fields,
+        ))
     }
 
     pub(super) fn cooks(
@@ -301,12 +365,12 @@ impl Interpreter {
         };
 
         let mse = ols.result.sigma * ols.result.sigma;
+
         let d = greeners::Diagnostics::cooks_distance(&ols.residuals, &ols.x, mse)
             .map_err(|e| self.rt_err(format!("cooks: {e}")))?;
 
         let n = d.len();
         let k = ols.x.ncols();
-        // configurable cutoff; default 4/n (most common rule of thumb)
         let cutoff = match opt_map.get("threshold") {
             Some(Value::Float(v)) => *v,
             Some(Value::Int(v)) => *v as f64,
@@ -321,27 +385,61 @@ impl Interpreter {
             .collect();
 
         let sep = "─".repeat(46);
-        println!("\nCook's Distance  —  n={n}  k={k}  cutoff={cutoff:.4} (4/n)");
-        println!("{sep}");
+        let mut display = String::new();
+        display.push_str(&format!(
+            "\nCook's Distance  —  n={n}  k={k}  cutoff={cutoff:.4} (4/n)\n"
+        ));
+        display.push_str(&format!("{sep}\n"));
         if flagged.is_empty() {
-            println!("No influential observations above cutoff.");
+            display.push_str("No influential observations above cutoff.\n");
         } else {
-            println!("{:<8} {:>10}  ", "obs", "D_i");
-            println!("{sep}");
+            display.push_str(&format!("{:<8} {:>10}  \n", "obs", "D_i"));
+            display.push_str(&format!("{sep}\n"));
             for (i, di) in &flagged {
                 let label = if *di > 1.0 {
                     "very influential"
                 } else {
                     "influential"
                 };
-                println!("{:<8} {:>10.4}  {}", i, di, label);
+                display.push_str(&format!("{:<8} {:>10.4}  {}\n", i, di, label));
             }
-            println!("{sep}");
-            println!("{} observation(s) with D_i > {:.4}", flagged.len(), cutoff);
+            display.push_str(&format!("{sep}\n"));
+            display.push_str(&format!(
+                "{} observation(s) with D_i > {:.4}\n",
+                flagged.len(),
+                cutoff
+            ));
         }
-        println!();
+        display.push('\n');
 
-        Ok(Value::Nil)
+        let obs: Vec<Value> = flagged.iter().map(|(i, _)| Value::Int(*i as i64)).collect();
+        let d_values: Vec<Value> = flagged.iter().map(|(_, di)| Value::Float(*di)).collect();
+        let flagged_dict = model_expansion::fit_dict(&[
+            ("obs", Value::List(Arc::new(obs))),
+            ("D_i", Value::List(Arc::new(d_values))),
+        ]);
+        let summary = format!("Cook's Distance(n={}, k={}), cutoff={:.4}", n, k, cutoff);
+        let fields: Vec<(String, Value)> = vec![
+            (
+                "cooks_distance".into(),
+                model_expansion::array1_to_series("cooks_distance", &d),
+            ),
+            ("flagged".into(), flagged_dict),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("cutoff", Value::Float(cutoff)),
+                    ("n", Value::Int(n as i64)),
+                    ("k", Value::Int(k as i64)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "CooksDistanceResult",
+            fields,
+        ))
     }
 
     pub(super) fn vif(
@@ -833,27 +931,28 @@ impl Interpreter {
             .map_err(|e| self.rt_err(format!("archtest: {e}")))?;
 
         let sep = "─".repeat(54);
-        println!(
-            "\nARCH LM Test (Engle 1982)  —  lags = {}  n = {}",
+        let mut display = String::new();
+        display.push_str(&format!(
+            "\nARCH LM Test (Engle 1982)  —  lags = {}  n = {}\n",
             res.lags, res.n_obs
-        );
-        println!("{sep}");
-        println!("H₀: sem efeitos ARCH de ordem {}", res.lags);
-        println!("{sep}");
-        println!(
-            "{:<22} {:>10} {:>10} {:>8}",
+        ));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!("H₀: sem efeitos ARCH de ordem {}\n", res.lags));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!(
+            "{:<22} {:>10} {:>10} {:>8}\n",
             "Test", "Statistic", "p-value", ""
-        );
-        println!("{sep}");
-        println!(
-            "{:<22} {:>10.4} {:>10.4} {:>8}",
+        ));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!(
+            "{:<22} {:>10.4} {:>10.4} {:>8}\n",
             format!("LM  ~ χ²({})", res.lags),
             res.lm_stat,
             res.lm_pvalue,
             Self::sig_stars(res.lm_pvalue)
-        );
-        println!(
-            "{:<22} {:>10.4} {:>10.4} {:>8}",
+        ));
+        display.push_str(&format!(
+            "{:<22} {:>10.4} {:>10.4} {:>8}\n",
             format!(
                 "F   ~ F({},{})",
                 res.lags,
@@ -862,15 +961,36 @@ impl Interpreter {
             res.f_stat,
             res.f_pvalue,
             Self::sig_stars(res.f_pvalue)
-        );
-        println!("{sep}");
-        println!(
-            "R² aux = {:.4}   (*** p<0.01  ** p<0.05  * p<0.10)",
+        ));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!(
+            "R² aux = {:.4}   (*** p<0.01  ** p<0.05  * p<0.10)\n",
             res.r_squared
-        );
-        println!();
+        ));
+        display.push('\n');
 
-        Ok(Value::Nil)
+        let summary = format!(
+            "ARCH LM(lags={}, n={}), LM={:.4}, p={:.4}",
+            res.lags, res.n_obs, res.lm_stat, res.lm_pvalue
+        );
+        let fields: Vec<(String, Value)> = vec![(
+            "fit".into(),
+            model_expansion::fit_dict(&[
+                ("lm_stat", Value::Float(res.lm_stat)),
+                ("lm_pvalue", Value::Float(res.lm_pvalue)),
+                ("f_stat", Value::Float(res.f_stat)),
+                ("f_pvalue", Value::Float(res.f_pvalue)),
+                ("lags", Value::Int(res.lags as i64)),
+                ("n_obs", Value::Int(res.n_obs as i64)),
+                ("r_squared", Value::Float(res.r_squared)),
+            ]),
+        )];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "ArchTestResult",
+            fields,
+        ))
     }
 
     pub(super) fn acf(
@@ -977,10 +1097,41 @@ impl Interpreter {
         };
         // Reconstruct y from residuals + fitted (x · params)
         let y = &ols.residuals + &ols.x.dot(&ols.result.params);
+
         let result = greeners::CUSUMTest::test(&y, &ols.x)
             .map_err(|e| self.rt_err(format!("cusumtest: {e}")))?;
-        print!("{result}");
-        Ok(Value::Nil)
+
+        let display = result.to_string();
+        let summary = format!("CUSUM(n={}), stable={}", result.n_obs, result.is_stable);
+        let fields: Vec<(String, Value)> = vec![
+            (
+                "cusum".into(),
+                model_expansion::array1_to_series("cusum", &result.cusum),
+            ),
+            (
+                "upper_bound".into(),
+                model_expansion::array1_to_series("upper_bound", &result.upper_bound),
+            ),
+            (
+                "lower_bound".into(),
+                model_expansion::array1_to_series("lower_bound", &result.lower_bound),
+            ),
+            ("is_stable".into(), Value::Bool(result.is_stable)),
+            ("n_obs".into(), Value::Int(result.n_obs as i64)),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("is_stable", Value::Bool(result.is_stable)),
+                    ("n_obs", Value::Int(result.n_obs as i64)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "CUSUMResult",
+            fields,
+        ))
     }
 
     pub(super) fn forecast_vol(
@@ -1012,6 +1163,7 @@ impl Interpreter {
         };
 
         let vol = model.forecast_volatility(steps);
+
         let model_label = match model.model_type {
             greeners::GarchModelType::GARCH => "GARCH",
             greeners::GarchModelType::EGARCH => "EGARCH",
@@ -1023,23 +1175,59 @@ impl Interpreter {
         };
 
         let sep = "─".repeat(40);
-        println!(
-            "\nForecast de Volatilidade — {model_label}({}, {}) [{dist_label}]  {steps} passos",
+        let mut display = String::new();
+        display.push_str(&format!(
+            "\nForecast de Volatilidade — {model_label}({}, {}) [{dist_label}]  {steps} passos\n",
             model.p, model.q
-        );
-        println!("{sep}");
-        println!(
-            "{:<6} {:>14} {:>14}",
+        ));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!(
+            "{:<6} {:>14} {:>14}\n",
             "h", "var. condicional", "volatilidade"
-        );
-        println!("{sep}");
+        ));
+        display.push_str(&format!("{sep}\n"));
         for h in 0..steps {
-            println!("{:<6} {:>14.6} {:>14.6}", h + 1, vol[h], vol[h].sqrt());
+            display.push_str(&format!(
+                "{:<6} {:>14.6} {:>14.6}\n",
+                h + 1,
+                vol[h],
+                vol[h].sqrt()
+            ));
         }
-        println!("{sep}");
-        println!();
+        display.push_str(&format!("{sep}\n"));
+        display.push('\n');
 
-        Ok(Value::Nil)
+        let variance = vol.clone();
+        let volatility = vol.mapv(|v| v.sqrt());
+        let summary = format!(
+            "Volatility Forecast({}({},{}), {}, steps={}), distribution={}",
+            model_label, model.p, model.q, dist_label, steps, dist_label
+        );
+        let fields: Vec<(String, Value)> = vec![
+            (
+                "variance".into(),
+                model_expansion::array1_to_series("variance", &variance),
+            ),
+            (
+                "volatility".into(),
+                model_expansion::array1_to_series("volatility", &volatility),
+            ),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("p", Value::Int(model.p as i64)),
+                    ("q", Value::Int(model.q as i64)),
+                    ("steps", Value::Int(steps as i64)),
+                    ("distribution", Value::Str(dist_label.to_string())),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "VolatilityForecast",
+            fields,
+        ))
     }
 
     fn sig_stars(p: f64) -> &'static str {
@@ -2206,31 +2394,54 @@ impl Interpreter {
             Some(Value::Int(v)) => *v as f64,
             _ => 0.5,
         };
+
         let (z, p) = greeners::ProportionTests::proportions_ztest_1samp(count, n, mu)
             .map_err(|e| self.rt_err(format!("proptest: {e}")))?;
         let p_hat = count as f64 / n as f64;
         let sep = "─".repeat(56);
-        println!("\nProportion Test (1 sample)");
-        println!("{sep}");
-        println!("  H₀: p = {mu:.4}");
-        println!("  p̂ = {p_hat:.4}  (count={count}, n={n})");
-        println!("{sep}");
-        println!(
-            "{:<26} {:>10} {:>10} {:>4}",
+        let mut display = String::new();
+        display.push_str("\nProportion Test (1 sample)\n");
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!("  H₀: p = {mu:.4}\n"));
+        display.push_str(&format!("  p̂ = {p_hat:.4}  (count={count}, n={n})\n"));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!(
+            "{:<26} {:>10} {:>10} {:>4}\n",
             "Test", "Statistic", "p-value", ""
-        );
-        println!("{sep}");
-        println!(
-            "{:<26} {:>10.4} {:>10.4} {:>4}",
+        ));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!(
+            "{:<26} {:>10.4} {:>10.4} {:>4}\n",
             "z",
             z,
             p,
             Self::sig_stars(p)
+        ));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str("(*** p<0.01  ** p<0.05  * p<0.10)\n");
+        display.push('\n');
+
+        let summary = format!(
+            "Proportion Test 1-sample(count={}, n={}, mu={:.4}), p_hat={:.4}, z={:.4}, p={:.4}",
+            count, n, mu, p_hat, z, p
         );
-        println!("{sep}");
-        println!("(*** p<0.01  ** p<0.05  * p<0.10)");
-        println!();
-        Ok(Value::Nil)
+        let fields = vec![(
+            "fit".into(),
+            model_expansion::fit_dict(&[
+                ("count", Value::Int(count as i64)),
+                ("n", Value::Int(n as i64)),
+                ("mu", Value::Float(mu)),
+                ("p_hat", Value::Float(p_hat)),
+                ("z", Value::Float(z)),
+                ("p_value", Value::Float(p)),
+            ]),
+        )];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "PropTestResult",
+            fields,
+        ))
     }
 
     pub(super) fn proptest2(
@@ -2258,33 +2469,58 @@ impl Interpreter {
         let n1 = to_usize(self.eval_expr(&args[1])?)?;
         let c2 = to_usize(self.eval_expr(&args[2])?)?;
         let n2 = to_usize(self.eval_expr(&args[3])?)?;
+
         let (z, p) = greeners::ProportionTests::proportions_ztest_2samp(c1, n1, c2, n2)
             .map_err(|e| self.rt_err(format!("proptest2: {e}")))?;
         let p1 = c1 as f64 / n1 as f64;
         let p2 = c2 as f64 / n2 as f64;
         let sep = "─".repeat(56);
-        println!("\nProportion Test (2 samples)");
-        println!("{sep}");
-        println!("  H₀: p₁ = p₂");
-        println!("  p̂₁ = {p1:.4}  (count={c1}, n={n1})");
-        println!("  p̂₂ = {p2:.4}  (count={c2}, n={n2})");
-        println!("{sep}");
-        println!(
-            "{:<26} {:>10} {:>10} {:>4}",
+        let mut display = String::new();
+        display.push_str("\nProportion Test (2 samples)\n");
+        display.push_str(&format!("{sep}\n"));
+        display.push_str("  H₀: p₁ = p₂\n");
+        display.push_str(&format!("  p̂₁ = {p1:.4}  (count={c1}, n={n1})\n"));
+        display.push_str(&format!("  p̂₂ = {p2:.4}  (count={c2}, n={n2})\n"));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!(
+            "{:<26} {:>10} {:>10} {:>4}\n",
             "Test", "Statistic", "p-value", ""
-        );
-        println!("{sep}");
-        println!(
-            "{:<26} {:>10.4} {:>10.4} {:>4}",
+        ));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!(
+            "{:<26} {:>10.4} {:>10.4} {:>4}\n",
             "z (bicaudal)",
             z,
             p,
             Self::sig_stars(p)
+        ));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str("(*** p<0.01  ** p<0.05  * p<0.10)\n");
+        display.push('\n');
+
+        let summary = format!(
+            "Proportion Test 2-sample(c1={}, n1={}, c2={}, n2={}), p1={:.4}, p2={:.4}, z={:.4}, p={:.4}",
+            c1, n1, c2, n2, p1, p2, z, p
         );
-        println!("{sep}");
-        println!("(*** p<0.01  ** p<0.05  * p<0.10)");
-        println!();
-        Ok(Value::Nil)
+        let fields = vec![(
+            "fit".into(),
+            model_expansion::fit_dict(&[
+                ("c1", Value::Int(c1 as i64)),
+                ("n1", Value::Int(n1 as i64)),
+                ("c2", Value::Int(c2 as i64)),
+                ("n2", Value::Int(n2 as i64)),
+                ("p1", Value::Float(p1)),
+                ("p2", Value::Float(p2)),
+                ("z", Value::Float(z)),
+                ("p_value", Value::Float(p)),
+            ]),
+        )];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "PropTest2Result",
+            fields,
+        ))
     }
 
     pub(super) fn propci(
@@ -2312,18 +2548,41 @@ impl Interpreter {
             Some(Value::Int(v)) => *v as f64,
             _ => 0.05,
         };
+
         let (lo, hi) = greeners::ProportionTests::proportion_confint(count, n, alpha)
             .map_err(|e| self.rt_err(format!("propci: {e}")))?;
         let p_hat = count as f64 / n as f64;
         let pct = (1.0 - alpha) * 100.0;
         let sep = "─".repeat(56);
-        println!("\nProportion CI — Wilson Score ({pct:.0}%)");
-        println!("{sep}");
-        println!("  p̂ = {p_hat:.4}  (count={count}, n={n})");
-        println!("  CI [{pct:.0}%]: [{lo:.4}, {hi:.4}]");
-        println!("{sep}");
-        println!();
-        Ok(Value::Nil)
+        let mut display = String::new();
+        display.push_str(&format!("\nProportion CI — Wilson Score ({pct:.0}%)\n"));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!("  p̂ = {p_hat:.4}  (count={count}, n={n})\n"));
+        display.push_str(&format!("  CI [{pct:.0}%]: [{lo:.4}, {hi:.4}]\n"));
+        display.push_str(&format!("{sep}\n"));
+        display.push('\n');
+
+        let summary = format!(
+            "Proportion CI(count={}, n={}, alpha={:.4}), p_hat={:.4}, CI=[{:.4}, {:.4}]",
+            count, n, alpha, p_hat, lo, hi
+        );
+        let fields = vec![(
+            "fit".into(),
+            model_expansion::fit_dict(&[
+                ("count", Value::Int(count as i64)),
+                ("n", Value::Int(n as i64)),
+                ("alpha", Value::Float(alpha)),
+                ("p_hat", Value::Float(p_hat)),
+                ("ci_low", Value::Float(lo)),
+                ("ci_high", Value::Float(hi)),
+            ]),
+        )];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "PropCIResult",
+            fields,
+        ))
     }
 
     pub(super) fn chisq2x2(
@@ -2347,38 +2606,69 @@ impl Interpreter {
         let b = to_usize(self.eval_expr(&args[1])?)?;
         let c = to_usize(self.eval_expr(&args[2])?)?;
         let d = to_usize(self.eval_expr(&args[3])?)?;
+
         let table = [[a, b], [c, d]];
         let (chi2, p) = greeners::ProportionTests::chi2_contingency(&table)
             .map_err(|e| self.rt_err(format!("chisq2x2: {e}")))?;
+
         let sep = "─".repeat(56);
-        println!("\nChi-Square Test — 2×2 Table");
-        println!("{sep}");
-        println!("       | Col 0 | Col 1 |  Total");
-        println!("  Row 0|  {:>5} |  {:>5} |  {:>5}", a, b, a + b);
-        println!("  Row 1|  {:>5} |  {:>5} |  {:>5}", c, d, c + d);
-        println!(
-            "  Total|  {:>5} |  {:>5} |  {:>5}",
+        let mut display = String::new();
+        display.push_str("\nChi-Square Test — 2×2 Table\n");
+        display.push_str(&format!("{sep}\n"));
+        display.push_str("       | Col 0 | Col 1 |  Total\n");
+        display.push_str(&format!("  Row 0|  {:>5} |  {:>5} |  {:>5}\n", a, b, a + b));
+        display.push_str(&format!("  Row 1|  {:>5} |  {:>5} |  {:>5}\n", c, d, c + d));
+        display.push_str(&format!(
+            "  Total|  {:>5} |  {:>5} |  {:>5}\n",
             a + c,
             b + d,
             a + b + c + d
-        );
-        println!("{sep}");
-        println!(
-            "{:<26} {:>10} {:>10} {:>4}",
+        ));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!(
+            "{:<26} {:>10} {:>10} {:>4}\n",
             "Test", "Statistic", "p-value", ""
-        );
-        println!("{sep}");
-        println!(
-            "{:<26} {:>10.4} {:>10.4} {:>4}",
+        ));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!(
+            "{:<26} {:>10.4} {:>10.4} {:>4}\n",
             "χ²(1)",
             chi2,
             p,
             Self::sig_stars(p)
-        );
-        println!("{sep}");
-        println!("(*** p<0.01  ** p<0.05  * p<0.10)");
-        println!();
-        Ok(Value::Nil)
+        ));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str("(*** p<0.01  ** p<0.05  * p<0.10)\n");
+        display.push('\n');
+
+        let mut table_arr = ndarray::Array2::<f64>::zeros((2, 2));
+        table_arr[[0, 0]] = a as f64;
+        table_arr[[0, 1]] = b as f64;
+        table_arr[[1, 0]] = c as f64;
+        table_arr[[1, 1]] = d as f64;
+        let summary = format!("Chi-Square 2x2, chi2={:.4}, p={:.4}", chi2, p);
+        let fields: Vec<(String, Value)> = vec![
+            (
+                "table".into(),
+                model_expansion::array2_to_dataframe_named(
+                    &table_arr,
+                    &["Col0".into(), "Col1".into()],
+                ),
+            ),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("chi2", Value::Float(chi2)),
+                    ("p_value", Value::Float(p)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "ChiSq2x2Result",
+            fields,
+        ))
     }
 
     pub(super) fn multipletests(
@@ -2437,17 +2727,20 @@ impl Interpreter {
             },
             _ => greeners::MultiTestMethod::Bonferroni,
         };
+
         let method_name = format!("{:?}", method);
         let (rejects, pvals_adj) = greeners::MultipleTests::multipletests(&pvals, alpha, method)
             .map_err(|e| self.rt_err(format!("multipletests: {e}")))?;
+
         let sep = "─".repeat(64);
-        println!("\nMultiple Tests — {method_name}  (α={alpha})");
-        println!("{sep}");
-        println!(
-            "{:>5}  {:>12}  {:>12}  {:>8}",
+        let mut display = String::new();
+        display.push_str(&format!("\nMultiple Tests — {method_name}  (α={alpha})\n"));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!(
+            "{:>5}  {:>12}  {:>12}  {:>8}\n",
             "#", "p original", "p ajustado", "Rejeitar?"
-        );
-        println!("{sep}");
+        ));
+        display.push_str(&format!("{sep}\n"));
         for (i, ((p_orig, p_adj), rej)) in pvals
             .iter()
             .zip(pvals_adj.iter())
@@ -2455,11 +2748,48 @@ impl Interpreter {
             .enumerate()
         {
             let mark = if *rej { "  YES ***" } else { "  no" };
-            println!("{:>5}  {:>12.6}  {:>12.6}  {}", i + 1, p_orig, p_adj, mark);
+            display.push_str(&format!(
+                "{:>5}  {:>12.6}  {:>12.6}  {}\n",
+                i + 1,
+                p_orig,
+                p_adj,
+                mark
+            ));
         }
-        println!("{sep}");
-        println!();
-        Ok(Value::Nil)
+        display.push_str(&format!("{sep}\n"));
+        display.push('\n');
+
+        let reject_list: Vec<Value> = rejects.iter().map(|&b| Value::Bool(b)).collect();
+        let summary = format!(
+            "Multiple Tests(method={}, alpha={:.4}, n={})",
+            method_name,
+            alpha,
+            pvals.len()
+        );
+        let fields: Vec<(String, Value)> = vec![
+            (
+                "p_values".into(),
+                model_expansion::series_from_vec("p_values", &pvals),
+            ),
+            (
+                "adjusted_p_values".into(),
+                model_expansion::series_from_vec("adjusted_p_values", &pvals_adj),
+            ),
+            ("reject".into(), Value::List(Arc::new(reject_list))),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("method", Value::Str(method_name)),
+                    ("alpha", Value::Float(alpha)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "MultipleTestsResult",
+            fields,
+        ))
     }
 
     pub(super) fn ucm(
@@ -3194,24 +3524,56 @@ impl Interpreter {
             }
         };
         let data = get_col_f64(&df, &var_name)?;
+
         let r = greeners::Diagnostics::anderson_darling(&ndarray::Array1::from(data))
             .map_err(|e| self.rt_err(format!("adtest: {e}")))?;
+
         let sep = "─".repeat(56);
-        println!("\nAnderson-Darling Test (normality)");
-        println!("{sep}");
-        println!("  H₀: data come from normal distribution");
-        println!("  A² (adjusted) = {:.4}  (n={})", r.statistic, r.n_obs);
-        println!("{sep}");
-        println!("{:<12} {:>10}", "α", "A²*_critical");
-        println!("{sep}");
+        let mut display = String::new();
+        display.push_str("\nAnderson-Darling Test (normality)\n");
+        display.push_str(&format!("{sep}\n"));
+        display.push_str("  H₀: data come from normal distribution\n");
+        display.push_str(&format!(
+            "  A² (adjusted) = {:.4}  (n={})\n",
+            r.statistic, r.n_obs
+        ));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!("{:<12} {:>10}\n", "α", "A²*_critical"));
+        display.push_str(&format!("{sep}\n"));
         for (&sig, &cv) in r.significance_levels.iter().zip(r.critical_values.iter()) {
             let mark = if r.statistic > cv { " ← REJECT" } else { "" };
-            println!("{:<12.3} {:>10.3}{mark}", sig, cv);
+            display.push_str(&format!("{:<12.3} {:>10.3}{mark}\n", sig, cv));
         }
-        println!("{sep}");
-        println!("(Reject H₀ when A²* > critical value)");
-        println!();
-        Ok(Value::Nil)
+        display.push_str(&format!("{sep}\n"));
+        display.push_str("(Reject H₀ when A²* > critical value)\n");
+        display.push('\n');
+
+        let critical_values: Vec<f64> = r.critical_values.to_vec();
+        let significance_levels: Vec<f64> = r.significance_levels.to_vec();
+        let summary = format!("Anderson-Darling(n={}), A2={:.4}", r.n_obs, r.statistic);
+        let fields: Vec<(String, Value)> = vec![
+            (
+                "critical_values".into(),
+                model_expansion::series_from_vec("critical_values", &critical_values),
+            ),
+            (
+                "significance_levels".into(),
+                model_expansion::series_from_vec("significance_levels", &significance_levels),
+            ),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("statistic", Value::Float(r.statistic)),
+                    ("n_obs", Value::Int(r.n_obs as i64)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "AndersonDarlingResult",
+            fields,
+        ))
     }
 
     pub(super) fn lilliefors(
@@ -3245,6 +3607,7 @@ impl Interpreter {
             }
         };
         let data = get_col_f64(&df, &var_name)?;
+
         let (stat, p) = greeners::Diagnostics::lilliefors(&ndarray::Array1::from(data))
             .map_err(|e| self.rt_err(format!("lilliefors: {e}")))?;
         let sig = if p < 0.01 {
@@ -3257,23 +3620,38 @@ impl Interpreter {
             ""
         };
         let sep = "─".repeat(56);
-        println!("\nLilliefors Test (normality — KS with estimated parameters)");
-        println!("{sep}");
-        println!("  H₀: data come from normal distribution");
-        println!("{sep}");
-        println!(
-            "{:<26} {:>10} {:>10} {:>4}",
+        let mut display = String::new();
+        display.push_str("\nLilliefors Test (normality — KS with estimated parameters)\n");
+        display.push_str(&format!("{sep}\n"));
+        display.push_str("  H₀: data come from normal distribution\n");
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!(
+            "{:<26} {:>10} {:>10} {:>4}\n",
             "Test", "Statistic", "p-value", ""
-        );
-        println!("{sep}");
-        println!(
-            "{:<26} {:>10.4} {:>10.4} {:>4}",
+        ));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!(
+            "{:<26} {:>10.4} {:>10.4} {:>4}\n",
             "KS (Lilliefors)", stat, p, sig
-        );
-        println!("{sep}");
-        println!("(*** p<0.01  ** p<0.05  * p<0.10)");
-        println!();
-        Ok(Value::Nil)
+        ));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str("(*** p<0.01  ** p<0.05  * p<0.10)\n");
+        display.push('\n');
+
+        let summary = format!("Lilliefors(statistic={:.4}, p={:.4})", stat, p);
+        let fields = vec![(
+            "fit".into(),
+            model_expansion::fit_dict(&[
+                ("statistic", Value::Float(stat)),
+                ("p_value", Value::Float(p)),
+            ]),
+        )];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "LillieforsResult",
+            fields,
+        ))
     }
 
     pub(super) fn omnibus(
@@ -3294,6 +3672,7 @@ impl Interpreter {
                 ))
             }
         };
+
         let (k2, p) = greeners::Diagnostics::omnibus(&ndarray::Array1::from(resids))
             .map_err(|e| self.rt_err(format!("omnibus: {e}")))?;
         let sig = if p < 0.01 {
@@ -3306,21 +3685,39 @@ impl Interpreter {
             ""
         };
         let sep = "─".repeat(56);
-        println!("\nD'Agostino-Pearson Omnibus Test (normality of residuals)");
-        println!("{sep}");
-        println!("  H₀: residuals are normally distributed");
-        println!("  (combines skewness and kurtosis via K² ~ χ²(2))");
-        println!("{sep}");
-        println!(
-            "{:<26} {:>10} {:>10} {:>4}",
+        let mut display = String::new();
+        display.push_str("\nD'Agostino-Pearson Omnibus Test (normality of residuals)\n");
+        display.push_str(&format!("{sep}\n"));
+        display.push_str("  H₀: residuals are normally distributed\n");
+        display.push_str("  (combines skewness and kurtosis via K² ~ χ²(2))\n");
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!(
+            "{:<26} {:>10} {:>10} {:>4}\n",
             "Test", "Statistic", "p-value", ""
-        );
-        println!("{sep}");
-        println!("{:<26} {:>10.4} {:>10.4} {:>4}", "K² ~ χ²(2)", k2, p, sig);
-        println!("{sep}");
-        println!("(*** p<0.01  ** p<0.05  * p<0.10)");
-        println!();
-        Ok(Value::Nil)
+        ));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!(
+            "{:<26} {:>10.4} {:>10.4} {:>4}\n",
+            "K² ~ χ²(2)", k2, p, sig
+        ));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str("(*** p<0.01  ** p<0.05  * p<0.10)\n");
+        display.push('\n');
+
+        let summary = format!("Omnibus(K2={:.4}, p={:.4})", k2, p);
+        let fields = vec![(
+            "fit".into(),
+            model_expansion::fit_dict(&[
+                ("statistic", Value::Float(k2)),
+                ("p_value", Value::Float(p)),
+            ]),
+        )];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "OmnibusResult",
+            fields,
+        ))
     }
 
     pub(super) fn swilk(
@@ -3354,6 +3751,7 @@ impl Interpreter {
             }
         };
         let data = get_col_f64(&df, &var_name)?;
+
         let res = greeners::Diagnostics::shapiro_wilk(&ndarray::Array1::from(data))
             .map_err(|e| self.rt_err(format!("swilk: {e}")))?;
         let sig = if res.p_value < 0.01 {
@@ -3366,21 +3764,43 @@ impl Interpreter {
             ""
         };
         let sep = "─".repeat(56);
-        println!("\nShapiro-Wilk Test for Normality");
-        println!("{sep}");
-        println!("  H₀: {var_name} is normally distributed");
-        println!("  n = {}", res.n_obs);
-        println!("{sep}");
-        println!("{:<26} {:>10} {:>10} {:>4}", "Test", "W", "p-value", "");
-        println!("{sep}");
-        println!(
-            "{:<26} {:>10.6} {:>10.4} {:>4}",
+        let mut display = String::new();
+        display.push_str("\nShapiro-Wilk Test for Normality\n");
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!("  H₀: {var_name} is normally distributed\n"));
+        display.push_str(&format!("  n = {}\n", res.n_obs));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!(
+            "{:<26} {:>10} {:>10} {:>4}\n",
+            "Test", "W", "p-value", ""
+        ));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!(
+            "{:<26} {:>10.6} {:>10.4} {:>4}\n",
             "Shapiro-Wilk", res.w, res.p_value, sig
+        ));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str("(*** p<0.01  ** p<0.05  * p<0.10)\n");
+        display.push('\n');
+
+        let summary = format!(
+            "Shapiro-Wilk(n={}), W={:.6}, p={:.4}",
+            res.n_obs, res.w, res.p_value
         );
-        println!("{sep}");
-        println!("(*** p<0.01  ** p<0.05  * p<0.10)");
-        println!();
-        Ok(Value::Nil)
+        let fields = vec![(
+            "fit".into(),
+            model_expansion::fit_dict(&[
+                ("w", Value::Float(res.w)),
+                ("p_value", Value::Float(res.p_value)),
+                ("n_obs", Value::Int(res.n_obs as i64)),
+            ]),
+        )];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "ShapiroWilkResult",
+            fields,
+        ))
     }
 
     pub(super) fn sfrancia(
@@ -3414,6 +3834,7 @@ impl Interpreter {
             }
         };
         let data = get_col_f64(&df, &var_name)?;
+
         let res = greeners::Diagnostics::shapiro_francia(&ndarray::Array1::from(data))
             .map_err(|e| self.rt_err(format!("sfrancia: {e}")))?;
         let sig = if res.p_value < 0.01 {
@@ -3426,21 +3847,43 @@ impl Interpreter {
             ""
         };
         let sep = "─".repeat(56);
-        println!("\nShapiro-Francia Test for Normality");
-        println!("{sep}");
-        println!("  H₀: {var_name} is normally distributed");
-        println!("  n = {}", res.n_obs);
-        println!("{sep}");
-        println!("{:<26} {:>10} {:>10} {:>4}", "Test", "W'", "p-value", "");
-        println!("{sep}");
-        println!(
-            "{:<26} {:>10.6} {:>10.4} {:>4}",
+        let mut display = String::new();
+        display.push_str("\nShapiro-Francia Test for Normality\n");
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!("  H₀: {var_name} is normally distributed\n"));
+        display.push_str(&format!("  n = {}\n", res.n_obs));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!(
+            "{:<26} {:>10} {:>10} {:>4}\n",
+            "Test", "W'", "p-value", ""
+        ));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!(
+            "{:<26} {:>10.6} {:>10.4} {:>4}\n",
             "Shapiro-Francia", res.w_prime, res.p_value, sig
+        ));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str("(*** p<0.01  ** p<0.05  * p<0.10)\n");
+        display.push('\n');
+
+        let summary = format!(
+            "Shapiro-Francia(n={}), W'={:.6}, p={:.4}",
+            res.n_obs, res.w_prime, res.p_value
         );
-        println!("{sep}");
-        println!("(*** p<0.01  ** p<0.05  * p<0.10)");
-        println!();
-        Ok(Value::Nil)
+        let fields = vec![(
+            "fit".into(),
+            model_expansion::fit_dict(&[
+                ("w_prime", Value::Float(res.w_prime)),
+                ("p_value", Value::Float(res.p_value)),
+                ("n_obs", Value::Int(res.n_obs as i64)),
+            ]),
+        )];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "ShapiroFranciaResult",
+            fields,
+        ))
     }
 
     pub(super) fn sktest(
@@ -3475,23 +3918,30 @@ impl Interpreter {
         };
         let data = get_col_f64(&df, &var_name)?;
         let slice = data.as_slice().unwrap();
+
         let skew = greeners::MomentHelpers::skewness(slice);
         let kurt = greeners::MomentHelpers::kurtosis(slice);
         let (jb, jb_p) = greeners::MomentHelpers::jarque_bera(slice);
         let (k2, k2_p) = greeners::MomentHelpers::dagostino(slice);
         let n = data.len();
         let sep = "─".repeat(66);
-        println!("\nSkewness/Kurtosis Tests for Normality");
-        println!("{sep}");
-        println!("  Variable: {var_name}    n = {n}");
-        println!("{sep}");
-        println!(
-            "{:<16} {:>10} {:>10} {:>12} {:>8}",
+        let mut display = String::new();
+        display.push_str("\nSkewness/Kurtosis Tests for Normality\n");
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!("  Variable: {var_name}    n = {n}\n"));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!(
+            "{:<16} {:>10} {:>10} {:>12} {:>8}\n",
             "", "Statistic", "Value", "chi2(2)", "p-value"
-        );
-        println!("{sep}");
-        println!("{:<16} {:>10} {:>10.4}", "Skewness", "", skew);
-        println!("{:<16} {:>10} {:>10.4}", "Kurtosis", "", kurt + 3.0);
+        ));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!("{:<16} {:>10} {:>10.4}\n", "Skewness", "", skew));
+        display.push_str(&format!(
+            "{:<16} {:>10} {:>10.4}\n",
+            "Kurtosis",
+            "",
+            kurt + 3.0
+        ));
         let jb_sig = if jb_p < 0.01 {
             "***"
         } else if jb_p < 0.05 {
@@ -3510,20 +3960,46 @@ impl Interpreter {
         } else {
             ""
         };
-        println!("{sep}");
-        println!(
-            "{:<16} {:>10} {:>10} {:>12.4} {:>8.4} {jb_sig}",
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!(
+            "{:<16} {:>10} {:>10} {:>12.4} {:>8.4} {jb_sig}\n",
             "Jarque-Bera", "JB", "", jb, jb_p
-        );
-        println!(
-            "{:<16} {:>10} {:>10} {:>12.4} {:>8.4} {k2_sig}",
+        ));
+        display.push_str(&format!(
+            "{:<16} {:>10} {:>10} {:>12.4} {:>8.4} {k2_sig}\n",
             "D'Agostino", "K²", "", k2, k2_p
+        ));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str("(*** p<0.01  ** p<0.05  * p<0.10)\n");
+        display.push_str("(Kurtosis shown as excess+3, i.e. Normal=3)\n");
+        display.push('\n');
+
+        let summary = format!(
+            "Skewness/Kurtosis(n={}), skew={:.4}, kurt={:.4}, jb={:.4}, k2={:.4}",
+            n,
+            skew,
+            kurt + 3.0,
+            jb,
+            k2
         );
-        println!("{sep}");
-        println!("(*** p<0.01  ** p<0.05  * p<0.10)");
-        println!("(Kurtosis shown as excess+3, i.e. Normal=3)");
-        println!();
-        Ok(Value::Nil)
+        let fields = vec![(
+            "fit".into(),
+            model_expansion::fit_dict(&[
+                ("skewness", Value::Float(skew)),
+                ("kurtosis", Value::Float(kurt + 3.0)),
+                ("jb", Value::Float(jb)),
+                ("jb_p", Value::Float(jb_p)),
+                ("k2", Value::Float(k2)),
+                ("k2_p", Value::Float(k2_p)),
+                ("n", Value::Int(n as i64)),
+            ]),
+        )];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "SkewnessKurtosisResult",
+            fields,
+        ))
     }
 
     pub(super) fn harveycollier(
@@ -3547,6 +4023,7 @@ impl Interpreter {
         // reconstruct y = ŷ + residuals (OlsModel does not store y directly)
         let y_hat = ols.x.dot(&ols.result.params);
         let y_obs = y_hat + &ols.residuals;
+
         let (t, p) = greeners::Diagnostics::harvey_collier(&y_obs, &ols.x)
             .map_err(|e| self.rt_err(format!("harveycollier: {e}")))?;
         let sig = if p < 0.01 {
@@ -3559,20 +4036,35 @@ impl Interpreter {
             ""
         };
         let sep = "─".repeat(56);
-        println!("\nHarvey-Collier Test (linearity of specification)");
-        println!("{sep}");
-        println!("  H₀: functional specification is correct (linear)");
-        println!("  (tests whether mean of recursive residuals is zero)");
-        println!("{sep}");
-        println!(
-            "{:<26} {:>10} {:>10} {:>4}",
+        let mut display = String::new();
+        display.push_str("\nHarvey-Collier Test (linearity of specification)\n");
+        display.push_str(&format!("{sep}\n"));
+        display.push_str("  H₀: functional specification is correct (linear)\n");
+        display.push_str("  (tests whether mean of recursive residuals is zero)\n");
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!(
+            "{:<26} {:>10} {:>10} {:>4}\n",
             "Test", "Statistic", "p-value", ""
-        );
-        println!("{sep}");
-        println!("{:<26} {:>10.4} {:>10.4} {:>4}", "t (HC)", t, p, sig);
-        println!("{sep}");
-        println!("(*** p<0.01  ** p<0.05  * p<0.10)");
-        println!();
-        Ok(Value::Nil)
+        ));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!(
+            "{:<26} {:>10.4} {:>10.4} {:>4}\n",
+            "t (HC)", t, p, sig
+        ));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str("(*** p<0.01  ** p<0.05  * p<0.10)\n");
+        display.push('\n');
+
+        let summary = format!("Harvey-Collier(t={:.4}, p={:.4})", t, p);
+        let fields = vec![(
+            "fit".into(),
+            model_expansion::fit_dict(&[("t_stat", Value::Float(t)), ("p_value", Value::Float(p))]),
+        )];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "HarveyCollierResult",
+            fields,
+        ))
     }
 }
