@@ -1,5 +1,6 @@
 use super::super::helpers::*;
 use super::super::*;
+use crate::lang::dap::model_expansion;
 
 impl Interpreter {
     pub(super) fn ols(
@@ -378,7 +379,48 @@ impl Interpreter {
         );
         let result = greeners::MANOVA::fit(&y_mat, &groups)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        println!("{result}");
-        Ok(Value::Nil)
+
+        let summary = format!(
+            "MANOVA(groups={}, vars={}, n={}), Wilks={:.4}, Pillai={:.4}",
+            result.n_groups, result.n_vars, result.n_obs, result.wilks_lambda, result.pillai_trace
+        );
+        let test_names: Vec<String> = vec![
+            "Wilks' Lambda".into(),
+            "Pillai's trace".into(),
+            "Hotelling-Lawley".into(),
+            "Roy's largest root".into(),
+        ];
+        let fields = vec![
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("n_obs", Value::Int(result.n_obs as i64)),
+                    ("n_groups", Value::Int(result.n_groups as i64)),
+                    ("n_vars", Value::Int(result.n_vars as i64)),
+                    ("wilks_lambda", Value::Float(result.wilks_lambda)),
+                    ("pillai_trace", Value::Float(result.pillai_trace)),
+                    ("hotelling_lawley", Value::Float(result.hotelling_lawley)),
+                    ("roys_largest_root", Value::Float(result.roys_largest_root)),
+                ]),
+            ),
+            (
+                "test_names".into(),
+                Value::List(Arc::new(test_names.into_iter().map(Value::Str).collect())),
+            ),
+            (
+                "f_values".into(),
+                model_expansion::series_from_vec("f_values", &result.f_values[..]),
+            ),
+            (
+                "p_values".into(),
+                model_expansion::series_from_vec("p_values", &result.p_values[..]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            result.to_string(),
+            summary,
+            "ManovaResult",
+            fields,
+        ))
     }
 }

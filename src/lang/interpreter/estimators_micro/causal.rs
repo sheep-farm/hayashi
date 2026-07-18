@@ -1,5 +1,6 @@
 use super::super::helpers::*;
 use super::super::*;
+use crate::lang::dap::model_expansion;
 
 impl Interpreter {
     pub(super) fn rd(
@@ -487,8 +488,71 @@ impl Interpreter {
         let result =
             greeners::EventStudy::fit(&y, &event_time, &x_controls, reference, min_t, max_t, cov)
                 .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        print!("{result}");
-        Ok(Value::Nil)
+
+        let event_names: Vec<String> = result
+            .event_times
+            .iter()
+            .map(|&t| format!("t={t}"))
+            .collect();
+        let mut ols_names = vec!["const".to_string()];
+        ols_names.extend(event_names.clone());
+        ols_names.extend(control_vars.iter().cloned());
+
+        let event_coef = model_expansion::coef_dataframe(
+            &event_names,
+            &result.event_coefs,
+            &result.event_se,
+            &result.event_t,
+            &result.event_p,
+            None,
+            None,
+        );
+        let full_ols_coef = model_expansion::coef_dataframe(
+            &ols_names,
+            &result.ols.params,
+            &result.ols.std_errors,
+            &result.ols.t_values,
+            &result.ols.p_values,
+            None,
+            None,
+        );
+
+        let summary = format!(
+            "EventStudy(ref={}, k={}, n={})",
+            result.reference,
+            result.event_coefs.len(),
+            result.ols.n_obs
+        );
+        let fields: Vec<(String, Value)> = vec![
+            ("event_coefficients".into(), event_coef),
+            ("full_coefficients".into(), full_ols_coef),
+            (
+                "event_col_indices".into(),
+                model_expansion::int_series("event_col_indices", &result.event_col_indices),
+            ),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("reference", Value::Int(result.reference)),
+                    ("n_obs", Value::Int(result.ols.n_obs as i64)),
+                    ("r2", Value::Float(result.ols.r_squared)),
+                    ("adj_r2", Value::Float(result.ols.adj_r_squared)),
+                    ("sigma", Value::Float(result.ols.sigma)),
+                    ("df_resid", Value::Int(result.ols.df_resid as i64)),
+                    ("df_model", Value::Int(result.ols.df_model as i64)),
+                    ("f_statistic", Value::Float(result.ols.f_statistic)),
+                    ("log_likelihood", Value::Float(result.ols.log_likelihood)),
+                    ("aic", Value::Float(result.ols.aic)),
+                    ("bic", Value::Float(result.ols.bic)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            result.to_string(),
+            summary,
+            "EventStudyResult",
+            fields,
+        ))
     }
 
     pub(super) fn double_ml(
@@ -538,8 +602,52 @@ impl Interpreter {
         let result = greeners::DoubleML::fit_plr(&y_vec, &d_vec, &x_mat, n_folds, poly_degree)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        let theta_names = vec!["theta".to_string()];
+        let theta_params = ndarray::Array1::from(vec![result.theta]);
+        let theta_se = ndarray::Array1::from(vec![result.std_error]);
+        let theta_t = ndarray::Array1::from(vec![result.t_value]);
+        let theta_p = ndarray::Array1::from(vec![result.p_value]);
+        let coefficients = model_expansion::coef_dataframe(
+            &theta_names,
+            &theta_params,
+            &theta_se,
+            &theta_t,
+            &theta_p,
+            None,
+            None,
+        );
+
+        let summary = format!("DoubleML(theta={:.4}, n={})", result.theta, result.n_obs);
+        let fields: Vec<(String, Value)> = vec![
+            ("coefficients".into(), coefficients),
+            (
+                "y_tilde".into(),
+                model_expansion::array1_to_series("y_tilde", &result.y_tilde),
+            ),
+            (
+                "d_tilde".into(),
+                model_expansion::array1_to_series("d_tilde", &result.d_tilde),
+            ),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("n_obs", Value::Int(result.n_obs as i64)),
+                    ("n_folds", Value::Int(result.n_folds as i64)),
+                    ("theta", Value::Float(result.theta)),
+                    ("std_error", Value::Float(result.std_error)),
+                    ("t_value", Value::Float(result.t_value)),
+                    ("p_value", Value::Float(result.p_value)),
+                    ("ci_low", Value::Float(result.ci_low)),
+                    ("ci_high", Value::Float(result.ci_high)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            result.to_string(),
+            summary,
+            "DoubleMLResult",
+            fields,
+        ))
     }
 
     pub(super) fn synthdid(
@@ -709,8 +817,66 @@ impl Interpreter {
         let result = greeners::SyntheticDiD::fit(&y_mat, &treated_vec, treatment_period)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        let att_names = vec!["ATT".to_string()];
+        let att_params = ndarray::Array1::from(vec![result.att]);
+        let att_se = ndarray::Array1::from(vec![result.se]);
+        let att_t = ndarray::Array1::from(vec![result.t_stat]);
+        let att_p = ndarray::Array1::from(vec![result.p_value]);
+        let coefficients = model_expansion::coef_dataframe(
+            &att_names,
+            &att_params,
+            &att_se,
+            &att_t,
+            &att_p,
+            None,
+            None,
+        );
+        let gap = &result.treated_avg - &result.synthetic_control;
+
+        let summary = format!(
+            "SyntheticDiD(att={:.4}, n_pre={}, n_post={})",
+            result.att, result.n_pre, result.n_post
+        );
+        let fields: Vec<(String, Value)> = vec![
+            ("coefficients".into(), coefficients),
+            (
+                "unit_weights".into(),
+                model_expansion::array1_to_series("unit_weights", &result.unit_weights),
+            ),
+            (
+                "time_weights".into(),
+                model_expansion::array1_to_series("time_weights", &result.time_weights),
+            ),
+            (
+                "treated_avg".into(),
+                model_expansion::array1_to_series("treated_avg", &result.treated_avg),
+            ),
+            (
+                "synthetic_control".into(),
+                model_expansion::array1_to_series("synthetic_control", &result.synthetic_control),
+            ),
+            ("gap".into(), model_expansion::array1_to_series("gap", &gap)),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("att", Value::Float(result.att)),
+                    ("se", Value::Float(result.se)),
+                    ("t_stat", Value::Float(result.t_stat)),
+                    ("p_value", Value::Float(result.p_value)),
+                    ("n_treated", Value::Int(result.n_treated as i64)),
+                    ("n_control", Value::Int(result.n_control as i64)),
+                    ("n_pre", Value::Int(result.n_pre as i64)),
+                    ("n_post", Value::Int(result.n_post as i64)),
+                    ("n_periods", Value::Int(result.n_periods as i64)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            result.to_string(),
+            summary,
+            "SyntheticDidResult",
+            fields,
+        ))
     }
 
     pub(super) fn cuped(
@@ -775,8 +941,60 @@ impl Interpreter {
         let result = greeners::CUPED::fit(&y_arr, &x_arr, &treated_vec)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        let effect_names = vec!["treatment".to_string()];
+        let effect_params = ndarray::Array1::from(vec![result.treatment_effect]);
+        let effect_se = ndarray::Array1::from(vec![result.se]);
+        let effect_t = ndarray::Array1::from(vec![result.t_stat]);
+        let effect_p = ndarray::Array1::from(vec![result.p_value]);
+        let coefficients = model_expansion::coef_dataframe(
+            &effect_names,
+            &effect_params,
+            &effect_se,
+            &effect_t,
+            &effect_p,
+            None,
+            None,
+        );
+
+        let summary = format!(
+            "CUPED(effect={:.4}, n={})",
+            result.treatment_effect, result.n_obs
+        );
+        let fields: Vec<(String, Value)> = vec![
+            ("coefficients".into(), coefficients),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("treatment_effect", Value::Float(result.treatment_effect)),
+                    ("se", Value::Float(result.se)),
+                    ("t_stat", Value::Float(result.t_stat)),
+                    ("p_value", Value::Float(result.p_value)),
+                    ("ci_low", Value::Float(result.ci[0])),
+                    ("ci_high", Value::Float(result.ci[1])),
+                    ("theta", Value::Float(result.theta)),
+                    ("unadjusted_effect", Value::Float(result.unadjusted_effect)),
+                    ("unadjusted_se", Value::Float(result.unadjusted_se)),
+                    (
+                        "variance_reduction",
+                        Value::Float(result.variance_reduction),
+                    ),
+                    ("adjusted_variance", Value::Float(result.adjusted_variance)),
+                    (
+                        "unadjusted_variance",
+                        Value::Float(result.unadjusted_variance),
+                    ),
+                    ("n_treatment", Value::Int(result.n_treatment as i64)),
+                    ("n_control", Value::Int(result.n_control as i64)),
+                    ("n_obs", Value::Int(result.n_obs as i64)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            result.to_string(),
+            summary,
+            "CupedResult",
+            fields,
+        ))
     }
 
     pub(super) fn dml_crossfit(
@@ -847,8 +1065,47 @@ impl Interpreter {
         let result = greeners::DMLCrossfit::fit(&y_arr, &d_arr, &x_mat, n_folds)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        let theta_names = vec!["theta".to_string()];
+        let theta_params = ndarray::Array1::from(vec![result.theta]);
+        let theta_se = ndarray::Array1::from(vec![result.se]);
+        let theta_t = ndarray::Array1::from(vec![result.t_stat]);
+        let theta_p = ndarray::Array1::from(vec![result.p_value]);
+        let coefficients = model_expansion::coef_dataframe(
+            &theta_names,
+            &theta_params,
+            &theta_se,
+            &theta_t,
+            &theta_p,
+            None,
+            None,
+        );
+
+        let summary = format!("DMLCrossfit(theta={:.4}, n={})", result.theta, result.n_obs);
+        let fields: Vec<(String, Value)> = vec![
+            ("coefficients".into(), coefficients),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("theta", Value::Float(result.theta)),
+                    ("se", Value::Float(result.se)),
+                    ("t_stat", Value::Float(result.t_stat)),
+                    ("p_value", Value::Float(result.p_value)),
+                    ("ci_low", Value::Float(result.ci[0])),
+                    ("ci_high", Value::Float(result.ci[1])),
+                    ("n_folds", Value::Int(result.n_folds as i64)),
+                    ("g_mse", Value::Float(result.g_mse)),
+                    ("m_mse", Value::Float(result.m_mse)),
+                    ("n_obs", Value::Int(result.n_obs as i64)),
+                    ("n_confounders", Value::Int(result.n_confounders as i64)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            result.to_string(),
+            summary,
+            "DmlResult",
+            fields,
+        ))
     }
 
     pub(super) fn bsc(
@@ -934,8 +1191,69 @@ impl Interpreter {
         let result = greeners::BayesianSC::fit(&y_arr, &y_controls, treatment_period, prior)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        let tau_names = vec!["tau".to_string()];
+        let tau_params = ndarray::Array1::from(vec![result.tau]);
+        let tau_sd = ndarray::Array1::from(vec![result.tau_sd]);
+        let tau_t = ndarray::Array1::from(vec![result.t_stat]);
+        let tau_p = ndarray::Array1::from(vec![result.p_value]);
+        let coefficients = model_expansion::coef_dataframe(
+            &tau_names,
+            &tau_params,
+            &tau_sd,
+            &tau_t,
+            &tau_p,
+            None,
+            None,
+        );
+        let effect = &result.observed - &result.counterfactual;
+
+        let summary = format!(
+            "BayesianSC(tau={:.4}, n_controls={}, n_pre={})",
+            result.tau, result.n_controls, result.n_pre
+        );
+        let fields: Vec<(String, Value)> = vec![
+            ("coefficients".into(), coefficients),
+            (
+                "weights".into(),
+                model_expansion::array1_to_series("weights", &result.weights),
+            ),
+            (
+                "observed".into(),
+                model_expansion::array1_to_series("observed", &result.observed),
+            ),
+            (
+                "counterfactual".into(),
+                model_expansion::array1_to_series("counterfactual", &result.counterfactual),
+            ),
+            (
+                "effect".into(),
+                model_expansion::array1_to_series("effect", &effect),
+            ),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("tau", Value::Float(result.tau)),
+                    ("tau_sd", Value::Float(result.tau_sd)),
+                    ("sigma2", Value::Float(result.sigma2)),
+                    ("p_value", Value::Float(result.p_value)),
+                    ("t_stat", Value::Float(result.t_stat)),
+                    ("log_marginal", Value::Float(result.log_marginal)),
+                    ("cumulative_effect", Value::Float(result.cumulative_effect)),
+                    ("tau_ci_low", Value::Float(result.tau_ci[0])),
+                    ("tau_ci_high", Value::Float(result.tau_ci[1])),
+                    ("n_controls", Value::Int(result.n_controls as i64)),
+                    ("n_pre", Value::Int(result.n_pre as i64)),
+                    ("n_post", Value::Int(result.n_post as i64)),
+                    ("prior_precision", Value::Float(result.prior_precision)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            result.to_string(),
+            summary,
+            "BayesianScResult",
+            fields,
+        ))
     }
 
     pub(super) fn causal_impact(
@@ -1024,7 +1342,79 @@ impl Interpreter {
         )
         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        let mut coef_names = vec!["const".to_string()];
+        coef_names.extend(result.control_names.clone());
+        let control_coef = model_expansion::coefficients_df(&coef_names, &result.coefficients);
+
+        let avg_names = vec!["avg_effect".to_string()];
+        let avg_mean = ndarray::Array1::from(vec![result.avg_effect]);
+        let avg_sd = ndarray::Array1::from(vec![result.avg_effect_sd]);
+        let avg_ci_low = ndarray::Array1::from(vec![result.avg_effect_ci[0]]);
+        let avg_ci_high = ndarray::Array1::from(vec![result.avg_effect_ci[1]]);
+        let avg_p = ndarray::Array1::from(vec![result.p_effect_positive]);
+        let avg_effect_df = model_expansion::posterior_coef_df(
+            &avg_names,
+            &avg_mean,
+            &avg_sd,
+            &avg_ci_low,
+            &avg_ci_high,
+            &avg_p,
+        );
+
+        let summary = format!(
+            "CausalImpact(avg_effect={:.4}, n_pre={}, n_post={})",
+            result.avg_effect, result.n_pre, result.n_post
+        );
+        let fields: Vec<(String, Value)> = vec![
+            ("control_coefficients".into(), control_coef),
+            ("avg_effect".into(), avg_effect_df),
+            (
+                "y".into(),
+                model_expansion::array1_to_series("y", &result.y),
+            ),
+            (
+                "counterfactual".into(),
+                model_expansion::array1_to_series("counterfactual", &result.counterfactual),
+            ),
+            (
+                "counterfactual_sd".into(),
+                model_expansion::array1_to_series("counterfactual_sd", &result.counterfactual_sd),
+            ),
+            (
+                "pointwise_effect".into(),
+                model_expansion::array1_to_series("pointwise_effect", &result.pointwise_effect),
+            ),
+            (
+                "cumulative_effect".into(),
+                model_expansion::array1_to_series("cumulative_effect", &result.cumulative_effect),
+            ),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("avg_effect", Value::Float(result.avg_effect)),
+                    ("avg_effect_sd", Value::Float(result.avg_effect_sd)),
+                    ("p_effect_positive", Value::Float(result.p_effect_positive)),
+                    ("total_effect", Value::Float(result.total_effect)),
+                    ("total_effect_sd", Value::Float(result.total_effect_sd)),
+                    (
+                        "total_effect_ci_low",
+                        Value::Float(result.total_effect_ci[0]),
+                    ),
+                    (
+                        "total_effect_ci_high",
+                        Value::Float(result.total_effect_ci[1]),
+                    ),
+                    ("pre_r_squared", Value::Float(result.pre_r_squared)),
+                    ("n_pre", Value::Int(result.n_pre as i64)),
+                    ("n_post", Value::Int(result.n_post as i64)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            result.to_string(),
+            summary,
+            "CausalImpactResult",
+            fields,
+        ))
     }
 }

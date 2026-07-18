@@ -1,5 +1,6 @@
 use super::super::helpers::*;
 use super::super::*;
+use crate::lang::dap::model_expansion;
 
 impl Interpreter {
     pub(super) fn weak_iv(
@@ -633,8 +634,62 @@ impl Interpreter {
                 let mse = m.result.sigma * m.result.sigma;
                 let result = greeners::Influence::compute(&m.residuals, &m.x, mse)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                println!("{result}");
-                Ok(Value::Nil)
+
+                let summary = format!(
+                    "Influence(n={}, k={}, influential={})",
+                    result.n_obs,
+                    result.n_params,
+                    result.influential_dffits().len()
+                );
+                let coef_names = m.result.variable_names.as_deref().unwrap_or(&[]);
+                let influential = result.influential_dffits();
+                let fields = vec![
+                    (
+                        "dffits".into(),
+                        model_expansion::array1_to_series("dffits", &result.dffits),
+                    ),
+                    (
+                        "leverage".into(),
+                        model_expansion::array1_to_series("leverage", &result.leverage),
+                    ),
+                    (
+                        "student_resid".into(),
+                        model_expansion::array1_to_series("student_resid", &result.student_resid),
+                    ),
+                    (
+                        "student_resid_external".into(),
+                        model_expansion::array1_to_series(
+                            "student_resid_external",
+                            &result.student_resid_external,
+                        ),
+                    ),
+                    (
+                        "dfbetas".into(),
+                        model_expansion::array2_to_dataframe_named(&result.dfbetas, coef_names),
+                    ),
+                    (
+                        "fit".into(),
+                        model_expansion::fit_dict(&[
+                            ("n_obs", Value::Int(result.n_obs as i64)),
+                            ("n_params", Value::Int(result.n_params as i64)),
+                            (
+                                "dfbetas_threshold",
+                                Value::Float(result.dfbetas_threshold()),
+                            ),
+                            ("dffits_threshold", Value::Float(result.dffits_threshold())),
+                            (
+                                "influential_dffits",
+                                model_expansion::int_series("influential_dffits", &influential),
+                            ),
+                        ]),
+                    ),
+                ];
+                Ok(model_expansion::model_result(
+                    result.to_string(),
+                    summary,
+                    "InfluenceResult",
+                    fields,
+                ))
             }
             _ => Err(HayashiError::Runtime(
                 "influence(): only supported for OLS/WLS models — use: influence(m_ols, df)".into(),

@@ -1,5 +1,6 @@
 use super::super::helpers::*;
 use super::super::*;
+use crate::lang::dap::model_expansion;
 
 impl Interpreter {
     pub(super) fn nls_exp(
@@ -97,7 +98,52 @@ impl Interpreter {
         )
         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        let summary = format!(
+            "NLS(k={}, n={}), R2={:.4}, converged={}",
+            result.n_params, result.n_obs, result.r_squared, result.converged
+        );
+        let names = result.param_names.as_deref().unwrap_or(&[]);
+        let fields = vec![
+            (
+                "coefficients".into(),
+                model_expansion::coef_dataframe(
+                    names,
+                    &result.params,
+                    &result.std_errors,
+                    &result.t_values,
+                    &result.p_values,
+                    None,
+                    None,
+                ),
+            ),
+            (
+                "residuals".into(),
+                model_expansion::array1_to_series("residuals", &result.residuals),
+            ),
+            (
+                "fitted".into(),
+                model_expansion::array1_to_series("fitted", &result.fitted),
+            ),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("rss", Value::Float(result.rss)),
+                    ("r_squared", Value::Float(result.r_squared)),
+                    ("adj_r_squared", Value::Float(result.adj_r_squared)),
+                    ("sigma", Value::Float(result.sigma)),
+                    ("n_obs", Value::Int(result.n_obs as i64)),
+                    ("df_resid", Value::Int(result.df_resid as i64)),
+                    ("n_params", Value::Int(result.n_params as i64)),
+                    ("n_iter", Value::Int(result.n_iter as i64)),
+                    ("converged", Value::Bool(result.converged)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            result.to_string(),
+            summary,
+            "NlsResult",
+            fields,
+        ))
     }
 }

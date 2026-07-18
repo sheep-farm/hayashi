@@ -1,4 +1,5 @@
 use super::super::*;
+use crate::lang::dap::model_expansion;
 
 impl Interpreter {
     pub(super) fn spatial_panel_sar(
@@ -87,8 +88,55 @@ impl Interpreter {
         }
         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        let result_names = result.variable_names.clone().unwrap_or_default();
+        let summary = format!(
+            "SpatialPanel{}(k={}, n={}, N={}), R2={:.4}",
+            if result.model_type == "sar" {
+                "SAR"
+            } else {
+                "SEM"
+            },
+            result.beta.len(),
+            result.n_obs,
+            result.n_entities,
+            result.r_squared
+        );
+        let fields = vec![
+            (
+                "coefficients".into(),
+                model_expansion::coef_dataframe(
+                    &result_names,
+                    &result.beta,
+                    &result.std_errors,
+                    &result.t_values,
+                    &result.p_values,
+                    None,
+                    None,
+                ),
+            ),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("model_type", Value::Str(result.model_type.clone())),
+                    ("spatial_param", Value::Float(result.spatial_param)),
+                    ("spatial_se", Value::Float(result.spatial_se)),
+                    ("spatial_t", Value::Float(result.spatial_t)),
+                    ("spatial_p", Value::Float(result.spatial_p)),
+                    ("r_squared", Value::Float(result.r_squared)),
+                    ("log_likelihood", Value::Float(result.log_likelihood)),
+                    ("sigma", Value::Float(result.sigma)),
+                    ("n_obs", Value::Int(result.n_obs as i64)),
+                    ("n_entities", Value::Int(result.n_entities as i64)),
+                    ("n_periods", Value::Int(result.n_periods as i64)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            result.to_string(),
+            summary,
+            "SpatialPanelResult",
+            fields,
+        ))
     }
 
     pub(super) fn spatial_durbin(
@@ -176,8 +224,57 @@ impl Interpreter {
             greeners::SpatialDurbin::fit(&y_arr, &x_arr, &w_mat, &entity_ids, Some(var_names))
                 .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        let result_names = result.variable_names.clone();
+        let summary = format!(
+            "SpatialDurbin(k={}, n={}, N={}), rho={:.4}",
+            result.beta.len(),
+            result.n_obs,
+            result.n_entities,
+            result.rho
+        );
+        let fields = vec![
+            (
+                "direct_effects".into(),
+                model_expansion::coef_dataframe(
+                    &result_names,
+                    &result.beta,
+                    &result.beta_se,
+                    &result.beta_t,
+                    &result.beta_p,
+                    None,
+                    None,
+                ),
+            ),
+            (
+                "indirect_effects".into(),
+                model_expansion::coef_dataframe(
+                    &result_names,
+                    &result.theta,
+                    &result.theta_se,
+                    &result.theta_t,
+                    &result.theta_p,
+                    None,
+                    None,
+                ),
+            ),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("rho", Value::Float(result.rho)),
+                    ("r_squared", Value::Float(result.r_squared)),
+                    ("log_likelihood", Value::Float(result.log_likelihood)),
+                    ("n_obs", Value::Int(result.n_obs as i64)),
+                    ("n_entities", Value::Int(result.n_entities as i64)),
+                    ("n_regressors", Value::Int(result.n_regressors as i64)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            result.to_string(),
+            summary,
+            "SpatialDurbinResult",
+            fields,
+        ))
     }
 
     pub(super) fn spatial_durbin_error(
@@ -264,8 +361,57 @@ impl Interpreter {
             greeners::SpatialDurbinError::fit(&y_arr, &x_arr, &w_mat, &entity_ids, Some(var_names))
                 .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        let result_names = result.variable_names.clone();
+        let summary = format!(
+            "SpatialDurbinError(k={}, n={}, N={}), lambda={:.4}",
+            result.beta.len(),
+            result.n_obs,
+            result.n_entities,
+            result.lambda
+        );
+        let fields = vec![
+            (
+                "direct_effects".into(),
+                model_expansion::coef_dataframe(
+                    &result_names,
+                    &result.beta,
+                    &result.beta_se,
+                    &result.beta_t,
+                    &result.beta_p,
+                    None,
+                    None,
+                ),
+            ),
+            (
+                "indirect_effects".into(),
+                model_expansion::coef_dataframe(
+                    &result_names,
+                    &result.theta,
+                    &result.theta_se,
+                    &result.theta_t,
+                    &result.theta_p,
+                    None,
+                    None,
+                ),
+            ),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("lambda", Value::Float(result.lambda)),
+                    ("r_squared", Value::Float(result.r_squared)),
+                    ("log_likelihood", Value::Float(result.log_likelihood)),
+                    ("n_obs", Value::Int(result.n_obs as i64)),
+                    ("n_entities", Value::Int(result.n_entities as i64)),
+                    ("n_regressors", Value::Int(result.n_regressors as i64)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            result.to_string(),
+            summary,
+            "SpatialDurbinErrorResult",
+            fields,
+        ))
     }
 
     pub(super) fn spatial_sar(
@@ -334,7 +480,57 @@ impl Interpreter {
         }
         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        print!("{result}");
-        Ok(Value::Nil)
+        let mut coef_names = vec![if result.model_type == "sar" {
+            "rho".into()
+        } else {
+            "lambda".into()
+        }];
+        coef_names.extend(result.variable_names.clone().unwrap_or_default());
+
+        let summary = format!(
+            "Spatial{}(k={}, n={}), R2={:.4}",
+            if result.model_type == "sar" {
+                "SAR"
+            } else {
+                "SEM"
+            },
+            result.params.len(),
+            result.n_obs,
+            result.r_squared
+        );
+        let fields = vec![
+            (
+                "coefficients".into(),
+                model_expansion::coef_dataframe(
+                    &coef_names,
+                    &result.params,
+                    &result.std_errors,
+                    &result.t_values,
+                    &result.p_values,
+                    None,
+                    None,
+                ),
+            ),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("model_type", Value::Str(result.model_type.clone())),
+                    ("spatial_param", Value::Float(result.spatial_param)),
+                    ("spatial_se", Value::Float(result.spatial_se)),
+                    ("spatial_t", Value::Float(result.spatial_t)),
+                    ("spatial_p", Value::Float(result.spatial_p)),
+                    ("r_squared", Value::Float(result.r_squared)),
+                    ("log_likelihood", Value::Float(result.log_likelihood)),
+                    ("n_obs", Value::Int(result.n_obs as i64)),
+                    ("converged", Value::Bool(result.converged)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            result.to_string(),
+            summary,
+            "SpatialResult",
+            fields,
+        ))
     }
 }
