@@ -1,0 +1,35 @@
+id: ols_twoway_cluster_wagepan
+title: OLS wage equation with two-way clustered SEs on Wooldridge wagepan
+estimator_family: ols
+status: active
+dimension: numerical
+
+dataset:
+  name: wooldridge::wagepan
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-6
+    standard_errors: 1e-6
+
+hayashi_script: cases/ols_twoway_cluster_wagepan/hayashi/run.hay
+reference_scripts:
+  R: cases/ols_twoway_cluster_wagepan/reference/run.R
+  Python: cases/ols_twoway_cluster_wagepan/reference/run.py
+
+notes: OLS wage equation with two-way clustered standard errors by worker id and year.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened:
+    - 87
