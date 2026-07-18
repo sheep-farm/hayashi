@@ -696,12 +696,11 @@ impl Interpreter {
         let total = arr.len();
         let vals: Vec<f64> = arr.iter().copied().filter(|x| x.is_finite()).collect();
         let missing = total - vals.len();
-        let n = vals.len();
         println!(
             "  {:<20} type: float    obs: {}    missing: {}",
             name, total, missing
         );
-        if n == 0 {
+        if vals.is_empty() {
             return CodebookEntry {
                 name: name.to_string(),
                 type_name: "float",
@@ -748,9 +747,8 @@ impl Interpreter {
     fn codebook_int(&self, name: &str, arr: &ndarray::Array1<i64>) -> CodebookEntry {
         let total = arr.len();
         let vals: Vec<f64> = arr.iter().map(|&x| x as f64).collect();
-        let n = vals.len();
         println!("  {:<20} type: int      obs: {}    missing: 0", name, total);
-        if n == 0 {
+        if vals.is_empty() {
             return CodebookEntry {
                 name: name.to_string(),
                 type_name: "int",
