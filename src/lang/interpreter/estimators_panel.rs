@@ -1,5 +1,7 @@
 use super::helpers::*;
 use super::*;
+use crate::lang::dap::model_expansion;
+use indexmap::IndexMap;
 use std::sync::Arc;
 
 mod panel_diagnostics;
@@ -89,6 +91,18 @@ impl Interpreter {
         match opt_map.get("alpha") {
             Some(Value::Float(v)) => *v,
             _ => 0.05,
+        }
+    }
+
+    fn panel_sig_stars(p: f64) -> &'static str {
+        if p < 0.01 {
+            "***"
+        } else if p < 0.05 {
+            "**"
+        } else if p < 0.10 {
+            "*"
+        } else {
+            ""
         }
     }
 
@@ -183,31 +197,106 @@ impl Interpreter {
 
         let thick = "═".repeat(76);
         let thin = "─".repeat(76);
-        println!("\n{thick}");
-        println!(
-            "{:^76}",
+        let mut display = String::new();
+        display.push_str(&format!("\n{thick}\n"));
+        display.push_str(&format!(
+            "{:^76}\n",
             format!(" Bootstrap SE — {} (n={n_ok}/{n_boot}) ", estimator_name)
-        );
-        println!("{thin}");
-        println!(
-            "{:<18} {:>10} {:>10} {:>10} {:>12} {:>12}",
+        ));
+        display.push_str(&format!("{thin}\n"));
+        display.push_str(&format!(
+            "{:<18} {:>10} {:>10} {:>10} {:>12} {:>12}\n",
             "Variable", "β̂", "Orig. SE", "Boot SE", "CI lower", "CI upper"
-        );
-        println!("{thin}");
+        ));
+        display.push_str(&format!("{thin}\n"));
+
+        let mut variable_col = Vec::with_capacity(k);
+        let mut beta_col = Vec::with_capacity(k);
+        let mut orig_se_col = Vec::with_capacity(k);
+        let mut boot_se_col = Vec::with_capacity(k);
+        let mut ci_low_col = Vec::with_capacity(k);
+        let mut ci_high_col = Vec::with_capacity(k);
+
         for i in 0..k {
-            let vname = var_names.get(i).map(|s| s.as_str()).unwrap_or("?");
+            let vname = var_names.get(i).cloned().unwrap_or_else(|| format!("x{i}"));
             let orig_se = if i < full_se.len() {
                 full_se[i]
             } else {
                 f64::NAN
             };
-            println!(
-                "{:<18} {:>10.4} {:>10.4} {:>10.4} {:>12.4} {:>12.4}",
+            display.push_str(&format!(
+                "{:<18} {:>10.4} {:>10.4} {:>10.4} {:>12.4} {:>12.4}\n",
                 vname, full_params[i], orig_se, boot_se[i], ci_lo[i], ci_hi[i]
+            ));
+            variable_col.push(vname);
+            beta_col.push(full_params[i]);
+            orig_se_col.push(orig_se);
+            boot_se_col.push(boot_se[i]);
+            ci_low_col.push(ci_lo[i]);
+            ci_high_col.push(ci_hi[i]);
+        }
+        display.push_str(&format!("{thick}\n"));
+
+        let mut coef_columns = IndexMap::new();
+        coef_columns.insert(
+            "variable".into(),
+            greeners::Column::String(ndarray::Array1::from(variable_col)),
+        );
+        coef_columns.insert(
+            "beta".into(),
+            greeners::Column::Float(ndarray::Array1::from(beta_col)),
+        );
+        coef_columns.insert(
+            "orig_se".into(),
+            greeners::Column::Float(ndarray::Array1::from(orig_se_col)),
+        );
+        coef_columns.insert(
+            "boot_se".into(),
+            greeners::Column::Float(ndarray::Array1::from(boot_se_col)),
+        );
+        coef_columns.insert(
+            "ci_low".into(),
+            greeners::Column::Float(ndarray::Array1::from(ci_low_col)),
+        );
+        coef_columns.insert(
+            "ci_high".into(),
+            greeners::Column::Float(ndarray::Array1::from(ci_high_col)),
+        );
+        let coef_table = Value::DataFrame(Arc::new(
+            greeners::DataFrame::from_columns(coef_columns)
+                .unwrap_or_else(|_| greeners::DataFrame::from_columns(IndexMap::new()).unwrap()),
+        ));
+
+        let mut rep_columns: IndexMap<String, greeners::Column> = IndexMap::new();
+        for j in 0..k {
+            let col_name = var_names.get(j).cloned().unwrap_or_else(|| format!("x{j}"));
+            let col: Vec<f64> = (0..n_boot).map(|i| boot_coefs[[i, j]]).collect();
+            rep_columns.insert(
+                col_name,
+                greeners::Column::Float(ndarray::Array1::from(col)),
             );
         }
-        println!("{thick}");
-        Ok(Value::Nil)
+        let replicates = Value::DataFrame(Arc::new(
+            greeners::DataFrame::from_columns(rep_columns)
+                .unwrap_or_else(|_| greeners::DataFrame::from_columns(IndexMap::new()).unwrap()),
+        ));
+
+        let summary = format!("Bootstrap SE for {estimator_name} (n_ok={n_ok}/{n_boot})");
+        let fit = model_expansion::fit_dict(&[
+            ("estimator", Value::Str(estimator_name)),
+            ("n_boot", Value::Int(n_boot as i64)),
+            ("n_ok", Value::Int(n_ok as i64)),
+            ("alpha", Value::Float(alpha)),
+            ("coef_table", coef_table),
+            ("replicates", replicates),
+        ]);
+        let fields = vec![("fit".into(), fit)];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "BootstrapResult",
+            fields,
+        ))
     }
 
     fn bootstrap_pairs(&mut self, args: &[Expr], n_boot: usize, alpha: f64) -> Result<Value> {
@@ -225,32 +314,118 @@ impl Interpreter {
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                 let boot_se = greeners::Bootstrap::bootstrap_se(&boot_coefs);
                 let (ci_lo, ci_hi) = greeners::Bootstrap::percentile_ci(&boot_coefs, alpha);
-                let vnames = m.result.variable_names.as_deref().unwrap_or(&[]);
-                let k = m.result.params.len();
                 let thick = "═".repeat(76);
                 let thin = "─".repeat(76);
-                println!("\n{thick}");
-                println!("{:^76}", format!(" Bootstrap SE (n={n_boot}, pairs) "));
-                println!("{thin}");
-                println!(
-                    "{:<18} {:>10} {:>10} {:>10} {:>12} {:>12}",
+                let mut display = String::new();
+                display.push_str(&format!("\n{thick}\n"));
+                display.push_str(&format!(
+                    "{:^76}\n",
+                    format!(" Bootstrap SE (n={n_boot}, pairs) ")
+                ));
+                display.push_str(&format!("{thin}\n"));
+                display.push_str(&format!(
+                    "{:<18} {:>10} {:>10} {:>10} {:>12} {:>12}\n",
                     "Variable", "β̂", "Orig. SE", "Boot SE", "CI lower 95%", "CI upper 95%"
-                );
-                println!("{thin}");
+                ));
+                display.push_str(&format!("{thin}\n"));
+
+                let vnames_owned = m.result.variable_names.clone().unwrap_or_default();
+                let k = m.result.params.len();
+                let mut variable_col = Vec::with_capacity(k);
+                let mut beta_col = Vec::with_capacity(k);
+                let mut orig_se_col = Vec::with_capacity(k);
+                let mut boot_se_col = Vec::with_capacity(k);
+                let mut ci_low_col = Vec::with_capacity(k);
+                let mut ci_high_col = Vec::with_capacity(k);
+
                 for i in 0..k {
-                    let vname = vnames.get(i).map(|s| s.as_str()).unwrap_or("?");
-                    println!(
-                        "{:<18} {:>10.4} {:>10.4} {:>10.4} {:>12.4} {:>12.4}",
+                    let vname = vnames_owned
+                        .get(i)
+                        .cloned()
+                        .unwrap_or_else(|| format!("x{i}"));
+                    display.push_str(&format!(
+                        "{:<18} {:>10.4} {:>10.4} {:>10.4} {:>12.4} {:>12.4}\n",
                         vname,
                         m.result.params[i],
                         m.result.std_errors[i],
                         boot_se[i],
                         ci_lo[i],
                         ci_hi[i]
+                    ));
+                    variable_col.push(vname);
+                    beta_col.push(m.result.params[i]);
+                    orig_se_col.push(m.result.std_errors[i]);
+                    boot_se_col.push(boot_se[i]);
+                    ci_low_col.push(ci_lo[i]);
+                    ci_high_col.push(ci_hi[i]);
+                }
+                display.push_str(&format!("{thick}\n"));
+
+                let mut coef_columns = IndexMap::new();
+                coef_columns.insert(
+                    "variable".into(),
+                    greeners::Column::String(ndarray::Array1::from(variable_col)),
+                );
+                coef_columns.insert(
+                    "beta".into(),
+                    greeners::Column::Float(ndarray::Array1::from(beta_col)),
+                );
+                coef_columns.insert(
+                    "orig_se".into(),
+                    greeners::Column::Float(ndarray::Array1::from(orig_se_col)),
+                );
+                coef_columns.insert(
+                    "boot_se".into(),
+                    greeners::Column::Float(ndarray::Array1::from(boot_se_col)),
+                );
+                coef_columns.insert(
+                    "ci_low".into(),
+                    greeners::Column::Float(ndarray::Array1::from(ci_low_col)),
+                );
+                coef_columns.insert(
+                    "ci_high".into(),
+                    greeners::Column::Float(ndarray::Array1::from(ci_high_col)),
+                );
+                let coef_table = Value::DataFrame(Arc::new(
+                    greeners::DataFrame::from_columns(coef_columns).unwrap_or_else(|_| {
+                        greeners::DataFrame::from_columns(IndexMap::new()).unwrap()
+                    }),
+                ));
+
+                let mut rep_columns: IndexMap<String, greeners::Column> = IndexMap::new();
+                for j in 0..k {
+                    let col_name = vnames_owned
+                        .get(j)
+                        .cloned()
+                        .unwrap_or_else(|| format!("x{j}"));
+                    let col: Vec<f64> = (0..n_boot).map(|i| boot_coefs[[i, j]]).collect();
+                    rep_columns.insert(
+                        col_name,
+                        greeners::Column::Float(ndarray::Array1::from(col)),
                     );
                 }
-                println!("{thick}");
-                Ok(Value::Nil)
+                let replicates = Value::DataFrame(Arc::new(
+                    greeners::DataFrame::from_columns(rep_columns).unwrap_or_else(|_| {
+                        greeners::DataFrame::from_columns(IndexMap::new()).unwrap()
+                    }),
+                ));
+
+                let summary = format!("Bootstrap SE (pairs, n={n_boot})");
+                let fit = model_expansion::fit_dict(&[
+                    ("estimator", Value::Str("pairs".into())),
+                    ("n_boot", Value::Int(n_boot as i64)),
+                    ("n_ok", Value::Int(n_boot as i64)),
+                    ("alpha", Value::Float(alpha)),
+                    ("coef_table", coef_table),
+                    ("replicates", replicates),
+                ]);
+                let fields = vec![("fit".into(), fit)];
+                Ok(model_expansion::model_result(
+                    display,
+                    summary,
+                    "BootstrapResult",
+                    fields,
+                ))
             }
             _ => Err(HayashiError::Runtime(
                 "bootse(model) supports OLS. For others: bootstrap(estimator, formula, df, n=1000)"
@@ -490,38 +665,50 @@ impl Interpreter {
         let (f, p, df1, df2) =
             greeners::SpecificationTests::goldfeld_quandt_test(&ols.residuals, split)
                 .map_err(|e| self.rt_err(format!("gqtest: {e}")))?;
-        let sig = |p: f64| {
-            if p < 0.01 {
-                "***"
-            } else if p < 0.05 {
-                "**"
-            } else if p < 0.10 {
-                "*"
-            } else {
-                ""
-            }
-        };
+        let sig = Self::panel_sig_stars(p);
         let sep = "─".repeat(56);
-        println!("\nGoldfeld-Quandt Test  —  split = {split:.2}");
-        println!("{sep}");
-        println!("H₀: homoskedasticity (σ²₁ = σ²₂)");
-        println!("{sep}");
-        println!(
-            "{:<26} {:>10} {:>10} {:>4}",
+        let conclusion = if p < 0.05 {
+            "Reject H0 — evidence of heteroskedasticity"
+        } else {
+            "Do not reject H0 — no evidence of heteroskedasticity"
+        };
+        let mut display = String::new();
+        display.push_str(&format!("\nGoldfeld-Quandt Test  —  split = {split:.2}\n"));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str("H₀: homoskedasticity (σ²₁ = σ²₂)\n");
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!(
+            "{:<26} {:>10} {:>10} {:>4}\n",
             "Test", "Statistic", "p-value", ""
-        );
-        println!("{sep}");
-        println!(
-            "{:<26} {:>10.4} {:>10.4} {:>4}",
+        ));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!(
+            "{:<26} {:>10.4} {:>10.4} {:>4}\n",
             format!("F ~ F({df1},{df2})"),
             f,
             p,
-            sig(p)
-        );
-        println!("{sep}");
-        println!("(*** p<0.01  ** p<0.05  * p<0.10)");
-        println!();
-        Ok(Value::Nil)
+            sig
+        ));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str("(*** p<0.01  ** p<0.05  * p<0.10)\n\n");
+
+        let summary = format!("Goldfeld-Quandt F({df1},{df2})={:.4}, p={:.4}", f, p);
+        let fit = model_expansion::fit_dict(&[
+            ("test", Value::Str("Goldfeld-Quandt".into())),
+            ("f_stat", Value::Float(f)),
+            ("p_value", Value::Float(p)),
+            ("df1", Value::Int(df1 as i64)),
+            ("df2", Value::Int(df2 as i64)),
+            ("split", Value::Float(split)),
+            ("conclusion", Value::Str(conclusion.into())),
+        ]);
+        let fields = vec![("fit".into(), fit)];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "GoldfeldQuandtResult",
+            fields,
+        ))
     }
 
     pub(super) fn bphet(
@@ -545,38 +732,48 @@ impl Interpreter {
         let (lm, p) = greeners::Diagnostics::breusch_pagan(&ols.residuals, &ols.x)
             .map_err(|e| self.rt_err(format!("bphet: {e}")))?;
         let k = ols.x.ncols().saturating_sub(1);
-        let sig = |p: f64| {
-            if p < 0.01 {
-                "***"
-            } else if p < 0.05 {
-                "**"
-            } else if p < 0.10 {
-                "*"
-            } else {
-                ""
-            }
-        };
+        let sig = Self::panel_sig_stars(p);
         let sep = "─".repeat(56);
-        println!("\nBreusch-Pagan Heteroskedasticity Test");
-        println!("{sep}");
-        println!("H₀: homoskedasticity (constant variance)");
-        println!("{sep}");
-        println!(
-            "{:<26} {:>10} {:>10} {:>4}",
+        let conclusion = if p < 0.05 {
+            "Reject H0 — evidence of heteroskedasticity"
+        } else {
+            "Do not reject H0 — no evidence of heteroskedasticity"
+        };
+        let mut display = String::new();
+        display.push_str("\nBreusch-Pagan Heteroskedasticity Test\n");
+        display.push_str(&format!("{sep}\n"));
+        display.push_str("H₀: homoskedasticity (constant variance)\n");
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!(
+            "{:<26} {:>10} {:>10} {:>4}\n",
             "Test", "Statistic", "p-value", ""
-        );
-        println!("{sep}");
-        println!(
-            "{:<26} {:>10.4} {:>10.4} {:>4}",
+        ));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str(&format!(
+            "{:<26} {:>10.4} {:>10.4} {:>4}\n",
             format!("LM ~ χ²({k})"),
             lm,
             p,
-            sig(p)
-        );
-        println!("{sep}");
-        println!("(*** p<0.01  ** p<0.05  * p<0.10)");
-        println!();
-        Ok(Value::Nil)
+            sig
+        ));
+        display.push_str(&format!("{sep}\n"));
+        display.push_str("(*** p<0.01  ** p<0.05  * p<0.10)\n\n");
+
+        let summary = format!("Breusch-Pagan LM={:.4}, p={:.4}, df={}", lm, p, k);
+        let fit = model_expansion::fit_dict(&[
+            ("test", Value::Str("Breusch-Pagan".into())),
+            ("lm_stat", Value::Float(lm)),
+            ("p_value", Value::Float(p)),
+            ("df", Value::Int(k as i64)),
+            ("conclusion", Value::Str(conclusion.into())),
+        ]);
+        let fields = vec![("fit".into(), fit)];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "BreuschPaganResult",
+            fields,
+        ))
     }
 
     pub(super) fn bptest(
@@ -640,26 +837,45 @@ impl Interpreter {
             .collect();
         let (lm, p) = greeners::PanelDiagnostics::breusch_pagan_lm(&resids, &entity_ids)
             .map_err(HayashiError::Runtime)?;
-        let sig = if p < 0.01 {
-            "***"
-        } else if p < 0.05 {
-            "**"
-        } else if p < 0.10 {
-            "*"
+        let n = resids.len();
+        let n_entities = id_map.len();
+        let t_bar = n as f64 / n_entities as f64;
+        let sig = Self::panel_sig_stars(p);
+        let conclusion = if p < 0.05 {
+            "Reject H0 → individual effects present (use RE or FE)"
         } else {
-            ""
+            "Do not reject H0 → pooled OLS adequate (no individual effects)"
         };
-        println!("\n{:=^62}", " Breusch-Pagan LM Test (RE) ");
-        println!(" H0: σ²_u = 0 — pooled OLS adequate");
-        println!("{:-^62}", "");
-        println!(" LM = {lm:.4}    p-value = {p:.4}  {sig}");
-        if p < 0.05 {
-            println!(" Conclusion: reject H0 → use RE or FE");
-        } else {
-            println!(" Conclusion: do not reject H0 → pooled OLS adequate");
-        }
-        println!("{:=^62}", "");
-        Ok(Value::Nil)
+
+        let mut display = String::new();
+        display.push_str(&format!("\n{:=^62}\n", " Breusch-Pagan LM Test (RE) "));
+        display.push_str(" H0: σ²_u = 0 — pooled OLS adequate\n");
+        display.push_str(&format!("{:-^62}\n", ""));
+        display.push_str(&format!(" LM = {lm:.4}    p-value = {p:.4}  {sig}\n"));
+        display.push_str(&format!(
+            "   n = {}   N = {}   T̄ ≈ {:.1}\n",
+            n, n_entities, t_bar
+        ));
+        display.push_str(&format!(" Conclusion: {conclusion}\n"));
+        display.push_str(&format!("{:=^62}\n", ""));
+
+        let summary = format!("Breusch-Pagan LM test: LM={:.4}, p={:.4}", lm, p);
+        let fit = model_expansion::fit_dict(&[
+            ("test", Value::Str("Breusch-Pagan LM (RE)".into())),
+            ("lm_stat", Value::Float(lm)),
+            ("p_value", Value::Float(p)),
+            ("n", Value::Int(n as i64)),
+            ("n_entities", Value::Int(n_entities as i64)),
+            ("t_bar", Value::Float(t_bar)),
+            ("conclusion", Value::Str(conclusion.into())),
+        ]);
+        let fields = vec![("fit".into(), fit)];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "BreuschPaganResult",
+            fields,
+        ))
     }
 
     pub(super) fn wooldridge(
@@ -812,20 +1028,31 @@ impl Interpreter {
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
         let min_aic = rows.first().map(|r| r.aic).unwrap_or(0.0);
-        let _min_bic = rows
+        let delta_aics: Vec<f64> = rows.iter().map(|r| r.aic - min_aic).collect();
+        let rel: Vec<f64> = delta_aics.iter().map(|d| (-d / 2.0).exp()).collect();
+        let sum_rel: f64 = rel.iter().sum();
+        let weights: Vec<f64> = rel
             .iter()
-            .map(|r| r.bic)
-            .min_by(nan_last_cmp)
-            .unwrap_or(0.0);
-        println!("\n{:=^80}", " Information Criteria ");
-        println!(
-            "{:<20} {:>6} {:>6} {:>12} {:>12} {:>8} {:>8}",
+            .map(|w| if sum_rel > 0.0 { w / sum_rel } else { 0.0 })
+            .collect();
+
+        let best_aic = rows.first().map(|r| r.label.clone()).unwrap_or_default();
+        let best_bic = rows
+            .iter()
+            .min_by(|a, b| a.bic.total_cmp(&b.bic))
+            .map(|r| r.label.clone())
+            .unwrap_or_default();
+
+        let mut display = String::new();
+        display.push_str(&format!("\n{:=^80}\n", " Information Criteria "));
+        display.push_str(&format!(
+            "{:<20} {:>6} {:>6} {:>12} {:>12} {:>8} {:>8}\n",
             "Model", "N", "k", "Log-Lik", "AIC", "ΔAIC", "BIC"
-        );
-        println!("{:-^80}", "");
+        ));
+        display.push_str(&format!("{:-^80}\n", ""));
         for row in &rows {
-            println!(
-                "{:<20} {:>6} {:>6} {:>12.4} {:>12.4} {:>8.4} {:>12.4}",
+            display.push_str(&format!(
+                "{:<20} {:>6} {:>6} {:>12.4} {:>12.4} {:>8.4} {:>12.4}\n",
                 row.label,
                 row.n,
                 row.k,
@@ -833,36 +1060,90 @@ impl Interpreter {
                 row.aic,
                 row.aic - min_aic,
                 row.bic
-            );
+            ));
         }
         if rows.len() > 1 {
-            println!("{:-^80}", "");
-            println!(
-                " Best AIC: {}   Best BIC: {}",
+            display.push_str(&format!("{:-^80}\n", ""));
+            display.push_str(&format!(
+                " Best AIC: {}   Best BIC: {}\n",
+                best_aic, best_bic
+            ));
+            display.push_str(&format!(
+                " Akaike weights: {}\n",
                 rows.iter()
-                    .min_by(|a, b| a.aic.total_cmp(&b.aic))
-                    .map(|r| r.label.as_str())
-                    .unwrap_or("—"),
-                rows.iter()
-                    .min_by(|a, b| a.bic.total_cmp(&b.bic))
-                    .map(|r| r.label.as_str())
-                    .unwrap_or("—")
-            );
-            // Akaike weights
-            let delta_aics: Vec<f64> = rows.iter().map(|r| r.aic - min_aic).collect();
-            let rel: Vec<f64> = delta_aics.iter().map(|d| (-d / 2.0).exp()).collect();
-            let sum_rel: f64 = rel.iter().sum();
-            println!(
-                " Akaike weights: {}",
-                rows.iter()
-                    .zip(rel.iter())
-                    .map(|(r, w)| format!("{}={:.3}", r.label, w / sum_rel))
+                    .zip(weights.iter())
+                    .map(|(r, w)| format!("{}={:.3}", r.label, w))
                     .collect::<Vec<_>>()
                     .join("  ")
-            );
+            ));
         }
-        println!("{:=^80}", "");
-        Ok(Value::Nil)
+        display.push_str(&format!("{:=^80}\n", ""));
+
+        let model_col: Vec<String> = rows.iter().map(|r| r.label.clone()).collect();
+        let n_col: Vec<i64> = rows.iter().map(|r| r.n as i64).collect();
+        let k_col: Vec<i64> = rows.iter().map(|r| r.k as i64).collect();
+        let ll_col: Vec<f64> = rows.iter().map(|r| r.ll).collect();
+        let aic_col: Vec<f64> = rows.iter().map(|r| r.aic).collect();
+        let delta_col: Vec<f64> = rows.iter().map(|r| r.aic - min_aic).collect();
+        let bic_col: Vec<f64> = rows.iter().map(|r| r.bic).collect();
+
+        let mut columns = IndexMap::new();
+        columns.insert(
+            "model".into(),
+            greeners::Column::String(ndarray::Array1::from(model_col)),
+        );
+        columns.insert(
+            "n".into(),
+            greeners::Column::Int(ndarray::Array1::from(n_col)),
+        );
+        columns.insert(
+            "k".into(),
+            greeners::Column::Int(ndarray::Array1::from(k_col)),
+        );
+        columns.insert(
+            "log_likelihood".into(),
+            greeners::Column::Float(ndarray::Array1::from(ll_col)),
+        );
+        columns.insert(
+            "aic".into(),
+            greeners::Column::Float(ndarray::Array1::from(aic_col)),
+        );
+        columns.insert(
+            "delta_aic".into(),
+            greeners::Column::Float(ndarray::Array1::from(delta_col)),
+        );
+        columns.insert(
+            "bic".into(),
+            greeners::Column::Float(ndarray::Array1::from(bic_col)),
+        );
+        columns.insert(
+            "akaike_weight".into(),
+            greeners::Column::Float(ndarray::Array1::from(weights)),
+        );
+        let comparison = Value::DataFrame(Arc::new(
+            greeners::DataFrame::from_columns(columns)
+                .unwrap_or_else(|_| greeners::DataFrame::from_columns(IndexMap::new()).unwrap()),
+        ));
+
+        let summary = format!(
+            "IC comparison ({} models); best AIC={}, best BIC={}",
+            rows.len(),
+            best_aic,
+            best_bic
+        );
+        let fit = model_expansion::fit_dict(&[
+            ("n_models", Value::Int(rows.len() as i64)),
+            ("best_aic", Value::Str(best_aic)),
+            ("best_bic", Value::Str(best_bic)),
+            ("comparison", comparison),
+        ]);
+        let fields = vec![("fit".into(), fit)];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "ICComparisonResult",
+            fields,
+        ))
     }
 
     pub(super) fn akaike_weights(
@@ -1296,15 +1577,7 @@ impl Interpreter {
         let (lm, p) = greeners::PanelDiagnostics::breusch_pagan_lm(&residuals, &entity_ids)
             .map_err(HayashiError::Runtime)?;
 
-        let sig = if p < 0.01 {
-            "***"
-        } else if p < 0.05 {
-            "**"
-        } else if p < 0.10 {
-            "*"
-        } else {
-            ""
-        };
+        let sig = Self::panel_sig_stars(p);
         let verdict = if p < 0.05 {
             "Reject H₀ → individual effects present (use FE or RE)"
         } else {
@@ -1313,35 +1586,44 @@ impl Interpreter {
 
         let thick = "═".repeat(62);
         let thin = "─".repeat(62);
-        let mut out = String::new();
-        out.push_str(&format!("\n{thick}\n"));
-        out.push_str(" Breusch-Pagan LM Test (individual effects)\n");
-        out.push_str(" H₀: σ²_u = 0  (no individual effects)\n");
-        out.push_str(&format!("{thick}\n"));
-        out.push_str("\n── Panel Data\n");
-        out.push_str(&format!(
+        let mut display = String::new();
+        display.push_str(&format!("\n{thick}\n"));
+        display.push_str(" Breusch-Pagan LM Test (individual effects)\n");
+        display.push_str(" H₀: σ²_u = 0  (no individual effects)\n");
+        display.push_str(&format!("{thick}\n"));
+        display.push_str("\n── Panel Data\n");
+        display.push_str(&format!(
             "   n = {}   N = {}   T̄ ≈ {:.1}\n",
             n, n_entities, t_bar
         ));
-        out.push_str("\n── Statistic\n");
-        out.push_str(&format!(
+        display.push_str("\n── Statistic\n");
+        display.push_str(&format!(
             "   LM ~ χ²(1) = {:.4}   p = {:.4}  {}\n",
             lm, p, sig
         ));
-        out.push_str("\n── Conclusion\n");
-        out.push_str(&format!("   {}\n", verdict));
-        out.push_str(&format!("\n{thin}\n"));
-        out.push_str("   *** p<0.01  ** p<0.05  * p<0.10\n");
-        out.push_str(&format!("{thick}\n"));
-        let mut fields = HashMap::new();
-        fields.insert("test".into(), Value::Str("Breusch-Pagan LM Test".into()));
-        fields.insert("lm_stat".into(), Value::Float(lm));
-        fields.insert("p_value".into(), Value::Float(p));
-        fields.insert("n".into(), Value::Int(n as i64));
-        fields.insert("n_entities".into(), Value::Int(n_entities as i64));
-        fields.insert("t_bar".into(), Value::Float(t_bar));
-        fields.insert("conclusion".into(), Value::Str(verdict.into()));
-        Ok(diag_with(out, fields))
+        display.push_str("\n── Conclusion\n");
+        display.push_str(&format!("   {}\n", verdict));
+        display.push_str(&format!("\n{thin}\n"));
+        display.push_str("   *** p<0.01  ** p<0.05  * p<0.10\n");
+        display.push_str(&format!("{thick}\n"));
+
+        let summary = format!("Breusch-Pagan LM test: LM={:.4}, p={:.4}", lm, p);
+        let fit = model_expansion::fit_dict(&[
+            ("test", Value::Str("Breusch-Pagan LM Test".into())),
+            ("lm_stat", Value::Float(lm)),
+            ("p_value", Value::Float(p)),
+            ("n", Value::Int(n as i64)),
+            ("n_entities", Value::Int(n_entities as i64)),
+            ("t_bar", Value::Float(t_bar)),
+            ("conclusion", Value::Str(verdict.into())),
+        ]);
+        let fields = vec![("fit".into(), fit)];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "BreuschPaganResult",
+            fields,
+        ))
     }
 
     pub(super) fn chamberlain(
@@ -2588,39 +2870,65 @@ impl Interpreter {
 
         match test_name.as_str() {
             // ── Specification tests ──────────────────────────────
-            "white" => match SpecificationTests::white_test(&ols.residuals, &ols.x) {
-                Ok((stat, p, df)) => {
-                    println!("White Test for Heteroskedasticity");
-                    println!("  LM statistic : {:.4}", stat);
-                    println!("  p-value      : {:.4}", p);
-                    println!("  df           : {}", df);
-                    let verdict = if p < 0.05 {
-                        "Reject H0 — evidence of heteroskedasticity"
-                    } else {
-                        "Fail to reject H0 — no evidence of heteroskedasticity"
-                    };
-                    println!("  Conclusion   : {}", verdict);
-                }
-                Err(e) => eprintln!("White test error: {e}"),
-            },
-            "bp" => match Diagnostics::breusch_pagan(&ols.residuals, &ols.x) {
-                Ok((stat, p)) => {
-                    println!("Breusch-Pagan Test for Heteroskedasticity");
-                    println!("  LM statistic : {:.4}", stat);
-                    println!("  p-value      : {:.4}", p);
-                    let verdict = if p < 0.05 {
-                        "Reject H0 — evidence of heteroskedasticity"
-                    } else {
-                        "Fail to reject H0 — no evidence of heteroskedasticity"
-                    };
-                    println!("  Conclusion   : {}", verdict);
-                }
-                Err(e) => eprintln!("Breusch-Pagan test error: {e}"),
-            },
+            "white" => {
+                let (stat, p, df) = SpecificationTests::white_test(&ols.residuals, &ols.x)
+                    .map_err(|e| HayashiError::Runtime(format!("white test: {e}")))?;
+                let verdict = if p < 0.05 {
+                    "Reject H0 — evidence of heteroskedasticity"
+                } else {
+                    "Fail to reject H0 — no evidence of heteroskedasticity"
+                };
+                let display = format!(
+                    "White Test for Heteroskedasticity\n  LM statistic : {:.4}\n  p-value      : {:.4}\n  df           : {}\n  Conclusion   : {}\n",
+                    stat, p, df, verdict
+                );
+                let summary = format!("White test LM={:.4}, p={:.4}, df={}", stat, p, df);
+                let fit = model_expansion::fit_dict(&[
+                    ("test", Value::Str("White".into())),
+                    ("statistic", Value::Float(stat)),
+                    ("p_value", Value::Float(p)),
+                    ("df", Value::Int(df as i64)),
+                    ("conclusion", Value::Str(verdict.into())),
+                ]);
+                let fields = vec![("fit".into(), fit)];
+                Ok(model_expansion::model_result(
+                    display,
+                    summary,
+                    "WhiteTestResult",
+                    fields,
+                ))
+            }
+            "bp" => {
+                let (stat, p) = Diagnostics::breusch_pagan(&ols.residuals, &ols.x)
+                    .map_err(|e| HayashiError::Runtime(format!("Breusch-Pagan test: {e}")))?;
+                let df = ols.x.ncols().saturating_sub(1) as i64;
+                let verdict = if p < 0.05 {
+                    "Reject H0 — evidence of heteroskedasticity"
+                } else {
+                    "Fail to reject H0 — no evidence of heteroskedasticity"
+                };
+                let display = format!(
+                    "Breusch-Pagan Test for Heteroskedasticity\n  LM statistic : {:.4}\n  p-value      : {:.4}\n  Conclusion   : {}\n",
+                    stat, p, verdict
+                );
+                let summary = format!("Breusch-Pagan test LM={:.4}, p={:.4}", stat, p);
+                let fit = model_expansion::fit_dict(&[
+                    ("test", Value::Str("Breusch-Pagan".into())),
+                    ("statistic", Value::Float(stat)),
+                    ("p_value", Value::Float(p)),
+                    ("df", Value::Int(df)),
+                    ("conclusion", Value::Str(verdict.into())),
+                ]);
+                let fields = vec![("fit".into(), fit)];
+                Ok(model_expansion::model_result(
+                    display,
+                    summary,
+                    "BreuschPaganResult",
+                    fields,
+                ))
+            }
             "dw" => {
                 let stat = Diagnostics::durbin_watson(&ols.residuals);
-                println!("Durbin-Watson Test for Autocorrelation");
-                println!("  DW statistic : {:.4}", stat);
                 let verdict = if stat < 1.5 {
                     "Positive autocorrelation suspected"
                 } else if stat > 2.5 {
@@ -2628,7 +2936,23 @@ impl Interpreter {
                 } else {
                     "No strong evidence of autocorrelation"
                 };
-                println!("  Conclusion   : {}", verdict);
+                let display = format!(
+                    "Durbin-Watson Test for Autocorrelation\n  DW statistic : {:.4}\n  Conclusion   : {}\n",
+                    stat, verdict
+                );
+                let summary = format!("Durbin-Watson DW={:.4}", stat);
+                let fit = model_expansion::fit_dict(&[
+                    ("test", Value::Str("Durbin-Watson".into())),
+                    ("statistic", Value::Float(stat)),
+                    ("conclusion", Value::Str(verdict.into())),
+                ]);
+                let fields = vec![("fit".into(), fit)];
+                Ok(model_expansion::model_result(
+                    display,
+                    summary,
+                    "DurbinWatsonResult",
+                    fields,
+                ))
             }
 
             // ── Wald / F-test on coefficients ────────────────────
@@ -2667,19 +2991,28 @@ impl Interpreter {
                             .result
                             .t_test(&r, val, &ols.x)
                             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                        println!("\n{:=^60}", " test ");
-                        println!("  H₀: {lhs_name} = {val}");
-                        println!("  t = {t:.4}   p = {p:.4}");
-                        let sig = if p < 0.01 {
-                            "***"
-                        } else if p < 0.05 {
-                            "**"
-                        } else if p < 0.10 {
-                            "*"
-                        } else {
-                            ""
-                        };
-                        println!("  {sig}");
+                        let sig = Self::panel_sig_stars(p);
+                        let display = format!(
+                            "\n{:=^60}\n  H₀: {lhs_name} = {val}\n  t = {t:.4}   p = {p:.4}\n  {sig}\n",
+                            " test "
+                        );
+                        let summary = format!("Wald t-test: t={:.4}, p={:.4}", t, p);
+                        let fit = model_expansion::fit_dict(&[
+                            ("test", Value::Str("t-test".into())),
+                            ("hypothesis", Value::Str(format!("{lhs_name} = {val}"))),
+                            ("coefficient", Value::Str(lhs_name.to_string())),
+                            ("restriction_value", Value::Float(val)),
+                            ("t_stat", Value::Float(t)),
+                            ("p_value", Value::Float(p)),
+                            ("sig", Value::Str(sig.into())),
+                        ]);
+                        let fields = vec![("fit".into(), fit)];
+                        Ok(model_expansion::model_result(
+                            display,
+                            summary,
+                            "WaldTestResult",
+                            fields,
+                        ))
                     } else {
                         let idx1 = find_idx(lhs_name)?;
                         let idx2 = find_idx(rhs_trimmed)?;
@@ -2690,19 +3023,31 @@ impl Interpreter {
                             .result
                             .t_test(&r, 0.0, &ols.x)
                             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                        println!("\n{:=^60}", " test ");
-                        println!("  H₀: {lhs_name} = {rhs_trimmed}");
-                        println!("  t = {t:.4}   p = {p:.4}");
-                        let sig = if p < 0.01 {
-                            "***"
-                        } else if p < 0.05 {
-                            "**"
-                        } else if p < 0.10 {
-                            "*"
-                        } else {
-                            ""
-                        };
-                        println!("  {sig}");
+                        let sig = Self::panel_sig_stars(p);
+                        let display = format!(
+                            "\n{:=^60}\n  H₀: {lhs_name} = {rhs_trimmed}\n  t = {t:.4}   p = {p:.4}\n  {sig}\n",
+                            " test "
+                        );
+                        let summary = format!("Wald t-test: t={:.4}, p={:.4}", t, p);
+                        let fit = model_expansion::fit_dict(&[
+                            ("test", Value::Str("t-test".into())),
+                            (
+                                "hypothesis",
+                                Value::Str(format!("{lhs_name} = {rhs_trimmed}")),
+                            ),
+                            ("coefficient1", Value::Str(lhs_name.to_string())),
+                            ("coefficient2", Value::Str(rhs_trimmed.to_string())),
+                            ("t_stat", Value::Float(t)),
+                            ("p_value", Value::Float(p)),
+                            ("sig", Value::Str(sig.into())),
+                        ]);
+                        let fields = vec![("fit".into(), fit)];
+                        Ok(model_expansion::model_result(
+                            display,
+                            summary,
+                            "WaldTestResult",
+                            fields,
+                        ))
                     }
                 } else {
                     let mut extra_names: Vec<String> = Vec::new();
@@ -2727,27 +3072,42 @@ impl Interpreter {
                         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                     let var_list: Vec<&str> = indices.iter().map(|&i| names[i].as_str()).collect();
                     let q = indices.len();
-                    println!("\n{:=^60}", " test ");
-                    if q == 1 {
-                        println!("  H₀: {} = 0", var_list[0]);
+                    let hypothesis = if q == 1 {
+                        format!("{} = 0", var_list[0])
                     } else {
-                        println!("  H₀: {} = 0", var_list.join(" = "));
-                    }
-                    println!("  F({q}, {}) = {f:.4}   p = {p:.4}", ols.result.df_resid);
-                    let sig = if p < 0.01 {
-                        "***"
-                    } else if p < 0.05 {
-                        "**"
-                    } else if p < 0.10 {
-                        "*"
-                    } else {
-                        ""
+                        format!("{} = 0", var_list.join(" = "))
                     };
-                    println!("  {sig}");
+                    let sig = Self::panel_sig_stars(p);
+                    let display = format!(
+                        "\n{:=^60}\n  H₀: {hypothesis}\n  F({q}, {}) = {f:.4}   p = {p:.4}\n  {sig}\n",
+                        " test ",
+                        ols.result.df_resid
+                    );
+                    let summary =
+                        format!("Wald F({q}, {})={:.4}, p={:.4}", ols.result.df_resid, f, p);
+                    let variables: Vec<Value> = var_list
+                        .iter()
+                        .map(|&s| Value::Str(s.to_string()))
+                        .collect();
+                    let fit = model_expansion::fit_dict(&[
+                        ("test", Value::Str("F-test".into())),
+                        ("hypothesis", Value::Str(hypothesis)),
+                        ("f_stat", Value::Float(f)),
+                        ("p_value", Value::Float(p)),
+                        ("df_num", Value::Int(q as i64)),
+                        ("df_denom", Value::Int(ols.result.df_resid as i64)),
+                        ("variables", Value::List(Arc::new(variables))),
+                        ("sig", Value::Str(sig.into())),
+                    ]);
+                    let fields = vec![("fit".into(), fit)];
+                    Ok(model_expansion::model_result(
+                        display,
+                        summary,
+                        "WaldTestResult",
+                        fields,
+                    ))
                 }
             }
         }
-
-        Ok(Value::Nil)
     }
 }

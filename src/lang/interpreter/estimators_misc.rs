@@ -1,5 +1,6 @@
 use super::helpers::*;
 use super::*;
+use crate::lang::dap::model_expansion;
 use std::sync::Arc;
 
 #[allow(clippy::too_many_arguments)]
@@ -303,10 +304,56 @@ impl Interpreter {
         }
         let result = greeners::CanCorr::fit(&x_mat, &y_mat)
             .map_err(|e| self.rt_err(format!("cancorr: {e}")))?;
-        println!("{result}");
-        println!("  X vars: {}", x_names.join(", "));
-        println!("  Y vars: {}", y_names.join(", "));
-        Ok(Value::Nil)
+        let mut display = format!("{result}\n");
+        display.push_str(&format!("  X vars: {}\n", x_names.join(", ")));
+        display.push_str(&format!("  Y vars: {}\n", y_names.join(", ")));
+        let summary = format!(
+            "CanCorr(n={}), {} canonical correlations",
+            result.n_obs,
+            result.cancorr.len()
+        );
+        let x_weight_names: Vec<String> = (0..result.x_weights.ncols())
+            .map(|i| format!("can{}", i + 1))
+            .collect();
+        let y_weight_names: Vec<String> = (0..result.y_weights.ncols())
+            .map(|i| format!("can{}", i + 1))
+            .collect();
+        let fields = vec![
+            (
+                "cancorr".into(),
+                model_expansion::array1_to_series("cancorr", &result.cancorr),
+            ),
+            (
+                "x_weights".into(),
+                model_expansion::array2_to_dataframe_named(&result.x_weights, &x_weight_names),
+            ),
+            (
+                "y_weights".into(),
+                model_expansion::array2_to_dataframe_named(&result.y_weights, &y_weight_names),
+            ),
+            ("wilks_lambda".into(), Value::Float(result.wilks_lambda)),
+            ("f_stat".into(), Value::Float(result.f_stat)),
+            ("p_value".into(), Value::Float(result.p_value)),
+            ("n_obs".into(), Value::Int(result.n_obs as i64)),
+            (
+                "x_vars".into(),
+                Value::List(Arc::new(
+                    x_names.iter().map(|s| Value::Str(s.clone())).collect(),
+                )),
+            ),
+            (
+                "y_vars".into(),
+                Value::List(Arc::new(
+                    y_names.iter().map(|s| Value::Str(s.clone())).collect(),
+                )),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "CanCorrResult",
+            fields,
+        ))
     }
 
     pub(super) fn summarize_w(
@@ -372,47 +419,85 @@ impl Interpreter {
             .conf_int_mean(alpha)
             .map_err(|e| self.rt_err(format!("summarize_w CI: {e}")))?;
         let label = w_ref.map_or("(equal weights)".to_string(), |_| "(weighted)".to_string());
-        println!("\n{:=^60}", format!(" DescrStats {label} — {var_name} "));
-        println!(
-            "{:<20} {:>12}   {:<20} {:>12}",
+        let mut display = String::new();
+        display.push_str(&format!(
+            "\n{:=^60}\n",
+            format!(" DescrStats {label} — {var_name} ")
+        ));
+        display.push_str(&format!(
+            "{:<20} {:>12}   {:<20} {:>12}\n",
             "N",
             ds.nobs as usize,
             "Σ weights",
             format!("{:.2}", ds.sum_weights)
-        );
-        println!(
-            "{:<20} {:>12.6}   {:<20} {:>12.6}",
+        ));
+        display.push_str(&format!(
+            "{:<20} {:>12.6}   {:<20} {:>12.6}\n",
             "Mean", ds.mean, "Std Dev", ds.std
-        );
-        println!(
-            "{:<20} {:>12.6}   {:<20} {:>12.6}",
+        ));
+        display.push_str(&format!(
+            "{:<20} {:>12.6}   {:<20} {:>12.6}\n",
             "Min", ds.min, "Max", ds.max
-        );
-        println!(
-            "{:<20} {:>12.6}   {:<20} {:>12.6}",
+        ));
+        display.push_str(&format!(
+            "{:<20} {:>12.6}   {:<20} {:>12.6}\n",
             "P25", ds.q25, "Median", ds.median
-        );
-        println!(
-            "{:<20} {:>12.6}   {:<20} {:>12.6}",
+        ));
+        display.push_str(&format!(
+            "{:<20} {:>12.6}   {:<20} {:>12.6}\n",
             "P75", ds.q75, "Variance", ds.var
-        );
-        println!(
-            "{:<20} {:>12.6}   {:<20} {:>12.6}",
+        ));
+        display.push_str(&format!(
+            "{:<20} {:>12.6}   {:<20} {:>12.6}\n",
             "Skewness", ds.skewness, "Kurtosis", ds.kurtosis
-        );
-        println!("{:-^60}", "");
-        println!(
-            "  t-test H₀: μ = {:.4}    t = {:.4}   p = {:.4}",
+        ));
+        display.push_str(&format!("{:-^60}\n", ""));
+        display.push_str(&format!(
+            "  t-test H₀: μ = {:.4}    t = {:.4}   p = {:.4}\n",
             mu0, t_stat, t_p
-        );
-        println!(
-            "  CI {}%: [{:.6}, {:.6}]",
+        ));
+        display.push_str(&format!(
+            "  CI {}%: [{:.6}, {:.6}]\n",
             ((1.0 - alpha) * 100.0) as usize,
             ci_lo,
             ci_hi
+        ));
+        display.push_str(&format!("{:=^60}\n", ""));
+        let summary = format!(
+            "DescrStatsW({label}), n={}, mean={:.4}, t={:.4}, p={:.4}",
+            ds.nobs as usize, ds.mean, t_stat, t_p
         );
-        println!("{:=^60}", "");
-        Ok(Value::Nil)
+        let fit = model_expansion::fit_dict(&[
+            ("n", Value::Int(ds.nobs as i64)),
+            ("sum_weights", Value::Float(ds.sum_weights)),
+            ("mean", Value::Float(ds.mean)),
+            ("std", Value::Float(ds.std)),
+            ("min", Value::Float(ds.min)),
+            ("max", Value::Float(ds.max)),
+            ("p25", Value::Float(ds.q25)),
+            ("median", Value::Float(ds.median)),
+            ("p75", Value::Float(ds.q75)),
+            ("variance", Value::Float(ds.var)),
+            ("skewness", Value::Float(ds.skewness)),
+            ("kurtosis", Value::Float(ds.kurtosis)),
+            ("t_stat", Value::Float(t_stat)),
+            ("t_pvalue", Value::Float(t_p)),
+            ("ci_low", Value::Float(ci_lo)),
+            ("ci_high", Value::Float(ci_hi)),
+            ("mu0", Value::Float(mu0)),
+            ("alpha", Value::Float(alpha)),
+        ]);
+        let fields = vec![
+            ("variable".into(), Value::Str(var_name.clone())),
+            ("weight".into(), Value::Str(label)),
+            ("fit".into(), fit),
+        ];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "DescrStatsWResult",
+            fields,
+        ))
     }
 
     pub(super) fn tabstat(
@@ -887,13 +972,31 @@ impl Interpreter {
         };
         let t_stat = rho * ((nf - 2.0) / (1.0 - rho * rho).max(1e-15)).sqrt();
         let p_val = greeners::t_pvalue_two(t_stat.abs(), nf - 2.0);
-        println!("\n  Spearman ρ({v1}, {v2})");
-        println!(
-            "  ρ = {rho:.6}   t = {t_stat:.4}   df = {}   p = {p_val:.4}",
+        let mut display = String::new();
+        display.push_str(&format!("\n  Spearman ρ({v1}, {v2})\n"));
+        display.push_str(&format!(
+            "  ρ = {rho:.6}   t = {t_stat:.4}   df = {}   p = {p_val:.4}\n",
             n - 2
-        );
-        println!("  H₀: ρₛ = 0 (uncorrelated in ranks)");
-        Ok(Value::Nil)
+        ));
+        display.push_str("  H₀: ρₛ = 0 (uncorrelated in ranks)\n");
+        let summary = format!("Spearman ρ = {rho:.4} (p = {p_val:.4})");
+        let fit = model_expansion::fit_dict(&[
+            ("rho", Value::Float(rho)),
+            ("t_stat", Value::Float(t_stat)),
+            ("p_value", Value::Float(p_val)),
+            ("df", Value::Int((n - 2) as i64)),
+        ]);
+        let fields = vec![
+            ("variable1".into(), Value::Str(v1)),
+            ("variable2".into(), Value::Str(v2)),
+            ("fit".into(), fit),
+        ];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "SpearmanResult",
+            fields,
+        ))
     }
 
     pub(super) fn ranksum(
@@ -999,15 +1102,69 @@ impl Interpreter {
         let z_stat = (u - mu_u) / var_u.sqrt();
         // p-value via normal approximation
         let p_normal = 2.0 * (1.0 - norm_cdf(z_stat.abs()));
-        println!("\n  Mann-Whitney U / Wilcoxon Rank-Sum");
-        println!("  {}: n₁={n1}  {}: n₂={n2}", var_name, by_name);
-        println!("  Group {}:  {var_name}", gvals[0] as i64);
-        println!("  Group {}:  {var_name}", gvals[1] as i64);
-        println!("  W (rank-sum group 0) = {w1:.1}");
-        println!("  U₁ = {u1:.1}   U₂ = {u2:.1}   U = {u:.1}");
-        println!("  z = {z_stat:.4}   p = {p_normal:.4}   (normal approx)");
-        println!("  H₀: distribution of {var_name} equal in both groups");
-        Ok(Value::Nil)
+        let total_rank_sum = (m * (m + 1)) as f64 / 2.0;
+        let w2 = total_rank_sum - w1;
+        let g0_mean = g0.iter().sum::<f64>() / n1.max(1) as f64;
+        let g1_mean = g1.iter().sum::<f64>() / n2.max(1) as f64;
+        let mut display = String::new();
+        display.push_str("\n  Mann-Whitney U / Wilcoxon Rank-Sum\n");
+        display.push_str(&format!("  {var_name} by {by_name}  (n₁={n1}, n₂={n2})\n"));
+        display.push_str(&format!("  Group {}:  {var_name}\n", gvals[0] as i64));
+        display.push_str(&format!("  Group {}:  {var_name}\n", gvals[1] as i64));
+        display.push_str(&format!("  W (rank-sum group 0) = {w1:.1}\n"));
+        display.push_str(&format!("  U₁ = {u1:.1}   U₂ = {u2:.1}   U = {u:.1}\n"));
+        display.push_str(&format!(
+            "  z = {z_stat:.4}   p = {p_normal:.4}   (normal approx)\n"
+        ));
+        display.push_str(&format!(
+            "  H₀: distribution of {var_name} equal in both groups\n"
+        ));
+        let summary = format!("Mann-Whitney U: U={u:.4}, z={z_stat:.4}, p={p_normal:.4}");
+        let groups_map = HashMap::from([
+            (
+                "group".into(),
+                Value::List(Arc::new(vec![
+                    Value::Str(format!("{}", gvals[0] as i64)),
+                    Value::Str(format!("{}", gvals[1] as i64)),
+                ])),
+            ),
+            (
+                "n".into(),
+                Value::List(Arc::new(vec![Value::Int(n1 as i64), Value::Int(n2 as i64)])),
+            ),
+            (
+                "mean".into(),
+                Value::List(Arc::new(vec![Value::Float(g0_mean), Value::Float(g1_mean)])),
+            ),
+            (
+                "rank_sum".into(),
+                Value::List(Arc::new(vec![Value::Float(w1), Value::Float(w2)])),
+            ),
+        ]);
+        let groups_df = self.dict_to_dataframe(&groups_map)?;
+        let fit = model_expansion::fit_dict(&[
+            ("u1", Value::Float(u1)),
+            ("u2", Value::Float(u2)),
+            ("u", Value::Float(u)),
+            ("z_stat", Value::Float(z_stat)),
+            ("p_value", Value::Float(p_normal)),
+            ("w1", Value::Float(w1)),
+            ("w2", Value::Float(w2)),
+            ("n1", Value::Int(n1 as i64)),
+            ("n2", Value::Int(n2 as i64)),
+        ]);
+        let fields = vec![
+            ("variable".into(), Value::Str(var_name)),
+            ("by".into(), Value::Str(by_name)),
+            ("groups".into(), Value::DataFrame(Arc::new(groups_df))),
+            ("fit".into(), fit),
+        ];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "MannWhitneyUResult",
+            fields,
+        ))
     }
 
     pub(super) fn kruskal(
@@ -1104,28 +1261,99 @@ impl Interpreter {
         let h = 12.0 / (nf * (nf + 1.0)) * h_num;
         let df_kw = (k - 1) as f64;
         let p_val = greeners::chi2_pvalue(h, (k - 1) as f64);
-        println!("\n  Kruskal-Wallis H");
-        println!("  {var_name} por {by_name}  ({k} grupos, N={n})");
+        let mut display = String::new();
+        display.push_str("\n  Kruskal-Wallis H\n");
+        display.push_str(&format!("  {var_name} by {by_name}  ({k} groups, N={n})\n"));
+        let mut groups_vec: Vec<(String, i64, f64, f64)> = Vec::new();
         for gid in &gvals {
             let gdata: Vec<f64> = (0..n)
                 .filter(|&i| (grp_col[i] - gid).abs() < 1e-9)
                 .map(|i| y_col[i])
                 .collect();
             let gn = gdata.len();
-            let gm = gdata.iter().sum::<f64>() / gn as f64;
-            let rbar = (0..n)
-                .filter(|&i| (grp_col[i] - gid).abs() < 1e-9)
-                .map(|i| global_ranks[i])
-                .sum::<f64>()
-                / gn as f64;
-            println!(
-                "    group {:>4}: n={gn:>4}  mean={gm:>8.4}  avg_rank={rbar:>8.2}",
-                *gid as i64
-            );
+            let gm = if gdata.is_empty() {
+                0.0
+            } else {
+                gdata.iter().sum::<f64>() / gn as f64
+            };
+            let rbar = if gdata.is_empty() {
+                0.0
+            } else {
+                (0..n)
+                    .filter(|&i| (grp_col[i] - gid).abs() < 1e-9)
+                    .map(|i| global_ranks[i])
+                    .sum::<f64>()
+                    / gn as f64
+            };
+            display.push_str(&format!(
+                "    group {:>4}: n={:>4}  mean={:>8.4}  avg_rank={:>8.2}\n",
+                *gid as i64, gn, gm, rbar
+            ));
+            groups_vec.push((format!("{}", *gid as i64), gn as i64, gm, rbar));
         }
-        println!("  H = {h:.4}   df = {df_kw}   p = {p_val:.4}   χ² approx.");
-        println!("  H₀: same distribution across all groups");
-        Ok(Value::Nil)
+        display.push_str(&format!(
+            "  H = {h:.4}   df = {df_kw}   p = {p_val:.4}   χ² approx.\n"
+        ));
+        display.push_str("  H₀: same distribution across all groups\n");
+        let summary = format!("Kruskal-Wallis H = {h:.4}, df = {df_kw}, p = {p_val:.4}");
+        let groups_map = HashMap::from([
+            (
+                "group".into(),
+                Value::List(Arc::new(
+                    groups_vec
+                        .iter()
+                        .map(|(g, _, _, _)| Value::Str(g.clone()))
+                        .collect(),
+                )),
+            ),
+            (
+                "n".into(),
+                Value::List(Arc::new(
+                    groups_vec
+                        .iter()
+                        .map(|(_, n, _, _)| Value::Int(*n))
+                        .collect(),
+                )),
+            ),
+            (
+                "mean".into(),
+                Value::List(Arc::new(
+                    groups_vec
+                        .iter()
+                        .map(|(_, _, m, _)| Value::Float(*m))
+                        .collect(),
+                )),
+            ),
+            (
+                "avg_rank".into(),
+                Value::List(Arc::new(
+                    groups_vec
+                        .iter()
+                        .map(|(_, _, _, r)| Value::Float(*r))
+                        .collect(),
+                )),
+            ),
+        ]);
+        let groups_df = self.dict_to_dataframe(&groups_map)?;
+        let fit = model_expansion::fit_dict(&[
+            ("h", Value::Float(h)),
+            ("df", Value::Float(df_kw)),
+            ("p_value", Value::Float(p_val)),
+            ("n_groups", Value::Int(k as i64)),
+            ("n_total", Value::Int(n as i64)),
+        ]);
+        let fields = vec![
+            ("variable".into(), Value::Str(var_name)),
+            ("by".into(), Value::Str(by_name)),
+            ("groups".into(), Value::DataFrame(Arc::new(groups_df))),
+            ("fit".into(), fit),
+        ];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "KruskalWallisResult",
+            fields,
+        ))
     }
 
     pub(super) fn signrank(
@@ -1204,12 +1432,36 @@ impl Interpreter {
         let var_w = nf * (nf + 1.0) * (2.0 * nf + 1.0) / 24.0;
         let z_stat = (w - mu_w) / var_w.sqrt();
         let p_val = 2.0 * (1.0 - norm_cdf(z_stat.abs()));
-        println!("\n  Wilcoxon Signed-Rank Test");
-        println!("  H₀: mediana({var_name}) = {mu0}");
-        println!("  n = {n}  (excluindo diffs ≈ 0)");
-        println!("  W+ = {w_plus:.1}   W- = {w_minus:.1}   W = {w:.1}");
-        println!("  z = {z_stat:.4}   p = {p_val:.4}   (normal approx)");
-        Ok(Value::Nil)
+        let mut display = String::new();
+        display.push_str("\n  Wilcoxon Signed-Rank Test\n");
+        display.push_str(&format!("  H₀: mediana({var_name}) = {mu0}\n"));
+        display.push_str(&format!("  n = {n}  (excluindo diffs ≈ 0)\n"));
+        display.push_str(&format!(
+            "  W+ = {w_plus:.1}   W- = {w_minus:.1}   W = {w:.1}\n"
+        ));
+        display.push_str(&format!(
+            "  z = {z_stat:.4}   p = {p_val:.4}   (normal approx)\n"
+        ));
+        let summary = format!("Wilcoxon signed-rank W={w:.4}, z={z_stat:.4}, p={p_val:.4}");
+        let fit = model_expansion::fit_dict(&[
+            ("w_plus", Value::Float(w_plus)),
+            ("w_minus", Value::Float(w_minus)),
+            ("w", Value::Float(w)),
+            ("z_stat", Value::Float(z_stat)),
+            ("p_value", Value::Float(p_val)),
+            ("n", Value::Int(n as i64)),
+            ("mu0", Value::Float(mu0)),
+        ]);
+        let fields = vec![
+            ("variable".into(), Value::Str(var_name)),
+            ("fit".into(), fit),
+        ];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "WilcoxonSignedRankResult",
+            fields,
+        ))
     }
 
     pub(super) fn bitest(
@@ -1228,9 +1480,8 @@ impl Interpreter {
         // 1) bitest(count, n, mu=0.5)       — contagens diretas
         // 2) bitest(df, var, mu=0, by=group) — positivos vs negativos na coluna
         let first_val = self.eval_expr(&args[0])?;
-        match first_val {
+        let (display, summary, type_name, fields) = match first_val {
             Value::Int(count) => {
-                // modo 1
                 let n_trials = match self.eval_expr(&args[1])? {
                     Value::Int(v) => v as usize,
                     Value::Float(v) => v as usize,
@@ -1242,21 +1493,31 @@ impl Interpreter {
                     _ => 0.5,
                 };
                 let k = count as usize;
-                // p-value via normal approx (prop test)
                 let nf = n_trials as f64;
                 let phat = k as f64 / nf;
                 let se = (mu * (1.0 - mu) / nf).sqrt();
                 let z = (phat - mu) / se;
                 let p = 2.0 * (1.0 - norm_cdf(z.abs()));
-                println!("\n  Binomial / Sign Test");
-                println!(
-                    "  Sucessos: {k}   n: {n_trials}   p̂ = {:.4}   H₀: p = {mu}",
+                let mut display = String::new();
+                display.push_str("\n  Binomial / Sign Test\n");
+                display.push_str(&format!(
+                    "  Sucessos: {k}   n: {n_trials}   p̂ = {:.4}   H₀: p = {mu}\n",
                     phat
-                );
-                println!("  z = {z:.4}   p = {p:.4}");
+                ));
+                display.push_str(&format!("  z = {z:.4}   p = {p:.4}\n"));
+                let summary = format!("Binomial test: p̂={phat:.4}, z={z:.4}, p={p:.4}");
+                let fields = vec![
+                    ("mode".into(), Value::Str("counts".into())),
+                    ("successes".into(), Value::Int(k as i64)),
+                    ("n_trials".into(), Value::Int(n_trials as i64)),
+                    ("p_hat".into(), Value::Float(phat)),
+                    ("p0".into(), Value::Float(mu)),
+                    ("z_stat".into(), Value::Float(z)),
+                    ("p_value".into(), Value::Float(p)),
+                ];
+                (display, summary, "BinomialTestResult", fields)
             }
             Value::DataFrame(_) | Value::Nil => {
-                // Tentativa de modo 2: bitest(df, var, mu=0)
                 let df_name = match &args[0] {
                     Expr::Var(n) => n.clone(),
                     _ => {
@@ -1291,18 +1552,37 @@ impl Interpreter {
                 let nf = n_eff as f64;
                 let z = (phat - 0.5) * nf.sqrt() / 0.5;
                 let p = 2.0 * (1.0 - norm_cdf(z.abs()));
-                println!("\n  Sign Test  ({var_name} vs {mu0})");
-                println!("  + : {pos}   - : {neg}   empates: {ties}   n efetivo: {n_eff}");
-                println!("  p̂(+) = {phat:.4}   z = {z:.4}   p = {p:.4}");
-                println!("  H₀: P(X > {mu0}) = 0.5");
+                let mut display = String::new();
+                display.push_str(&format!("\n  Sign Test  ({var_name} vs {mu0})\n"));
+                display.push_str(&format!(
+                    "  + : {pos}   - : {neg}   empates: {ties}   n efetivo: {n_eff}\n"
+                ));
+                display.push_str(&format!("  p̂(+) = {phat:.4}   z = {z:.4}   p = {p:.4}\n"));
+                display.push_str(&format!("  H₀: P(X > {mu0}) = 0.5\n"));
+                let summary = format!("Sign test: pos={pos}, neg={neg}, p={p:.4}");
+                let fields = vec![
+                    ("mode".into(), Value::Str("dataframe".into())),
+                    ("variable".into(), Value::Str(var_name)),
+                    ("mu0".into(), Value::Float(mu0)),
+                    ("positive".into(), Value::Int(pos as i64)),
+                    ("negative".into(), Value::Int(neg as i64)),
+                    ("ties".into(), Value::Int(ties as i64)),
+                    ("n_eff".into(), Value::Int(n_eff as i64)),
+                    ("p_hat".into(), Value::Float(phat)),
+                    ("z_stat".into(), Value::Float(z)),
+                    ("p_value".into(), Value::Float(p)),
+                ];
+                (display, summary, "BinomialTestResult", fields)
             }
             _ => {
                 return Err(HayashiError::Type(
                     "bitest: first argument must be inteiro (count) ou DataFrame".into(),
                 ))
             }
-        }
-        Ok(Value::Nil)
+        };
+        Ok(model_expansion::model_result(
+            display, summary, type_name, fields,
+        ))
     }
 
     pub(super) fn hpfilter(
@@ -1347,15 +1627,38 @@ impl Interpreter {
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         let trend_name = format!("{var_name}_trend");
         let cycle_name = format!("{var_name}_cycle");
+        let trend_series = model_expansion::array1_to_series("trend", &trend);
+        let cycle_series = model_expansion::array1_to_series("cycle", &cycle);
         Arc::make_mut(&mut df)
             .insert(trend_name.clone(), trend)
             .map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
         Arc::make_mut(&mut df)
             .insert(cycle_name.clone(), cycle)
             .map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
-        println!("hpfilter: λ={lambda}  →  {trend_name} e {cycle_name} adicionadas a {df_name}");
+        let mut display = String::new();
+        display.push_str(&format!(
+            "hpfilter: λ={lambda}  →  {trend_name} e {cycle_name} adicionadas a {df_name}\n"
+        ));
+        let summary = format!("HPFilter λ={lambda}, {var_name} → {trend_name}/{cycle_name}");
+        let fit = model_expansion::fit_dict(&[
+            ("lambda", Value::Float(lambda)),
+            ("trend_name", Value::Str(trend_name.clone())),
+            ("cycle_name", Value::Str(cycle_name.clone())),
+        ]);
+        let fields = vec![
+            ("fit".into(), fit),
+            ("trend".into(), trend_series),
+            ("cycle".into(), cycle_series),
+            ("trend_name".into(), Value::Str(trend_name)),
+            ("cycle_name".into(), Value::Str(cycle_name)),
+        ];
         self.env.set(&df_name, Value::DataFrame(df))?;
-        Ok(Value::Nil)
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "HPFilterResult",
+            fields,
+        ))
     }
 
     pub(super) fn bkfilter(
@@ -1409,12 +1712,33 @@ impl Interpreter {
         let cycle = greeners::TimeSeries::bk_filter(&series, low, high, k)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         let cycle_name = format!("{var_name}_cycle");
+        let cycle_series = model_expansion::array1_to_series("cycle", &cycle);
         Arc::make_mut(&mut df)
             .insert(cycle_name.clone(), cycle)
             .map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
-        println!("bkfilter: periods [{low},{high}] k={k}  →  {cycle_name} added to {df_name}");
+        let mut display = String::new();
+        display.push_str(&format!(
+            "bkfilter: periods [{low},{high}] k={k}  →  {cycle_name} added to {df_name}\n"
+        ));
+        let summary = format!("BKFilter [{low},{high}] k={k}, {var_name} → {cycle_name}");
+        let fit = model_expansion::fit_dict(&[
+            ("low", Value::Int(low as i64)),
+            ("high", Value::Int(high as i64)),
+            ("k", Value::Int(k as i64)),
+            ("cycle_name", Value::Str(cycle_name.clone())),
+        ]);
+        let fields = vec![
+            ("fit".into(), fit),
+            ("cycle".into(), cycle_series),
+            ("cycle_name".into(), Value::Str(cycle_name)),
+        ];
         self.env.set(&df_name, Value::DataFrame(df))?;
-        Ok(Value::Nil)
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "BKFilterResult",
+            fields,
+        ))
     }
 
     pub(super) fn cffilter(
@@ -1464,14 +1788,33 @@ impl Interpreter {
         let cycle = greeners::TimeSeries::cf_filter(&series, low, high, drift)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         let cycle_name = format!("{var_name}_cycle");
+        let cycle_series = model_expansion::array1_to_series("cycle", &cycle);
         Arc::make_mut(&mut df)
             .insert(cycle_name.clone(), cycle)
             .map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
-        println!(
-            "cffilter: periods [{low},{high}] drift={drift}  →  {cycle_name} added to {df_name}"
-        );
+        let mut display = String::new();
+        display.push_str(&format!(
+            "cffilter: periods [{low},{high}] drift={drift}  →  {cycle_name} added to {df_name}\n"
+        ));
+        let summary = format!("CFFilter [{low},{high}] drift={drift}, {var_name} → {cycle_name}");
+        let fit = model_expansion::fit_dict(&[
+            ("low", Value::Int(low as i64)),
+            ("high", Value::Int(high as i64)),
+            ("drift", Value::Bool(drift)),
+            ("cycle_name", Value::Str(cycle_name.clone())),
+        ]);
+        let fields = vec![
+            ("fit".into(), fit),
+            ("cycle".into(), cycle_series),
+            ("cycle_name".into(), Value::Str(cycle_name)),
+        ];
         self.env.set(&df_name, Value::DataFrame(df))?;
-        Ok(Value::Nil)
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "CFFilterResult",
+            fields,
+        ))
     }
 
     pub(super) fn ridge(
@@ -1934,24 +2277,59 @@ impl Interpreter {
         let arr = ndarray::Array1::from(series.to_vec());
         let r = greeners::TimeSeries::adf(&arr, max_lags)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        println!("\n{:=^60}", " Augmented Dickey-Fuller Test ");
-        println!("  Variable: {var_name}   Lags used: {}", r.lags_used);
-        println!("  H₀: series has a unit root (non-stationary)");
-        println!("  Test statistic:  {:>10.4}", r.test_statistic);
+        let mut display = String::new();
+        display.push_str(&format!("\n{:=^60}\n", " Augmented Dickey-Fuller Test "));
+        display.push_str(&format!(
+            "  Variable: {var_name}   Lags used: {}\n",
+            r.lags_used
+        ));
+        display.push_str("  H₀: series has a unit root (non-stationary)\n");
+        display.push_str(&format!("  Test statistic:  {:>10.4}\n", r.test_statistic));
         if let Some(p) = r.p_value {
-            println!("  p-value:         {:>10.4}", p);
+            display.push_str(&format!("  p-value:         {:>10.4}\n", p));
         }
         let (cv1, cv5, cv10) = r.critical_values;
-        println!("  Critical values:  1%={cv1:.3}  5%={cv5:.3}  10%={cv10:.3}");
-        println!(
-            "  Conclusion: {}",
+        display.push_str(&format!(
+            "  Critical values:  1%={cv1:.3}  5%={cv5:.3}  10%={cv10:.3}\n"
+        ));
+        display.push_str(&format!(
+            "  Conclusion: {}\n",
             if r.is_stationary {
                 "REJECT H₀ — stationary"
             } else {
                 "Does not reject H₀ — unit root present"
             }
+        ));
+        let summary = format!(
+            "ADF test: stat={:.4}, lags={}, stationary={}",
+            r.test_statistic, r.lags_used, r.is_stationary
         );
-        Ok(Value::Nil)
+        let fit = model_expansion::fit_dict(&[
+            ("test_statistic", Value::Float(r.test_statistic)),
+            (
+                "p_value",
+                match r.p_value {
+                    Some(p) => Value::Float(p),
+                    None => Value::Nil,
+                },
+            ),
+            ("cv_1pct", Value::Float(cv1)),
+            ("cv_5pct", Value::Float(cv5)),
+            ("cv_10pct", Value::Float(cv10)),
+            ("is_stationary", Value::Bool(r.is_stationary)),
+            ("lags_used", Value::Int(r.lags_used as i64)),
+            ("n_obs", Value::Int(r.n_obs as i64)),
+        ]);
+        let fields = vec![
+            ("variable".into(), Value::Str(var_name)),
+            ("fit".into(), fit),
+        ];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "ADFTestResult",
+            fields,
+        ))
     }
 
     pub(super) fn kpss(
@@ -1999,24 +2377,51 @@ impl Interpreter {
         let arr = ndarray::Array1::from(series.to_vec());
         let r = greeners::TimeSeries::kpss(&arr, &regression, max_lags)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        println!("\n{:=^60}", " KPSS Test ");
-        println!(
-            "  Variable: {var_name}   Regression: {}   Lags: {}",
+        let mut display = String::new();
+        display.push_str(&format!("\n{:=^60}\n", " KPSS Test "));
+        display.push_str(&format!(
+            "  Variable: {var_name}   Regression: {}   Lags: {}\n",
             r.regression, r.lags_used
-        );
-        println!("  H₀: series is stationary");
-        println!("  Test statistic:  {:>10.4}", r.test_statistic);
+        ));
+        display.push_str("  H₀: series is stationary\n");
+        display.push_str(&format!("  Test statistic:  {:>10.4}\n", r.test_statistic));
         let (cv10, cv5, cv25, cv1) = r.critical_values;
-        println!("  Critical values:  10%={cv10:.3}  5%={cv5:.3}  2.5%={cv25:.3}  1%={cv1:.3}");
-        println!(
-            "  Conclusion: {}",
+        display.push_str(&format!(
+            "  Critical values:  10%={cv10:.3}  5%={cv5:.3}  2.5%={cv25:.3}  1%={cv1:.3}\n"
+        ));
+        display.push_str(&format!(
+            "  Conclusion: {}\n",
             if r.is_stationary {
                 "Does not reject H₀ — stationary"
             } else {
                 "REJECT H₀ — non-stationary"
             }
+        ));
+        let summary = format!(
+            "KPSS test: stat={:.4}, regression={}, lags={}, stationary={}",
+            r.test_statistic, r.regression, r.lags_used, r.is_stationary
         );
-        Ok(Value::Nil)
+        let fit = model_expansion::fit_dict(&[
+            ("test_statistic", Value::Float(r.test_statistic)),
+            ("cv_10pct", Value::Float(cv10)),
+            ("cv_5pct", Value::Float(cv5)),
+            ("cv_2_5pct", Value::Float(cv25)),
+            ("cv_1pct", Value::Float(cv1)),
+            ("is_stationary", Value::Bool(r.is_stationary)),
+            ("lags_used", Value::Int(r.lags_used as i64)),
+            ("regression", Value::Str(r.regression.clone())),
+            ("n_obs", Value::Int(r.n_obs as i64)),
+        ]);
+        let fields = vec![
+            ("variable".into(), Value::Str(var_name)),
+            ("fit".into(), fit),
+        ];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "KPSSTestResult",
+            fields,
+        ))
     }
 
     pub(super) fn pp(
@@ -2058,22 +2463,51 @@ impl Interpreter {
         let arr = ndarray::Array1::from(series.to_vec());
         let r = greeners::TimeSeries::phillips_perron(&arr, max_lags)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        println!("\n{:=^60}", " Phillips-Perron Test ");
-        println!("  Variable: {var_name}   Lags used: {}", r.lags_used);
-        println!("  H₀: series has a unit root (non-stationary)");
-        println!("  Zα statistic:    {:>10.4}", r.z_alpha);
-        println!("  Zt statistic:    {:>10.4}", r.z_t);
+        let mut display = String::new();
+        display.push_str(&format!("\n{:=^60}\n", " Phillips-Perron Test "));
+        display.push_str(&format!(
+            "  Variable: {var_name}   Lags used: {}\n",
+            r.lags_used
+        ));
+        display.push_str("  H₀: series has a unit root (non-stationary)\n");
+        display.push_str(&format!("  Zα statistic:    {:>10.4}\n", r.z_alpha));
+        display.push_str(&format!("  Zt statistic:    {:>10.4}\n", r.z_t));
         let (cv1, cv5, cv10) = r.critical_values;
-        println!("  Critical values:  1%={cv1:.3}  5%={cv5:.3}  10%={cv10:.3}");
-        println!(
-            "  Conclusion: {}",
+        display.push_str(&format!(
+            "  Critical values:  1%={cv1:.3}  5%={cv5:.3}  10%={cv10:.3}\n"
+        ));
+        display.push_str(&format!(
+            "  Conclusion: {}\n",
             if r.is_stationary {
                 "REJECT H₀ — stationary"
             } else {
                 "Does not reject H₀ — unit root present"
             }
+        ));
+        let summary = format!(
+            "Phillips-Perron: Zα={:.4}, Zt={:.4}, stationary={}",
+            r.z_alpha, r.z_t, r.is_stationary
         );
-        Ok(Value::Nil)
+        let fit = model_expansion::fit_dict(&[
+            ("z_alpha", Value::Float(r.z_alpha)),
+            ("z_t", Value::Float(r.z_t)),
+            ("cv_1pct", Value::Float(cv1)),
+            ("cv_5pct", Value::Float(cv5)),
+            ("cv_10pct", Value::Float(cv10)),
+            ("is_stationary", Value::Bool(r.is_stationary)),
+            ("lags_used", Value::Int(r.lags_used as i64)),
+            ("n_obs", Value::Int(r.n_obs as i64)),
+        ]);
+        let fields = vec![
+            ("variable".into(), Value::Str(var_name)),
+            ("fit".into(), fit),
+        ];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "PhillipsPerronResult",
+            fields,
+        ))
     }
 
     pub(super) fn za(
@@ -2115,22 +2549,47 @@ impl Interpreter {
         let arr = ndarray::Array1::from(series.to_vec());
         let r = greeners::TimeSeries::zivot_andrews(&arr, trim)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        println!("\n{:=^60}", " Zivot-Andrews Test ");
-        println!("  Variable: {var_name}");
-        println!("  H₀: unit root (sem quebra estrutural)");
-        println!("  Test statistic:  {:>10.4}", r.statistic);
-        println!("  Break point:     obs {}", r.break_point);
+        let mut display = String::new();
+        display.push_str(&format!("\n{:=^60}\n", " Zivot-Andrews Test "));
+        display.push_str(&format!("  Variable: {var_name}\n"));
+        display.push_str("  H₀: unit root (sem quebra estrutural)\n");
+        display.push_str(&format!("  Test statistic:  {:>10.4}\n", r.statistic));
+        display.push_str(&format!("  Break point:     obs {}\n", r.break_point));
         let (cv1, cv5, cv10) = r.critical_values;
-        println!("  Critical values:  1%={cv1:.3}  5%={cv5:.3}  10%={cv10:.3}");
-        println!(
-            "  Conclusion: {}",
+        display.push_str(&format!(
+            "  Critical values:  1%={cv1:.3}  5%={cv5:.3}  10%={cv10:.3}\n"
+        ));
+        display.push_str(&format!(
+            "  Conclusion: {}\n",
             if r.is_stationary {
                 "REJECT H₀ — stationary with break"
             } else {
                 "Does not reject H₀ — unit root"
             }
+        ));
+        let summary = format!(
+            "Zivot-Andrews: stat={:.4}, break={}, stationary={}",
+            r.statistic, r.break_point, r.is_stationary
         );
-        Ok(Value::Nil)
+        let fit = model_expansion::fit_dict(&[
+            ("statistic", Value::Float(r.statistic)),
+            ("break_point", Value::Int(r.break_point as i64)),
+            ("cv_1pct", Value::Float(cv1)),
+            ("cv_5pct", Value::Float(cv5)),
+            ("cv_10pct", Value::Float(cv10)),
+            ("is_stationary", Value::Bool(r.is_stationary)),
+            ("n_obs", Value::Int(r.n_obs as i64)),
+        ]);
+        let fields = vec![
+            ("variable".into(), Value::Str(var_name)),
+            ("fit".into(), fit),
+        ];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "ZivotAndrewsResult",
+            fields,
+        ))
     }
 
     pub(super) fn granger(
@@ -2180,21 +2639,45 @@ impl Interpreter {
         let x_arr = ndarray::Array1::from(get_col_f64(&df, &x_name)?.to_vec());
         let r = greeners::TimeSeries::granger_causality(&y_arr, &x_arr, lags)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        println!("\n{:=^60}", " Granger Causality Test ");
-        println!("  H₀: {x_name} does not Granger-cause {y_name}   (lags={lags})");
-        println!(
-            "  F({}, {}) = {:.4}   p = {:.4}",
+        let mut display = String::new();
+        display.push_str(&format!("\n{:=^60}\n", " Granger Causality Test "));
+        display.push_str(&format!(
+            "  H₀: {x_name} does not Granger-cause {y_name}   (lags={lags})\n"
+        ));
+        display.push_str(&format!(
+            "  F({}, {}) = {:.4}   p = {:.4}\n",
             r.df_num, r.df_denom, r.f_statistic, r.p_value
-        );
-        println!(
-            "  Conclusion: {}",
+        ));
+        display.push_str(&format!(
+            "  Conclusion: {}\n",
             if r.p_value < 0.05 {
                 format!("REJECT H₀ — {x_name} Granger-causes {y_name}")
             } else {
                 "Does not reject H₀".to_string()
             }
+        ));
+        let summary = format!(
+            "Granger causality: F={:.4}, p={:.4}, lags={}",
+            r.f_statistic, r.p_value, r.lags
         );
-        Ok(Value::Nil)
+        let fit = model_expansion::fit_dict(&[
+            ("f_statistic", Value::Float(r.f_statistic)),
+            ("p_value", Value::Float(r.p_value)),
+            ("df_num", Value::Int(r.df_num as i64)),
+            ("df_denom", Value::Int(r.df_denom as i64)),
+            ("lags", Value::Int(r.lags as i64)),
+        ]);
+        let fields = vec![
+            ("y".into(), Value::Str(y_name)),
+            ("x".into(), Value::Str(x_name)),
+            ("fit".into(), fit),
+        ];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "GrangerCausalityResult",
+            fields,
+        ))
     }
 
     pub(super) fn engle_granger(
@@ -2239,25 +2722,60 @@ impl Interpreter {
         let y2_arr = ndarray::Array1::from(get_col_f64(&df, &y2_name)?.to_vec());
         let r = greeners::TimeSeries::engle_granger(&y1_arr, &y2_arr)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        println!("\n{:=^60}", " Engle-Granger Cointegration Test ");
-        println!("  Variables: {y1_name}, {y2_name}");
-        println!("  H₀: no cointegration");
-        println!("  ADF statistic: {:>10.4}", r.adf_statistic);
+        let mut display = String::new();
+        display.push_str(&format!(
+            "\n{:=^60}\n",
+            " Engle-Granger Cointegration Test "
+        ));
+        display.push_str(&format!("  Variables: {y1_name}, {y2_name}\n"));
+        display.push_str("  H₀: no cointegration\n");
+        display.push_str(&format!("  ADF statistic: {:>10.4}\n", r.adf_statistic));
         let (cv1, cv5, cv10) = r.critical_values;
-        println!("  Critical values:  1%={cv1:.3}  5%={cv5:.3}  10%={cv10:.3}");
+        display.push_str(&format!(
+            "  Critical values:  1%={cv1:.3}  5%={cv5:.3}  10%={cv10:.3}\n"
+        ));
         let coef = &r.cointegrating_vector;
         if coef.len() >= 2 {
-            println!("  Vetor cointegrante: [{:.4}, {:.4}]", coef[0], coef[1]);
+            display.push_str(&format!(
+                "  Vetor cointegrante: [{:.4}, {:.4}]\n",
+                coef[0], coef[1]
+            ));
         }
-        println!(
-            "  Conclusion: {}",
+        display.push_str(&format!(
+            "  Conclusion: {}\n",
             if r.is_cointegrated {
                 "REJECT H₀ — cointegrated series"
             } else {
                 "Does not reject H₀ — no cointegration"
             }
+        ));
+        let summary = format!(
+            "Engle-Granger: ADF={:.4}, cointegrated={}",
+            r.adf_statistic, r.is_cointegrated
         );
-        Ok(Value::Nil)
+        let fit = model_expansion::fit_dict(&[
+            ("adf_statistic", Value::Float(r.adf_statistic)),
+            ("cv_1pct", Value::Float(cv1)),
+            ("cv_5pct", Value::Float(cv5)),
+            ("cv_10pct", Value::Float(cv10)),
+            ("is_cointegrated", Value::Bool(r.is_cointegrated)),
+        ]);
+        let cointegrating_vector =
+            model_expansion::array1_to_series("cointegrating_vector", &r.cointegrating_vector);
+        let residuals = model_expansion::array1_to_series("residuals", &r.residuals);
+        let fields = vec![
+            ("y1".into(), Value::Str(y1_name)),
+            ("y2".into(), Value::Str(y2_name)),
+            ("cointegrating_vector".into(), cointegrating_vector),
+            ("residuals".into(), residuals),
+            ("fit".into(), fit),
+        ];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "EngleGrangerResult",
+            fields,
+        ))
     }
 
     pub(super) fn johansen(
@@ -2313,39 +2831,109 @@ impl Interpreter {
         }
         let r = greeners::TimeSeries::johansen(&data, lags, det)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        println!("\n{:=^60}", " Johansen Cointegration Test ");
-        println!(
-            "  Variables: {}   Lags: {lags}   Det order: {det}",
+        let mut display = String::new();
+        display.push_str(&format!("\n{:=^60}\n", " Johansen Cointegration Test "));
+        display.push_str(&format!(
+            "  Variables: {}   Lags: {lags}   Det order: {det}\n",
             var_names.join(", ")
-        );
-        println!("  Cointegrating rank: {}", r.cointegrating_rank);
-        println!("\n  Trace Test:");
-        println!(
-            "  {:>4}  {:>12}  {:>10}  {:>10}  {:>10}",
+        ));
+        display.push_str(&format!("  Cointegrating rank: {}\n", r.cointegrating_rank));
+        display.push_str("\n  Trace Test:\n");
+        display.push_str(&format!(
+            "  {:>4}  {:>12}  {:>10}  {:>10}  {:>10}\n",
             "Rank", "Trace stat", "10%", "5%", "1%"
-        );
+        ));
+        let mut trace_rank = Vec::new();
+        let mut trace_stat = Vec::new();
+        let mut trace_cv10 = Vec::new();
+        let mut trace_cv5 = Vec::new();
+        let mut trace_cv1 = Vec::new();
         for i in 0..r.n_vars {
             let stat = r.trace_stats[i];
             let cv = r.trace_critical_values.row(i);
-            println!(
-                "  {:>4}  {:>12.4}  {:>10.4}  {:>10.4}  {:>10.4}",
+            display.push_str(&format!(
+                "  {:>4}  {:>12.4}  {:>10.4}  {:>10.4}  {:>10.4}\n",
                 i, stat, cv[0], cv[1], cv[2]
-            );
+            ));
+            trace_rank.push(Value::Int(i as i64));
+            trace_stat.push(Value::Float(stat));
+            trace_cv10.push(Value::Float(cv[0]));
+            trace_cv5.push(Value::Float(cv[1]));
+            trace_cv1.push(Value::Float(cv[2]));
         }
-        println!("\n  Max-Eigenvalue Test:");
-        println!(
-            "  {:>4}  {:>12}  {:>10}  {:>10}  {:>10}",
+        let trace_map = HashMap::from([
+            ("rank".into(), Value::List(Arc::new(trace_rank))),
+            ("trace_stat".into(), Value::List(Arc::new(trace_stat))),
+            ("cv_10pct".into(), Value::List(Arc::new(trace_cv10))),
+            ("cv_5pct".into(), Value::List(Arc::new(trace_cv5))),
+            ("cv_1pct".into(), Value::List(Arc::new(trace_cv1))),
+        ]);
+        let trace_df = self.dict_to_dataframe(&trace_map)?;
+        display.push_str("\n  Max-Eigenvalue Test:\n");
+        display.push_str(&format!(
+            "  {:>4}  {:>12}  {:>10}  {:>10}  {:>10}\n",
             "Rank", "Max-eig", "10%", "5%", "1%"
-        );
+        ));
+        let mut me_rank = Vec::new();
+        let mut me_stat = Vec::new();
+        let mut me_cv10 = Vec::new();
+        let mut me_cv5 = Vec::new();
+        let mut me_cv1 = Vec::new();
         for i in 0..r.n_vars {
             let stat = r.max_eigen_stats[i];
             let cv = r.max_eigen_critical_values.row(i);
-            println!(
-                "  {:>4}  {:>12.4}  {:>10.4}  {:>10.4}  {:>10.4}",
+            display.push_str(&format!(
+                "  {:>4}  {:>12.4}  {:>10.4}  {:>10.4}  {:>10.4}\n",
                 i, stat, cv[0], cv[1], cv[2]
-            );
+            ));
+            me_rank.push(Value::Int(i as i64));
+            me_stat.push(Value::Float(stat));
+            me_cv10.push(Value::Float(cv[0]));
+            me_cv5.push(Value::Float(cv[1]));
+            me_cv1.push(Value::Float(cv[2]));
         }
-        Ok(Value::Nil)
+        let max_eigen_map = HashMap::from([
+            ("rank".into(), Value::List(Arc::new(me_rank))),
+            ("max_eigen_stat".into(), Value::List(Arc::new(me_stat))),
+            ("cv_10pct".into(), Value::List(Arc::new(me_cv10))),
+            ("cv_5pct".into(), Value::List(Arc::new(me_cv5))),
+            ("cv_1pct".into(), Value::List(Arc::new(me_cv1))),
+        ]);
+        let max_eigen_df = self.dict_to_dataframe(&max_eigen_map)?;
+        let summary = format!(
+            "Johansen: rank={}, n_vars={}, lags={}",
+            r.cointegrating_rank, r.n_vars, lags
+        );
+        let eigenvalues = model_expansion::array1_to_series("eigenvalues", &r.eigenvalues);
+        let eigenvectors = model_expansion::array2_to_dataframe_named(&r.eigenvectors, &var_names);
+        let fit = model_expansion::fit_dict(&[
+            (
+                "cointegrating_rank",
+                Value::Int(r.cointegrating_rank as i64),
+            ),
+            ("n_vars", Value::Int(r.n_vars as i64)),
+            ("lags", Value::Int(lags as i64)),
+            ("det", Value::Int(det as i64)),
+        ]);
+        let fields = vec![
+            (
+                "variables".into(),
+                Value::List(Arc::new(
+                    var_names.iter().map(|s| Value::Str(s.clone())).collect(),
+                )),
+            ),
+            ("trace".into(), Value::DataFrame(Arc::new(trace_df))),
+            ("max_eigen".into(), Value::DataFrame(Arc::new(max_eigen_df))),
+            ("eigenvalues".into(), eigenvalues),
+            ("eigenvectors".into(), eigenvectors),
+            ("fit".into(), fit),
+        ];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "JohansenResult",
+            fields,
+        ))
     }
 
     pub(super) fn xtset(
@@ -2368,8 +2956,8 @@ impl Interpreter {
                 ))
             }
         };
-        match self.env.get(&df_name) {
-            Some(Value::DataFrame(_)) => {}
+        let df = match self.env.get(&df_name) {
+            Some(Value::DataFrame(d)) => d.clone(),
             _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
         };
         let id_col = match &args[1] {
@@ -2394,11 +2982,37 @@ impl Interpreter {
         };
         self.panel_info
             .insert(df_name.clone(), (id_col.clone(), time_col.clone()));
-        if time_col.is_empty() {
-            println!("xtset {df_name}  (time series: t={id_col})");
+        let is_panel = !time_col.is_empty();
+        let mut display = String::new();
+        if is_panel {
+            display.push_str(&format!("xtset {df_name}  id={id_col}  time={time_col}\n"));
         } else {
-            println!("xtset {df_name}  id={id_col}  time={time_col}");
+            display.push_str(&format!("xtset {df_name}  (time series: t={id_col})\n"));
         }
-        Ok(Value::Nil)
+        let summary = if is_panel {
+            format!("xtset panel: {df_name} id={id_col} time={time_col}")
+        } else {
+            format!("xtset time series: {df_name} t={id_col}")
+        };
+        let fit = model_expansion::fit_dict(&[
+            ("df", Value::Str(df_name.clone())),
+            ("id", Value::Str(id_col.clone())),
+            ("time", Value::Str(time_col.clone())),
+            ("is_panel", Value::Bool(is_panel)),
+        ]);
+        let fields = vec![
+            ("df".into(), Value::Str(df_name.clone())),
+            ("id".into(), Value::Str(id_col)),
+            ("time".into(), Value::Str(time_col)),
+            ("is_panel".into(), Value::Bool(is_panel)),
+            ("dataframe".into(), Value::DataFrame(df)),
+            ("fit".into(), fit),
+        ];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "XtsetResult",
+            fields,
+        ))
     }
 }

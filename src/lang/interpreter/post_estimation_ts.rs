@@ -1,5 +1,6 @@
 use super::helpers::*;
 use super::*;
+use crate::lang::dap::model_expansion;
 use std::sync::Arc;
 
 mod timeseries_models;
@@ -449,8 +450,12 @@ impl Interpreter {
                         }
 
                         if rows.is_empty() {
-                            println!("(no marginal effects to plot)");
-                            return Ok(Some(Value::Nil));
+                            return Ok(Some(model_expansion::model_result(
+                                "(no marginal effects to plot)",
+                                "marginsplot: no marginal effects",
+                                "MarginsPlotResult",
+                                vec![],
+                            )));
                         }
 
                         let label_w = rows
@@ -479,8 +484,13 @@ impl Interpreter {
                         };
                         let zero_col = to_col(0.0);
 
-                        println!("\n  Marginal Effects Plot ({})", bm.kind);
-                        println!("  {}", "─".repeat(width + 4));
+                        let mut display = String::new();
+                        display.push_str(&format!("\n  Marginal Effects Plot ({})\n", bm.kind));
+                        display.push_str(&format!("  {}\n", "─".repeat(width + 4)));
+                        let mut var_vec = Vec::new();
+                        let mut effect_vec = Vec::new();
+                        let mut ci_lo_vec = Vec::new();
+                        let mut ci_hi_vec = Vec::new();
                         for (name, eff, ci_lo, ci_hi) in &rows {
                             let c_lo = to_col(*ci_lo);
                             let c_hi = to_col(*ci_hi).min(width - 1);
@@ -496,10 +506,50 @@ impl Interpreter {
                                 line[c_pt] = '●';
                             }
                             let bar: String = line.into_iter().collect();
-                            println!("{:>lw$} │{bar}  {eff:>8.4}", name, lw = label_w);
+                            display.push_str(&format!(
+                                "{:>lw$} │{bar}  {eff:>8.4}\n",
+                                name,
+                                lw = label_w,
+                                bar = bar,
+                                eff = eff
+                            ));
+                            var_vec.push(Value::Str(name.clone()));
+                            effect_vec.push(Value::Float(*eff));
+                            ci_lo_vec.push(Value::Float(*ci_lo));
+                            ci_hi_vec.push(Value::Float(*ci_hi));
                         }
-                        println!("  {}", "─".repeat(width + 4));
-                        println!("  {zero_col} (zero reference)");
+                        display.push_str(&format!("  {}\n", "─".repeat(width + 4)));
+                        display.push_str(&format!("  {zero_col} (zero reference)\n"));
+
+                        let mut columns = HashMap::new();
+                        columns.insert("variable".into(), Value::List(Arc::new(var_vec)));
+                        columns.insert("effect".into(), Value::List(Arc::new(effect_vec)));
+                        columns.insert("ci_lo".into(), Value::List(Arc::new(ci_lo_vec)));
+                        columns.insert("ci_hi".into(), Value::List(Arc::new(ci_hi_vec)));
+                        let effects_df = self.dict_to_dataframe(&columns)?;
+
+                        let fields: Vec<(String, Value)> = vec![
+                            ("effects".into(), Value::DataFrame(Arc::new(effects_df))),
+                            (
+                                "fit".into(),
+                                model_expansion::fit_dict(&[
+                                    ("model_kind", Value::Str(bm.kind.clone())),
+                                    ("n", Value::Int(bm.y.len() as i64)),
+                                    ("width", Value::Int(width as i64)),
+                                ]),
+                            ),
+                        ];
+                        let summary = format!(
+                            "Marginal effects plot ({}): {} variables",
+                            bm.kind,
+                            rows.len()
+                        );
+                        return Ok(Some(model_expansion::model_result(
+                            display,
+                            summary,
+                            "MarginsPlotResult",
+                            fields,
+                        )));
                     }
                     _ => {
                         return Err(HayashiError::Runtime(
@@ -507,7 +557,6 @@ impl Interpreter {
                         ))
                     }
                 }
-                Ok(Value::Nil)
             }
 
             // ── vecm ─────────────────────────────────────────────────────────
@@ -775,6 +824,27 @@ impl Interpreter {
                 let filt_name = format!("{var_name}_filtered");
                 let smooth_name = format!("{var_name}_smoothed");
 
+                let mut fields: Vec<(String, Value)> = vec![
+                    (
+                        "fit".into(),
+                        model_expansion::fit_dict(&[
+                            ("model_kind", Value::Str(model_kind.clone())),
+                            ("n", Value::Int(n as i64)),
+                            ("log_likelihood", Value::Float(ss_result.log_likelihood)),
+                            ("sigma_obs", Value::Float(sigma_obs)),
+                            ("sigma_state", Value::Float(sigma_state)),
+                        ]),
+                    ),
+                    (
+                        "filtered".into(),
+                        model_expansion::array1_to_series(&filt_name, &filtered),
+                    ),
+                    (
+                        "smoothed".into(),
+                        model_expansion::array1_to_series(&smooth_name, &smoothed),
+                    ),
+                ];
+
                 Arc::make_mut(&mut df)
                     .insert(filt_name.clone(), filtered)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -783,7 +853,7 @@ impl Interpreter {
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
                 // For LLT, also add trend (slope = state 1)
-                if matches!(model_kind.as_str(), "llt" | "local_linear_trend") {
+                let display = if matches!(model_kind.as_str(), "llt" | "local_linear_trend") {
                     let slope_filt: ndarray::Array1<f64> = ndarray::Array1::from_vec(
                         ss_result.filtered_states.iter().map(|s| s[1]).collect(),
                     );
@@ -792,29 +862,49 @@ impl Interpreter {
                     );
                     let sf_name = format!("{var_name}_slope_filtered");
                     let ss_name = format!("{var_name}_slope_smoothed");
+
+                    fields.push((
+                        "slope_filtered".into(),
+                        model_expansion::array1_to_series(&sf_name, &slope_filt),
+                    ));
+                    fields.push((
+                        "slope_smoothed".into(),
+                        model_expansion::array1_to_series(&ss_name, &slope_smooth),
+                    ));
+                    if let Some(Value::Dict(fit)) =
+                        fields.iter_mut().find(|(k, _)| k == "fit").map(|(_, v)| v)
+                    {
+                        Arc::make_mut(fit).insert("sigma_slope".into(), Value::Float(sigma_slope));
+                    }
+
                     Arc::make_mut(&mut df)
                         .insert(sf_name.clone(), slope_filt)
                         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                     Arc::make_mut(&mut df)
                         .insert(ss_name.clone(), slope_smooth)
                         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                    println!(
-                        "\nKalman ({}):  T={}  loglik={:.4}  σ_obs={:.4}  σ_state={:.4}  σ_slope={:.4}",
+                    format!(
+                        "\nKalman ({}):  T={}  loglik={:.4}  σ_obs={:.4}  σ_state={:.4}  σ_slope={:.4}\n  → {filt_name}, {smooth_name}, {sf_name}, {ss_name} adicionadas a {df_name}\n",
                         model_kind, n, ss_result.log_likelihood, sigma_obs, sigma_state, sigma_slope
-                    );
-                    println!(
-                        "  → {filt_name}, {smooth_name}, {sf_name}, {ss_name} adicionadas a {df_name}"
-                    );
+                    )
                 } else {
-                    println!(
-                        "\nKalman ({}):  T={}  loglik={:.4}  σ_obs={:.4}  σ_state={:.4}",
+                    format!(
+                        "\nKalman ({}):  T={}  loglik={:.4}  σ_obs={:.4}  σ_state={:.4}\n  → {filt_name}, {smooth_name} adicionadas a {df_name}\n",
                         model_kind, n, ss_result.log_likelihood, sigma_obs, sigma_state
-                    );
-                    println!("  → {filt_name}, {smooth_name} adicionadas a {df_name}");
-                }
+                    )
+                };
 
                 self.env.set(&df_name, Value::DataFrame(df))?;
-                Ok(Value::Nil)
+                let summary = format!(
+                    "Kalman {}: T={}, loglik={:.4}",
+                    model_kind, n, ss_result.log_likelihood
+                );
+                Ok(model_expansion::model_result(
+                    display,
+                    summary,
+                    "KalmanResult",
+                    fields,
+                ))
             }
 
             // ── forecast ─────────────────────────────────────────────────────
