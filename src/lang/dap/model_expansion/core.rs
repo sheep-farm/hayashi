@@ -1,7 +1,7 @@
 use super::*;
 use crate::lang::interpreter::{DiagResult, Series, Value};
 use indexmap::IndexMap;
-use ndarray::{Array1, Array2};
+use ndarray::{Array1, Array2, Array3};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -1127,6 +1127,71 @@ pub fn model_result(
     }
 }
 
+/// Converts a 3-D array into a `List` of `DataFrame`s, one per 2-D slice along
+/// the first dimension, using `col_names` for the columns of each slice.
+pub fn array3_to_list_of_dataframes(arr: &Array3<f64>, col_names: &[String]) -> Value {
+    let n = arr.shape()[0];
+    let rows = arr.shape()[1];
+    let cols = arr.shape()[2];
+    let mut list = Vec::with_capacity(n);
+    for i in 0..n {
+        let mut columns: IndexMap<String, greeners::Column> = IndexMap::new();
+        for j in 0..cols {
+            let name = col_names
+                .get(j)
+                .cloned()
+                .unwrap_or_else(|| format!("col{j}"));
+            let data: Vec<f64> = (0..rows).map(|r| arr[[i, r, j]]).collect();
+            columns.insert(name, greeners::Column::Float(Array1::from(data)));
+        }
+        let df = Value::DataFrame(Arc::new(
+            greeners::DataFrame::from_columns(columns)
+                .unwrap_or_else(|_| greeners::DataFrame::from_columns(IndexMap::new()).unwrap()),
+        ));
+        list.push(df);
+    }
+    Value::List(Arc::new(list))
+}
+
+/// Converts a `Vec<Array1<f64>>` into a `List` of `Value::Series`.
+pub fn vec_array1_to_series_list(v: &[Array1<f64>], name_prefix: &str) -> Value {
+    let list: Vec<Value> = v
+        .iter()
+        .enumerate()
+        .map(|(i, arr)| array1_to_series(&format!("{name_prefix}_{i}"), arr))
+        .collect();
+    Value::List(Arc::new(list))
+}
+
+/// Column names for a VAR with `k` variables and `p` lags, optionally including
+/// the constant term.  Names follow `L1.x`, `L2.x`, etc.
+pub fn var_lag_names(k: usize, p: usize, var_names: &[String], include_const: bool) -> Vec<String> {
+    let mut names = Vec::with_capacity(if include_const { 1 } else { 0 } + k * p);
+    if include_const {
+        names.push("const".into());
+    }
+    for lag in 1..=p {
+        for name in var_names.iter().take(k) {
+            names.push(format!("L{lag}.{name}"));
+        }
+    }
+    names
+}
+
+/// Regime labels `Regime0` .. `Regime{k-1}`.
+pub fn regime_col_names(k: usize) -> Vec<String> {
+    (0..k).map(|i| format!("Regime{i}")).collect()
+}
+
+/// AR coefficient names: `const`, `AR.L1`, `AR.L2`, ...
+pub fn ar_coef_names(ar_order: usize) -> Vec<String> {
+    let mut names = vec!["const".into()];
+    for i in 1..=ar_order {
+        names.push(format!("AR.L{i}"));
+    }
+    names
+}
+
 /// Series of integer values from a `&[usize]` (e.g. cluster labels).
 pub fn int_series(name: &str, values: &[usize]) -> Value {
     let vals: Vec<Value> = values.iter().map(|&v| Value::Int(v as i64)).collect();
@@ -1171,6 +1236,33 @@ pub fn coefficients_df(names: &[String], params: &Array1<f64>) -> Value {
         "coefficient".into(),
         greeners::Column::Float(ndarray::Array1::from(coef_col)),
     );
+    Value::DataFrame(Arc::new(
+        greeners::DataFrame::from_columns(columns)
+            .unwrap_or_else(|_| greeners::DataFrame::from_columns(IndexMap::new()).unwrap()),
+    ))
+}
+
+/// DataFrame summarising a posterior coefficient distribution: variable, mean,
+/// sd, ci_low, ci_high, p_positive.
+pub fn posterior_coef_df(
+    names: &[String],
+    mean: &Array1<f64>,
+    sd: &Array1<f64>,
+    ci_low: &Array1<f64>,
+    ci_high: &Array1<f64>,
+    p_positive: &Array1<f64>,
+) -> Value {
+    let n = mean.len();
+    let mut columns: IndexMap<String, greeners::Column> = IndexMap::new();
+    let name_col: Vec<String> = (0..n)
+        .map(|i| names.get(i).cloned().unwrap_or_else(|| format!("x{i}")))
+        .collect();
+    columns.insert("variable".into(), greeners::Column::from_strings(name_col));
+    columns.insert("mean".into(), f64_array_column(mean));
+    columns.insert("sd".into(), f64_array_column(sd));
+    columns.insert("ci_low".into(), f64_array_column(ci_low));
+    columns.insert("ci_high".into(), f64_array_column(ci_high));
+    columns.insert("p_positive".into(), f64_array_column(p_positive));
     Value::DataFrame(Arc::new(
         greeners::DataFrame::from_columns(columns)
             .unwrap_or_else(|_| greeners::DataFrame::from_columns(IndexMap::new()).unwrap()),
