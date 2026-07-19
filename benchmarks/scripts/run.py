@@ -36,6 +36,21 @@ ESTIMATORS = {
         "python": "logit_python.py",
         "r": "logit_r.R",
     },
+    "probit": {
+        "hay": "probit(y ~ x1 + x2, df)",
+        "python": "probit_python.py",
+        "r": "probit_r.R",
+    },
+    "iv": {
+        "hay": "iv(y ~ x, ~ z, df)",
+        "python": "iv_python.py",
+        "r": "iv_r.R",
+    },
+    "qreg": {
+        "hay": "qreg(y ~ x1 + x2, df, tau=0.5, boot=0)",
+        "python": "qreg_python.py",
+        "r": "qreg_r.R",
+    },
     "arima": {
         "hay": "arima(df, y, p=1, d=0, q=0)",
         "python": "arima_python.py",
@@ -45,6 +60,11 @@ ESTIMATORS = {
         "hay": "garch(df, y, p=1, q=1)",
         "python": "garch_python.py",
         "r": "garch_r.R",
+    },
+    "var": {
+        "hay": "var(df, y1, y2, lags=1)",
+        "python": "var_python.py",
+        "r": "var_r.R",
     },
     "panel": {
         "hay": "fe(y ~ x, df, id=firm)",

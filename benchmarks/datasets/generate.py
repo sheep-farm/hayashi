@@ -68,12 +68,69 @@ def panel_data(n: int, seed: int = 42) -> pd.DataFrame:
     return df
 
 
+def iv_data(n: int, seed: int = 42) -> pd.DataFrame:
+    rng = np.random.default_rng(seed)
+    z = rng.normal(0, 1, size=n)
+    u = rng.normal(0, 1, size=n)
+    # v correlated with u to create endogeneity
+    rho = 0.7
+    v = rho * u + rng.normal(0, np.sqrt(1 - rho**2), size=n)
+    x = 1.0 + 0.8 * z + v
+    y = 1.0 + 2.0 * x + u
+    return pd.DataFrame({"y": y, "x": x, "z": z})
+
+
+def probit_data(n: int, seed: int = 42) -> pd.DataFrame:
+    rng = np.random.default_rng(seed)
+    x1 = rng.normal(0, 1, size=n)
+    x2 = rng.normal(0, 1, size=n)
+    z = 1.0 + 1.5 * x1 - 0.8 * x2
+    # standard normal CDF using error function
+    pr = 0.5 * (1.0 + np.erf(z / np.sqrt(2.0)))
+    y = rng.binomial(1, pr).astype(float)
+    return pd.DataFrame({"y": y, "x1": x1, "x2": x2})
+
+
+def qreg_data(n: int, seed: int = 42) -> pd.DataFrame:
+    rng = np.random.default_rng(seed)
+    x1 = rng.normal(0, 1, size=n)
+    x2 = rng.normal(0, 1, size=n)
+    # add some heteroskedasticity to make quantile interesting
+    eps = rng.normal(0, 1 + 0.5 * x1.abs(), size=n)
+    y = 1.0 + 2.0 * x1 - 1.5 * x2 + eps
+    return pd.DataFrame({"y": y, "x1": x1, "x2": x2})
+
+
+def var_data(n: int, seed: int = 42) -> pd.DataFrame:
+    rng = np.random.default_rng(seed)
+    c = np.array([0.5, 0.3])
+    A = np.array([[0.7, 0.2], [0.1, 0.6]])
+    # burn-in to reach stationarity
+    burn = 100
+    y_prev = rng.normal(0, 1, size=2)
+    for _ in range(burn):
+        e = rng.normal(0, 1, size=2)
+        y_prev = c + A @ y_prev + e
+    y1 = np.zeros(n)
+    y2 = np.zeros(n)
+    for t in range(n):
+        e = rng.normal(0, 1, size=2)
+        y_prev = c + A @ y_prev + e
+        y1[t] = y_prev[0]
+        y2[t] = y_prev[1]
+    return pd.DataFrame({"y1": y1, "y2": y2})
+
+
 GENERATORS = {
     "ols": ols_data,
     "logit": logit_data,
     "arima": arima_data,
     "garch": garch_data,
     "panel": panel_data,
+    "iv": iv_data,
+    "probit": probit_data,
+    "qreg": qreg_data,
+    "var": var_data,
 }
 
 

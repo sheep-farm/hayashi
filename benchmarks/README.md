@@ -12,15 +12,19 @@ No cherry-picking.
 
 - `ols` — Ordinary Least Squares
 - `logit` — Binary logit
+- `probit` — Binary probit
+- `iv` — IV / 2SLS
+- `qreg` — Quantile regression (median, `tau=0.5`, no bootstrap)
 - `arima` — AR(1) via `arima(df, y, p=1, d=0, q=0)`
 - `garch` — GARCH(1,1)
+- `var` — Vector Autoregression, 2-equation VAR(1)
 - `panel` — Fixed-effects panel (`plm` / `linearmodels`)
 
 ## Competitors
 
-- **R:** `lm`, `glm`, `arima`, `rugarch`, `plm`
-- **Python:** `statsmodels`, `linearmodels`, `arch`
-- **Hayashi:** `ols`, `logit`, `arima`, `garch`, `fe`
+- **R:** `lm`, `glm` (logit/probit), `arima`, `rugarch`, `plm`, `ivreg`, `quantreg`, `vars`
+- **Python:** `statsmodels` (OLS, logit/probit, ARIMA, VAR, quantile), `linearmodels` (IV, panel), `arch`
+- **Hayashi:** `ols`, `logit`, `probit`, `iv`, `qreg`, `arima`, `garch`, `var`, `fe`
 
 ## Methodology
 
@@ -64,6 +68,10 @@ python scripts/run.py --estimator ols --sizes 1000,10000,100000 \
   equivalent implementation.
 - `statsmodels` in particular does a lot of extra work in the default
   `fit()`, so it may look slower than it really is for an equivalent task.
+- `qreg` is benchmarked with `boot=0` in Hayashi to measure only the
+  IRLS fit; R/Python compute their standard errors by default.
+- `var` uses a 2-equation VAR(1) with intercept on stationary synthetic
+  data; the absolute time is small, so focus on relative speedup.
 - R and Python have mature ecosystems; this benchmark measures raw
   estimation speed, not overall productivity.
 

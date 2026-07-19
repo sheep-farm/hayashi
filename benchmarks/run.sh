@@ -9,7 +9,7 @@ if [ ! -f "../target/release/hay" ]; then
     (cd .. && cargo build --release)
 fi
 
-ESTIMATORS=(ols logit arima garch panel)
+ESTIMATORS=(ols logit probit iv qreg arima garch var panel)
 SIZES="1000,10000"
 ITERS=30
 RUNS=5
