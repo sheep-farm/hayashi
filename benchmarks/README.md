@@ -57,6 +57,29 @@ python scripts/run.py --estimator ols --sizes 1000,10000,100000 \
 - `--runs`: how many times the timed subprocess is launched.
 - `--warmup`: untimed iterations before the timed loop.
 
+## DataFrame / language operation benchmarks
+
+`scripts/benchmark_ops.py` benchmarks individual Hayashi operations, with
+optional pandas comparison for the same task:
+
+```bash
+python scripts/benchmark_ops.py
+python scripts/benchmark_ops.py --op load_csv,filter,sort --sizes 10000,100000
+python scripts/benchmark_ops.py --op load_csv --sizes 100000,1000000
+```
+
+Covered operations:
+
+- `load_csv` — CSV parse/load (uses wall-clock time per run)
+- `generate_random` — add a random-normal column
+- `generate_expr` — add a derived column `(x + y) * 2`
+- `filter` — row filter `x > 0`
+- `sort` — sort by a single column
+- `groupby_mean` — group and compute mean
+- `merge` — inner join on `id`
+- `loop` — integer `for` loop overhead
+- `function_call` — user function call overhead
+
 ## Honest interpretation / caveats
 
 - Hayashi may lose on small datasets because of binary load / script parsing time.
