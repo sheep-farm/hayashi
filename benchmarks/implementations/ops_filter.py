@@ -21,7 +21,7 @@ def main():
         t0 = time.perf_counter()
         df[df["x"] > 0]
         t1 = time.perf_counter()
-        print(f"  elapsed: {t1 - t0:.4f}s")
+        print(f"  elapsed: {t1 - t0:.6f}s")
 
 
 if __name__ == "__main__":

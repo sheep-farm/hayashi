@@ -24,7 +24,7 @@ def main():
         t0 = time.perf_counter()
         arch_model(y, vol="GARCH", p=1, q=1).fit(update_freq=0, disp="off")
         t1 = time.perf_counter()
-        print(f"  elapsed: {t1 - t0:.4f}s")
+        print(f"  elapsed: {t1 - t0:.6f}s")
 
 
 if __name__ == "__main__":

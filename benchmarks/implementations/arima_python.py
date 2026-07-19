@@ -24,7 +24,7 @@ def main():
         t0 = time.perf_counter()
         ARIMA(y, order=(1, 0, 0)).fit()
         t1 = time.perf_counter()
-        print(f"  elapsed: {t1 - t0:.4f}s")
+        print(f"  elapsed: {t1 - t0:.6f}s")
 
 
 if __name__ == "__main__":

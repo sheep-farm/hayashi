@@ -20,5 +20,5 @@ for (i in seq_len(iters)) {
   t0 <- proc.time()[["elapsed"]]
   m <- suppressWarnings(VAR(y, p = 1, type = "const"))
   t1 <- proc.time()[["elapsed"]]
-  cat(sprintf("  elapsed: %.4fs\n", t1 - t0))
+  cat(sprintf("  elapsed: %.6fs\n", t1 - t0))
 }

@@ -23,7 +23,7 @@ def main():
         t0 = time.perf_counter()
         IV2SLS.from_formula("y ~ 1 + [x ~ z]", df).fit()
         t1 = time.perf_counter()
-        print(f"  elapsed: {t1 - t0:.4f}s")
+        print(f"  elapsed: {t1 - t0:.6f}s")
 
 
 if __name__ == "__main__":

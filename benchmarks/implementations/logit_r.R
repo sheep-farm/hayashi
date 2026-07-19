@@ -17,5 +17,5 @@ for (i in seq_len(iters)) {
   t0 <- proc.time()[["elapsed"]]
   m <- suppressWarnings(glm(y ~ x1 + x2, data = df, family = binomial))
   t1 <- proc.time()[["elapsed"]]
-  cat(sprintf("  elapsed: %.4fs\n", t1 - t0))
+  cat(sprintf("  elapsed: %.6fs\n", t1 - t0))
 }

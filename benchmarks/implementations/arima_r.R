@@ -18,5 +18,5 @@ for (i in seq_len(iters)) {
   t0 <- proc.time()[["elapsed"]]
   m <- arima(y, order = c(1, 0, 0))
   t1 <- proc.time()[["elapsed"]]
-  cat(sprintf("  elapsed: %.4fs\n", t1 - t0))
+  cat(sprintf("  elapsed: %.6fs\n", t1 - t0))
 }
