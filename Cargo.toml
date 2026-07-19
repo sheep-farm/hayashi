@@ -77,8 +77,8 @@ network = ["dep:ureq", "dep:url", "dep:tempfile", "dep:libloading"]
 dta = ["dep:dta"]
 sqlite = ["dep:rusqlite"]
 repl = ["dep:rustyline"]
-# Full native CLI also exposes Greeners URL loaders.
-native = ["network", "dta", "sqlite", "repl", "greeners/url"]
+# Full native CLI (network + database formats + REPL).
+native = ["network", "dta", "sqlite", "repl"]
 wasm-bindings = ["dep:wasm-bindgen", "dep:js-sys"]
 # Minimal feature for the headless hay-run binary (no REPL/DAP).
 script = []
