@@ -68,16 +68,23 @@ if [ "$RUN_ESTIMATORS" -eq 0 ] && [ "$RUN_OPS" -eq 0 ] && [ "$RUN_RUST" -eq 0 ];
     RUN_RUST=1
 fi
 
-# Ensure Hayashi release binary is up-to-date.
-if [ "$NO_BUILD" -eq 1 ]; then
-    if [ ! -f "../target/release/hay" ]; then
-        echo "Error: --no-build requested but ../target/release/hay does not exist." >&2
-        exit 1
+# Ensure Hayashi headless runner is up-to-date when needed.
+HAY_NEEDED=0
+if [ "$RUN_ESTIMATORS" -eq 1 ] || [ "$RUN_OPS" -eq 1 ]; then
+    HAY_NEEDED=1
+fi
+
+if [ "$HAY_NEEDED" -eq 1 ]; then
+    if [ "$NO_BUILD" -eq 1 ]; then
+        if [ ! -f "../target/release/hay-run" ] && [ ! -f "../target/release/hay" ]; then
+            echo "Error: --no-build requested but neither hay-run nor hay exists." >&2
+            exit 1
+        fi
+        echo "Skipping Hayashi build (--no-build)."
+    else
+        echo "Building/updating headless Hayashi runner (hay-run)..."
+        (cd .. && cargo build --release --bin hay-run --no-default-features --features "script network")
     fi
-    echo "Skipping Hayashi build (--no-build)."
-else
-    echo "Building/updating Hayashi release binary..."
-    (cd .. && cargo build --release)
 fi
 
 if [ "$RUN_ESTIMATORS" -eq 1 ]; then

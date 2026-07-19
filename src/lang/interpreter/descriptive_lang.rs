@@ -425,7 +425,7 @@ impl Interpreter {
         }
 
         let resolved = {
-            #[cfg(feature = "native")]
+            #[cfg(feature = "network")]
             {
                 if crate::io::fetch::is_url(&module) {
                     let tmp = crate::io::fetch::download_to_temp(&module)?;
@@ -434,7 +434,7 @@ impl Interpreter {
                     self.resolve_import(&module)?
                 }
             }
-            #[cfg(not(feature = "native"))]
+            #[cfg(not(feature = "network"))]
             {
                 self.resolve_import(&module)?
             }
@@ -494,9 +494,9 @@ impl Interpreter {
                 ));
             }
         } else if is_native {
-            #[cfg(not(feature = "native"))]
-            return Err(self.rt_err("import: native plugins require 'native' feature"));
-            #[cfg(feature = "native")]
+            #[cfg(not(feature = "network"))]
+            return Err(self.rt_err("import: native plugins require 'network' feature"));
+            #[cfg(feature = "network")]
             {
                 use crate::lang::plugin::RustNativePlugin;
                 let plugin = RustNativePlugin::new(&resolved, &ns).map_err(|e| {
@@ -617,7 +617,11 @@ impl Interpreter {
             opt_map.get("force").map(value_as_bool).unwrap_or(false)
         };
 
-        #[cfg(feature = "native")]
+        // Silence unused-variable warnings when the `network` feature is off.
+        #[cfg(not(feature = "network"))]
+        let _ = (&spec, &version, force);
+
+        #[cfg(feature = "network")]
         {
             crate::io::packages::install(&spec, version.as_deref(), force)?;
             let display = format!("install {spec}");
@@ -638,10 +642,10 @@ impl Interpreter {
                 display, summary, "install", fields,
             ))
         }
-        #[cfg(not(feature = "native"))]
+        #[cfg(not(feature = "network"))]
         {
             Err(HayashiError::Runtime(
-                "install() requires the 'native' feature".into(),
+                "install() requires the 'network' feature".into(),
             ))
         }
     }

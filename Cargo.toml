@@ -22,6 +22,11 @@ name = "hay"
 path = "src/main.rs"
 required-features = ["native"]
 
+[[bin]]
+name = "hay-run"
+path = "src/bin/hay-run.rs"
+required-features = ["script", "network"]
+
 [dependencies]
 greeners = { path = "../Greeners" }
 ndarray = "0.17"
@@ -67,8 +72,16 @@ default = ["plotters", "wasm", "native"]
 odbc = ["dep:odbc-api"]
 plotters = ["dep:plotters"]
 wasm = ["dep:wasmi"]
-native = ["dep:rustyline", "dep:dta", "dep:ureq", "dep:url", "dep:tempfile", "dep:rusqlite", "dep:libloading"]
+# Headless network/install support (URL loading, package install, native plugins).
+network = ["dep:ureq", "dep:url", "dep:tempfile", "dep:libloading"]
+dta = ["dep:dta"]
+sqlite = ["dep:rusqlite"]
+repl = ["dep:rustyline"]
+# Full native CLI also exposes Greeners URL loaders.
+native = ["network", "dta", "sqlite", "repl", "greeners/url"]
 wasm-bindings = ["dep:wasm-bindgen", "dep:js-sys"]
+# Minimal feature for the headless hay-run binary (no REPL/DAP).
+script = []
 
 [profile.release]
 opt-level = 3

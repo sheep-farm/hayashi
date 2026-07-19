@@ -11,7 +11,10 @@ from pathlib import Path
 
 BENCH_DIR = Path(__file__).resolve().parent.parent
 ROOT_DIR = BENCH_DIR.parent
-HAY_EXE = ROOT_DIR / "target" / "release" / "hay"
+# Prefer the headless hay-run binary if it exists; fall back to the full hay binary.
+HAY_EXE = ROOT_DIR / "target" / "release" / "hay-run"
+if not HAY_EXE.exists():
+    HAY_EXE = ROOT_DIR / "target" / "release" / "hay"
 DATASETS_DIR = BENCH_DIR / "datasets" / "generated"
 RESULTS_DIR = BENCH_DIR / "results"
 TMP_DIR = BENCH_DIR / ".tmp"
