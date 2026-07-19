@@ -44,7 +44,7 @@ Load options: `sheet=`, `table=`, `query=`, `sep=`, `columns=`, `where=`. URLs a
 | `drop_collinear` | `drop_collinear(df [, vars=[...]])` | Remove perfectly collinear columns |
 | `preserve` | `preserve(df)` | Snapshot DataFrame |
 | `restore` | `restore(df)` | Restore to last snapshot |
-| `dataframe` | `dataframe({"x": [1, 2]})` | Build DataFrame from dict of lists |
+| `dataframe` | `dataframe({"x": [1, 2]})` or `dataframe(1000)` | Build DataFrame from dict of lists, or pre-dimension an empty DataFrame |
 
 ---
 

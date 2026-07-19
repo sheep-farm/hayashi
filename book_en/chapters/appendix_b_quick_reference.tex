@@ -98,6 +98,7 @@ match  try  catch  and  or  not  true  false  nil  quietly
 \toprule
 \textbf{Function} & \textbf{Description} \\
 \midrule
+\texttt{dataframe(dict)} / \texttt{dataframe(n)} & Build DataFrame from dict, or pre-dimension an empty one \\
 \texttt{load "f" as df [, opts]}  & Load file (CSV, TSV, JSON, Parquet, DTA, XLSX, SQLite, ODBC) \\
                                   & \quad \textit{opts}: \texttt{sheet=}, \texttt{table=}, \texttt{query=}, \texttt{sep=}, \texttt{columns=}, \texttt{where=} \\
 \texttt{save df "f"}              & Save file \\

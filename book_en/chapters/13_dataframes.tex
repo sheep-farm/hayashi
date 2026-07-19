@@ -54,6 +54,18 @@ must have the same number of values.
   \lstinline{load}.
 \end{nota}
 
+\subsection*{\texttt{dataframe(n)} — pre-dimensioned empty DataFrame}
+
+Create an empty DataFrame with a fixed number of rows. This is useful
+before populating it with \lstinline{generate}:
+
+\begin{lstlisting}[caption={Pre-dimensioned DataFrame}]
+let df = dataframe(1000)
+
+generate df u = rnormal(0, 1)
+generate df treat = rbernoulli(0.5)
+\end{lstlisting}
+
 \subsection*{\texttt{load} — external files}
 
 \begin{lstlisting}[caption={Loading files}]

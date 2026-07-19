@@ -60,6 +60,18 @@ mesmo número de valores.
   \lstinline{load}.
 \end{nota}
 
+\subsection*{\texttt{dataframe(n)} — DataFrame vazio pré-dimensionado}
+
+Cria um DataFrame vazio com um número fixo de linhas. Útil para
+pré-dimensionar antes de preenchê-lo com \lstinline{generate}:
+
+\begin{lstlisting}[caption={DataFrame pré-dimensionado}]
+let df = dataframe(1000)
+
+generate df u = rnormal(0, 1)
+generate df treat = rbernoulli(0.5)
+\end{lstlisting}
+
 \subsection*{\texttt{load} — arquivos externos}
 
 \begin{lstlisting}[caption={Carregando arquivos}]

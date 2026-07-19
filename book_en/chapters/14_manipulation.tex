@@ -39,7 +39,7 @@ row, broadcasting scalar parameters to the DataFrame length.
 
 \begin{lstlisting}[caption={Simulating data}]
 set_seed(42)
-let df = dataframe({"obs": 1..=1000})
+let df = dataframe(1000)
 
 generate df u = rnormal(0, 1)
 generate df treated = rbernoulli(0.5)

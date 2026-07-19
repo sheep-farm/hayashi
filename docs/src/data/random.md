@@ -8,7 +8,7 @@ value per row of the target DataFrame.
 
 ```hay
 set_seed(42)
-let df = dataframe({"obs": 1..=1000})
+let df = dataframe(1000)
 
 generate df u = rnormal()
 generate df eps = rnormal(0, 2)

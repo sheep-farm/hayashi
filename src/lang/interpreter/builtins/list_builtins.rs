@@ -127,7 +127,7 @@ impl Interpreter {
             }
             "dataframe" => {
                 if args.len() != 1 {
-                    return Err(self.rt_err("dataframe(dict)"));
+                    return Err(self.rt_err("dataframe(dict) or dataframe(n)"));
                 }
                 let d = self.eval_expr(&args[0])?;
                 match d {
@@ -135,7 +135,15 @@ impl Interpreter {
                         let df = self.dict_to_dataframe(&m)?;
                         Ok(Value::DataFrame(Arc::new(df)))
                     }
-                    _ => Err(HayashiError::Type("dataframe() requires dict".into())),
+                    Value::Int(n) if n >= 0 => Ok(Value::DataFrame(Arc::new(
+                        greeners::DataFrame::empty(n as usize),
+                    ))),
+                    Value::Float(n) if n >= 0.0 && n.fract() == 0.0 => Ok(Value::DataFrame(
+                        Arc::new(greeners::DataFrame::empty(n as usize)),
+                    )),
+                    _ => Err(HayashiError::Type(
+                        "dataframe() requires a dict or a non-negative integer row count".into(),
+                    )),
                 }
             }
             _ => unreachable!(),
