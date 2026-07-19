@@ -42,7 +42,7 @@ NO_BUILD=0
 RUST_ARGS="--quick"
 
 ESTIMATORS=(ols logit probit iv qreg arima garch var panel)
-: "${SIZES:=1000,10000,100000}"
+: "${SIZES:=1000,10000}"
 : "${ITERS:=30}"
 : "${RUNS:=5}"
 : "${WARMUP:=3}"
