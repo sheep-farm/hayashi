@@ -1,0 +1,35 @@
+id: ols_hc3_wooldridge_wage1
+title: OLS log-wage equation with HC3 robust SEs on Wooldridge wage1
+estimator_family: ols
+status: active
+dimension: numerical
+
+dataset:
+  name: wooldridge::wage1
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-6
+    standard_errors: 1e-6
+
+hayashi_script: cases/ols_hc3_wooldridge_wage1/hayashi/run.hay
+reference_scripts:
+  R: cases/ols_hc3_wooldridge_wage1/reference/run.R
+  Python: cases/ols_hc3_wooldridge_wage1/reference/run.py
+
+notes: OLS log-wage equation with HC3 heteroskedasticity-robust standard errors.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened:
+    - 89
