@@ -41,16 +41,37 @@ No cherry-picking.
 
 ## Usage
 
+Run everything (estimators + DataFrame operations + Greeners Rust
+microbenchmarks) with sensible defaults:
+
 ```bash
 cd benchmarks
 ./run.sh
 ```
 
-Or, with fine control:
+Options:
+
+```bash
+./run.sh --estimators          # only cross-language estimator benchmarks
+./run.sh --ops                 # only DataFrame/language operation benchmarks
+./run.sh --rust                # only Greeners Criterion microbenchmarks
+./run.sh --rust --full         # full Criterion statistics (slower)
+./run.sh --estimators --ops    # estimators + ops, skipping Rust
+```
+
+Environment variables for tuning:
+
+```bash
+SIZES=1000,10000,100000 ITERS=30 RUNS=5 WARMUP=3 ./run.sh
+```
+
+Or call the individual runners directly:
 
 ```bash
 python scripts/run.py --estimator ols --sizes 1000,10000,100000 \
     --iters 30 --runs 5 --warmup 3
+
+python scripts/benchmark_ops.py --op load_csv,filter,sort --sizes 10000,100000
 ```
 
 - `--iters`: timed iterations per subprocess run.
@@ -115,5 +136,8 @@ Requires `matplotlib` installed (optional).
 
 ## Results
 
-Raw results are written to `results/<estimator>_YYYYMMDD_HHMMSS.json`.
-They are git-ignored and should be regenerated locally.
+- Hayashi raw results are written to `results/<estimator>_YYYYMMDD_HHMMSS.json`
+  and `results/ops_YYYYMMDD_HHMMSS.json`.
+- Greeners Criterion reports (HTML + JSON) are written to
+  `target/criterion/` inside `../Greeners`.
+- All result files are git-ignored and should be regenerated locally.
