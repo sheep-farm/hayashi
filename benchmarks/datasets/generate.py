@@ -103,7 +103,7 @@ def qreg_data(n: int, seed: int = 42) -> pd.DataFrame:
     x1 = rng.normal(0, 1, size=n)
     x2 = rng.normal(0, 1, size=n)
     # add some heteroskedasticity to make quantile interesting
-    eps = rng.normal(0, 1 + 0.5 * x1.abs(), size=n)
+    eps = rng.normal(0, 1 + 0.5 * np.abs(x1), size=n)
     y = 1.0 + 2.0 * x1 - 1.5 * x2 + eps
     return pd.DataFrame({"y": y, "x1": x1, "x2": x2})
 
