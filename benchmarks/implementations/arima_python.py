@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """ARIMA benchmark with statsmodels."""
 
-import json
-import statistics
 import sys
 import time
 
@@ -12,31 +10,21 @@ from statsmodels.tsa.arima.model import ARIMA
 
 def main():
     path = sys.argv[1]
-    reps = int(sys.argv[2])
+    iters = int(sys.argv[2]) if len(sys.argv) > 2 else 30
+    warmup = int(sys.argv[3]) if len(sys.argv) > 3 else 3
+
     df = pd.read_csv(path)
     y = df["y"]
 
     # warmup
-    ARIMA(y, order=(1, 0, 0)).fit()
+    for _ in range(warmup):
+        ARIMA(y, order=(1, 0, 0)).fit()
 
-    times = []
-    for _ in range(reps):
+    for _ in range(iters):
         t0 = time.perf_counter()
-        model = ARIMA(y, order=(1, 0, 0)).fit()
+        ARIMA(y, order=(1, 0, 0)).fit()
         t1 = time.perf_counter()
-        times.append(t1 - t0)
-
-    print(
-        json.dumps(
-            {
-                "mean": sum(times) / len(times),
-                "std": statistics.stdev(times) if len(times) > 1 else 0.0,
-                "min": min(times),
-                "max": max(times),
-                "reps": reps,
-            }
-        )
-    )
+        print(f"  elapsed: {t1 - t0:.4f}s")
 
 
 if __name__ == "__main__":

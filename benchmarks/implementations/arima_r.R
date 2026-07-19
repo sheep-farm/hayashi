@@ -3,26 +3,20 @@
 
 args <- commandArgs(trailingOnly = TRUE)
 path <- args[1]
-reps <- as.integer(args[2])
+iters <- as.integer(args[2])
+warmup <- as.integer(args[3])
 
 df <- read.csv(path)
 y <- df$y
 
 # warmup
-invisible(arima(y, order = c(1, 0, 0)))
-
-times <- numeric(reps)
-for (i in seq_len(reps)) {
-  t0 <- Sys.time()
+for (i in seq_len(warmup)) {
   m <- arima(y, order = c(1, 0, 0))
-  t1 <- Sys.time()
-  times[i] <- as.numeric(t1 - t0, units = "secs")
 }
 
-cat(jsonlite::toJSON(list(
-  mean = mean(times),
-  std = sd(times),
-  min = min(times),
-  max = max(times),
-  reps = reps
-), auto_unbox = TRUE), "\n")
+for (i in seq_len(iters)) {
+  t0 <- proc.time()[["elapsed"]]
+  m <- arima(y, order = c(1, 0, 0))
+  t1 <- proc.time()[["elapsed"]]
+  cat(sprintf("  elapsed: %.4fs\n", t1 - t0))
+}

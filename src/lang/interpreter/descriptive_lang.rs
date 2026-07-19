@@ -196,17 +196,22 @@ impl Interpreter {
         _func: &str,
         args: &[Expr],
         _opts: &[Opt],
-        _opt_map: &HashMap<String, Value>,
+        opt_map: &HashMap<String, Value>,
     ) -> Result<Value> {
         if args.is_empty() {
             return Err(HayashiError::Runtime(
-                "timer(expr) — measures evaluation time".into(),
+                "timer(expr [, digits=N]) — measures evaluation time".into(),
             ));
         }
+        let digits: usize = match opt_map.get("digits") {
+            Some(Value::Int(n)) if *n >= 0 => *n as usize,
+            Some(Value::Float(n)) if *n >= 0.0 => *n as usize,
+            _ => 4,
+        };
         let start = std::time::Instant::now();
         let result = self.eval_expr(&args[0])?;
         let elapsed = start.elapsed();
-        println!("  elapsed: {:.4}s", elapsed.as_secs_f64());
+        println!("  elapsed: {:.1$}s", elapsed.as_secs_f64(), digits);
         Ok(result)
     }
 

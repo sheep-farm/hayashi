@@ -3,7 +3,8 @@
 
 args <- commandArgs(trailingOnly = TRUE)
 path <- args[1]
-reps <- as.integer(args[2])
+iters <- as.integer(args[2])
+warmup <- as.integer(args[3])
 
 df <- read.csv(path)
 y <- df$y
@@ -16,20 +17,13 @@ spec <- ugarchspec(
 )
 
 # warmup
-invisible(ugarchfit(spec, y, solver = "hybrid"))
-
-times <- numeric(reps)
-for (i in seq_len(reps)) {
-  t0 <- Sys.time()
-  m <- ugarchfit(spec, y, solver = "hybrid")
-  t1 <- Sys.time()
-  times[i] <- as.numeric(t1 - t0, units = "secs")
+for (i in seq_len(warmup)) {
+  capture.output(invisible(ugarchfit(spec, y, solver = "hybrid")), file = nullfile())
 }
 
-cat(jsonlite::toJSON(list(
-  mean = mean(times),
-  std = sd(times),
-  min = min(times),
-  max = max(times),
-  reps = reps
-), auto_unbox = TRUE), "\n")
+for (i in seq_len(iters)) {
+  t0 <- proc.time()[["elapsed"]]
+  capture.output(invisible(ugarchfit(spec, y, solver = "hybrid")), file = nullfile())
+  t1 <- proc.time()[["elapsed"]]
+  cat(sprintf("  elapsed: %.4fs\n", t1 - t0))
+}

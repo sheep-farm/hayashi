@@ -25,10 +25,14 @@ No cherry-picking.
 ## Methodology
 
 1. Each estimator runs on synthetic datasets of increasing size.
-2. Each combination (estimator × language × size) runs several times.
-3. The first run is discarded as warmup when applicable.
-4. Mean and standard deviation of wall-clock time are reported.
-5. Datasets and scripts are versioned; raw results are kept in `results/`
+2. Each implementation runs `warmup` untimed iterations to warm caches,
+   then `iters` timed iterations inside a single process.
+3. The timed run is repeated `runs` times; each timed iteration emits a
+   `  elapsed: X.XXXXs` line.
+4. The runner parses all `elapsed:` lines and reports mean, std, min and max
+   **per estimator call**.
+5. Peak RSS is sampled via `/proc/<pid>/status` during each run and averaged.
+6. Datasets and scripts are versioned; raw results are kept in `results/`
    and are not committed.
 
 ## Usage
@@ -41,14 +45,20 @@ cd benchmarks
 Or, with fine control:
 
 ```bash
-python scripts/run.py --estimator ols --sizes 1000,10000,100000 --reps 10
+python scripts/run.py --estimator ols --sizes 1000,10000,100000 \
+    --iters 30 --runs 5 --warmup 3
 ```
+
+- `--iters`: timed iterations per subprocess run.
+- `--runs`: how many times the timed subprocess is launched.
+- `--warmup`: untimed iterations before the timed loop.
 
 ## Honest interpretation / caveats
 
-- Hayashi may lose on small datasets because of compilation / binary load time.
-- Hayashi tends to win on large datasets and repeated loops thanks to
-  Rust/LLVM.
+- Hayashi may lose on small datasets because of binary load / script parsing time.
+- Hayashi tends to win on large datasets and repeated loops thanks to Rust/LLVM.
+- The reported time is **per estimator call**; startup is amortized by the
+  inner iteration count.
 - Competitors compute more by default (covariance matrix, tests, influence).
   This benchmark measures the default command time, not a minimally
   equivalent implementation.
