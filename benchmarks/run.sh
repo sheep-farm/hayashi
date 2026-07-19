@@ -17,6 +17,7 @@ Options:
   --rust           Run only the Greeners Criterion microbenchmarks
   --quick          Use Criterion's --quick mode (default)
   --full           Run Criterion with full statistics (slower)
+  --no-build       Skip rebuilding the Hayashi release binary (ensure it exists)
   --help           Show this help
 
 Environment variables:
@@ -37,6 +38,7 @@ EOF
 RUN_ESTIMATORS=0
 RUN_OPS=0
 RUN_RUST=0
+NO_BUILD=0
 RUST_ARGS="--quick"
 
 ESTIMATORS=(ols logit probit iv qreg arima garch var panel)
@@ -52,6 +54,7 @@ while [ $# -gt 0 ]; do
         --rust) RUN_RUST=1 ;;
         --quick) RUST_ARGS="--quick" ;;
         --full) RUST_ARGS="" ;;
+        --no-build) NO_BUILD=1 ;;
         --help) usage; exit 0 ;;
         *) echo "Unknown option: $1" >&2; usage; exit 1 ;;
     esac
@@ -65,9 +68,15 @@ if [ "$RUN_ESTIMATORS" -eq 0 ] && [ "$RUN_OPS" -eq 0 ] && [ "$RUN_RUST" -eq 0 ];
     RUN_RUST=1
 fi
 
-# Ensure Hayashi release binary is built.
-if [ ! -f "../target/release/hay" ]; then
-    echo "Building Hayashi release binary..."
+# Ensure Hayashi release binary is up-to-date.
+if [ "$NO_BUILD" -eq 1 ]; then
+    if [ ! -f "../target/release/hay" ]; then
+        echo "Error: --no-build requested but ../target/release/hay does not exist." >&2
+        exit 1
+    fi
+    echo "Skipping Hayashi build (--no-build)."
+else
+    echo "Building/updating Hayashi release binary..."
     (cd .. && cargo build --release)
 fi
 
