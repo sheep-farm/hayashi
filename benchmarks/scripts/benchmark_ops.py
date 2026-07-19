@@ -150,6 +150,23 @@ OPS = {
         "python_script": "ops_function_call.py",
         "r_script": None,
     },
+    "parallel_loop": {
+        "sizes": [50, 200, 500],
+        "timer": True,
+        "needs_n": True,
+        "hay_script": (
+            "fn work(i) {{\n"
+            "    let path = \"datasets/generated/ops/parallel_loop/file_\" + str(i) + \".csv\"\n"
+            "    load path as df\n"
+            "    df\n"
+            "}}\n"
+            "for i in 1..={warmup} {{ let _ = rbind(parallel for k in 1..={n}, threads=8 {{ work(k) }}) }}\n"
+            "for i in 1..={iters} {{ let _ = timer(rbind(parallel for k in 1..={n}, threads=8 {{ work(k) }}), digits=6) }}\n"
+            'print("done")\n'
+        ),
+        "python_script": "ops_parallel_loop.py",
+        "r_script": None,
+    },
 }
 
 
@@ -303,12 +320,33 @@ def run_r(op_name: str, n: int, iters: int, warmup: int, runs: int) -> dict:
     return _run_wall_timed(cmd, runs)
 
 
+def _generate_parallel_loop_csvs(n: int, rows_per_file: int = 1_000) -> None:
+    """Generate n CSV files for the parallel_loop I/O benchmark."""
+    import numpy as np
+    import pandas as pd
+
+    d = _ops_dir() / "parallel_loop"
+    d.mkdir(parents=True, exist_ok=True)
+    rng = np.random.default_rng(42)
+    for i in range(1, n + 1):
+        path = d / f"file_{i}.csv"
+        if path.exists():
+            continue
+        ids = np.arange(1, rows_per_file + 1)
+        x = i + rng.random(rows_per_file)
+        y = rng.random(rows_per_file)
+        pd.DataFrame({"id": ids, "x": x, "y": y}).to_csv(path, index=False)
+    print(f"  generated {d} ({n} files, {rows_per_file} rows each)")
+
+
 def _prepare_data(op_name: str, n: int) -> None:
     op = OPS[op_name]
     if op.get("needs_csv"):
         _generate_csv(n)
     if op.get("needs_merge"):
         _generate_merge_csvs(n)
+    if op_name == "parallel_loop":
+        _generate_parallel_loop_csvs(n)
 
 
 def main():
