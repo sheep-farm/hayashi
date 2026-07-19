@@ -8,6 +8,13 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+try:
+    from scipy.special import erf
+except ImportError:
+    import math
+
+    erf = np.vectorize(math.erf, otypes=[float])
+
 
 def ols_data(n: int, seed: int = 42) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
@@ -86,7 +93,7 @@ def probit_data(n: int, seed: int = 42) -> pd.DataFrame:
     x2 = rng.normal(0, 1, size=n)
     z = 1.0 + 1.5 * x1 - 0.8 * x2
     # standard normal CDF using error function
-    pr = 0.5 * (1.0 + np.erf(z / np.sqrt(2.0)))
+    pr = 0.5 * (1.0 + erf(z / np.sqrt(2.0)))
     y = rng.binomial(1, pr).astype(float)
     return pd.DataFrame({"y": y, "x1": x1, "x2": x2})
 
