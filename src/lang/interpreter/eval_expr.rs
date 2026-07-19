@@ -1,5 +1,12 @@
 use super::*;
 use crate::lang::dap::model_expansion;
+use rand::Rng as _;
+use rand_distr::Distribution as _;
+use rand_distr::{
+    Beta, Binomial, Cauchy, ChiSquared, Exp, FisherF, Frechet, Gamma, Geometric, Gumbel,
+    Hypergeometric, InverseGaussian, LogNormal, Normal, NormalInverseGaussian, Pareto, Pert,
+    Poisson, SkewNormal, StudentT, Triangular, Uniform, Weibull, Zeta, Zipf,
+};
 use std::sync::Arc;
 
 /// Result of evaluating an expression element-wise over a DataFrame.
@@ -770,39 +777,309 @@ impl Interpreter {
         Ok(None)
     }
 
+    fn col_scalar_arg(&mut self, expr: &Expr, df: &DataFrame) -> Result<f64> {
+        let vals = self.eval_col_expr(expr, df)?;
+        vals.first()
+            .copied()
+            .ok_or_else(|| HayashiError::Runtime("random distribution argument is empty".into()))
+    }
+
+    fn try_sample_f64<D, E>(
+        &mut self,
+        dist: std::result::Result<D, E>,
+        func: &str,
+        n: usize,
+    ) -> Result<Vec<f64>>
+    where
+        D: rand_distr::Distribution<f64>,
+        E: std::fmt::Display,
+    {
+        let dist = dist.map_err(|e| HayashiError::Runtime(format!("{func}: {e}")))?;
+        Ok((0..n).map(|_| dist.sample(&mut self.rng)).collect())
+    }
+
+    fn try_sample_u64<D, E>(
+        &mut self,
+        dist: std::result::Result<D, E>,
+        func: &str,
+        n: usize,
+    ) -> Result<Vec<f64>>
+    where
+        D: rand_distr::Distribution<u64>,
+        E: std::fmt::Display,
+    {
+        let dist = dist.map_err(|e| HayashiError::Runtime(format!("{func}: {e}")))?;
+        Ok((0..n).map(|_| dist.sample(&mut self.rng) as f64).collect())
+    }
+
     fn eval_col_call_random(
         &mut self,
         func: &str,
         args: &[Expr],
         df: &DataFrame,
     ) -> Result<Option<ColResult>> {
-        if !matches!(func, "uniform" | "runiform" | "rnormal" | "rbernoulli") {
+        if !matches!(
+            func,
+            "uniform"
+                | "runiform"
+                | "rnormal"
+                | "rlognormal"
+                | "rskewnormal"
+                | "rcauchy"
+                | "rstudentt"
+                | "rt"
+                | "rchisq"
+                | "rf"
+                | "rbeta"
+                | "rgamma"
+                | "rexponential"
+                | "rweibull"
+                | "rpareto"
+                | "rpert"
+                | "rtriangular"
+                | "rfrechet"
+                | "rgumbel"
+                | "rinversegaussian"
+                | "rnig"
+                | "rbernoulli"
+                | "rbinomial"
+                | "rpoisson"
+                | "rgeometric"
+                | "rhypergeometric"
+                | "rzeta"
+                | "rzipf"
+        ) {
             return Ok(None);
         }
         let n = df.n_rows();
-        use rand::Rng;
-        Ok(Some(ColResult::Float(match func {
+        let expected_arg_count = |count: usize| -> Result<()> {
+            if args.len() != count {
+                return Err(HayashiError::Runtime(format!(
+                    "{func}() expects {count} argument(s), got {}",
+                    args.len()
+                )));
+            }
+            Ok(())
+        };
+
+        let result = match func {
             "uniform" | "runiform" => {
-                let rng = &mut self.rng;
-                (0..n).map(|_| rng.gen::<f64>()).collect()
+                if args.is_empty() {
+                    ColResult::Float((0..n).map(|_| self.rng.gen::<f64>()).collect())
+                } else if args.len() == 2 {
+                    let a = self.col_scalar_arg(&args[0], df)?;
+                    let b = self.col_scalar_arg(&args[1], df)?;
+                    if a.is_nan() || b.is_nan() || a >= b {
+                        return Err(HayashiError::Runtime(format!(
+                            "{func}: low must be strictly less than high"
+                        )));
+                    }
+                    let dist = Uniform::new(a, b);
+                    ColResult::Float((0..n).map(|_| dist.sample(&mut self.rng)).collect())
+                } else {
+                    return Err(HayashiError::Runtime(format!(
+                        "{func}() takes 0 or 2 arguments"
+                    )));
+                }
             }
             "rnormal" => {
-                let rng = &mut self.rng;
-                (0..n).map(|_| standard_normal_draw(rng)).collect()
+                if args.is_empty() {
+                    ColResult::Float(self.try_sample_f64(Normal::new(0.0, 1.0), func, n)?)
+                } else if args.len() == 2 {
+                    let mu = self.col_scalar_arg(&args[0], df)?;
+                    let sigma = self.col_scalar_arg(&args[1], df)?;
+                    ColResult::Float(self.try_sample_f64(Normal::new(mu, sigma), func, n)?)
+                } else {
+                    return Err(HayashiError::Runtime(format!(
+                        "{func}() takes 0 or 2 arguments"
+                    )));
+                }
+            }
+            "rlognormal" => {
+                expected_arg_count(2)?;
+                let mu = self.col_scalar_arg(&args[0], df)?;
+                let sigma = self.col_scalar_arg(&args[1], df)?;
+                ColResult::Float(self.try_sample_f64(LogNormal::new(mu, sigma), func, n)?)
+            }
+            "rskewnormal" => {
+                expected_arg_count(3)?;
+                let loc = self.col_scalar_arg(&args[0], df)?;
+                let scale = self.col_scalar_arg(&args[1], df)?;
+                let shape = self.col_scalar_arg(&args[2], df)?;
+                ColResult::Float(self.try_sample_f64(
+                    SkewNormal::new(loc, scale, shape),
+                    func,
+                    n,
+                )?)
+            }
+            "rcauchy" => {
+                expected_arg_count(2)?;
+                let loc = self.col_scalar_arg(&args[0], df)?;
+                let scale = self.col_scalar_arg(&args[1], df)?;
+                ColResult::Float(self.try_sample_f64(Cauchy::new(loc, scale), func, n)?)
+            }
+            "rstudentt" | "rt" => {
+                expected_arg_count(1)?;
+                let df_param = self.col_scalar_arg(&args[0], df)?;
+                ColResult::Float(self.try_sample_f64(StudentT::new(df_param), func, n)?)
+            }
+            "rchisq" => {
+                expected_arg_count(1)?;
+                let k = self.col_scalar_arg(&args[0], df)?;
+                ColResult::Float(self.try_sample_f64(ChiSquared::new(k), func, n)?)
+            }
+            "rf" => {
+                expected_arg_count(2)?;
+                let d1 = self.col_scalar_arg(&args[0], df)?;
+                let d2 = self.col_scalar_arg(&args[1], df)?;
+                ColResult::Float(self.try_sample_f64(FisherF::new(d1, d2), func, n)?)
+            }
+            "rbeta" => {
+                expected_arg_count(2)?;
+                let alpha = self.col_scalar_arg(&args[0], df)?;
+                let beta = self.col_scalar_arg(&args[1], df)?;
+                ColResult::Float(self.try_sample_f64(Beta::new(alpha, beta), func, n)?)
+            }
+            "rgamma" => {
+                expected_arg_count(2)?;
+                let shape = self.col_scalar_arg(&args[0], df)?;
+                let scale = self.col_scalar_arg(&args[1], df)?;
+                ColResult::Float(self.try_sample_f64(Gamma::new(shape, scale), func, n)?)
+            }
+            "rexponential" => {
+                expected_arg_count(1)?;
+                let lambda = self.col_scalar_arg(&args[0], df)?;
+                ColResult::Float(self.try_sample_f64(Exp::new(lambda), func, n)?)
+            }
+            "rweibull" => {
+                expected_arg_count(2)?;
+                let scale = self.col_scalar_arg(&args[0], df)?;
+                let shape = self.col_scalar_arg(&args[1], df)?;
+                ColResult::Float(self.try_sample_f64(Weibull::new(scale, shape), func, n)?)
+            }
+            "rpareto" => {
+                expected_arg_count(2)?;
+                let scale = self.col_scalar_arg(&args[0], df)?;
+                let shape = self.col_scalar_arg(&args[1], df)?;
+                ColResult::Float(self.try_sample_f64(Pareto::new(scale, shape), func, n)?)
+            }
+            "rpert" => {
+                if args.len() == 3 {
+                    let min = self.col_scalar_arg(&args[0], df)?;
+                    let max = self.col_scalar_arg(&args[1], df)?;
+                    let mode = self.col_scalar_arg(&args[2], df)?;
+                    ColResult::Float(self.try_sample_f64(Pert::new(min, max, mode), func, n)?)
+                } else if args.len() == 4 {
+                    let min = self.col_scalar_arg(&args[0], df)?;
+                    let max = self.col_scalar_arg(&args[1], df)?;
+                    let mode = self.col_scalar_arg(&args[2], df)?;
+                    let shape = self.col_scalar_arg(&args[3], df)?;
+                    ColResult::Float(self.try_sample_f64(
+                        Pert::new_with_shape(min, max, mode, shape),
+                        func,
+                        n,
+                    )?)
+                } else {
+                    return Err(HayashiError::Runtime(format!(
+                        "{func}() takes 3 or 4 arguments"
+                    )));
+                }
+            }
+            "rtriangular" => {
+                expected_arg_count(3)?;
+                let min = self.col_scalar_arg(&args[0], df)?;
+                let max = self.col_scalar_arg(&args[1], df)?;
+                let mode = self.col_scalar_arg(&args[2], df)?;
+                ColResult::Float(self.try_sample_f64(Triangular::new(min, max, mode), func, n)?)
+            }
+            "rfrechet" => {
+                expected_arg_count(3)?;
+                let loc = self.col_scalar_arg(&args[0], df)?;
+                let scale = self.col_scalar_arg(&args[1], df)?;
+                let shape = self.col_scalar_arg(&args[2], df)?;
+                ColResult::Float(self.try_sample_f64(Frechet::new(loc, scale, shape), func, n)?)
+            }
+            "rgumbel" => {
+                expected_arg_count(2)?;
+                let loc = self.col_scalar_arg(&args[0], df)?;
+                let scale = self.col_scalar_arg(&args[1], df)?;
+                ColResult::Float(self.try_sample_f64(Gumbel::new(loc, scale), func, n)?)
+            }
+            "rinversegaussian" => {
+                expected_arg_count(2)?;
+                let mean = self.col_scalar_arg(&args[0], df)?;
+                let shape = self.col_scalar_arg(&args[1], df)?;
+                ColResult::Float(self.try_sample_f64(InverseGaussian::new(mean, shape), func, n)?)
+            }
+            "rnig" => {
+                expected_arg_count(2)?;
+                let alpha = self.col_scalar_arg(&args[0], df)?;
+                let beta = self.col_scalar_arg(&args[1], df)?;
+                ColResult::Float(self.try_sample_f64(
+                    NormalInverseGaussian::new(alpha, beta),
+                    func,
+                    n,
+                )?)
             }
             "rbernoulli" => {
-                let p = if !args.is_empty() {
-                    self.eval_col_expr(&args[0], df)?[0]
-                } else {
+                let p = if args.is_empty() {
                     0.5
+                } else {
+                    expected_arg_count(1)?;
+                    self.col_scalar_arg(&args[0], df)?
                 };
-                let rng = &mut self.rng;
-                (0..n)
-                    .map(|_| if rng.gen::<f64>() < p { 1.0 } else { 0.0 })
-                    .collect()
+                if !(0.0..=1.0).contains(&p) {
+                    return Err(HayashiError::Runtime(format!(
+                        "{func}: probability must be in [0, 1]"
+                    )));
+                }
+                ColResult::Float(
+                    (0..n)
+                        .map(|_| if self.rng.gen::<f64>() < p { 1.0 } else { 0.0 })
+                        .collect(),
+                )
+            }
+            "rbinomial" => {
+                expected_arg_count(2)?;
+                let trials = self.col_scalar_arg(&args[0], df)? as u64;
+                let p = self.col_scalar_arg(&args[1], df)?;
+                ColResult::Float(self.try_sample_u64(Binomial::new(trials, p), func, n)?)
+            }
+            "rpoisson" => {
+                expected_arg_count(1)?;
+                let lambda = self.col_scalar_arg(&args[0], df)?;
+                ColResult::Float(self.try_sample_f64(Poisson::new(lambda), func, n)?)
+            }
+            "rgeometric" => {
+                expected_arg_count(1)?;
+                let p = self.col_scalar_arg(&args[0], df)?;
+                ColResult::Float(self.try_sample_u64(Geometric::new(p), func, n)?)
+            }
+            "rhypergeometric" => {
+                expected_arg_count(3)?;
+                let pop = self.col_scalar_arg(&args[0], df)? as u64;
+                let successes = self.col_scalar_arg(&args[1], df)? as u64;
+                let draws = self.col_scalar_arg(&args[2], df)? as u64;
+                ColResult::Float(self.try_sample_u64(
+                    Hypergeometric::new(pop, successes, draws),
+                    func,
+                    n,
+                )?)
+            }
+            "rzeta" => {
+                expected_arg_count(1)?;
+                let a = self.col_scalar_arg(&args[0], df)?;
+                ColResult::Float(self.try_sample_f64(Zeta::new(a), func, n)?)
+            }
+            "rzipf" => {
+                expected_arg_count(2)?;
+                let nn = self.col_scalar_arg(&args[0], df)? as u64;
+                let s = self.col_scalar_arg(&args[1], df)?;
+                ColResult::Float(self.try_sample_f64(Zipf::new(nn, s), func, n)?)
             }
             _ => unreachable!(),
-        })))
+        };
+        Ok(Some(result))
     }
 
     fn eval_col_call_rowwise(

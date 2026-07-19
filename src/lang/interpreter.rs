@@ -177,12 +177,6 @@ fn rd_kernel_opt(opt: Option<&Value>) -> std::result::Result<greeners::RdKernel,
     }
 }
 
-fn standard_normal_draw<R: rand::Rng + ?Sized>(rng: &mut R) -> f64 {
-    let u1 = 1.0 - rng.gen::<f64>();
-    let u2 = rng.gen::<f64>();
-    (-2.0 * u1.ln()).sqrt() * (2.0 * std::f64::consts::PI * u2).cos()
-}
-
 // ── Interpreter ──────────────────────────────────────────────────────────────
 
 pub struct Interpreter {

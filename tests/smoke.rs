@@ -4639,6 +4639,88 @@ assert(variance(df, N) < 1.3, "rnormal variance should be near one")
 }
 
 #[test]
+fn math_random_distributions() {
+    let rows = (1..=512)
+        .map(|i| i.to_string())
+        .collect::<Vec<_>>()
+        .join("\n");
+    let script = format!(
+        r#"
+set_seed(12345)
+input df
+X
+{rows}
+end
+generate df u1 = runiform()
+generate df u2 = runiform(10, 20)
+generate df n1 = rnormal()
+generate df n2 = rnormal(5, 2)
+generate df b = rbernoulli(0.3)
+generate df p = rpoisson(4)
+generate df bn = rbinomial(10, 0.3)
+generate df g = rgamma(2, 1)
+generate df e = rexponential(1)
+generate df w = rweibull(1, 2)
+generate df c = rcauchy(0, 1)
+generate df t = rstudentt(5)
+generate df cs = rchisq(3)
+generate df f = rf(2, 10)
+generate df bt = rbeta(2, 5)
+generate df ln = rlognormal(0, 1)
+generate df sk = rskewnormal(0, 1, 2)
+generate df geo = rgeometric(0.3)
+generate df hyp = rhypergeometric(100, 30, 10)
+generate df zt = rzipf(1000, 3)
+generate df pert = rpert(0, 10, 5)
+generate df tri = rtriangular(0, 10, 5)
+generate df fr = rfrechet(0, 1, 3)
+generate df gum = rgumbel(0, 1)
+generate df ig = rinversegaussian(1, 1)
+generate df nig = rnig(2, 0.5)
+generate df par = rpareto(1, 3)
+generate df z = rzeta(4)
+
+assert(min(df, u2) >= 10, "runiform(10,20) lower bound")
+assert(max(df, u2) < 20, "runiform(10,20) upper bound")
+assert(mean(df, b) > 0.15 && mean(df, b) < 0.45, "rbernoulli mean")
+assert(mean(df, p) > 3 && mean(df, p) < 5, "rpoisson mean")
+assert(mean(df, bn) > 2 && mean(df, bn) < 4, "rbinomial mean")
+assert(min(df, bn) >= 0 && max(df, bn) <= 10, "rbinomial support")
+assert(mean(df, g) > 1.5 && mean(df, g) < 2.5, "rgamma mean")
+assert(mean(df, e) > 0.7 && mean(df, e) < 1.3, "rexponential mean")
+assert(mean(df, w) > 0.7 && mean(df, w) < 1.0, "rweibull mean")
+assert(min(df, c) < max(df, c), "rcauchy range")
+assert(mean(df, t) > -0.3 && mean(df, t) < 0.3, "rstudentt mean")
+assert(mean(df, cs) > 2 && mean(df, cs) < 4, "rchisq mean")
+assert(mean(df, f) > 0.8 && mean(df, f) < 1.8, "rf mean")
+assert(mean(df, bt) > 0.2 && mean(df, bt) < 0.4, "rbeta mean")
+assert(mean(df, ln) > 1.0 && mean(df, ln) < 2.2, "rlognormal mean")
+assert(mean(df, sk) > 0.4 && mean(df, sk) < 1.0, "rskewnormal mean")
+assert(min(df, geo) >= 0, "rgeometric support")
+assert(mean(df, geo) > 2.0 && mean(df, geo) < 2.7, "rgeometric mean")
+assert(min(df, hyp) >= 0 && max(df, hyp) <= 10, "rhypergeometric support")
+assert(mean(df, hyp) > 2.5 && mean(df, hyp) < 3.5, "rhypergeometric mean")
+assert(min(df, zt) >= 1 && max(df, zt) <= 1000, "rzipf support")
+assert(mean(df, zt) > 1.0 && mean(df, zt) < 2.0, "rzipf mean")
+assert(min(df, pert) >= 0 && max(df, pert) <= 10, "rpert support")
+assert(mean(df, pert) > 4 && mean(df, pert) < 6, "rpert mean")
+assert(min(df, tri) >= 0 && max(df, tri) <= 10, "rtriangular support")
+assert(mean(df, tri) > 4.5 && mean(df, tri) < 5.5, "rtriangular mean")
+assert(mean(df, fr) > 1.0 && mean(df, fr) < 1.7, "rfrechet mean")
+assert(mean(df, gum) > 0.3 && mean(df, gum) < 0.9, "rgumbel mean")
+assert(min(df, ig) > 0, "rinversegaussian support")
+assert(mean(df, ig) > 0.7 && mean(df, ig) < 1.3, "rinversegaussian mean")
+assert(mean(df, nig) > 0.1 && mean(df, nig) < 0.4, "rnig mean")
+assert(min(df, par) >= 1, "rpareto support")
+assert(mean(df, par) > 1.0 && mean(df, par) < 2.0, "rpareto mean")
+assert(min(df, z) >= 1, "rzeta support")
+assert(mean(df, z) > 1.0 && mean(df, z) < 1.3, "rzeta mean")
+"#
+    );
+    assert_ok("random_distributions", &script);
+}
+
+#[test]
 fn math_normal_pdf() {
     assert_ok_contains(
         "normal_pdf",
