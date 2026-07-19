@@ -106,18 +106,18 @@ OPS = {
         "python_script": "ops_groupby_mean.py",
         "r_script": None,
     },
-    "merge": {
+    "rbind": {
         "sizes": [1_000, 10_000, 100_000],
         "timer": True,
         "needs_merge": True,
         "hay_script": (
             'load "{left_csv}" as df1\n'
             'load "{right_csv}" as df2\n'
-            "for i in 1..={warmup} {{ let _ = merge(df1, df2, key=id) }}\n"
-            "for i in 1..={iters} {{ let _ = timer(merge(df1, df2, key=id), digits=6) }}\n"
+            "for i in 1..={warmup} {{ let _ = rbind([df1, df2]) }}\n"
+            "for i in 1..={iters} {{ let _ = timer(rbind([df1, df2]), digits=6) }}\n"
             'print("done")\n'
         ),
-        "python_script": "ops_merge.py",
+        "python_script": "ops_rbind.py",
         "r_script": None,
     },
     "loop": {

@@ -1395,6 +1395,7 @@ dependencies = [
  "odbc-api",
  "parquet",
  "plotters",
+ "radsort",
  "rand 0.8.6",
  "rand_distr",
  "rusqlite",
@@ -2780,6 +2781,12 @@ dependencies = [
  "endian-type",
  "nibble_vec",
 ]
+
+[[package]]
+name = "radsort"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "019b4b213425016d7d84a153c4c73afb0946fbb4840e4eece7ba8848b9d6da22"
 
 [[package]]
 name = "rand"

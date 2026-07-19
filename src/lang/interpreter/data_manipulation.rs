@@ -1438,19 +1438,41 @@ impl Interpreter {
 
         let n = df.n_rows();
         let mut idx: Vec<usize> = (0..n).collect();
-        idx.sort_by(|&a, &b| {
-            use std::cmp::Ordering;
-            for key in &keys {
-                let ord = match key {
-                    SortKey::Num(v) => nan_last_cmp(&v[a], &v[b]),
-                    SortKey::Str(v) => v[a].cmp(&v[b]),
-                };
-                if ord != Ordering::Equal {
-                    return if desc { ord.reverse() } else { ord };
+
+        // Fast path for a single ascending numeric key: radix sort on f64 keys.
+        let use_radsort = !desc && keys.len() == 1 && matches!(keys[0], SortKey::Num(_));
+        if use_radsort {
+            if let SortKey::Num(ref vals) = keys[0] {
+                let mut finite_idx = Vec::with_capacity(n);
+                let mut nan_idx = Vec::new();
+                for (i, &v) in vals.iter().enumerate() {
+                    if v.is_nan() {
+                        nan_idx.push(i);
+                    } else {
+                        finite_idx.push(i);
+                    }
                 }
+                radsort::sort_by_cached_key(&mut finite_idx, |&i| vals[i]);
+                idx.clear();
+                idx.reserve(n);
+                idx.extend(finite_idx);
+                idx.extend(nan_idx);
             }
-            Ordering::Equal
-        });
+        } else {
+            idx.sort_by(|&a, &b| {
+                use std::cmp::Ordering;
+                for key in &keys {
+                    let ord = match key {
+                        SortKey::Num(v) => nan_last_cmp(&v[a], &v[b]),
+                        SortKey::Str(v) => v[a].cmp(&v[b]),
+                    };
+                    if ord != Ordering::Equal {
+                        return if desc { ord.reverse() } else { ord };
+                    }
+                }
+                Ordering::Equal
+            });
+        }
 
         let all_names = df.column_names();
         let mut builder = DataFrame::builder();
