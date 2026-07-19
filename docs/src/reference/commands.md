@@ -333,6 +333,22 @@ Available inside `generate` expressions and general arithmetic:
 
 ---
 
+## Random Variate Functions
+
+Available inside `generate` expressions. All respect `set_seed` and produce one
+value per DataFrame row. See [Random Variates](../data/random.md) for full
+examples and parameter details.
+
+**Continuous:** `rnormal`, `rlognormal`, `rskewnormal`, `rcauchy`, `rstudentt`/`rt`,
+`rchisq`, `rf`, `rbeta`, `rgamma`, `rexponential`, `rweibull`, `rpareto`,
+`rpert`, `rtriangular`, `rfrechet`, `rgumbel`, `rinversegaussian`, `rnig`,
+`runiform`.
+
+**Discrete:** `rbernoulli`, `rbinomial`, `rpoisson`, `rgeometric`,
+`rhypergeometric`, `rzeta`, `rzipf`.
+
+---
+
 ## String Functions
 
 | Function | Description |

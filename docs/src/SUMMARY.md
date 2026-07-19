@@ -15,6 +15,7 @@
 
 - [Loading Data](./data/loading.md)
 - [Data Manipulation](./data/manipulation.md)
+- [Random Variates](./data/random.md)
 - [Descriptive Statistics](./data/descriptive.md)
 - [Exporting](./data/exporting.md)
 

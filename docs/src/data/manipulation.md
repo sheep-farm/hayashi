@@ -9,6 +9,15 @@ generate df wage_real = wage / cpi * 100
 generate df female = if(sex == "F", 1, 0)
 ```
 
+Random variate generators work inside `generate` and respect `set_seed`.
+See [Random Variates](./random.md) for the full list of distributions.
+
+```
+set_seed(42)
+generate df u = rnormal(0, 1)
+generate df treated = rbernoulli(0.5)
+```
+
 Pipe with closures for multi-step transforms:
 
 ```
