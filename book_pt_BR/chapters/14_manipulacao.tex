@@ -31,6 +31,31 @@ let df2 = mutate(df, lrenda = log(renda), renda2 = renda^2)
 // df2 as possui
 \end{lstlisting}
 
+\section{Geradores de variáveis aleatórias}
+
+Todas as distribuições abaixo estão disponíveis dentro de expressões
+\lstinline{generate}. Elas respeitam a semente global definida por
+\lstinline{set_seed} e retornam um valor por linha, propagando parâmetros
+escalares para o comprimento do DataFrame.
+
+\begin{lstlisting}[caption={Simulando dados}]
+set_seed(42)
+let df = dataframe({"obs": 1..=1000})
+
+generate df u = rnormal(0, 1)
+generate df treated = rbernoulli(0.5)
+generate df duration = rexponential(1)
+\end{lstlisting}
+
+\textbf{Contínuas:} \lstinline{rnormal}, \lstinline{rlognormal}, \lstinline{rskewnormal}, \lstinline{rcauchy}, \lstinline{rstudentt} (alias \lstinline{rt}), \lstinline{rchisq}, \lstinline{rf}, \lstinline{rbeta}, \lstinline{rgamma}, \lstinline{rexponential}, \lstinline{rweibull}, \lstinline{rpareto}, \lstinline{rpert}, \lstinline{rtriangular}, \lstinline{rfrechet}, \lstinline{rgumbel}, \lstinline{rinversegaussian}, \lstinline{rnig}, \lstinline{runiform}.
+
+\textbf{Discretas:} \lstinline{rbernoulli}, \lstinline{rbinomial}, \lstinline{rpoisson}, \lstinline{rgeometric}, \lstinline{rhypergeometric}, \lstinline{rzeta}, \lstinline{rzipf}.
+
+\begin{nota}
+  \lstinline{rgeometric(p)} retorna o número de falhas antes do primeiro
+  sucesso, com suporte $\{0, 1, 2, \ldots\}$.
+\end{nota}
+
 \section{\texttt{filter}}
 
 Seleciona linhas que satisfazem uma condição:

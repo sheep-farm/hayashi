@@ -179,15 +179,40 @@ match  try  catch  and  or  not  true  false  nil  quietly
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Geradores aleatórios}
 
+Disponíveis dentro de \lstinline{generate df col = expr}. Todos respeitam \lstinline{set_seed}.
+
 \begin{center}
 \begin{tabular}{ll}
 \toprule
 \textbf{Função} & \textbf{Distribuição} \\
 \midrule
-\texttt{rnormal()}       & $N(0,1)$ — normal padrão \\
-\texttt{runiform()}      & $U(0,1)$ — uniforme \\
-\texttt{rbernoulli(p)}   & Bernoulli com probabilidade $p$ fixa \\
-\texttt{seed(n)}         & Fixa semente PRNG para reprodutibilidade \\
+\texttt{rnormal()} / \texttt{rnormal($\mu$, $\sigma$)} & Normal \\
+\texttt{rlognormal($\mu$, $\sigma$)} & Log-normal \\
+\texttt{rskewnormal(loc, scale, shape)} & Skew-normal \\
+\texttt{rcauchy(loc, scale)} & Cauchy \\
+\texttt{rstudentt(df)} / \texttt{rt(df)} & $t$ de Student \\
+\texttt{rchisq(k)} & Qui-quadrado \\
+\texttt{rf(d1, d2)} & Distribuição $F$ \\
+\texttt{rbeta($\alpha$, $\beta$)} & Beta \\
+\texttt{rgamma(shape, scale)} & Gamma \\
+\texttt{rexponential($\lambda$)} & Exponencial (taxa $\lambda$) \\
+\texttt{rweibull(scale, shape)} & Weibull \\
+\texttt{rpareto(scale, shape)} & Pareto \\
+\texttt{rpert(min, max, mode)} / \texttt{rpert(min, max, mode, shape)} & PERT \\
+\texttt{rtriangular(min, max, mode)} & Triangular \\
+\texttt{rfrechet(location, scale, shape)} & Fr\'{e}chet \\
+\texttt{rgumbel(location, scale)} & Gumbel \\
+\texttt{rinversegaussian(mean, shape)} & Gaussiana inversa \\
+\texttt{rnig($\alpha$, $\beta$)} & Normal-inversa-Gaussiana \\
+\texttt{runiform()} / \texttt{runiform(a, b)} & Uniforme $[0,1)$ ou $[a,b)$ \\
+\midrule
+\texttt{rbernoulli(p)} & Bernoulli (default $p=0{,}5$) \\
+\texttt{rbinomial(n, p)} & Binomial \\
+\texttt{rpoisson($\lambda$)} & Poisson \\
+\texttt{rgeometric(p)} & Geométrica (falhas antes do primeiro sucesso) \\
+\texttt{rhypergeometric(N, K, n)} & Hipergeométrica \\
+\texttt{rzeta(a)} & Zeta ($a>1$) \\
+\texttt{rzipf(N, s)} & Zipf \\
 \bottomrule
 \end{tabular}
 \end{center}

@@ -31,6 +31,30 @@ let df2 = mutate(df, lincome = log(income), income2 = income^2)
 // df2 has them
 \end{lstlisting}
 
+\section{Random variate generators}
+
+All distributions below are available inside \lstinline{generate} expressions.
+They respect the global seed set by \lstinline{set_seed} and return one value per
+row, broadcasting scalar parameters to the DataFrame length.
+
+\begin{lstlisting}[caption={Simulating data}]
+set_seed(42)
+let df = dataframe({"obs": 1..=1000})
+
+generate df u = rnormal(0, 1)
+generate df treated = rbernoulli(0.5)
+generate df duration = rexponential(1)
+\end{lstlisting}
+
+\textbf{Continuous:} \lstinline{rnormal}, \lstinline{rlognormal}, \lstinline{rskewnormal}, \lstinline{rcauchy}, \lstinline{rstudentt} (alias \lstinline{rt}), \lstinline{rchisq}, \lstinline{rf}, \lstinline{rbeta}, \lstinline{rgamma}, \lstinline{rexponential}, \lstinline{rweibull}, \lstinline{rpareto}, \lstinline{rpert}, \lstinline{rtriangular}, \lstinline{rfrechet}, \lstinline{rgumbel}, \lstinline{rinversegaussian}, \lstinline{rnig}, \lstinline{runiform}.
+
+\textbf{Discrete:} \lstinline{rbernoulli}, \lstinline{rbinomial}, \lstinline{rpoisson}, \lstinline{rgeometric}, \lstinline{rhypergeometric}, \lstinline{rzeta}, \lstinline{rzipf}.
+
+\begin{nota}
+  \lstinline{rgeometric(p)} returns the number of failures before the first
+  success, with support $\{0, 1, 2, \ldots\}$.
+\end{nota}
+
 \section{\texttt{filter}}
 
 Selects rows that satisfy a condition:

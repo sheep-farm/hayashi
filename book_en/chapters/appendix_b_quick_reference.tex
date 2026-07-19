@@ -142,15 +142,40 @@ match  try  catch  and  or  not  true  false  nil  quietly
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Random generators}
 
+Available inside \lstinline{generate df col = expr}. All respect \lstinline{set_seed}.
+
 \begin{center}
 \begin{tabular}{ll}
 \toprule
 \textbf{Function} & \textbf{Distribution} \\
 \midrule
-\texttt{rnormal()}       & $N(0,1)$ — standard normal \\
-\texttt{runiform()}      & $U(0,1)$ — uniform \\
-\texttt{rbernoulli(p)}   & Bernoulli with fixed probability $p$ \\
-\texttt{seed(n)}         & Sets PRNG seed for reproducibility \\
+\texttt{rnormal()} / \texttt{rnormal($\mu$, $\sigma$)} & Normal \\
+\texttt{rlognormal($\mu$, $\sigma$)} & Log-normal \\
+\texttt{rskewnormal(loc, scale, shape)} & Skew-normal \\
+\texttt{rcauchy(loc, scale)} & Cauchy \\
+\texttt{rstudentt(df)} / \texttt{rt(df)} & Student's $t$ \\
+\texttt{rchisq(k)} & Chi-squared \\
+\texttt{rf(d1, d2)} & $F$ distribution \\
+\texttt{rbeta($\alpha$, $\beta$)} & Beta \\
+\texttt{rgamma(shape, scale)} & Gamma \\
+\texttt{rexponential($\lambda$)} & Exponential (rate $\lambda$) \\
+\texttt{rweibull(scale, shape)} & Weibull \\
+\texttt{rpareto(scale, shape)} & Pareto \\
+\texttt{rpert(min, max, mode)} / \texttt{rpert(min, max, mode, shape)} & PERT \\
+\texttt{rtriangular(min, max, mode)} & Triangular \\
+\texttt{rfrechet(location, scale, shape)} & Fr\'{e}chet \\
+\texttt{rgumbel(location, scale)} & Gumbel \\
+\texttt{rinversegaussian(mean, shape)} & Inverse Gaussian \\
+\texttt{rnig($\alpha$, $\beta$)} & Normal-inverse-Gaussian \\
+\texttt{runiform()} / \texttt{runiform(a, b)} & Uniform $[0,1)$ or $[a,b)$ \\
+\midrule
+\texttt{rbernoulli(p)} & Bernoulli (default $p=0.5$) \\
+\texttt{rbinomial(n, p)} & Binomial \\
+\texttt{rpoisson($\lambda$)} & Poisson \\
+\texttt{rgeometric(p)} & Geometric (failures before first success) \\
+\texttt{rhypergeometric(N, K, n)} & Hypergeometric \\
+\texttt{rzeta(a)} & Zeta ($a>1$) \\
+\texttt{rzipf(N, s)} & Zipf \\
 \bottomrule
 \end{tabular}
 \end{center}
