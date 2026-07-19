@@ -22,7 +22,7 @@ Options:
 
 Environment variables:
   ESTIMATORS       Space-separated estimator list (default: ols logit probit iv qreg arima garch var panel)
-  SIZES            Comma-separated dataset sizes (default: 1000,10000)
+  SIZES            Comma-separated dataset sizes (default: 1000,10000,100000)
   ITERS            Timed iterations per subprocess run (default: 30)
   RUNS             Number of subprocess runs (default: 5)
   WARMUP           Untimed warmup iterations (default: 3)
@@ -42,7 +42,7 @@ NO_BUILD=0
 RUST_ARGS="--quick"
 
 ESTIMATORS=(ols logit probit iv qreg arima garch var panel)
-: "${SIZES:=1000,10000}"
+: "${SIZES:=1000,10000,100000}"
 : "${ITERS:=30}"
 : "${RUNS:=5}"
 : "${WARMUP:=3}"
