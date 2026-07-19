@@ -99,6 +99,7 @@ Covered operations:
 - `groupby_mean` — group and compute mean
 - `merge` — inner join on `id`
 - `loop` — integer `for` loop overhead
+- `parallel_loop` — `parallel for` loading CSVs and `rbind` with ordered output (vs Python multiprocessing.Pool + pandas.concat)
 - `function_call` — user function call overhead
 
 ## Honest interpretation / caveats
