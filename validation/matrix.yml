@@ -191,6 +191,10 @@ cases:
   notes: OLS wage equation with one-way cluster-robust standard errors by worker id.
   dimension: numerical
   status: pass
+- id: ols_hc3_wooldridge_wage1
+  notes: OLS log-wage equation with HC3 heteroskedasticity-robust standard errors.
+  dimension: numerical
+  status: pass
 - id: ols_twoway_cluster_wagepan
   notes: OLS wage equation with two-way clustered standard errors by worker id and
     year.
