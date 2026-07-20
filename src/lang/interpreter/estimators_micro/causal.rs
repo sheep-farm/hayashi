@@ -1417,4 +1417,254 @@ impl Interpreter {
             fields,
         ))
     }
+
+    pub(super) fn lpdid(
+        &mut self,
+        _func: &str,
+        args: &[Expr],
+        _opts: &[Opt],
+        opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        fn to_usize(v: &Value, name: &str) -> Result<usize> {
+            match v {
+                Value::Int(i) if *i >= 0 => Ok(*i as usize),
+                Value::Float(f) if f.fract() == 0.0 && *f >= 0.0 => Ok(*f as usize),
+                _ => Err(HayashiError::Runtime(format!(
+                    "lpdid(): {name} must be a non-negative integer"
+                ))),
+            }
+        }
+
+        if args.len() < 2 {
+            return Err(HayashiError::Runtime(
+                "lpdid(outcome ~ unit + time + [treat_col], df [, options])".into(),
+            ));
+        }
+        let formula_ast = self.resolve_formula(&args[0])?;
+        let df = match self.eval_expr(&args[1])? {
+            Value::DataFrame(d) => d,
+            _ => {
+                return Err(HayashiError::Type(
+                    "lpdid(): second argument must be DataFrame".into(),
+                ))
+            }
+        };
+
+        let rhs_vars: Vec<String> = formula_ast
+            .rhs
+            .iter()
+            .filter_map(|t| t.as_var().map(|s| s.to_string()))
+            .collect();
+        if rhs_vars.len() < 2 {
+            return Err(HayashiError::Runtime(
+                "lpdid(): formula must have at least outcome ~ unit + time".into(),
+            ));
+        }
+
+        let outcome = &formula_ast.lhs;
+        let unit = &rhs_vars[0];
+        let time = &rhs_vars[1];
+
+        let mut first_treat: Option<String> = rhs_vars.get(2).cloned();
+        if let Some(Value::Str(s)) = opt_map.get("first_treat") {
+            first_treat = Some(s.clone());
+        }
+
+        let mut treatment: Option<String> = None;
+        if let Some(Value::Str(s)) = opt_map.get("treatment") {
+            treatment = Some(s.clone());
+        }
+
+        if first_treat.is_none() && treatment.is_none() {
+            return Err(HayashiError::Runtime(
+                "lpdid(): provide a third formula term or the treatment/first_treat option".into(),
+            ));
+        }
+
+        let covariates: Vec<String> = match opt_map.get("covariates") {
+            Some(Value::List(lst)) => lst
+                .iter()
+                .filter_map(|v| match v {
+                    Value::Str(s) => Some(s.clone()),
+                    _ => None,
+                })
+                .collect(),
+            Some(Value::Str(s)) => vec![s.clone()],
+            None => Vec::new(),
+            _ => {
+                return Err(HayashiError::Runtime(
+                    "lpdid(): covariates must be a list of strings".into(),
+                ))
+            }
+        };
+
+        // -----------------------------------------------------------------
+        // Configure the estimator
+        // -----------------------------------------------------------------
+        let mut estimator = greeners::LpDid::new();
+
+        if let Some(Value::Str(s)) = opt_map.get("estimand") {
+            estimator = estimator.with_target_estimand(s);
+        }
+
+        estimator = match opt_map.get("base_period") {
+            Some(Value::Int(i)) => estimator.with_base_period_int(*i),
+            Some(Value::Float(f)) => {
+                if f.fract() != 0.0 || *f >= 0.0 {
+                    return Err(HayashiError::Runtime(
+                        "lpdid(): base_period float must be a negative integer".into(),
+                    ));
+                }
+                estimator.with_base_period_int(*f as i64)
+            }
+            Some(Value::List(lst)) => {
+                let mut vals = Vec::new();
+                for v in lst.iter() {
+                    match v {
+                        Value::Int(i) if *i < 0 => vals.push(*i),
+                        Value::Float(f) if f.fract() == 0.0 && *f < 0.0 => {
+                            vals.push(*f as i64)
+                        }
+                        _ => {
+                            return Err(HayashiError::Runtime(
+                                "lpdid(): base_period list must contain negative integers"
+                                    .into(),
+                            ));
+                        }
+                    }
+                }
+                estimator.with_base_period_list(&vals)
+            }
+            Some(Value::Str(s)) if s == "all_pre" => estimator.with_base_period_all_pre(),
+            Some(_) => {
+                return Err(HayashiError::Runtime(
+                    "lpdid(): base_period must be a negative int, a list of negative ints, or 'all_pre'".into(),
+                ))
+            }
+            None => estimator,
+        };
+
+        if let Some(Value::Str(s)) = opt_map.get("clean_control") {
+            estimator = estimator.with_clean_control(s);
+        }
+        if let Some(Value::Bool(b)) = opt_map.get("nonabsorbing") {
+            estimator = estimator.with_nonabsorbing(*b);
+        }
+        if let Some(v) = opt_map.get("effect_stabilization") {
+            let l = to_usize(v, "effect_stabilization")?;
+            estimator = estimator.with_effect_stabilization(Some(l));
+        }
+        if let Some(v) = opt_map.get("anticipation") {
+            estimator = estimator.with_anticipation(to_usize(v, "anticipation")?);
+        }
+        if let Some(Value::Bool(b)) = opt_map.get("include_lagged_outcome_change") {
+            estimator = estimator.with_include_lagged_outcome_change(*b);
+        }
+        if let Some(v) = opt_map.get("n_lagged_outcome_changes") {
+            estimator =
+                estimator.with_n_lagged_outcome_changes(to_usize(v, "n_lagged_outcome_changes")?);
+        }
+        if let Some(Value::Bool(b)) = opt_map.get("lag_covariates") {
+            estimator = estimator.with_lag_covariates(*b);
+        }
+        if let Some(Value::Bool(b)) = opt_map.get("fixed_composition") {
+            estimator = estimator.with_fixed_composition(*b);
+        }
+        if let Some(Value::Str(s)) = opt_map.get("control_pool") {
+            estimator = estimator.with_control_pool(s);
+        }
+        if let Some(Value::Str(s)) = opt_map.get("switch_in") {
+            estimator = estimator.with_switch_in(s);
+        }
+        if let Some(v) = opt_map.get("max_pre") {
+            estimator = estimator.with_max_pre(Some(to_usize(v, "max_pre")?));
+        }
+        if let Some(v) = opt_map.get("max_post") {
+            estimator = estimator.with_max_post(Some(to_usize(v, "max_post")?));
+        }
+        if let Some(Value::Float(f)) = opt_map.get("alpha") {
+            estimator = estimator.with_alpha(*f);
+        }
+
+        let result = estimator
+            .fit(
+                &df,
+                outcome,
+                unit,
+                time,
+                first_treat.as_deref(),
+                treatment.as_deref(),
+                if covariates.is_empty() {
+                    None
+                } else {
+                    Some(&covariates)
+                },
+            )
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+        // -----------------------------------------------------------------
+        // Package result as ModelResult
+        // -----------------------------------------------------------------
+        let horizons_str: Vec<String> = result
+            .horizons
+            .iter()
+            .map(|&h| format!("h={}", h))
+            .collect();
+        let event_coef = model_expansion::coef_dataframe(
+            &horizons_str,
+            &result.estimates,
+            &result.standard_errors,
+            &result.t_values,
+            &result.p_values,
+            Some(&result.conf_lower),
+            Some(&result.conf_upper),
+        );
+
+        let scalar_coef = model_expansion::coef_dataframe(
+            &result.scalar_terms,
+            &result.scalar_estimates,
+            &result.scalar_standard_errors,
+            &result.scalar_t_values,
+            &result.scalar_p_values,
+            Some(&result.scalar_conf_lower),
+            Some(&result.scalar_conf_upper),
+        );
+
+        let n_pre = result.horizons.iter().filter(|&&h| h < 0).count() as i64;
+        let n_post = result.horizons.iter().filter(|&&h| h >= 0).count() as i64;
+        let summary = format!(
+            "LpDid(base={}, pre={}, post={}, n={})",
+            result.base_period, n_pre, n_post, result.n_obs
+        );
+        let display = result.to_string();
+
+        let fields: Vec<(String, Value)> = vec![
+            ("event_coefficients".into(), event_coef),
+            ("scalar_coefficients".into(), scalar_coef),
+            (
+                "fit".into(),
+                model_expansion::fit_dict(&[
+                    ("base_period", Value::Str(result.base_period)),
+                    ("max_pre", Value::Int(result.max_pre as i64)),
+                    ("max_post", Value::Int(result.max_post as i64)),
+                    ("n_obs", Value::Int(result.n_obs as i64)),
+                    ("n_treated_units", Value::Int(result.n_treated_units as i64)),
+                    ("n_control_units", Value::Int(result.n_control_units as i64)),
+                    ("n_cohorts", Value::Int(result.n_cohorts as i64)),
+                    ("n_periods", Value::Int(result.n_periods as i64)),
+                    ("n_horizons", Value::Int(result.horizons.len() as i64)),
+                    ("n_pre", Value::Int(n_pre)),
+                    ("n_post", Value::Int(n_post)),
+                    ("clean_control", Value::Str(result.clean_control)),
+                    ("estimand", Value::Str(result.estimand)),
+                ]),
+            ),
+        ];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "LpDidResult",
+            fields,
+        ))
+    }
 }

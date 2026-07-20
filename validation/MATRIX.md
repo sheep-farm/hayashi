@@ -37,6 +37,7 @@
 | lasso | wooldridge::hprice1 | R:passed *, Python:passed * | pass | — | Lasso regression of house price on lot size, square footage and bedrooms. |
 | logit | wooldridge::mroz | R:passed *, Python:passed * | pass | — | Logit average marginal effects on Wooldridge mroz. |
 | logit | wooldridge::mroz | R:passed *, Python:passed * | pass | — | Logit labour-force participation on the Mroz dataset. |
+| did | simulated_absorbing_panel | Python:passed * | pass | — | LP-DiD quickstart against pylpdid on an absorbing staggered-adoption panel. R reference is left aside for now. |
 | arima | simulated_ma1 | R:passed *, Python:passed * | pass | — | Uses the same simulated MA(1) DGP as Chapter 26 of the book. |
 | mice_chained | simulated_mice | R:passed *, Python:passed * | pass | — | MICE (Multiple Imputation by Chained Equations, van Buuren 2011) with m=5, iter=10. Uses simulated data with MCAR missing values. |
 | mixed | wooldridge::wagepan | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 14 Example 14.4 mixed linear model wage equation. |

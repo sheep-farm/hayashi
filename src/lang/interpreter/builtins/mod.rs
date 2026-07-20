@@ -85,6 +85,7 @@ pub const BUILTIN_NAMES: &[&str] = &[
     "three_sls",
     "fmb",
     "did",
+    "lpdid",
     "rd",
     "psm",
     "synth",

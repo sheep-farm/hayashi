@@ -413,6 +413,7 @@ fn legacy_help_text(topic: &str) -> Option<&'static str> {
         "irf" => "irf(model [, periods=20])\n  Impulse response function from VAR/SVAR.\n\n  irf(m_var, periods=20)\n",
         "fevd" => "fevd(model [, periods=20])\n  Forecast error variance decomposition.\n\n  fevd(m_var, periods=20)\n",
         "did" => "did(formula, df, treat=var, post=var)\n  Difference-in-differences.\n\n  let m = did(Y ~ X1, df, treat=treated, post=after)\n",
+        "lpdid" => "lpdid(outcome ~ unit + time + first_treat, df [, max_pre=p, max_post=p, base_period=-1, clean_control=not_yet_treated|never_treated, covariates=[...], nonabsorbing=false])\n  Local Projections Difference-in-Differences (staggered, absorbing).\n\n  let m = lpdid(y ~ unit + time + first_treat, df, max_pre=2, max_post=3)\n",
         "rd" => "rd(formula, df, running=var, cutoff=value)\n  Regression discontinuity design.\n\n  let m = rd(Y ~ X, df, running=score, cutoff=50)\n",
         "fuzzy_rd" => "fuzzy_rd(outcome ~ running, \"treatment_col\", cutoff, df [, bw=h, poly=1])\n  Fuzzy Regression Discontinuity (treatment compliance imperfect).\n\n  let m = fuzzy_rd(Y ~ score, \"treated\", 50, df, bw=10, poly=1)\n",
         "synth" => "synth(df, outcome=var, treat_unit=id, treat_time=t, id=var, time=var)\n  Synthetic control method.\n\n  let m = synth(df, outcome=gdp, treat_unit=3, treat_time=2000, id=state, time=year)\n",

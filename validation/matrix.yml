@@ -157,6 +157,11 @@ cases:
   notes: Logit labour-force participation on the Mroz dataset.
   dimension: numerical
   status: pass
+- id: lpdid_pylpdid_quickstart
+  notes: LP-DiD quickstart against pylpdid on an absorbing staggered-adoption panel.
+    R reference is left aside for now.
+  dimension: numerical
+  status: pass
 - id: ma_book
   notes: Uses the same simulated MA(1) DGP as Chapter 26 of the book.
   dimension: numerical

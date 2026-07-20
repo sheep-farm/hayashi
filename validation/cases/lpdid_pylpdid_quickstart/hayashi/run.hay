@@ -1,0 +1,19 @@
+// Hayashi LP-DiD validation run for the pylpdid quickstart panel.
+load "validation/cases/lpdid_pylpdid_quickstart/data/panel.csv" as df
+
+let m = lpdid(
+    y ~ id + t + g,
+    df,
+    max_pre=5,
+    max_post=8,
+    base_period=-1,
+    clean_control="not_yet_treated"
+)
+
+let ev = m.event_coefficients
+let ev2 = rename(ev, variable, Variable)
+let ev3 = rename(ev2, coef, Coef)
+let ev4 = rename(ev3, std_err, Std_Err)
+let ev5 = keep(ev4, Variable, Coef, Std_Err)
+
+export(ev5, "csv", "/dev/stdout")

@@ -1,0 +1,8 @@
+load "examples/data/lpdid_test.csv" as df
+print(df)
+
+m = lpdid(y ~ unit + time + first_treat, df, max_pre=2, max_post=3, base_period=-1, clean_control="not_yet_treated")
+
+print(m)
+print(m.event_coefficients)
+print(m.fit)

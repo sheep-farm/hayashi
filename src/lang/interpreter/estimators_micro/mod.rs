@@ -55,6 +55,7 @@ impl Interpreter {
             "oprobit" => self.oprobit(func, args, opts, opt_map),
             "mlogit" => self.mlogit(func, args, opts, opt_map),
             "did" => self.did(func, args, opts, opt_map),
+            "lpdid" => self.lpdid(func, args, opts, opt_map),
             "eventstudy" | "event_study" | "es" => self.eventstudy(func, args, opts, opt_map),
             "nls_exp" | "nls_power" | "nls_logistic" | "nls_cobb_douglas" | "nls_ces" => {
                 self.nls_exp(func, args, opts, opt_map)
