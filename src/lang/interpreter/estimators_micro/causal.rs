@@ -1585,6 +1585,15 @@ impl Interpreter {
         if let Some(Value::Float(f)) = opt_map.get("alpha") {
             estimator = estimator.with_alpha(*f);
         }
+        if let Some(Value::Str(s)) = opt_map.get("inference") {
+            estimator = estimator.with_inference(s);
+        }
+        if let Some(v) = opt_map.get("n_bootstrap") {
+            estimator = estimator.with_n_bootstrap(to_usize(v, "n_bootstrap")?);
+        }
+        if let Some(Value::Int(i)) = opt_map.get("seed") {
+            estimator = estimator.with_seed(*i as u64);
+        }
 
         let result = estimator
             .fit(
