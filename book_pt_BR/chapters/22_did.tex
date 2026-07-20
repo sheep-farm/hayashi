@@ -213,3 +213,63 @@ O resultado reporta coeficientes, erros-padrão, estatísticas $t$ e
 $p$-values para cada tempo de evento. Os coeficientes dos leads
 ($t < 0$) testam a hipótese de tendências paralelas: se
 estatisticamente significativos, indicam violação do pressuposto.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Local Projections Difference-in-Differences}
+\label{sec:lpdid}
+
+\index{lpdid@\texttt{lpdid()}}
+\index{Local Projections Difference-in-Differences}
+
+O comando \texttt{lpdid} implementa o estimador de
+Dube, Girardi, Jordà e Taylor (2025), que combina projeções locais com
+Diferenças-em-Diferenças para designs de adoção escalonada. Em vez
+de dummies de tempo de evento, o LP-DiD estima o ATT em cada horizonte
+$h$ por uma regressão de diferenças longas:
+\[
+  \Delta_h y_{it} = \tau_h \, \Delta_h D_{it} + \text{controles} + \varepsilon_{it},
+\]
+onde $\Delta_h y_{it} = y_{i,t+h} - y_{i,t-\ell}$ é a diferença
+longa do outcome, $\ell$ é o período base e $D_{it}$ indica a
+unidade tratada. A amostra em cada horizonte é restrita a unidades
+``limpas'' (clean controls): nunca tratadas ou ainda não tratadas em
+$t+h$, conforme a opção \texttt{clean\_control}.
+
+\begin{lstlisting}[caption={LP-DiD com adoção escalonada absorvente}]
+let m = lpdid(y ~ unit + time + first_treat, df,
+              max_pre=5, max_post=8, base_period=-1,
+              clean_control="not_yet_treated")
+print(m.event_coefficients)
+\end{lstlisting}
+
+Os principais argumentos são:
+
+\begin{itemize}
+  \item \texttt{outcome \textasciitilde\ unit + time + first\_treat}:
+    fórmula com outcome, identificador da unidade, tempo e primeiro
+    período de tratamento (0 indica nunca tratado).
+  \item \texttt{max\_pre}, \texttt{max\_post}: número de horizontes
+    pré e pós-tratamento a estimar.
+  \item \texttt{base\_period}: período base para a diferença longa.
+    Pode ser um inteiro negativo (ex. \texttt{-1}), uma lista de
+    inteiros negativos ou \texttt{"all\_pre"}.
+  \item \texttt{clean\_control}: estratégia de controle limpo
+    (\texttt{not\_yet\_treated}, \texttt{never\_treated},
+    \texttt{first\_entry}, \texttt{stabilized}).
+  \item \texttt{estimand}: estimando alvo \texttt{vw} (padrão,
+    variance-weighted), \texttt{rw} (equally-weighted via
+    Frisch-Waugh-Lovell) ou \texttt{ra} (regression-adjusted
+    imputation).
+  \item \texttt{nonabsorbing}: permite que o tratamento ligue e
+    desligue ao longo do tempo. Nesse caso use a variável de
+    tratamento binário \texttt{treatment=} em vez de
+    \texttt{first\_treat}.
+  \item \texttt{fixed\_composition}: mantém o mesmo conjunto de
+    unidades em todos os horizontes, exigindo controles não tratados
+    em $t+H$.
+\end{itemize}
+
+O objeto de resultado possui três campos principais:
+\texttt{event\_coefficients} (tabela horizonte a horizonte),
+\texttt{scalar\_coefficients} (ATT médio e ATT pooled) e
+\texttt{fit} (metadados do ajuste).

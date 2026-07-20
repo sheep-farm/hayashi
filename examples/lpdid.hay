@@ -1,8 +1,33 @@
+// Example: Local Projections Difference-in-Differences (LP-DiD)
+//
+// The dataset has a staggered-adoption design: units are treated at different
+// cohorts (g = 0 means never treated). The true constant treatment effect is 2.0.
+
 load "examples/data/lpdid_test.csv" as df
 print(df)
 
-m = lpdid(y ~ unit + time + first_treat, df, max_pre=2, max_post=3, base_period=-1, clean_control="not_yet_treated")
+// Estimate event-study ATTs with the default variance-weighted (vw) estimand.
+// - max_pre=2: two pre-treatment horizons (-2, -1)
+// - max_post=3: three post-treatment horizons (0, 1, 2, 3)
+// - base_period=-1: long-difference relative to t-1
+// - clean_control="not_yet_treated": controls are units not yet treated at t+h
+let m = lpdid(
+    y ~ unit + time + first_treat,
+    df,
+    max_pre=2,
+    max_post=3,
+    base_period=-1,
+    clean_control="not_yet_treated"
+)
 
+// Display the formatted estimation summary.
 print(m)
+
+// Event-study table: horizon, estimate, standard error, t-stat, p-value, CI.
 print(m.event_coefficients)
+
+// Scalar summaries: ATT avg and ATT pooled.
+print(m.scalar_coefficients)
+
+// Metadata (estimand, base_period, clean_control, n_obs, etc.).
 print(m.fit)
