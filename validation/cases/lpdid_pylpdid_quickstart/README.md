@@ -34,3 +34,9 @@ coefficients and standard errors.
 
 These tolerances are tight because both sides use the same OLS point estimate
 and a cluster-robust covariance estimator grouped by unit.
+
+## Attribution
+
+The reference implementation `pylpdid` is copyright (c) 2026 Daniel de Abreu
+Pereira Uhr and is used here under the MIT License. The DGP and quickstart
+example are taken from `pylpdid/examples/01_quickstart.py`.
