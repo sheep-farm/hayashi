@@ -1,0 +1,9 @@
+// Intended validation target for panel FE with entity-clustered SEs.
+// This case is registered as not-supported until fe() honours cluster=.
+
+load "validation/cases/panel_fe_cluster_wagepan/data/wagepan.csv" as df
+
+xtset(df, nr, year)
+let m = fe(lwage ~ union + married + d81 + d82 + d83 + d84 + d85 + d86 + d87, df, cluster=nr)
+
+export(m, "txt", "/dev/stdout")

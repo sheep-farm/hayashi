@@ -1,0 +1,34 @@
+id: panel_fe_cluster_wagepan
+title: Panel fixed-effects wage equation with entity-clustered SEs on Wooldridge wagepan
+estimator_family: panel_fe
+status: not-supported
+dimension: numerical
+
+dataset:
+  name: wooldridge::wagepan
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+
+references: []
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-6
+    standard_errors: 1e-6
+
+output_format: txt
+
+hayashi_script: cases/panel_fe_cluster_wagepan/hayashi/run.hay
+reference_scripts: {}
+
+notes: Panel fixed-effects wage equation with worker-clustered standard errors; currently not supported because fe() ignores cluster=.
+
+result:
+  summary: "Not supported pending clustered covariance support for fe()."
+  known_differences:
+    - "fe(..., cluster=nr) currently produces the same standard errors as conventional fe(...)."
+  issues_opened:
+    - 93
