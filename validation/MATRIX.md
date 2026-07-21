@@ -46,6 +46,7 @@
 | ologit | wooldridge::beauty | R:passed *, Python:passed * | pass | — | Ordered logit of looks (2, 3, 4) on female, educ, exper, black. |
 | ols | wooldridge::wagepan | R:passed *, Python:passed * | pass | — | OLS wage equation with one-way cluster-robust standard errors by worker id. |
 | ols | wooldridge::wage1 | R:passed *, Python:passed * | pass | 89 | OLS log-wage equation with HC3 heteroskedasticity-robust standard errors. |
+| ols | wooldridge::phillips | R:passed *, Python:passed * | pass | 91 | OLS expectations-augmented Phillips curve with Newey-West HAC standard errors. |
 | ols | wooldridge::wagepan | R:passed *, Python:passed * | pass | 87 | OLS wage equation with two-way clustered standard errors by worker id and year. |
 | ols | wooldridge::401k | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 3 Example 3.3 401(k) participation equation. |
 | ols | wooldridge::attend | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 6 Example 6.3 attendance effects on exam score. |

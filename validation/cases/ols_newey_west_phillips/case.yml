@@ -1,0 +1,35 @@
+id: ols_newey_west_phillips
+title: OLS Phillips curve with Newey-West SEs on Wooldridge phillips
+estimator_family: ols
+status: active
+dimension: numerical
+
+dataset:
+  name: wooldridge::phillips
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-6
+    standard_errors: 1e-6
+
+hayashi_script: cases/ols_newey_west_phillips/hayashi/run.hay
+reference_scripts:
+  R: cases/ols_newey_west_phillips/reference/run.R
+  Python: cases/ols_newey_west_phillips/reference/run.py
+
+notes: OLS expectations-augmented Phillips curve with Newey-West HAC standard errors.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened:
+    - 91

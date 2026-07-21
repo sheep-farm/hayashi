@@ -200,6 +200,10 @@ cases:
   notes: OLS log-wage equation with HC3 heteroskedasticity-robust standard errors.
   dimension: numerical
   status: pass
+- id: ols_newey_west_phillips
+  notes: OLS expectations-augmented Phillips curve with Newey-West HAC standard errors.
+  dimension: numerical
+  status: pass
 - id: ols_twoway_cluster_wagepan
   notes: OLS wage equation with two-way clustered standard errors by worker id and
     year.
