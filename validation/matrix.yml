@@ -363,6 +363,11 @@ cases:
     education, experience and black indicators.
   dimension: numerical
   status: pass
+- id: panel_fe_cluster_wagepan
+  notes: Panel fixed-effects wage equation with worker-clustered standard errors;
+    currently not supported because fe() ignores cluster=.
+  dimension: numerical
+  status: not-supported
 - id: panel_fe_grunfeld
   notes: Panel fixed-effects investment demand model (Grunfeld).
   dimension: numerical
