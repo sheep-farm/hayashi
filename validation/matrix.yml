@@ -130,6 +130,11 @@ cases:
   notes: IV with education endogenous and nearc4 as instrument.
   dimension: numerical
   status: pass
+- id: iv_robust_mroz
+  notes: IV returns-to-schooling equation with HC1 heteroskedasticity-robust standard
+    errors.
+  dimension: numerical
+  status: pass
 - id: iv_wooldridge_mroz_ch15
   notes: Wooldridge Introductory Econometrics Chapter 15 Example 15.1 IV returns to
     schooling for married women.
