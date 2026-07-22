@@ -31,6 +31,7 @@
 | hausman_robust | wooldridge::wagepan | R:passed *, Python:passed * | pass | — | Robust Hausman test (Cameron-Trivedi 2005, Wooldridge 2010) with cluster-robust covariance. |
 | heckman | wooldridge::mroz | R:passed *, Python:passed * | pass | — | Two-step Heckman (Heckit) on the Mroz dataset. SEs are approximate because the reference implementations are two-step. |
 | iv | wooldridge::card | R:passed *, Python:passed * | pass | — | IV with education endogenous and nearc4 as instrument. |
+| iv | wooldridge::card | R:passed *, Python:passed * | pass | 97 | IV returns-to-schooling equation with one-way clustered standard errors by Census region. |
 | iv | wooldridge::mroz | R:passed *, Python:passed * | pass | 95 | IV returns-to-schooling equation with HC1 heteroskedasticity-robust standard errors. |
 | iv | wooldridge::mroz | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 15 Example 15.1 IV returns to schooling for married women. |
 | kalman | wooldridge::nyse | R:passed * | pass | — | Local-level Kalman filter on NYSE returns. Hayashi estimates sigma_obs and sigma_state by MLE and returns a printable result object. |
@@ -132,4 +133,3 @@ covered by validation" section of the README.
 Esta matriz abrange os estimadores empíricos centrais. Alguns comandos são
 deixados de fora intencionalmente pelos motivos descritos na seção
 "Estimators not covered by validation" do README.
-

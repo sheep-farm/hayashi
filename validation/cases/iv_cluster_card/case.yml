@@ -1,0 +1,37 @@
+id: iv_cluster_card
+title: IV returns to schooling with region-clustered SEs on Wooldridge card
+estimator_family: iv
+status: active
+dimension: numerical
+
+dataset:
+  name: wooldridge::card
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-4
+    standard_errors: 1e-4
+
+output_format: txt
+
+hayashi_script: cases/iv_cluster_card/hayashi/run.hay
+reference_scripts:
+  R: cases/iv_cluster_card/reference/run.R
+  Python: cases/iv_cluster_card/reference/run.py
+
+notes: IV returns-to-schooling equation with one-way clustered standard errors by Census region.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened:
+    - 97
