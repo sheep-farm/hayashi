@@ -1,0 +1,37 @@
+id: iv_robust_mroz
+title: IV returns to schooling with robust SEs on Wooldridge mroz
+estimator_family: iv
+status: active
+dimension: numerical
+
+dataset:
+  name: wooldridge::mroz
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-4
+    standard_errors: 1e-4
+
+output_format: txt
+
+hayashi_script: cases/iv_robust_mroz/hayashi/run.hay
+reference_scripts:
+  R: cases/iv_robust_mroz/reference/run.R
+  Python: cases/iv_robust_mroz/reference/run.py
+
+notes: IV returns-to-schooling equation with HC1 heteroskedasticity-robust standard errors.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened:
+    - 95
