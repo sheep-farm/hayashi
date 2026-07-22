@@ -130,6 +130,11 @@ cases:
   notes: IV with education endogenous and nearc4 as instrument.
   dimension: numerical
   status: pass
+- id: iv_cluster_card
+  notes: IV returns-to-schooling equation with one-way clustered standard errors by
+    Census region.
+  dimension: numerical
+  status: pass
 - id: iv_robust_mroz
   notes: IV returns-to-schooling equation with HC1 heteroskedasticity-robust standard
     errors.
