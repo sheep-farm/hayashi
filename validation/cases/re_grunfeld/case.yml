@@ -15,8 +15,8 @@ comparison:
   - coefficients
   - standard_errors
   tolerances:
-    coefficients: 1e-1
-    standard_errors: 1e-3
+    coefficients: 1e-4
+    standard_errors: 1e-4
 output_format: txt
 hayashi_script: cases/re_grunfeld/hayashi/run.hay
 reference_scripts:
@@ -24,6 +24,7 @@ reference_scripts:
   Python: cases/re_grunfeld/reference/run.py
 notes: Random-effects investment demand model (Grunfeld).
 result:
-  summary: ''
+  summary: "Hayashi matches R plm and Python linearmodels random-effects references with an explicit intercept."
   known_differences: []
-  issues_opened: []
+  issues_opened:
+  - 101
