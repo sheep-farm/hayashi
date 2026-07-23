@@ -402,8 +402,8 @@ cases:
   dimension: numerical
   status: pass
 - id: pcse_wagepan
-  notes: PCSE estimation of log wage on education, experience, and dummies using panel-corrected
-    standard errors.
+  notes: PCSE estimation of log wage on education, experience, and dummies using
+    the Hayashi/Greeners Beck-Katz covariance convention.
   dimension: numerical
   status: pass
 - id: poisson_fertil2
