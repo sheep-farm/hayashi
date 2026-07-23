@@ -10,25 +10,27 @@ dataset:
   licence: public teaching dataset
 
 references:
-  - R
+  - Python
 
 comparison:
   quantities:
     - coefficients
     - standard_errors
   tolerances:
-    coefficients: 1e-3
-    standard_errors: 1e-1
+    coefficients: 1e-4
+    standard_errors: 1e-4
 
 output_format: txt
 
 hayashi_script: cases/pcse_wagepan/hayashi/run.hay
 reference_scripts:
-  R: cases/pcse_wagepan/reference/run.R
+  Python: cases/pcse_wagepan/reference/run.py
 
-notes: PCSE estimation of log wage on education, experience, and dummies using panel-corrected standard errors.
+notes: PCSE estimation of log wage on education, experience, and dummies using the Hayashi/Greeners Beck-Katz covariance convention.
 
 result:
-  summary: ""
-  known_differences: []
-  issues_opened: []
+  summary: "Hayashi is validated against an explicit Python implementation of the Hayashi/Greeners PCSE covariance convention."
+  known_differences:
+    - "R plm::vcovBK is kept as a packaged cross-check but is not an active reference because its standard errors follow a different convention on this case."
+  issues_opened:
+    - 99
