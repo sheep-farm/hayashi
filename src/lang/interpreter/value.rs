@@ -489,7 +489,13 @@ impl std::fmt::Display for Value {
                 };
                 write!(f, "Geometry({preview}...)")
             }
-            Value::Plot { format, .. } => write!(f, "Plot({format})"),
+            Value::Plot { spec, format } => {
+                if format == "latex" || format == "html" || format == "markdown" {
+                    write!(f, "{spec}")
+                } else {
+                    write!(f, "Plot({format})")
+                }
+            }
             Value::Nil => write!(f, "nil"),
         }
     }

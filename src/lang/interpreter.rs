@@ -63,7 +63,7 @@ mod execution;
 mod helpers;
 pub mod models;
 mod post_estimation_ts;
-mod value;
+pub mod value;
 mod visualization;
 
 use self::helpers::*;
@@ -194,6 +194,11 @@ pub struct Interpreter {
     plugin_paths: Vec<String>,
     pub plugins: HashMap<String, Box<dyn super::plugin::HayashiPlugin>>,
     capturing: bool,
+    /// When false, the last expression of a cell is captured but not auto-printed.
+    /// Used by the Jupyter kernel to avoid duplicate output.
+    auto_display: bool,
+    /// Value of the last evaluated expression (set by `Stmt::Expr`).
+    last_expr_value: Option<Value>,
     // (function name, call site line, env scope depth at call)
     call_stack: Vec<(String, usize, usize)>,
     pub debug_state: Option<DebugState>,
@@ -230,6 +235,8 @@ impl Interpreter {
             plugin_paths: Vec::new(),
             plugins: HashMap::new(),
             capturing: false,
+            auto_display: true,
+            last_expr_value: None,
             call_stack: Vec::new(),
             debug_state: None,
             current_source: std::path::PathBuf::new(),
@@ -238,6 +245,17 @@ impl Interpreter {
 
     pub fn set_current_source(&mut self, path: impl Into<std::path::PathBuf>) {
         self.current_source = path.into();
+    }
+
+    /// Controls whether `Stmt::Expr` auto-prints its value.
+    /// When `false`, the value is still captured by `take_last_expr_value`.
+    pub fn set_auto_display(&mut self, enabled: bool) {
+        self.auto_display = enabled;
+    }
+
+    /// Returns the value of the last `Stmt::Expr` evaluated and clears it.
+    pub fn take_last_expr_value(&mut self) -> Option<Value> {
+        self.last_expr_value.take()
     }
 
     pub fn enable_debug(

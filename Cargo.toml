@@ -27,6 +27,11 @@ name = "hay-run"
 path = "src/bin/hay-run.rs"
 required-features = ["script", "network"]
 
+[[bin]]
+name = "hay-kernel"
+path = "src/bin/hay-kernel/main.rs"
+required-features = ["native"]
+
 [dependencies]
 greeners = { path = "../Greeners" }
 ndarray = "0.17"
@@ -55,6 +60,15 @@ rusqlite = { version = "0.33", features = ["bundled"], optional = true }
 odbc-api = { version = "28", optional = true }
 libloading = { version = "0.8", optional = true }
 wasmi = { version = "0.31", optional = true }
+
+# Jupyter kernel support
+jupyter-protocol = "2"
+jupyter-zmq-client = { version = "1", features = ["tokio-runtime"] }
+tokio = { version = "1.36", features = ["macros", "rt-multi-thread"] }
+anyhow = "1"
+uuid = { version = "1", features = ["v4"] }
+gag = "1"
+zeromq = "0.6"
 
 # Enable getrandom js backend for wasm
 getrandom = { version = "0.2", features = ["js"] }

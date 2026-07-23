@@ -37,6 +37,7 @@ impl Interpreter {
                 }
                 let content = match self.eval_expr(&args[0])? {
                     Value::Str(s) => s,
+                    Value::Plot { spec, .. } => spec,
                     v => {
                         return Err(self.type_err(format!("write: content must be string, got {v}")))
                     }

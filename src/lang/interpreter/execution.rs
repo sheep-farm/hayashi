@@ -315,9 +315,11 @@ impl Interpreter {
                     if let Expr::Var(name) = source.as_ref() {
                         self.env.set(name, val)?;
                     }
+                    self.last_expr_value = Some(Value::Nil);
                 } else {
                     let val = self.eval_expr(expr)?;
-                    if !matches!(val, Value::Nil) {
+                    self.last_expr_value = Some(val.clone());
+                    if self.auto_display && !matches!(val, Value::Nil) {
                         match &val {
                             Value::Str(v) => emitln!(self, "\"{v}\""),
                             _ => emitln!(self, "{val}"),
