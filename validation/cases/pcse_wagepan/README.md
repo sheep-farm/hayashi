@@ -17,12 +17,11 @@ pcse(lwage ~ educ + exper + expersq + married + union, df, id=nr, time=year)
 ## Reference implementation
 
 - **Python:** manual implementation of the Hayashi/Greeners PCSE convention.
-- **R cross-check:** `plm::plm(..., model = "pooling")` followed by
-  `plm::vcovBK(...)` is retained in `reference/run.R`, but is not an active
-  reference because it uses a different packaged PCSE convention on this case.
+- **R:** `plm::plm(..., model = "pooling")` followed by
+  `plm::vcovBK(..., cluster = "time", type = "HC0")`.
 - **Hayashi:** `pcse(lwage ~ educ + exper + expersq + married + union, df, id=nr, time=year)`
 
-The active Python reference computes:
+The Python reference computes the same covariance directly:
 
 ```text
 beta = (X'X)^-1 X'y
@@ -30,6 +29,10 @@ sigma_ij = e_i'e_j / T
 meat = sum_i sum_j sigma_ij X_i'X_j
 V = (X'X)^-1 meat (X'X)^-1
 ```
+
+Bare `plm::vcovBK(model)` uses defaults that differ from this validation
+target on this case. The R reference therefore sets `cluster = "time"` and
+`type = "HC0"` explicitly.
 
 ## Compared quantities
 

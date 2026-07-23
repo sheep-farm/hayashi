@@ -14,5 +14,6 @@ Imports:
     glmnet,
     jsonlite,
     MASS,
+    plm,
     systemfit,
     wooldridge

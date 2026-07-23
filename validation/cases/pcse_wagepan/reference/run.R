@@ -2,6 +2,7 @@
 
 library(wooldridge)
 library(jsonlite)
+library(plm)
 
 data(wagepan)
 
@@ -12,16 +13,12 @@ dir.create(data_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(ref_dir, recursive = TRUE, showWarnings = FALSE)
 write.csv(wagepan, file.path(data_dir, "wagepan.csv"), row.names = FALSE)
 
-if (!requireNamespace("plm", quietly = TRUE)) {
-  install.packages("plm", repos = "http://cran.r-project.org")
-}
-library(plm)
-
 pdata <- pdata.frame(wagepan, index = c("nr", "year"))
 model <- plm(lwage ~ educ + exper + expersq + married + union, data = pdata, model = "pooling")
 
-# Panel-corrected standard errors (Beck-Katz)
-vcv <- vcovBK(model)
+# Panel-corrected standard errors (Beck-Katz), matching the
+# Hayashi/Greeners balanced-panel convention validated by the Python reference.
+vcv <- vcovBK(model, cluster = "time", type = "HC0")
 coefs <- coef(model)
 se <- sqrt(diag(vcv))
 
