@@ -10,6 +10,7 @@
 - [Installation](./getting-started/installation.md)
 - [First Script](./getting-started/first-script.md)
 - [The REPL](./getting-started/repl.md)
+- [Jupyter Kernel](./getting-started/jupyter.md)
 
 # Data
 

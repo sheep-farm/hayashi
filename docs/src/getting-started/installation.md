@@ -50,6 +50,17 @@ cargo build --release --features odbc
 
 ODBC is optional and uses system ODBC drivers at runtime. See the [Trust Model](../trust-model.md) before connecting Hayashi scripts to shared or production databases.
 
+## Jupyter kernel
+
+Hayashi also provides a Jupyter kernel. After building from source:
+
+```bash
+cargo build --release --bin hay-kernel --features native
+./target/release/hay-kernel --install
+```
+
+Then start JupyterLab or Jupyter Notebook and select the **Hayashi** kernel. See the [Jupyter Kernel](./jupyter.md) page for details.
+
 ## Verify
 
 ```bash
