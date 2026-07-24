@@ -182,6 +182,24 @@ impl Value {
             Value::RlmResult(r) => Some(model_view_from_rlm(r)),
             Value::BetaResult(r) => Some(model_view_from_beta(r)),
             Value::GmmResult(r) => Some(model_view_from_gmm(r)),
+            Value::GarchResult(r) => Some(model_view_from_garch(r)),
+            Value::AutoRegResult(r) => Some(model_view_from_autoreg(r)),
+            Value::ArdlResult(r) => Some(model_view_from_ardl(r)),
+            Value::GlsarResult(r) => Some(model_view_from_glsar(r)),
+            Value::OrderedResult(r) => Some(model_view_from_ordered(r)),
+            Value::CoxResult(r) => Some(model_view_from_cox(r)),
+            Value::GeeResult(r) => Some(model_view_from_gee(r)),
+            Value::MixedResult(r) => Some(model_view_from_mixed(r)),
+            Value::ZeroInflatedResult(r) => Some(model_view_from_zero_inflated(r)),
+            Value::ThresholdResult(r) => Some(model_view_from_threshold(r)),
+            Value::DidResult(r) => Some(model_view_from_did(r)),
+            Value::RdResult(r) => Some(model_view_from_rd(r)),
+            Value::RecursiveLSResult(r) => Some(model_view_from_recursive_ls(r)),
+            Value::ConditionalResult(r) => Some(model_view_from_conditional(r)),
+            Value::GamResult(r) => Some(model_view_from_gam(r)),
+            Value::EtsResult(r) => Some(model_view_from_ets(r)),
+            Value::MarkovResult(r) => Some(model_view_from_markov_switching(r)),
+            Value::MSARResult(r) => Some(model_view_from_markov_autoreg(r)),
             Value::ModelResult {
                 display,
                 summary,
@@ -945,6 +963,580 @@ fn model_view_from_gmm(r: &std::rc::Rc<greeners::GmmResult>) -> ModelView {
         std_errors: r.std_errors.clone(),
         test_values: r.t_values.clone(),
         p_values: r.p_values.clone(),
+        conf_lower: None,
+        conf_upper: None,
+        fit,
+        residuals: None,
+        fitted_values: None,
+        x: None,
+        extras: HashMap::new(),
+    }
+}
+
+fn model_view_from_garch(r: &std::rc::Rc<greeners::GarchResult>) -> ModelView {
+    let mut fit = HashMap::new();
+    fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
+    fit.insert("log_likelihood".into(), Value::Float(r.log_likelihood));
+    fit.insert("aic".into(), Value::Float(r.aic));
+    fit.insert("bic".into(), Value::Float(r.bic));
+    fit.insert("p".into(), Value::Int(r.p as i64));
+    fit.insert("q".into(), Value::Int(r.q as i64));
+
+    let mut extras = HashMap::new();
+    extras.insert("model_type".into(), Value::Str(format!("{:?}", r.model_type)));
+    extras.insert("dist".into(), Value::Str(format!("{:?}", r.dist)));
+
+    ModelView {
+        type_name: "GarchResult".into(),
+        summary: format!("{}({}, p={}, q={}), n={}",
+            r.model_type, r.dist, r.p, r.q, r.n_obs),
+        variable_names: r.variable_names.clone(),
+        params: r.params.clone(),
+        std_errors: r.std_errors.clone(),
+        test_values: r.z_values.clone(),
+        p_values: r.p_values.clone(),
+        conf_lower: Some(r.conf_lower.clone()),
+        conf_upper: Some(r.conf_upper.clone()),
+        fit,
+        residuals: Some(r.residuals.clone()),
+        fitted_values: None,
+        x: None,
+        extras,
+    }
+}
+
+fn model_view_from_autoreg(r: &std::rc::Rc<greeners::AutoRegResult>) -> ModelView {
+    let mut fit = HashMap::new();
+    fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
+    fit.insert("r2".into(), Value::Float(r.r_squared));
+    fit.insert("adj_r2".into(), Value::Float(r.adj_r_squared));
+    fit.insert("aic".into(), Value::Float(r.aic));
+    fit.insert("bic".into(), Value::Float(r.bic));
+    fit.insert("lags".into(), Value::Int(r.lags as i64));
+
+    let mut extras = HashMap::new();
+    extras.insert("trend".into(), Value::Str(r.trend.clone()));
+
+    ModelView {
+        type_name: "AutoRegResult".into(),
+        summary: format!("AR(lags={}, n={}), R2={:.4}", r.lags, r.n_obs, r.r_squared),
+        variable_names: r.param_names.clone(),
+        params: r.params.clone(),
+        std_errors: r.std_errors.clone(),
+        test_values: r.t_values.clone(),
+        p_values: r.p_values.clone(),
+        conf_lower: None,
+        conf_upper: None,
+        fit,
+        residuals: Some(r.residuals.clone()),
+        fitted_values: Some(r.fitted_values.clone()),
+        x: None,
+        extras,
+    }
+}
+
+fn model_view_from_ardl(r: &std::rc::Rc<greeners::ARDLResult>) -> ModelView {
+    let mut fit = HashMap::new();
+    fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
+    fit.insert("r2".into(), Value::Float(r.r_squared));
+    fit.insert("adj_r2".into(), Value::Float(r.adj_r_squared));
+    fit.insert("aic".into(), Value::Float(r.aic));
+    fit.insert("bic".into(), Value::Float(r.bic));
+    fit.insert("y_lags".into(), Value::Int(r.y_lags as i64));
+    fit.insert("x_lags".into(), Value::Int(r.x_lags as i64));
+
+    ModelView {
+        type_name: "ArdlResult".into(),
+        summary: format!("ARDL(y_lags={}, x_lags={}, n={}), R2={:.4}",
+            r.y_lags, r.x_lags, r.n_obs, r.r_squared),
+        variable_names: r.param_names.clone(),
+        params: r.params.clone(),
+        std_errors: r.std_errors.clone(),
+        test_values: r.t_values.clone(),
+        p_values: r.p_values.clone(),
+        conf_lower: None,
+        conf_upper: None,
+        fit,
+        residuals: Some(r.residuals.clone()),
+        fitted_values: Some(r.fitted_values.clone()),
+        x: None,
+        extras: HashMap::new(),
+    }
+}
+
+fn model_view_from_glsar(r: &std::rc::Rc<greeners::GlsarResult>) -> ModelView {
+    let mut fit = HashMap::new();
+    fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
+    fit.insert("df_resid".into(), Value::Int(r.df_resid as i64));
+    fit.insert("r2".into(), Value::Float(r.r_squared));
+    fit.insert("rho".into(), Value::List(Arc::new(r.rho.iter().map(|&v| Value::Float(v)).collect())));
+
+    ModelView {
+        type_name: "GlsarResult".into(),
+        summary: format!("GLS-AR(rho_len={}, n={}), R2={:.4}", r.rho.len(), r.n_obs, r.r_squared),
+        variable_names: names_or_x(r.variable_names.as_ref(), r.params.len()),
+        params: r.params.clone(),
+        std_errors: r.std_errors.clone(),
+        test_values: r.t_values.clone(),
+        p_values: r.p_values.clone(),
+        conf_lower: None,
+        conf_upper: None,
+        fit,
+        residuals: None,
+        fitted_values: None,
+        x: None,
+        extras: HashMap::new(),
+    }
+}
+
+fn model_view_from_ordered(r: &std::rc::Rc<greeners::OrderedResult>) -> ModelView {
+    let mut fit = HashMap::new();
+    fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
+    fit.insert("log_likelihood".into(), Value::Float(r.log_likelihood));
+    fit.insert("aic".into(), Value::Float(r.aic));
+    fit.insert("bic".into(), Value::Float(r.bic));
+    fit.insert("pseudo_r2".into(), Value::Float(r.pseudo_r2));
+    fit.insert("n_categories".into(), Value::Int(r.n_categories as i64));
+
+    let mut names = r.variable_names.clone().unwrap_or_default();
+    for i in 0..r.thresholds.len() {
+        names.push(format!("_cut{}", i + 1));
+    }
+    let mut params = r.params.to_vec();
+    params.extend(&r.thresholds);
+    let mut se = r.std_errors.to_vec();
+    se.extend(&r.threshold_std_errors);
+
+    ModelView {
+        type_name: "OrderedResult".into(),
+        summary: format!("{}(k={}, n={}), pseudo-R2={:.4}",
+            r.model_name, r.params.len(), r.n_obs, r.pseudo_r2),
+        variable_names: names,
+        params: Array1::from(params),
+        std_errors: Array1::from(se),
+        test_values: r.z_values.clone(),
+        p_values: r.p_values.clone(),
+        conf_lower: None,
+        conf_upper: None,
+        fit,
+        residuals: None,
+        fitted_values: None,
+        x: None,
+        extras: HashMap::new(),
+    }
+}
+
+fn model_view_from_cox(r: &std::rc::Rc<greeners::CoxResult>) -> ModelView {
+    let mut fit = HashMap::new();
+    fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
+    fit.insert("n_events".into(), Value::Int(r.n_events as i64));
+    fit.insert("log_likelihood".into(), Value::Float(r.log_likelihood));
+    fit.insert("concordance".into(), Value::Float(r.concordance));
+
+    ModelView {
+        type_name: "CoxResult".into(),
+        summary: format!("Cox PH(k={}, n={}, events={}), C={:.4}",
+            r.params.len(), r.n_obs, r.n_events, r.concordance),
+        variable_names: names_or_x(r.variable_names.as_ref(), r.params.len()),
+        params: r.params.clone(),
+        std_errors: r.std_errors.clone(),
+        test_values: r.z_values.clone(),
+        p_values: r.p_values.clone(),
+        conf_lower: None,
+        conf_upper: None,
+        fit,
+        residuals: None,
+        fitted_values: None,
+        x: None,
+        extras: HashMap::new(),
+    }
+}
+
+fn model_view_from_gee(r: &std::rc::Rc<greeners::GeeResult>) -> ModelView {
+    let mut fit = HashMap::new();
+    fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
+    fit.insert("n_groups".into(), Value::Int(r.n_groups as i64));
+    fit.insert("scale".into(), Value::Float(r.scale));
+    fit.insert("qic".into(), Value::Float(r.qic));
+
+    ModelView {
+        type_name: "GeeResult".into(),
+        summary: format!("GEE(k={}, n={}, groups={})", r.params.len(), r.n_obs, r.n_groups),
+        variable_names: names_or_x(r.variable_names.as_ref(), r.params.len()),
+        params: r.params.clone(),
+        std_errors: r.robust_se.clone(),
+        test_values: r.z_values.clone(),
+        p_values: r.p_values.clone(),
+        conf_lower: None,
+        conf_upper: None,
+        fit,
+        residuals: None,
+        fitted_values: None,
+        x: None,
+        extras: HashMap::new(),
+    }
+}
+
+fn model_view_from_mixed(r: &std::rc::Rc<greeners::MixedResult>) -> ModelView {
+    let mut fit = HashMap::new();
+    fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
+    fit.insert("n_groups".into(), Value::Int(r.n_groups as i64));
+    fit.insert("log_likelihood".into(), Value::Float(r.log_likelihood));
+    fit.insert("aic".into(), Value::Float(r.aic));
+    fit.insert("bic".into(), Value::Float(r.bic));
+    fit.insert("var_resid".into(), Value::Float(r.var_resid));
+
+    let mut extras = HashMap::new();
+    extras.insert("random_effects".into(), Value::Dict(Arc::new(
+        r.random_effects.iter().map(|(k, v)| (k.to_string(), Value::List(Arc::new(v.iter().map(|&x| Value::Float(x)).collect())))).collect()
+    )));
+
+    ModelView {
+        type_name: "MixedResult".into(),
+        summary: format!("Mixed LM(k={}, n={}, groups={})", r.fixed_effects.len(), r.n_obs, r.n_groups),
+        variable_names: names_or_x(r.variable_names.as_ref(), r.fixed_effects.len()),
+        params: r.fixed_effects.clone(),
+        std_errors: r.fixed_se.clone(),
+        test_values: r.z_values.clone(),
+        p_values: r.p_values.clone(),
+        conf_lower: None,
+        conf_upper: None,
+        fit,
+        residuals: None,
+        fitted_values: None,
+        x: None,
+        extras,
+    }
+}
+
+fn model_view_from_zero_inflated(r: &std::rc::Rc<greeners::ZeroInflatedResult>) -> ModelView {
+    let mut fit = HashMap::new();
+    fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
+    fit.insert("log_likelihood".into(), Value::Float(r.log_likelihood));
+    fit.insert("aic".into(), Value::Float(r.aic));
+    fit.insert("bic".into(), Value::Float(r.bic));
+    if let Some(alpha) = r.alpha {
+        fit.insert("alpha".into(), Value::Float(alpha));
+    }
+
+    let mut names = Vec::new();
+    for i in 0..r.count_params.len() {
+        names.push(format!("count_x{i}"));
+    }
+    for i in 0..r.inflate_params.len() {
+        names.push(format!("inflate_x{i}"));
+    }
+    let mut params = r.count_params.to_vec();
+    params.extend(r.inflate_params.iter());
+    let mut se = r.count_std_errors.to_vec();
+    se.extend(r.inflate_std_errors.iter());
+    let mut z = r.count_z_values.to_vec();
+    z.extend(r.inflate_z_values.iter());
+    let mut p = r.count_p_values.to_vec();
+    p.extend(r.inflate_p_values.iter());
+
+    ModelView {
+        type_name: "ZeroInflatedResult".into(),
+        summary: format!("{}(count={}, inflate={}, n={})",
+            r.model_name, r.count_params.len(), r.inflate_params.len(), r.n_obs),
+        variable_names: names,
+        params: Array1::from(params),
+        std_errors: Array1::from(se),
+        test_values: Array1::from(z),
+        p_values: Array1::from(p),
+        conf_lower: None,
+        conf_upper: None,
+        fit,
+        residuals: None,
+        fitted_values: None,
+        x: None,
+        extras: HashMap::new(),
+    }
+}
+
+fn model_view_from_threshold(r: &std::rc::Rc<greeners::threshold::ThresholdResult>) -> ModelView {
+    let mut fit = HashMap::new();
+    fit.insert("n_search".into(), Value::Int(r.n_search as i64));
+    fit.insert("r2".into(), Value::Float(r.r_squared));
+    fit.insert("ssr_min".into(), Value::Float(r.ssr_min));
+
+    let mut params = r.params_regime1.to_vec();
+    params.extend(r.params_regime2.iter());
+    params.push(r.threshold_gamma);
+    let n = params.len();
+    let names: Vec<String> = (0..r.params_regime1.len()).map(|i| format!("regime1_x{i}")).chain(
+        (0..r.params_regime2.len()).map(|i| format!("regime2_x{i}"))
+    ).chain(std::iter::once("threshold".into())).collect();
+
+    ModelView {
+        type_name: "ThresholdResult".into(),
+        summary: format!("Threshold(gamma={:.4}, n_search={}), R2={:.4}",
+            r.threshold_gamma, r.n_search, r.r_squared),
+        variable_names: names,
+        params: Array1::from(params),
+        std_errors: Array1::zeros(n),
+        test_values: Array1::zeros(n),
+        p_values: Array1::ones(n),
+        conf_lower: None,
+        conf_upper: None,
+        fit,
+        residuals: None,
+        fitted_values: None,
+        x: None,
+        extras: HashMap::new(),
+    }
+}
+
+fn model_view_from_did(r: &std::rc::Rc<greeners::DidResult>) -> ModelView {
+    let mut fit = HashMap::new();
+    fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
+    fit.insert("r2".into(), Value::Float(r.r_squared));
+    fit.insert("att".into(), Value::Float(r.att));
+    fit.insert("control_pre_mean".into(), Value::Float(r.control_pre_mean));
+    fit.insert("control_post_mean".into(), Value::Float(r.control_post_mean));
+    fit.insert("treated_pre_mean".into(), Value::Float(r.treated_pre_mean));
+    fit.insert("treated_post_mean".into(), Value::Float(r.treated_post_mean));
+
+    ModelView {
+        type_name: "DidResult".into(),
+        summary: format!("DiD(ATT={:.4}, n={})", r.att, r.n_obs),
+        variable_names: r.variable_names.clone(),
+        params: r.params.clone(),
+        std_errors: r.std_errors.clone(),
+        test_values: r.t_values.clone(),
+        p_values: r.p_values.clone(),
+        conf_lower: None,
+        conf_upper: None,
+        fit,
+        residuals: None,
+        fitted_values: None,
+        x: None,
+        extras: HashMap::new(),
+    }
+}
+
+fn model_view_from_rd(r: &std::rc::Rc<greeners::RdResult>) -> ModelView {
+    let mut fit = HashMap::new();
+    fit.insert("n_left".into(), Value::Int(r.n_left as i64));
+    fit.insert("n_right".into(), Value::Int(r.n_right as i64));
+    fit.insert("n_total".into(), Value::Int(r.n_total as i64));
+    fit.insert("bandwidth".into(), Value::Float(r.bandwidth));
+    fit.insert("poly_order".into(), Value::Int(r.poly_order as i64));
+    fit.insert("cutoff".into(), Value::Float(r.cutoff));
+
+    let mut extras = HashMap::new();
+    extras.insert("is_fuzzy".into(), Value::Int(r.is_fuzzy as i64));
+    if let Some(t) = r.first_stage_tau {
+        extras.insert("first_stage_tau".into(), Value::Float(t));
+    }
+    if let Some(se) = r.first_stage_se {
+        extras.insert("first_stage_se".into(), Value::Float(se));
+    }
+
+    let params = Array1::from_vec(vec![r.tau]);
+    let se = Array1::from_vec(vec![r.se]);
+    let t = Array1::from_vec(vec![r.z]);
+    let p = Array1::from_vec(vec![r.p_value]);
+
+    ModelView {
+        type_name: "RdResult".into(),
+        summary: format!("RD(tau={:.4}, n={}), bw={:.4}", r.tau, r.n_total, r.bandwidth),
+        variable_names: vec!["tau".into()],
+        params,
+        std_errors: se,
+        test_values: t,
+        p_values: p,
+        conf_lower: Some(Array1::from_vec(vec![r.ci_lower])),
+        conf_upper: Some(Array1::from_vec(vec![r.ci_upper])),
+        fit,
+        residuals: None,
+        fitted_values: None,
+        x: None,
+        extras,
+    }
+}
+
+fn model_view_from_recursive_ls(r: &std::rc::Rc<greeners::RecursiveLSResult>) -> ModelView {
+    let mut fit = HashMap::new();
+    fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
+
+    ModelView {
+        type_name: "RecursiveLSResult".into(),
+        summary: format!("Recursive LS(k={}, n={})", r.params.len(), r.n_obs),
+        variable_names: (0..r.params.len()).map(|i| format!("x{i}")).collect(),
+        params: r.params.clone(),
+        std_errors: Array1::zeros(r.params.len()),
+        test_values: Array1::zeros(r.params.len()),
+        p_values: Array1::ones(r.params.len()),
+        conf_lower: None,
+        conf_upper: None,
+        fit,
+        residuals: Some(r.residuals.clone()),
+        fitted_values: None,
+        x: None,
+        extras: HashMap::new(),
+    }
+}
+
+fn model_view_from_conditional(r: &std::rc::Rc<greeners::ConditionalResult>) -> ModelView {
+    let mut fit = HashMap::new();
+    fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
+    fit.insert("n_groups".into(), Value::Int(r.n_groups as i64));
+    fit.insert("log_likelihood".into(), Value::Float(r.log_likelihood));
+    fit.insert("aic".into(), Value::Float(r.aic));
+    fit.insert("bic".into(), Value::Float(r.bic));
+    fit.insert("iterations".into(), Value::Int(r.iterations as i64));
+
+    ModelView {
+        type_name: "ConditionalResult".into(),
+        summary: format!("{}(k={}, n={}, groups={})",
+            r.model_name, r.params.len(), r.n_obs, r.n_groups),
+        variable_names: names_or_x(r.variable_names.as_ref(), r.params.len()),
+        params: r.params.clone(),
+        std_errors: r.std_errors.clone(),
+        test_values: r.z_values.clone(),
+        p_values: r.p_values.clone(),
+        conf_lower: None,
+        conf_upper: None,
+        fit,
+        residuals: None,
+        fitted_values: None,
+        x: None,
+        extras: HashMap::new(),
+    }
+}
+
+fn model_view_from_gam(r: &std::rc::Rc<greeners::GamResult>) -> ModelView {
+    let mut fit = HashMap::new();
+    fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
+    fit.insert("n_linear".into(), Value::Int(r.n_linear as i64));
+    fit.insert("n_smooth".into(), Value::Int(r.n_smooth as i64));
+    fit.insert("edf".into(), Value::Float(r.edf));
+    fit.insert("gcv_score".into(), Value::Float(r.gcv_score));
+    fit.insert("scale".into(), Value::Float(r.scale));
+
+    ModelView {
+        type_name: "GamResult".into(),
+        summary: format!("GAM(k={}, n={}), GCV={:.4}", r.params.len(), r.n_obs, r.gcv_score),
+        variable_names: names_or_x(r.variable_names.as_ref(), r.params.len()),
+        params: r.params.clone(),
+        std_errors: r.std_errors.clone(),
+        test_values: r.z_values.clone(),
+        p_values: r.p_values.clone(),
+        conf_lower: None,
+        conf_upper: None,
+        fit,
+        residuals: None,
+        fitted_values: None,
+        x: None,
+        extras: HashMap::new(),
+    }
+}
+
+fn model_view_from_ets(r: &std::rc::Rc<greeners::ETSResult>) -> ModelView {
+    let mut fit = HashMap::new();
+    fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
+    fit.insert("sse".into(), Value::Float(r.sse));
+    fit.insert("aic".into(), Value::Float(r.aic));
+    fit.insert("bic".into(), Value::Float(r.bic));
+    fit.insert("alpha".into(), Value::Float(r.alpha));
+    fit.insert("phi".into(), Value::Float(r.phi.unwrap_or(f64::NAN)));
+    fit.insert("seasonal_periods".into(), Value::Int(r.seasonal_periods as i64));
+    fit.insert("damped".into(), Value::Int(r.damped as i64));
+
+    let mut extras = HashMap::new();
+    extras.insert("trend_type".into(), Value::Str(r.trend_type.clone()));
+    extras.insert("seasonal_type".into(), Value::Str(r.seasonal_type.clone()));
+
+    ModelView {
+        type_name: "EtsResult".into(),
+        summary: format!("ETS({}, trend={}, n={})",
+            r.seasonal_type, r.trend_type, r.n_obs),
+        variable_names: (0..3).map(|i| format!("comp{i}")).collect(),
+        params: Array1::zeros(3),
+        std_errors: Array1::zeros(3),
+        test_values: Array1::zeros(3),
+        p_values: Array1::ones(3),
+        conf_lower: None,
+        conf_upper: None,
+        fit,
+        residuals: Some(r.residuals.clone()),
+        fitted_values: Some(r.fitted_values.clone()),
+        x: None,
+        extras,
+    }
+}
+
+fn model_view_from_markov_switching(r: &std::rc::Rc<greeners::MarkovSwitchingResult>) -> ModelView {
+    let mut fit = HashMap::new();
+    fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
+    fit.insert("n_regimes".into(), Value::Int(r.n_regimes as i64));
+    fit.insert("ar_order".into(), Value::Int(r.ar_order as i64));
+    fit.insert("log_likelihood".into(), Value::Float(r.log_likelihood));
+    fit.insert("aic".into(), Value::Float(r.aic));
+    fit.insert("bic".into(), Value::Float(r.bic));
+
+    let mut params = Vec::new();
+    let mut names = Vec::new();
+    for (i, rp) in r.regime_params.iter().enumerate() {
+        for (j, &v) in rp.iter().enumerate() {
+            params.push(v);
+            names.push(format!("regime{}_x{}", i + 1, j));
+        }
+    }
+    let n = params.len();
+
+    ModelView {
+        type_name: "MarkovSwitchingResult".into(),
+        summary: format!("Markov Switching(regimes={}, ar={}, n={})",
+            r.n_regimes, r.ar_order, r.n_obs),
+        variable_names: names,
+        params: Array1::from(params),
+        std_errors: Array1::zeros(n),
+        test_values: Array1::zeros(n),
+        p_values: Array1::ones(n),
+        conf_lower: None,
+        conf_upper: None,
+        fit,
+        residuals: None,
+        fitted_values: None,
+        x: None,
+        extras: HashMap::new(),
+    }
+}
+
+fn model_view_from_markov_autoreg(r: &std::rc::Rc<greeners::MarkovAutoregResult>) -> ModelView {
+    let mut fit = HashMap::new();
+    fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
+    fit.insert("n_regimes".into(), Value::Int(r.k_regimes as i64));
+    fit.insert("ar_order".into(), Value::Int(r.ar_order as i64));
+    fit.insert("log_likelihood".into(), Value::Float(r.log_likelihood));
+    fit.insert("aic".into(), Value::Float(r.aic));
+    fit.insert("bic".into(), Value::Float(r.bic));
+
+    let mut params = Vec::new();
+    let mut names = Vec::new();
+    for i in 0..r.k_regimes {
+        params.push(r.regime_means[i]);
+        names.push(format!("regime{}_intercept", i + 1));
+        for p in 0..r.ar_order {
+            params.push(r.ar_params[[i, p]]);
+            names.push(format!("regime{}_ar{}", i + 1, p + 1));
+        }
+        params.push(r.regime_sigmas[i]);
+        names.push(format!("regime{}_sigma", i + 1));
+    }
+    let n = params.len();
+
+    ModelView {
+        type_name: "MSARResult".into(),
+        summary: format!("MSAR(regimes={}, ar={}, n={})",
+            r.k_regimes, r.ar_order, r.n_obs),
+        variable_names: names,
+        params: Array1::from(params),
+        std_errors: Array1::zeros(n),
+        test_values: Array1::zeros(n),
+        p_values: Array1::ones(n),
         conf_lower: None,
         conf_upper: None,
         fit,
