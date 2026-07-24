@@ -1,4 +1,5 @@
 use super::*;
+use crate::lang::interpreter::model_view::model_view_to_children;
 use crate::lang::interpreter::{DiagResult, Series, Value};
 use indexmap::IndexMap;
 use ndarray::{Array1, Array2, Array3};
@@ -27,6 +28,13 @@ pub fn value_summary(v: &Value) -> (String, String, usize) {
 
 /// Returns the named children of a value for DAP variable expansion.
 pub fn value_children(v: &Value) -> Vec<(String, Value)> {
+    // If the value can be viewed canonically through ModelView, use the
+    // uniform expansion.  Estimators not yet covered by `to_model_view` fall
+    // through to the explicit match arms below.
+    if let Some(mv) = v.to_model_view() {
+        return model_view_to_children(&mv);
+    }
+
     match v {
         Value::DataFrame(df) => df
             .column_names()

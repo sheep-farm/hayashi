@@ -1,5 +1,6 @@
 use super::models::{BinaryModel, DFMModel, FactorModel, OlsModel, PcaModel, PenalizedModel, SurModel, ThreeSLSModel};
-use super::Value;
+use super::{Series, Value};
+use indexmap::IndexMap;
 use ndarray::{Array1, Array2};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -731,6 +732,103 @@ fn model_view_from_gmm(r: &std::rc::Rc<greeners::GmmResult>) -> ModelView {
         x: None,
         extras: HashMap::new(),
     }
+}
+
+// ── DAP / field expansion helpers ──────────────────────────────────────────
+
+fn array1_to_series(name: &str, arr: &Array1<f64>) -> Value {
+    let values: Vec<Value> = arr.iter().map(|&v| Value::Float(v)).collect();
+    Value::Series(Arc::new(Series::new(name, values)))
+}
+
+fn f64_array_column(arr: &Array1<f64>) -> greeners::Column {
+    greeners::Column::Float(Array1::from(arr.iter().copied().collect::<Vec<_>>()))
+}
+
+pub fn coef_dataframe(
+    names: &[String],
+    params: &Array1<f64>,
+    std_errors: &Array1<f64>,
+    test_values: &Array1<f64>,
+    p_values: &Array1<f64>,
+    conf_lower: Option<&Array1<f64>>,
+    conf_upper: Option<&Array1<f64>>,
+) -> Value {
+    let n = params.len();
+    let mut columns: IndexMap<String, greeners::Column> = IndexMap::new();
+
+    let name_col: Vec<String> = (0..n)
+        .map(|i| names.get(i).cloned().unwrap_or_else(|| format!("x{i}")))
+        .collect();
+    columns.insert("variable".into(), greeners::Column::from_strings(name_col));
+    columns.insert("coef".into(), f64_array_column(params));
+    columns.insert("std_err".into(), f64_array_column(std_errors));
+    columns.insert("t".into(), f64_array_column(test_values));
+    columns.insert("p_value".into(), f64_array_column(p_values));
+    if let Some(cl) = conf_lower {
+        columns.insert("conf_low".into(), f64_array_column(cl));
+    }
+    if let Some(cu) = conf_upper {
+        columns.insert("conf_high".into(), f64_array_column(cu));
+    }
+
+    Value::DataFrame(Arc::new(
+        greeners::DataFrame::from_columns(columns)
+            .unwrap_or_else(|_| greeners::DataFrame::from_columns(IndexMap::new()).unwrap()),
+    ))
+}
+
+/// Generate DAP-style `(name, Value)` children from a `ModelView`.
+pub fn model_view_to_children(mv: &ModelView) -> Vec<(String, Value)> {
+    let mut vars = Vec::new();
+
+    let coef_df = coef_dataframe(
+        &mv.variable_names,
+        &mv.params,
+        &mv.std_errors,
+        &mv.test_values,
+        &mv.p_values,
+        mv.conf_lower.as_ref(),
+        mv.conf_upper.as_ref(),
+    );
+    vars.push(("coefficients".into(), coef_df));
+
+    let fit = Value::Dict(Arc::new(mv.fit.clone()));
+    vars.push(("fit".into(), fit));
+
+    if let Some(resid) = mv.residuals.as_ref() {
+        if !resid.is_empty() {
+            vars.push(("residuals".into(), array1_to_series("residuals", resid)));
+        }
+    }
+    if let Some(fitted) = mv.fitted_values.as_ref() {
+        if !fitted.is_empty() {
+            vars.push(("fitted_values".into(), array1_to_series("fitted_values", fitted)));
+        }
+    } else if let Some(x) = mv.x.as_ref() {
+        if !x.is_empty() {
+            let fitted = x.dot(&mv.params);
+            vars.push(("fitted_values".into(), array1_to_series("fitted_values", &fitted)));
+        }
+    }
+
+    vars.push(("params".into(), array1_to_series("params", &mv.params)));
+    vars.push(("std_errors".into(), array1_to_series("std_errors", &mv.std_errors)));
+    vars.push(("test_values".into(), array1_to_series("test_values", &mv.test_values)));
+    vars.push(("p_values".into(), array1_to_series("p_values", &mv.p_values)));
+    if let Some(cl) = mv.conf_lower.as_ref() {
+        vars.push(("conf_lower".into(), array1_to_series("conf_lower", cl)));
+    }
+    if let Some(cu) = mv.conf_upper.as_ref() {
+        vars.push(("conf_upper".into(), array1_to_series("conf_upper", cu)));
+    }
+
+    // Expose extras at the top level so `m.kind`, `m.var_names`, etc. work.
+    for (k, v) in &mv.extras {
+        vars.push((k.clone(), v.clone()));
+    }
+
+    vars
 }
 
 fn model_view_from_model_result(
