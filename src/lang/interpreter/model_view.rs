@@ -200,6 +200,15 @@ impl Value {
             Value::EtsResult(r) => Some(model_view_from_ets(r)),
             Value::MarkovResult(r) => Some(model_view_from_markov_switching(r)),
             Value::MSARResult(r) => Some(model_view_from_markov_autoreg(r)),
+            Value::VarResult(r) => Some(model_view_from_var(r)),
+            Value::VecmResult(r) => Some(model_view_from_vecm(r)),
+            Value::SVarResult(r) => Some(model_view_from_svar(r)),
+            Value::VarmaResult(r) => Some(model_view_from_varma(r)),
+            Value::AbResult(r) => Some(model_view_from_ab(r)),
+            Value::SysGmmResult(r) => Some(model_view_from_sys_gmm(r)),
+            Value::PcseResult(r) => Some(model_view_from_pcse(r)),
+            Value::PanelGlsResult(r) => Some(model_view_from_panel_gls(r)),
+            Value::RollingResult(r) => Some(model_view_from_rolling(r)),
             Value::ModelResult {
                 display,
                 summary,
@@ -1541,6 +1550,349 @@ fn model_view_from_markov_autoreg(r: &std::rc::Rc<greeners::MarkovAutoregResult>
         conf_upper: None,
         fit,
         residuals: None,
+        fitted_values: None,
+        x: None,
+        extras: HashMap::new(),
+    }
+}
+
+fn flatten_var_params(r: &greeners::var::VarResult) -> (Vec<String>, Array1<f64>, Array1<f64>) {
+    let k = r.n_vars;
+    let p = r.lags;
+    let n_coef = (1 + p * k) * k;
+    let mut params = Array1::<f64>::zeros(n_coef);
+    let mut ses = Array1::<f64>::zeros(n_coef);
+    let mut names: Vec<String> = Vec::with_capacity(n_coef);
+    let mut idx = 0;
+    for eq in 0..k {
+        for row in 0..(1 + p * k) {
+            params[idx] = r.params[(row, eq)];
+            ses[idx] = r.std_errors[(row, eq)];
+            names.push(if row == 0 {
+                format!("const_{}", r.var_names[eq])
+            } else {
+                let lag = (row - 1) / k;
+                let src = (row - 1) % k;
+                format!("L{}.{}/{}", lag + 1, r.var_names[src], r.var_names[eq])
+            });
+            idx += 1;
+        }
+    }
+    (names, params, ses)
+}
+
+fn model_view_from_var(r: &std::rc::Rc<greeners::var::VarResult>) -> ModelView {
+    let mut fit = HashMap::new();
+    fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
+    fit.insert("n_vars".into(), Value::Int(r.n_vars as i64));
+    fit.insert("lags".into(), Value::Int(r.lags as i64));
+    fit.insert("aic".into(), Value::Float(r.aic));
+    fit.insert("bic".into(), Value::Float(r.bic));
+
+    let (names, params, std_errors) = flatten_var_params(r);
+    let n = params.len();
+
+    ModelView {
+        type_name: "VarResult".into(),
+        summary: format!("VAR(vars={}, lags={}, n={})", r.n_vars, r.lags, r.n_obs),
+        variable_names: names,
+        params,
+        std_errors,
+        test_values: Array1::zeros(n),
+        p_values: Array1::ones(n),
+        conf_lower: None,
+        conf_upper: None,
+        fit,
+        residuals: None,
+        fitted_values: None,
+        x: None,
+        extras: HashMap::new(),
+    }
+}
+
+fn model_view_from_svar(r: &std::rc::Rc<greeners::SVarResult>) -> ModelView {
+    let mut fit = HashMap::new();
+    let vr = &r.var_result;
+    fit.insert("n_obs".into(), Value::Int(vr.n_obs as i64));
+    fit.insert("n_vars".into(), Value::Int(vr.n_vars as i64));
+    fit.insert("lags".into(), Value::Int(vr.lags as i64));
+    fit.insert("aic".into(), Value::Float(vr.aic));
+    fit.insert("bic".into(), Value::Float(vr.bic));
+
+    let mut extras = HashMap::new();
+    extras.insert("identification".into(), Value::Str(r.identification.clone()));
+
+    let (names, params, std_errors) = flatten_var_params(vr);
+    let n = params.len();
+
+    ModelView {
+        type_name: "SVarResult".into(),
+        summary: format!("SVAR(vars={}, lags={}, n={}), id={}",
+            vr.n_vars, vr.lags, vr.n_obs, r.identification),
+        variable_names: names,
+        params,
+        std_errors,
+        test_values: Array1::zeros(n),
+        p_values: Array1::ones(n),
+        conf_lower: None,
+        conf_upper: None,
+        fit,
+        residuals: None,
+        fitted_values: None,
+        x: None,
+        extras,
+    }
+}
+
+fn model_view_from_varma(r: &std::rc::Rc<greeners::varma::VarmaResult>) -> ModelView {
+    let mut fit = HashMap::new();
+    fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
+    fit.insert("n_vars".into(), Value::Int(r.n_vars as i64));
+    fit.insert("p_lags".into(), Value::Int(r.p_lags as i64));
+    fit.insert("q_lags".into(), Value::Int(r.q_lags as i64));
+    fit.insert("aic".into(), Value::Float(r.aic));
+    fit.insert("bic".into(), Value::Float(r.bic));
+
+    let n_ar = r.ar_params.len();
+    let n_ma = r.ma_params.len();
+    let n_exog = r.exog_params.as_ref().map(|x| x.len()).unwrap_or(0);
+    let n = n_ar + n_ma + n_exog;
+    let mut names = Vec::with_capacity(n);
+    for i in 0..n_ar {
+        names.push(format!("ar{i}"));
+    }
+    for i in 0..n_ma {
+        names.push(format!("ma{i}"));
+    }
+    for i in 0..n_exog {
+        names.push(format!("exog{i}"));
+    }
+
+    let mut params = Vec::with_capacity(n);
+    params.extend(r.ar_params.iter());
+    params.extend(r.ma_params.iter());
+    if let Some(ex) = r.exog_params.as_ref() {
+        params.extend(ex.iter());
+    }
+
+    ModelView {
+        type_name: "VarmaResult".into(),
+        summary: format!("VARMA(vars={}, p={}, q={}, n={})",
+            r.n_vars, r.p_lags, r.q_lags, r.n_obs),
+        variable_names: names,
+        params: Array1::from(params),
+        std_errors: Array1::zeros(n),
+        test_values: Array1::zeros(n),
+        p_values: Array1::ones(n),
+        conf_lower: None,
+        conf_upper: None,
+        fit,
+        residuals: None,
+        fitted_values: None,
+        x: None,
+        extras: HashMap::new(),
+    }
+}
+
+fn model_view_from_vecm(r: &std::rc::Rc<greeners::vecm::VecmResult>) -> ModelView {
+    let mut fit = HashMap::new();
+    fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
+    fit.insert("n_vars".into(), Value::Int(r.n_vars as i64));
+    fit.insert("rank".into(), Value::Int(r.rank as i64));
+    fit.insert("lags".into(), Value::Int(r.lags as i64));
+
+    let k = r.n_vars;
+    let rank = r.rank;
+    let p = r.lags;
+    let n_alpha = rank * k;
+    let n_beta = rank * k;
+    let n_gamma = k * (p.saturating_sub(1)) * k;
+    let n_total = n_alpha + n_beta + n_gamma;
+    let mut params = Array1::<f64>::zeros(n_total);
+    let mut ses = Array1::<f64>::zeros(n_total);
+    let mut names: Vec<String> = Vec::with_capacity(n_total);
+    let mut idx = 0;
+    for j in 0..k {
+        for i in 0..rank {
+            params[idx] = r.alpha[(i, j)];
+            ses[idx] = r.std_errors_alpha[(i, j)];
+            names.push(format!("alpha_{}_{}", i + 1, r.variable_names.get(j).cloned().unwrap_or_else(|| format!("x{j}"))));
+            idx += 1;
+        }
+    }
+    for j in 0..k {
+        for i in 0..rank {
+            params[idx] = r.beta[(i, j)];
+            ses[idx] = r.std_errors_beta[(i, j)];
+            names.push(format!("beta_{}_{}", i + 1, r.variable_names.get(j).cloned().unwrap_or_else(|| format!("x{j}"))));
+            idx += 1;
+        }
+    }
+    for eq in 0..k {
+        for lag in 1..p {
+            for src in 0..k {
+                params[idx] = r.gamma[((lag - 1) * k + src, eq)];
+                ses[idx] = r.std_errors_gamma[((lag - 1) * k + src, eq)];
+                names.push(format!("gamma_L{lag}_{}_{}", r.variable_names[src], r.variable_names[eq]));
+                idx += 1;
+            }
+        }
+    }
+
+    ModelView {
+        type_name: "VecmResult".into(),
+        summary: format!("VECM(vars={}, rank={}, lags={}, n={})",
+            r.n_vars, r.rank, r.lags, r.n_obs),
+        variable_names: names,
+        params,
+        std_errors: ses,
+        test_values: Array1::zeros(n_total),
+        p_values: Array1::ones(n_total),
+        conf_lower: None,
+        conf_upper: None,
+        fit,
+        residuals: None,
+        fitted_values: None,
+        x: None,
+        extras: HashMap::new(),
+    }
+}
+
+fn model_view_from_ab(r: &std::rc::Rc<greeners::ArellanoBondResult>) -> ModelView {
+    let mut fit = HashMap::new();
+    fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
+    fit.insert("n_entities".into(), Value::Int(r.n_entities as i64));
+    fit.insert("sargan_stat".into(), Value::Float(r.sargan_stat));
+    fit.insert("sargan_pvalue".into(), Value::Float(r.sargan_pvalue));
+    fit.insert("n_instruments".into(), Value::Int(r.n_instruments as i64));
+
+    ModelView {
+        type_name: "AbResult".into(),
+        summary: format!("Arellano-Bond(k={}, n={}, entities={})",
+            r.params.len(), r.n_obs, r.n_entities),
+        variable_names: names_or_x(r.variable_names.as_ref(), r.params.len()),
+        params: r.params.clone(),
+        std_errors: r.std_errors.clone(),
+        test_values: r.t_values.clone(),
+        p_values: r.p_values.clone(),
+        conf_lower: None,
+        conf_upper: None,
+        fit,
+        residuals: None,
+        fitted_values: None,
+        x: None,
+        extras: HashMap::new(),
+    }
+}
+
+fn model_view_from_sys_gmm(r: &std::rc::Rc<greeners::SystemGmmResult>) -> ModelView {
+    let mut fit = HashMap::new();
+    fit.insert("n_obs_fd".into(), Value::Int(r.n_obs_fd as i64));
+    fit.insert("n_obs_lev".into(), Value::Int(r.n_obs_lev as i64));
+    fit.insert("n_entities".into(), Value::Int(r.n_entities as i64));
+    fit.insert("sargan_stat".into(), Value::Float(r.sargan_stat));
+    fit.insert("sargan_pvalue".into(), Value::Float(r.sargan_pvalue));
+    fit.insert("n_instruments".into(), Value::Int(r.n_instruments as i64));
+
+    ModelView {
+        type_name: "SysGmmResult".into(),
+        summary: format!("System GMM(k={}, n_fd={}, n_lev={})",
+            r.params.len(), r.n_obs_fd, r.n_obs_lev),
+        variable_names: names_or_x(r.variable_names.as_ref(), r.params.len()),
+        params: r.params.clone(),
+        std_errors: r.std_errors.clone(),
+        test_values: r.t_values.clone(),
+        p_values: r.p_values.clone(),
+        conf_lower: None,
+        conf_upper: None,
+        fit,
+        residuals: None,
+        fitted_values: None,
+        x: None,
+        extras: HashMap::new(),
+    }
+}
+
+fn model_view_from_pcse(r: &std::rc::Rc<greeners::PcseResult>) -> ModelView {
+    let mut fit = HashMap::new();
+    fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
+    fit.insert("n_entities".into(), Value::Int(r.n_entities as i64));
+    fit.insert("t_periods".into(), Value::Int(r.t_periods as i64));
+    fit.insert("df_resid".into(), Value::Int(r.df_resid as i64));
+    fit.insert("r2".into(), Value::Float(r.r_squared));
+    fit.insert("sigma".into(), Value::Float(r.sigma));
+
+    ModelView {
+        type_name: "PcseResult".into(),
+        summary: format!("PCSE(k={}, n={}, entities={}), R2={:.4}",
+            r.params.len(), r.n_obs, r.n_entities, r.r_squared),
+        variable_names: names_or_x(r.variable_names.as_ref(), r.params.len()),
+        params: r.params.clone(),
+        std_errors: r.std_errors.clone(),
+        test_values: r.t_values.clone(),
+        p_values: r.p_values.clone(),
+        conf_lower: None,
+        conf_upper: None,
+        fit,
+        residuals: None,
+        fitted_values: None,
+        x: None,
+        extras: HashMap::new(),
+    }
+}
+
+fn model_view_from_panel_gls(r: &std::rc::Rc<greeners::PanelGlsResult>) -> ModelView {
+    let mut fit = HashMap::new();
+    fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
+    fit.insert("n_entities".into(), Value::Int(r.n_entities as i64));
+    fit.insert("t_periods".into(), Value::Int(r.t_periods as i64));
+    fit.insert("df_resid".into(), Value::Int(r.df_resid as i64));
+    fit.insert("r2".into(), Value::Float(r.r_squared));
+    fit.insert("sigma".into(), Value::Float(r.sigma));
+
+    let mut extras = HashMap::new();
+    extras.insert("panels".into(), Value::Str(format!("{:?}", r.panels)));
+
+    ModelView {
+        type_name: "PanelGlsResult".into(),
+        summary: format!("Panel GLS(k={}, n={}, entities={}), R2={:.4}",
+            r.params.len(), r.n_obs, r.n_entities, r.r_squared),
+        variable_names: names_or_x(r.variable_names.as_ref(), r.params.len()),
+        params: r.params.clone(),
+        std_errors: r.std_errors.clone(),
+        test_values: r.t_values.clone(),
+        p_values: r.p_values.clone(),
+        conf_lower: None,
+        conf_upper: None,
+        fit,
+        residuals: None,
+        fitted_values: None,
+        x: None,
+        extras,
+    }
+}
+
+fn model_view_from_rolling(r: &std::rc::Rc<greeners::RollingResult>) -> ModelView {
+    let mut fit = HashMap::new();
+    fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
+    fit.insert("window".into(), Value::Int(r.window as i64));
+
+    // Use final parameter estimates as the canonical coefficients.
+    let k = r.params_history.ncols();
+    let names = r.variable_names.clone().unwrap_or_default();
+
+    ModelView {
+        type_name: "RollingResult".into(),
+        summary: format!("Rolling OLS(k={}, window={}, n={})", k, r.window, r.n_obs),
+        variable_names: names,
+        params: r.params_history.row(r.n_obs.saturating_sub(1)).to_owned(),
+        std_errors: Array1::zeros(k),
+        test_values: Array1::zeros(k),
+        p_values: Array1::ones(k),
+        conf_lower: None,
+        conf_upper: None,
+        fit,
+        residuals: Some(r.residuals.clone()),
         fitted_values: None,
         x: None,
         extras: HashMap::new(),
