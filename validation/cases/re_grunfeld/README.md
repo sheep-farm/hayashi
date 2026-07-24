@@ -20,8 +20,11 @@ with random firm effects.
 ## Reference implementation
 
 - **R:** `plm(inv ~ value + capital, data = Grunfeld, index = c("firm", "year"), model = "random")`
-- **Python:** `linearmodels.RandomEffects.from_formula("inv ~ value + capital", ...)`
+- **Python:** `linearmodels.RandomEffects.from_formula("inv ~ 1 + value + capital", ...)`
 - **Hayashi:** `xtset(df, firm, year)` then `re(inv ~ value + capital, df)`
+
+The explicit `1 +` in the Python formula is required because `linearmodels`
+does not add an intercept by default. The R and Hayashi formulas include one.
 
 ## Compared quantities
 
