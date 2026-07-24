@@ -129,6 +129,18 @@ impl ModelView {
         map
     }
 
+    /// Build coefficient rows for `esttab` and similar table builders.
+    /// Tuple is `(variable, coef, std_err, p_value)`.
+    pub fn to_coef_rows(&self) -> Vec<(String, f64, Option<f64>, Option<f64>)> {
+        self.variable_names
+            .iter()
+            .zip(self.params.iter())
+            .zip(self.std_errors.iter())
+            .zip(self.p_values.iter())
+            .map(|(((n, &c), &s), &p)| (n.clone(), c, Some(s), Some(p)))
+            .collect()
+    }
+
     /// Build the `glance()` output: a copy of `fit` as a one-row Dict,
     /// wrapping each scalar in a single-element `Value::List` so that
     /// `dict_to_dataframe` can materialise it.

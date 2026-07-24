@@ -99,6 +99,33 @@ fn esttab_extract_std(
     }
 }
 
+fn fit_float(fit: &std::collections::HashMap<String, Value>, keys: &[&str]) -> Option<f64> {
+    for k in keys {
+        if let Some(Value::Float(v)) = fit.get(*k) {
+            return Some(*v);
+        }
+    }
+    None
+}
+
+fn model_view_to_model_info(mv: &crate::lang::interpreter::model_view::ModelView) -> ModelInfo {
+    let coefs = mv.to_coef_rows();
+    let n = mv.n_obs().unwrap_or(0);
+    let r2 = mv
+        .r_squared()
+        .or_else(|| fit_float(&mv.fit, &["r2", "r_squared", "r_squared_overall"]));
+    let adj_r2 = fit_float(&mv.fit, &["adj_r2", "adj_r_squared"]);
+    let ll = fit_float(&mv.fit, &["log_lik", "log_likelihood"]);
+    ModelInfo {
+        label: mv.type_name.clone(),
+        coefs,
+        n,
+        r2,
+        adj_r2,
+        ll,
+    }
+}
+
 fn codebook_numeric_stats(vals: &[f64]) -> (f64, f64, f64, f64, f64, f64, f64, usize) {
     let n = vals.len();
     let mean = vals.iter().sum::<f64>() / n as f64;
@@ -1773,6 +1800,27 @@ impl Interpreter {
             vals
         };
         for val in model_vals {
+            // Use the canonical ModelView for any single-equation regression-like
+            // estimator.  Models with special esttab formatting (OLS covariance
+            // labels, thresholds, lambdas, multi-equation systems, or non-β
+            // results) fall through to the explicit match arms below.
+            if let Some(mv) = val.to_model_view() {
+                let skip = matches!(mv.type_name.as_str(),
+                    "OlsResult" | "BinaryResult" | "OrderedResult" | "TobitResult" | "HeckmanResult"
+                    | "PanelGlsResult" | "ZeroInflatedResult" | "SurResult" | "RollingResult"
+                    | "RecursiveLSResult" | "MNLogitResult" | "DidResult" | "KMResult" | "RdResult"
+                    | "SynthResult" | "PsmResult" | "VarmaResult" | "DecompResult" | "MstlResult"
+                    | "UCResult" | "GamResult" | "MiceResult" | "MSARResult" | "SVarResult"
+                    | "ThreeSLSResult" | "DFMResult" | "EtsResult" | "ThresholdResult" | "VarResult"
+                    | "VecmResult" | "PcaResult" | "FactorResult" | "GmmClusteringResult"
+                    | "HierarchicalResult" | "SpectralResult" | "KmeansResult" | "DbscanResult"
+                    | "IsotonicResult" | "KdeResult" | "BartResult" | "GpResult" | "LowessResult"
+                );
+                if !skip && !mv.to_coef_rows().is_empty() {
+                    models.push(model_view_to_model_info(&mv));
+                    continue;
+                }
+            }
             match val {
                 Value::OlsResult(m) => {
                     use greeners::ExportableResult;
