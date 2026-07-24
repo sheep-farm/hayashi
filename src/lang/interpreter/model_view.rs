@@ -992,13 +992,18 @@ fn model_view_from_garch(r: &std::rc::Rc<greeners::GarchResult>) -> ModelView {
     fit.insert("q".into(), Value::Int(r.q as i64));
 
     let mut extras = HashMap::new();
-    extras.insert("model_type".into(), Value::Str(format!("{:?}", r.model_type)));
+    extras.insert(
+        "model_type".into(),
+        Value::Str(format!("{:?}", r.model_type)),
+    );
     extras.insert("dist".into(), Value::Str(format!("{:?}", r.dist)));
 
     ModelView {
         type_name: "GarchResult".into(),
-        summary: format!("{}({}, p={}, q={}), n={}",
-            r.model_type, r.dist, r.p, r.q, r.n_obs),
+        summary: format!(
+            "{}({}, p={}, q={}), n={}",
+            r.model_type, r.dist, r.p, r.q, r.n_obs
+        ),
         variable_names: r.variable_names.clone(),
         params: r.params.clone(),
         std_errors: r.std_errors.clone(),
@@ -1056,8 +1061,10 @@ fn model_view_from_ardl(r: &std::rc::Rc<greeners::ARDLResult>) -> ModelView {
 
     ModelView {
         type_name: "ArdlResult".into(),
-        summary: format!("ARDL(y_lags={}, x_lags={}, n={}), R2={:.4}",
-            r.y_lags, r.x_lags, r.n_obs, r.r_squared),
+        summary: format!(
+            "ARDL(y_lags={}, x_lags={}, n={}), R2={:.4}",
+            r.y_lags, r.x_lags, r.n_obs, r.r_squared
+        ),
         variable_names: r.param_names.clone(),
         params: r.params.clone(),
         std_errors: r.std_errors.clone(),
@@ -1078,11 +1085,19 @@ fn model_view_from_glsar(r: &std::rc::Rc<greeners::GlsarResult>) -> ModelView {
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
     fit.insert("df_resid".into(), Value::Int(r.df_resid as i64));
     fit.insert("r2".into(), Value::Float(r.r_squared));
-    fit.insert("rho".into(), Value::List(Arc::new(r.rho.iter().map(|&v| Value::Float(v)).collect())));
+    fit.insert(
+        "rho".into(),
+        Value::List(Arc::new(r.rho.iter().map(|&v| Value::Float(v)).collect())),
+    );
 
     ModelView {
         type_name: "GlsarResult".into(),
-        summary: format!("GLS-AR(rho_len={}, n={}), R2={:.4}", r.rho.len(), r.n_obs, r.r_squared),
+        summary: format!(
+            "GLS-AR(rho_len={}, n={}), R2={:.4}",
+            r.rho.len(),
+            r.n_obs,
+            r.r_squared
+        ),
         variable_names: names_or_x(r.variable_names.as_ref(), r.params.len()),
         params: r.params.clone(),
         std_errors: r.std_errors.clone(),
@@ -1118,8 +1133,13 @@ fn model_view_from_ordered(r: &std::rc::Rc<greeners::OrderedResult>) -> ModelVie
 
     ModelView {
         type_name: "OrderedResult".into(),
-        summary: format!("{}(k={}, n={}), pseudo-R2={:.4}",
-            r.model_name, r.params.len(), r.n_obs, r.pseudo_r2),
+        summary: format!(
+            "{}(k={}, n={}), pseudo-R2={:.4}",
+            r.model_name,
+            r.params.len(),
+            r.n_obs,
+            r.pseudo_r2
+        ),
         variable_names: names,
         params: Array1::from(params),
         std_errors: Array1::from(se),
@@ -1144,8 +1164,13 @@ fn model_view_from_cox(r: &std::rc::Rc<greeners::CoxResult>) -> ModelView {
 
     ModelView {
         type_name: "CoxResult".into(),
-        summary: format!("Cox PH(k={}, n={}, events={}), C={:.4}",
-            r.params.len(), r.n_obs, r.n_events, r.concordance),
+        summary: format!(
+            "Cox PH(k={}, n={}, events={}), C={:.4}",
+            r.params.len(),
+            r.n_obs,
+            r.n_events,
+            r.concordance
+        ),
         variable_names: names_or_x(r.variable_names.as_ref(), r.params.len()),
         params: r.params.clone(),
         std_errors: r.std_errors.clone(),
@@ -1170,7 +1195,12 @@ fn model_view_from_gee(r: &std::rc::Rc<greeners::GeeResult>) -> ModelView {
 
     ModelView {
         type_name: "GeeResult".into(),
-        summary: format!("GEE(k={}, n={}, groups={})", r.params.len(), r.n_obs, r.n_groups),
+        summary: format!(
+            "GEE(k={}, n={}, groups={})",
+            r.params.len(),
+            r.n_obs,
+            r.n_groups
+        ),
         variable_names: names_or_x(r.variable_names.as_ref(), r.params.len()),
         params: r.params.clone(),
         std_errors: r.robust_se.clone(),
@@ -1196,13 +1226,29 @@ fn model_view_from_mixed(r: &std::rc::Rc<greeners::MixedResult>) -> ModelView {
     fit.insert("var_resid".into(), Value::Float(r.var_resid));
 
     let mut extras = HashMap::new();
-    extras.insert("random_effects".into(), Value::Dict(Arc::new(
-        r.random_effects.iter().map(|(k, v)| (k.to_string(), Value::List(Arc::new(v.iter().map(|&x| Value::Float(x)).collect())))).collect()
-    )));
+    extras.insert(
+        "random_effects".into(),
+        Value::Dict(Arc::new(
+            r.random_effects
+                .iter()
+                .map(|(k, v)| {
+                    (
+                        k.to_string(),
+                        Value::List(Arc::new(v.iter().map(|&x| Value::Float(x)).collect())),
+                    )
+                })
+                .collect(),
+        )),
+    );
 
     ModelView {
         type_name: "MixedResult".into(),
-        summary: format!("Mixed LM(k={}, n={}, groups={})", r.fixed_effects.len(), r.n_obs, r.n_groups),
+        summary: format!(
+            "Mixed LM(k={}, n={}, groups={})",
+            r.fixed_effects.len(),
+            r.n_obs,
+            r.n_groups
+        ),
         variable_names: names_or_x(r.variable_names.as_ref(), r.fixed_effects.len()),
         params: r.fixed_effects.clone(),
         std_errors: r.fixed_se.clone(),
@@ -1246,8 +1292,13 @@ fn model_view_from_zero_inflated(r: &std::rc::Rc<greeners::ZeroInflatedResult>) 
 
     ModelView {
         type_name: "ZeroInflatedResult".into(),
-        summary: format!("{}(count={}, inflate={}, n={})",
-            r.model_name, r.count_params.len(), r.inflate_params.len(), r.n_obs),
+        summary: format!(
+            "{}(count={}, inflate={}, n={})",
+            r.model_name,
+            r.count_params.len(),
+            r.inflate_params.len(),
+            r.n_obs
+        ),
         variable_names: names,
         params: Array1::from(params),
         std_errors: Array1::from(se),
@@ -1273,14 +1324,18 @@ fn model_view_from_threshold(r: &std::rc::Rc<greeners::threshold::ThresholdResul
     params.extend(r.params_regime2.iter());
     params.push(r.threshold_gamma);
     let n = params.len();
-    let names: Vec<String> = (0..r.params_regime1.len()).map(|i| format!("regime1_x{i}")).chain(
-        (0..r.params_regime2.len()).map(|i| format!("regime2_x{i}"))
-    ).chain(std::iter::once("threshold".into())).collect();
+    let names: Vec<String> = (0..r.params_regime1.len())
+        .map(|i| format!("regime1_x{i}"))
+        .chain((0..r.params_regime2.len()).map(|i| format!("regime2_x{i}")))
+        .chain(std::iter::once("threshold".into()))
+        .collect();
 
     ModelView {
         type_name: "ThresholdResult".into(),
-        summary: format!("Threshold(gamma={:.4}, n_search={}), R2={:.4}",
-            r.threshold_gamma, r.n_search, r.r_squared),
+        summary: format!(
+            "Threshold(gamma={:.4}, n_search={}), R2={:.4}",
+            r.threshold_gamma, r.n_search, r.r_squared
+        ),
         variable_names: names,
         params: Array1::from(params),
         std_errors: Array1::zeros(n),
@@ -1302,9 +1357,15 @@ fn model_view_from_did(r: &std::rc::Rc<greeners::DidResult>) -> ModelView {
     fit.insert("r2".into(), Value::Float(r.r_squared));
     fit.insert("att".into(), Value::Float(r.att));
     fit.insert("control_pre_mean".into(), Value::Float(r.control_pre_mean));
-    fit.insert("control_post_mean".into(), Value::Float(r.control_post_mean));
+    fit.insert(
+        "control_post_mean".into(),
+        Value::Float(r.control_post_mean),
+    );
     fit.insert("treated_pre_mean".into(), Value::Float(r.treated_pre_mean));
-    fit.insert("treated_post_mean".into(), Value::Float(r.treated_post_mean));
+    fit.insert(
+        "treated_post_mean".into(),
+        Value::Float(r.treated_post_mean),
+    );
 
     ModelView {
         type_name: "DidResult".into(),
@@ -1349,7 +1410,10 @@ fn model_view_from_rd(r: &std::rc::Rc<greeners::RdResult>) -> ModelView {
 
     ModelView {
         type_name: "RdResult".into(),
-        summary: format!("RD(tau={:.4}, n={}), bw={:.4}", r.tau, r.n_total, r.bandwidth),
+        summary: format!(
+            "RD(tau={:.4}, n={}), bw={:.4}",
+            r.tau, r.n_total, r.bandwidth
+        ),
         variable_names: vec!["tau".into()],
         params,
         std_errors: se,
@@ -1398,8 +1462,13 @@ fn model_view_from_conditional(r: &std::rc::Rc<greeners::ConditionalResult>) -> 
 
     ModelView {
         type_name: "ConditionalResult".into(),
-        summary: format!("{}(k={}, n={}, groups={})",
-            r.model_name, r.params.len(), r.n_obs, r.n_groups),
+        summary: format!(
+            "{}(k={}, n={}, groups={})",
+            r.model_name,
+            r.params.len(),
+            r.n_obs,
+            r.n_groups
+        ),
         variable_names: names_or_x(r.variable_names.as_ref(), r.params.len()),
         params: r.params.clone(),
         std_errors: r.std_errors.clone(),
@@ -1426,7 +1495,12 @@ fn model_view_from_gam(r: &std::rc::Rc<greeners::GamResult>) -> ModelView {
 
     ModelView {
         type_name: "GamResult".into(),
-        summary: format!("GAM(k={}, n={}), GCV={:.4}", r.params.len(), r.n_obs, r.gcv_score),
+        summary: format!(
+            "GAM(k={}, n={}), GCV={:.4}",
+            r.params.len(),
+            r.n_obs,
+            r.gcv_score
+        ),
         variable_names: names_or_x(r.variable_names.as_ref(), r.params.len()),
         params: r.params.clone(),
         std_errors: r.std_errors.clone(),
@@ -1450,7 +1524,10 @@ fn model_view_from_ets(r: &std::rc::Rc<greeners::ETSResult>) -> ModelView {
     fit.insert("bic".into(), Value::Float(r.bic));
     fit.insert("alpha".into(), Value::Float(r.alpha));
     fit.insert("phi".into(), Value::Float(r.phi.unwrap_or(f64::NAN)));
-    fit.insert("seasonal_periods".into(), Value::Int(r.seasonal_periods as i64));
+    fit.insert(
+        "seasonal_periods".into(),
+        Value::Int(r.seasonal_periods as i64),
+    );
     fit.insert("damped".into(), Value::Int(r.damped as i64));
 
     let mut extras = HashMap::new();
@@ -1459,8 +1536,10 @@ fn model_view_from_ets(r: &std::rc::Rc<greeners::ETSResult>) -> ModelView {
 
     ModelView {
         type_name: "EtsResult".into(),
-        summary: format!("ETS({}, trend={}, n={})",
-            r.seasonal_type, r.trend_type, r.n_obs),
+        summary: format!(
+            "ETS({}, trend={}, n={})",
+            r.seasonal_type, r.trend_type, r.n_obs
+        ),
         variable_names: (0..3).map(|i| format!("comp{i}")).collect(),
         params: Array1::zeros(3),
         std_errors: Array1::zeros(3),
@@ -1497,8 +1576,10 @@ fn model_view_from_markov_switching(r: &std::rc::Rc<greeners::MarkovSwitchingRes
 
     ModelView {
         type_name: "MarkovSwitchingResult".into(),
-        summary: format!("Markov Switching(regimes={}, ar={}, n={})",
-            r.n_regimes, r.ar_order, r.n_obs),
+        summary: format!(
+            "Markov Switching(regimes={}, ar={}, n={})",
+            r.n_regimes, r.ar_order, r.n_obs
+        ),
         variable_names: names,
         params: Array1::from(params),
         std_errors: Array1::zeros(n),
@@ -1539,8 +1620,10 @@ fn model_view_from_markov_autoreg(r: &std::rc::Rc<greeners::MarkovAutoregResult>
 
     ModelView {
         type_name: "MSARResult".into(),
-        summary: format!("MSAR(regimes={}, ar={}, n={})",
-            r.k_regimes, r.ar_order, r.n_obs),
+        summary: format!(
+            "MSAR(regimes={}, ar={}, n={})",
+            r.k_regimes, r.ar_order, r.n_obs
+        ),
         variable_names: names,
         params: Array1::from(params),
         std_errors: Array1::zeros(n),
@@ -1620,15 +1703,20 @@ fn model_view_from_svar(r: &std::rc::Rc<greeners::SVarResult>) -> ModelView {
     fit.insert("bic".into(), Value::Float(vr.bic));
 
     let mut extras = HashMap::new();
-    extras.insert("identification".into(), Value::Str(r.identification.clone()));
+    extras.insert(
+        "identification".into(),
+        Value::Str(r.identification.clone()),
+    );
 
     let (names, params, std_errors) = flatten_var_params(vr);
     let n = params.len();
 
     ModelView {
         type_name: "SVarResult".into(),
-        summary: format!("SVAR(vars={}, lags={}, n={}), id={}",
-            vr.n_vars, vr.lags, vr.n_obs, r.identification),
+        summary: format!(
+            "SVAR(vars={}, lags={}, n={}), id={}",
+            vr.n_vars, vr.lags, vr.n_obs, r.identification
+        ),
         variable_names: names,
         params,
         std_errors,
@@ -1677,8 +1765,10 @@ fn model_view_from_varma(r: &std::rc::Rc<greeners::varma::VarmaResult>) -> Model
 
     ModelView {
         type_name: "VarmaResult".into(),
-        summary: format!("VARMA(vars={}, p={}, q={}, n={})",
-            r.n_vars, r.p_lags, r.q_lags, r.n_obs),
+        summary: format!(
+            "VARMA(vars={}, p={}, q={}, n={})",
+            r.n_vars, r.p_lags, r.q_lags, r.n_obs
+        ),
         variable_names: names,
         params: Array1::from(params),
         std_errors: Array1::zeros(n),
@@ -1716,7 +1806,14 @@ fn model_view_from_vecm(r: &std::rc::Rc<greeners::vecm::VecmResult>) -> ModelVie
         for i in 0..rank {
             params[idx] = r.alpha[(i, j)];
             ses[idx] = r.std_errors_alpha[(i, j)];
-            names.push(format!("alpha_{}_{}", i + 1, r.variable_names.get(j).cloned().unwrap_or_else(|| format!("x{j}"))));
+            names.push(format!(
+                "alpha_{}_{}",
+                i + 1,
+                r.variable_names
+                    .get(j)
+                    .cloned()
+                    .unwrap_or_else(|| format!("x{j}"))
+            ));
             idx += 1;
         }
     }
@@ -1724,7 +1821,14 @@ fn model_view_from_vecm(r: &std::rc::Rc<greeners::vecm::VecmResult>) -> ModelVie
         for i in 0..rank {
             params[idx] = r.beta[(i, j)];
             ses[idx] = r.std_errors_beta[(i, j)];
-            names.push(format!("beta_{}_{}", i + 1, r.variable_names.get(j).cloned().unwrap_or_else(|| format!("x{j}"))));
+            names.push(format!(
+                "beta_{}_{}",
+                i + 1,
+                r.variable_names
+                    .get(j)
+                    .cloned()
+                    .unwrap_or_else(|| format!("x{j}"))
+            ));
             idx += 1;
         }
     }
@@ -1733,7 +1837,10 @@ fn model_view_from_vecm(r: &std::rc::Rc<greeners::vecm::VecmResult>) -> ModelVie
             for src in 0..k {
                 params[idx] = r.gamma[((lag - 1) * k + src, eq)];
                 ses[idx] = r.std_errors_gamma[((lag - 1) * k + src, eq)];
-                names.push(format!("gamma_L{lag}_{}_{}", r.variable_names[src], r.variable_names[eq]));
+                names.push(format!(
+                    "gamma_L{lag}_{}_{}",
+                    r.variable_names[src], r.variable_names[eq]
+                ));
                 idx += 1;
             }
         }
@@ -1741,8 +1848,10 @@ fn model_view_from_vecm(r: &std::rc::Rc<greeners::vecm::VecmResult>) -> ModelVie
 
     ModelView {
         type_name: "VecmResult".into(),
-        summary: format!("VECM(vars={}, rank={}, lags={}, n={})",
-            r.n_vars, r.rank, r.lags, r.n_obs),
+        summary: format!(
+            "VECM(vars={}, rank={}, lags={}, n={})",
+            r.n_vars, r.rank, r.lags, r.n_obs
+        ),
         variable_names: names,
         params,
         std_errors: ses,
@@ -1768,8 +1877,12 @@ fn model_view_from_ab(r: &std::rc::Rc<greeners::ArellanoBondResult>) -> ModelVie
 
     ModelView {
         type_name: "AbResult".into(),
-        summary: format!("Arellano-Bond(k={}, n={}, entities={})",
-            r.params.len(), r.n_obs, r.n_entities),
+        summary: format!(
+            "Arellano-Bond(k={}, n={}, entities={})",
+            r.params.len(),
+            r.n_obs,
+            r.n_entities
+        ),
         variable_names: names_or_x(r.variable_names.as_ref(), r.params.len()),
         params: r.params.clone(),
         std_errors: r.std_errors.clone(),
@@ -1796,8 +1909,12 @@ fn model_view_from_sys_gmm(r: &std::rc::Rc<greeners::SystemGmmResult>) -> ModelV
 
     ModelView {
         type_name: "SysGmmResult".into(),
-        summary: format!("System GMM(k={}, n_fd={}, n_lev={})",
-            r.params.len(), r.n_obs_fd, r.n_obs_lev),
+        summary: format!(
+            "System GMM(k={}, n_fd={}, n_lev={})",
+            r.params.len(),
+            r.n_obs_fd,
+            r.n_obs_lev
+        ),
         variable_names: names_or_x(r.variable_names.as_ref(), r.params.len()),
         params: r.params.clone(),
         std_errors: r.std_errors.clone(),
@@ -1824,8 +1941,13 @@ fn model_view_from_pcse(r: &std::rc::Rc<greeners::PcseResult>) -> ModelView {
 
     ModelView {
         type_name: "PcseResult".into(),
-        summary: format!("PCSE(k={}, n={}, entities={}), R2={:.4}",
-            r.params.len(), r.n_obs, r.n_entities, r.r_squared),
+        summary: format!(
+            "PCSE(k={}, n={}, entities={}), R2={:.4}",
+            r.params.len(),
+            r.n_obs,
+            r.n_entities,
+            r.r_squared
+        ),
         variable_names: names_or_x(r.variable_names.as_ref(), r.params.len()),
         params: r.params.clone(),
         std_errors: r.std_errors.clone(),
@@ -1855,8 +1977,13 @@ fn model_view_from_panel_gls(r: &std::rc::Rc<greeners::PanelGlsResult>) -> Model
 
     ModelView {
         type_name: "PanelGlsResult".into(),
-        summary: format!("Panel GLS(k={}, n={}, entities={}), R2={:.4}",
-            r.params.len(), r.n_obs, r.n_entities, r.r_squared),
+        summary: format!(
+            "Panel GLS(k={}, n={}, entities={}), R2={:.4}",
+            r.params.len(),
+            r.n_obs,
+            r.n_entities,
+            r.r_squared
+        ),
         variable_names: names_or_x(r.variable_names.as_ref(), r.params.len()),
         params: r.params.clone(),
         std_errors: r.std_errors.clone(),
