@@ -1894,19 +1894,21 @@ fn model_view_from_vecm(r: &std::rc::Rc<greeners::vecm::VecmResult>) -> ModelVie
 
     let k = r.n_vars;
     let rank = r.rank;
-    let p = r.lags;
+    let p_vecm = r.lags.saturating_sub(1);
     let n_alpha = rank * k;
     let n_beta = rank * k;
-    let n_gamma = k * (p.saturating_sub(1)) * k;
+    // gamma has columns [intercept | Delta y_{t-1} ... Delta y_{t-p}], so
+    // short-run coefficient count is k * p_vecm * k (excluding intercept column 0).
+    let n_gamma = k * p_vecm * k;
     let n_total = n_alpha + n_beta + n_gamma;
     let mut params = Array1::<f64>::zeros(n_total);
     let mut ses = Array1::<f64>::zeros(n_total);
     let mut names: Vec<String> = Vec::with_capacity(n_total);
     let mut idx = 0;
-    for j in 0..k {
-        for i in 0..rank {
-            params[idx] = r.alpha[(i, j)];
-            ses[idx] = r.std_errors_alpha[(i, j)];
+    for i in 0..rank {
+        for j in 0..k {
+            params[idx] = r.alpha[(j, i)];
+            ses[idx] = r.std_errors_alpha[(j, i)];
             names.push(format!(
                 "alpha_{}_{}",
                 i + 1,
@@ -1918,10 +1920,10 @@ fn model_view_from_vecm(r: &std::rc::Rc<greeners::vecm::VecmResult>) -> ModelVie
             idx += 1;
         }
     }
-    for j in 0..k {
-        for i in 0..rank {
-            params[idx] = r.beta[(i, j)];
-            ses[idx] = r.std_errors_beta[(i, j)];
+    for i in 0..rank {
+        for j in 0..k {
+            params[idx] = r.beta[(j, i)];
+            ses[idx] = r.std_errors_beta[(j, i)];
             names.push(format!(
                 "beta_{}_{}",
                 i + 1,
@@ -1934,10 +1936,11 @@ fn model_view_from_vecm(r: &std::rc::Rc<greeners::vecm::VecmResult>) -> ModelVie
         }
     }
     for eq in 0..k {
-        for lag in 1..p {
+        for lag in 1..=p_vecm {
             for src in 0..k {
-                params[idx] = r.gamma[((lag - 1) * k + src, eq)];
-                ses[idx] = r.std_errors_gamma[((lag - 1) * k + src, eq)];
+                let col = 1 + (lag - 1) * k + src;
+                params[idx] = r.gamma[(eq, col)];
+                ses[idx] = r.std_errors_gamma[(eq, (lag - 1) * k + src)];
                 names.push(format!(
                     "gamma_L{lag}_{}_{}",
                     r.variable_names[src], r.variable_names[eq]
