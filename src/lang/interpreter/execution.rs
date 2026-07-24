@@ -1391,15 +1391,32 @@ impl Interpreter {
                 println!("Exported OLS → '{path_str}'");
             }
 
-            // ── Any model result → CSV / LaTeX / HTML / TXT via ModelView ──
-            (val, fmt @ ("csv" | "latex" | "tex" | "html" | "htm" | "txt" | "text")) => {
+            // ── Any model result → TXT via Display ─────────────────────────
+            (val, "txt" | "text") => {
+                std::fs::write(&path_str, format!("{val}"))
+                    .map_err(|e| HayashiError::Io(e.to_string()))?;
+                let label = if let Some(mv) = val.to_model_view() {
+                    match mv.type_name.as_str() {
+                        "PanelResult" => "FE results",
+                        "ReResult" => "RE results",
+                        "BinaryResult" => "logit/probit results",
+                        "IvResult" => "IV results",
+                        _ => "results",
+                    }
+                } else {
+                    "results"
+                };
+                println!("Exported {label} → '{path_str}'");
+            }
+
+            // ── Model results → CSV / LaTeX / HTML via ModelView ────────────
+            (val, fmt @ ("csv" | "latex" | "tex" | "html" | "htm")) => {
                 if let Some(mv) = val.to_model_view() {
                     let content = match fmt {
                         "csv" => mv.to_csv(),
                         "latex" | "tex" => mv.to_latex(),
                         "html" | "htm" => mv.to_html(),
-                        "txt" | "text" => format!("{val}"),
-                        _ => format!("{val}"),
+                        _ => unreachable!(),
                     };
                     std::fs::write(&path_str, content)
                         .map_err(|e| HayashiError::Io(e.to_string()))?;
