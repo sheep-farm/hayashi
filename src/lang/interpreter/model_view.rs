@@ -1,4 +1,6 @@
-use super::models::{BinaryModel, DFMModel, FactorModel, OlsModel, PcaModel, PenalizedModel, SurModel, ThreeSLSModel};
+use super::models::{
+    BinaryModel, DFMModel, FactorModel, OlsModel, PcaModel, PenalizedModel, SurModel, ThreeSLSModel,
+};
 use super::{Series, Value};
 use indexmap::IndexMap;
 use ndarray::{Array1, Array2};
@@ -73,11 +75,15 @@ impl ModelView {
                     _ => None,
                 })
                 .collect::<Option<Vec<_>>>(),
-            Some(Value::Series(s)) => s.values.iter().map(|v| match v {
-                Value::Float(f) => Some(*f),
-                Value::Int(i) => Some(*i as f64),
-                _ => None,
-            }).collect::<Option<Vec<_>>>(),
+            Some(Value::Series(s)) => s
+                .values
+                .iter()
+                .map(|v| match v {
+                    Value::Float(f) => Some(*f),
+                    Value::Int(i) => Some(*i as f64),
+                    _ => None,
+                })
+                .collect::<Option<Vec<_>>>(),
             _ => None,
         }
     }
@@ -87,7 +93,14 @@ impl ModelView {
     pub fn to_tidy_map(&self) -> HashMap<String, Value> {
         let n = self.params.len();
         let names: Vec<Value> = (0..n)
-            .map(|i| Value::Str(self.variable_names.get(i).cloned().unwrap_or_else(|| format!("x{i}"))))
+            .map(|i| {
+                Value::Str(
+                    self.variable_names
+                        .get(i)
+                        .cloned()
+                        .unwrap_or_else(|| format!("x{i}")),
+                )
+            })
             .collect();
         let coefs: Vec<Value> = self.params.iter().map(|&v| Value::Float(v)).collect();
         let ses: Vec<Value> = self.std_errors.iter().map(|&v| Value::Float(v)).collect();
@@ -169,16 +182,22 @@ impl Value {
             Value::RlmResult(r) => Some(model_view_from_rlm(r)),
             Value::BetaResult(r) => Some(model_view_from_beta(r)),
             Value::GmmResult(r) => Some(model_view_from_gmm(r)),
-            Value::ModelResult { display, summary, type_name, fields } => {
-                Some(model_view_from_model_result(display, summary, type_name, fields))
-            }
+            Value::ModelResult {
+                display,
+                summary,
+                type_name,
+                fields,
+            } => Some(model_view_from_model_result(
+                display, summary, type_name, fields,
+            )),
             _ => None,
         }
     }
 }
 
 fn names_or_x(n: Option<&Vec<String>>, len: usize) -> Vec<String> {
-    n.cloned().unwrap_or_else(|| (0..len).map(|i| format!("x{i}")).collect())
+    n.cloned()
+        .unwrap_or_else(|| (0..len).map(|i| format!("x{i}")).collect())
 }
 
 fn model_view_from_ols(m: &OlsModel) -> ModelView {
@@ -197,7 +216,12 @@ fn model_view_from_ols(m: &OlsModel) -> ModelView {
 
     ModelView {
         type_name: "OlsResult".into(),
-        summary: format!("OLS(k={}, n={}), R2={:.4}", r.params.len(), r.n_obs, r.r_squared),
+        summary: format!(
+            "OLS(k={}, n={}), R2={:.4}",
+            r.params.len(),
+            r.n_obs,
+            r.r_squared
+        ),
         variable_names: r.variable_names.clone().unwrap_or_default(),
         params: r.params.clone(),
         std_errors: r.std_errors.clone(),
@@ -224,8 +248,12 @@ fn model_view_from_binary(m: &BinaryModel) -> ModelView {
 
     ModelView {
         type_name: "BinaryResult".into(),
-        summary: format!("{}(k={}), pseudo-R2={:.4}",
-            r.model_name, r.params.len(), r.pseudo_r2),
+        summary: format!(
+            "{}(k={}), pseudo-R2={:.4}",
+            r.model_name,
+            r.params.len(),
+            r.pseudo_r2
+        ),
         variable_names: m.coef_names.clone(),
         params: r.params.clone(),
         std_errors: r.std_errors.clone(),
@@ -242,7 +270,15 @@ fn model_view_from_binary(m: &BinaryModel) -> ModelView {
 }
 
 #[allow(clippy::type_complexity)]
-fn flatten_equations(equations: &[greeners::sur::SurEquationResult]) -> (Vec<String>, Array1<f64>, Array1<f64>, Array1<f64>, Array1<f64>) {
+fn flatten_equations(
+    equations: &[greeners::sur::SurEquationResult],
+) -> (
+    Vec<String>,
+    Array1<f64>,
+    Array1<f64>,
+    Array1<f64>,
+    Array1<f64>,
+) {
     let total_len: usize = equations.iter().map(|eq| eq.params.len()).sum();
     let mut names = Vec::with_capacity(total_len);
     let mut params = Vec::with_capacity(total_len);
@@ -252,7 +288,11 @@ fn flatten_equations(equations: &[greeners::sur::SurEquationResult]) -> (Vec<Str
 
     for eq in equations {
         for i in 0..eq.params.len() {
-            let vname = if i == 0 { format!("{}:_cons", eq.name) } else { format!("{}:x{i}", eq.name) };
+            let vname = if i == 0 {
+                format!("{}:_cons", eq.name)
+            } else {
+                format!("{}:x{i}", eq.name)
+            };
             names.push(vname);
             params.push(eq.params[i]);
             std_errors.push(eq.std_errors[i]);
@@ -261,7 +301,13 @@ fn flatten_equations(equations: &[greeners::sur::SurEquationResult]) -> (Vec<Str
         }
     }
 
-    (names, params.into(), std_errors.into(), t_values.into(), p_values.into())
+    (
+        names,
+        params.into(),
+        std_errors.into(),
+        t_values.into(),
+        p_values.into(),
+    )
 }
 
 fn model_view_from_sur(m: &SurModel) -> ModelView {
@@ -287,7 +333,12 @@ fn model_view_from_sur(m: &SurModel) -> ModelView {
 
     ModelView {
         type_name: "SurResult".into(),
-        summary: format!("SUR(equations={}, n≈{}), system-R2={:.4}", r.equations.len(), n_obs, r.system_r2),
+        summary: format!(
+            "SUR(equations={}, n≈{}), system-R2={:.4}",
+            r.equations.len(),
+            n_obs,
+            r.system_r2
+        ),
         variable_names: names,
         params,
         std_errors,
@@ -310,21 +361,43 @@ fn model_view_from_pca(m: &PcaModel) -> ModelView {
     fit.insert("n_components".into(), Value::Int(r.n_components as i64));
 
     let mut extras = HashMap::new();
-    extras.insert("var_names".into(), Value::List(Arc::new(
-        m.var_names.iter().map(|s| Value::Str(s.clone())).collect()
-    )));
-    extras.insert("explained_variance".into(), Value::List(Arc::new(
-        r.explained_variance.iter().map(|&v| Value::Float(v)).collect()
-    )));
-    extras.insert("explained_variance_ratio".into(), Value::List(Arc::new(
-        r.explained_variance_ratio.iter().map(|&v| Value::Float(v)).collect()
-    )));
+    extras.insert(
+        "var_names".into(),
+        Value::List(Arc::new(
+            m.var_names.iter().map(|s| Value::Str(s.clone())).collect(),
+        )),
+    );
+    extras.insert(
+        "explained_variance".into(),
+        Value::List(Arc::new(
+            r.explained_variance
+                .iter()
+                .map(|&v| Value::Float(v))
+                .collect(),
+        )),
+    );
+    extras.insert(
+        "explained_variance_ratio".into(),
+        Value::List(Arc::new(
+            r.explained_variance_ratio
+                .iter()
+                .map(|&v| Value::Float(v))
+                .collect(),
+        )),
+    );
 
     // PCA does not have regression-style coefficients in the usual sense.
     ModelView {
         type_name: "PcaResult".into(),
-        summary: format!("PCA(components={}, variables={}, n={})", r.n_components, m.var_names.len(), r.n_obs),
-        variable_names: (0..r.n_components).map(|i| format!("PC{}", i + 1)).collect(),
+        summary: format!(
+            "PCA(components={}, variables={}, n={})",
+            r.n_components,
+            m.var_names.len(),
+            r.n_obs
+        ),
+        variable_names: (0..r.n_components)
+            .map(|i| format!("PC{}", i + 1))
+            .collect(),
         params: Array1::zeros(r.n_components),
         std_errors: Array1::zeros(r.n_components),
         test_values: Array1::zeros(r.n_components),
@@ -346,16 +419,27 @@ fn model_view_from_factor(m: &FactorModel) -> ModelView {
     fit.insert("n_factors".into(), Value::Int(r.n_factors as i64));
 
     let mut extras = HashMap::new();
-    extras.insert("var_names".into(), Value::List(Arc::new(
-        m.var_names.iter().map(|s| Value::Str(s.clone())).collect()
-    )));
-    extras.insert("eigenvalues".into(), Value::List(Arc::new(
-        r.eigenvalues.iter().map(|&v| Value::Float(v)).collect()
-    )));
+    extras.insert(
+        "var_names".into(),
+        Value::List(Arc::new(
+            m.var_names.iter().map(|s| Value::Str(s.clone())).collect(),
+        )),
+    );
+    extras.insert(
+        "eigenvalues".into(),
+        Value::List(Arc::new(
+            r.eigenvalues.iter().map(|&v| Value::Float(v)).collect(),
+        )),
+    );
 
     ModelView {
         type_name: "FactorResult".into(),
-        summary: format!("Factor Analysis(factors={}, variables={}, n={})", r.n_factors, m.var_names.len(), r.n_obs),
+        summary: format!(
+            "Factor Analysis(factors={}, variables={}, n={})",
+            r.n_factors,
+            m.var_names.len(),
+            r.n_obs
+        ),
         variable_names: (0..r.n_factors).map(|i| format!("F{}", i + 1)).collect(),
         params: Array1::zeros(r.n_factors),
         std_errors: Array1::zeros(r.n_factors),
@@ -379,14 +463,22 @@ fn model_view_from_dfm(m: &DFMModel) -> ModelView {
     fit.insert("n_vars".into(), Value::Int(r.n_vars as i64));
 
     let mut extras = HashMap::new();
-    extras.insert("var_names".into(), Value::List(Arc::new(
-        m.var_names.iter().map(|s| Value::Str(s.clone())).collect()
-    )));
+    extras.insert(
+        "var_names".into(),
+        Value::List(Arc::new(
+            m.var_names.iter().map(|s| Value::Str(s.clone())).collect(),
+        )),
+    );
 
     ModelView {
         type_name: "DFMResult".into(),
-        summary: format!("Dynamic Factor Model(factors={}, n={})", r.n_factors, r.n_obs),
-        variable_names: (0..r.n_factors).map(|i| format!("Factor{}", i + 1)).collect(),
+        summary: format!(
+            "Dynamic Factor Model(factors={}, n={})",
+            r.n_factors, r.n_obs
+        ),
+        variable_names: (0..r.n_factors)
+            .map(|i| format!("Factor{}", i + 1))
+            .collect(),
         params: Array1::zeros(r.n_factors),
         std_errors: Array1::zeros(r.n_factors),
         test_values: Array1::zeros(r.n_factors),
@@ -402,7 +494,15 @@ fn model_view_from_dfm(m: &DFMModel) -> ModelView {
 }
 
 #[allow(clippy::type_complexity)]
-fn flatten_three_sls_equations(equations: &[greeners::three_sls::EquationResult]) -> (Vec<String>, Array1<f64>, Array1<f64>, Array1<f64>, Array1<f64>) {
+fn flatten_three_sls_equations(
+    equations: &[greeners::three_sls::EquationResult],
+) -> (
+    Vec<String>,
+    Array1<f64>,
+    Array1<f64>,
+    Array1<f64>,
+    Array1<f64>,
+) {
     let total_len: usize = equations.iter().map(|eq| eq.params.len()).sum();
     let mut names = Vec::with_capacity(total_len);
     let mut params = Vec::with_capacity(total_len);
@@ -412,7 +512,11 @@ fn flatten_three_sls_equations(equations: &[greeners::three_sls::EquationResult]
 
     for eq in equations {
         for i in 0..eq.params.len() {
-            let vname = if i == 0 { format!("{}:_cons", eq.name) } else { format!("{}:x{i}", eq.name) };
+            let vname = if i == 0 {
+                format!("{}:_cons", eq.name)
+            } else {
+                format!("{}:x{i}", eq.name)
+            };
             names.push(vname);
             params.push(eq.params[i]);
             std_errors.push(eq.std_errors[i]);
@@ -421,7 +525,13 @@ fn flatten_three_sls_equations(equations: &[greeners::three_sls::EquationResult]
         }
     }
 
-    (names, params.into(), std_errors.into(), t_values.into(), p_values.into())
+    (
+        names,
+        params.into(),
+        std_errors.into(),
+        t_values.into(),
+        p_values.into(),
+    )
 }
 
 fn model_view_from_three_sls(m: &ThreeSLSModel) -> ModelView {
@@ -447,7 +557,12 @@ fn model_view_from_three_sls(m: &ThreeSLSModel) -> ModelView {
 
     ModelView {
         type_name: "ThreeSLSResult".into(),
-        summary: format!("3SLS(equations={}, n≈{}), system-R2={:.4}", r.equations.len(), n_obs, r.system_r2),
+        summary: format!(
+            "3SLS(equations={}, n≈{}), system-R2={:.4}",
+            r.equations.len(),
+            n_obs,
+            r.system_r2
+        ),
         variable_names: names,
         params,
         std_errors,
@@ -477,14 +592,18 @@ fn model_view_from_penalized(m: &PenalizedModel) -> ModelView {
 
     ModelView {
         type_name: "PenalizedResult".into(),
-        summary: format!("{}(k={}, n={}), R2={:.4}",
+        summary: format!(
+            "{}(k={}, n={}), R2={:.4}",
             match m.kind.as_str() {
                 "ridge" => "Ridge",
                 "lasso" => "Lasso",
                 "elasticnet" => "ElasticNet",
                 _ => "Penalized Regression",
             },
-            m.params.len(), m.n_obs, m.r_squared),
+            m.params.len(),
+            m.n_obs,
+            m.r_squared
+        ),
         variable_names: m.variable_names.clone(),
         params: m.params.clone(),
         std_errors: m.std_errors.clone(),
@@ -511,7 +630,12 @@ fn model_view_from_iv(r: &std::rc::Rc<greeners::iv::IvResult>) -> ModelView {
 
     ModelView {
         type_name: "IvResult".into(),
-        summary: format!("IV/2SLS(k={}, n={}), R2={:.4}", r.params.len(), r.n_obs, r.r_squared),
+        summary: format!(
+            "IV/2SLS(k={}, n={}), R2={:.4}",
+            r.params.len(),
+            r.n_obs,
+            r.r_squared
+        ),
         variable_names: names_or_x(r.variable_names.as_ref(), r.params.len()),
         params: r.params.clone(),
         std_errors: r.std_errors.clone(),
@@ -536,8 +660,13 @@ fn model_view_from_panel(r: &std::rc::Rc<greeners::panel::PanelResult>) -> Model
 
     ModelView {
         type_name: "PanelResult".into(),
-        summary: format!("Fixed Effects(k={}, n={}, panels={}), R2={:.4}",
-            r.params.len(), r.n_obs, r.n_entities, r.r_squared),
+        summary: format!(
+            "Fixed Effects(k={}, n={}, panels={}), R2={:.4}",
+            r.params.len(),
+            r.n_obs,
+            r.n_entities,
+            r.r_squared
+        ),
         variable_names: names_or_x(r.variable_names.as_ref(), r.params.len()),
         params: r.params.clone(),
         std_errors: r.std_errors.clone(),
@@ -553,17 +682,25 @@ fn model_view_from_panel(r: &std::rc::Rc<greeners::panel::PanelResult>) -> Model
     }
 }
 
-fn model_view_from_random_effects(r: &std::rc::Rc<greeners::panel::RandomEffectsResult>) -> ModelView {
+fn model_view_from_random_effects(
+    r: &std::rc::Rc<greeners::panel::RandomEffectsResult>,
+) -> ModelView {
     let mut fit = HashMap::new();
-    fit.insert("r_squared_overall".into(), Value::Float(r.r_squared_overall));
+    fit.insert(
+        "r_squared_overall".into(),
+        Value::Float(r.r_squared_overall),
+    );
     fit.insert("sigma_u".into(), Value::Float(r.sigma_u));
     fit.insert("sigma_e".into(), Value::Float(r.sigma_e));
     fit.insert("theta".into(), Value::Float(r.theta));
 
     ModelView {
         type_name: "ReResult".into(),
-        summary: format!("Random Effects(k={}), R2={:.4}",
-            r.params.len(), r.r_squared_overall),
+        summary: format!(
+            "Random Effects(k={}), R2={:.4}",
+            r.params.len(),
+            r.r_squared_overall
+        ),
         variable_names: names_or_x(r.variable_names.as_ref(), r.params.len()),
         params: r.params.clone(),
         std_errors: r.std_errors.clone(),
@@ -587,7 +724,11 @@ fn model_view_from_quantile(r: &std::rc::Rc<greeners::QuantileResult>) -> ModelV
 
     ModelView {
         type_name: "QuantileResult".into(),
-        summary: format!("Quantile Regression(tau={:.2}, k={})", r.tau, r.params.len()),
+        summary: format!(
+            "Quantile Regression(tau={:.2}, k={})",
+            r.tau,
+            r.params.len()
+        ),
         variable_names: names_or_x(r.variable_names.as_ref(), r.params.len()),
         params: r.params.clone(),
         std_errors: r.std_errors.clone(),
@@ -610,7 +751,12 @@ fn model_view_from_tobit(r: &std::rc::Rc<greeners::TobitResult>) -> ModelView {
 
     ModelView {
         type_name: "TobitResult".into(),
-        summary: format!("Tobit(k={}, n={}), logLik={:.4}", r.params.len(), r.n_obs, r.log_likelihood),
+        summary: format!(
+            "Tobit(k={}, n={}), logLik={:.4}",
+            r.params.len(),
+            r.n_obs,
+            r.log_likelihood
+        ),
         variable_names: names_or_x(r.variable_names.as_ref(), r.params.len()),
         params: r.params.clone(),
         std_errors: r.std_errors.clone(),
@@ -637,7 +783,12 @@ fn model_view_from_poisson(r: &std::rc::Rc<greeners::PoissonResult>) -> ModelVie
 
     ModelView {
         type_name: "PoissonResult".into(),
-        summary: format!("Poisson(k={}, n={}), pseudo-R2={:.4}", r.params.len(), r.n_obs, r.pseudo_r2),
+        summary: format!(
+            "Poisson(k={}, n={}), pseudo-R2={:.4}",
+            r.params.len(),
+            r.n_obs,
+            r.pseudo_r2
+        ),
         variable_names: names_or_x(r.variable_names.as_ref(), r.params.len()),
         params: r.params.clone(),
         std_errors: r.std_errors.clone(),
@@ -664,7 +815,12 @@ fn model_view_from_negbin(r: &std::rc::Rc<greeners::NegBinResult>) -> ModelView 
 
     ModelView {
         type_name: "NegBinResult".into(),
-        summary: format!("Negative Binomial(k={}, n={}), alpha={:.4}", r.params.len(), r.n_obs, r.alpha),
+        summary: format!(
+            "Negative Binomial(k={}, n={}), alpha={:.4}",
+            r.params.len(),
+            r.n_obs,
+            r.alpha
+        ),
         variable_names: names_or_x(r.variable_names.as_ref(), r.params.len()),
         params: r.params.clone(),
         std_errors: r.std_errors.clone(),
@@ -692,7 +848,12 @@ fn model_view_from_glm(r: &std::rc::Rc<greeners::GlmResult>) -> ModelView {
 
     ModelView {
         type_name: "GlmResult".into(),
-        summary: format!("GLM(k={}, n={}), pseudo-R2={:.4}", r.params.len(), r.n_obs, r.pseudo_r2),
+        summary: format!(
+            "GLM(k={}, n={}), pseudo-R2={:.4}",
+            r.params.len(),
+            r.n_obs,
+            r.pseudo_r2
+        ),
         variable_names: names_or_x(r.variable_names.as_ref(), r.params.len()),
         params: r.params.clone(),
         std_errors: r.std_errors.clone(),
@@ -743,7 +904,12 @@ fn model_view_from_beta(r: &std::rc::Rc<greeners::BetaResult>) -> ModelView {
 
     ModelView {
         type_name: "BetaResult".into(),
-        summary: format!("Beta Regression(k={}, n={}), pseudo-R2={:.4}", r.params.len(), r.n_obs, r.pseudo_r2),
+        summary: format!(
+            "Beta Regression(k={}, n={}), pseudo-R2={:.4}",
+            r.params.len(),
+            r.n_obs,
+            r.pseudo_r2
+        ),
         variable_names: names_or_x(r.variable_names.as_ref(), r.params.len()),
         params: r.params.clone(),
         std_errors: r.std_errors.clone(),
@@ -768,7 +934,12 @@ fn model_view_from_gmm(r: &std::rc::Rc<greeners::GmmResult>) -> ModelView {
 
     ModelView {
         type_name: "GmmResult".into(),
-        summary: format!("GMM(k={}, n={}), J={:.4}", r.params.len(), r.n_obs, r.j_stat),
+        summary: format!(
+            "GMM(k={}, n={}), J={:.4}",
+            r.params.len(),
+            r.n_obs,
+            r.j_stat
+        ),
         variable_names: (0..r.params.len()).map(|i| format!("x{i}")).collect(),
         params: r.params.clone(),
         std_errors: r.std_errors.clone(),
@@ -853,19 +1024,34 @@ pub fn model_view_to_children(mv: &ModelView) -> Vec<(String, Value)> {
     }
     if let Some(fitted) = mv.fitted_values.as_ref() {
         if !fitted.is_empty() {
-            vars.push(("fitted_values".into(), array1_to_series("fitted_values", fitted)));
+            vars.push((
+                "fitted_values".into(),
+                array1_to_series("fitted_values", fitted),
+            ));
         }
     } else if let Some(x) = mv.x.as_ref() {
         if !x.is_empty() {
             let fitted = x.dot(&mv.params);
-            vars.push(("fitted_values".into(), array1_to_series("fitted_values", &fitted)));
+            vars.push((
+                "fitted_values".into(),
+                array1_to_series("fitted_values", &fitted),
+            ));
         }
     }
 
     vars.push(("params".into(), array1_to_series("params", &mv.params)));
-    vars.push(("std_errors".into(), array1_to_series("std_errors", &mv.std_errors)));
-    vars.push(("test_values".into(), array1_to_series("test_values", &mv.test_values)));
-    vars.push(("p_values".into(), array1_to_series("p_values", &mv.p_values)));
+    vars.push((
+        "std_errors".into(),
+        array1_to_series("std_errors", &mv.std_errors),
+    ));
+    vars.push((
+        "test_values".into(),
+        array1_to_series("test_values", &mv.test_values),
+    ));
+    vars.push((
+        "p_values".into(),
+        array1_to_series("p_values", &mv.p_values),
+    ));
     if let Some(cl) = mv.conf_lower.as_ref() {
         vars.push(("conf_lower".into(), array1_to_series("conf_lower", cl)));
     }
@@ -890,18 +1076,25 @@ fn model_view_from_model_result(
     // Heuristic: try to extract common fields from the generic ModelResult.
     let empty = Array1::zeros(0);
     let params = match fields.get("params") {
-        Some(Value::List(v)) => v.iter().map(|x| match x {
-            Value::Float(f) => *f,
-            Value::Int(i) => *i as f64,
-            _ => f64::NAN,
-        }).collect::<Vec<_>>().into(),
+        Some(Value::List(v)) => v
+            .iter()
+            .map(|x| match x {
+                Value::Float(f) => *f,
+                Value::Int(i) => *i as f64,
+                _ => f64::NAN,
+            })
+            .collect::<Vec<_>>()
+            .into(),
         _ => empty.clone(),
     };
     let names = match fields.get("variable_names") {
-        Some(Value::List(v)) => v.iter().map(|x| match x {
-            Value::Str(s) => s.clone(),
-            _ => "?".into(),
-        }).collect(),
+        Some(Value::List(v)) => v
+            .iter()
+            .map(|x| match x {
+                Value::Str(s) => s.clone(),
+                _ => "?".into(),
+            })
+            .collect(),
         _ => (0..params.len()).map(|i| format!("x{i}")).collect(),
     };
 
