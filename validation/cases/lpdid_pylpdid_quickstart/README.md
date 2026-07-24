@@ -16,8 +16,9 @@ where `unit_fe_i ~ N(0, 1)` and `ε_it ~ N(0, 0.5)`.
 
 ## Files
 
-- `data/gen.hay` — generates `data/panel.csv` from the DGP above.
-- `data/panel.csv` — the generated panel (committed for reproducibility).
+- `data/gen.hay` — Hayashi generator for the DGP above.
+- `data/panel.csv` — generated on demand by the Python reference before the
+  Hayashi script runs; the CSV is not committed.
 - `hayashi/run.hay` — runs Hayashi's `lpdid` and exports the event-study
 coefficients as a CSV.
 - `reference/run.py` — runs `pylpdid` on the same panel and emits JSON with
@@ -25,7 +26,8 @@ coefficients and standard errors.
 
 ## Reference
 
-- Python: `pylpdid` (Dube, Girardi, Jordà & Taylor 2025).
+- Python: `pylpdid` (Dube, Girardi, Jordà & Taylor 2025), installed from the
+  pinned Git commit declared in `validation/requirements.txt`.
 
 ## Tolerances
 

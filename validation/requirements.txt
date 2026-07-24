@@ -8,3 +8,4 @@ arch>=6.0
 statspai>=1.0
 pandas>=2.0
 pyyaml>=6.0
+pylpdid @ git+https://github.com/Daniel-Uhr/pylpdid.git@03d9cfd46eea61276829812ed357da6c7b32a2a7
