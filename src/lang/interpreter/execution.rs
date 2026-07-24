@@ -599,6 +599,30 @@ impl Interpreter {
         df: &DataFrame,
         varname: &str,
     ) -> Result<Vec<f64>> {
+        // Canonical linear predictor: any ModelView whose variable names map
+        // directly to DataFrame columns can produce xb/fitted/residuals without
+        // a dedicated method.  Specific predictors (proba, count, hazard,
+        // categorical expansions, etc.) fall through to the match below.
+        if let Some(mv) = model_val.to_model_view() {
+            let names_map_to_df = mv.variable_names.iter().all(|name| {
+                matches!(name.as_str(), "_cons" | "const" | "Intercept" | "(Intercept)")
+                    || df.get_column(name).is_ok()
+            });
+            if names_map_to_df {
+                match kind {
+                    "xb" | "fitted" | "linear" | "yhat" => {
+                        let x = build_x_from_varnames(df, &mv.variable_names)?;
+                        return Ok(x.dot(&mv.params).to_vec());
+                    }
+                    "residuals" | "resid" | "e" => {
+                        if let Some(resid) = mv.residuals.as_ref() {
+                            return Ok(resid.to_vec());
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
         match (model_val, kind) {
             (Value::OlsResult(m), k) => self.predict_ols_vals(m, k),
             (Value::BinaryResult(m), k) => self.predict_binary_vals(m, k),
