@@ -210,7 +210,10 @@ impl ModelView {
                 name, c, stars, se, p
             )
         } else {
-            format!("{} & {:.4} {} & ({:.4}) & {:.4} \\\\\n", name, c, stars, se, p)
+            format!(
+                "{} & {:.4} {} & ({:.4}) & {:.4} \\\\\n",
+                name, c, stars, se, p
+            )
         }
     }
 
@@ -233,7 +236,9 @@ impl ModelView {
     pub fn to_html(&self) -> String {
         let mut out = String::new();
         out.push_str("<table>\n");
-        out.push_str("<tr><th>Variable</th><th>Coef.</th><th>Std. Err.</th><th>p-value</th></tr>\n");
+        out.push_str(
+            "<tr><th>Variable</th><th>Coef.</th><th>Std. Err.</th><th>p-value</th></tr>\n",
+        );
         for i in 0..self.params.len() {
             out.push_str(&self.fmt_row(i, true));
         }

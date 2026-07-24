@@ -605,8 +605,10 @@ impl Interpreter {
         // categorical expansions, etc.) fall through to the match below.
         if let Some(mv) = model_val.to_model_view() {
             let names_map_to_df = mv.variable_names.iter().all(|name| {
-                matches!(name.as_str(), "_cons" | "const" | "Intercept" | "(Intercept)")
-                    || df.get_column(name).is_ok()
+                matches!(
+                    name.as_str(),
+                    "_cons" | "const" | "Intercept" | "(Intercept)"
+                ) || df.get_column(name).is_ok()
             });
             if names_map_to_df {
                 match kind {
@@ -1396,7 +1398,8 @@ impl Interpreter {
                         "csv" => mv.to_csv(),
                         "latex" | "tex" => mv.to_latex(),
                         "html" | "htm" => mv.to_html(),
-                        "txt" | "text" | _ => format!("{val}"),
+                        "txt" | "text" => format!("{val}"),
+                        _ => format!("{val}"),
                     };
                     std::fs::write(&path_str, content)
                         .map_err(|e| HayashiError::Io(e.to_string()))?;
@@ -1409,9 +1412,9 @@ impl Interpreter {
                     };
                     println!("Exported {label} → '{path_str}'");
                 } else {
-                    return Err(HayashiError::Runtime(format!(
-                        "export: value is not an exportable model result"
-                    )));
+                    return Err(HayashiError::Runtime(
+                        "export: value is not an exportable model result".to_string(),
+                    ));
                 }
             }
 
