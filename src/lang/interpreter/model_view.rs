@@ -81,6 +81,56 @@ impl ModelView {
             _ => None,
         }
     }
+
+    /// Build the `tidy()` output map: variable, coef, std_err, t, p_value,
+    /// conf_low, conf_high.
+    pub fn to_tidy_map(&self) -> HashMap<String, Value> {
+        let n = self.params.len();
+        let names: Vec<Value> = (0..n)
+            .map(|i| Value::Str(self.variable_names.get(i).cloned().unwrap_or_else(|| format!("x{i}"))))
+            .collect();
+        let coefs: Vec<Value> = self.params.iter().map(|&v| Value::Float(v)).collect();
+        let ses: Vec<Value> = self.std_errors.iter().map(|&v| Value::Float(v)).collect();
+        let tests: Vec<Value> = self.test_values.iter().map(|&v| Value::Float(v)).collect();
+        let ps: Vec<Value> = self.p_values.iter().map(|&v| Value::Float(v)).collect();
+
+        let (cl, cu): (Vec<Value>, Vec<Value>) = match (&self.conf_lower, &self.conf_upper) {
+            (Some(l), Some(u)) if l.len() == n && u.len() == n => (
+                l.iter().map(|&v| Value::Float(v)).collect(),
+                u.iter().map(|&v| Value::Float(v)).collect(),
+            ),
+            _ => {
+                let nan = vec![Value::Float(f64::NAN); n];
+                (nan.clone(), nan)
+            }
+        };
+
+        let mut map = HashMap::new();
+        map.insert("variable".into(), Value::List(Arc::new(names)));
+        map.insert("coef".into(), Value::List(Arc::new(coefs)));
+        map.insert("std_err".into(), Value::List(Arc::new(ses)));
+        map.insert("t".into(), Value::List(Arc::new(tests)));
+        map.insert("p_value".into(), Value::List(Arc::new(ps)));
+        map.insert("conf_low".into(), Value::List(Arc::new(cl)));
+        map.insert("conf_high".into(), Value::List(Arc::new(cu)));
+        map
+    }
+
+    /// Build the `glance()` output: a copy of `fit` as a one-row Dict,
+    /// wrapping each scalar in a single-element `Value::List` so that
+    /// `dict_to_dataframe` can materialise it.
+    pub fn to_glance_map(&self) -> HashMap<String, Value> {
+        self.fit
+            .iter()
+            .map(|(k, v)| {
+                let wrapped = match v {
+                    Value::List(_) | Value::Series(_) => v.clone(),
+                    _ => Value::List(Arc::new(vec![v.clone()])),
+                };
+                (k.clone(), wrapped)
+            })
+            .collect()
+    }
 }
 
 impl std::fmt::Debug for ModelView {
@@ -134,13 +184,13 @@ fn names_or_x(n: Option<&Vec<String>>, len: usize) -> Vec<String> {
 fn model_view_from_ols(m: &OlsModel) -> ModelView {
     let r = &m.result;
     let mut fit = HashMap::new();
-    fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
+    fit.insert("n".into(), Value::Int(r.n_obs as i64));
     fit.insert("df_resid".into(), Value::Int(r.df_resid as i64));
-    fit.insert("r_squared".into(), Value::Float(r.r_squared));
-    fit.insert("adj_r_squared".into(), Value::Float(r.adj_r_squared));
-    fit.insert("f_statistic".into(), Value::Float(r.f_statistic));
-    fit.insert("f_p_value".into(), Value::Float(r.prob_f));
-    fit.insert("log_likelihood".into(), Value::Float(r.log_likelihood));
+    fit.insert("r2".into(), Value::Float(r.r_squared));
+    fit.insert("adj_r2".into(), Value::Float(r.adj_r_squared));
+    fit.insert("f_stat".into(), Value::Float(r.f_statistic));
+    fit.insert("prob_f".into(), Value::Float(r.prob_f));
+    fit.insert("log_lik".into(), Value::Float(r.log_likelihood));
     fit.insert("aic".into(), Value::Float(r.aic));
     fit.insert("bic".into(), Value::Float(r.bic));
     fit.insert("sigma".into(), Value::Float(r.sigma));

@@ -17,6 +17,9 @@ impl Interpreter {
                 let val = self.eval_expr(&args[0])?;
                 let mut map = std::collections::HashMap::<String, Value>::new();
 
+                if let Some(mv) = val.to_model_view() {
+                    map = mv.to_glance_map();
+                } else {
                 match val {
                     Value::OlsResult(m) => {
                         let r = &m.result;
@@ -687,6 +690,7 @@ impl Interpreter {
                         map.insert("median_survival".into(), scalar(r.median_survival));
                     }
                     _ => return Err(HayashiError::Type("glance: unsupported model type".into())),
+                }
                 }
 
                 let df = self.dict_to_dataframe(&map)?;

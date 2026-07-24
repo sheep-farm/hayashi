@@ -17,6 +17,9 @@ impl Interpreter {
                 let val = self.eval_expr(&args[0])?;
                 let mut map = std::collections::HashMap::<String, Value>::new();
 
+                if let Some(mv) = val.to_model_view() {
+                    map = mv.to_tidy_map();
+                } else {
                 match val {
                     Value::OlsResult(m) => {
                         let r = &m.result;
@@ -1005,6 +1008,7 @@ impl Interpreter {
                         map.insert("conf_high".into(), Value::List(Arc::new(Vec::new())));
                     }
                     _ => return Err(HayashiError::Type("tidy: unsupported model type".into())),
+                }
                 }
 
                 let df = self.dict_to_dataframe(&map)?;
