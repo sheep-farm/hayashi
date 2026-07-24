@@ -156,6 +156,90 @@ impl ModelView {
             })
             .collect()
     }
+
+    /// Export coefficients as CSV (tidy format).
+    pub fn to_csv(&self) -> String {
+        let mut out = String::from("variable,coef,std_err,t,p_value,conf_low,conf_high\n");
+        let n = self.params.len();
+        let se = &self.std_errors;
+        let t = &self.test_values;
+        let p = &self.p_values;
+        let cl = self.conf_lower.as_ref();
+        let cu = self.conf_upper.as_ref();
+        for i in 0..n {
+            let name = self
+                .variable_names
+                .get(i)
+                .cloned()
+                .unwrap_or_else(|| format!("x{i}"));
+            out.push_str(&format!(
+                "{},{:.7},{:.7},{:.7},{:.7},{:.7},{:.7}\n",
+                name,
+                self.params[i],
+                se.get(i).copied().unwrap_or(f64::NAN),
+                t.get(i).copied().unwrap_or(f64::NAN),
+                p.get(i).copied().unwrap_or(f64::NAN),
+                cl.map(|v| v[i]).unwrap_or(f64::NAN),
+                cu.map(|v| v[i]).unwrap_or(f64::NAN),
+            ));
+        }
+        out
+    }
+
+    fn fmt_row(&self, i: usize, use_html: bool) -> String {
+        let name = self
+            .variable_names
+            .get(i)
+            .cloned()
+            .unwrap_or_else(|| format!("x{i}"));
+        let c = self.params[i];
+        let se = self.std_errors.get(i).copied().unwrap_or(f64::NAN);
+        let p = self.p_values.get(i).copied().unwrap_or(1.0);
+        let stars = if p < 0.01 {
+            "***"
+        } else if p < 0.05 {
+            "**"
+        } else if p < 0.10 {
+            "*"
+        } else {
+            ""
+        };
+        if use_html {
+            format!(
+                "<tr><td>{}</td><td>{:.4} {}</td><td>({:.4})</td><td>{:.4}</td></tr>\n",
+                name, c, stars, se, p
+            )
+        } else {
+            format!("{} & {:.4} {} & ({:.4}) & {:.4} \\\\\n", name, c, stars, se, p)
+        }
+    }
+
+    /// Export coefficients as a LaTeX table fragment.
+    pub fn to_latex(&self) -> String {
+        let mut out = String::new();
+        out.push_str("\\begin{tabular}{lccc}\n");
+        out.push_str("\\hline\n");
+        out.push_str("Variable & Coef. & Std. Err. & p-value \\\\\n");
+        out.push_str("\\hline\n");
+        for i in 0..self.params.len() {
+            out.push_str(&self.fmt_row(i, false));
+        }
+        out.push_str("\\hline\n");
+        out.push_str("\\end{tabular}\n");
+        out
+    }
+
+    /// Export coefficients as an HTML table fragment.
+    pub fn to_html(&self) -> String {
+        let mut out = String::new();
+        out.push_str("<table>\n");
+        out.push_str("<tr><th>Variable</th><th>Coef.</th><th>Std. Err.</th><th>p-value</th></tr>\n");
+        for i in 0..self.params.len() {
+            out.push_str(&self.fmt_row(i, true));
+        }
+        out.push_str("</table>\n");
+        out
+    }
 }
 
 impl std::fmt::Debug for ModelView {

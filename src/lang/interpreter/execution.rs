@@ -1389,94 +1389,37 @@ impl Interpreter {
                 println!("Exported OLS → '{path_str}'");
             }
 
-            // ── Any model → txt ───────────────────────────────────
-            (Value::IvResult(r), "txt" | "text") => {
-                std::fs::write(&path_str, format!("{r}"))
-                    .map_err(|e| HayashiError::Io(e.to_string()))?;
-                println!("Exported IV results → '{path_str}'");
-            }
-            (Value::BinaryResult(m), "txt" | "text") => {
-                std::fs::write(&path_str, format!("{m}"))
-                    .map_err(|e| HayashiError::Io(e.to_string()))?;
-                println!("Exported logit/probit results → '{path_str}'");
-            }
-            (Value::PanelResult(r), "txt" | "text") => {
-                std::fs::write(&path_str, format!("{r}"))
-                    .map_err(|e| HayashiError::Io(e.to_string()))?;
-                println!("Exported FE results → '{path_str}'");
-            }
-            (Value::ReResult(r), "txt" | "text") => {
-                std::fs::write(&path_str, format!("{r}"))
-                    .map_err(|e| HayashiError::Io(e.to_string()))?;
-                println!("Exported RE results → '{path_str}'");
-            }
-            (
-                val @ (Value::PoissonResult(_)
-                | Value::NegBinResult(_)
-                | Value::TobitResult(_)
-                | Value::HeckmanResult(_)
-                | Value::CoxResult(_)
-                | Value::QuantileResult(_)
-                | Value::GmmResult(_)
-                | Value::DidResult(_)
-                | Value::ArimaResult(_)
-                | Value::GarchResult(_)
-                | Value::VarResult(_)
-                | Value::VecmResult(_)
-                | Value::AutoRegResult(_)
-                | Value::ArdlResult(_)
-                | Value::SVarResult(_)
-                | Value::MSARResult(_)
-                | Value::EtsResult(_)
-                | Value::SurResult(_)
-                | Value::ThreeSLSResult(_)
-                | Value::RdResult(_)
-                | Value::PsmResult(_)
-                | Value::SynthResult(_)
-                | Value::RlmResult(_)
-                | Value::GeeResult(_)
-                | Value::ZeroInflatedResult(_)
-                | Value::MixedResult(_)
-                | Value::BetaResult(_)
-                | Value::GlsarResult(_)
-                | Value::GlmResult(_)
-                | Value::LowessResult(_)
-                | Value::PcaResult(_)
-                | Value::FactorResult(_)
-                | Value::MarkovResult(_)
-                | Value::ConditionalResult(_)
-                | Value::VarmaResult(_)
-                | Value::DecompResult(_)
-                | Value::MstlResult(_)
-                | Value::UCResult(_)
-                | Value::GamResult(_)
-                | Value::MiceResult(_)
-                | Value::DFMResult(_)
-                | Value::ThresholdResult(_)
-                | Value::RollingResult(_)
-                | Value::RecursiveLSResult(_)
-                | Value::AbResult(_)
-                | Value::SysGmmResult(_)
-                | Value::DiagResult(_)
-                | Value::PcseResult(_)
-                | Value::PanelGlsResult(_)
-                | Value::OrderedResult(_)
-                | Value::MNLogitResult(_)
-                | Value::PenalizedResult(_)
-                | Value::LocalLevelResult(_)),
-                "txt" | "text",
-            ) => {
-                std::fs::write(&path_str, format!("{val}"))
-                    .map_err(|e| HayashiError::Io(e.to_string()))?;
-                println!("Exported results → '{path_str}'");
+            // ── Any model result → CSV / LaTeX / HTML / TXT via ModelView ──
+            (val, fmt @ ("csv" | "latex" | "tex" | "html" | "htm" | "txt" | "text")) => {
+                if let Some(mv) = val.to_model_view() {
+                    let content = match fmt {
+                        "csv" => mv.to_csv(),
+                        "latex" | "tex" => mv.to_latex(),
+                        "html" | "htm" => mv.to_html(),
+                        "txt" | "text" | _ => format!("{val}"),
+                    };
+                    std::fs::write(&path_str, content)
+                        .map_err(|e| HayashiError::Io(e.to_string()))?;
+                    let label = match mv.type_name.as_str() {
+                        "PanelResult" => "FE results".to_string(),
+                        "ReResult" => "RE results".to_string(),
+                        "BinaryResult" => "logit/probit results".to_string(),
+                        "IvResult" => "IV results".to_string(),
+                        other => format!("{other} results"),
+                    };
+                    println!("Exported {label} → '{path_str}'");
+                } else {
+                    return Err(HayashiError::Runtime(format!(
+                        "export: value is not an exportable model result"
+                    )));
+                }
             }
 
             (_, fmt) => {
                 return Err(HayashiError::Runtime(format!(
                     "unsupported export format '{fmt}' for this value type\n\
-                 DataFrame → csv, json, tsv, xlsx, sqlite\n\
-                 OLS       → csv, latex, html\n\
-                 Models    → txt"
+                 DataFrame → csv, json, tsv, xlsx, sqlite, parquet\n\
+                 Models    → csv, latex, html, txt"
                 )))
             }
         }
