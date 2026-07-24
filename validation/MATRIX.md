@@ -95,7 +95,7 @@
 | qreg | wooldridge::wage1 | R:passed *, Python:passed * | pass | — | Median quantile regression of wage on education, experience, and tenure. |
 | rdd | rdd_book | R:passed *, Python:passed * | pass | — | Sharp RDD with local linear regression, triangular kernel and Imbens-Kalyanaraman bandwidth. |
 | re | grunfeld | R:passed *, Python:passed * | pass | 101 | Random-effects investment demand model (Grunfeld). |
-| ridge | wooldridge::hprice1 | Python:passed * | pass | — | Ridge regression of log house price on log lot size, log square footage, bedrooms and colonial dummy. |
+| ridge | wooldridge::hprice1 | Python:passed * | pass | 106 | Ridge regression of log house price on log lot size, log square footage, bedrooms and colonial dummy. |
 | rlm | wooldridge::wage1 | R:passed *, Python:passed * | pass | — | Huber robust linear regression of log wage on education, experience, and tenure. |
 | spatial | simulated_spatial_durbin | R:passed *, Python:passed * | pass | — | Spatial Durbin model with spatial lag of dependent variable and spatially lagged independent variables. Uses simulated spatial data with known spatial weights matrix. |
 | sur | wooldridge::grunfeld | R:passed *, Python:passed * | pass | — | Two-equation SUR (Zellner FGLS) on the Grunfeld investment data. |
