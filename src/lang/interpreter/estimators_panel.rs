@@ -1290,18 +1290,20 @@ impl Interpreter {
         // FE removes the intercept via within-transform; force intercept=false
         g_formula.intercept = false;
 
+        let cov = resolve_cov_full(opt_map, &df)?;
+
         // try int; fall back to float→int; then to string
         let result = if let Ok(ids) = df.get_int(&id_col) {
             let ids_vec: Vec<i64> = ids.to_vec();
-            FixedEffects::from_formula(&g_formula, &df, &ids_vec)
+            FixedEffects::from_formula_with_cov(&g_formula, &df, &ids_vec, cov)
                 .map_err(|e| HayashiError::Runtime(e.to_string()))?
         } else if let Ok(floats) = df.get(&id_col) {
             let ids_vec: Vec<i64> = floats.iter().map(|&v| v as i64).collect();
-            FixedEffects::from_formula(&g_formula, &df, &ids_vec)
+            FixedEffects::from_formula_with_cov(&g_formula, &df, &ids_vec, cov)
                 .map_err(|e| HayashiError::Runtime(e.to_string()))?
         } else if let Ok(ids) = df.get_string(&id_col) {
             let ids_vec: Vec<String> = ids.to_vec();
-            FixedEffects::from_formula(&g_formula, &df, &ids_vec)
+            FixedEffects::from_formula_with_cov(&g_formula, &df, &ids_vec, cov)
                 .map_err(|e| HayashiError::Runtime(e.to_string()))?
         } else {
             return Err(HayashiError::Runtime(format!(
