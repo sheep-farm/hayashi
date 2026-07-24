@@ -28,6 +28,7 @@ reference_scripts:
 notes: Ridge regression of log house price on log lot size, log square footage, bedrooms and colonial dummy.
 
 result:
-  summary: ""
+  summary: "Python reference generates the Wooldridge hprice1 CSV when absent, so the active ridge validation case is self-contained in fresh CI."
   known_differences: []
-  issues_opened: []
+  issues_opened:
+    - 106
