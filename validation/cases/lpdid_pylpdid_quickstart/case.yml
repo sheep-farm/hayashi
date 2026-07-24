@@ -1,7 +1,7 @@
 id: lpdid_pylpdid_quickstart
 title: LP-DiD quickstart against pylpdid (absorbing staggered adoption)
 estimator_family: did
-status: pass
+status: active
 dimension: numerical
 
 dataset:
