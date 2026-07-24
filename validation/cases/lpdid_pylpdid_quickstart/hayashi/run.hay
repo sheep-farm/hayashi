@@ -10,7 +10,7 @@ let m = lpdid(
     clean_control="not_yet_treated"
 )
 
-let ev = m.event_coefficients
+let ev = m["event_coefficients"]
 let ev2 = rename(ev, variable, Variable)
 let ev3 = rename(ev2, coef, Coef)
 let ev4 = rename(ev3, std_err, Std_Err)
