@@ -1120,6 +1120,26 @@ def run_case(case: dict[str, Any], quiet: bool = False) -> tuple[str, list[str],
     # Ensure data directory exists.
     data_dir.mkdir(parents=True, exist_ok=True)
 
+    # Locate Hayashi binary. Prefer the binary built in this repo (debug or
+    # release) over a globally installed `hay`, so that local changes are
+    # actually validated.
+    hay_exe = str(ROOT_DIR / "target" / "debug" / "hay")
+    if not Path(hay_exe).exists():
+        hay_exe = str(ROOT_DIR / "target" / "release" / "hay")
+    if not Path(hay_exe).exists() and check_executable("hay"):
+        hay_exe = "hay"
+
+    # Generate data if the case ships a data/gen.hay script. This keeps the
+    # repository free of generated CSVs while still allowing CI to run each
+    # case from a clean checkout.
+    gen_hay = data_dir / "gen.hay"
+    if gen_hay.exists():
+        if not quiet:
+            log("  Generating data...")
+        gen_res = run_command([hay_exe, str(gen_hay)], quiet=quiet)
+        if gen_res.returncode != 0:
+            return "blocked", [f"Data generation failed:\n{gen_res.stderr}"], {}
+
     # Resolve script paths relative to the validation directory.
     reference_scripts = case.get("reference_scripts", {})
     references = case.get("references", [])
@@ -1195,15 +1215,7 @@ def run_case(case: dict[str, Any], quiet: bool = False) -> tuple[str, list[str],
             return "blocked", msgs, ref_report
         return "blocked", ["No reference implementation could run."], ref_report
 
-    # Run Hayashi script. Prefer the binary built in this repo (debug or
-    # release) over a globally installed `hay`, so that local changes are
-    # actually validated.
-    hay_exe = str(ROOT_DIR / "target" / "debug" / "hay")
-    if not Path(hay_exe).exists():
-        hay_exe = str(ROOT_DIR / "target" / "release" / "hay")
-    if not Path(hay_exe).exists() and check_executable("hay"):
-        hay_exe = "hay"
-
+    # Run Hayashi script using the binary selected earlier.
     hay_script = str(VALIDATION_DIR / case.get("hayashi_script", f"cases/{case_id}/hayashi/run.hay"))
     hay_res = run_command([hay_exe, hay_script], quiet=quiet)
     if hay_res.returncode != 0:
