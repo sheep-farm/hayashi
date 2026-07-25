@@ -54,6 +54,8 @@ howto/
 validation/.venv
 validation/cases/**/data/*
 !validation/cases/**/data/gen.hay
+!validation/cases/**/data/gen.py
+!validation/cases/**/data/gen.R
 validation/cases/**/hayashi/output.csv
 validation/cases/**/reference/expected.*
 planning.md

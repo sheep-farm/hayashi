@@ -1129,16 +1129,21 @@ def run_case(case: dict[str, Any], quiet: bool = False) -> tuple[str, list[str],
     if not Path(hay_exe).exists() and check_executable("hay"):
         hay_exe = "hay"
 
-    # Generate data if the case ships a data/gen.hay script. This keeps the
+    # Generate data if the case ships a data/gen.* script. This keeps the
     # repository free of generated CSVs while still allowing CI to run each
     # case from a clean checkout.
-    gen_hay = data_dir / "gen.hay"
-    if gen_hay.exists():
-        if not quiet:
-            log("  Generating data...")
-        gen_res = run_command([hay_exe, str(gen_hay)], quiet=quiet)
-        if gen_res.returncode != 0:
-            return "blocked", [f"Data generation failed:\n{gen_res.stderr}"], {}
+    gen_scripts = [
+        (data_dir / "gen.hay", [hay_exe, str(data_dir / "gen.hay")]),
+        (data_dir / "gen.py", ["python", str(data_dir / "gen.py")]),
+        (data_dir / "gen.R", ["Rscript", str(data_dir / "gen.R")]),
+    ]
+    for gen_path, gen_cmd in gen_scripts:
+        if gen_path.exists():
+            if not quiet:
+                log("  Generating data...")
+            gen_res = run_command(gen_cmd, quiet=quiet)
+            if gen_res.returncode != 0:
+                return "blocked", [f"Data generation failed:\n{gen_res.stderr}"], {}
 
     # Resolve script paths relative to the validation directory.
     reference_scripts = case.get("reference_scripts", {})

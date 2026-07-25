@@ -9,9 +9,10 @@ dir.create(data_dir, recursive = TRUE, showWarnings = FALSE)
 
 csv_path <- file.path(data_dir, "grunfeld.csv")
 if (!file.exists(csv_path)) {
-  # Generate the CSV from the wooldridge package so the case is self-contained.
-  library(wooldridge)
-  data(grunfeld)
+  # Generate the CSV from the plm package so the case is self-contained.
+  data(Grunfeld, package = "plm")
+  grunfeld <- Grunfeld
+  names(grunfeld)[names(grunfeld) == "firm"] <- "firm"
   write.csv(grunfeld, csv_path, row.names = FALSE)
 }
 
