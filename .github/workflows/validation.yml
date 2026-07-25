@@ -57,7 +57,7 @@ jobs:
         run: echo "${{ github.workspace }}/target/release" >> "$GITHUB_PATH"
 
       - name: Run validation programme
-        run: python validation/run.py --allow-blocked
+        run: python validation/run.py
 
       - name: Upload validation report
         if: always()

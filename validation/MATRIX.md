@@ -83,12 +83,12 @@
 | ols | wooldridge::wage1 | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 7 Example 7.1 log hourly wage equation with female dummy. |
 | ols | wooldridge::wage1 | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 6 Section 6.2 wage equation with experience quadratic. |
 | oprobit | wooldridge::beauty | R:passed *, Python:passed * | pass | — | Ordered probit model of self-reported beauty rating (looks 2-5) on female, education, experience and black indicators. |
-| panel_fe | wooldridge::wagepan | — | not-supported | 93 | Panel fixed-effects wage equation with worker-clustered standard errors; currently not supported because fe() ignores cluster=. |
+| panel_fe | wooldridge::wagepan |  | not-supported | 93 | Panel fixed-effects wage equation with worker-clustered standard errors; currently not supported because fe() ignores cluster=. |
 | panel_fe | wooldridge::grunfeld | R:passed *, Python:passed * | pass | — | Panel fixed-effects investment demand model (Grunfeld). |
 | panel_fe | wooldridge::wagepan | R:passed *, Python:passed * | pass | — | Wooldridge Introductory Econometrics Chapter 14 Example 14.4 panel fixed-effects wage equation. |
 | panel_heckman | simulated_panel_heckman | R:passed *, Python:passed * | pass | — | Panel Heckman selection model (two-step) with selection equation and outcome equation. Uses simulated panel data with known selection mechanism. |
 | pca | wooldridge::wage1 | R:passed *, Python:passed * | pass | — | Standardised PCA of educ, exper, tenure, and wage; absolute loadings are compared because component signs are arbitrary. |
-| pcse | wooldridge::wagepan | R, Python | pass | 99, 103 | PCSE estimation of log wage on education, experience, and dummies using the Hayashi/Greeners Beck-Katz covariance convention. |
+| pcse | wooldridge::wagepan | R:passed *, Python:passed * | pass | 99, 103 | PCSE estimation of log wage on education, experience, and dummies using the Hayashi/Greeners Beck-Katz covariance convention. |
 | poisson | wooldridge::fertil2 | R:passed *, Python:passed * | pass | — | Poisson regression for number of children on the fertil2 dataset. |
 | probit | wooldridge::mroz | R:passed *, Python:passed * | pass | — | Probit labour-force participation on the Mroz dataset. |
 | psm | wooldridge::jtrain3 | R:passed *, Python:passed * | pass | — | 1:1 nearest-neighbor propensity score matching with caliper 0.2 and bootstrap SE. |
@@ -133,3 +133,4 @@ covered by validation" section of the README.
 Esta matriz abrange os estimadores empíricos centrais. Alguns comandos são
 deixados de fora intencionalmente pelos motivos descritos na seção
 "Estimators not covered by validation" do README.
+
