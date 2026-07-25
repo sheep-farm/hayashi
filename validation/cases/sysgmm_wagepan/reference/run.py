@@ -194,7 +194,14 @@ def compute_reference() -> dict:
     data_dir.mkdir(parents=True, exist_ok=True)
     ref_dir.mkdir(parents=True, exist_ok=True)
 
-    df = pd.read_csv(data_dir / "wagepan.csv")
+    csv_path = data_dir / "wagepan.csv"
+    if not csv_path.exists():
+        # Generate the CSV from the wooldridge package so the case is self-contained.
+        from wooldridge import data
+        df = data("wagepan")
+        df.to_csv(csv_path, index=False)
+
+    df = pd.read_csv(csv_path)
     df = df.sort_values(["nr", "year"]).reset_index(drop=True)
 
     y = df["lwage"].to_numpy(dtype=float)

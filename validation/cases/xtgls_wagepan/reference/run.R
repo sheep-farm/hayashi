@@ -10,7 +10,15 @@ ref_dir <- file.path(case_dir, "reference")
 dir.create(data_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(ref_dir, recursive = TRUE, showWarnings = FALSE)
 
-df <- read.csv(file.path(data_dir, "wagepan.csv"), stringsAsFactors = FALSE)
+csv_path <- file.path(data_dir, "wagepan.csv")
+if (!file.exists(csv_path)) {
+  # Generate the CSV from the wooldridge package so the case is self-contained.
+  library(wooldridge)
+  data(wagepan)
+  write.csv(wagepan, csv_path, row.names = FALSE)
+}
+
+df <- read.csv(csv_path, stringsAsFactors = FALSE)
 
 # Sort by entity and time to match the panel extraction order in Greeners.
 df <- df[order(df$nr, df$year), ]
