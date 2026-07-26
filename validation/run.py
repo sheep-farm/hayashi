@@ -1669,7 +1669,10 @@ def run_cases(cases: list[dict[str, Any]], only_blocked: bool = False) -> str:
     for case in cases:
         case_id = case["id"]
         title = case.get("title", "")
-        declared_status = case.get("status", "not-started")
+        # Use the manifest status from case.yml to decide whether to run.
+        # The registry status in matrix.yml is for reporting and should not
+        # force a case to be skipped on a fresh run.
+        declared_status = case.get("_manifest_status", case.get("status", "not-started"))
         if declared_status in ("blocked", "not-supported"):
             # Keep the declared status and skip execution; the case files
             # should document why it is blocked/not-supported.
