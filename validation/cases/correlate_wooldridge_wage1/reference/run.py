@@ -48,6 +48,10 @@ for i in sorted_vars:
         else:
             t = rij * math.sqrt((n - 2) / (1 - rij**2))
             pij = float(2 * (1 - stats.t.cdf(abs(t), n - 2)))
+        var1.append(i)
+        var2.append(j)
+        r_vals.append(rij)
+        p_vals.append(pij)
 
 result = {
     "var1": var1,
