@@ -1,0 +1,45 @@
+id: summarize_wooldridge_wage1
+title: Summary statistics for Wooldridge wage1
+estimator_family: descriptive
+status: active
+dimension: numerical
+dataset:
+  name: wooldridge::wage1
+  source: R package wooldridge / Python wooldridge-python
+  licence: public teaching dataset
+references:
+- R
+- Python
+comparison:
+  quantities:
+  - N
+  - mean
+  - sd
+  - min
+  - max
+  - p25
+  - p50
+  - p75
+  - skewness
+  - kurtosis
+  tolerances:
+    N: 1e-12
+    mean: 1e-6
+    sd: 1e-6
+    min: 1e-6
+    max: 1e-6
+    p25: 1e-6
+    p50: 1e-6
+    p75: 1e-6
+    skewness: 1e-6
+    kurtosis: 1e-6
+output_format: json
+hayashi_script: cases/summarize_wooldridge_wage1/hayashi/run.hay
+reference_scripts:
+  R: cases/summarize_wooldridge_wage1/reference/run.R
+  Python: cases/summarize_wooldridge_wage1/reference/run.py
+notes: Summary statistics with detail (percentiles, skewness, kurtosis) for wage.
+result:
+  summary: ''
+  known_differences: []
+  issues_opened: []

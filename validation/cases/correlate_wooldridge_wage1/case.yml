@@ -1,0 +1,33 @@
+id: correlate_wooldridge_wage1
+title: Correlation matrix for Wooldridge wage1
+estimator_family: descriptive
+status: active
+dimension: numerical
+dataset:
+  name: wooldridge::wage1
+  source: R package wooldridge / Python wooldridge-python
+  licence: public teaching dataset
+references:
+- R
+- Python
+comparison:
+  quantities:
+  - var1
+  - var2
+  - r
+  - p
+  tolerances:
+    var1: 0
+    var2: 0
+    r: 1e-6
+    p: 1e-6
+output_format: json
+hayashi_script: cases/correlate_wooldridge_wage1/hayashi/run.hay
+reference_scripts:
+  R: cases/correlate_wooldridge_wage1/reference/run.R
+  Python: cases/correlate_wooldridge_wage1/reference/run.py
+notes: Pairwise correlations of wage, educ, exper, tenure.
+result:
+  summary: ''
+  known_differences: []
+  issues_opened: []

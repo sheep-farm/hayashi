@@ -1340,7 +1340,7 @@ impl Interpreter {
             fmt_lower.as_str()
         };
 
-        match (val, effective_fmt) {
+        match (&val, effective_fmt) {
             // ── DataFrame ─────────────────────────────────────────────
             (Value::DataFrame(df), "csv" | "delimited") => {
                 df.to_csv(&path_str)
@@ -1350,27 +1350,43 @@ impl Interpreter {
             (Value::DataFrame(df), "json") => {
                 df.to_json(&path_str)
                     .map_err(|e| self.rt_err(e.to_string()))?;
-                println!("Exported DataFrame → '{path_str}' ({} rows)", df.n_rows());
+                if path_str.contains("stdout") {
+                    std::fs::write(&path_str, b"\n")
+                        .map_err(|e| HayashiError::Io(e.to_string()))?;
+                } else {
+                    println!("Exported DataFrame → '{path_str}' ({} rows)", df.n_rows());
+                }
+            }
+            (Value::Dict(_) | Value::List(_) | Value::Series(_), "json") => {
+                let mut temp: Vec<(usize, usize)> = Vec::new();
+                let json_val = crate::lang::plugin::value_to_json(&val, false, &mut temp);
+                let mut content = serde_json::to_string_pretty(&json_val)
+                    .map_err(|e| self.rt_err(e.to_string()))?;
+                content.push('\n');
+                std::fs::write(&path_str, content).map_err(|e| HayashiError::Io(e.to_string()))?;
+                if !path_str.contains("stdout") {
+                    println!("Exported value → '{path_str}'");
+                }
             }
             (Value::DataFrame(df), "tsv" | "tab") => {
-                crate::io::dsv::write_dsv(&df, &path_str, b'\t')?;
+                crate::io::dsv::write_dsv(df, &path_str, b'\t')?;
                 println!("Exported DataFrame → '{path_str}' ({} rows)", df.n_rows());
             }
             (Value::DataFrame(df), "xlsx" | "xls") => {
-                crate::io::excel::write_excel(&df, &path_str)?;
+                crate::io::excel::write_excel(df, &path_str)?;
                 println!("Exported DataFrame → '{path_str}' ({} rows)", df.n_rows());
             }
             (Value::DataFrame(_df), "sqlite" | "sqlite3" | "db") => {
                 #[cfg(feature = "sqlite")]
                 {
-                    crate::io::sqlite::write_sqlite(&_df, &path_str, "data")?;
+                    crate::io::sqlite::write_sqlite(_df, &path_str, "data")?;
                     println!("Exported DataFrame → '{path_str}' ({} rows)", _df.n_rows());
                 }
                 #[cfg(not(feature = "sqlite"))]
                 return Err(self.rt_err("SQLite export requires 'sqlite' feature"));
             }
             (Value::DataFrame(df), "parquet" | "pq") => {
-                crate::io::parquet::write_parquet(&df, &path_str)?;
+                crate::io::parquet::write_parquet(df, &path_str)?;
                 println!("Exported DataFrame → '{path_str}' ({} rows)", df.n_rows());
             }
 
@@ -1392,7 +1408,7 @@ impl Interpreter {
             }
 
             // ── Any model result → TXT via Display ─────────────────────────
-            (val, "txt" | "text") => {
+            (_, "txt" | "text") => {
                 std::fs::write(&path_str, format!("{val}"))
                     .map_err(|e| HayashiError::Io(e.to_string()))?;
                 let label = if let Some(mv) = val.to_model_view() {
@@ -1410,7 +1426,7 @@ impl Interpreter {
             }
 
             // ── Model results → CSV / LaTeX / HTML via ModelView ────────────
-            (val, fmt @ ("csv" | "latex" | "tex" | "html" | "htm")) => {
+            (_, fmt @ ("csv" | "latex" | "tex" | "html" | "htm")) => {
                 if let Some(mv) = val.to_model_view() {
                     let content = match fmt {
                         "csv" => mv.to_csv(),

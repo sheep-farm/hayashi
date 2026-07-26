@@ -1,0 +1,31 @@
+id: tabstat_wooldridge_wage1
+title: Tabstat for Wooldridge wage1
+estimator_family: descriptive
+status: active
+dimension: numerical
+dataset:
+  name: wooldridge::wage1
+  source: R package wooldridge / Python wooldridge-python
+  licence: public teaching dataset
+references:
+- R
+- Python
+comparison:
+  quantities:
+  - variable
+  - stat
+  - value
+  tolerances:
+    variable: 0
+    stat: 0
+    value: 1e-6
+output_format: json
+hayashi_script: cases/tabstat_wooldridge_wage1/hayashi/run.hay
+reference_scripts:
+  R: cases/tabstat_wooldridge_wage1/reference/run.R
+  Python: cases/tabstat_wooldridge_wage1/reference/run.py
+notes: Tabstat statistics (mean, sd, min, max, p50) for wage, educ, exper, tenure.
+result:
+  summary: ''
+  known_differences: []
+  issues_opened: []

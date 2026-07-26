@@ -1,0 +1,49 @@
+id: codebook_wooldridge_wage1
+title: Codebook for Wooldridge wage1 wage variable
+estimator_family: descriptive
+status: active
+dimension: numerical
+dataset:
+  name: wooldridge::wage1
+  source: R package wooldridge / Python wooldridge-python
+  licence: public teaching dataset
+references:
+- R
+- Python
+comparison:
+  quantities:
+  - variable
+  - type
+  - obs
+  - missing
+  - unique
+  - mean
+  - sd
+  - min
+  - p25
+  - p50
+  - p75
+  - max
+  tolerances:
+    variable: 0
+    type: 0
+    obs: 0
+    missing: 0
+    unique: 0
+    mean: 1e-6
+    sd: 1e-6
+    min: 1e-6
+    p25: 1e-6
+    p50: 1e-6
+    p75: 1e-6
+    max: 1e-6
+output_format: json
+hayashi_script: cases/codebook_wooldridge_wage1/hayashi/run.hay
+reference_scripts:
+  R: cases/codebook_wooldridge_wage1/reference/run.R
+  Python: cases/codebook_wooldridge_wage1/reference/run.py
+notes: Codebook summary for the continuous wage variable.
+result:
+  summary: ''
+  known_differences: []
+  issues_opened: []

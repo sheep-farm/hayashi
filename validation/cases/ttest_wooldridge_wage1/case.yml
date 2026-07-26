@@ -1,0 +1,45 @@
+id: ttest_wooldridge_wage1
+title: One-sample t-test for Wooldridge wage1 wage
+estimator_family: descriptive
+status: active
+dimension: numerical
+dataset:
+  name: wooldridge::wage1
+  source: R package wooldridge / Python wooldridge-python
+  licence: public teaching dataset
+references:
+- R
+- Python
+comparison:
+  quantities:
+  - variable
+  - n
+  - mean
+  - std_err
+  - t_stat
+  - df
+  - p_value
+  - mu
+  - ci_lower
+  - ci_upper
+  tolerances:
+    variable: 0
+    n: 0
+    mean: 1e-6
+    std_err: 1e-6
+    t_stat: 1e-6
+    df: 1e-12
+    p_value: 1e-6
+    mu: 1e-12
+    ci_lower: 1e-6
+    ci_upper: 1e-6
+output_format: json
+hayashi_script: cases/ttest_wooldridge_wage1/hayashi/run.hay
+reference_scripts:
+  R: cases/ttest_wooldridge_wage1/reference/run.R
+  Python: cases/ttest_wooldridge_wage1/reference/run.py
+notes: One-sample t-test of wage mean against mu=5.
+result:
+  summary: ''
+  known_differences: []
+  issues_opened: []

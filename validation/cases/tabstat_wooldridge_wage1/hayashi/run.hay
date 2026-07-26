@@ -1,0 +1,8 @@
+// Load the Wooldridge wage1 dataset from CSV.
+load "validation/cases/tabstat_wooldridge_wage1/data/wage1.csv" as df
+
+// Tabstat with selected statistics for wage, educ, exper, tenure.
+let s = tabstat(df, wage, educ, exper, tenure, stats=["mean", "sd", "min", "max", "p50"])
+
+// Export the result as JSON for automated comparison.
+export(s, "json", "/dev/stdout")

@@ -1,0 +1,8 @@
+// Load the Wooldridge wagepan dataset from CSV.
+load "validation/cases/xtsum_wooldridge_wagepan/data/wagepan.csv" as df
+
+// Panel summary (overall, between, within) for log wage.
+let x = xtsum(df, lwage, id=nr, t=year)
+
+// Export the result as JSON for automated comparison.
+export(x, "json", "/dev/stdout")

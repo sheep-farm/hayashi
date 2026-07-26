@@ -1,0 +1,41 @@
+id: tabulate_mroz_inlf_kidslt6
+title: Cross-tabulation of inlf by kidslt6 in Wooldridge mroz
+estimator_family: descriptive
+status: active
+dimension: numerical
+dataset:
+  name: wooldridge::mroz
+  source: R package wooldridge / Python wooldridge-python
+  licence: public teaching dataset
+references:
+- R
+- Python
+comparison:
+  quantities:
+  - chi2
+  - df
+  - p_value
+  - table.freq
+  - table.inlf
+  - table.kidslt6
+  - table.row_total
+  - table.col_total
+  tolerances:
+    chi2: 1e-6
+    df: 1e-12
+    p_value: 1e-6
+    table.freq: 0
+    table.inlf: 0
+    table.kidslt6: 0
+    table.row_total: 0
+    table.col_total: 0
+output_format: json
+hayashi_script: cases/tabulate_mroz_inlf_kidslt6/hayashi/run.hay
+reference_scripts:
+  R: cases/tabulate_mroz_inlf_kidslt6/reference/run.R
+  Python: cases/tabulate_mroz_inlf_kidslt6/reference/run.py
+notes: Two-way frequency table with Pearson chi-square test.
+result:
+  summary: ''
+  known_differences: []
+  issues_opened: []

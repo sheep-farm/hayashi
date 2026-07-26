@@ -1,0 +1,41 @@
+id: ci_wooldridge_wage1
+title: Confidence interval for Wooldridge wage1 wage
+estimator_family: descriptive
+status: active
+dimension: numerical
+dataset:
+  name: wooldridge::wage1
+  source: R package wooldridge / Python wooldridge-python
+  licence: public teaching dataset
+references:
+- R
+- Python
+comparison:
+  quantities:
+  - variable
+  - n
+  - mean
+  - sd
+  - std_err
+  - ci_lower
+  - ci_upper
+  - level
+  tolerances:
+    variable: 0
+    n: 0
+    mean: 1e-6
+    sd: 1e-6
+    std_err: 1e-6
+    ci_lower: 1e-6
+    ci_upper: 1e-6
+    level: 0
+output_format: json
+hayashi_script: cases/ci_wooldridge_wage1/hayashi/run.hay
+reference_scripts:
+  R: cases/ci_wooldridge_wage1/reference/run.R
+  Python: cases/ci_wooldridge_wage1/reference/run.py
+notes: 95% confidence interval for the wage mean.
+result:
+  summary: ''
+  known_differences: []
+  issues_opened: []

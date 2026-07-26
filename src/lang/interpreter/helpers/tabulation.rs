@@ -26,6 +26,10 @@ pub(in crate::lang::interpreter) fn col_to_strings(
         Ok(Column::Categorical(cat)) => Ok((0..df.n_rows())
             .map(|row| cat.get_string(row).unwrap_or("").to_string())
             .collect()),
+        Ok(Column::Bool(arr)) => Ok(arr
+            .iter()
+            .map(|b| if *b { "1".to_string() } else { "0".to_string() })
+            .collect()),
         _ => df.get_string(name).map(|arr| arr.to_vec()).map_err(|_| {
             HayashiError::Runtime(format!(
                 "column '{name}' not found or has unsupported type for tabulate"

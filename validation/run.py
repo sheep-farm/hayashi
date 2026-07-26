@@ -1031,6 +1031,49 @@ def approx_equal(a: float, b: float, tol: float) -> bool:
     return abs(a - b) <= tol
 
 
+def _get_nested(data: Any, path: str) -> Any:
+    """Fetch a possibly dotted value from a nested dictionary."""
+    parts = path.split(".")
+    current = data
+    for part in parts:
+        if isinstance(current, dict) and part in current:
+            current = current[part]
+        else:
+            return None
+    return current
+
+
+def _compare_values(hay_val: Any, ref_val: Any, tol: float, path: str) -> list[str]:
+    """Compare two JSON-like values and return failure messages."""
+    failures: list[str] = []
+    if isinstance(ref_val, dict):
+        for key in ref_val:
+            failures.extend(
+                _compare_values(
+                    hay_val.get(key) if isinstance(hay_val, dict) else None,
+                    ref_val[key],
+                    tol,
+                    f"{path}.{key}",
+                )
+            )
+    elif isinstance(ref_val, list):
+        if not isinstance(hay_val, list) or len(hay_val) != len(ref_val):
+            failures.append(f"{path}: length mismatch hayashi={hay_val} reference={ref_val}")
+            return failures
+        for idx, (h, r) in enumerate(zip(hay_val, ref_val)):
+            failures.extend(_compare_values(h, r, tol, f"{path}[{idx}]"))
+    elif isinstance(ref_val, (int, float)):
+        try:
+            if not approx_equal(float(hay_val), float(ref_val), tol):
+                failures.append(f"{path}: {hay_val} vs {ref_val} (tol={tol})")
+        except (ValueError, TypeError):
+            failures.append(f"{path}: cannot compare {hay_val} with {ref_val}")
+    else:
+        if str(hay_val) != str(ref_val):
+            failures.append(f"{path}: {hay_val} != {ref_val}")
+    return failures
+
+
 def compare_quantities(
     hayashi: dict[str, Any],
     reference: dict[str, Any],
@@ -1038,46 +1081,18 @@ def compare_quantities(
 ) -> tuple[str, list[str]]:
     failures: list[str] = []
     for quantity in tolerances:
-        if quantity not in reference:
+        ref_val = _get_nested(reference, quantity)
+        hay_val = _get_nested(hayashi, quantity)
+        tol = float(tolerances[quantity])
+
+        if ref_val is None:
             failures.append(f"{quantity}: missing in reference")
             continue
-        if quantity not in hayashi:
+        if hay_val is None:
             failures.append(f"{quantity}: missing in Hayashi output")
             continue
 
-        ref_val = reference[quantity]
-        hay_val = hayashi[quantity]
-        tol = float(tolerances[quantity])
-
-        if isinstance(ref_val, dict):
-            # Compare per-coefficient quantities (e.g., coefficients).
-            for key in ref_val:
-                if key not in hay_val:
-                    failures.append(f"{quantity}.{key}: missing in Hayashi")
-                    continue
-                if not approx_equal(float(hay_val[key]), float(ref_val[key]), tol):
-                    failures.append(
-                        f"{quantity}.{key}: {hay_val[key]} vs {ref_val[key]} (tol={tol})"
-                    )
-        elif isinstance(ref_val, list):
-            if not isinstance(hay_val, list) or len(hay_val) != len(ref_val):
-                failures.append(
-                    f"{quantity}: length mismatch hayashi={hay_val} reference={ref_val}"
-                )
-                continue
-            for idx, (h, r) in enumerate(zip(hay_val, ref_val)):
-                if not approx_equal(float(h), float(r), tol):
-                    failures.append(
-                        f"{quantity}[{idx}]: {h} vs {r} (tol={tol})"
-                    )
-        elif isinstance(ref_val, (int, float)):
-            if not approx_equal(float(hay_val), float(ref_val), tol):
-                failures.append(
-                    f"{quantity}: {hay_val} vs {ref_val} (tol={tol})"
-                )
-        else:
-            if hay_val != ref_val:
-                failures.append(f"{quantity}: {hay_val} != {ref_val}")
+        failures.extend(_compare_values(hay_val, ref_val, tol, quantity))
 
     if failures:
         return "fail", failures
@@ -1288,6 +1303,10 @@ def run_case(case: dict[str, Any], quiet: bool = False) -> tuple[str, list[str],
                     hayashi = parse_hayashi_local_level(hay_res.stdout)
                 else:
                     hayashi = normalise_intercept(parse_hayashi_txt_table(hay_res.stdout))
+            elif output_format == "json":
+                hayashi = parse_reference_json(hay_res.stdout)
+                if hayashi is None:
+                    raise ValueError(f"Could not parse Hayashi stdout as JSON: {hay_res.stdout[:200]!r}")
             else:
                 hayashi = normalise_intercept(parse_hayashi_csv_from_string(hay_res.stdout))
         except Exception as e:
@@ -1317,6 +1336,13 @@ def run_case(case: dict[str, Any], quiet: bool = False) -> tuple[str, list[str],
                 hayashi = parse_hayashi_local_level(hayashi_txt.read_text())
             else:
                 hayashi = normalise_intercept(parse_hayashi_txt_table(hayashi_txt.read_text()))
+        elif output_format == "json":
+            hayashi_json = hayashi_dir / "output.json"
+            if not hayashi_json.exists():
+                return "blocked", [f"Hayashi output not found: {hayashi_json}"], ref_report
+            hayashi = parse_reference_json(hayashi_json.read_text())
+            if hayashi is None:
+                return "blocked", [f"Could not parse Hayashi output.json"], ref_report
         else:
             hayashi_csv = hayashi_dir / "output.csv"
             if not hayashi_csv.exists():

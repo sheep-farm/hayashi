@@ -831,15 +831,11 @@ impl Interpreter {
                         .iter()
                         .position(|&g| (g - id).abs() < 1e-9)
                         .unwrap_or(0)];
-                    v - gm + mean_ov // demeaned + overall mean
+                    v - gm // within deviation (mean zero by construction)
                 })
                 .collect();
             let n_w = n_total as f64;
-            let var_w = within_vals
-                .iter()
-                .map(|x| (x - mean_ov).powi(2))
-                .sum::<f64>()
-                / (n_w - 1.0).max(1.0);
+            let var_w = within_vals.iter().map(|x| x.powi(2)).sum::<f64>() / (n_w - 1.0).max(1.0);
             let sd_w = var_w.sqrt();
             let min_w = within_vals.iter().cloned().fold(f64::INFINITY, f64::min);
             let max_w = within_vals
@@ -860,7 +856,7 @@ impl Interpreter {
                 &mut n_vec,
                 vname,
                 "within",
-                mean_ov,
+                0.0,
                 sd_w,
                 min_w,
                 max_w,

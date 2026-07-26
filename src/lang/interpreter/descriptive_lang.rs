@@ -1440,17 +1440,15 @@ impl Interpreter {
             ));
         }
 
-        let refs: Vec<&str> = names.iter().map(String::as_str).collect();
+        let mut sorted_names = names.clone();
+        sorted_names.sort();
+        let refs: Vec<&str> = sorted_names.iter().map(String::as_str).collect();
         let sub = df
             .select(&refs)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         let mat = sub
             .corr()
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-
-        // corr() sorts columns alphabetically — synchronize with the matrix
-        let mut sorted_names = names.clone();
-        sorted_names.sort();
 
         let col_w = 10usize;
         let row_label_w = 16usize;
