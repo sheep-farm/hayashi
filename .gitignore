@@ -67,6 +67,7 @@ validation/COBERTURA.md
 repositories.txt
 
 deploy-site.sh
+reload.sh
 __pycache__/
 
 # Relatórios gerados manualmente
