@@ -123,7 +123,7 @@
 ## Status legend
 
 - `pass` — Hayashi matches all available references within declared tolerances.
-- `partial` — Hayashi matches at least one reference, but other declared references failed or are missing.
+- `partial` — Hayashi matches at least one reference, but other declared references failed or are missing; exits non-zero unless `--allow-partial` is passed.
 - `fail` — Hayashi differs from at least one reference beyond tolerances.
 - `blocked` — no declared reference could run; the case cannot be judged.
 - `not-supported` — estimator/workflow not supported yet.
@@ -131,8 +131,8 @@
 
 The Reference column shows per-reference status as `name:status`,
 where `*` marks the reference used for comparison. A declared
-reference that fails or is missing no longer blocks the case; it is
-reported in the Reference column while any passing reference is used.
+reference that fails or is missing no longer blocks comparison when
+`--allow-partial` is used; otherwise partial cases fail the runner.
 
 This matrix is generated from `validation/matrix.yml` by `validation/run.py`.
 

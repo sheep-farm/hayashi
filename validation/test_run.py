@@ -297,5 +297,110 @@ n = 753
         self.assertTrue(ref_report["Python"]["used"])
 
 
+class MainExitStatusTests(unittest.TestCase):
+    def setUp(self):
+        self.module = load_runner_module()
+        self.matrix = {"cases": []}
+        self.cases = [
+            {"id": "example_1", "title": "Example 1"},
+            {"id": "example_2", "title": "Example 2"},
+        ]
+
+    def run_main_with_status(
+        self,
+        status: str,
+        extra_args: list[str] | None = None,
+        case_statuses: list[str] | None = None,
+    ) -> tuple[int, list[str]]:
+        argv = ["--no-write"] + list(extra_args or [])
+        case_statuses = case_statuses or [status]
+
+        def fake_run_cases(selected_cases, only_blocked=False):
+            for case, case_status in zip(selected_cases, case_statuses):
+                case["status"] = case_status
+            return status
+
+        with patch.object(
+            self.module,
+            "load_cases",
+            return_value=(
+                self.matrix,
+                self.cases,
+                {"example_1", "example_2"},
+                {"example_1", "example_2"},
+            ),
+        ), patch.object(
+            self.module,
+            "select_cases",
+            return_value=self.cases,
+        ), patch.object(
+            self.module,
+            "run_cases",
+            side_effect=fake_run_cases,
+        ), patch.object(
+            self.module,
+            "write_matrix",
+        ) as write_matrix, patch.object(
+            self.module,
+            "log",
+        ) as log:
+            exit_code = self.module.main(argv)
+
+        write_matrix.assert_not_called()
+        return exit_code, [call.args[0] for call in log.call_args_list]
+
+    def test_main_accepts_pass(self):
+        exit_code, _ = self.run_main_with_status("pass")
+
+        self.assertEqual(exit_code, 0)
+
+    def test_main_rejects_fail(self):
+        exit_code, _ = self.run_main_with_status("fail", ["--allow-blocked"])
+
+        self.assertEqual(exit_code, 1)
+
+    def test_main_rejects_blocked_by_default(self):
+        exit_code, messages = self.run_main_with_status("blocked")
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("ERROR: validation blocked (use --allow-blocked to tolerate)", messages)
+
+    def test_main_allows_blocked_with_flag(self):
+        exit_code, _ = self.run_main_with_status("blocked", ["--allow-blocked"])
+
+        self.assertEqual(exit_code, 0)
+
+    def test_main_rejects_partial_by_default(self):
+        exit_code, messages = self.run_main_with_status("partial")
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("ERROR: validation partial (use --allow-partial to tolerate)", messages)
+
+    def test_main_allows_partial_with_flag(self):
+        exit_code, _ = self.run_main_with_status("partial", ["--allow-partial"])
+
+        self.assertEqual(exit_code, 0)
+
+    def test_main_rejects_partial_when_blocked_is_allowed(self):
+        exit_code, messages = self.run_main_with_status(
+            "blocked",
+            ["--allow-blocked"],
+            case_statuses=["blocked", "partial"],
+        )
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("ERROR: validation partial (use --allow-partial to tolerate)", messages)
+
+    def test_main_rejects_blocked_when_partial_is_allowed(self):
+        exit_code, messages = self.run_main_with_status(
+            "blocked",
+            ["--allow-partial"],
+            case_statuses=["blocked", "partial"],
+        )
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("ERROR: validation blocked (use --allow-blocked to tolerate)", messages)
+
+
 if __name__ == "__main__":
     unittest.main()
