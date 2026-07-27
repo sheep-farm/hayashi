@@ -1410,7 +1410,10 @@ def render_matrix_md(cases: list[dict[str, Any]]) -> str:
         "## Status legend",
         "",
         "- `pass` — Hayashi matches all available references within declared tolerances.",
-        "- `partial` — Hayashi matches at least one reference, but other declared references failed or are missing.",
+        (
+            "- `partial` — Hayashi matches at least one reference, but other declared references "
+            "failed or are missing; exits non-zero unless `--allow-partial` is passed."
+        ),
         "- `fail` — Hayashi differs from at least one reference beyond tolerances.",
         "- `blocked` — no declared reference could run; the case cannot be judged.",
         "- `not-supported` — estimator/workflow not supported yet.",
@@ -1418,8 +1421,8 @@ def render_matrix_md(cases: list[dict[str, Any]]) -> str:
         "",
         "The Reference column shows per-reference status as `name:status`,",
         "where `*` marks the reference used for comparison. A declared",
-        "reference that fails or is missing no longer blocks the case; it is",
-        "reported in the Reference column while any passing reference is used.",
+        "reference that fails or is missing no longer blocks comparison when",
+        "`--allow-partial` is used; otherwise partial cases fail the runner.",
         "",
         "This matrix is generated from `validation/matrix.yml` by `validation/run.py`.",
         "",
@@ -1577,6 +1580,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--allow-blocked",
         action="store_true",
         help="Exit with status 0 when validation cases are blocked. By default blocked counts as failure.",
+    )
+    parser.add_argument(
+        "--allow-partial",
+        action="store_true",
+        help="Exit with status 0 when validation cases are partial. By default partial counts as failure.",
     )
     parser.add_argument(
         "--check",
@@ -1794,11 +1802,17 @@ def main(argv: list[str] | None = None) -> int:
     else:
         write_matrix(matrix, cases)
 
+    observed_statuses = {case.get("status") for case in selected_cases}
+    observed_statuses.add(overall_status)
+
     log(f"\nOverall status: {overall_status}")
-    if overall_status == "fail":
+    if "fail" in observed_statuses:
         return 1
-    if overall_status == "blocked" and not args.allow_blocked:
+    if "blocked" in observed_statuses and not args.allow_blocked:
         log("ERROR: validation blocked (use --allow-blocked to tolerate)")
+        return 1
+    if "partial" in observed_statuses and not args.allow_partial:
+        log("ERROR: validation partial (use --allow-partial to tolerate)")
         return 1
     return 0
 
