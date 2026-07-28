@@ -6,7 +6,7 @@ cases:
 - id: anova_wooldridge_wage1
   notes: One-way ANOVA of wage across education groups.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ar_book
   notes: Uses the same simulated AR(1) DGP as Chapter 26 of the book.
   dimension: numerical
@@ -14,16 +14,16 @@ cases:
 - id: ardl_gdp
   notes: ARDL(1,1) model of US real GDP on consumption.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: arima_book
   notes: ARIMA(1,1,0) on a simulated random walk with seed 42. Intercept is excluded
     from comparison because R/Python references are estimated without trend.
   dimension: numerical
-  status: partial
+  status: pass
 - id: arima_gdp
   notes: ARIMA(1,1,1) on log US real GDP via exact Gaussian MLE.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: arma_book
   notes: Uses the same simulated ARMA(1,1) DGP as Chapter 26 of the book. Intercept
     is excluded from comparison because Hayashi profiles it out in MLE (SE = 0).
@@ -32,7 +32,7 @@ cases:
 - id: autoreg_gdp
   notes: AR(1) on US real GDP with constant and trend.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: betareg_wooldridge_401k
   notes: Beta regression on 401k participation rates. Greeners estimates by BFGS with
     an analytic gradient and matches R betareg.
@@ -42,7 +42,7 @@ cases:
   notes: Bayesian structural time series for counterfactual inference (Brodersen 2015).
     Uses simulated data with known treatment effect.
   dimension: numerical
-  status: partial
+  status: pass
 - id: centile_wooldridge_wage1
   notes: Centiles 10, 25, 50, 75, 90 for the wage variable.
   dimension: numerical
@@ -50,12 +50,12 @@ cases:
 - id: ci_wooldridge_wage1
   notes: 95% confidence interval for the wage mean.
   dimension: numerical
-  status: partial
+  status: pass
 - id: cloglog_wooldridge_affairs
   notes: Complementary log-log GLM on Wooldridge affairs. Fixed cloglog link derivative
     sign; Hayashi now converges and matches R glm.
   dimension: numerical
-  status: partial
+  status: pass
 - id: codebook_wooldridge_wage1
   notes: Codebook summary for the continuous wage variable.
   dimension: numerical
@@ -68,11 +68,11 @@ cases:
 - id: correlate_wooldridge_wage1
   notes: Pairwise correlations of wage, educ, exper, tenure.
   dimension: numerical
-  status: partial
+  status: pass
 - id: cox_heart
   notes: Cox proportional hazards regression for survival time after heart transplant.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: dcc_garch_nyse
   notes: DCC-GARCH (Dynamic Conditional Correlation GARCH) on NYSE returns. Uses simplified
     DCC-GARCH(1,1) model.
@@ -81,16 +81,16 @@ cases:
 - id: did_kielmc
   notes: Difference-in-differences effect of incinerator proximity on log house prices.
   dimension: numerical
-  status: partial
+  status: pass
 - id: double_ml_simulated
   notes: Double Machine Learning (Chernozhukov et al. 2018) for heterogeneous treatment
     effects. Uses simulated data with known treatment effect.
   dimension: numerical
-  status: partial
+  status: pass
 - id: egarch_nyse
   notes: EGARCH(1,1) on NYSE returns.
   dimension: numerical
-  status: partial
+  status: pass
 - id: elasticnet_hprice1
   notes: Elastic Net regression of log house price on log lot size, log square footage,
     bedrooms and colonial dummy.
@@ -100,56 +100,56 @@ cases:
   notes: Exponential smoothing state-space model on US real GDP. Blocked because Hayashi
     uses SSE grid search while references use MLE.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: fmb_simulated
   notes: Classic Fama-MacBeth regression on a deterministic simulated asset panel.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ftest_robust_wooldridge_wage1
   notes: Robust F-test (Wooldridge 2010) with cluster-robust covariance for joint
     significance test.
   dimension: numerical
-  status: partial
+  status: pass
 - id: garch_book
   notes: Uses the same simulated GARCH(1,1) DGP as Chapter 30 of the book. MLE tolerances
     are looser because the optimizer may stop at slightly different points.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: garch_nyse
   notes: GARCH(1,1) on NYSE returns.
   dimension: numerical
-  status: partial
+  status: pass
 - id: gee_wooldridge_wagepan_ch14
   notes: Wooldridge Introductory Econometrics Chapter 14 Example 14.4 generalized
     estimating equations wage equation.
   dimension: numerical
-  status: partial
+  status: pass
 - id: glm_wooldridge_fertil2_poisson
   notes: Poisson GLM for number of children on Wooldridge fertil2.
   dimension: numerical
-  status: partial
+  status: pass
 - id: glsar_hprice1
   notes: GLS with AR(1) errors on housing price equation.
   dimension: numerical
-  status: partial
+  status: pass
 - id: gmm_card
   notes: GMM returns to schooling with nearc4 as instrument for education.
   dimension: numerical
-  status: partial
+  status: pass
 - id: hausman_robust_wooldridge_wagepan
   notes: Robust Hausman test (Cameron-Trivedi 2005, Wooldridge 2010) with cluster-robust
     covariance.
   dimension: numerical
-  status: partial
+  status: pass
 - id: heckman_mroz
   notes: Two-step Heckman (Heckit) on the Mroz dataset. SEs are approximate because
     the reference implementations are two-step.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: iv_card
   notes: IV with education endogenous and nearc4 as instrument.
   dimension: numerical
-  status: partial
+  status: pass
 - id: iv_cluster_card
   notes: IV returns-to-schooling equation with one-way clustered standard errors by
     Census region.
@@ -164,7 +164,7 @@ cases:
   notes: Wooldridge Introductory Econometrics Chapter 15 Example 15.1 IV returns to
     schooling for married women.
   dimension: numerical
-  status: partial
+  status: pass
 - id: kalman_nyse
   notes: Local-level Kalman filter on NYSE returns. Hayashi estimates sigma_obs and
     sigma_state by MLE and returns a printable result object.
@@ -182,16 +182,16 @@ cases:
 - id: logit_margins_mroz
   notes: Logit average marginal effects on Wooldridge mroz.
   dimension: numerical
-  status: partial
+  status: pass
 - id: logit_mroz
   notes: Logit labour-force participation on the Mroz dataset.
   dimension: numerical
-  status: partial
+  status: pass
 - id: lpdid_pylpdid_quickstart
   notes: LP-DiD quickstart against pylpdid on an absorbing staggered-adoption panel.
     R reference is left aside for now.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: ma_book
   notes: Uses the same simulated MA(1) DGP as Chapter 26 of the book.
   dimension: numerical
@@ -205,198 +205,198 @@ cases:
   notes: Wooldridge Introductory Econometrics Chapter 14 Example 14.4 mixed linear
     model wage equation.
   dimension: numerical
-  status: partial
+  status: pass
 - id: mlogit_mode
   notes: Multinomial logit of chosen travel mode (air=1, train=2, bus=3, car=4) on
     income, wait time, vehicle cost and travel time. Alternative-specific attributes
     are averaged per individual to make them individual-specific covariates.
   dimension: numerical
-  status: partial
+  status: pass
 - id: nbreg_fertil2
   notes: Negative binomial regression for number of children on age, education, electric
     and urban indicators. Dispersion parameter (alpha) is not compared because Hayashi
     does not report it; coefficient tolerance is 2e-1 due to different alpha estimates.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ologit_beauty
   notes: Ordered logit of looks (2, 3, 4) on female, educ, exper, black.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: ols_cluster_wagepan
   notes: OLS wage equation with one-way cluster-robust standard errors by worker id.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_hc3_wooldridge_wage1
   notes: OLS log-wage equation with HC3 heteroskedasticity-robust standard errors.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_newey_west_phillips
   notes: OLS expectations-augmented Phillips curve with Newey-West HAC standard errors.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_twoway_cluster_wagepan
   notes: OLS wage equation with two-way clustered standard errors by worker id and
     year.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_wooldridge_401k_ch3
   notes: Wooldridge Introductory Econometrics Chapter 3 Example 3.3 401(k) participation
     equation.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_wooldridge_attend_ch6
   notes: Wooldridge Introductory Econometrics Chapter 6 Example 6.3 attendance effects
     on exam score.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_wooldridge_barium_ch10
   notes: Wooldridge Introductory Econometrics Chapter 10 Example 10.5 barium chloride
     import equation.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_wooldridge_bwght_ch5
   notes: Wooldridge Introductory Econometrics Chapter 5 Example 5.2 birth weight equation.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_wooldridge_campus_ch4
   notes: Wooldridge Introductory Econometrics Chapter 4 Example 4.4 log-log campus
     crime equation.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_wooldridge_ceosal1_ch2
   notes: Wooldridge Introductory Econometrics Chapter 2 Example 2.11 log-log CEO salary
     equation.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_wooldridge_ceosal1_roe_ch2
   notes: Wooldridge Introductory Econometrics Chapter 2 Example 2.3 CEO salary on
     return on equity.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_wooldridge_consump_ch10
   notes: Wooldridge Introductory Econometrics Chapter 10 Example 10.4 consumption
     growth on income growth.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_wooldridge_crime1_avgsen_ch3
   notes: Wooldridge Introductory Econometrics Chapter 3 Example 3.5 arrest records
     equation with average sentence.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_wooldridge_crime1_ch3
   notes: Wooldridge Introductory Econometrics Chapter 3 Example 3.5 arrest records
     equation.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_wooldridge_fertil3_ch13
   notes: Wooldridge Introductory Econometrics Chapter 13 Example 13.3 fertility distributed
     lag equation.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_wooldridge_gpa1_ch3
   notes: Wooldridge Introductory Econometrics Chapter 3 Example 3.1 college GPA equation.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_wooldridge_hprice1_ch4
   notes: Wooldridge Introductory Econometrics Chapter 4 Section 4.5 log housing price
     equation.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_wooldridge_hprice2_ch6
   notes: Wooldridge Introductory Econometrics Chapter 6 Example 6.2 log housing price
     equation with rooms quadratic.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_wooldridge_htv_ch9
   notes: Wooldridge Introductory Econometrics Chapter 9 Example 9.3 education equation.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_wooldridge_intdef_ch10
   notes: Wooldridge Introductory Econometrics Chapter 10 Example 10.2 interest rate
     on inflation and deficit.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_wooldridge_jtrain_pooled_ch14
   notes: Wooldridge Introductory Econometrics Chapter 14 Example 14.3 pooled job training
     scrap rate equation.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_wooldridge_kielmc_ch13
   notes: Wooldridge Introductory Econometrics Chapter 13 Example 13.1 difference-in-differences
     housing price equation.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_wooldridge_meap93_ch4
   notes: Wooldridge Introductory Econometrics Chapter 4 math pass rate equation.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_wooldridge_nyse_ch11
   notes: Wooldridge Introductory Econometrics Chapter 11 Example 11.4 efficient markets
     hypothesis.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_wooldridge_phillips_ch10
   notes: Wooldridge Introductory Econometrics Chapter 10 Example 10.1 static Phillips
     curve.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_wooldridge_phillips_cinf_ch11
   notes: Wooldridge Introductory Econometrics Chapter 11 Example 11.5 expectations-augmented
     Phillips curve.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_wooldridge_prminwge_ch10
   notes: Wooldridge Introductory Econometrics Chapter 10 Example 10.3 Puerto Rican
     employment equation.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_wooldridge_sleep75_ch5
   notes: Wooldridge Introductory Econometrics Chapter 5 Problem 3.3 sleep equation.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_wooldridge_twoyear_ch4
   notes: Wooldridge Introductory Econometrics Chapter 4 Example 4.10 returns to college
     equation.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_wooldridge_vote1_ch2
   notes: Wooldridge Introductory Econometrics Chapter 2 Examples 2.5 and 2.9 election
     outcomes equation.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_wooldridge_wage1
   notes: First real-dataset validation case.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_wooldridge_wage1_ch2
   notes: Wooldridge Introductory Econometrics Chapter 2 Example 2.10 log wage equation.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_wooldridge_wage1_female_ch7
   notes: Wooldridge Introductory Econometrics Chapter 7 Example 7.1 hourly wage equation
     with female dummy.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_wooldridge_wage1_interaction_ch7
   notes: Wooldridge Introductory Econometrics Chapter 7 Example 7.6 hourly wage equation
     with marriage-gender interactions.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_wooldridge_wage1_log_female_ch7
   notes: Wooldridge Introductory Econometrics Chapter 7 Example 7.1 log hourly wage
     equation with female dummy.
   dimension: numerical
-  status: partial
+  status: pass
 - id: ols_wooldridge_wage1_quad_ch6
   notes: Wooldridge Introductory Econometrics Chapter 6 Section 6.2 wage equation
     with experience quadratic.
   dimension: numerical
-  status: partial
+  status: pass
 - id: oprobit_beauty
   notes: Ordered probit model of self-reported beauty rating (looks 2-5) on female,
     education, experience and black indicators.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: panel_fe_cluster_wagepan
   notes: Panel fixed-effects wage equation with worker-clustered standard errors;
     currently not supported because fe() ignores cluster=.
@@ -405,17 +405,17 @@ cases:
 - id: panel_fe_grunfeld
   notes: Panel fixed-effects investment demand model (Grunfeld).
   dimension: numerical
-  status: partial
+  status: pass
 - id: panel_fe_wooldridge_wagepan_ch14
   notes: Wooldridge Introductory Econometrics Chapter 14 Example 14.4 panel fixed-effects
     wage equation.
   dimension: numerical
-  status: partial
+  status: pass
 - id: panel_heckman_simulated
   notes: Panel Heckman selection model (two-step) with selection equation and outcome
     equation. Uses simulated panel data with known selection mechanism.
   dimension: numerical
-  status: partial
+  status: pass
 - id: pca_wooldridge_wage1
   notes: Standardised PCA of educ, exper, tenure, and wage; absolute loadings are
     compared because component signs are arbitrary.
@@ -429,20 +429,20 @@ cases:
 - id: poisson_fertil2
   notes: Poisson regression for number of children on the fertil2 dataset.
   dimension: numerical
-  status: partial
+  status: pass
 - id: probit_mroz
   notes: Probit labour-force participation on the Mroz dataset.
   dimension: numerical
-  status: partial
+  status: pass
 - id: psm_jtrain3
   notes: 1:1 nearest-neighbor propensity score matching with caliper 0.2 and bootstrap
     SE.
   dimension: numerical
-  status: partial
+  status: pass
 - id: quantile_wage1
   notes: Median quantile regression of wage on education, experience, and tenure.
   dimension: numerical
-  status: partial
+  status: pass
 - id: rdd_book
   notes: Sharp RDD with local linear regression, triangular kernel and Imbens-Kalyanaraman
     bandwidth.
@@ -451,7 +451,7 @@ cases:
 - id: re_grunfeld
   notes: Random-effects investment demand model (Grunfeld).
   dimension: numerical
-  status: partial
+  status: pass
 - id: ridge_hprice1
   notes: Ridge regression of log house price on log lot size, log square footage,
     bedrooms and colonial dummy.
@@ -461,13 +461,13 @@ cases:
   notes: Huber robust linear regression of log wage on education, experience, and
     tenure.
   dimension: numerical
-  status: partial
+  status: pass
 - id: spatial_durbin_simulated
   notes: Spatial Durbin model with spatial lag of dependent variable and spatially
     lagged independent variables. Uses simulated spatial data with known spatial weights
     matrix.
   dimension: numerical
-  status: partial
+  status: pass
 - id: summarize_wooldridge_wage1
   notes: Summary statistics with detail (percentiles, skewness, kurtosis) for wage.
   dimension: numerical
@@ -479,11 +479,11 @@ cases:
 - id: svar_macro
   notes: Cholesky-identified SVAR(2) on log US real GDP and consumption.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: synth_smoking
   notes: Synthetic-control ATT on a simulated panel with 10 donors and 1 treated unit.
   dimension: numerical
-  status: partial
+  status: pass
 - id: sysgmm_wagepan
   notes: System GMM (Blundell-Bond) two-step on Wooldridge wagepan with lags=2. Python
     reference implements the same two-step System GMM procedure used by Hayashi/Greeners.
@@ -496,7 +496,7 @@ cases:
 - id: tabulate_mroz_inlf_kidslt6
   notes: Two-way frequency table with Pearson chi-square test.
   dimension: numerical
-  status: partial
+  status: pass
 - id: tobit_mroz
   notes: Tobit regression of hours worked with left censoring at zero. Hayashi matches
     AER::tobit at displayed precision; the custom Python MLE is retained as a diagnostic
@@ -506,7 +506,7 @@ cases:
 - id: ttest_wooldridge_wage1
   notes: One-sample t-test of wage mean against mu=5.
   dimension: numerical
-  status: partial
+  status: pass
 - id: var_book
   notes: Uses the same simulated bivariate VAR(1) DGP as Chapter 28 of the book.
   dimension: numerical
@@ -514,11 +514,11 @@ cases:
 - id: var_macro
   notes: VAR(2) on US real GDP and consumption.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: wls_hprice1
   notes: WLS with weights generated inside Hayashi to avoid sandbox file issues.
   dimension: numerical
-  status: partial
+  status: pass
 - id: xtgls_wagepan
   notes: Panel feasible GLS with panel-level heteroskedasticity (Parks/Kmenta, Stata
     xtgls panels(heteroskedastic)). R and Python references implement the same two-step
