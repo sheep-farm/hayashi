@@ -170,6 +170,11 @@ cases:
     sigma_state by MLE and returns a printable result object.
   dimension: numerical
   status: pass
+- id: km_aml
+  notes: Kaplan-Meier right-continuous survival probabilities at seven checkpoints
+    on survival::aml.
+  dimension: numerical
+  status: pass
 - id: kmeans_simulated
   notes: K-Means clustering (MacQueen 1967) with k-means++ initialization. Uses simulated
     2D data with 3 Gaussian clusters.
