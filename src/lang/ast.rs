@@ -380,11 +380,12 @@ pub enum Stmt {
     // print(expr, expr, ..., sep=" ", end="\n")
     Print(Vec<Expr>, Vec<Opt>),
 
-    // export(expr, format, "file")
+    // export(expr, format, "file", append=false)
     Export {
         value: Expr,
         fmt: Expr,
         path: Expr,
+        append: Expr,
     },
 
     // replace df varname = expr [if cond]

@@ -1846,8 +1846,22 @@ impl Parser {
         let fmt = self.parse_expr()?;
         self.expect(&Token::Comma)?;
         let path = self.parse_expr()?;
+
+        // Parâmetro opcional append
+        let append = if self.peek() == &Token::Comma {
+            self.advance();
+            self.parse_expr()?
+        } else {
+            Expr::Bool(false)
+        };
+
         self.expect(&Token::RParen)?;
-        Ok(Some(Stmt::Export { value, fmt, path }))
+        Ok(Some(Stmt::Export {
+            value,
+            fmt,
+            path,
+            append,
+        }))
     }
 
     fn parse_count_stmt(&mut self) -> Result<Option<Stmt>> {

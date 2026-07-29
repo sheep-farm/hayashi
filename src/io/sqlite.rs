@@ -203,6 +203,15 @@ fn quote_sqlite_identifier(name: &str) -> Result<String> {
 }
 
 pub fn write_sqlite(df: &greeners::DataFrame, path: &str, table: &str) -> Result<()> {
+    write_sqlite_with_append(df, path, table, false)
+}
+
+pub fn write_sqlite_with_append(
+    df: &greeners::DataFrame,
+    path: &str,
+    table: &str,
+    append: bool,
+) -> Result<()> {
     let mut conn = Connection::open(path)
         .map_err(|e| HayashiError::Runtime(format!("cannot open '{path}': {e}")))?;
 
@@ -222,14 +231,16 @@ pub fn write_sqlite(df: &greeners::DataFrame, path: &str, table: &str) -> Result
         })
         .collect::<Result<Vec<_>>>()?;
 
-    conn.execute(&format!("DROP TABLE IF EXISTS {quoted_table}"), [])
-        .map_err(|e| HayashiError::Runtime(format!("SQL error: {e}")))?;
+    if !append {
+        conn.execute(&format!("DROP TABLE IF EXISTS {quoted_table}"), [])
+            .map_err(|e| HayashiError::Runtime(format!("SQL error: {e}")))?;
 
-    conn.execute(
-        &format!("CREATE TABLE {quoted_table} ({})", col_defs.join(", ")),
-        [],
-    )
-    .map_err(|e| HayashiError::Runtime(format!("SQL error: {e}")))?;
+        conn.execute(
+            &format!("CREATE TABLE {quoted_table} ({})", col_defs.join(", ")),
+            [],
+        )
+        .map_err(|e| HayashiError::Runtime(format!("SQL error: {e}")))?;
+    }
 
     let placeholders: Vec<&str> = vec!["?"; col_names.len()];
     let insert_sql = format!(

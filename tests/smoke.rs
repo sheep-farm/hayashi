@@ -5535,7 +5535,10 @@ export(df, "csv", "{}")"#,
     );
     let (ok, out) = run_inline(&script);
     assert!(ok, "export csv failed:\n{out}");
-    assert!(out.contains("Exported"), "expected 'Exported':\n{out}");
+    assert!(
+        out.contains("exported to"),
+        "expected 'exported to':\n{out}"
+    );
     let content = std::fs::read_to_string(tmp("hayashi_test_export.csv")).unwrap();
     assert!(content.contains("Soja"), "csv missing data:\n{content}");
 }
@@ -5616,6 +5619,191 @@ display mean(df2, preco)"#,
     let (ok, out) = run_inline(&script);
     assert!(ok, "roundtrip xlsx failed:\n{out}");
     assert!(out.contains("88.4"), "expected mean ~88.4:\n{out}");
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// EXPORT — append mode
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn export_csv_append() {
+    let p = tmp("hayashi_append.csv");
+    let _ = std::fs::remove_file(&p);
+
+    // Primeira exportação (cria arquivo)
+    let script1 = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "csv", "{}", false)"#,
+        p
+    );
+    let (ok, out) = run_inline(&script1);
+    assert!(ok, "first export csv failed:\n{out}");
+    assert!(
+        out.contains("exported to"),
+        "expected 'exported to':\n{out}"
+    );
+
+    // Segunda exportação (append)
+    let script2 = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "csv", "{}", true)"#,
+        p
+    );
+    let (ok, out) = run_inline(&script2);
+    assert!(ok, "append csv failed:\n{out}");
+    assert!(
+        out.contains("appended to"),
+        "expected 'appended to':\n{out}"
+    );
+
+    // Verificar que arquivo tem o dobro de linhas (exceto header)
+    let content = std::fs::read_to_string(&p).unwrap();
+    let lines: Vec<&str> = content.lines().collect();
+    assert!(
+        lines.len() > 10,
+        "csv should have more lines after append:\n{content}"
+    );
+
+    let _ = std::fs::remove_file(&p);
+}
+
+#[test]
+fn export_tsv_append() {
+    let p = tmp("hayashi_append.tsv");
+    let _ = std::fs::remove_file(&p);
+
+    // Primeira exportação
+    let script1 = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "tsv", "{}", false)"#,
+        p
+    );
+    let (ok, out) = run_inline(&script1);
+    assert!(ok, "first export tsv failed:\n{out}");
+
+    // Segunda exportação (append)
+    let script2 = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "tsv", "{}", true)"#,
+        p
+    );
+    let (ok, out) = run_inline(&script2);
+    assert!(ok, "append tsv failed:\n{out}");
+    assert!(
+        out.contains("appended to"),
+        "expected 'appended to':\n{out}"
+    );
+
+    let _ = std::fs::remove_file(&p);
+}
+
+#[test]
+fn export_json_append() {
+    let p = tmp("hayashi_append.json");
+    let _ = std::fs::remove_file(&p);
+
+    // Primeira exportação
+    let script1 = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "json", "{}", false)"#,
+        p
+    );
+    let (ok, out) = run_inline(&script1);
+    assert!(ok, "first export json failed:\n{out}");
+
+    // Segunda exportação (append)
+    let script2 = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "json", "{}", true)"#,
+        p
+    );
+    let (ok, out) = run_inline(&script2);
+    assert!(ok, "append json failed:\n{out}");
+    assert!(
+        out.contains("appended to"),
+        "expected 'appended to':\n{out}"
+    );
+
+    let _ = std::fs::remove_file(&p);
+}
+
+#[test]
+fn export_sqlite_append() {
+    let p = tmp("hayashi_append.db");
+    let _ = std::fs::remove_file(&p);
+
+    // Primeira exportação
+    let script1 = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "sqlite", "{}", false)"#,
+        p
+    );
+    let (ok, out) = run_inline(&script1);
+    assert!(ok, "first export sqlite failed:\n{out}");
+
+    // Segunda exportação (append)
+    let script2 = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "sqlite", "{}", true)"#,
+        p
+    );
+    let (ok, out) = run_inline(&script2);
+    assert!(ok, "append sqlite failed:\n{out}");
+    assert!(
+        out.contains("appended to"),
+        "expected 'appended to':\n{out}"
+    );
+
+    let _ = std::fs::remove_file(&p);
+}
+
+#[test]
+fn export_xlsx_append() {
+    let p = tmp("hayashi_append.xlsx");
+    let _ = std::fs::remove_file(&p);
+
+    // Primeira exportação
+    let script1 = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "xlsx", "{}", false)"#,
+        p
+    );
+    let (ok, out) = run_inline(&script1);
+    assert!(ok, "first export xlsx failed:\n{out}");
+
+    // Segunda exportação (append)
+    let script2 = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "xlsx", "{}", true)"#,
+        p
+    );
+    let (ok, out) = run_inline(&script2);
+    assert!(ok, "append xlsx failed:\n{out}");
+    assert!(
+        out.contains("appended to"),
+        "expected 'appended to':\n{out}"
+    );
+
+    let _ = std::fs::remove_file(&p);
+}
+
+#[test]
+fn export_parquet_append_error() {
+    let p = tmp("hayashi_append.pq");
+    let _ = std::fs::remove_file(&p);
+
+    // Tentar append em parquet deve falhar
+    let script = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "parquet", "{}", true)"#,
+        p
+    );
+    let (ok, out) = run_inline(&script);
+    assert!(!ok, "parquet append should fail:\n{out}");
+    assert!(
+        out.contains("does not support append"),
+        "expected append error:\n{out}"
+    );
 }
 
 #[test]

@@ -220,6 +220,10 @@ impl<'a> RowAccess for ExcelRow<'a> {
 }
 
 pub fn write_excel(df: &DataFrame, path: &str) -> Result<()> {
+    write_excel_with_append(df, path, false)
+}
+
+pub fn write_excel_with_append(df: &DataFrame, path: &str, append: bool) -> Result<()> {
     use rust_xlsxwriter::{Format, Workbook};
 
     let mut workbook = Workbook::new();
@@ -228,17 +232,92 @@ pub fn write_excel(df: &DataFrame, path: &str) -> Result<()> {
     let col_names = df.column_names();
     let bold = Format::new().set_bold();
 
-    for (c, name) in col_names.iter().enumerate() {
-        worksheet
-            .write_string_with_format(0, c as u16, name, &bold)
-            .map_err(|e| HayashiError::Runtime(format!("xlsx write error: {e}")))?;
+    let start_row = if append {
+        // Se append, tentar ler arquivo existente para determinar onde começar
+        if std::path::Path::new(path).exists() {
+            // Usar calamine para ler o arquivo existente
+            let mut existing_workbook = calamine::open_workbook_auto(path).map_err(|e| {
+                HayashiError::Runtime(format!("cannot open existing excel '{path}': {e}"))
+            })?;
+
+            let sheet_names = existing_workbook.sheet_names();
+            if let Some(first_sheet) = sheet_names.first() {
+                let range = existing_workbook
+                    .worksheet_range(first_sheet)
+                    .map_err(|e| {
+                        HayashiError::Runtime(format!("cannot read sheet '{first_sheet}': {e}"))
+                    })?;
+
+                // Contar linhas existentes (incluindo header)
+                let existing_rows = range.height();
+                // Copiar dados existentes para o novo workbook
+                for (row_idx, row) in range.rows().enumerate() {
+                    for (col_idx, cell) in row.iter().enumerate() {
+                        let r = row_idx as u32;
+                        let col = col_idx as u16;
+                        match cell {
+                            calamine::Data::Float(f) => {
+                                worksheet.write_number(r, col, *f).map_err(|e| {
+                                    HayashiError::Runtime(format!("xlsx copy error: {e}"))
+                                })?;
+                            }
+                            calamine::Data::Int(i) => {
+                                worksheet.write_number(r, col, *i as f64).map_err(|e| {
+                                    HayashiError::Runtime(format!("xlsx copy error: {e}"))
+                                })?;
+                            }
+                            calamine::Data::String(s) => {
+                                worksheet.write_string(r, col, s).map_err(|e| {
+                                    HayashiError::Runtime(format!("xlsx copy error: {e}"))
+                                })?;
+                            }
+                            calamine::Data::Bool(b) => {
+                                worksheet
+                                    .write_number(r, col, if *b { 1.0 } else { 0.0 })
+                                    .map_err(|e| {
+                                        HayashiError::Runtime(format!("xlsx copy error: {e}"))
+                                    })?;
+                            }
+                            calamine::Data::Empty => {
+                                // Skip empty cells
+                            }
+                            _ => {
+                                worksheet
+                                    .write_string(r, col, format!("{:?}", cell))
+                                    .map_err(|e| {
+                                        HayashiError::Runtime(format!("xlsx copy error: {e}"))
+                                    })?;
+                            }
+                        }
+                    }
+                }
+                existing_rows as u32
+            } else {
+                0
+            }
+        } else {
+            0
+        }
+    } else {
+        0
+    };
+
+    // Se não for append ou arquivo não existia, escrever header
+    if start_row == 0 {
+        for (c, name) in col_names.iter().enumerate() {
+            worksheet
+                .write_string_with_format(0, c as u16, name, &bold)
+                .map_err(|e| HayashiError::Runtime(format!("xlsx write error: {e}")))?;
+        }
     }
 
     let n_rows = df.n_rows();
+    let data_start_row = if start_row == 0 { 1 } else { start_row };
+
     for row in 0..n_rows {
         for (c, name) in col_names.iter().enumerate() {
             let val = crate::io::dsv::col_value_at(df, name, row);
-            let r = (row + 1) as u32;
+            let r = data_start_row + row as u32;
             let col = c as u16;
             if let Ok(num) = val.parse::<f64>() {
                 worksheet

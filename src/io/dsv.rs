@@ -146,15 +146,39 @@ impl<'a> RowAccess for DsvRow<'a> {
 }
 
 pub fn write_dsv(df: &DataFrame, path: &str, delimiter: u8) -> Result<()> {
+    write_dsv_with_append(df, path, delimiter, false)
+}
+
+pub fn write_dsv_with_append(
+    df: &DataFrame,
+    path: &str,
+    delimiter: u8,
+    append: bool,
+) -> Result<()> {
+    use std::fs::OpenOptions;
+
+    let file = if append {
+        OpenOptions::new()
+            .append(true)
+            .open(path)
+            .map_err(|e| HayashiError::Runtime(format!("cannot open '{path}' for append: {e}")))?
+    } else {
+        std::fs::File::create(path)
+            .map_err(|e| HayashiError::Runtime(format!("cannot create '{path}': {e}")))?
+    };
+
     let mut writer = csv::WriterBuilder::new()
         .delimiter(delimiter)
-        .from_path(path)
-        .map_err(|e| HayashiError::Runtime(format!("cannot write '{path}': {e}")))?;
+        .from_writer(file);
 
     let col_names = df.column_names();
-    writer
-        .write_record(&col_names)
-        .map_err(|e| HayashiError::Runtime(format!("write header error: {e}")))?;
+
+    // Write headers only if not appending
+    if !append {
+        writer
+            .write_record(&col_names)
+            .map_err(|e| HayashiError::Runtime(format!("write header error: {e}")))?;
+    }
 
     let n_rows = df.n_rows();
     for row in 0..n_rows {

@@ -165,7 +165,12 @@ impl Interpreter {
                 self.print_output(output);
             }
 
-            Stmt::Export { value, fmt, path } => self.exec_export(value, fmt, path)?,
+            Stmt::Export {
+                value,
+                fmt,
+                path,
+                append,
+            } => self.exec_export(value, fmt, path, append)?,
 
             Stmt::Tsset { df, t_var } => {
                 let frame = match self
@@ -1315,7 +1320,7 @@ impl Interpreter {
 
     // ── export ───────────────────────────────────────────────────────────────
 
-    fn exec_export(&mut self, value: &Expr, fmt: &Expr, path: &Expr) -> Result<()> {
+    fn exec_export(&mut self, value: &Expr, fmt: &Expr, path: &Expr, append: &Expr) -> Result<()> {
         let val = self.eval_expr(value)?;
         let fmt_str = match self.eval_expr(fmt)? {
             Value::Str(s) => s,
@@ -1328,6 +1333,14 @@ impl Interpreter {
         let path_str = match self.eval_expr(path)? {
             Value::Str(s) => s,
             _ => return Err(self.type_err("export path must be a string")),
+        };
+        let append_bool = match self.eval_expr(append)? {
+            Value::Bool(b) => b,
+            other => {
+                return Err(HayashiError::Type(format!(
+                    "export append must be a boolean, got {other}"
+                )))
+            }
         };
 
         use greeners::ExportableResult;
@@ -1343,18 +1356,54 @@ impl Interpreter {
         match (&val, effective_fmt) {
             // ── DataFrame ─────────────────────────────────────────────
             (Value::DataFrame(df), "csv" | "delimited") => {
-                df.to_csv(&path_str)
+                df.to_csv_with_append(&path_str, append_bool)
                     .map_err(|e| self.rt_err(e.to_string()))?;
-                println!("Exported DataFrame → '{path_str}' ({} rows)", df.n_rows());
+                let mode = if append_bool { "appended to" } else { "exported to" };
+                println!("DataFrame {} '{path_str}' ({} rows)", mode, df.n_rows());
             }
             (Value::DataFrame(df), "json") => {
-                df.to_json(&path_str)
-                    .map_err(|e| self.rt_err(e.to_string()))?;
-                if path_str.contains("stdout") {
-                    std::fs::write(&path_str, b"\n")
-                        .map_err(|e| HayashiError::Io(e.to_string()))?;
+                if append_bool {
+                    // Para JSON append, precisamos ler o arquivo existente, mesclar e escrever de volta
+                    let existing_data = if std::path::Path::new(&path_str).exists() {
+                        let existing_content = std::fs::read_to_string(&path_str)
+                            .map_err(|e| HayashiError::Io(e.to_string()))?;
+                        Some(serde_json::from_str::<serde_json::Value>(&existing_content)
+                            .map_err(|e| HayashiError::Runtime(format!("JSON parse error: {e}")))?)
+                    } else {
+                        None
+                    };
+
+                    // Converter DataFrame atual para JSON
+                    let mut temp: Vec<(usize, usize)> = Vec::new();
+                    let new_data = crate::lang::plugin::value_to_json(&Value::DataFrame(df.clone()), false, &mut temp);
+
+                    // Mesclar dados
+                    let merged_data = if let Some(mut existing) = existing_data {
+                        if let serde_json::Value::Object(ref mut map) = existing {
+                            if let serde_json::Value::Object(new_map) = new_data {
+                                for (key, value) in new_map {
+                                    map.insert(key, value);
+                                }
+                            }
+                        }
+                        existing
+                    } else {
+                        new_data
+                    };
+
+                    let content = serde_json::to_string_pretty(&merged_data)
+                        .map_err(|e| self.rt_err(e.to_string()))?;
+                    std::fs::write(&path_str, content).map_err(|e| HayashiError::Io(e.to_string()))?;
+                    println!("DataFrame appended to '{path_str}' ({} rows)", df.n_rows());
                 } else {
-                    println!("Exported DataFrame → '{path_str}' ({} rows)", df.n_rows());
+                    df.to_json(&path_str)
+                        .map_err(|e| self.rt_err(e.to_string()))?;
+                    if path_str.contains("stdout") {
+                        std::fs::write(&path_str, b"\n")
+                            .map_err(|e| HayashiError::Io(e.to_string()))?;
+                    } else {
+                        println!("DataFrame exported to '{path_str}' ({} rows)", df.n_rows());
+                    }
                 }
             }
             (Value::Dict(_) | Value::List(_) | Value::Series(_), "json") => {
@@ -1369,39 +1418,54 @@ impl Interpreter {
                 }
             }
             (Value::DataFrame(df), "tsv" | "tab") => {
-                crate::io::dsv::write_dsv(df, &path_str, b'\t')?;
-                println!("Exported DataFrame → '{path_str}' ({} rows)", df.n_rows());
+                crate::io::dsv::write_dsv_with_append(df, &path_str, b'\t', append_bool)?;
+                let mode = if append_bool { "appended to" } else { "exported to" };
+                println!("DataFrame {} '{path_str}' ({} rows)", mode, df.n_rows());
             }
             (Value::DataFrame(df), "xlsx" | "xls") => {
-                crate::io::excel::write_excel(df, &path_str)?;
-                println!("Exported DataFrame → '{path_str}' ({} rows)", df.n_rows());
+                crate::io::excel::write_excel_with_append(df, &path_str, append_bool)?;
+                let mode = if append_bool { "appended to" } else { "exported to" };
+                println!("DataFrame {} '{path_str}' ({} rows)", mode, df.n_rows());
             }
             (Value::DataFrame(_df), "sqlite" | "sqlite3" | "db") => {
                 #[cfg(feature = "sqlite")]
                 {
-                    crate::io::sqlite::write_sqlite(_df, &path_str, "data")?;
-                    println!("Exported DataFrame → '{path_str}' ({} rows)", _df.n_rows());
+                    crate::io::sqlite::write_sqlite_with_append(_df, &path_str, "data", append_bool)?;
+                    let mode = if append_bool { "appended to" } else { "exported to" };
+                    println!("DataFrame {} '{path_str}' ({} rows)", mode, _df.n_rows());
                 }
                 #[cfg(not(feature = "sqlite"))]
                 return Err(self.rt_err("SQLite export requires 'sqlite' feature"));
             }
             (Value::DataFrame(df), "parquet" | "pq") => {
+                if append_bool {
+                    return Err(self.rt_err("Parquet format does not support append mode - use CSV/TSV/SQLite/JSON/Excel for append operations"));
+                }
                 crate::io::parquet::write_parquet(df, &path_str)?;
-                println!("Exported DataFrame → '{path_str}' ({} rows)", df.n_rows());
+                println!("DataFrame exported to '{path_str}' ({} rows)", df.n_rows());
             }
 
             // ── OLS → CSV / LaTeX / HTML ──────────────────────────────
             (Value::OlsResult(m), "csv") => {
+                if append_bool {
+                    return Err(self.rt_err("Model result export does not support append mode - use DataFrame export for append operations"));
+                }
                 let content = m.result.to_csv();
                 std::fs::write(&path_str, &content).map_err(|e| HayashiError::Io(e.to_string()))?;
                 println!("Exported OLS → '{path_str}'");
             }
             (Value::OlsResult(m), "latex" | "tex") => {
+                if append_bool {
+                    return Err(self.rt_err("Model result export does not support append mode - use DataFrame export for append operations"));
+                }
                 let content = m.result.to_latex();
                 std::fs::write(&path_str, &content).map_err(|e| HayashiError::Io(e.to_string()))?;
                 println!("Exported OLS → '{path_str}'");
             }
             (Value::OlsResult(m), "html" | "htm") => {
+                if append_bool {
+                    return Err(self.rt_err("Model result export does not support append mode - use DataFrame export for append operations"));
+                }
                 let content = m.result.to_html();
                 std::fs::write(&path_str, &content).map_err(|e| HayashiError::Io(e.to_string()))?;
                 println!("Exported OLS → '{path_str}'");
@@ -1409,6 +1473,9 @@ impl Interpreter {
 
             // ── Any model result → TXT via Display ─────────────────────────
             (_, "txt" | "text") => {
+                if append_bool {
+                    return Err(self.rt_err("Model result export does not support append mode - use DataFrame export for append operations"));
+                }
                 std::fs::write(&path_str, format!("{val}"))
                     .map_err(|e| HayashiError::Io(e.to_string()))?;
                 let label = if let Some(mv) = val.to_model_view() {
@@ -1427,6 +1494,9 @@ impl Interpreter {
 
             // ── Model results → CSV / LaTeX / HTML via ModelView ────────────
             (_, fmt @ ("csv" | "latex" | "tex" | "html" | "htm")) => {
+                if append_bool {
+                    return Err(self.rt_err("Model result export does not support append mode - use DataFrame export for append operations"));
+                }
                 if let Some(mv) = val.to_model_view() {
                     let content = match fmt {
                         "csv" => mv.to_csv(),
@@ -1454,8 +1524,8 @@ impl Interpreter {
             (_, fmt) => {
                 return Err(HayashiError::Runtime(format!(
                     "unsupported export format '{fmt}' for this value type\n\
-                 DataFrame → csv, json, tsv, xlsx, sqlite, parquet\n\
-                 Models    → csv, latex, html, txt"
+                 DataFrame → csv, json, tsv, xlsx, sqlite, parquet (append: csv, tsv, json, xlsx, sqlite)\n\
+                 Models    → csv, latex, html, txt (append not supported)"
                 )))
             }
         }
