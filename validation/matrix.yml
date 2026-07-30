@@ -491,8 +491,10 @@ cases:
   dimension: numerical
   status: pass
 - id: sysgmm_wagepan
-  notes: System GMM (Blundell-Bond) two-step on Wooldridge wagepan with lags=2. Python
-    reference implements the same two-step System GMM procedure used by Hayashi/Greeners.
+  notes: System GMM (Blundell-Bond) two-step on Wooldridge wagepan with lags=2.
+    R and Python references explicitly implement the same two-step System GMM procedure
+    used by Hayashi/Greeners; plm::pgmm is not used as the active R oracle because
+    it uses different instrument and weighting conventions.
   dimension: numerical
   status: pass
 - id: tabstat_wooldridge_wage1
