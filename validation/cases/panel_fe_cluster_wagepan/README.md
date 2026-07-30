@@ -1,7 +1,7 @@
 # panel_fe_cluster_wagepan
 
-Tracks the currently unsupported validation target for panel fixed effects with
-entity-clustered standard errors on the Wooldridge `wagepan` dataset.
+Validates panel fixed effects with entity-clustered standard errors on the
+Wooldridge `wagepan` dataset.
 
 ## Dataset
 
@@ -26,30 +26,22 @@ xtset(df, nr, year)
 fe(lwage ~ union + married + d81 + d82 + d83 + d84 + d85 + d86 + d87, df, cluster=nr)
 ```
 
-## Current Status
+## Reference Contract
 
-This case is registered as `not-supported`.
+The R and Python references implement the same calculation directly rather than
+calling high-level panel packages with package-specific small-sample defaults:
 
-The current `fe()` interpreter path resolves the panel entity id and calls
-`FixedEffects::from_formula(...)`; it does not consume `cluster=...`.
-Greeners' fixed-effects implementation then estimates the within model with
-non-robust OLS covariance. Direct runtime comparison of `fe(..., df)` and
-`fe(..., df, cluster=nr)` on this dataset produced identical standard errors.
+1. Drop incomplete rows for `lwage`, regressors, `nr`, and `year`.
+2. Demean `lwage` and each regressor by worker id `nr`.
+3. Estimate OLS without an intercept on the demeaned design.
+4. Compute one-way clustered covariance by worker id.
+5. Apply the Greeners CR1 finite-sample correction:
+   `(G / (G - 1)) * ((N - 1) / (N - K))`.
 
-See issue #93.
-
-## Activation Criteria
-
-Convert this case to `active` only after Hayashi implements clustered covariance
-for `fe()`. The active case should compare:
+The case compares:
 
 - coefficients
 - entity-clustered standard errors
 
-Suggested references:
-
-- **R:** `plm` fixed effects with entity-clustered covariance, or an explicit
-  within-transformed cluster sandwich implementation.
-- **Python:** `linearmodels.PanelOLS(...).fit(cov_type="clustered",
-  cluster_entity=True)`, or an explicit within-transformed cluster sandwich
-  implementation.
+The tolerance is `1e-4` because Hayashi's plain-text coefficient table rounds
+reported coefficients and standard errors to four decimal places.
