@@ -403,10 +403,11 @@ cases:
   dimension: numerical
   status: pass
 - id: panel_fe_cluster_wagepan
-  notes: Panel fixed-effects wage equation with worker-clustered standard errors;
-    currently not supported because fe() ignores cluster=.
+  notes: Panel fixed-effects wage equation with worker-clustered standard errors
+    using explicit within-transformed CR1 reference implementations. Tolerance reflects
+    Hayashi's four-decimal text export.
   dimension: numerical
-  status: not-supported
+  status: pass
 - id: panel_fe_grunfeld
   notes: Panel fixed-effects investment demand model (Grunfeld).
   dimension: numerical

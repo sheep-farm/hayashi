@@ -1,5 +1,4 @@
-// Intended validation target for panel FE with entity-clustered SEs.
-// This case is registered as not-supported until fe() honours cluster=.
+// Panel FE validation target with entity-clustered SEs.
 
 load "validation/cases/panel_fe_cluster_wagepan/data/wagepan.csv" as df
 
