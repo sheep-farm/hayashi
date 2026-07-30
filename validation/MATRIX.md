@@ -108,7 +108,7 @@
 | sur | wooldridge::grunfeld | R:passed *, Python:passed * | pass | — | Two-equation SUR (Zellner FGLS) on the Grunfeld investment data. |
 | svar | statsmodels::macrodata | R:passed *, Python:passed * | pass | — | Cholesky-identified SVAR(2) on log US real GDP and consumption. |
 | synth | synth_smoking | R:passed *, Python:passed * | pass | — | Synthetic-control ATT on a simulated panel with 10 donors and 1 treated unit. |
-| sysgmm | wooldridge::wagepan | Python:passed * | pass | — | System GMM (Blundell-Bond) two-step on Wooldridge wagepan with lags=2. Python reference implements the same two-step System GMM procedure used by Hayashi/Greeners. |
+| sysgmm | wooldridge::wagepan | R:passed *, Python:passed * | pass | 117 | System GMM (Blundell-Bond) two-step on Wooldridge wagepan with lags=2. R and Python references explicitly implement the same two-step System GMM procedure used by Hayashi/Greeners; plm::pgmm is not used as the active R oracle because it uses different instrument and weighting conventions. |
 | descriptive | wooldridge::wage1 | R:passed *, Python:passed * | pass | — | Tabstat statistics (mean, sd, min, max, p50) for wage, educ, exper, tenure. |
 | descriptive | wooldridge::mroz | R:passed *, Python:passed * | pass | — | Two-way frequency table with Pearson chi-square test. |
 | tobit | wooldridge::mroz | R:passed * | pass | — | Tobit regression of hours worked with left censoring at zero. Hayashi matches AER::tobit at displayed precision; the custom Python MLE is retained as a diagnostic script but is not the active reference. |

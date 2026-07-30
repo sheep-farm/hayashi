@@ -18,9 +18,13 @@ sysgmm(lwage ~ exper + expersq + married + union, df,
 ## Reference implementation
 
 - **Python:** Two-step System GMM (Blundell-Bond) with lags 2 and 3 of `lwage` as instruments for the first-difference equations and lagged first differences of `y` and `X` as instruments for the level equations.
-- **R:** `plm::pgmm(... | lag(lwage, 2:3), ..., model = "twosteps", transformation = "ld")` is kept as a cross-check but is not the active reference because `plm::pgmm` uses a broader lag structure and a slightly different weight matrix by default.
+- **R:** Explicit base-R implementation of the same sorted-panel, stacked first-difference and level-equation System GMM contract used by Hayashi/Greeners.
 - **Hayashi:** `sysgmm(...)`
+
+`plm::pgmm` is not used as the active R oracle for this case because its
+formula interface and default weighting conventions estimate a nearby, not
+identical, System GMM variant.
 
 ## Status
 
-Pass — Hayashi matches the Python reference for System GMM coefficients and standard errors.
+Pass — Hayashi matches the R and Python references for System GMM coefficients and standard errors.
