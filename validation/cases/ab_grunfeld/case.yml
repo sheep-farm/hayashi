@@ -9,6 +9,7 @@ dataset:
   licence: public teaching dataset
 references:
 - R
+- Python
 comparison:
   quantities:
   - coefficients
@@ -20,8 +21,10 @@ output_format: txt
 hayashi_script: cases/ab_grunfeld/hayashi/run.hay
 reference_scripts:
   R: cases/ab_grunfeld/reference/run.R
+  Python: cases/ab_grunfeld/reference/run.py
 notes: Arellano-Bond difference GMM for dynamic panel investment demand.
 result:
   summary: ''
   known_differences: []
-  issues_opened: []
+  issues_opened:
+  - 119

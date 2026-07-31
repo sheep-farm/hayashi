@@ -2,7 +2,7 @@
 
 | Family | Dataset | Reference | Status | Blocking Issue | Notes |
 |---|---|---:|---|---|---|
-| ab | wooldridge::grunfeld | R:passed * | pass | — | Arellano-Bond difference GMM for dynamic panel investment demand. |
+| ab | wooldridge::grunfeld | R:passed *, Python:passed * | pass | 119 | Arellano-Bond difference GMM for dynamic panel investment demand. |
 | descriptive | wooldridge::wage1 | R:passed *, Python:passed * | pass | — | One-way ANOVA of wage across education groups. |
 | arima | simulated_ar1 | R:passed *, Python:passed * | pass | — | Uses the same simulated AR(1) DGP as Chapter 26 of the book. |
 | ardl | statsmodels::macrodata | R:passed *, Python:passed * | pass | — | ARDL(1,1) model of US real GDP on consumption. |
