@@ -19,13 +19,13 @@ Estimated in first differences with `inv_{i,t-2}` as the (collapsed) instrument 
 - **Name:** `wooldridge::grunfeld`
 - **Source:** R package `wooldridge`; also available in Python via `wooldridge`.
 - **Licence:** Public teaching dataset.
-- **Size:** 220 observations (10 firms × 22 years).
+- **Size:** 200 observations (10 firms × 20 years).
 
 ## Reference implementation
 
 - **R:** one-step difference GMM in base R (no `plm` dependency): `inv_{i,t-2}` instruments `Δ inv_{i,t-1}`; robust sandwich standard errors.
+- **Python:** one-step difference GMM implemented directly with the same collapsed instrument and weight-matrix convention as the R reference and Hayashi/Greeners.
 - **Hayashi:** `ab(inv ~ value + capital, df, id=firm, time=year, lags=1)`
-- **Python:** not used.
 
 ## Compared quantities
 
