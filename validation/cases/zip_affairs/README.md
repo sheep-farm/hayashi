@@ -13,12 +13,13 @@ The inflation equation uses the same regressors.
 ## Dataset
 
 - **Name:** `wooldridge::affairs`
-- **Source:** R package `wooldridge`.
+- **Source:** R package `wooldridge`; Python package `wooldridge`.
 - **Licence:** Public teaching dataset.
 
-## Reference implementation
+## Reference implementations
 
 - **R:** `pscl::zeroinfl(naffairs ~ ..., data = affairs, dist = "poisson", link = "logit")`
+- **Python:** `statsmodels.discrete.count_model.ZeroInflatedPoisson` with the same count and logit-inflation regressors.
 - **Hayashi:** `zip(naffairs ~ ..., df)`
 
 ## Compared quantities

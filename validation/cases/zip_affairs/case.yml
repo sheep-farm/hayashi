@@ -11,6 +11,7 @@ dataset:
 
 references:
   - R
+  - Python
 
 comparison:
   quantities:
@@ -25,10 +26,12 @@ output_format: txt
 hayashi_script: cases/zip_affairs/hayashi/run.hay
 reference_scripts:
   R: cases/zip_affairs/reference/run.R
+  Python: cases/zip_affairs/reference/run.py
 
 notes: ZIP model of number of affairs on demographic predictors.
 
 result:
   summary: ""
   known_differences: []
-  issues_opened: []
+  issues_opened:
+    - 121
