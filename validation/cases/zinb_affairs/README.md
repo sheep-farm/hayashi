@@ -13,12 +13,13 @@ The inflation equation uses the same regressors.
 ## Dataset
 
 - **Name:** `wooldridge::affairs`
-- **Source:** R package `wooldridge`.
+- **Source:** R package `wooldridge`; Python package `wooldridge`.
 - **Licence:** Public teaching dataset.
 
-## Reference implementation
+## Reference implementations
 
 - **R:** `pscl::zeroinfl(naffairs ~ ..., data = affairs, dist = "negbin", link = "logit")`
+- **Python:** `statsmodels.discrete.count_model.ZeroInflatedNegativeBinomialP` with NB-P `p = 2`, started from an independently fitted ZIP model to avoid a lower-likelihood local optimum.
 - **Hayashi:** `zinb(naffairs ~ ..., df)`
 
 ## Compared quantities

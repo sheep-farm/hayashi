@@ -118,7 +118,7 @@
 | wls | wooldridge::hprice1 | R:passed *, Python:passed * | pass | — | WLS with weights generated inside Hayashi to avoid sandbox file issues. |
 | xtgls | wooldridge::wagepan | R:passed *, Python:passed * | pass | — | Panel feasible GLS with panel-level heteroskedasticity (Parks/Kmenta, Stata xtgls panels(heteroskedastic)). R and Python references implement the same two-step FGLS procedure used by Hayashi/Greeners. |
 | descriptive | wooldridge::wagepan | R:passed *, Python:passed * | pass | — | Overall, between, and within panel summary for lwage. |
-| zinb | wooldridge::affairs | R:passed * | pass | — | ZINB model of number of affairs on demographic predictors. |
+| zinb | wooldridge::affairs | R:passed *, Python:passed * | pass | 123 | ZINB model of number of affairs on demographic predictors. |
 | zip | wooldridge::affairs | R:passed *, Python:passed * | pass | 121 | ZIP model of number of affairs on demographic predictors. |
 
 ## Status legend
