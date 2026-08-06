@@ -10,7 +10,7 @@
 | arima | statsmodels::macrodata | R:passed *, Python:passed * | pass | — | ARIMA(1,1,1) on log US real GDP via exact Gaussian MLE. |
 | arima | simulated_arma11 | R:passed *, Python:passed * | pass | — | Uses the same simulated ARMA(1,1) DGP as Chapter 26 of the book. Intercept is excluded from comparison because Hayashi profiles it out in MLE (SE = 0). |
 | autoreg | statsmodels::macrodata | R:passed *, Python:passed * | pass | — | AR(1) on US real GDP with constant and trend. |
-| betareg | wooldridge::401k | R:passed * | pass | — | Beta regression on 401k participation rates. Greeners estimates by BFGS with an analytic gradient and matches R betareg. |
+| betareg | wooldridge::401k | R:passed *, Python:passed * | pass | 125 | Beta regression on 401k participation rates. Greeners estimates by BFGS with an analytic gradient and matches R betareg. |
 | causal_impact | simulated_causal_impact | R:passed *, Python:passed * | pass | — | Bayesian structural time series for counterfactual inference (Brodersen 2015). Uses simulated data with known treatment effect. |
 | descriptive | wooldridge::wage1 | R:passed *, Python:passed * | pass | — | Centiles 10, 25, 50, 75, 90 for the wage variable. |
 | descriptive | wooldridge::wage1 | R:passed *, Python:passed * | pass | — | 95% confidence interval for the wage mean. |

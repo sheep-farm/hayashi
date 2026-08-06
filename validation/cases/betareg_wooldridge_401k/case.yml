@@ -11,6 +11,7 @@ dataset:
 
 references:
   - R
+  - Python
 
 comparison:
   quantities:
@@ -25,10 +26,12 @@ output_format: txt
 hayashi_script: cases/betareg_wooldridge_401k/hayashi/run.hay
 reference_scripts:
   R: cases/betareg_wooldridge_401k/reference/run.R
+  Python: cases/betareg_wooldridge_401k/reference/run.py
 
 notes: Beta regression on 401k participation rates. Greeners now estimates the model by BFGS with an analytic gradient and computes standard errors from the observed inverse Hessian, matching R betareg.
 
 result:
   summary: "Hayashi matches R betareg coefficients and standard errors."
   known_differences: []
-  issues_opened: []
+  issues_opened:
+    - 125

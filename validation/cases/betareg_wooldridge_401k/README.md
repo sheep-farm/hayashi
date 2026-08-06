@@ -11,18 +11,20 @@ prate ~ mrate + age + sole
 ## Dataset
 
 - **Name:** `wooldridge::k401k`
-- **Source:** R package `wooldridge`.
+- **Source:** R package `wooldridge`; Python package `wooldridge`.
 - **Licence:** Public teaching dataset.
 - **Preprocessing:** `prate` is scaled from percentage to proportion and bounded away from 0 and 1.
 
-## Reference implementation
+## Reference implementations
 
 - **R:** `betareg::betareg(prate ~ mrate + age + sole, data = df)`
+- **Python:** `statsmodels.othermod.betareg.BetaModel` with the same mean equation and constant precision.
 - **Hayashi:** `betareg(prate ~ mrate + age + sole, df)`
 
 ## Compared quantities
 
-- Regression coefficients and standard errors for `const`, `mrate`, `age`, `sole`.
+- Mean-equation coefficients and standard errors for `const`, `mrate`, `age`, `sole`.
+- Precision parameters are not compared.
 
 ## Status
 
