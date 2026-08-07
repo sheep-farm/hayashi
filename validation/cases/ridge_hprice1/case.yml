@@ -10,6 +10,7 @@ dataset:
   licence: public teaching dataset
 
 references:
+  - R
   - Python
 
 comparison:
@@ -28,7 +29,7 @@ reference_scripts:
 notes: Ridge regression of log house price on log lot size, log square footage, bedrooms and colonial dummy.
 
 result:
-  summary: "Python reference generates the Wooldridge hprice1 CSV when absent, so the active ridge validation case is self-contained in fresh CI."
+  summary: "R and Python references generate/consume the same Wooldridge hprice1 CSV and use the same closed-form ridge convention with a penalised intercept."
   known_differences: []
   issues_opened:
     - 106

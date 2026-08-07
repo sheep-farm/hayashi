@@ -17,9 +17,12 @@ lprice ~ llotsize + lsqrft + bdrms + colonial
 
 ## Reference implementation
 
-- **Python:** reference implementation using `scikit-learn` (`sklearn.linear_model.Ridge`).
-- **R:** reference implementation using `MASS::lm.ridge`. Both references are run by the validation runner.
+- **Python:** closed-form ridge solve using NumPy.
+- **R:** closed-form ridge solve using base R.
 - **Hayashi:** `ridge(lprice ~ llotsize + lsqrft + bdrms + colonial, df, alpha=0.1)`
+
+All three implementations use the same convention: the intercept is included in
+the design matrix and penalised together with the slope coefficients.
 
 ## Compared quantities
 
@@ -29,4 +32,4 @@ lprice ~ llotsize + lsqrft + bdrms + colonial
 
 | Quantity | Tolerance | Rationale |
 |---|---|---|
-| coefficients | 1e-1 | Different implementations standardise X differently and handle the intercept differently; Python is aligned to Hayashi's closed-form formula |
+| coefficients | 1e-1 | R and Python encode Hayashi's closed-form ridge convention with a penalised intercept |
