@@ -583,6 +583,13 @@ let ratio = finance::sharpe(ret, rf)
 // String interpolation
 let msg = f"mean = {mu:.2f}, n = {n}, p = {p:.4e}"
 
+// Template strings (t-strings) re-evaluate the generated text as code
+let n = 1
+let x1 = 42
+let y = t"x{n}"                     // y == 42, as if you had written x1
+let gen_y = "x1 + x2 + x3"
+generate df y = t"{gen_y}"          // creates column y from x1 + x2 + x3
+
 // Pipe operator (|>)
 [5, 3, 1, 4, 2] |> sort |> reverse |> map(|x| x * 10)
 df |> ols(lw ~ yos, _)             // passes df to the '_' placeholder position

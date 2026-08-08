@@ -112,13 +112,19 @@ impl Interpreter {
                     Some(Value::DataFrame(d)) => d.clone(),
                     _ => return Err(self.rt_err(format!("'{df}' is not a DataFrame"))),
                 };
-                let col_name = match self.eval_expr(varname)? {
-                    Value::Str(s) => s,
-                    other => {
-                        return Err(self.type_err(format!(
-                            "generate: column name must evaluate to a string, got {other}"
-                        )))
-                    }
+                let col_name = match varname {
+                    // t-strings in column-name position are used for dynamic
+                    // names: generate df t"{var}" = expr uses the generated
+                    // source text as the column name, not as an expression.
+                    Expr::Template(parts) => self.eval_template_string(parts)?,
+                    _ => match self.eval_expr(varname)? {
+                        Value::Str(s) => s,
+                        other => {
+                            return Err(self.type_err(format!(
+                                "generate: column name must evaluate to a string, got {other}"
+                            )))
+                        }
+                    },
                 };
                 let col_result = self.eval_col_expr_typed(expr, &df_val)?;
                 match col_result {

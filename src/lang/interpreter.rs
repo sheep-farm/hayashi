@@ -204,6 +204,8 @@ pub struct Interpreter {
     call_stack: Vec<(String, usize, usize)>,
     pub debug_state: Option<DebugState>,
     pub current_source: std::path::PathBuf,
+    /// Tracks nested t-string evaluations to prevent infinite recursion.
+    template_eval_depth: usize,
 }
 
 impl Default for Interpreter {
@@ -241,6 +243,7 @@ impl Interpreter {
             call_stack: Vec::new(),
             debug_state: None,
             current_source: std::path::PathBuf::new(),
+            template_eval_depth: 0,
         }
     }
 

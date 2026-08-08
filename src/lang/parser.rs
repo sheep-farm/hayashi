@@ -259,6 +259,86 @@ impl Parser {
         Ok(())
     }
 
+    // ── TString (template/eval string) ───────────────────────────────────────
+
+    /// Parse a t-string template into `Vec<TStringPart>` at parse time.
+    ///
+    /// The `template` string is the raw content after the `t"…"` delimiters.
+    /// Each `{expr}` is parsed as a Hayashi expression. At runtime the parts
+    /// are interpolated, concatenated, and the resulting source string is
+    /// re-lexed and re-parsed as a fresh expression.
+    fn parse_template_parts(
+        &mut self,
+        template: &str,
+    ) -> crate::lang::error::Result<Vec<TStringPart>> {
+        let mut parts: Vec<TStringPart> = Vec::new();
+        let mut lit = String::new();
+        let mut chars = template.chars().peekable();
+
+        while let Some(c) = chars.next() {
+            if c == '{' {
+                if chars.peek() == Some(&'{') {
+                    // escaped brace: {{ → {
+                    chars.next();
+                    lit.push('{');
+                    continue;
+                }
+                self.parse_template_interp(&mut chars, &mut lit, &mut parts)?;
+            } else if c == '}' {
+                if chars.peek() == Some(&'}') {
+                    // escaped brace: }} → }
+                    chars.next();
+                }
+                lit.push('}');
+            } else {
+                lit.push(c);
+            }
+        }
+        if !lit.is_empty() {
+            parts.push(TStringPart::Lit(lit));
+        }
+        Ok(parts)
+    }
+
+    fn parse_template_interp<I>(
+        &self,
+        chars: &mut std::iter::Peekable<I>,
+        lit: &mut String,
+        parts: &mut Vec<TStringPart>,
+    ) -> crate::lang::error::Result<()>
+    where
+        I: Iterator<Item = char>,
+    {
+        // flush accumulated literal
+        if !lit.is_empty() {
+            parts.push(TStringPart::Lit(std::mem::take(lit)));
+        }
+        // collect expression until matching '}'
+        let mut expr_str = String::new();
+        let mut depth: usize = 1;
+        for c2 in chars.by_ref() {
+            if c2 == '{' {
+                depth += 1;
+            }
+            if c2 == '}' {
+                depth -= 1;
+                if depth == 0 {
+                    break;
+                }
+            }
+            expr_str.push(c2);
+        }
+        // parse the interpolated expression
+        let mut lexer = crate::lang::lexer::Lexer::new(&expr_str);
+        let tokens = lexer.tokenize()?;
+        let mut inner = Parser::new(tokens);
+        let expr = inner.parse_expr()?;
+        parts.push(TStringPart::Interp {
+            expr: Box::new(expr),
+        });
+        Ok(())
+    }
+
     // ── Formula ──────────────────────────────────────────────────────────────
 
     fn parse_formula(&mut self, lhs: String) -> Result<Formula> {
@@ -651,6 +731,12 @@ impl Parser {
                 self.advance();
                 let parts = self.parse_fstring_parts(&s)?;
                 Ok(Expr::FString(parts))
+            }
+            Token::TemplateLit(s) => {
+                let s = s.clone();
+                self.advance();
+                let parts = self.parse_template_parts(&s)?;
+                Ok(Expr::Template(parts))
             }
 
             // Grouping: (expr)
@@ -1359,6 +1445,7 @@ impl Parser {
             | Token::Bool(_)
             | Token::StringLit(_)
             | Token::FStringLit(_)
+            | Token::TemplateLit(_)
             | Token::LBracket
             | Token::LParen
             | Token::Minus
@@ -1718,10 +1805,17 @@ impl Parser {
                     let parts = self.parse_fstring_parts(&s)?;
                     Expr::FString(parts)
                 }
+                Token::TemplateLit(s) => {
+                    let s = s.clone();
+                    self.advance();
+                    let parts = self.parse_template_parts(&s)?;
+                    Expr::Template(parts)
+                }
                 _ => {
                     return Err(HayashiError::Parse {
                         line: self.line(),
-                        msg: "generate: expected column name (identifier or f-string)".into(),
+                        msg: "generate: expected column name (identifier, f-string or t-string)"
+                            .into(),
                     })
                 }
             };

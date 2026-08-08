@@ -139,6 +139,7 @@
 | Pattern matching | `match x { 1 => "one", _ => "other" }` |
 | If-expression | `let r = if x > 0 { "yes" } else { "no" }` |
 | F-strings | `f"mean = {mu:.2f}"` |
+| T-strings | `t"x{n}"` re-evaluates the generated text as code |
 | `in` operator | `if x in [1, 2, 3]` |
 | Dict type | `{"key": value}` with full operations |
 | List operations | push, pop, map, filter, sort, unique, flatten, ... |

@@ -1,5 +1,7 @@
 use super::*;
 use crate::lang::dap::model_expansion;
+use crate::lang::lexer::Lexer;
+use crate::lang::parser::Parser;
 use rand::Rng as _;
 use rand_distr::Distribution as _;
 use rand_distr::{
@@ -30,6 +32,8 @@ impl Interpreter {
             Expr::Nil => Ok(Value::Nil),
 
             Expr::FString(parts) => self.eval_fstring(parts),
+
+            Expr::Template(parts) => self.eval_template(parts),
 
             Expr::Var(name) => self.env.get(name).cloned().ok_or_else(|| {
                 let known = self.env.all_names();
@@ -154,6 +158,52 @@ impl Interpreter {
             }
         }
         Ok(Value::Str(result))
+    }
+
+    /// Builds the source text of a t-string by interpolating each `{expr}`
+    /// part without re-parsing or re-evaluating it.
+    pub(super) fn eval_template_string(&mut self, parts: &[TStringPart]) -> Result<String> {
+        let mut source = String::new();
+        for part in parts {
+            match part {
+                TStringPart::Lit(s) => source.push_str(s),
+                TStringPart::Interp { expr } => {
+                    let val = self.eval_expr(expr)?;
+                    source.push_str(&format!("{val}"));
+                }
+            }
+        }
+        Ok(source)
+    }
+
+    /// Builds and re-parses a t-string, returning the resulting `Expr`.
+    fn eval_template_expr(&mut self, parts: &[TStringPart]) -> Result<Expr> {
+        const MAX_DEPTH: usize = 32;
+        if self.template_eval_depth >= MAX_DEPTH {
+            return Err(HayashiError::Runtime(
+                "t-string: exceeded maximum nested evaluation depth".into(),
+            ));
+        }
+        let source = self.eval_template_string(parts)?;
+        let mut lexer = Lexer::new(&source);
+        let tokens = lexer.tokenize()?;
+        let mut parser = Parser::new(tokens);
+        let parsed_expr = parser.parse_expr()?;
+        self.template_eval_depth += 1;
+        let result = Ok(parsed_expr);
+        self.template_eval_depth -= 1;
+        result
+    }
+
+    /// Evaluates a t-string template by interpolating each `{expr}` part,
+    /// concatenating the resulting source text, and re-lexing/re-parsing
+    /// it as a fresh Hayashi expression.
+    fn eval_template(&mut self, parts: &[TStringPart]) -> Result<Value> {
+        let parsed_expr = self.eval_template_expr(parts)?;
+        self.template_eval_depth += 1;
+        let result = self.eval_expr(&parsed_expr);
+        self.template_eval_depth -= 1;
+        result
     }
 
     fn eval_apply(&mut self, func: &Expr, args: &[Expr]) -> Result<Value> {
@@ -614,6 +664,13 @@ impl Interpreter {
             Expr::TsOp { op, var, n } => self.eval_col_tsop(op, var, *n, df),
 
             Expr::Apply { func, args } => self.eval_col_apply(func, args, df),
+
+            // t-strings: expand the generated source text into an expression
+            // and evaluate it in column context.
+            Expr::Template(parts) => {
+                let parsed_expr = self.eval_template_expr(parts)?;
+                self.eval_col_expr_typed(&parsed_expr, df)
+            }
 
             _ => Err(HayashiError::Runtime(
                 "expression type not supported in generate".into(),

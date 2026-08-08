@@ -6,6 +6,7 @@ pub enum Token {
     Ident(String),
     StringLit(String),
     FStringLit(String),
+    TemplateLit(String),
     DocString(String),
     Float(f64),
     Int(i64),
@@ -311,6 +312,13 @@ impl Lexer {
                     self.advance(); // consume "
                     match self.read_string()? {
                         Token::StringLit(s) => tokens.push((Token::FStringLit(s), line)),
+                        _ => unreachable!(),
+                    }
+                }
+                Some('t') if self.peek() == Some('"') => {
+                    self.advance(); // consume "
+                    match self.read_string()? {
+                        Token::StringLit(s) => tokens.push((Token::TemplateLit(s), line)),
                         _ => unreachable!(),
                     }
                 }

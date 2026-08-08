@@ -6365,6 +6365,70 @@ fn fstring_scientific() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// T-STRINGS — t"..." evaluates the generated source as an expression
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn tstring_basic_var() {
+    assert_ok_contains(
+        "tstr_basic",
+        r#"
+let n = 1
+let x1 = 42
+let y = t"x{n}"
+display y
+"#,
+        "42",
+    );
+}
+
+#[test]
+fn tstring_expr() {
+    assert_ok_contains(
+        "tstr_expr",
+        r#"
+let x1 = 10
+let y = t"x1 * 2 + 5"
+display y
+"#,
+        "25",
+    );
+}
+
+#[test]
+fn tstring_interpolated_expr() {
+    assert_ok_contains(
+        "tstr_interp",
+        r#"
+let a = 3
+let b = 4
+let y = t"{a} + {b}"
+display y
+"#,
+        "7",
+    );
+}
+
+#[test]
+fn tstring_generate_column_name() {
+    assert_ok_contains(
+        "tstr_gen_col",
+        r#"
+input df
+Y X
+1 2
+3 4
+end
+
+let gen_y = "new_col"
+generate df t"{gen_y}" = X * 2
+describe(df)
+"#,
+        "new_col",
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // CLOSURES — |x| expr
 // ══════════════════════════════════════════════════════════════════════════════
 

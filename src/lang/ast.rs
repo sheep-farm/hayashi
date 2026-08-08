@@ -154,6 +154,22 @@ pub(crate) fn expr_display(e: &Expr) -> String {
                 format!("{}.{}({})", expr_display(obj), field, args_s.join(","))
             }
         }
+        // t-string template: reconstruct as t"lit{expr}lit"
+        Expr::Template(parts) => {
+            let mut s = String::from("t\"");
+            for part in parts {
+                match part {
+                    TStringPart::Lit(lit) => s.push_str(lit),
+                    TStringPart::Interp { expr } => {
+                        s.push('{');
+                        s.push_str(&expr_display(expr));
+                        s.push('}');
+                    }
+                }
+            }
+            s.push('"');
+            s
+        }
         // remaining variants are not meaningful as column/coefficient names
         _ => "_".to_string(),
     }
@@ -218,6 +234,18 @@ pub enum FStringPart {
     },
 }
 
+/// One segment of a t-string template.
+///
+/// `t"x{n}"` is parsed at parse-time into:
+/// `[Lit("x"), Interp { expr: Var("n") }]`
+#[derive(Debug, Clone)]
+pub enum TStringPart {
+    /// Literal text segment.
+    Lit(String),
+    /// Interpolated expression.
+    Interp { expr: Box<Expr> },
+}
+
 /// Language expressions
 #[derive(Debug, Clone)]
 pub enum Expr {
@@ -226,6 +254,7 @@ pub enum Expr {
     Bool(bool),
     Str(String),
     FString(Vec<FStringPart>),
+    Template(Vec<TStringPart>),
     Var(String),
     Formula(Formula),
     Nil,

@@ -840,7 +840,8 @@ impl Interpreter {
                         }
                     }
                 }
-                Ok(Value::DataFrame(df.clone()))
+                // Return Nil to avoid the DataFrame being auto-printed a second time.
+                Ok(Value::Nil)
             }
             _ => Err(HayashiError::Type("describe() requires a DataFrame".into())),
         }
