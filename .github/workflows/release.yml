@@ -36,26 +36,58 @@ jobs:
         with:
           key: release-${{ matrix.target }}
 
-      - name: Build
-        run: cargo build --release
+      - name: Build binaries
+        run: cargo build --release --bin hay --bin hay-kernel
 
       - name: Package (Unix)
         if: runner.os != 'Windows'
-        run: tar czf hay-${{ github.ref_name }}-${{ matrix.target }}.tar.gz -C target/release hay
+        run: |
+          pkg="hay-${{ github.ref_name }}-${{ matrix.target }}"
+          mkdir -p "$pkg"
+          cp target/release/hay target/release/hay-kernel "$pkg/"
+          tar czf "$pkg.tar.gz" "$pkg"
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
-        run: Compress-Archive -Path target/release/hay.exe -DestinationPath hay-${{ github.ref_name }}-${{ matrix.target }}.zip
+        run: |
+          $pkg = "hay-${{ github.ref_name }}-${{ matrix.target }}"
+          New-Item -ItemType Directory -Force -Path "$pkg" | Out-Null
+          Copy-Item target/release/hay.exe -Destination "$pkg/"
+          Copy-Item target/release/hay-kernel.exe -Destination "$pkg/"
+          Compress-Archive -Path "$pkg/*" -DestinationPath "$pkg.zip"
 
       - uses: actions/upload-artifact@v4
         with:
           name: hay-${{ matrix.target }}
           path: hay-${{ github.ref_name }}-*
 
-  publish:
-    needs: build
+  vscode:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build VS Code extension
+        run: |
+          cd editors/vscode
+          npm install
+          npm run compile
+          npx --yes @vscode/vsce package -o "../../hay-vscode-${{ github.ref_name }}.vsix"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hay-vscode
+          path: hay-vscode-*.vsix
+
+  publish:
+    needs: [build, vscode]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           merge-multiple: true
