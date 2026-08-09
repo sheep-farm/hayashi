@@ -2140,32 +2140,24 @@ impl Interpreter {
         };
 
         // structural formula → y and X (no constant, FE absorbs it)
-        let (df_endog2, g_endog, _) = self.prepare_formula(&endog_ast, &df)?;
+        let (df_endog2, mut g_endog, _) = self.prepare_formula(&endog_ast, &df)?;
+        g_endog.intercept = false;
         let (y_vec, x_mat) = df_endog2
             .to_design_matrix(&g_endog)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        // instrument formula → Z (no constant); materializamos para suportar exprs
-        let (_, g_instr2, _) = self.prepare_formula(&instr_ast, &df)?;
-        let instr_vars: Vec<String> = g_instr2.independents;
+        // instrument formula → Z (no constant)
+        let (df_instr2, mut g_instr2, _) = self.prepare_formula(&instr_ast, &df)?;
+        g_instr2.dependent = g_endog.dependent.clone();
+        g_instr2.intercept = false;
+        let (_, z_mat) = df_instr2
+            .to_design_matrix(&g_instr2)
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        let n = y_vec.len();
-        let l = instr_vars.len();
-        if l == 0 {
+        if z_mat.ncols() == 0 {
             return Err(HayashiError::Runtime(
                 "feiv(): instrument formula must have at least one instrument".into(),
             ));
-        }
-        let mut z_mat = ndarray::Array2::<f64>::zeros((n, l));
-        for (j, col_name) in instr_vars.iter().enumerate() {
-            let col = df.get(col_name).map_err(|_| {
-                HayashiError::Runtime(format!(
-                    "feiv: instrument '{col_name}' not found in DataFrame"
-                ))
-            })?;
-            for (i, &v) in col.iter().enumerate() {
-                z_mat[[i, j]] = v;
-            }
         }
 
         // entity IDs

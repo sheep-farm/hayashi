@@ -90,6 +90,139 @@ fn assert_close(label: &str, actual: f64, expected: f64, tol: f64) {
     );
 }
 
+#[derive(Clone, Copy)]
+struct FeivObservation {
+    id: i64,
+    y: f64,
+    w: f64,
+    x: i64,
+    z: i64,
+}
+
+#[derive(Debug)]
+struct FeivRow {
+    coefficient: f64,
+    standard_error: f64,
+}
+
+fn invert_2x2(matrix: [[f64; 2]; 2]) -> [[f64; 2]; 2] {
+    let determinant = matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0];
+    assert!(
+        determinant.abs() > 1e-12,
+        "FE-IV test oracle encountered a singular matrix"
+    );
+    let scale = 1.0 / determinant;
+    [
+        [matrix[1][1] * scale, -matrix[0][1] * scale],
+        [-matrix[1][0] * scale, matrix[0][0] * scale],
+    ]
+}
+
+fn multiply_2x2(lhs: [[f64; 2]; 2], rhs: [[f64; 2]; 2]) -> [[f64; 2]; 2] {
+    let mut product = [[0.0; 2]; 2];
+    for row in 0..2 {
+        for column in 0..2 {
+            product[row][column] = lhs[row][0] * rhs[0][column] + lhs[row][1] * rhs[1][column];
+        }
+    }
+    product
+}
+
+fn transpose_2x2(matrix: [[f64; 2]; 2]) -> [[f64; 2]; 2] {
+    [[matrix[0][0], matrix[1][0]], [matrix[0][1], matrix[1][1]]]
+}
+
+fn multiply_2x2_vector(matrix: [[f64; 2]; 2], vector: [f64; 2]) -> [f64; 2] {
+    [
+        matrix[0][0] * vector[0] + matrix[0][1] * vector[1],
+        matrix[1][0] * vector[0] + matrix[1][1] * vector[1],
+    ]
+}
+
+fn feiv_expected(observations: &[FeivObservation]) -> ([f64; 2], [f64; 2]) {
+    let mut group_sums = std::collections::BTreeMap::<i64, ([f64; 4], usize)>::new();
+    for observation in observations {
+        let (sums, count) = group_sums.entry(observation.id).or_default();
+        sums[0] += observation.y;
+        sums[1] += observation.w;
+        sums[2] += observation.x as f64;
+        sums[3] += observation.z as f64;
+        *count += 1;
+    }
+
+    let mut demeaned = Vec::with_capacity(observations.len());
+    for observation in observations {
+        let (sums, count) = group_sums
+            .get(&observation.id)
+            .expect("FE-IV test observation must have a group mean");
+        let denominator = *count as f64;
+        demeaned.push((
+            observation.y - sums[0] / denominator,
+            [
+                observation.w - sums[1] / denominator,
+                observation.x as f64 - sums[2] / denominator,
+            ],
+            [
+                observation.z as f64 - sums[3] / denominator,
+                observation.x as f64 - sums[2] / denominator,
+            ],
+        ));
+    }
+
+    let mut z_cross_z = [[0.0; 2]; 2];
+    let mut z_cross_x = [[0.0; 2]; 2];
+    let mut z_cross_y = [0.0; 2];
+    for (y, x, z) in &demeaned {
+        for row in 0..2 {
+            z_cross_y[row] += z[row] * y;
+            for column in 0..2 {
+                z_cross_z[row][column] += z[row] * z[column];
+                z_cross_x[row][column] += z[row] * x[column];
+            }
+        }
+    }
+
+    // Independent scalar implementation of Xhat'X = X'Z(Z'Z)^-1Z'X.
+    let inverse_z_cross_z = invert_2x2(z_cross_z);
+    let x_cross_z = transpose_2x2(z_cross_x);
+    let xhat_cross_x = multiply_2x2(multiply_2x2(x_cross_z, inverse_z_cross_z), z_cross_x);
+    let xhat_cross_y = multiply_2x2_vector(multiply_2x2(x_cross_z, inverse_z_cross_z), z_cross_y);
+    let inverse_xhat_cross_x = invert_2x2(xhat_cross_x);
+    let coefficients = multiply_2x2_vector(inverse_xhat_cross_x, xhat_cross_y);
+
+    let residual_sum_squares = demeaned
+        .iter()
+        .map(|(y, x, _)| {
+            let residual = y - x[0] * coefficients[0] - x[1] * coefficients[1];
+            residual * residual
+        })
+        .sum::<f64>();
+    let residual_df = observations.len() - 2 - (group_sums.len() - 1);
+    let sigma_squared = residual_sum_squares / residual_df as f64;
+    let standard_errors = [
+        (sigma_squared * inverse_xhat_cross_x[0][0]).sqrt(),
+        (sigma_squared * inverse_xhat_cross_x[1][1]).sqrt(),
+    ];
+
+    (coefficients, standard_errors)
+}
+
+fn parse_feiv_row(out: &str, variable: &str) -> FeivRow {
+    let row = out
+        .lines()
+        .find(|line| line.split_whitespace().next() == Some(variable))
+        .unwrap_or_else(|| panic!("missing FE-IV row for {variable}:\n{out}"));
+    let fields: Vec<&str> = row.split_whitespace().collect();
+    assert!(
+        fields.len() >= 3,
+        "FE-IV row for {variable} did not include coefficient and SE:\n{row}\n\n{out}"
+    );
+    FeivRow {
+        coefficient: fields[1].parse().unwrap(),
+        standard_error: fields[2].parse().unwrap(),
+    }
+}
+
 fn assert_margins_row_close(
     model: &str,
     var_name: &str,
@@ -10468,6 +10601,97 @@ estat_endog(y ~ x, ~ z1, df)
 "#,
         "Durbin-Wu-Hausman",
     );
+}
+
+#[test]
+fn feiv_integer_design_matches_within_2sls() {
+    let x = [[1, 2, 4, 3], [2, 4, 1, 5], [3, 1, 5, 2], [4, 5, 2, 1]];
+    let z = [[2, 5, 1, 4], [5, 1, 4, 2], [1, 4, 2, 5], [4, 2, 5, 1]];
+    let first_stage_shock = [
+        [0.2, -0.3, 0.5, -0.1],
+        [-0.4, 0.3, -0.2, 0.6],
+        [0.1, 0.4, -0.5, 0.2],
+        [0.5, -0.2, 0.3, -0.4],
+    ];
+    let outcome_shock = [
+        [0.3, -0.2, 0.1, -0.4],
+        [-0.1, 0.5, -0.3, 0.2],
+        [0.4, -0.5, 0.2, -0.1],
+        [-0.3, 0.1, 0.5, -0.2],
+    ];
+    let entity_effect = [0.7, -0.5, 1.1, -0.9];
+
+    let mut observations = Vec::new();
+    for entity in 0..4 {
+        for period in 0..4 {
+            let x_value = x[entity][period];
+            let z_value = z[entity][period];
+            let w = 0.8 * z_value as f64
+                + 0.4 * x_value as f64
+                + entity_effect[entity]
+                + first_stage_shock[entity][period];
+            let y = 1.7 * w - 0.6 * x_value as f64
+                + entity_effect[entity]
+                + 0.7 * first_stage_shock[entity][period]
+                + outcome_shock[entity][period];
+            observations.push(FeivObservation {
+                id: entity as i64 + 1,
+                y,
+                w,
+                x: x_value,
+                z: z_value,
+            });
+        }
+    }
+
+    let (expected_coefficients, expected_standard_errors) = feiv_expected(&observations);
+    let mut script = String::from("input df\nid y w x z\n");
+    for observation in &observations {
+        script.push_str(&format!(
+            "{} {:.12} {:.12} {} {}\n",
+            observation.id, observation.y, observation.w, observation.x, observation.z
+        ));
+    }
+    script.push_str("end\nfeiv(y ~ w + x, ~ z + x, df, id=id)\n");
+
+    let (ok, out) = run_inline(&script);
+    assert!(ok, "FE-IV integer design failed:\n{out}");
+    let w_row = parse_feiv_row(&out, "w");
+    let x_row = parse_feiv_row(&out, "x");
+
+    // FE2SLS displays four decimals, whose maximum rounding error is 5e-5.
+    assert_close(
+        "FE-IV w coefficient",
+        w_row.coefficient,
+        expected_coefficients[0],
+        5e-5,
+    );
+    assert_close(
+        "FE-IV x coefficient",
+        x_row.coefficient,
+        expected_coefficients[1],
+        5e-5,
+    );
+    assert_close(
+        "FE-IV w standard error",
+        w_row.standard_error,
+        expected_standard_errors[0],
+        5e-5,
+    );
+    assert_close(
+        "FE-IV x standard error",
+        x_row.standard_error,
+        expected_standard_errors[1],
+        5e-5,
+    );
+
+    for line in out.lines() {
+        let first_field = line.split_whitespace().next().unwrap_or_default();
+        assert!(
+            !matches!(first_field, "Intercept" | "_cons" | "const" | "__term_0"),
+            "FE-IV output contains an intercept-like row:\n{out}"
+        );
+    }
 }
 
 #[test]
