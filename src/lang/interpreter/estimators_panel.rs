@@ -1285,8 +1285,10 @@ impl Interpreter {
         _opts: &[Opt],
         opt_map: &HashMap<String, Value>,
     ) -> Result<Value> {
-        let (formula_ast, df, _df_name, id_col) = self.extract_panel_args(args, opt_map)?;
-        let (df, mut g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+        let (formula_ast, df, _df_name, id_col) =
+            self.extract_panel_args_allow_no_intercept(args, opt_map)?;
+        let (df, mut g_formula, _display) =
+            self.prepare_formula_allow_no_intercept(&formula_ast, &df)?;
         // FE removes the intercept via within-transform; force intercept=false
         g_formula.intercept = false;
 
@@ -1962,8 +1964,8 @@ impl Interpreter {
                 "gmm(endog_formula, instrument_formula, dataframe)".into(),
             ));
         }
-        let endog_ast = self.resolve_formula(&args[0])?;
-        let instr_ast = self.resolve_formula(&args[1])?;
+        let endog_ast = self.resolve_formula_allow_no_intercept(&args[0])?;
+        let instr_ast = self.resolve_formula_allow_no_intercept(&args[1])?;
         let df_name = match &args[2] {
             Expr::Var(name) => name.clone(),
             _ => {
@@ -1977,17 +1979,17 @@ impl Interpreter {
             _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
         };
 
-        let (df_endog, g_endog, _) = self.prepare_formula(&endog_ast, &df)?;
+        let (df_endog, g_endog, _) = self.prepare_formula_allow_no_intercept(&endog_ast, &df)?;
 
         let g_instr = if instr_ast.lhs.is_empty() {
-            let (_, g_i, _) = self.prepare_formula(&instr_ast, &df)?;
+            let (_, g_i, _) = self.prepare_formula_allow_no_intercept(&instr_ast, &df)?;
             GFormula {
                 dependent: String::new(),
                 independents: g_i.independents,
-                intercept: true,
+                intercept: g_i.intercept,
             }
         } else {
-            let (_, g_i, _) = self.prepare_formula(&instr_ast, &df)?;
+            let (_, g_i, _) = self.prepare_formula_allow_no_intercept(&instr_ast, &df)?;
             g_i
         };
 

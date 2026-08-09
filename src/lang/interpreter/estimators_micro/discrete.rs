@@ -9,8 +9,9 @@ impl Interpreter {
         opts: &[Opt],
         _opt_map: &HashMap<String, Value>,
     ) -> Result<Value> {
-        let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
-        let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+        let (formula_ast, df) = self.extract_binary_args_filtered_allow_no_intercept(args, opts)?;
+        let (df, g_formula, _display) =
+            self.prepare_formula_allow_no_intercept(&formula_ast, &df)?;
         let (y, x) = df
             .to_design_matrix(&g_formula)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -33,8 +34,9 @@ impl Interpreter {
         opts: &[Opt],
         _opt_map: &HashMap<String, Value>,
     ) -> Result<Value> {
-        let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
-        let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+        let (formula_ast, df) = self.extract_binary_args_filtered_allow_no_intercept(args, opts)?;
+        let (df, g_formula, _display) =
+            self.prepare_formula_allow_no_intercept(&formula_ast, &df)?;
         let (y, x) = df
             .to_design_matrix(&g_formula)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -62,8 +64,8 @@ impl Interpreter {
                 "heckman() requires (outcome_formula, selection_formula, df)".into(),
             ));
         }
-        let out_ast = self.resolve_formula(&args[0])?;
-        let sel_ast = self.resolve_formula(&args[1])?;
+        let out_ast = self.resolve_formula_allow_no_intercept(&args[0])?;
+        let sel_ast = self.resolve_formula_allow_no_intercept(&args[1])?;
         let df_name = match &args[2] {
             Expr::Var(name) => name.clone(),
             _ => {
@@ -82,26 +84,26 @@ impl Interpreter {
         };
 
         // Outcome equation
-        let (df_out, g_out, out_display) = self.prepare_formula(&out_ast, &df)?;
+        let (df_out, g_out, out_display) =
+            self.prepare_formula_allow_no_intercept(&out_ast, &df)?;
         let (y_vec_raw, x_out) = df_out
             .to_design_matrix(&g_out)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        let out_names = {
-            let mut n = vec!["_cons".to_string()];
-            n.extend(out_display);
-            n
-        };
+        let mut out_names = out_display;
+        if g_out.intercept {
+            out_names.insert(0, "_cons".to_string());
+        }
 
         // Selection equation
-        let (df_sel, g_sel, sel_display) = self.prepare_formula(&sel_ast, &df)?;
+        let (df_sel, g_sel, sel_display) =
+            self.prepare_formula_allow_no_intercept(&sel_ast, &df)?;
         let (z_vec, x_sel) = df_sel
             .to_design_matrix(&g_sel)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        let sel_names = {
-            let mut n = vec!["_cons".to_string()];
-            n.extend(sel_display);
-            n
-        };
+        let mut sel_names = sel_display;
+        if g_sel.intercept {
+            sel_names.insert(0, "_cons".to_string());
+        }
 
         // Heckman: y and x_out may contain NaN for unselected obs (z=0).
         // Replace NaN/Inf with 0.0 in those rows (values are not used in outcome equation).

@@ -3,7 +3,7 @@ use crate::lang::dap::model_expansion;
 use crate::lang::dap::protocol::*;
 use crate::lang::error::{HayashiError, Result};
 use crate::lang::lexer::Lexer;
-use crate::lang::parser::Parser;
+use crate::lang::parser::{parse_formula_text, Parser};
 use greeners::diagnostics::Diagnostics;
 use greeners::linalg::UPLO;
 use greeners::linalg::{LinalgEigh as _, LinalgInverse as _};
@@ -20,6 +20,12 @@ use std::collections::{HashMap, HashSet};
 use std::io::{self, Write as _};
 use std::rc::Rc;
 use std::sync::Arc;
+
+#[derive(Clone, Copy)]
+enum FormulaInterceptPolicy {
+    RequireIntercept,
+    AllowNoIntercept,
+}
 
 /// Language automatic output: respects `quiet_mode` and `capturing`.
 /// Use for every print that is not explicit user output (print/display).
@@ -1229,34 +1235,36 @@ impl Interpreter {
     // ── Built-in functions ────────────────────────────────────────────────────
 
     pub(super) fn resolve_formula(&mut self, expr: &Expr) -> Result<Formula> {
-        match expr {
+        self.resolve_formula_with_policy(expr, FormulaInterceptPolicy::RequireIntercept)
+    }
+
+    pub(super) fn resolve_formula_allow_no_intercept(&mut self, expr: &Expr) -> Result<Formula> {
+        self.resolve_formula_with_policy(expr, FormulaInterceptPolicy::AllowNoIntercept)
+    }
+
+    fn resolve_formula_with_policy(
+        &mut self,
+        expr: &Expr,
+        policy: FormulaInterceptPolicy,
+    ) -> Result<Formula> {
+        let formula = match expr {
             Expr::Formula(f) => Ok(f.clone()),
             other => {
                 let val = self.eval_expr(other)?;
                 match val {
-                    Value::Str(s) => {
-                        let parts: Vec<&str> = s.splitn(2, '~').collect();
-                        if parts.len() != 2 {
-                            return Err(self.type_err(format!(
-                                "string '{s}' is not a valid formula (needs ~)"
-                            )));
-                        }
-                        let lhs = parts[0].trim().to_string();
-                        let rhs_str = parts[1].trim();
-                        let rhs: Vec<RhsTerm> =
-                            rhs_str.split('+').map(|t| RhsTerm::var(t.trim())).collect();
-                        Ok(Formula {
-                            lhs,
-                            rhs,
-                            fe: vec![],
-                        })
-                    }
+                    Value::Str(s) => parse_formula_text(&s),
                     _ => Err(HayashiError::Type(
                         "first argument must be a formula or string".into(),
                     )),
                 }
             }
+        }?;
+        if matches!(policy, FormulaInterceptPolicy::RequireIntercept) && !formula.intercept {
+            return Err(HayashiError::Runtime(
+                "no-intercept formulas are not supported by this estimator".into(),
+            ));
         }
+        Ok(formula)
     }
 
     fn extract_binary_args_filtered(
@@ -1264,12 +1272,37 @@ impl Interpreter {
         args: &[Expr],
         opts: &[Opt],
     ) -> Result<(Formula, Arc<DataFrame>)> {
+        self.extract_binary_args_filtered_with_policy(
+            args,
+            opts,
+            FormulaInterceptPolicy::RequireIntercept,
+        )
+    }
+
+    fn extract_binary_args_filtered_allow_no_intercept(
+        &mut self,
+        args: &[Expr],
+        opts: &[Opt],
+    ) -> Result<(Formula, Arc<DataFrame>)> {
+        self.extract_binary_args_filtered_with_policy(
+            args,
+            opts,
+            FormulaInterceptPolicy::AllowNoIntercept,
+        )
+    }
+
+    fn extract_binary_args_filtered_with_policy(
+        &mut self,
+        args: &[Expr],
+        opts: &[Opt],
+        policy: FormulaInterceptPolicy,
+    ) -> Result<(Formula, Arc<DataFrame>)> {
         if args.len() < 2 {
             return Err(HayashiError::Runtime(
                 "estimator requires (formula, dataframe)".into(),
             ));
         }
-        let formula_ast = self.resolve_formula(&args[0])?;
+        let formula_ast = self.resolve_formula_with_policy(&args[0], policy)?;
         let df_name = match &args[1] {
             Expr::Var(name) => name.clone(),
             _ => {
@@ -1288,12 +1321,24 @@ impl Interpreter {
 
     // ── Formula materialization ─────────────────────────────────────────────
 
-    /// Atalho para o padrão `formula_to_string → GFormula::parse` que existia
-    /// em todos os estimadores.  Agora usa `materialize_formula` internamente,
-    /// então `log(K):log(L)`, `I(x^2)`, etc. funcionam corretamente.
-    ///
-    /// Retorna `(df_aumentado, g_formula, display_names)`.
+    /// Safe default for formula-based estimators. No-intercept support requires
+    /// an explicit, audited call to `prepare_formula_allow_no_intercept()`.
     pub(super) fn prepare_formula(
+        &mut self,
+        formula: &Formula,
+        df: &Arc<greeners::DataFrame>,
+    ) -> Result<(Arc<greeners::DataFrame>, GFormula, Vec<String>)> {
+        if !formula.intercept {
+            return Err(HayashiError::Runtime(
+                "no-intercept formulas are not supported by this estimator".into(),
+            ));
+        }
+        self.prepare_formula_allow_no_intercept(formula, df)
+    }
+
+    /// Materialises formulas for estimator paths whose matrix, metadata, and
+    /// post-estimation contracts have been audited for a missing intercept.
+    pub(super) fn prepare_formula_allow_no_intercept(
         &mut self,
         formula: &Formula,
         df: &Arc<greeners::DataFrame>,
@@ -1330,7 +1375,7 @@ impl Interpreter {
         let g_formula = GFormula {
             dependent: formula.lhs.clone(),
             independents: col_names,
-            intercept: true,
+            intercept: formula.intercept,
         };
 
         Ok((Arc::new(augmented), g_formula, display_names))

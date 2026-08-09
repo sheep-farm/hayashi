@@ -98,7 +98,12 @@ impl Interpreter {
         opts: &[Opt],
         opt_map: &HashMap<String, Value>,
     ) -> Result<Value> {
-        let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
+        let (formula_ast, df) = self.extract_binary_args_filtered_allow_no_intercept(args, opts)?;
+        if !formula_ast.intercept {
+            return Err(HayashiError::Runtime(
+                "panel_heckman() does not support no-intercept outcome formulas".into(),
+            ));
+        }
         let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
         let (y_vec, x_mat) = df
             .to_design_matrix(&g_formula)
@@ -121,26 +126,17 @@ impl Interpreter {
             }
         };
 
-        // Parse selection formula from string
-        let sel_hayashi_formula = {
-            let parts: Vec<&str> = sel_formula_str.splitn(2, '~').collect();
-            if parts.len() != 2 {
-                return Err(HayashiError::Runtime(format!(
-                    "panel_heckman: sel formula '{sel_formula_str}' is not valid (needs ~)"
-                )));
-            }
-            let lhs = parts[0].trim().to_string();
-            let rhs_str = parts[1].trim();
-            let rhs: Vec<crate::lang::ast::RhsTerm> = rhs_str
-                .split('+')
-                .map(|t| crate::lang::ast::RhsTerm::var(t.trim()))
-                .collect();
-            crate::lang::ast::Formula {
-                lhs,
-                rhs,
-                fe: vec![],
-            }
-        };
+        let sel_hayashi_formula = crate::lang::parser::parse_formula_text(&sel_formula_str)?;
+        if !sel_hayashi_formula.intercept {
+            return Err(HayashiError::Runtime(
+                "panel_heckman() does not support no-intercept selection formulas".into(),
+            ));
+        }
+        if !sel_hayashi_formula.fe.is_empty() {
+            return Err(HayashiError::Runtime(
+                "panel_heckman() does not support fixed effects in selection formulas".into(),
+            ));
+        }
         let (df_sel, sel_g_formula, _) = self.prepare_formula(&sel_hayashi_formula, &df)?;
         let z_col = &sel_g_formula.dependent;
         let z_vec: Vec<bool> = {

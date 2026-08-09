@@ -15,8 +15,8 @@ impl Interpreter {
                 "weak_iv() requires (structural_formula, instrument_formula, df)".into(),
             ));
         }
-        let endog_ast = self.resolve_formula(&args[0])?;
-        let instr_ast = self.resolve_formula(&args[1])?;
+        let endog_ast = self.resolve_formula_allow_no_intercept(&args[0])?;
+        let instr_ast = self.resolve_formula_allow_no_intercept(&args[1])?;
         let df_name = match &args[2] {
             Expr::Var(n) => n.clone(),
             _ => {
@@ -80,17 +80,27 @@ impl Interpreter {
         let n = df.n_rows();
         let k_endog = x_endog_names.len();
         let l = z_excl_names.len(); // number of excluded instruments
-        let k_exog = x_exog_names.len() + 1; // +1 intercept
+        let intercept_offset = usize::from(instr_ast.intercept);
+        let k_exog = x_exog_names.len() + intercept_offset;
+        let first_stage_regressors = k_exog + l;
+        if n <= first_stage_regressors {
+            return Err(HayashiError::Runtime(format!(
+                "weak_iv: requires more observations than first-stage regressors (n={n}, regressors={first_stage_regressors})"
+            )));
+        }
 
         // ── Build matrices ──
-        // X_exog: intercept + included exogenous  (n × k_exog)
-        let mut x_exog = Array2::<f64>::ones((n, k_exog));
+        // X_exog: optional intercept + included exogenous  (n × k_exog)
+        let mut x_exog = Array2::<f64>::zeros((n, k_exog));
+        if instr_ast.intercept {
+            x_exog.column_mut(0).fill(1.0);
+        }
         for (j, col) in x_exog_names.iter().enumerate() {
             let v = df
                 .get(col)
                 .map_err(|e| HayashiError::Runtime(e.to_string()))?;
             for i in 0..n {
-                x_exog[[i, j + 1]] = v[i];
+                x_exog[[i, j + intercept_offset]] = v[i];
             }
         }
 
@@ -123,13 +133,24 @@ impl Interpreter {
 
         // ── M_exog = I - X_exog (X_exog'X_exog)⁻¹ X_exog' ──
         // to partial out included exogenous
-        let xtx_exog = x_exog.t().dot(&x_exog);
-        let xtx_exog_inv = xtx_exog
-            .inv()
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let xtx_exog_inv = if k_exog == 0 {
+            None
+        } else {
+            Some(
+                x_exog
+                    .t()
+                    .dot(&x_exog)
+                    .inv()
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?,
+            )
+        };
         // P_exog aplicado a qualquer matriz A: P_exog A = X_exog (X_exog'X_exog)⁻¹ X_exog' A
-        let proj_exog =
-            |a: &Array2<f64>| -> Array2<f64> { x_exog.dot(&xtx_exog_inv.dot(&x_exog.t().dot(a))) };
+        let proj_exog = |a: &Array2<f64>| -> Array2<f64> {
+            match &xtx_exog_inv {
+                Some(inv) => x_exog.dot(&inv.dot(&x_exog.t().dot(a))),
+                None => Array2::zeros(a.raw_dim()),
+            }
+        };
         // M_exog Z_excl (partialling out exog from Z_excl)
         let mz = &z_excl - &proj_exog(&z_excl); // n × L
                                                 // M_exog X_endog
@@ -284,8 +305,8 @@ impl Interpreter {
                 "estat_overid(endog_formula, instrument_formula, df) requires 3 arguments",
             ));
         }
-        let endog_ast = self.resolve_formula(&args[0])?;
-        let instr_ast = self.resolve_formula(&args[1])?;
+        let endog_ast = self.resolve_formula_allow_no_intercept(&args[0])?;
+        let instr_ast = self.resolve_formula_allow_no_intercept(&args[1])?;
         let df_name = match &args[2] {
             Expr::Var(n) => n.clone(),
             _ => return Err(self.rt_err("third argument must be a DataFrame variable")),
@@ -294,16 +315,16 @@ impl Interpreter {
             Some(Value::DataFrame(df)) => df.clone(),
             _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
         };
-        let (df_endog, g_endog, _) = self.prepare_formula(&endog_ast, &df)?;
+        let (df_endog, g_endog, _) = self.prepare_formula_allow_no_intercept(&endog_ast, &df)?;
         let g_instr = if instr_ast.lhs.is_empty() {
-            let (_, g_i, _) = self.prepare_formula(&instr_ast, &df)?;
+            let (_, g_i, _) = self.prepare_formula_allow_no_intercept(&instr_ast, &df)?;
             GFormula {
                 dependent: String::new(),
                 independents: g_i.independents,
-                intercept: true,
+                intercept: g_i.intercept,
             }
         } else {
-            let (_, g_i, _) = self.prepare_formula(&instr_ast, &df)?;
+            let (_, g_i, _) = self.prepare_formula_allow_no_intercept(&instr_ast, &df)?;
             g_i
         };
         // Build y, x, z
@@ -355,8 +376,8 @@ impl Interpreter {
                 "estat_endog(endog_formula, instrument_formula, df) requires 3 arguments",
             ));
         }
-        let endog_ast = self.resolve_formula(&args[0])?;
-        let instr_ast = self.resolve_formula(&args[1])?;
+        let endog_ast = self.resolve_formula_allow_no_intercept(&args[0])?;
+        let instr_ast = self.resolve_formula_allow_no_intercept(&args[1])?;
         let df_name = match &args[2] {
             Expr::Var(n) => n.clone(),
             _ => return Err(self.rt_err("third argument must be a DataFrame variable")),
@@ -365,7 +386,7 @@ impl Interpreter {
             Some(Value::DataFrame(df)) => df.clone(),
             _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
         };
-        let (df_endog, g_endog, _) = self.prepare_formula(&endog_ast, &df)?;
+        let (df_endog, g_endog, _) = self.prepare_formula_allow_no_intercept(&endog_ast, &df)?;
 
         // Identify endogenous variables (in endog but NOT in instr)
         let instr_vars: std::collections::HashSet<String> = instr_ast
@@ -387,14 +408,14 @@ impl Interpreter {
         }
 
         let g_instr = if instr_ast.lhs.is_empty() {
-            let (_, g_i, _) = self.prepare_formula(&instr_ast, &df)?;
+            let (_, g_i, _) = self.prepare_formula_allow_no_intercept(&instr_ast, &df)?;
             GFormula {
                 dependent: String::new(),
                 independents: g_i.independents,
-                intercept: true,
+                intercept: g_i.intercept,
             }
         } else {
-            let (_, g_i, _) = self.prepare_formula(&instr_ast, &df)?;
+            let (_, g_i, _) = self.prepare_formula_allow_no_intercept(&instr_ast, &df)?;
             g_i
         };
 

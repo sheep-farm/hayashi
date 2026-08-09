@@ -57,6 +57,126 @@ fn assert_err_contains(name: &str, src: &str, needle: &str) {
     );
 }
 
+fn parse_coefficient_rows(out: &str) -> Vec<(String, f64)> {
+    let rows: Vec<Vec<String>> = out
+        .lines()
+        .filter(|line| line.contains('│'))
+        .map(|line| {
+            line.split('│')
+                .map(str::trim)
+                .filter(|cell| !cell.is_empty())
+                .map(str::to_string)
+                .collect()
+        })
+        .collect();
+    let header_index = rows
+        .iter()
+        .position(|row| {
+            row.iter().any(|cell| cell == "variable") && row.iter().any(|cell| cell == "coef")
+        })
+        .unwrap_or_else(|| panic!("missing coefficient table header:\n{out}"));
+    let header = &rows[header_index];
+    let variable_index = header.iter().position(|cell| cell == "variable").unwrap();
+    let coefficient_index = header.iter().position(|cell| cell == "coef").unwrap();
+    let header_len = header.len();
+
+    rows.into_iter()
+        .skip(header_index + 1)
+        .filter(|row| row.len() == header_len)
+        .map(|row| {
+            let coefficient = row[coefficient_index]
+                .parse::<f64>()
+                .unwrap_or_else(|_| panic!("invalid coefficient row {row:?}:\n{out}"));
+            (row[variable_index].clone(), coefficient)
+        })
+        .collect()
+}
+
+fn assert_no_intercept_name(name: &str) {
+    assert!(
+        !matches!(name, "_cons" | "const" | "Intercept"),
+        "unexpected intercept coefficient '{name}'"
+    );
+}
+
+fn binary_no_intercept_script(estimator: &str, result: &str) -> String {
+    format!(
+        r#"
+input df
+y x
+0 -3.0
+0 -2.5
+1 -2.0
+0 -1.5
+0 -1.0
+1 -0.5
+0 0.0
+1 0.5
+0 1.0
+1 1.5
+1 2.0
+0 2.5
+1 3.0
+1 3.5
+1 4.0
+1 4.5
+end
+let m = {estimator}(y ~ x - 1, df)
+{result}
+"#
+    )
+}
+
+fn panel_heckman_script(outcome: &str, selection: &str) -> String {
+    format!(
+        r#"
+input df
+id wage educ exper particip kids
+1 10 8 2 1 0
+1 12 8 5 1 1
+1 0 8 8 0 3
+1 15 8 11 1 0
+2 8 6 1 1 1
+2 0 6 4 0 2
+2 11 6 7 1 0
+2 13 6 10 1 1
+3 0 10 3 0 3
+3 18 10 6 1 0
+3 20 10 9 1 1
+3 22 10 12 1 0
+4 9 7 2 1 0
+4 0 7 5 0 3
+4 12 7 8 1 1
+4 14 7 11 1 0
+5 11 9 3 1 0
+5 0 9 6 0 2
+5 16 9 9 1 1
+5 19 9 12 1 0
+end
+panel_heckman({outcome}, df, sel="{selection}", id="id")
+"#
+    )
+}
+
+fn manual_formula_no_intercept_script(call: &str) -> String {
+    format!(
+        r#"
+input df
+y running treated x post etime id time event
+1.0 -3.0 0 0.2 0 -3 1 1 1
+1.5 -2.0 0 0.4 0 -2 1 2 1
+2.0 -1.0 0 0.7 0 -1 1 3 1
+3.0 0.5 1 1.0 1 0 1 4 1
+3.5 1.0 1 1.2 1 1 2 1 1
+4.0 2.0 1 1.5 1 2 2 2 0
+4.5 3.0 1 1.7 1 3 2 3 1
+5.0 4.0 1 2.0 1 4 2 4 1
+end
+{call}
+"#
+    )
+}
+
 #[derive(Debug)]
 struct MarginsRow {
     dydx: f64,
@@ -230,6 +350,47 @@ fn margins_probit_at_matches_statsmodels_delta_method() {
         "margins(m, at_x2=1)",
         (0.075333, 0.025688, 2.933, 0.0034),
         (-0.009041, 0.144700, -0.062, 0.9502),
+    );
+}
+
+#[test]
+fn no_intercept_logit_preserves_slope_name() {
+    let (ok, out) = run_inline(&binary_no_intercept_script("logit", "tidy(m)"));
+    assert!(ok, "no-intercept logit failed:\n{out}");
+    let rows = parse_coefficient_rows(&out);
+    assert_eq!(rows.len(), 1, "unexpected logit coefficient rows:\n{out}");
+    assert_eq!(rows[0].0, "x", "wrong logit coefficient name:\n{out}");
+    assert!(
+        rows[0].1.is_finite(),
+        "non-finite logit coefficient:\n{out}"
+    );
+}
+
+#[test]
+fn no_intercept_probit_preserves_slope_name() {
+    let (ok, out) = run_inline(&binary_no_intercept_script("probit", "tidy(m)"));
+    assert!(ok, "no-intercept probit failed:\n{out}");
+    let rows = parse_coefficient_rows(&out);
+    assert_eq!(rows.len(), 1, "unexpected probit coefficient rows:\n{out}");
+    assert_eq!(rows[0].0, "x", "wrong probit coefficient name:\n{out}");
+    assert!(
+        rows[0].1.is_finite(),
+        "non-finite probit coefficient:\n{out}"
+    );
+}
+
+#[test]
+fn no_intercept_logit_margins_reports_finite_slope_effect() {
+    let (ok, out) = run_inline(&binary_no_intercept_script("logit", "margins(m)"));
+    assert!(ok, "no-intercept logit margins failed:\n{out}");
+    let row = parse_margins_row(&out, "x");
+    assert!(row.dydx.is_finite(), "non-finite marginal effect:\n{out}");
+    assert!(row.se.is_finite(), "non-finite marginal-effect SE:\n{out}");
+    assert!(row.z.is_finite(), "non-finite marginal-effect z:\n{out}");
+    assert!(row.p.is_finite(), "non-finite marginal-effect p:\n{out}");
+    assert!(
+        row.dydx.abs() > 1e-6,
+        "marginal effect is not meaningfully non-zero:\n{out}"
     );
 }
 
@@ -874,6 +1035,360 @@ end
 ols("Y ~ X1", df)
 "#,
         "OLS Regression",
+    );
+}
+
+#[test]
+fn formula_no_intercept_literal() {
+    let (ok, out) = run_inline(
+        r#"
+input df
+y x
+3 1
+5 2
+7 3
+9 4
+end
+let m = ols(y ~ x - 1, df)
+print(m.coef)
+"#,
+    );
+    assert!(ok, "literal no-intercept OLS failed:\n{out}");
+    let rows = parse_coefficient_rows(&out);
+    assert_eq!(rows.len(), 1, "unexpected OLS coefficient rows:\n{out}");
+    assert_eq!(rows[0].0, "x", "wrong OLS coefficient name:\n{out}");
+    assert_close("no-intercept OLS coefficient", rows[0].1, 2.33, 0.005);
+}
+
+#[test]
+fn formula_no_intercept_runtime_string() {
+    let (ok, out) = run_inline(
+        r#"
+input df
+y x
+3 1
+5 2
+7 3
+9 4
+end
+let specification = "y ~ 0 + x"
+let m = ols(specification, df)
+print(m.coef)
+"#,
+    );
+    assert!(ok, "runtime no-intercept OLS failed:\n{out}");
+    let rows = parse_coefficient_rows(&out);
+    assert_eq!(rows.len(), 1, "unexpected OLS coefficient rows:\n{out}");
+    assert_eq!(rows[0].0, "x", "wrong OLS coefficient name:\n{out}");
+    assert_close(
+        "runtime no-intercept OLS coefficient",
+        rows[0].1,
+        2.33,
+        0.005,
+    );
+}
+
+#[test]
+fn formula_runtime_multiline_matches_literal_multiline() {
+    let data = r#"
+input df
+y x z
+5 1 1
+7 2 1
+8 1 2
+10 2 2
+11 4 1
+13 2 3
+end
+"#;
+    let literal_source = format!(
+        r#"{data}
+let m = ols(
+    y ~ x +
+        z - 1,
+    df
+)
+print(m.coef)
+"#
+    );
+    let runtime_source = format!(
+        r#"{data}
+let specification = "y ~ x +
+z - 1"
+let m = ols(specification, df)
+print(m.coef)
+"#
+    );
+
+    let (literal_ok, literal_out) = run_inline(&literal_source);
+    assert!(
+        literal_ok,
+        "multiline literal formula failed:\n{literal_out}"
+    );
+    let (runtime_ok, runtime_out) = run_inline(&runtime_source);
+    assert!(
+        runtime_ok,
+        "multiline runtime formula failed:\n{runtime_out}"
+    );
+
+    let literal_rows = parse_coefficient_rows(&literal_out);
+    let runtime_rows = parse_coefficient_rows(&runtime_out);
+    assert_eq!(
+        literal_rows.len(),
+        2,
+        "unexpected literal rows:\n{literal_out}"
+    );
+    assert_eq!(
+        runtime_rows.len(),
+        2,
+        "unexpected runtime rows:\n{runtime_out}"
+    );
+    for ((literal_name, literal_coef), (runtime_name, runtime_coef)) in
+        literal_rows.iter().zip(&runtime_rows)
+    {
+        assert_eq!(runtime_name, literal_name);
+        assert_close(
+            &format!("multiline runtime coefficient '{runtime_name}'"),
+            *runtime_coef,
+            *literal_coef,
+            0.005,
+        );
+    }
+}
+
+#[test]
+fn formula_default_and_intercept_only_models_keep_an_intercept() {
+    let (default_ok, default_out) = run_inline(
+        r#"
+input df
+y x
+3 1
+5 2
+7 3
+9 4
+end
+let m = ols(y ~ x, df)
+print(m.coef)
+"#,
+    );
+    assert!(default_ok, "default-intercept OLS failed:\n{default_out}");
+    assert!(
+        default_out.contains("_cons"),
+        "default intercept missing:\n{default_out}"
+    );
+
+    let (only_ok, only_out) = run_inline(
+        r#"
+input df
+y
+3
+5
+7
+9
+end
+let m = ols(y ~ 1, df)
+print(m.coef)
+"#,
+    );
+    assert!(only_ok, "intercept-only OLS failed:\n{only_out}");
+    assert!(
+        only_out.contains("_cons"),
+        "intercept-only coefficient missing:\n{only_out}"
+    );
+}
+
+#[test]
+fn formula_no_intercept_reaches_iv_structural_and_instrument_matrices() {
+    let (ok, out) = run_inline(
+        r#"
+input df
+y x z
+2 1 1
+3 2 1
+7 3 2
+8 4 3
+end
+let m = iv(y ~ x - 1, ~ z - 1, df)
+tidy(m)
+"#,
+    );
+    assert!(ok, "no-intercept IV failed:\n{out}");
+    let rows = parse_coefficient_rows(&out);
+    assert_eq!(rows.len(), 1, "unexpected IV coefficient rows:\n{out}");
+    assert_eq!(rows[0].0, "x", "wrong IV coefficient name:\n{out}");
+    assert_no_intercept_name(&rows[0].0);
+    assert_close("no-intercept IV coefficient", rows[0].1, 2.05, 0.005);
+    for forbidden in ["_cons", "const", "Intercept"] {
+        assert!(!out.contains(forbidden), "unexpected '{forbidden}':\n{out}");
+    }
+}
+
+#[test]
+fn formula_no_intercept_runtime_instrument_string() {
+    let (ok, out) = run_inline(
+        r#"
+input df
+y x z
+2 1 1
+3 2 1
+7 3 2
+8 4 3
+end
+let instruments = "~ z - 1"
+let m = iv(y ~ x - 1, instruments, df)
+tidy(m)
+"#,
+    );
+    assert!(ok, "runtime no-intercept instrument formula failed:\n{out}");
+    let rows = parse_coefficient_rows(&out);
+    assert_eq!(rows.len(), 1, "unexpected IV coefficient rows:\n{out}");
+    assert_eq!(rows[0].0, "x", "wrong IV coefficient name:\n{out}");
+    assert_no_intercept_name(&rows[0].0);
+    assert_close(
+        "runtime no-intercept IV coefficient",
+        rows[0].1,
+        2.05,
+        0.005,
+    );
+    for forbidden in ["_cons", "const", "Intercept"] {
+        assert!(!out.contains(forbidden), "unexpected '{forbidden}':\n{out}");
+    }
+}
+
+#[test]
+fn formula_no_intercept_weak_iv_without_exogenous_columns() {
+    let (ok, out) = run_inline(
+        r#"
+input df
+y x z
+2.0 1.1 1.0
+3.0 1.8 1.5
+4.5 2.7 2.0
+5.0 3.1 2.7
+6.8 4.2 3.0
+7.1 4.6 3.8
+8.9 5.7 4.1
+9.2 6.0 5.0
+10.8 7.1 5.4
+12.0 7.8 6.2
+end
+weak_iv(y ~ x - 1, ~ z - 1, df)
+"#,
+    );
+    assert!(ok, "no-intercept weak-IV diagnostic failed:\n{out}");
+    let first_stage = out
+        .lines()
+        .find(|line| line.contains("F(1,"))
+        .unwrap_or_else(|| panic!("missing first-stage F line:\n{out}"));
+    let df = first_stage
+        .split("F(1,")
+        .nth(1)
+        .and_then(|tail| tail.split(')').next())
+        .and_then(|value| value.parse::<usize>().ok())
+        .unwrap_or_else(|| panic!("invalid first-stage degrees of freedom:\n{out}"));
+    let f_stat = first_stage
+        .split('=')
+        .nth(1)
+        .and_then(|tail| tail.split_whitespace().next())
+        .and_then(|value| value.parse::<f64>().ok())
+        .unwrap_or_else(|| panic!("invalid first-stage F statistic:\n{out}"));
+    assert_eq!(df, 9, "wrong no-intercept first-stage df:\n{out}");
+    assert!(f_stat.is_finite(), "non-finite first-stage F:\n{out}");
+    assert_close("no-intercept first-stage F", f_stat, 2674.363, 5e-4);
+}
+
+#[test]
+fn manual_rd_rejects_no_intercept_formula() {
+    assert_err_contains(
+        "rd_no_intercept",
+        &manual_formula_no_intercept_script("rd(y ~ running - 1, 0, df)"),
+        "no-intercept formulas are not supported by this estimator",
+    );
+}
+
+#[test]
+fn manual_fuzzy_rd_rejects_no_intercept_formula() {
+    assert_err_contains(
+        "fuzzy_rd_no_intercept",
+        &manual_formula_no_intercept_script("fuzzy_rd(y ~ running - 1, \"treated\", 0, df)"),
+        "no-intercept formulas are not supported by this estimator",
+    );
+}
+
+#[test]
+fn manual_psm_rejects_no_intercept_formula() {
+    assert_err_contains(
+        "psm_no_intercept",
+        &manual_formula_no_intercept_script("psm(y ~ treated + x - 1, df)"),
+        "no-intercept formulas are not supported by this estimator",
+    );
+}
+
+#[test]
+fn manual_did_rejects_no_intercept_formula() {
+    assert_err_contains(
+        "did_no_intercept",
+        &manual_formula_no_intercept_script("did(y ~ treated + post - 1, df)"),
+        "no-intercept formulas are not supported by this estimator",
+    );
+}
+
+#[test]
+fn manual_eventstudy_rejects_no_intercept_formula() {
+    assert_err_contains(
+        "eventstudy_no_intercept",
+        &manual_formula_no_intercept_script("eventstudy(y ~ etime - 1, df)"),
+        "no-intercept formulas are not supported by this estimator",
+    );
+}
+
+#[test]
+fn manual_lpdid_rejects_no_intercept_formula() {
+    assert_err_contains(
+        "lpdid_no_intercept",
+        &manual_formula_no_intercept_script("lpdid(y ~ id + time + treated - 1, df)"),
+        "no-intercept formulas are not supported by this estimator",
+    );
+}
+
+#[test]
+fn manual_cox_rejects_no_intercept_formula() {
+    assert_err_contains(
+        "cox_no_intercept",
+        &manual_formula_no_intercept_script("cox(time ~ x - 1, df, event=\"event\")"),
+        "no-intercept formulas are not supported by this estimator",
+    );
+}
+
+#[test]
+fn weak_iv_rejects_non_positive_residual_degrees_of_freedom() {
+    assert_err_contains(
+        "weak_iv_zero_residual_df",
+        r#"
+input df
+y x z
+1 2 3
+end
+weak_iv(y ~ x - 1, ~ z - 1, df)
+"#,
+        "requires more observations than first-stage regressors",
+    );
+}
+
+#[test]
+fn formula_rejects_unsupported_top_level_subtraction() {
+    assert_err_contains(
+        "formula_subtraction",
+        r#"
+input df
+y x1 x2
+1 1 2
+2 2 3
+3 3 4
+end
+ols(y ~ x1 - x2, df)
+"#,
+        "only '- 1' is supported",
     );
 }
 
@@ -2382,6 +2897,37 @@ output capital labor firm year
 end
 xtset(panel, firm, year)
 fe(output ~ capital + labor, panel)
+"#,
+        "Fixed Effects",
+    );
+}
+
+#[test]
+fn panel_fe_accepts_explicit_no_intercept_formula() {
+    assert_ok_contains(
+        "panel_fe_no_intercept",
+        r#"
+input panel
+output capital labor firm year
+10.2 5 8 1 2019
+11.0 5 9 1 2020
+12.5 6 9 1 2021
+11.8 5 10 1 2022
+19.3 10 12 2 2019
+20.1 10 13 2 2020
+23.1 12 14 2 2021
+20.7 11 13 2 2022
+14.6 7 10 3 2019
+15.3 7 11 3 2020
+17.9 8 11 3 2021
+15.2 7 12 3 2022
+24.8 13 15 4 2019
+25.5 13 16 4 2020
+27.3 14 16 4 2021
+26.1 14 17 4 2022
+end
+xtset(panel, firm, year)
+fe(output ~ capital + labor - 1, panel)
 "#,
         "Fixed Effects",
     );
@@ -10446,6 +10992,54 @@ estat_overid(y ~ x, ~ z1 + z2, df)
 }
 
 #[test]
+fn iv_sargan_no_intercept_reports_structured_instrument_count() {
+    assert_ok(
+        "sargan_no_intercept_instrument_count",
+        r#"
+input df
+y x z1 z2
+3 2 1 3
+5 3 2 1
+4 4 3 4
+7 5 4 2
+6 6 5 5
+9 7 6 3
+8 8 7 6
+11 9 8 4
+10 10 9 7
+13 11 10 5
+end
+let d = estat_overid(y ~ x - 1, ~ z1 + z2 - 1, df)
+assert(d.n_instruments == 2, "no-intercept instrument count")
+"#,
+    );
+}
+
+#[test]
+fn gmm_no_intercept_reports_structural_parameter_count() {
+    assert_ok(
+        "gmm_no_intercept_parameter_count",
+        r#"
+input df
+y x z1 z2
+3 2 1 3
+5 3 2 1
+4 4 3 4
+7 5 4 2
+6 6 5 5
+9 7 6 3
+8 8 7 6
+11 9 8 4
+10 10 9 7
+13 11 10 5
+end
+let m = gmm(y ~ x - 1, ~ z1 + z2 - 1, df)
+assert(nrow(m.coefficients) == 1, "no-intercept GMM parameter count")
+"#,
+    );
+}
+
+#[test]
 fn iv_endog_test() {
     // DWH endogeneity test: x is endogenous (correlated with error via construction)
     assert_ok_contains(
@@ -11036,6 +11630,35 @@ sfa_production(y ~ k + l, df)
 }
 
 #[test]
+fn sfa_production_rejects_no_intercept_formula() {
+    assert_err_contains(
+        "sfa_production_no_intercept",
+        r#"
+input df
+y k l
+10 5 5
+12 6 6
+15 8 7
+18 10 8
+20 12 10
+22 13 11
+25 15 12
+28 17 13
+30 18 14
+32 20 15
+35 22 16
+38 24 17
+40 25 18
+42 27 19
+45 28 20
+end
+sfa_production(y ~ k + l - 1, df)
+"#,
+        "no-intercept formulas are not supported by this estimator",
+    );
+}
+
+#[test]
 fn panel_tobit_basic() {
     assert_ok_contains(
         "panel_tobit",
@@ -11096,6 +11719,81 @@ end
 panel_heckman(wage ~ educ + exper, df, sel="particip ~ educ + kids", id="id")
 "#,
         "Panel Heckman",
+    );
+}
+
+#[test]
+fn heckman_no_intercept_preserves_outcome_and_selection_names() {
+    let (ok, out) = run_inline(
+        r#"
+seed(42)
+input df
+id
+1
+end
+for i in 1..=8 { df = append(df, df) }
+df |> filter(_n <= 200)
+generate df x = rnormal()
+generate df z = rnormal()
+generate df e = rnormal()
+generate df v = rnormal()
+generate df s = (0.5 + 1.5 * z + v) > 0
+generate df y = (1.0 + 2.0 * x + e) * s
+let m = heckman(y ~ x - 1, s ~ z - 1, df)
+print(m)
+tidy(m)
+"#,
+    );
+    assert!(ok, "no-intercept Heckman failed:\n{out}");
+    for forbidden in ["_cons", "const", "Intercept"] {
+        assert!(
+            !out.contains(forbidden),
+            "unexpected Heckman intercept name '{forbidden}':\n{out}"
+        );
+    }
+    assert!(
+        out.lines()
+            .any(|line| line.split_whitespace().next() == Some("x")),
+        "outcome coefficient name 'x' missing:\n{out}"
+    );
+    assert!(
+        out.lines()
+            .any(|line| line.split_whitespace().next() == Some("z")),
+        "selection coefficient name 'z' missing:\n{out}"
+    );
+    let rows = parse_coefficient_rows(&out);
+    assert_eq!(rows.len(), 1, "unexpected Heckman outcome rows:\n{out}");
+    assert_eq!(rows[0].0, "x", "wrong Heckman outcome name:\n{out}");
+    assert!(
+        rows[0].1.is_finite(),
+        "non-finite Heckman outcome coefficient:\n{out}"
+    );
+}
+
+#[test]
+fn panel_heckman_rejects_no_intercept_outcome_formula() {
+    assert_err_contains(
+        "panel_heckman_no_outcome_intercept",
+        &panel_heckman_script("wage ~ educ + exper - 1", "particip ~ educ + kids"),
+        "panel_heckman() does not support no-intercept outcome formulas",
+    );
+}
+
+#[test]
+fn panel_heckman_rejects_no_intercept_selection_formula() {
+    assert_err_contains(
+        "panel_heckman_no_selection_intercept",
+        &panel_heckman_script("wage ~ educ + exper", "particip ~ educ + kids - 1"),
+        "panel_heckman() does not support no-intercept selection formulas",
+    );
+}
+
+#[test]
+fn panel_heckman_rejects_selection_fixed_effects() {
+    assert_err_contains(
+        "panel_heckman_selection_fixed_effects",
+        &panel_heckman_script("wage ~ educ + exper", "particip ~ educ + kids | id"),
+        "panel_heckman() does not support fixed effects in selection formulas",
     );
 }
 
@@ -11722,6 +12420,36 @@ end
 fcoef(y ~ x, df, z="z", points=10)
 "#,
         "Functional Coefficient",
+    );
+}
+
+#[test]
+fn fcoef_rejects_no_intercept_formula() {
+    assert_err_contains(
+        "fcoef_no_intercept",
+        r#"
+input df
+y x z
+10 1.0 5
+12 2.0 6
+15 3.0 7
+18 4.0 8
+20 5.0 9
+22 6.0 10
+25 7.0 11
+28 8.0 12
+30 9.0 13
+32 10.0 14
+35 11.0 15
+38 12.0 16
+40 13.0 17
+42 14.0 18
+45 15.0 19
+48 16.0 20
+end
+fcoef(y ~ x - 1, df, z="z", points=10)
+"#,
+        "no-intercept formulas are not supported by this estimator",
     );
 }
 
@@ -12773,6 +13501,32 @@ end
 bayes_lm(y ~ x1 + x2, df)
 "#,
         "Bayesian Linear",
+    );
+}
+
+#[test]
+fn bayes_lm_rejects_no_intercept_formula() {
+    assert_err_contains(
+        "bayes_lm_no_intercept",
+        r#"
+input df
+y x1 x2
+10 1.0 5
+12 2.0 6
+15 3.0 7
+18 4.0 8
+20 5.0 9
+22 6.0 10
+25 7.0 11
+28 8.0 12
+30 9.0 13
+32 10.0 14
+35 11.0 15
+38 12.0 16
+end
+bayes_lm(y ~ x1 + x2 - 1, df)
+"#,
+        "no-intercept formulas are not supported by this estimator",
     );
 }
 

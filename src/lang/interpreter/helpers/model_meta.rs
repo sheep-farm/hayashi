@@ -7,7 +7,11 @@ pub(in crate::lang::interpreter) fn coef_names_from_formula(
     df: &DataFrame,
     n_cols: usize,
 ) -> Vec<String> {
-    let mut names: Vec<String> = vec!["_cons".into()];
+    let mut names: Vec<String> = if formula_ast.intercept {
+        vec!["_cons".into()]
+    } else {
+        Vec::new()
+    };
     for term in &formula_ast.rhs {
         match term {
             RhsTerm::Categorical(e) => {

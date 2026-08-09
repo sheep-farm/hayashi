@@ -4,6 +4,7 @@ pub struct Formula {
     pub lhs: String,
     pub rhs: Vec<RhsTerm>,
     pub fe: Vec<String>, // after |
+    pub intercept: bool,
 }
 
 /// Um termo no RHS de uma fórmula econométrica.

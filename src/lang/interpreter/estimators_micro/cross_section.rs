@@ -15,7 +15,7 @@ impl Interpreter {
                 "ols() requires (formula, dataframe)".into(),
             ));
         }
-        let formula_ast = self.resolve_formula(&args[0])?;
+        let formula_ast = self.resolve_formula_allow_no_intercept(&args[0])?;
         let df_name = match &args[1] {
             Expr::Var(name) => name.clone(),
             _ => {
@@ -29,7 +29,8 @@ impl Interpreter {
             _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
         };
         let df_raw2 = self.maybe_filter_df(&df_raw, opts)?;
-        let (df, g_formula, display_names) = self.prepare_formula(&formula_ast, &df_raw2)?;
+        let (df, g_formula, display_names) =
+            self.prepare_formula_allow_no_intercept(&formula_ast, &df_raw2)?;
         let cov = resolve_cov_full(opt_map, &df)?;
 
         let (y, x) = df
@@ -37,9 +38,13 @@ impl Interpreter {
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         // Usa fit_with_names para preservar nomes legíveis (e.g. "log(K):log(L)")
-        let var_names: Vec<String> = std::iter::once("_cons".to_string())
-            .chain(display_names)
-            .collect();
+        let var_names: Vec<String> = if g_formula.intercept {
+            std::iter::once("_cons".to_string())
+                .chain(display_names)
+                .collect()
+        } else {
+            display_names
+        };
         let result = OLS::fit_with_names(&y, &x, cov, Some(var_names))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
@@ -66,8 +71,8 @@ impl Interpreter {
                 "iv() requires (endog_formula, instrument_formula, dataframe)".into(),
             ));
         }
-        let endog_ast = self.resolve_formula(&args[0])?;
-        let instr_ast = self.resolve_formula(&args[1])?;
+        let endog_ast = self.resolve_formula_allow_no_intercept(&args[0])?;
+        let instr_ast = self.resolve_formula_allow_no_intercept(&args[1])?;
         let df_name = match &args[2] {
             Expr::Var(name) => name.clone(),
             _ => {
@@ -80,20 +85,20 @@ impl Interpreter {
             Some(Value::DataFrame(df)) => df.clone(),
             _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
         };
-        let (df_endog, g_endog, _) = self.prepare_formula(&endog_ast, &df)?;
+        let (df_endog, g_endog, _) = self.prepare_formula_allow_no_intercept(&endog_ast, &df)?;
         let cov = resolve_cov_full(opt_map, &df_endog)?;
 
         // Instrumento pode ter LHS vazio (~ z1 + z2)
         let g_instr = if instr_ast.lhs.is_empty() {
-            let (df_instr, g_i, _) = self.prepare_formula(&instr_ast, &df)?;
+            let (df_instr, g_i, _) = self.prepare_formula_allow_no_intercept(&instr_ast, &df)?;
             let _ = df_instr; // df aumentado não é necessário para instrumento
             GFormula {
                 dependent: String::new(),
                 independents: g_i.independents,
-                intercept: true,
+                intercept: g_i.intercept,
             }
         } else {
-            let (_, g_i, _) = self.prepare_formula(&instr_ast, &df)?;
+            let (_, g_i, _) = self.prepare_formula_allow_no_intercept(&instr_ast, &df)?;
             g_i
         };
 
