@@ -1,6 +1,35 @@
 use crate::lang::ast::*;
 use crate::lang::error::{HayashiError, Result};
-use crate::lang::lexer::Token;
+use crate::lang::lexer::{Lexer, Token};
+
+/// Parse one complete formula expression from runtime text.
+pub fn parse_formula_text(source: &str) -> Result<Formula> {
+    let mut lexer = Lexer::new(source.trim());
+    let tokens = lexer
+        .tokenize()?
+        .into_iter()
+        .filter(|(token, _)| token != &Token::Newline)
+        .collect();
+    let mut parser = Parser::new(tokens);
+    let expr = parser.parse_expr()?;
+    parser.skip_newlines();
+    if parser.peek() != &Token::Eof {
+        return Err(HayashiError::Parse {
+            line: parser.line(),
+            msg: format!(
+                "unexpected token after formula: {:?}",
+                parser.peek().clone()
+            ),
+        });
+    }
+    match expr {
+        Expr::Formula(formula) => Ok(formula),
+        _ => Err(HayashiError::Parse {
+            line: 1,
+            msg: "expected a formula containing '~'".into(),
+        }),
+    }
+}
 
 pub struct Parser {
     tokens: Vec<(Token, usize)>,
@@ -347,40 +376,150 @@ impl Parser {
         let mut rhs = Vec::new();
         let mut fe = Vec::new();
         let mut in_fe = false;
+        let mut intercept = true;
+        let mut saw_rhs_item = false;
+        let mut expecting_rhs_item = true;
+        let mut expecting_fe_item = false;
 
         loop {
             match self.peek().clone() {
-                Token::Newline | Token::Eof | Token::RParen | Token::Comma => break,
-                Token::Pipe => {
+                Token::Newline | Token::Eof | Token::RParen | Token::Comma => {
+                    let line = self.line();
+                    if !saw_rhs_item {
+                        return Err(HayashiError::Parse {
+                            line,
+                            msg: "formula RHS requires a term or intercept control".into(),
+                        });
+                    }
+                    if (!in_fe && expecting_rhs_item) || (in_fe && expecting_fe_item) {
+                        return Err(HayashiError::Parse {
+                            line,
+                            msg: if in_fe {
+                                "fixed-effects section requires an identifier".into()
+                            } else {
+                                "formula RHS contains an empty term".into()
+                            },
+                        });
+                    }
+                    break;
+                }
+                Token::Pipe if !in_fe => {
+                    let line = self.line();
+                    if !saw_rhs_item || expecting_rhs_item {
+                        return Err(HayashiError::Parse {
+                            line,
+                            msg: "formula RHS contains an empty term before '|'".into(),
+                        });
+                    }
                     self.advance();
                     in_fe = true;
+                    expecting_fe_item = true;
                 }
                 Token::Plus => {
+                    let line = self.line();
+                    let expecting_item = if in_fe {
+                        expecting_fe_item
+                    } else {
+                        expecting_rhs_item
+                    };
+                    if expecting_item {
+                        return Err(HayashiError::Parse {
+                            line,
+                            msg: if in_fe {
+                                "fixed-effects section contains an empty term".into()
+                            } else {
+                                "formula RHS contains an empty term".into()
+                            },
+                        });
+                    }
                     self.advance();
+                    if in_fe {
+                        expecting_fe_item = true;
+                    } else {
+                        expecting_rhs_item = true;
+                    }
                 }
-                Token::Minus => {
-                    // "-1" remove intercept — o interpreter trata via `fe`/flags
+                Token::Minus if !in_fe => {
+                    let line = self.line();
                     self.advance();
+                    if self.peek() == &Token::Int(1) {
+                        self.advance();
+                        intercept = false;
+                    } else {
+                        return Err(HayashiError::Parse {
+                            line,
+                            msg: "only '- 1' is supported in formulas".into(),
+                        });
+                    }
+                    saw_rhs_item = true;
+                    expecting_rhs_item = false;
+                }
+                Token::Int(0) if !in_fe => {
+                    if !expecting_rhs_item {
+                        return Err(HayashiError::Parse {
+                            line: self.line(),
+                            msg: "expected '+' before intercept control".into(),
+                        });
+                    }
+                    self.advance();
+                    intercept = false;
+                    saw_rhs_item = true;
+                    expecting_rhs_item = false;
+                }
+                Token::Int(1) if !in_fe => {
+                    if !expecting_rhs_item {
+                        return Err(HayashiError::Parse {
+                            line: self.line(),
+                            msg: "expected '+' before intercept control".into(),
+                        });
+                    }
+                    self.advance();
+                    intercept = true;
+                    saw_rhs_item = true;
+                    expecting_rhs_item = false;
                 }
                 _ => {
                     if in_fe {
-                        // Dentro de efeitos fixos aceitamos apenas idents simples
-                        if let Token::Ident(name) = self.peek().clone() {
-                            self.advance();
-                            fe.push(name);
-                        } else {
-                            self.advance();
+                        let line = self.line();
+                        if !expecting_fe_item {
+                            return Err(HayashiError::Parse {
+                                line,
+                                msg: "expected '+' between fixed-effect identifiers".into(),
+                            });
                         }
+                        let Token::Ident(name) = self.peek().clone() else {
+                            return Err(HayashiError::Parse {
+                                line,
+                                msg: "fixed-effects section requires an identifier".into(),
+                            });
+                        };
+                        self.advance();
+                        fe.push(name);
+                        expecting_fe_item = false;
                         continue;
+                    }
+
+                    if !expecting_rhs_item {
+                        return Err(HayashiError::Parse {
+                            line: self.line(),
+                            msg: "expected '+' between formula terms".into(),
+                        });
                     }
 
                     // parse_formula_terms pode retornar 1 ou 3 termos (expansão x1*x2)
                     let terms = self.parse_formula_terms()?;
                     rhs.extend(terms);
+                    saw_rhs_item = true;
+                    expecting_rhs_item = false;
                 }
             }
         }
-        Ok(Formula { lhs, rhs, fe })
+        Ok(Formula {
+            lhs,
+            rhs,
+            fe,
+            intercept,
+        })
     }
 
     /// Parseia um ou mais termos do RHS.
@@ -2033,5 +2172,152 @@ impl Parser {
             }
         }
         Ok(stmts)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lang::lexer::Lexer;
+
+    fn parse_formula(source: &str) -> Result<Formula> {
+        let mut lexer = Lexer::new(source);
+        let tokens = lexer.tokenize()?;
+        let mut parser = Parser::new(tokens);
+        match parser.parse_expr()? {
+            Expr::Formula(formula) => Ok(formula),
+            _ => panic!("expected formula expression"),
+        }
+    }
+
+    fn rhs_names(formula: &Formula) -> Vec<String> {
+        formula.rhs.iter().map(RhsTerm::display_name).collect()
+    }
+
+    #[test]
+    fn intercept_controls_do_not_become_rhs_terms() {
+        let default = parse_formula("y ~ x").unwrap();
+        assert!(default.intercept);
+
+        let minus_one = parse_formula("y ~ x - 1").unwrap();
+        assert!(!minus_one.intercept);
+        assert_eq!(rhs_names(&minus_one), ["x"]);
+
+        let zero = parse_formula("y ~ 0 + x").unwrap();
+        assert!(!zero.intercept);
+        assert_eq!(rhs_names(&zero), ["x"]);
+
+        let zero_then_one = parse_formula("y ~ 0 + x + 1").unwrap();
+        assert!(zero_then_one.intercept);
+        assert_eq!(rhs_names(&zero_then_one), ["x"]);
+
+        let explicit_one = parse_formula("y ~ 1 + x").unwrap();
+        assert!(explicit_one.intercept);
+        assert_eq!(rhs_names(&explicit_one), ["x"]);
+
+        let one_then_minus_one = parse_formula("y ~ x + 1 - 1").unwrap();
+        assert!(!one_then_minus_one.intercept);
+        assert_eq!(rhs_names(&one_then_minus_one), ["x"]);
+
+        let intercept_only = parse_formula("y ~ 1").unwrap();
+        assert!(intercept_only.intercept);
+        assert!(intercept_only.rhs.is_empty());
+
+        let instruments = parse_formula("~ z - 1").unwrap();
+        assert!(!instruments.intercept);
+        assert_eq!(rhs_names(&instruments), ["z"]);
+
+        let fixed_effects = parse_formula("y ~ x - 1 | id").unwrap();
+        assert!(!fixed_effects.intercept);
+        assert_eq!(rhs_names(&fixed_effects), ["x"]);
+        assert_eq!(fixed_effects.fe, ["id"]);
+    }
+
+    #[test]
+    fn nested_one_remains_a_formula_expression() {
+        assert_eq!(rhs_names(&parse_formula("y ~ I(1)").unwrap()), ["I(1)"]);
+    }
+
+    #[test]
+    fn unsupported_formula_subtraction_is_rejected() {
+        let err = parse_formula("y ~ x1 - x2").unwrap_err();
+        assert!(
+            err.to_string().contains("only '- 1' is supported"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn runtime_formula_parser_requires_complete_input() {
+        let formula = parse_formula_text("y ~ x - 1\n").unwrap();
+        assert!(!formula.intercept);
+        assert_eq!(rhs_names(&formula), ["x"]);
+
+        let instruments = parse_formula_text("~ z - 1").unwrap();
+        assert!(!instruments.intercept);
+        assert_eq!(rhs_names(&instruments), ["z"]);
+
+        for source in ["y ~ x, z", "y ~ x)"] {
+            let err = parse_formula_text(source).unwrap_err();
+            assert!(
+                err.to_string().contains("unexpected token after formula"),
+                "'{source}' produced unexpected error: {err}"
+            );
+        }
+
+        assert!(
+            parse_formula_text("y ~ x\ny").is_err(),
+            "a second expression without a separator unexpectedly parsed"
+        );
+    }
+
+    #[test]
+    fn runtime_formula_parser_accepts_surrounding_whitespace() {
+        let formula = parse_formula_text(" \n\t y ~ x - 1 \n ").unwrap();
+        assert_eq!(formula.lhs, "y");
+        assert_eq!(rhs_names(&formula), ["x"]);
+        assert!(!formula.intercept);
+    }
+
+    #[test]
+    fn runtime_formula_parser_matches_multiline_literal_in_call() {
+        let mut lexer = Lexer::new("ols(y ~ x +\n z - 1, df)");
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let literal = match parser.parse_expr().unwrap() {
+            Expr::Call { args, .. } => match &args[0] {
+                Expr::Formula(formula) => formula.clone(),
+                other => panic!("expected formula argument, got {other:?}"),
+            },
+            other => panic!("expected estimator call, got {other:?}"),
+        };
+
+        let runtime = parse_formula_text("y ~ x +\n z - 1").unwrap();
+        assert_eq!(runtime.lhs, literal.lhs);
+        assert_eq!(rhs_names(&runtime), rhs_names(&literal));
+        assert_eq!(runtime.fe, literal.fe);
+        assert_eq!(runtime.intercept, literal.intercept);
+        assert_eq!(rhs_names(&runtime), ["x", "z"]);
+        assert!(!runtime.intercept);
+    }
+
+    #[test]
+    fn formula_parser_rejects_empty_terms_and_fixed_effects() {
+        for source in [
+            "y ~",
+            "y ~ + x",
+            "y ~ x +",
+            "y ~ x + + z",
+            "y ~ x - 1 +",
+            "y ~ x |",
+            "y ~ x | + id",
+            "y ~ x | id +",
+            "y ~ x | id + + time",
+        ] {
+            assert!(
+                parse_formula_text(source).is_err(),
+                "malformed formula unexpectedly parsed: {source}"
+            );
+        }
     }
 }

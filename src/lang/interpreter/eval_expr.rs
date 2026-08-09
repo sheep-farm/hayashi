@@ -527,10 +527,17 @@ impl Interpreter {
 
     pub(super) fn formula_to_string(f: &Formula) -> String {
         let rhs_parts: Vec<String> = f.rhs.iter().map(|t| t.display_name()).collect();
-        let mut formula_str = if f.lhs.is_empty() {
-            format!("~ {}", rhs_parts.join(" + "))
+        let rhs = if rhs_parts.is_empty() {
+            if f.intercept { "1" } else { "0" }.to_string()
+        } else if f.intercept {
+            rhs_parts.join(" + ")
         } else {
-            format!("{} ~ {}", f.lhs, rhs_parts.join(" + "))
+            format!("{} - 1", rhs_parts.join(" + "))
+        };
+        let mut formula_str = if f.lhs.is_empty() {
+            format!("~ {rhs}")
+        } else {
+            format!("{} ~ {rhs}", f.lhs)
         };
         if !f.fe.is_empty() {
             formula_str.push_str(" | ");
@@ -1791,5 +1798,44 @@ impl Interpreter {
                 "{ctx}: expected integer, got {other}"
             ))),
         }
+    }
+}
+
+#[cfg(test)]
+mod formula_display_tests {
+    use super::Interpreter;
+    use crate::lang::ast::Expr;
+    use crate::lang::lexer::Lexer;
+    use crate::lang::parser::{parse_formula_text, Parser};
+
+    #[test]
+    fn no_intercept_formula_stringifies_canonically() {
+        let mut lexer = Lexer::new("y ~ x - 1");
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let Expr::Formula(formula) = parser.parse_expr().unwrap() else {
+            panic!("expected formula expression");
+        };
+
+        let displayed = Interpreter::formula_to_string(&formula);
+        assert_eq!(displayed, "y ~ x - 1");
+
+        let reparsed = parse_formula_text(&displayed).unwrap();
+        assert!(!reparsed.intercept);
+        assert_eq!(reparsed.lhs, "y");
+        assert_eq!(reparsed.rhs.len(), 1);
+        assert_eq!(reparsed.rhs[0].display_name(), "x");
+
+        let with_fixed_effects = parse_formula_text("y ~ x - 1 | id").unwrap();
+        assert_eq!(
+            Interpreter::formula_to_string(&with_fixed_effects),
+            "y ~ x - 1 | id"
+        );
+
+        let intercept_only = parse_formula_text("y ~ 1").unwrap();
+        assert_eq!(Interpreter::formula_to_string(&intercept_only), "y ~ 1");
+
+        let instruments = parse_formula_text("~ z - 1").unwrap();
+        assert_eq!(Interpreter::formula_to_string(&instruments), "~ z - 1");
     }
 }

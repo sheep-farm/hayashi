@@ -188,12 +188,29 @@ impl Interpreter {
         args: &[Expr],
         opt_map: &HashMap<String, Value>,
     ) -> Result<(Formula, Arc<DataFrame>, String, String)> {
+        self.extract_panel_args_with_policy(args, opt_map, FormulaInterceptPolicy::RequireIntercept)
+    }
+
+    pub(super) fn extract_panel_args_allow_no_intercept(
+        &mut self,
+        args: &[Expr],
+        opt_map: &HashMap<String, Value>,
+    ) -> Result<(Formula, Arc<DataFrame>, String, String)> {
+        self.extract_panel_args_with_policy(args, opt_map, FormulaInterceptPolicy::AllowNoIntercept)
+    }
+
+    fn extract_panel_args_with_policy(
+        &mut self,
+        args: &[Expr],
+        opt_map: &HashMap<String, Value>,
+        policy: FormulaInterceptPolicy,
+    ) -> Result<(Formula, Arc<DataFrame>, String, String)> {
         if args.len() < 2 {
             return Err(HayashiError::Runtime(
                 "panel estimator requires (formula, dataframe [, id=col])".into(),
             ));
         }
-        let formula_ast = self.resolve_formula(&args[0])?;
+        let formula_ast = self.resolve_formula_with_policy(&args[0], policy)?;
         let df_name = match &args[1] {
             Expr::Var(name) => name.clone(),
             _ => {
