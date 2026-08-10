@@ -3418,11 +3418,12 @@ impl Interpreter {
             let var_names = df
                 .formula_var_names(&g_formula)
                 .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-            eq_var_names.push(var_names);
+            eq_var_names.push(var_names.clone());
             equations.push(greeners::Equation {
                 y,
                 x,
                 name: formula_ast.lhs.clone(),
+                var_names,
             });
         }
         let result = greeners::ThreeSLS::fit(&equations, &z_instr)

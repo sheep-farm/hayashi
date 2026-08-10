@@ -82,33 +82,33 @@ dependencies = [
 
 [[package]]
 name = "argmin"
-version = "0.11.0"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7ab7ca97779074715a402e5e8045fae27e7191acaec9b4c5653276316e9e404"
+checksum = "760a49d596b18b881d2fe6e9e6da4608fa64d4a7653ef5cd43bfaa4da018d596"
 dependencies = [
  "anyhow",
  "argmin-math",
+ "instant",
  "num-traits",
  "paste",
- "rand 0.9.4",
+ "rand 0.8.6",
  "rand_xoshiro",
- "thiserror 2.0.18",
- "web-time",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
 name = "argmin-math"
-version = "0.5.1"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba6958a87117ff5e1d0d7716856a4303752518012ec4a67a68446b6631a1a54d"
+checksum = "d93a0d0269b60bd1cd674de70314e3f0da97406cf8c1936ce760d2a46e0f13fe"
 dependencies = [
  "anyhow",
  "cfg-if",
  "num-complex",
  "num-integer",
  "num-traits",
- "rand 0.9.4",
- "thiserror 2.0.18",
+ "rand 0.8.6",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -1458,7 +1458,7 @@ dependencies = [
 
 [[package]]
 name = "greeners"
-version = "1.5.5-dev"
+version = "1.6.0"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1466,16 +1466,16 @@ dependencies = [
  "csv",
  "faer",
  "indexmap",
- "ndarray 0.17.2",
- "ndarray-rand",
+ "ndarray",
  "num-complex",
  "rand 0.8.6",
+ "rand_distr",
  "rayon",
  "regex",
  "serde",
  "serde_json",
  "statrs",
- "thiserror 2.0.18",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -1534,7 +1534,7 @@ dependencies = [
  "jupyter-protocol",
  "jupyter-zmq-client",
  "libloading",
- "ndarray 0.17.2",
+ "ndarray",
  "odbc-api",
  "parquet",
  "plotters",
@@ -1723,6 +1723,15 @@ name = "indexmap-nostd"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8e04e2fd2b8188ea827b32ef11de88377086d690286ab35747ef7f9bf3ccb590"
+
+[[package]]
+name = "instant"
+version = "0.1.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e0242819d153cba4b4b05a5a8f2a7e9bbf97b6055b2a002b395c96b5ff3c0222"
+dependencies = [
+ "cfg-if",
+]
 
 [[package]]
 name = "interpol"
@@ -2144,19 +2153,6 @@ dependencies = [
 
 [[package]]
 name = "ndarray"
-version = "0.15.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "adb12d4e967ec485a5f71c6311fe28158e9d6f4bc4a447b474184d0f91a8fa32"
-dependencies = [
- "matrixmultiply",
- "num-complex",
- "num-integer",
- "num-traits",
- "rawpointer",
-]
-
-[[package]]
-name = "ndarray"
 version = "0.17.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "520080814a7a6b4a6e9070823bb24b4531daac8c4627e08ba5de8c5ef2f2752d"
@@ -2168,17 +2164,6 @@ dependencies = [
  "portable-atomic",
  "portable-atomic-util",
  "rawpointer",
-]
-
-[[package]]
-name = "ndarray-rand"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "65608f937acc725f5b164dcf40f4f0bc5d67dc268ab8a649d3002606718c4588"
-dependencies = [
- "ndarray 0.15.6",
- "rand 0.8.6",
- "rand_distr",
 ]
 
 [[package]]
@@ -2996,11 +2981,11 @@ dependencies = [
 
 [[package]]
 name = "rand_xoshiro"
-version = "0.7.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f703f4665700daf5512dcca5f43afa6af89f09db47fb56be587f80636bda2d41"
+checksum = "6f97cdb2a36ed4183de61b2f824cc45c9f1037f28afe0a322e9fff4c108b5aaa"
 dependencies = [
- "rand_core 0.9.5",
+ "rand_core 0.6.4",
 ]
 
 [[package]]
