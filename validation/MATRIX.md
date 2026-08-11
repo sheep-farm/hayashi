@@ -55,8 +55,9 @@
 | mice_chained | simulated_mice | R, Python | pass | — | MICE (Multiple Imputation by Chained Equations, van Buuren 2011) with m=5, iter=10. Uses simulated data with MCAR missing values. |
 | mixed | wooldridge::wagepan | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 14 Example 14.4 mixed linear model wage equation. |
 | mlogit | AER::TravelMode | R, Python | pass | — | Multinomial logit of chosen travel mode (air=1, train=2, bus=3, car=4) on income, wait time, vehicle cost and travel time. Alternative-specific attributes are averaged per individual to make them individual-specific covariates. |
-| modwt | simulated | Python:passed * | pass | — | Simulated series (trend + 16-period sine + noise). Greeners MODWT uses unnormalised Haar filters, equivalent to `pywt.swt(..., norm=False)`. `pywt` returns coefficients coarse-to-fine; the reference reverses them to match Greeners' W_1 (finest) convention. |
+| modwt | simulated | Python | pass | — | Simulated series (trend + 16-period sine + noise). Greeners MODWT uses unnormalised Haar filters, equivalent to `pywt.swt(..., norm=False)`. `pywt` returns coefficients coarse-to-fine; the reference reverses them to match Greeners' W_1 (finest) convention. |
 | negbin | wooldridge::fertil2 | R, Python | pass | — | Negative binomial regression for number of children on age, education, electric and urban indicators. Dispersion parameter (alpha) is not compared because Hayashi does not report it; coefficient tolerance is 2e-1 due to different alpha estimates. |
+| nls | simulated | R:passed *, Python:passed * | pass | — | Simulated data from y = a * x1^b1 * x2^b2 + N(0, 0.3). Coefficients and standard errors compared against R `nls` and Python `curve_fit`. |
 | nls | simulated | R, Python | pass | — | Nonlinear least squares exponential model on simulated data. Reference matches y = a * exp(b * x) + N(0, 0.1) against R `nls` and Python `curve_fit`. |
 | nls | simulated | R, Python | pass | — | Simulated data from y = a / (1 + exp(-b*(x-c))) + N(0, 0.2). Coefficients and standard errors compared against R `nls` and Python `scipy.optimize.curve_fit`. |
 | nls | simulated | R, Python | pass | — | Simulated data from y = a * x^b + N(0, 0.3). Coefficients and standard errors compared against R `nls` and Python `scipy.optimize.curve_fit`. |
@@ -114,6 +115,7 @@
 | rlm | wooldridge::wage1 | R, Python | pass | — | Huber robust linear regression of log wage on education, experience, and tenure. |
 | spatial | simulated_spatial_durbin | R, Python | pass | — | Spatial Durbin model with spatial lag of dependent variable and spatially lagged independent variables. Uses simulated spatial data with known spatial weights matrix. |
 | spatial_sar | simulated | Python | pass | — | Spatial autoregressive (SAR) model on a simulated 7x7 grid with rook contiguity weights. Reference implements the same concentrated MLE independently. |
+| spatial_sem | simulated | Python | pass | — | Data generated on a 7x7 grid with rook contiguity W, lambda=0.3, beta=0.5. Reference implements the concentrated MLE for SEM independently. |
 | descriptive | wooldridge::wage1 | R, Python | pass | — | Summary statistics with detail (percentiles, skewness, kurtosis) for wage. |
 | sur | wooldridge::grunfeld | R, Python | pass | — | Two-equation SUR (Zellner FGLS) on the Grunfeld investment data. |
 | svar | statsmodels::macrodata | R, Python | pass | — | Cholesky-identified SVAR(2) on log US real GDP and consumption. |

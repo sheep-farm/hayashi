@@ -1,0 +1,3 @@
+load "validation/cases/nls_cobb_douglas_simulated/data/data.csv" as df
+let m = nls_cobb_douglas(y ~ x1 + x2, df, start=[1.0, 0.3, 0.5], max_iter=200, tol=1e-8)
+print(m)

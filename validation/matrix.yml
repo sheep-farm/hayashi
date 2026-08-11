@@ -259,6 +259,11 @@ cases:
     does not report it; coefficient tolerance is 2e-1 due to different alpha estimates.
   dimension: numerical
   status: pass
+- id: nls_cobb_douglas_simulated
+  notes: Simulated data from y = a * x1^b1 * x2^b2 + N(0, 0.3). Coefficients and standard
+    errors compared against R `nls` and Python `curve_fit`.
+  dimension: numerical
+  status: pass
 - id: nls_exp_simulated
   notes: Nonlinear least squares exponential model on simulated data. Reference matches
     y = a * exp(b * x) + N(0, 0.1) against R `nls` and Python `curve_fit`.
@@ -528,6 +533,11 @@ cases:
 - id: spatial_sar_simulated
   notes: Spatial autoregressive (SAR) model on a simulated 7x7 grid with rook contiguity
     weights. Reference implements the same concentrated MLE independently.
+  dimension: numerical
+  status: pass
+- id: spatial_sem_simulated
+  notes: Data generated on a 7x7 grid with rook contiguity W, lambda=0.3, beta=0.5.
+    Reference implements the concentrated MLE for SEM independently.
   dimension: numerical
   status: pass
 - id: summarize_wooldridge_wage1
