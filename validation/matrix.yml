@@ -502,6 +502,11 @@ cases:
     matrix.
   dimension: numerical
   status: pass
+- id: spatial_sar_simulated
+  notes: Spatial autoregressive (SAR) model on a simulated 7x7 grid with rook contiguity
+    weights. Reference implements the same concentrated MLE independently.
+  dimension: numerical
+  status: pass
 - id: summarize_wooldridge_wage1
   notes: Summary statistics with detail (percentiles, skewness, kurtosis) for wage.
   dimension: numerical

@@ -137,6 +137,16 @@ def parse_hayashi_txt_table(text: str) -> dict[str, dict[str, float]]:
     pipe_delimited = " | " in header
     result = {"coefficients": {}, "standard_errors": {}}
 
+    # Also capture spatial parameter rows printed above the main table:
+    # "rho (spatial lag)        0.151343     0.177176      0.854     0.3930"
+    # "lambda (spatial error)   0.123456     0.065432      1.888     0.0600"
+    for line in lines:
+        stripped = line.strip()
+        m = re.match(r"^(rho \(spatial lag\)|lambda \(spatial error\))\s+([-+]?\d+\.?\d*)\s+([-+]?\d+\.?\d*)", stripped)
+        if m:
+            result["coefficients"][m.group(1)] = float(m.group(2))
+            result["standard_errors"][m.group(1)] = float(m.group(3))
+
     if pipe_delimited:
         # Match lines like: "educ       |    0.1320 |    0.0540 |    2.440 |    0.015"
         pattern = re.compile(r"^\s*(\S.*?)\s*\|\s*([-+]?\d+\.?\d*)\s*\|\s*([-+]?\d+\.?\d*)\s*\|")

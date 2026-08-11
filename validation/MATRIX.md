@@ -55,7 +55,7 @@
 | mixed | wooldridge::wagepan | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 14 Example 14.4 mixed linear model wage equation. |
 | mlogit | AER::TravelMode | R, Python | pass | — | Multinomial logit of chosen travel mode (air=1, train=2, bus=3, car=4) on income, wait time, vehicle cost and travel time. Alternative-specific attributes are averaged per individual to make them individual-specific covariates. |
 | negbin | wooldridge::fertil2 | R, Python | pass | — | Negative binomial regression for number of children on age, education, electric and urban indicators. Dispersion parameter (alpha) is not compared because Hayashi does not report it; coefficient tolerance is 2e-1 due to different alpha estimates. |
-| nls | simulated | R:passed *, Python:passed * | pass | — | Nonlinear least squares exponential model on simulated data. Reference matches y = a * exp(b * x) + N(0, 0.1) against R `nls` and Python `curve_fit`. |
+| nls | simulated | R, Python | pass | — | Nonlinear least squares exponential model on simulated data. Reference matches y = a * exp(b * x) + N(0, 0.1) against R `nls` and Python `curve_fit`. |
 | ologit | wooldridge::beauty | R, Python | pass | — | Ordered logit of looks (2, 3, 4) on female, educ, exper, black. |
 | ols | wooldridge::wagepan | R, Python | pass | — | OLS wage equation with one-way cluster-robust standard errors by worker id. |
 | ols | wooldridge::wage1 | R, Python | pass | 89 | OLS log-wage equation with HC3 heteroskedasticity-robust standard errors. |
@@ -109,6 +109,7 @@
 | ridge | wooldridge::hprice1 | R, Python | pass | 106 | Ridge regression of log house price on log lot size, log square footage, bedrooms and colonial dummy. |
 | rlm | wooldridge::wage1 | R, Python | pass | — | Huber robust linear regression of log wage on education, experience, and tenure. |
 | spatial | simulated_spatial_durbin | R, Python | pass | — | Spatial Durbin model with spatial lag of dependent variable and spatially lagged independent variables. Uses simulated spatial data with known spatial weights matrix. |
+| spatial_sar | simulated | Python | pass | — | Spatial autoregressive (SAR) model on a simulated 7x7 grid with rook contiguity weights. Reference implements the same concentrated MLE independently. |
 | descriptive | wooldridge::wage1 | R, Python | pass | — | Summary statistics with detail (percentiles, skewness, kurtosis) for wage. |
 | sur | wooldridge::grunfeld | R, Python | pass | — | Two-equation SUR (Zellner FGLS) on the Grunfeld investment data. |
 | svar | statsmodels::macrodata | R, Python | pass | — | Cholesky-identified SVAR(2) on log US real GDP and consumption. |
