@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased] — dev
 
+### Validation
+
+- Validation matrix now covers 125 cases, all passing.
+- Added `be_simulated`, `svec_simulated`, and finalised coverage for estimators previously marked as unvalidated in #128.
+- Estimators with single-language or algorithm-matched references: `clogit` (R), `kalman` (R), `tobit` (R), `be` (Python), `cpoisson` (Python), `elasticnet` (Python), `feiv` (Python), `garch` (Python), `lpdid` (Python), `three_sls` (Python), `varma` (Python).
+- Thin or convention-sensitive coverage remains for `kalman`, `svar` (Cholesky), `sysgmm`, `pcse`, and `xtgls`.
+
 ### Added
 
 - **VS Code debugger: structured model expansion**. When debugging a `.hay` script, model results now expand in the Variables panel with a short summary and child nodes: `coefficients` (DataFrame), `fit` (Dict), and per-parameter Series (`params`, `std_errors`, `test_values`, `p_values`, `conf_lower`, `conf_upper`). Supported for OLS, IV/2SLS, panel estimators (`fe`, `re`, `pcse`, `xtgls`, `feiv`), binary choice (`logit`, `probit`), count data (`poisson`, `nbreg`), `tobit`, `ordered`, `mnlogit`, `zip`/`zinb`, `glm`, `rlm`, `qreg`, `gmm`, `ab`, `sysgmm`, `glsar`, `mixed`, `sur`, and `3sls`. Requires the VS Code extension and `hay dap` in `PATH`.
