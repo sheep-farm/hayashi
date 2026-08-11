@@ -111,7 +111,7 @@
 | descriptive | wooldridge::wage1 | R, Python | pass | — | Summary statistics with detail (percentiles, skewness, kurtosis) for wage. |
 | sur | wooldridge::grunfeld | R, Python | pass | — | Two-equation SUR (Zellner FGLS) on the Grunfeld investment data. |
 | svar | statsmodels::macrodata | R, Python | pass | — | Cholesky-identified SVAR(2) on log US real GDP and consumption. |
-| svar | simulated | Python:passed * | pass | — | Blanchard-Quah SVAR(1) with long-run restrictions on a simulated bivariate system. Reference implements the same C(1) Cholesky procedure used by Greeners. |
+| svar | simulated | R:passed *, Python:passed * | pass | — | Blanchard-Quah SVAR(1) with long-run restrictions on a simulated bivariate system. Reference implements the same C(1) Cholesky procedure used by Greeners. |
 | synth | synth_smoking | R, Python | pass | — | Synthetic-control ATT on a simulated panel with 10 donors and 1 treated unit. |
 | sysgmm | wooldridge::wagepan | R, Python | pass | 117 | System GMM (Blundell-Bond) two-step on Wooldridge wagepan with lags=2. R and Python references explicitly implement the same two-step System GMM procedure used by Hayashi/Greeners; plm::pgmm is not used as the active R oracle because it uses different instrument and weighting conventions. |
 | descriptive | wooldridge::wage1 | R, Python | pass | — | Tabstat statistics (mean, sd, min, max, p50) for wage, educ, exper, tenure. |

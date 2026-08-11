@@ -10,6 +10,7 @@ dataset:
   licence: n/a
 
 references:
+  - R
   - Python
 
 comparison:
@@ -24,6 +25,7 @@ output_format: txt
 
 hayashi_script: cases/svec_simulated/hayashi/run.hay
 reference_scripts:
+  R: cases/svec_simulated/reference/run.R
   Python: cases/svec_simulated/reference/run.py
 
 notes: Simulated stable VAR(1) with 250 observations. Blanchard-Quah long-run
