@@ -509,6 +509,11 @@ cases:
   notes: Cholesky-identified SVAR(2) on log US real GDP and consumption.
   dimension: numerical
   status: pass
+- id: svec_simulated
+  notes: Blanchard-Quah SVAR(1) with long-run restrictions on a simulated bivariate
+    system. Reference implements the same C(1) Cholesky procedure used by Greeners.
+  dimension: numerical
+  status: pass
 - id: synth_smoking
   notes: Synthetic-control ATT on a simulated panel with 10 donors and 1 treated unit.
   dimension: numerical
