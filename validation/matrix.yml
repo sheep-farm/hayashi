@@ -535,12 +535,6 @@ cases:
     tenure.
   dimension: numerical
   status: pass
-- id: spatial_durbin_simulated
-  notes: Spatial Durbin model with spatial lag of dependent variable and spatially
-    lagged independent variables. Uses simulated spatial data with known spatial weights
-    matrix.
-  dimension: numerical
-  status: pass
 - id: spatial_sar_simulated
   notes: Spatial autoregressive (SAR) model on a simulated 7x7 grid with rook contiguity
     weights. Reference implements the same concentrated MLE independently.
