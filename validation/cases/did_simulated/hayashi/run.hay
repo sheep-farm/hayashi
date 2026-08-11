@@ -1,0 +1,3 @@
+load "validation/cases/did_simulated/data/data.csv" as df
+let m = did(y ~ treat + post, df)
+print(m)

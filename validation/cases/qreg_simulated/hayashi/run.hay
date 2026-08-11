@@ -1,0 +1,5 @@
+load "validation/cases/qreg_simulated/data/data.csv" as df
+let m = qreg(y ~ x, df, tau=0.75, boot=0)
+let p = m.params
+print("const=" + str(p[0]))
+print("x=" + str(p[1]))
