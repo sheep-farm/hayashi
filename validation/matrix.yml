@@ -272,13 +272,6 @@ cases:
     iter=10. Uses simulated data with MCAR missing values.
   dimension: numerical
   status: pass
-- id: midas_simulated
-  notes: Simplified MIDAS with freq=1 (same-frequency y and x). True mixed-frequency
-    usage (freq>1) is impossible because Hayashi midas cannot ingest a high-frequency
-    x column that is longer than the low-frequency y column within a single DataFrame.
-    BLOCKED pending a workable mixed-frequency data API.
-  dimension: numerical
-  status: blocked
 - id: mixed_wooldridge_wagepan_ch14
   notes: Wooldridge Introductory Econometrics Chapter 14 Example 14.4 mixed linear
     model wage equation.
@@ -297,12 +290,10 @@ cases:
   dimension: numerical
   status: pass
 - id: nardl_simulated
-  notes: Simulated NARDL(1,1) with asymmetric responses to positive/negative changes
-    in x. BLOCKED because Hayashi nardl returns degenerate coefficients (near-zero
-    for most terms and Dy_{t-1}=1.0 with t-values in the trillions), indicating a
-    numerical or collinearity bug in the Greeners implementation.
+  notes: Simulated NARDL(1,1) with asymmetric long-run multipliers and short-run dynamics.
+    y and x are random walks with positive and negative shock decomposition.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: nbreg_fertil2
   notes: Negative binomial regression for number of children on age, education, electric
     and urban indicators. Dispersion parameter (alpha) is not compared because Hayashi
@@ -540,11 +531,10 @@ cases:
   dimension: numerical
   status: pass
 - id: panel_tobit_simulated
-  notes: Simulated panel Tobit with y censored at 0. BLOCKED because Hayashi panel_tobit
-    mislabels coefficients (returns variables named 'x' and 'x1' instead of 'const'
-    and 'x'), making comparison impossible without editing Rust code.
+  notes: Simulated panel with N=50, T=4, random effects, left-censored at 0. Coefficients
+    and standard errors compared against pooled Tobit (censReg and MLE).
   dimension: numerical
-  status: blocked
+  status: pass
 - id: pca_wooldridge_wage1
   notes: Standardised PCA of educ, exper, tenure, and wage; absolute loadings are
     compared because component signs are arbitrary.

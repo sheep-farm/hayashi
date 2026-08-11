@@ -61,11 +61,10 @@
 | logit | simulated | R, Python | pass | — | Simulated strong predictor logit. AUC and Gini exported as a coefficient table. |
 | arima | simulated_ma1 | R, Python | pass | — | Uses the same simulated MA(1) DGP as Chapter 26 of the book. |
 | mice_chained | simulated_mice | R, Python | pass | — | MICE (Multiple Imputation by Chained Equations, van Buuren 2011) with m=5, iter=10. Uses simulated data with MCAR missing values. |
-| midas | simulated |  | blocked | — | Simplified MIDAS with freq=1 (same-frequency y and x). True mixed-frequency usage (freq>1) is impossible because Hayashi midas cannot ingest a high-frequency x column that is longer than the low-frequency y column within a single DataFrame. BLOCKED pending a workable mixed-frequency data API. |
 | mixed | wooldridge::wagepan | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 14 Example 14.4 mixed linear model wage equation. |
 | mlogit | AER::TravelMode | R, Python | pass | — | Multinomial logit of chosen travel mode (air=1, train=2, bus=3, car=4) on income, wait time, vehicle cost and travel time. Alternative-specific attributes are averaged per individual to make them individual-specific covariates. |
 | modwt | simulated | R, Python | pass | — | Simulated series (trend + 16-period sine + noise). Greeners MODWT uses unnormalised Haar filters, equivalent to `pywt.swt(..., norm=False)`. `pywt` returns coefficients coarse-to-fine; the reference reverses them to match Greeners' W_1 (finest) convention. |
-| nardl | simulated |  | blocked | — | Simulated NARDL(1,1) with asymmetric responses to positive/negative changes in x. BLOCKED because Hayashi nardl returns degenerate coefficients (near-zero for most terms and Dy_{t-1}=1.0 with t-values in the trillions), indicating a numerical or collinearity bug in the Greeners implementation. |
+| nardl | simulated | R:passed *, Python:passed * | pass | — | Simulated NARDL(1,1) with asymmetric long-run multipliers and short-run dynamics. y and x are random walks with positive and negative shock decomposition. |
 | negbin | wooldridge::fertil2 | R, Python | pass | — | Negative binomial regression for number of children on age, education, electric and urban indicators. Dispersion parameter (alpha) is not compared because Hayashi does not report it; coefficient tolerance is 2e-1 due to different alpha estimates. |
 | nls | simulated | R, Python | pass | — | Simulated data from y = a * (b1*x1^rho + (1-b1)*x2^rho)^(1/rho) + N(0, 0.1). The CES function is now identified by the share restriction b2 = 1 - b1. |
 | nls | simulated | R, Python | pass | — | Simulated data from y = a * x1^b1 * x2^b2 + N(0, 0.3). Coefficients and standard errors compared against R `nls` and Python `curve_fit`. |
@@ -115,13 +114,13 @@
 | panel_fe | wooldridge::wagepan | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 14 Example 14.4 panel fixed-effects wage equation. |
 | panel_heckman | simulated_panel_heckman | R, Python | pass | — | Panel Heckman selection model (two-step) with selection equation and outcome equation. Uses simulated panel data with known selection mechanism. |
 | panel_qreg | simulated | R, Python | pass | — | Simulated panel with entity fixed effects and heteroskedastic errors. References demean the data and run quantile regression without an intercept; standard errors are convention-sensitive. |
-| panel_tobit | simulated |  | blocked | — | Simulated panel Tobit with y censored at 0. BLOCKED because Hayashi panel_tobit mislabels coefficients (returns variables named 'x' and 'x1' instead of 'const' and 'x'), making comparison impossible without editing Rust code. |
+| panel | simulated | R, Python | pass | — | Simulated panel with N=50, T=4, random effects, left-censored at 0. Coefficients and standard errors compared against pooled Tobit (censReg and MLE). |
 | pca | wooldridge::wage1 | R, Python | pass | — | Standardised PCA of educ, exper, tenure, and wage; absolute loadings are compared because component signs are arbitrary. |
 | pcse | wooldridge::wagepan | R, Python | pass | 99, 103 | PCSE estimation of log wage on education, experience, and dummies using the Hayashi/Greeners Beck-Katz covariance convention. |
 | poisson | wooldridge::fertil2 | R, Python | pass | — | Poisson regression for number of children on the fertil2 dataset. |
 | probit | wooldridge::mroz | R, Python | pass | — | Probit labour-force participation on the Mroz dataset. |
 | psm | wooldridge::jtrain3 | R, Python | pass | — | 1:1 nearest-neighbor propensity score matching with caliper 0.2 and bootstrap SE. |
-| pvar | simulated | R:passed *, Python:passed * | pass | — | Simulated bivariate panel VAR with N=50 and T=100. Hayashi GMM and within-OLS references agree within moderate tolerance due to the Nickell bias in within estimation. |
+| pvar | simulated | R, Python | pass | — | Simulated bivariate panel VAR with N=50 and T=100. Hayashi GMM and within-OLS references agree within moderate tolerance due to the Nickell bias in within estimation. |
 | qreg | simulated | R, Python | pass | — | Simulated heteroskedastic data y = 1 + 2x + (1 + 0.5x) * (Exponential(1)-1). Quantile regression at tau=0.75 compared against statsmodels. boot=0 to avoid bootstrap overhead. |
 | qreg | wooldridge::wage1 | R, Python | pass | — | Median quantile regression of wage on education, experience, and tenure. |
 | rdd | rdd_book | R, Python | pass | — | Sharp RDD with local linear regression, triangular kernel and Imbens-Kalyanaraman bandwidth. |

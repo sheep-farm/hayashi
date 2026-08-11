@@ -1,0 +1,3 @@
+load "validation/cases/nardl_simulated/data/data.csv" as df
+let m = nardl(y ~ x, df, lags=1)
+export(m.coefficients, "csv", "/dev/stdout")
