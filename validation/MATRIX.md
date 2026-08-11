@@ -130,7 +130,8 @@
 | wls | wooldridge::hprice1 | R, Python | pass | — | WLS with weights generated inside Hayashi to avoid sandbox file issues. |
 | xtgls | wooldridge::wagepan | R, Python | pass | — | Panel feasible GLS with panel-level heteroskedasticity (Parks/Kmenta, Stata xtgls panels(heteroskedastic)). R and Python references implement the same two-step FGLS procedure used by Hayashi/Greeners. |
 | xtlogit | simulated | Python | pass | — | Simulated panel with N=50 groups and T=4 periods. GEE logit with exchangeable working correlation. Only coefficients compared; standard errors depend on the sandwich estimator convention used by each package. |
-| xtprobit | simulated | Python:passed * | pass | — | Simulated panel with N=50 groups and T=4 periods. GEE probit with exchangeable working correlation. Only coefficients compared. |
+| xtpoisson | simulated | Python:passed * | pass | — | Simulated panel with N=50 groups and T=4 periods. GEE Poisson with exchangeable working correlation. Only coefficients compared; standard errors depend on the sandwich estimator convention. |
+| xtprobit | simulated | Python | pass | — | Simulated panel with N=50 groups and T=4 periods. GEE probit with exchangeable working correlation. Only coefficients compared. |
 | descriptive | wooldridge::wagepan | R, Python | pass | — | Overall, between, and within panel summary for lwage. |
 | zinb | wooldridge::affairs | R, Python | pass | 123 | ZINB model of number of affairs on demographic predictors. |
 | zip | wooldridge::affairs | R, Python | pass | 121 | ZIP model of number of affairs on demographic predictors. |

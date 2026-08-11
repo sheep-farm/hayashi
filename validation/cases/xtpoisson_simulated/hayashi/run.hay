@@ -1,0 +1,3 @@
+load "validation/cases/xtpoisson_simulated/data/data.csv" as df
+let m = xtpoisson(y ~ x, df, id="id")
+print(m)

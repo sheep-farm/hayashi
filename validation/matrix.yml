@@ -607,6 +607,12 @@ cases:
     sandwich estimator convention used by each package.
   dimension: numerical
   status: pass
+- id: xtpoisson_simulated
+  notes: Simulated panel with N=50 groups and T=4 periods. GEE Poisson with exchangeable
+    working correlation. Only coefficients compared; standard errors depend on the
+    sandwich estimator convention.
+  dimension: numerical
+  status: pass
 - id: xtprobit_simulated
   notes: Simulated panel with N=50 groups and T=4 periods. GEE probit with exchangeable
     working correlation. Only coefficients compared.
