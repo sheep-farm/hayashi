@@ -1,0 +1,10 @@
+load "validation/cases/linktest_simulated/data/data.csv" as df
+let m = logit(y ~ x, df)
+let r = linktest(m)
+let out = dataframe({
+  "variable": ["yhat", "yhat2"],
+  "coef": [r.hat_coef, r.hatsq_coef],
+  "std_err": [r.hat_se, r.hatsq_se]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

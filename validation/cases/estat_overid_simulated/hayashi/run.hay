@@ -1,0 +1,11 @@
+load "validation/cases/estat_overid_simulated/data/data.csv" as df
+let m = iv(y ~ x, ~ z1 + z2, df)
+let r = estat_overid(y ~ x, ~ z1 + z2, df)
+let se = 0.0
+let out = dataframe({
+  "variable": ["j_stat", "p_value"],
+  "coef": [r.j_stat, r.p_value],
+  "std_err": [se, se]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

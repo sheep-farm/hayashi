@@ -125,6 +125,23 @@ cases:
     bedrooms and colonial dummy.
   dimension: numerical
   status: pass
+- id: estat_classification_simulated
+  notes: Simulated logit. Sensitivity, specificity and correct rate at threshold 0.5.
+  dimension: numerical
+  status: pass
+- id: estat_endog_simulated
+  notes: Simulated endogenous regressor with one instrument. Wu-Hausman F and p-value.
+  dimension: numerical
+  status: pass
+- id: estat_gof_simulated
+  notes: Simulated strong predictor logit. Hosmer-Lemeshow chi-square by deciles.
+  dimension: numerical
+  status: pass
+- id: estat_overid_simulated
+  notes: Simulated IV with two instruments and one endogenous regressor. Sargan J-statistic
+    and p-value.
+  dimension: numerical
+  status: pass
 - id: ets_gdp
   notes: Exponential smoothing state-space model on US real GDP. Blocked because Hayashi
     uses SSE grid search while references use MLE.
@@ -181,6 +198,11 @@ cases:
     the reference implementations are two-step.
   dimension: numerical
   status: pass
+- id: influence_simulated
+  notes: Simulated OLS with an outlier. Hayashi exposes DFFITS; reference uses max
+    |DFFITS| (Cook's D not exported).
+  dimension: numerical
+  status: pass
 - id: iv_card
   notes: IV with education endogenous and nearc4 as instrument.
   dimension: numerical
@@ -219,6 +241,10 @@ cases:
   notes: Lasso regression of house price on lot size, square footage and bedrooms.
   dimension: numerical
   status: pass
+- id: linktest_simulated
+  notes: Simulated logit. Linktest yhat and yhat2 coefficients and standard errors.
+  dimension: numerical
+  status: pass
 - id: logit_margins_mroz
   notes: Logit average marginal effects on Wooldridge mroz.
   dimension: numerical
@@ -230,6 +256,11 @@ cases:
 - id: lpdid_pylpdid_quickstart
   notes: LP-DiD quickstart against pylpdid on an absorbing staggered-adoption panel.
     R reference is left aside for now.
+  dimension: numerical
+  status: pass
+- id: lroc_simulated
+  notes: Simulated strong predictor logit. AUC and Gini exported as a coefficient
+    table.
   dimension: numerical
   status: pass
 - id: ma_book
@@ -603,6 +634,10 @@ cases:
   notes: Two-way frequency table with Pearson chi-square test.
   dimension: numerical
   status: pass
+- id: testparm_simulated
+  notes: 'Simulated OLS. testparm F and p-value for H0: x1 = x2 = 0.'
+  dimension: numerical
+  status: pass
 - id: threesl_simulated
   notes: Simultaneous two-equation system with correlated errors. Each equation includes
     an intercept, one exogenous and one endogenous regressor; the excluded exogenous
@@ -632,6 +667,10 @@ cases:
   notes: Bivariate VARMA(1,1) with known AR and MA matrices. Hayashi uses the Hannan-Rissanen
     algorithm; the Python reference uses statsmodels VARMAX with no trend. Coefficients
     are compared (standard errors are not computed by the current Hayashi VARMA implementation).
+  dimension: numerical
+  status: pass
+- id: weak_iv_simulated
+  notes: Simulated weak instrument. First-stage partial F and p-value.
   dimension: numerical
   status: pass
 - id: wls_hprice1

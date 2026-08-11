@@ -1,0 +1,10 @@
+load "validation/cases/weak_iv_simulated/data/data.csv" as df
+let r = weak_iv(y ~ x, ~ z, df)
+let se = 0.0
+let out = dataframe({
+  "variable": ["first_stage_f", "first_stage_p"],
+  "coef": [r.first_stage_f[0], r.first_stage_p[0]],
+  "std_err": [se, se]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

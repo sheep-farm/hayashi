@@ -1,0 +1,11 @@
+load "validation/cases/estat_classification_simulated/data/data.csv" as df
+let m = logit(y ~ x, df)
+let r = estat_classification(m, threshold=0.5)
+let se = 0.0
+let out = dataframe({
+  "variable": ["sensitivity", "specificity", "correct_rate"],
+  "coef": [r.sensitivity, r.specificity, r.correct_rate],
+  "std_err": [se, se, se]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")
