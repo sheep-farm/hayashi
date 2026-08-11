@@ -1,0 +1,11 @@
+load "validation/cases/pvar_simulated/data/data.csv" as df
+let m = pvar(y1 ~ y2, df, id="id", lags=1)
+let c = m.coefficients
+let se = m.std_errors
+let out0 = dataframe({
+  "variable": ["y1_L1.y1", "y1_L1.y2", "y2_L1.y1", "y2_L1.y2"],
+  "coef": [c["L1.y1"][0], c["L1.y2"][0], c["L1.y1"][1], c["L1.y2"][1]],
+  "std_err": [se["L1.y1"][0], se["L1.y2"][0], se["L1.y1"][1], se["L1.y2"][1]]
+})
+let out = select(out0, "variable", "coef", "std_err")
+export(out, "csv", "/dev/stdout")

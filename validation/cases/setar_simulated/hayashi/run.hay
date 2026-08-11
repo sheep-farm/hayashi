@@ -1,0 +1,11 @@
+load "validation/cases/setar_simulated/data/data.csv" as df
+let m = setar(y ~ 1, df, order=1, delay=1)
+let rl = m.regime_low
+let rh = m.regime_high
+let out0 = dataframe({
+  "variable": ["low_const", "low_AR.L1", "high_const", "high_AR.L1"],
+  "coef": [rl["coef"][0], rl["coef"][1], rh["coef"][0], rh["coef"][1]],
+  "std_err": [rl["std_err"][0], rl["std_err"][1], rh["std_err"][0], rh["std_err"][1]]
+})
+let out = select(out0, "variable", "coef", "std_err")
+export(out, "csv", "/dev/stdout")

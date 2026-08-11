@@ -29,10 +29,10 @@
 | double_ml | simulated_double_ml | R, Python | pass | — | Double Machine Learning (Chernozhukov et al. 2018) for heterogeneous treatment effects. Uses simulated data with known treatment effect. |
 | egarch | wooldridge::nyse | R, Python | pass | — | EGARCH(1,1) on NYSE returns. |
 | elasticnet | wooldridge::hprice1 | Python | pass | — | Elastic Net regression of log house price on log lot size, log square footage, bedrooms and colonial dummy. |
-| logit | simulated | R:passed *, Python:passed * | pass | — | Simulated logit. Sensitivity, specificity and correct rate at threshold 0.5. |
-| iv | simulated | R:passed *, Python:passed * | pass | — | Simulated endogenous regressor with one instrument. Wu-Hausman F and p-value. |
-| logit | simulated | R:passed *, Python:passed * | pass | — | Simulated strong predictor logit. Hosmer-Lemeshow chi-square by deciles. |
-| iv | simulated | R:passed *, Python:passed * | pass | — | Simulated IV with two instruments and one endogenous regressor. Sargan J-statistic and p-value. |
+| logit | simulated | R, Python | pass | — | Simulated logit. Sensitivity, specificity and correct rate at threshold 0.5. |
+| iv | simulated | R, Python | pass | — | Simulated endogenous regressor with one instrument. Wu-Hausman F and p-value. |
+| logit | simulated | R, Python | pass | — | Simulated strong predictor logit. Hosmer-Lemeshow chi-square by deciles. |
+| iv | simulated | R, Python | pass | — | Simulated IV with two instruments and one endogenous regressor. Sargan J-statistic and p-value. |
 | ets | statsmodels::macrodata | R, Python | pass | — | Exponential smoothing state-space model on US real GDP. Blocked because Hayashi uses SSE grid search while references use MLE. |
 | feiv | simulated | R, Python | pass | 134 | Panel with N=200 entities and T=5 periods; x is endogenous and instrumented by z. Independent R and Python within-2SLS references use the Greeners residual degrees-of-freedom convention n - k - (G - 1). |
 | fmb | simulated_fmb_panel | R, Python | pass | 49 | Classic Fama-MacBeth regression on a deterministic simulated asset panel. |
@@ -45,7 +45,7 @@
 | gmm | wooldridge::card | R, Python | pass | — | GMM returns to schooling with nearc4 as instrument for education. |
 | hausman_robust | wooldridge::wagepan | R, Python | pass | — | Robust Hausman test (Cameron-Trivedi 2005, Wooldridge 2010) with cluster-robust covariance. |
 | heckman | wooldridge::mroz | R, Python | pass | — | Two-step Heckman (Heckit) on the Mroz dataset. SEs are approximate because the reference implementations are two-step. |
-| ols | simulated | R:passed *, Python:passed * | pass | — | Simulated OLS with an outlier. Hayashi exposes DFFITS; reference uses max |DFFITS| (Cook's D not exported). |
+| ols | simulated | R, Python | pass | — | Simulated OLS with an outlier. Hayashi exposes DFFITS; reference uses max |DFFITS| (Cook's D not exported). |
 | iv | wooldridge::card | R, Python | pass | — | IV with education endogenous and nearc4 as instrument. |
 | iv | wooldridge::card | R, Python | pass | 97 | IV returns-to-schooling equation with one-way clustered standard errors by Census region. |
 | iv | wooldridge::mroz | R, Python | pass | 95 | IV returns-to-schooling equation with HC1 heteroskedasticity-robust standard errors. |
@@ -54,16 +54,18 @@
 | km | survival::aml | R, Python | pass | 113 | Kaplan-Meier right-continuous survival probabilities at seven checkpoints on survival::aml. |
 | kmeans | simulated_kmeans | R, Python | pass | — | K-Means clustering (MacQueen 1967) with k-means++ initialization. Uses simulated 2D data with 3 Gaussian clusters. |
 | lasso | wooldridge::hprice1 | R, Python | pass | — | Lasso regression of house price on lot size, square footage and bedrooms. |
-| logit | simulated | R:passed *, Python:passed * | pass | — | Simulated logit. Linktest yhat and yhat2 coefficients and standard errors. |
+| logit | simulated | R, Python | pass | — | Simulated logit. Linktest yhat and yhat2 coefficients and standard errors. |
 | logit | wooldridge::mroz | R, Python | pass | — | Logit average marginal effects on Wooldridge mroz. |
 | logit | wooldridge::mroz | R, Python | pass | — | Logit labour-force participation on the Mroz dataset. |
 | did | simulated_absorbing_panel | Python | pass | — | LP-DiD quickstart against pylpdid on an absorbing staggered-adoption panel. R reference is left aside for now. |
-| logit | simulated | R:passed *, Python:passed * | pass | — | Simulated strong predictor logit. AUC and Gini exported as a coefficient table. |
+| logit | simulated | R, Python | pass | — | Simulated strong predictor logit. AUC and Gini exported as a coefficient table. |
 | arima | simulated_ma1 | R, Python | pass | — | Uses the same simulated MA(1) DGP as Chapter 26 of the book. |
 | mice_chained | simulated_mice | R, Python | pass | — | MICE (Multiple Imputation by Chained Equations, van Buuren 2011) with m=5, iter=10. Uses simulated data with MCAR missing values. |
+| midas | simulated |  | blocked | — | Simplified MIDAS with freq=1 (same-frequency y and x). True mixed-frequency usage (freq>1) is impossible because Hayashi midas cannot ingest a high-frequency x column that is longer than the low-frequency y column within a single DataFrame. BLOCKED pending a workable mixed-frequency data API. |
 | mixed | wooldridge::wagepan | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 14 Example 14.4 mixed linear model wage equation. |
 | mlogit | AER::TravelMode | R, Python | pass | — | Multinomial logit of chosen travel mode (air=1, train=2, bus=3, car=4) on income, wait time, vehicle cost and travel time. Alternative-specific attributes are averaged per individual to make them individual-specific covariates. |
 | modwt | simulated | R, Python | pass | — | Simulated series (trend + 16-period sine + noise). Greeners MODWT uses unnormalised Haar filters, equivalent to `pywt.swt(..., norm=False)`. `pywt` returns coefficients coarse-to-fine; the reference reverses them to match Greeners' W_1 (finest) convention. |
+| nardl | simulated |  | blocked | — | Simulated NARDL(1,1) with asymmetric responses to positive/negative changes in x. BLOCKED because Hayashi nardl returns degenerate coefficients (near-zero for most terms and Dy_{t-1}=1.0 with t-values in the trillions), indicating a numerical or collinearity bug in the Greeners implementation. |
 | negbin | wooldridge::fertil2 | R, Python | pass | — | Negative binomial regression for number of children on age, education, electric and urban indicators. Dispersion parameter (alpha) is not compared because Hayashi does not report it; coefficient tolerance is 2e-1 due to different alpha estimates. |
 | nls | simulated | R, Python | pass | — | Simulated data from y = a * (b1*x1^rho + (1-b1)*x2^rho)^(1/rho) + N(0, 0.1). The CES function is now identified by the share restriction b2 = 1 - b1. |
 | nls | simulated | R, Python | pass | — | Simulated data from y = a * x1^b1 * x2^b2 + N(0, 0.3). Coefficients and standard errors compared against R `nls` and Python `curve_fit`. |
@@ -112,11 +114,14 @@
 | panel_fe | wooldridge::grunfeld | R, Python | pass | — | Panel fixed-effects investment demand model (Grunfeld). |
 | panel_fe | wooldridge::wagepan | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 14 Example 14.4 panel fixed-effects wage equation. |
 | panel_heckman | simulated_panel_heckman | R, Python | pass | — | Panel Heckman selection model (two-step) with selection equation and outcome equation. Uses simulated panel data with known selection mechanism. |
+| panel_qreg | simulated | R, Python | pass | — | Simulated panel with entity fixed effects and heteroskedastic errors. References demean the data and run quantile regression without an intercept; standard errors are convention-sensitive. |
+| panel_tobit | simulated |  | blocked | — | Simulated panel Tobit with y censored at 0. BLOCKED because Hayashi panel_tobit mislabels coefficients (returns variables named 'x' and 'x1' instead of 'const' and 'x'), making comparison impossible without editing Rust code. |
 | pca | wooldridge::wage1 | R, Python | pass | — | Standardised PCA of educ, exper, tenure, and wage; absolute loadings are compared because component signs are arbitrary. |
 | pcse | wooldridge::wagepan | R, Python | pass | 99, 103 | PCSE estimation of log wage on education, experience, and dummies using the Hayashi/Greeners Beck-Katz covariance convention. |
 | poisson | wooldridge::fertil2 | R, Python | pass | — | Poisson regression for number of children on the fertil2 dataset. |
 | probit | wooldridge::mroz | R, Python | pass | — | Probit labour-force participation on the Mroz dataset. |
 | psm | wooldridge::jtrain3 | R, Python | pass | — | 1:1 nearest-neighbor propensity score matching with caliper 0.2 and bootstrap SE. |
+| pvar | simulated | R:passed *, Python:passed * | pass | — | Simulated bivariate panel VAR with N=50 and T=100. Hayashi GMM and within-OLS references agree within moderate tolerance due to the Nickell bias in within estimation. |
 | qreg | simulated | R, Python | pass | — | Simulated heteroskedastic data y = 1 + 2x + (1 + 0.5x) * (Exponential(1)-1). Quantile regression at tau=0.75 compared against statsmodels. boot=0 to avoid bootstrap overhead. |
 | qreg | wooldridge::wage1 | R, Python | pass | — | Median quantile regression of wage on education, experience, and tenure. |
 | rdd | rdd_book | R, Python | pass | — | Sharp RDD with local linear regression, triangular kernel and Imbens-Kalyanaraman bandwidth. |
@@ -124,6 +129,7 @@
 | rf | simulated | R, Python | pass | — | Simulated data y = 3*x1 + N(0, 0.1). In-sample R² compared against scikit-learn RandomForestRegressor with the same tree and depth settings. |
 | ridge | wooldridge::hprice1 | R, Python | pass | 106 | Ridge regression of log house price on log lot size, log square footage, bedrooms and colonial dummy. |
 | rlm | wooldridge::wage1 | R, Python | pass | — | Huber robust linear regression of log wage on education, experience, and tenure. |
+| setar | simulated | R, Python | pass | — | Simulated SETAR(1,1,1) with two regimes split by y_{t-1}. Hayashi grid search may differ slightly from R tsDyn; tolerances are relaxed accordingly. |
 | spatial_durbin | simulated | R, Python | pass | — | Data generated on a 7x7 grid with rook contiguity W, rho=0.3, beta=0.5, theta=0.2. Only rho is compared because the intercept and spatially lagged intercept are collinear in the cross-sectional specification. |
 | spatial_sar | simulated | R, Python | pass | — | Spatial autoregressive (SAR) model on a simulated 7x7 grid with rook contiguity weights. Reference implements the same concentrated MLE independently. |
 | spatial_sem | simulated | R, Python | pass | — | Data generated on a 7x7 grid with rook contiguity W, lambda=0.3, beta=0.5. Reference implements the concentrated MLE for SEM independently. |
@@ -136,14 +142,14 @@
 | sysgmm | wooldridge::wagepan | R, Python | pass | 117 | System GMM (Blundell-Bond) two-step on Wooldridge wagepan with lags=2. R and Python references explicitly implement the same two-step System GMM procedure used by Hayashi/Greeners; plm::pgmm is not used as the active R oracle because it uses different instrument and weighting conventions. |
 | descriptive | wooldridge::wage1 | R, Python | pass | — | Tabstat statistics (mean, sd, min, max, p50) for wage, educ, exper, tenure. |
 | descriptive | wooldridge::mroz | R, Python | pass | — | Two-way frequency table with Pearson chi-square test. |
-| ols | simulated | R:passed *, Python:passed * | pass | — | Simulated OLS. testparm F and p-value for H0: x1 = x2 = 0. |
+| ols | simulated | R, Python | pass | — | Simulated OLS. testparm F and p-value for H0: x1 = x2 = 0. |
 | three_sls | simulated | Python | pass | — | Simultaneous two-equation system with correlated errors. Each equation includes an intercept, one exogenous and one endogenous regressor; the excluded exogenous from the other equation is used as an instrument. Python reference is linearmodels.system.IV3SLS with an explicit constant column. |
 | tobit | wooldridge::mroz | R | pass | — | Tobit regression of hours worked with left censoring at zero. Hayashi matches AER::tobit at displayed precision; the custom Python MLE is retained as a diagnostic script but is not the active reference. |
 | descriptive | wooldridge::wage1 | R, Python | pass | — | One-sample t-test of wage mean against mu=5. |
 | var | simulated_var1 | R, Python | pass | — | Uses the same simulated bivariate VAR(1) DGP as Chapter 28 of the book. |
 | var | statsmodels::macrodata | R, Python | pass | — | VAR(2) on US real GDP and consumption. |
 | varma | simulated | Python | pass | — | Bivariate VARMA(1,1) with known AR and MA matrices. Hayashi uses the Hannan-Rissanen algorithm; the Python reference uses statsmodels VARMAX with no trend. Coefficients are compared (standard errors are not computed by the current Hayashi VARMA implementation). |
-| iv | simulated | R:passed *, Python:passed * | pass | — | Simulated weak instrument. First-stage partial F and p-value. |
+| iv | simulated | R, Python | pass | — | Simulated weak instrument. First-stage partial F and p-value. |
 | wls | wooldridge::hprice1 | R, Python | pass | — | WLS with weights generated inside Hayashi to avoid sandbox file issues. |
 | xtgls | wooldridge::wagepan | R, Python | pass | — | Panel feasible GLS with panel-level heteroskedasticity (Parks/Kmenta, Stata xtgls panels(heteroskedastic)). R and Python references implement the same two-step FGLS procedure used by Hayashi/Greeners. |
 | xtlogit | simulated | R, Python | pass | — | Simulated panel with N=50 groups and T=4 periods. GEE logit with exchangeable working correlation. Only coefficients compared; standard errors depend on the sandwich estimator convention used by each package. |

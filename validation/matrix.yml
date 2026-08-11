@@ -272,6 +272,13 @@ cases:
     iter=10. Uses simulated data with MCAR missing values.
   dimension: numerical
   status: pass
+- id: midas_simulated
+  notes: Simplified MIDAS with freq=1 (same-frequency y and x). True mixed-frequency
+    usage (freq>1) is impossible because Hayashi midas cannot ingest a high-frequency
+    x column that is longer than the low-frequency y column within a single DataFrame.
+    BLOCKED pending a workable mixed-frequency data API.
+  dimension: numerical
+  status: blocked
 - id: mixed_wooldridge_wagepan_ch14
   notes: Wooldridge Introductory Econometrics Chapter 14 Example 14.4 mixed linear
     model wage equation.
@@ -289,6 +296,13 @@ cases:
     coarse-to-fine; the reference reverses them to match Greeners' W_1 (finest) convention.
   dimension: numerical
   status: pass
+- id: nardl_simulated
+  notes: Simulated NARDL(1,1) with asymmetric responses to positive/negative changes
+    in x. BLOCKED because Hayashi nardl returns degenerate coefficients (near-zero
+    for most terms and Dy_{t-1}=1.0 with t-values in the trillions), indicating a
+    numerical or collinearity bug in the Greeners implementation.
+  dimension: numerical
+  status: blocked
 - id: nbreg_fertil2
   notes: Negative binomial regression for number of children on age, education, electric
     and urban indicators. Dispersion parameter (alpha) is not compared because Hayashi
@@ -519,6 +533,18 @@ cases:
     equation. Uses simulated panel data with known selection mechanism.
   dimension: numerical
   status: pass
+- id: panel_qreg_simulated
+  notes: Simulated panel with entity fixed effects and heteroskedastic errors. References
+    demean the data and run quantile regression without an intercept; standard errors
+    are convention-sensitive.
+  dimension: numerical
+  status: pass
+- id: panel_tobit_simulated
+  notes: Simulated panel Tobit with y censored at 0. BLOCKED because Hayashi panel_tobit
+    mislabels coefficients (returns variables named 'x' and 'x1' instead of 'const'
+    and 'x'), making comparison impossible without editing Rust code.
+  dimension: numerical
+  status: blocked
 - id: pca_wooldridge_wage1
   notes: Standardised PCA of educ, exper, tenure, and wage; absolute loadings are
     compared because component signs are arbitrary.
@@ -540,6 +566,11 @@ cases:
 - id: psm_jtrain3
   notes: 1:1 nearest-neighbor propensity score matching with caliper 0.2 and bootstrap
     SE.
+  dimension: numerical
+  status: pass
+- id: pvar_simulated
+  notes: Simulated bivariate panel VAR with N=50 and T=100. Hayashi GMM and within-OLS
+    references agree within moderate tolerance due to the Nickell bias in within estimation.
   dimension: numerical
   status: pass
 - id: qreg_simulated
@@ -574,6 +605,11 @@ cases:
 - id: rlm_wage1
   notes: Huber robust linear regression of log wage on education, experience, and
     tenure.
+  dimension: numerical
+  status: pass
+- id: setar_simulated
+  notes: Simulated SETAR(1,1,1) with two regimes split by y_{t-1}. Hayashi grid search
+    may differ slightly from R tsDyn; tolerances are relaxed accordingly.
   dimension: numerical
   status: pass
 - id: spatial_durbin_simulated
