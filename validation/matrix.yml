@@ -76,6 +76,13 @@ cases:
     Only the cointegration (beta) and adjustment (alpha) coefficients are compared.
   dimension: numerical
   status: pass
+- id: copula_simulated
+  notes: Simulated bivariate normal with Pearson correlation 0.6. Hayashi `copula(...,
+    type="gaussian")` returns the empirical correlation matrix, Kendall's tau, and
+    Spearman's rho. The Gaussian copula parameter for a bivariate normal equals the
+    Pearson correlation.
+  dimension: numerical
+  status: pass
 - id: correlate_wooldridge_wage1
   notes: Pairwise correlations of wage, educ, exper, tenure.
   dimension: numerical

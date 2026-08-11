@@ -3,15 +3,15 @@ df <- read.csv(file.path("validation", "cases", "copula_simulated", "data", "dat
 y <- df$y
 x <- df$x
 
-# Kendall's tau and Spearman's rho (with sin transformation to theta)
 tau <- cor(y, x, method = "kendall")
-rho <- sin(pi / 2 * tau)
 spearman <- cor(y, x, method = "spearman")
+# Gaussian copula parameter derived from Kendall's tau: rho = sin(pi * tau / 2)
+corr <- sin(pi * tau / 2)
 
 result <- list(
-  theta = as.numeric(rho),
-  kendall_tau_yx = as.numeric(tau),
-  spearman_rho_yx = as.numeric(spearman)
+  corr_yx = as.numeric(corr),
+  kendall_yx = as.numeric(tau),
+  spearman_yx = as.numeric(spearman)
 )
 
-cat(jsonlite::toJSON(result, auto_unbox = TRUE, pretty = TRUE), "\n")
+cat(jsonlite::toJSON(result, auto_unbox = TRUE, digits = 15), "\n")

@@ -228,6 +228,25 @@ def parse_hayashi_local_level(text: str) -> dict[str, float]:
     return result
 
 
+def parse_hayashi_key_value(text: str) -> dict[str, Any]:
+    """Parse lines of the form `key=value` (e.g. for copula matrices)."""
+    import re
+
+    result: dict[str, Any] = {}
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        try:
+            result[key] = float(value)
+        except ValueError:
+            result[key] = value
+    return result
+
+
 def parse_hayashi_pca(text: str) -> dict[str, dict[str, float]]:
     """Parse PCA eigenvalues, variance ratios, and loadings from Hayashi text."""
     import re
@@ -1321,6 +1340,8 @@ def run_case(case: dict[str, Any], quiet: bool = False) -> tuple[str, list[str],
                     hayashi = parse_hayashi_local_level(hay_res.stdout)
                 else:
                     hayashi = normalise_intercept(parse_hayashi_txt_table(hay_res.stdout))
+            elif output_format == "keyvalue":
+                hayashi = parse_hayashi_key_value(hay_res.stdout)
             elif output_format == "json":
                 hayashi = parse_reference_json(hay_res.stdout)
                 if hayashi is None:
@@ -1361,6 +1382,11 @@ def run_case(case: dict[str, Any], quiet: bool = False) -> tuple[str, list[str],
             hayashi = parse_reference_json(hayashi_json.read_text())
             if hayashi is None:
                 return "blocked", [f"Could not parse Hayashi output.json"], ref_report
+        elif output_format == "keyvalue":
+            hayashi_txt = hayashi_dir / "output.txt"
+            if not hayashi_txt.exists():
+                return "blocked", [f"Hayashi output not found: {hayashi_txt}"], ref_report
+            hayashi = parse_hayashi_key_value(hayashi_txt.read_text())
         else:
             hayashi_csv = hayashi_dir / "output.csv"
             if not hayashi_csv.exists():

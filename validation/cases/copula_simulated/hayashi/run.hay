@@ -1,3 +1,8 @@
 load "validation/cases/copula_simulated/data/data.csv" as df
 let m = copula(y ~ x, df, type="gaussian")
-print(m)
+let corr_yx = (m.corr_matrix["y"])[1]
+let kendall_yx = (m.kendall_tau["y"])[1]
+let spearman_yx = (m.spearman_rho["y"])[1]
+print("corr_yx=" + str(corr_yx))
+print("kendall_yx=" + str(kendall_yx))
+print("spearman_yx=" + str(spearman_yx))

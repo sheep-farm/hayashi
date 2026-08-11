@@ -19,6 +19,7 @@
 | cloglog | wooldridge::affairs | R, Python | pass | — | Complementary log-log GLM on Wooldridge affairs. Fixed cloglog link derivative sign; Hayashi now converges and matches R glm. |
 | descriptive | wooldridge::wage1 | R, Python | pass | — | Codebook summary for the continuous wage variable. |
 | vecm | simulated_cointegrated | R, Python | pass | — | VECM(1) on a simulated cointegrated system where y = 2*x + e2 and x = cumsum(e1). Only the cointegration (beta) and adjustment (alpha) coefficients are compared. |
+| copula | simulated | R:passed *, Python:passed * | pass | — | Simulated bivariate normal with Pearson correlation 0.6. Hayashi `copula(..., type="gaussian")` returns the empirical correlation matrix, Kendall's tau, and Spearman's rho. The Gaussian copula parameter for a bivariate normal equals the Pearson correlation. |
 | descriptive | wooldridge::wage1 | R, Python | pass | — | Pairwise correlations of wage, educ, exper, tenure. |
 | cox | statsmodels::heart | R, Python | pass | — | Cox proportional hazards regression for survival time after heart transplant. |
 | cpoisson | simulated | Python | pass | — | Simulated panel counts with group fixed effects; the reference implements the exact conditional Poisson likelihood (multinomial fixed-total) using analytic gradient and Hessian. |
