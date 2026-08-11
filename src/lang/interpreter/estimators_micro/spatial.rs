@@ -471,7 +471,10 @@ impl Interpreter {
             .to_design_matrix(&g_formula)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        let var_names = g_formula.independents.clone();
+        let mut var_names = g_formula.independents.clone();
+        if g_formula.intercept {
+            var_names.insert(0, "_cons".into());
+        }
 
         let result = if func == "spatial_sar" {
             greeners::Spatial::fit_sar(&y_vec, &x_mat, &w_matrix, Some(var_names))
