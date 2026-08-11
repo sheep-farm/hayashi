@@ -1,0 +1,3 @@
+load "validation/cases/synthdid_simulated/data/data.csv" as df
+let m = synthdid(df, y, treated, 6, unit="unit", period="period")
+print("ATT=" + str(m.fit.att))

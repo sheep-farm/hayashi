@@ -561,6 +561,12 @@ cases:
   notes: Synthetic-control ATT on a simulated panel with 10 donors and 1 treated unit.
   dimension: numerical
   status: pass
+- id: synthdid_simulated
+  notes: Simulated panel with 20 units, 10 periods, treatment begins at period 6 for
+    unit 0 with ATT=2.0. Reference uses a simple synthetic-control-style pre-treatment
+    weighting and computes the post-treatment mean gap.
+  dimension: numerical
+  status: pass
 - id: sysgmm_wagepan
   notes: System GMM (Blundell-Bond) two-step on Wooldridge wagepan with lags=2. R
     and Python references explicitly implement the same two-step System GMM procedure
