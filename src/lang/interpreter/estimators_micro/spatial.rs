@@ -203,8 +203,7 @@ impl Interpreter {
         let (y_arr, x_arr) = df
             .to_design_matrix(&g_formula)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        let mut var_names = vec!["_cons".to_string()];
-        var_names.extend(g_formula.independents.clone());
+        let var_names = g_formula.independents.clone();
 
         let entity_ids: Vec<i64> = {
             let col = df
@@ -341,8 +340,7 @@ impl Interpreter {
         let (y_arr, x_arr) = df
             .to_design_matrix(&g_formula)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        let mut var_names = vec!["_cons".to_string()];
-        var_names.extend(g_formula.independents.clone());
+        let var_names = g_formula.independents.clone();
 
         let entity_ids: Vec<i64> = {
             let col = df

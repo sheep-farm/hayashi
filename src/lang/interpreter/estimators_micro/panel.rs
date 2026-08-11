@@ -45,8 +45,7 @@ impl Interpreter {
             _ => 0.0,
         };
 
-        let mut var_names = vec!["_cons".to_string()];
-        var_names.extend(g_formula.independents.clone());
+        let var_names = g_formula.independents.clone();
         let result = greeners::PanelTobit::fit(&y_vec, &x_mat, &panel_ids, censor, Some(var_names))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
