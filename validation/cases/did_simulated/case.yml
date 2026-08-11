@@ -10,24 +10,27 @@ dataset:
   licence: n/a
 
 references:
+  - R
   - Python
 
 comparison:
   quantities:
     - coefficients
+    - standard_errors
   tolerances:
-    coefficients: 1e-3
+    coefficients: 1e-8
+    standard_errors: 1e-2
 
-output_format: txt
+output_format: csv
 
 hayashi_script: cases/did_simulated/hayashi/run.hay
 reference_scripts:
+  R: cases/did_simulated/reference/run.R
   Python: cases/did_simulated/reference/run.py
 
-notes: Simulated 2x2 DiD with ATT=1.5. Interaction coefficient compared
-  against statsmodels OLS with robust standard errors.
+notes: Simulated 2x2 DiD with ATT=1.5. Coefficients and heteroskedasticity-consistent (HC0) standard errors are compared against base-R/sandwich and statsmodels.
 
 result:
-  summary: "DiD interaction coefficient matches statsmodels."
+  summary: "DiD coefficients and HC0 standard errors match R and Python references."
   known_differences: []
   issues_opened: []

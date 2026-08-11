@@ -48,7 +48,7 @@ w_str = "[\n  " + ",\n  ".join(rows) + "\n]"
 script = f'''load "validation/cases/spatial_sem_simulated/data/data.csv" as df
 let W = {w_str}
 let m = spatial_sem(y ~ x, df, w=W)
-print(m)
+export(m.coefficients, "csv", "/dev/stdout")
 '''
 with open(os.path.join(os.path.dirname(__file__), "..", "hayashi", "run.hay"), "w") as f:
     f.write(script)

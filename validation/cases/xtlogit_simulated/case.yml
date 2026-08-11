@@ -10,26 +10,27 @@ dataset:
   licence: n/a
 
 references:
+  - R
   - Python
 
 comparison:
   quantities:
     - coefficients
+    - standard_errors
   tolerances:
-    coefficients: 1e-3
+    coefficients: 1e-4
+    standard_errors: 1e-4
 
-output_format: txt
+output_format: csv
 
 hayashi_script: cases/xtlogit_simulated/hayashi/run.hay
 reference_scripts:
+  R: cases/xtlogit_simulated/reference/run.R
   Python: cases/xtlogit_simulated/reference/run.py
 
-notes: Simulated panel with N=50 groups and T=4 periods. GEE logit with
-  exchangeable working correlation. Only coefficients compared; standard errors
-  depend on the sandwich estimator convention used by each package.
+notes: Simulated panel with N=50 groups and T=4 periods. GEE logit with exchangeable working correlation; coefficients and sandwich standard errors compared.
 
 result:
-  summary: "Hayashi GEE logit coefficients match statsmodels."
-  known_differences:
-    - Robust standard errors differ between implementations; not compared.
+  summary: "Hayashi GEE logit coefficients and standard errors match R and Python references."
+  known_differences: []
   issues_opened: []

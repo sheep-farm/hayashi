@@ -34,9 +34,11 @@ y_treated_pre = y_treated[:treat_period]
 # Find weights minimizing pre-treatment MSE
 w0 = np.ones(len(control_idx)) / len(control_idx)
 
+
 def mse(w):
     y_syn = w.dot(Y_pre)
     return np.mean((y_treated_pre - y_syn) ** 2)
+
 
 cons = {"type": "eq", "fun": lambda w: w.sum() - 1.0}
 bounds = [(0, 1)] * len(control_idx)
@@ -49,7 +51,12 @@ y_treated_post = y_treated[treat_period:]
 att = (y_treated_post - y_syn_post).mean()
 
 result = {
-    "ATT": float(att),
+    "coefficients": {
+        "ATT": float(att),
+    },
+    "standard_errors": {
+        "ATT": float("nan"),
+    },
 }
 
 print(json.dumps(result, indent=2))

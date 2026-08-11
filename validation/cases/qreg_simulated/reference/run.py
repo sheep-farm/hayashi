@@ -9,8 +9,14 @@ model = smf.quantreg("y ~ x", df)
 res = model.fit(q=0.75)
 
 result = {
-    "const": float(res.params["Intercept"]),
-    "x": float(res.params["x"]),
+    "coefficients": {
+        "const": float(res.params["Intercept"]),
+        "x": float(res.params["x"]),
+    },
+    "standard_errors": {
+        "const": float(res.bse["Intercept"]),
+        "x": float(res.bse["x"]),
+    },
 }
 
 print(json.dumps(result, indent=2))

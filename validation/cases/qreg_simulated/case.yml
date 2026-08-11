@@ -10,28 +10,27 @@ dataset:
   licence: n/a
 
 references:
+  - R
   - Python
 
 comparison:
   quantities:
-    - const
-    - x
+    - coefficients
+    - standard_errors
   tolerances:
-    const: 1e-6
-    x: 1e-6
+    coefficients: 1e-6
+    standard_errors: 1e-1
 
-output_format: keyvalue
+output_format: csv
 
 hayashi_script: cases/qreg_simulated/hayashi/run.hay
 reference_scripts:
+  R: cases/qreg_simulated/reference/run.R
   Python: cases/qreg_simulated/reference/run.py
 
-notes: >-
-  Simulated heteroskedastic data y = 1 + 2x + (1 + 0.5x) * (Exponential(1)-1).
-  Quantile regression at tau=0.75 compared against statsmodels. boot=0 to avoid
-  bootstrap overhead.
+notes: Simulated heteroskedastic data. Quantile regression at tau=0.75 with bootstrap standard errors compared against R quantreg and statsmodels.
 
 result:
-  summary: "Hayashi quantile regression matches statsmodels."
+  summary: "Hayashi quantile regression matches R and Python references."
   known_differences: []
   issues_opened: []

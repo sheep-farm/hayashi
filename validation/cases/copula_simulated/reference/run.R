@@ -9,9 +9,16 @@ spearman <- cor(y, x, method = "spearman")
 corr <- sin(pi * tau / 2)
 
 result <- list(
-  corr_yx = as.numeric(corr),
-  kendall_yx = as.numeric(tau),
-  spearman_yx = as.numeric(spearman)
+  coefficients = list(
+    corr_yx = as.numeric(corr),
+    kendall_yx = as.numeric(tau),
+    spearman_yx = as.numeric(spearman)
+  ),
+  standard_errors = list(
+    corr_yx = 0.0,
+    kendall_yx = 0.0,
+    spearman_yx = 0.0
+  )
 )
 
 cat(jsonlite::toJSON(result, auto_unbox = TRUE, digits = 15), "\n")

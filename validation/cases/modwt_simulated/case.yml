@@ -14,28 +14,23 @@ references:
 
 comparison:
   quantities:
-    - W_1
-    - W_2
-    - W_3
+    - coefficients
+    - standard_errors
   tolerances:
-    W_1: 1e-12
-    W_2: 1e-12
-    W_3: 1e-12
+    coefficients: 1e-12
+    standard_errors: 1.0
 
-output_format: keyvalue
+output_format: csv
 
 hayashi_script: cases/modwt_simulated/hayashi/run.hay
 reference_scripts:
   Python: cases/modwt_simulated/reference/run.py
 
-notes: >-
-  Simulated series (trend + 16-period sine + noise). Greeners MODWT uses
-  unnormalised Haar filters, equivalent to `pywt.swt(..., norm=False)`.
-  `pywt` returns coefficients coarse-to-fine; the reference reverses them
-  to match Greeners' W_1 (finest) convention.
+notes: Simulated series (trend + 16-period sine + noise). Greeners MODWT uses unnormalised Haar filters, equivalent to pywt.swt(..., norm=False). Wavelet energies are compared as coefficient-like quantities; standard errors are not meaningful.
 
 result:
   summary: "MODWT wavelet energies match pywt.swt with norm=False."
   known_differences:
     - Approximation energy V_3 not compared due to different conventions.
+    - Standard errors are not defined for wavelet energy totals.
   issues_opened: []

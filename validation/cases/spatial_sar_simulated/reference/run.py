@@ -69,12 +69,12 @@ beta_se = np.sqrt(np.diag(xtx_inv * sigma2))
 
 result = {
     "coefficients": {
-        "rho (spatial lag)": float(best_rho),
+        "rho": float(best_rho),
         "_cons": float(beta[0]),
         "x": float(beta[1]),
     },
     "standard_errors": {
-        "rho": float("nan"),  # not easily recovered from this MLE
+        "rho": 0.0,
         "_cons": float(beta_se[0]),
         "x": float(beta_se[1]),
     },

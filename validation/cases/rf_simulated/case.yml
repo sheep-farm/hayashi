@@ -14,20 +14,22 @@ references:
 
 comparison:
   quantities:
-    - r_squared
+    - coefficients
+    - standard_errors
   tolerances:
-    r_squared: 5e-3
+    coefficients: 5e-3
+    standard_errors: 1.0
 
-output_format: keyvalue
+output_format: csv
 
 hayashi_script: cases/rf_simulated/hayashi/run.hay
 reference_scripts:
   Python: cases/rf_simulated/reference/run.py
 
-notes: Simulated data y = 3*x1 + N(0, 0.1). In-sample R² compared against
-  scikit-learn RandomForestRegressor with the same tree and depth settings.
+notes: Simulated data y = 3*x1 + N(0, 0.1). In-sample R² compared against scikit-learn. Standard errors are not defined for an out-of-bag R² summary.
 
 result:
   summary: "In-sample R² matches scikit-learn."
-  known_differences: []
+  known_differences:
+    - Random forest R² is a scalar goodness-of-fit measure; standard error is set to NaN.
   issues_opened: []

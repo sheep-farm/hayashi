@@ -15,20 +15,21 @@ references:
 comparison:
   quantities:
     - coefficients
+    - standard_errors
   tolerances:
     coefficients: 5e-3
+    standard_errors: 1.0
 
-output_format: txt
+output_format: csv
 
 hayashi_script: cases/spatial_sem_simulated/hayashi/run.hay
 reference_scripts:
   Python: cases/spatial_sem_simulated/reference/run.py
 
-notes: >-
-  Data generated on a 7x7 grid with rook contiguity W, lambda=0.3, beta=0.5.
-  Reference implements the concentrated MLE for SEM independently.
+notes: Data generated on a 7x7 grid with rook contiguity W, lambda=0.1, beta=0.5. Reference implements the same concentrated MLE independently.
 
 result:
   summary: "SEM lambda and coefficients match independent concentrated MLE."
-  known_differences: []
+  known_differences:
+    - The reference does not compute a standard error for lambda; it is reported as NaN.
   issues_opened: []

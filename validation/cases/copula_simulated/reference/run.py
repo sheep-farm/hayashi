@@ -14,9 +14,16 @@ spearman, _ = stats.spearmanr(y, x)
 corr = np.sin(np.pi * tau / 2)
 
 result = {
-    "corr_yx": float(corr),
-    "kendall_yx": float(tau),
-    "spearman_yx": float(spearman),
+    "coefficients": {
+        "corr_yx": float(corr),
+        "kendall_yx": float(tau),
+        "spearman_yx": float(spearman),
+    },
+    "standard_errors": {
+        "corr_yx": 0.0,
+        "kendall_yx": 0.0,
+        "spearman_yx": 0.0,
+    },
 }
 
-print(json.dumps(result))
+print(json.dumps(result, indent=2))

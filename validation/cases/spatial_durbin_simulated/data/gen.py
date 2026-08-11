@@ -46,7 +46,14 @@ w_str = "[\n  " + ",\n  ".join(rows) + "\n]"
 script = f'''load "validation/cases/spatial_durbin_simulated/data/data.csv" as df
 let W = {w_str}
 let m = spatial_durbin(y ~ x, df, w=W, id="id")
-print("rho=" + str(m.fit.rho))
+let nan = 0.0/0.0
+let out = dataframe({{
+  "variable": ["rho"],
+  "coef": [m.fit.rho],
+  "std_err": [nan]
+}})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")
 '''
 with open(os.path.join(os.path.dirname(__file__), "..", "hayashi", "run.hay"), "w") as f:
     f.write(script)

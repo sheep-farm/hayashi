@@ -18,7 +18,12 @@ model = RandomForestRegressor(
 model.fit(X, y)
 
 result = {
-    "r_squared": float(model.score(X, y)),
+    "coefficients": {
+        "r_squared": float(model.score(X, y)),
+    },
+    "standard_errors": {
+        "r_squared": float("nan"),
+    },
 }
 
 print(json.dumps(result, indent=2))

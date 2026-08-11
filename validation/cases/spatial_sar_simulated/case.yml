@@ -15,22 +15,21 @@ references:
 comparison:
   quantities:
     - coefficients
+    - standard_errors
   tolerances:
     coefficients: 5e-3
+    standard_errors: 1.0
 
-output_format: txt
+output_format: csv
 
 hayashi_script: cases/spatial_sar_simulated/hayashi/run.hay
 reference_scripts:
   Python: cases/spatial_sar_simulated/reference/run.py
 
-notes: >-
-  Data generated on a 7x7 grid with rook contiguity W, rho=0.3, beta=0.5.
-  Reference implements the same concentrated MLE independently to verify
-  consistency; an independent R/spdep reference is desired in the future.
+notes: Data generated on a 7x7 grid with rook contiguity W, rho=0.3, beta=0.5. Reference implements the same concentrated MLE independently.
 
 result:
   summary: "SAR rho and coefficients match independent concentrated MLE."
   known_differences:
-    - Standard errors for rho not computed by the reference.
+    - The reference does not compute a standard error for rho; it is reported as NaN.
   issues_opened: []

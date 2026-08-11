@@ -14,22 +14,22 @@ references:
 
 comparison:
   quantities:
-    - ATT
+    - coefficients
+    - standard_errors
   tolerances:
-    ATT: 5e-2
+    coefficients: 5e-2
+    standard_errors: 1.0
 
-output_format: keyvalue
+output_format: csv
 
 hayashi_script: cases/synthdid_simulated/hayashi/run.hay
 reference_scripts:
   Python: cases/synthdid_simulated/reference/run.py
 
-notes: >-
-  Simulated panel with 20 units, 10 periods, treatment begins at period 6
-  for unit 0 with ATT=2.0. Reference uses a simple synthetic-control-style
-  pre-treatment weighting and computes the post-treatment mean gap.
+notes: Simulated panel with 20 units, 10 periods, treatment begins at period 6 for unit 0 with ATT=2.0. Reference uses a simple synthetic-control-style pre-treatment weighting and computes the post-treatment mean gap. The ATT has no standard error.
 
 result:
   summary: "Synthetic DiD ATT matches the simple synthetic-control reference."
-  known_differences: []
+  known_differences:
+    - The ATT is a scalar treatment-effect estimate; standard error is set to NaN.
   issues_opened: []
