@@ -67,25 +67,32 @@ def parse_hayashi_csv(path: Path) -> dict[str, dict[str, float]]:
 
 
 def parse_hayashi_csv_from_string(text: str) -> dict[str, dict[str, float]]:
-    """Parse the CSV produced by Hayashi OLS/WLS export from a string.
+    """Parse the CSV produced by Hayashi OLS/WLS/model export from a string.
 
-    Hayashi may print an "Exported OLS → ..." line before the CSV data, so we
-    locate the header row and parse from there.
+    Hayashi may print an "Exported ... → ..." line before the CSV data, so we
+    locate the header row and parse from there. Some estimators export lower-case
+    headers (variable,coef,std_err) instead of the OLS-style (Variable,Coef,Std_Err).
     """
     import csv
     import io
 
-    header = "Variable,Coef,Std_Err"
-    start = text.find(header)
-    if start == -1:
+    header_aliases = [
+        ("Variable,Coef,Std_Err", "Variable", "Coef", "Std_Err"),
+        ("variable,coef,std_err", "variable", "coef", "std_err"),
+    ]
+    for header, var_col, coef_col, se_col in header_aliases:
+        start = text.find(header)
+        if start != -1:
+            break
+    else:
         raise ValueError(f"CSV header not found in Hayashi output: {text[:200]!r}")
 
     result = {"coefficients": {}, "standard_errors": {}}
     reader = csv.DictReader(io.StringIO(text[start:]))
     for row in reader:
-        var = row.get("Variable")
-        coef = row.get("Coef")
-        se = row.get("Std_Err")
+        var = row.get(var_col)
+        coef = row.get(coef_col)
+        se = row.get(se_col)
         if not var or coef is None or se is None or coef == "" or se == "":
             continue
         # Normalise intercept label across implementations.
@@ -1149,7 +1156,7 @@ def run_case(case: dict[str, Any], quiet: bool = False) -> tuple[str, list[str],
     # case from a clean checkout.
     gen_scripts = [
         (data_dir / "gen.hay", [hay_exe, str(data_dir / "gen.hay")]),
-        (data_dir / "gen.py", ["python", str(data_dir / "gen.py")]),
+        (data_dir / "gen.py", [python_executable(), str(data_dir / "gen.py")]),
         (data_dir / "gen.R", ["Rscript", str(data_dir / "gen.R")]),
     ]
     for gen_path, gen_cmd in gen_scripts:

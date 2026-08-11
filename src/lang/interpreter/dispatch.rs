@@ -191,6 +191,7 @@ impl Interpreter {
         self.extract_panel_args_with_policy(args, opt_map, FormulaInterceptPolicy::RequireIntercept)
     }
 
+    #[allow(dead_code)]
     pub(super) fn extract_panel_args_allow_no_intercept(
         &mut self,
         args: &[Expr],

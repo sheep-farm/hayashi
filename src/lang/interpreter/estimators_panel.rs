@@ -509,7 +509,8 @@ impl Interpreter {
             }
             _ => return Err(HayashiError::Type("clogit: group= must be string".into())),
         };
-        let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+        let (df, mut g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+        g_formula.intercept = false;
         let (y_vec, x_mat) = df
             .to_design_matrix(&g_formula)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -553,7 +554,8 @@ impl Interpreter {
             }
             _ => return Err(HayashiError::Type("cpoisson: group= must be string".into())),
         };
-        let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+        let (df, mut g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+        g_formula.intercept = false;
         let (y_vec, x_mat) = df
             .to_design_matrix(&g_formula)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -2148,18 +2150,28 @@ impl Interpreter {
             .to_design_matrix(&g_endog)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        // instrument formula → Z (no constant)
-        let (df_instr2, mut g_instr2, _) = self.prepare_formula(&instr_ast, &df)?;
-        g_instr2.dependent = g_endog.dependent.clone();
+        // instrument formula → Z (no constant); materializamos para suportar exprs
+        let (_, mut g_instr2, _) = self.prepare_formula(&instr_ast, &df)?;
         g_instr2.intercept = false;
-        let (_, z_mat) = df_instr2
-            .to_design_matrix(&g_instr2)
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let instr_vars: Vec<String> = g_instr2.independents;
 
-        if z_mat.ncols() == 0 {
+        let n = y_vec.len();
+        let l = instr_vars.len();
+        if l == 0 {
             return Err(HayashiError::Runtime(
                 "feiv(): instrument formula must have at least one instrument".into(),
             ));
+        }
+        let mut z_mat = ndarray::Array2::<f64>::zeros((n, l));
+        for (j, col_name) in instr_vars.iter().enumerate() {
+            let col = df.get(col_name).map_err(|_| {
+                HayashiError::Runtime(format!(
+                    "feiv: instrument '{col_name}' not found in DataFrame"
+                ))
+            })?;
+            for (i, &v) in col.iter().enumerate() {
+                z_mat[[i, j]] = v;
+            }
         }
 
         // entity IDs

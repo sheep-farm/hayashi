@@ -94,7 +94,6 @@ Load options: `sheet=`, `table=`, `query=`, `sep=`, `columns=`, `where=`. URLs a
 | `wls` | `wls(Y ~ X, df, weights="w")` | Weighted least squares |
 | `fe` | `fe(Y ~ X, df [, id=col])` | Fixed effects (within) |
 | `re` | `re(Y ~ X, df [, id=col])` | Random effects (GLS) |
-| `be` | `be(Y ~ X, df [, id=col])` | Between estimator |
 | `feiv` | `feiv(Y ~ Xendog + X, ~ Z, df, id=col)` | Fixed-effects IV |
 | `ab` | `ab(Y ~ X, df, id=, time=)` | Arellano-Bond |
 | `sysgmm` | `sysgmm(Y ~ X, df, id=, time=)` | System GMM (Blundell-Bond) |

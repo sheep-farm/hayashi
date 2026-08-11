@@ -1,0 +1,3 @@
+load "validation/cases/feiv_simulated/data/data.csv" as df
+let m = feiv(y ~ x, ~ z, df, id="id")
+print(m)

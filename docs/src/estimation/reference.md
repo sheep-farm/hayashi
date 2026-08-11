@@ -36,7 +36,6 @@ end of the page.
 |---------|-------------|--------|
 | `fe` | Fixed effects (within estimator) | `fe(Y ~ X1 + X2, df)` |
 | `re` | Random effects (GLS) | `re(Y ~ X1 + X2, df)` |
-| `be` | Between estimator | `be(Y ~ X1 + X2, df)` |
 | `feiv` | FE with instrumental variables | `feiv(Y ~ X_exog + X_endo, ~ Z, df)` |
 | `ab` | Arellano-Bond | `ab(Y ~ X1 + X2, df, id=firm, time=year)` |
 | `sysgmm` | System GMM | `sysgmm(Y ~ X1 + X2, df, id=firm, time=year)` |

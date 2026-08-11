@@ -208,8 +208,7 @@ Public surface:
   implementations. `validation/run.py` orchestrates discovery, execution,
   parsing, and tolerance-based comparison; `validation/matrix.yml` is the
   registry; `validation/MATRIX.md` is the human-readable dashboard.
-- Current validation: 100 cases, 99 `pass`, 1 `not-supported`
-  (`panel_fe_cluster_wagepan` because `fe()` ignores `cluster=`).
+- Current validation: 123 cases, all `pass`.
 
 ### 5.1 CI
 

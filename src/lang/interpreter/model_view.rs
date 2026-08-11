@@ -640,11 +640,12 @@ fn flatten_three_sls_equations(
 
     for eq in equations {
         for i in 0..eq.params.len() {
-            let vname = if i == 0 {
-                format!("{}:_cons", eq.name)
-            } else {
-                format!("{}:x{i}", eq.name)
-            };
+            let base = eq
+                .var_names
+                .get(i)
+                .cloned()
+                .unwrap_or_else(|| format!("x{i}"));
+            let vname = format!("{}:{}", eq.name, base);
             names.push(vname);
             params.push(eq.params[i]);
             std_errors.push(eq.std_errors[i]);

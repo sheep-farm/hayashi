@@ -51,6 +51,12 @@ cases:
   notes: 95% confidence interval for the wage mean.
   dimension: numerical
   status: pass
+- id: clogit_simulated
+  notes: Simulated matched groups with group fixed effects and a single endogenous
+    regressor. R reference is survival::clogit; groups without within-group variation
+    are dropped at generation time.
+  dimension: numerical
+  status: pass
 - id: cloglog_wooldridge_affairs
   notes: Complementary log-log GLM on Wooldridge affairs. Fixed cloglog link derivative
     sign; Hayashi now converges and matches R glm.
@@ -71,6 +77,12 @@ cases:
   status: pass
 - id: cox_heart
   notes: Cox proportional hazards regression for survival time after heart transplant.
+  dimension: numerical
+  status: pass
+- id: cpoisson_simulated
+  notes: Simulated panel counts with group fixed effects; the reference implements
+    the exact conditional Poisson likelihood (multinomial fixed-total) using analytic
+    gradient and Hessian.
   dimension: numerical
   status: pass
 - id: dcc_garch_nyse
@@ -99,6 +111,12 @@ cases:
 - id: ets_gdp
   notes: Exponential smoothing state-space model on US real GDP. Blocked because Hayashi
     uses SSE grid search while references use MLE.
+  dimension: numerical
+  status: pass
+- id: feiv_simulated
+  notes: Panel with N=200 entities and T=5 periods; x is endogenous and instrumented
+    by z. Within-2SLS reference computes the same FE-IV coefficients and standard
+    errors that account for the N fixed effects in the residual degrees of freedom.
   dimension: numerical
   status: pass
 - id: fmb_simulated
@@ -403,8 +421,8 @@ cases:
   dimension: numerical
   status: pass
 - id: panel_fe_cluster_wagepan
-  notes: Panel fixed-effects wage equation with worker-clustered standard errors
-    using explicit within-transformed CR1 reference implementations. Tolerance reflects
+  notes: Panel fixed-effects wage equation with worker-clustered standard errors using
+    explicit within-transformed CR1 reference implementations. Tolerance reflects
     Hayashi's four-decimal text export.
   dimension: numerical
   status: pass
@@ -491,8 +509,8 @@ cases:
   dimension: numerical
   status: pass
 - id: sysgmm_wagepan
-  notes: System GMM (Blundell-Bond) two-step on Wooldridge wagepan with lags=2.
-    R and Python references explicitly implement the same two-step System GMM procedure
+  notes: System GMM (Blundell-Bond) two-step on Wooldridge wagepan with lags=2. R
+    and Python references explicitly implement the same two-step System GMM procedure
     used by Hayashi/Greeners; plm::pgmm is not used as the active R oracle because
     it uses different instrument and weighting conventions.
   dimension: numerical
@@ -503,6 +521,13 @@ cases:
   status: pass
 - id: tabulate_mroz_inlf_kidslt6
   notes: Two-way frequency table with Pearson chi-square test.
+  dimension: numerical
+  status: pass
+- id: threesl_simulated
+  notes: Simultaneous two-equation system with correlated errors. Each equation includes
+    an intercept, one exogenous and one endogenous regressor; the excluded exogenous
+    from the other equation is used as an instrument. Python reference is linearmodels.system.IV3SLS
+    with an explicit constant column.
   dimension: numerical
   status: pass
 - id: tobit_mroz
@@ -521,6 +546,12 @@ cases:
   status: pass
 - id: var_macro
   notes: VAR(2) on US real GDP and consumption.
+  dimension: numerical
+  status: pass
+- id: varma_simulated
+  notes: Bivariate VARMA(1,1) with known AR and MA matrices. Hayashi uses the Hannan-Rissanen
+    algorithm; the Python reference uses statsmodels VARMAX with no trend. Coefficients
+    are compared (standard errors are not computed by the current Hayashi VARMA implementation).
   dimension: numerical
   status: pass
 - id: wls_hprice1

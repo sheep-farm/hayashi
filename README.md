@@ -280,7 +280,7 @@ export(m, "html", "table.html")
 | Category | Commands |
 |---|---|
 | Linear | `ols` `reg` `iv` `wls` `glsar` |
-| Panel | `fe` `re` `be` `feiv` `ab` `sysgmm` `pcse` `xtgls` |
+| Panel | `fe` `re` `feiv` `ab` `sysgmm` `pcse` `xtgls` |
 | Binary | `logit` `probit` `clogit` |
 | Count | `poisson` `nbreg` `zip` `zinb` |
 | Ordinal | `ologit` `oprobit` `mlogit` `cmnlogit` |
