@@ -10,12 +10,20 @@ simulated panel where the endogenous regressor `x` is instrumented by `z`.
 - **Licence:** n/a
 - **Size:** 1,000 observations (200 entities × 5 periods)
 
-## Reference implementation
+## Reference implementations
 
-- **Python:** within-2SLS computed manually: within-demean `y`, `x`, and `z` by
-  entity, run first-stage `x` on `z`, then second-stage `y` on fitted `x`.
-  Residual variance uses `n - 1 - G` degrees of freedom, accounting for the
-  `G` entity fixed effects.
+- **R:** independent base-R matrix implementation.
+- **Python:** NumPy matrix implementation.
+
+Both references within-demean `y`, `x`, and `z` by entity, project within-`x`
+onto within-`z`, and estimate the second stage using the fitted regressor. The
+homoskedastic covariance is
+`sigma2 * inverse(X_hat' X)`, with
+`sigma2 = SSR / (n - k - (G - 1))`. This is the convention implemented by
+Greeners 1.6.0; for this case the residual degrees of freedom are 800.
+
+Hayashi exports `tidy(m)` as CSV so the runner compares full-precision values
+rather than the four-decimal display table.
 
 ## Compared quantities
 
@@ -26,5 +34,5 @@ simulated panel where the endogenous regressor `x` is instrumented by `z`.
 
 | Quantity | Tolerance | Rationale |
 |---|---|---|
-| coefficients | 1e-4 | FE-IV closed-form should match exactly |
-| standard_errors | 1e-4 | Same closed-form residual variance |
+| coefficients | 1e-8 | Independent closed-form matrix implementations agree to machine precision |
+| standard_errors | 1e-8 | Same homoskedastic covariance and residual degrees of freedom |

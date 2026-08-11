@@ -10,6 +10,7 @@ dataset:
   licence: n/a
 
 references:
+  - R
   - Python
 
 comparison:
@@ -17,18 +18,20 @@ comparison:
     - coefficients
     - standard_errors
   tolerances:
-    coefficients: 1e-4
-    standard_errors: 1e-4
+    coefficients: 1e-8
+    standard_errors: 1e-8
 
-output_format: txt
+output_format: csv
 
 hayashi_script: cases/feiv_simulated/hayashi/run.hay
 reference_scripts:
+  R: cases/feiv_simulated/reference/run.R
   Python: cases/feiv_simulated/reference/run.py
 
-notes: Panel with N=200 entities and T=5 periods; x is endogenous and instrumented by z. Within-2SLS reference computes the same FE-IV coefficients and standard errors that account for the N fixed effects in the residual degrees of freedom.
+notes: Panel with N=200 entities and T=5 periods; x is endogenous and instrumented by z. Independent R and Python within-2SLS references use the Greeners residual degrees-of-freedom convention n - k - (G - 1).
 
 result:
-  summary: "Hayashi FE-2SLS matches the within-2SLS reference."
+  summary: "Hayashi FE-2SLS matches independent R and Python within-2SLS references at full output precision."
   known_differences: []
-  issues_opened: []
+  issues_opened:
+    - 134

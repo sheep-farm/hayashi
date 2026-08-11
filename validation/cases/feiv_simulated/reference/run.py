@@ -6,32 +6,35 @@ from pathlib import Path
 df = pd.read_csv(Path(__file__).resolve().parent.parent / "data" / "data.csv")
 
 # Within transformation by entity
-entity = df["id"].values
 vars = ["y", "x", "z"]
 dm = df.groupby("id")[vars].transform(lambda s: s - s.mean())
 
-Y = dm["y"].values
-X = dm["x"].values
-Z = dm["z"].values
+Y = dm["y"].to_numpy()
+X = dm[["x"]].to_numpy()
+Z = dm[["z"]].to_numpy()
 n = len(Y)
 G = df["id"].nunique()
 
 # First stage: within-X on within-Z
-pi = np.sum(Z * X) / np.sum(Z * Z)
-Xhat = pi * Z
+Xhat = Z @ np.linalg.solve(Z.T @ Z, Z.T @ X)
 
 # Second stage: within-Y on fitted within-X
-b = np.sum(Xhat * Y) / np.sum(Xhat * Xhat)
+beta = np.linalg.solve(Xhat.T @ X, Xhat.T @ Y)
 
 # Residuals using the observed (within) endogenous regressor
-resid = Y - b * X
-# Degrees of freedom account for the slope and one fixed effect per entity
-s2 = np.sum(resid * resid) / (n - 1 - G)
-se = np.sqrt(s2 / np.sum(Xhat * Xhat))
+resid = Y - X @ beta
+k = X.shape[1]
+df_resid = n - k - (G - 1)
+if df_resid <= 0:
+    raise ValueError("FE-IV reference has no residual degrees of freedom")
+
+sigma2 = float(resid @ resid) / df_resid
+cov = sigma2 * np.linalg.solve(Xhat.T @ X, np.eye(k))
+se = np.sqrt(np.diag(cov))
 
 result = {
-    "coefficients": {"x": float(b)},
-    "standard_errors": {"x": float(se)},
+    "coefficients": {"x": float(beta[0])},
+    "standard_errors": {"x": float(se[0])},
 }
 
 print(json.dumps(result, indent=2))
