@@ -264,6 +264,11 @@ cases:
     does not report it; coefficient tolerance is 2e-1 due to different alpha estimates.
   dimension: numerical
   status: pass
+- id: nls_ces_simulated
+  notes: Simulated data from y = a * (b1*x1^rho + (1-b1)*x2^rho)^(1/rho) + N(0, 0.1).
+    The CES function is now identified by the share restriction b2 = 1 - b1.
+  dimension: numerical
+  status: pass
 - id: nls_cobb_douglas_simulated
   notes: Simulated data from y = a * x1^b1 * x2^b2 + N(0, 0.3). Coefficients and standard
     errors compared against R `nls` and Python `curve_fit`.
@@ -525,6 +530,11 @@ cases:
   notes: Random-effects investment demand model (Grunfeld).
   dimension: numerical
   status: pass
+- id: rf_simulated
+  notes: Simulated data y = 3*x1 + N(0, 0.1). In-sample R² compared against scikit-learn
+    RandomForestRegressor with the same tree and depth settings.
+  dimension: numerical
+  status: pass
 - id: ridge_hprice1
   notes: Ridge regression of log house price on log lot size, log square footage,
     bedrooms and colonial dummy.
@@ -533,6 +543,12 @@ cases:
 - id: rlm_wage1
   notes: Huber robust linear regression of log wage on education, experience, and
     tenure.
+  dimension: numerical
+  status: pass
+- id: spatial_durbin_simulated
+  notes: Data generated on a 7x7 grid with rook contiguity W, rho=0.3, beta=0.5, theta=0.2.
+    Only rho is compared because the intercept and spatially lagged intercept are
+    collinear in the cross-sectional specification.
   dimension: numerical
   status: pass
 - id: spatial_sar_simulated

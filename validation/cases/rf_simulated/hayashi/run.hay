@@ -1,0 +1,3 @@
+load "validation/cases/rf_simulated/data/data.csv" as df
+let m = rf(y ~ x1 + x2, df, trees=50, depth=5)
+print("r_squared=" + str(m.fit.r_squared))

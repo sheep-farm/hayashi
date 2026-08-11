@@ -74,7 +74,7 @@ impl Interpreter {
             }
             "nls_ces" => (
                 &greeners::predict_ces,
-                vec!["a".into(), "b1".into(), "b2".into(), "rho".into()],
+                vec!["a".into(), "b1".into(), "rho".into()],
             ),
             _ => unreachable!(),
         };

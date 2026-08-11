@@ -25,9 +25,13 @@ impl Interpreter {
             _ => 10,
         };
 
-        let (y_arr, x_arr) = df
+        let (y_arr, mut x_arr) = df
             .to_design_matrix(&g_formula)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        // Random forest does not need an intercept column.
+        if x_arr.ncols() > g_formula.independents.len() {
+            x_arr = x_arr.slice(ndarray::s![.., 1..]).to_owned();
+        }
         let var_names = g_formula.independents.clone();
 
         let result =
