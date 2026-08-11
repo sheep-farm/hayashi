@@ -10,6 +10,7 @@ dataset:
   licence: n/a
 
 references:
+  - R
   - Python
 
 comparison:
@@ -24,6 +25,7 @@ output_format: csv
 
 hayashi_script: cases/rf_simulated/hayashi/run.hay
 reference_scripts:
+  R: cases/rf_simulated/reference/run.R
   Python: cases/rf_simulated/reference/run.py
 
 notes: Simulated data y = 3*x1 + N(0, 0.1). In-sample R² compared against scikit-learn. Standard errors are not defined for an out-of-bag R² summary.

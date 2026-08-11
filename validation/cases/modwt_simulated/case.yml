@@ -10,6 +10,7 @@ dataset:
   licence: n/a
 
 references:
+  - R
   - Python
 
 comparison:
@@ -24,6 +25,7 @@ output_format: csv
 
 hayashi_script: cases/modwt_simulated/hayashi/run.hay
 reference_scripts:
+  R: cases/modwt_simulated/reference/run.R
   Python: cases/modwt_simulated/reference/run.py
 
 notes: Simulated series (trend + 16-period sine + noise). Greeners MODWT uses unnormalised Haar filters, equivalent to pywt.swt(..., norm=False). Wavelet energies are compared as coefficient-like quantities; standard errors are not meaningful.

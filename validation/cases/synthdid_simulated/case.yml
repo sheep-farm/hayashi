@@ -10,6 +10,7 @@ dataset:
   licence: n/a
 
 references:
+  - R
   - Python
 
 comparison:
@@ -24,6 +25,7 @@ output_format: csv
 
 hayashi_script: cases/synthdid_simulated/hayashi/run.hay
 reference_scripts:
+  R: cases/synthdid_simulated/reference/run.R
   Python: cases/synthdid_simulated/reference/run.py
 
 notes: Simulated panel with 20 units, 10 periods, treatment begins at period 6 for unit 0 with ATT=2.0. Reference uses a simple synthetic-control-style pre-treatment weighting and computes the post-treatment mean gap. The ATT has no standard error.
