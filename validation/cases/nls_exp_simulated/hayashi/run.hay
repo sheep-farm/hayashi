@@ -1,0 +1,3 @@
+load "validation/cases/nls_exp_simulated/data/data.csv" as df
+let m = nls_exp(y ~ x, df, start=[2.0, -1.0], max_iter=200, tol=1e-8)
+print(m)
