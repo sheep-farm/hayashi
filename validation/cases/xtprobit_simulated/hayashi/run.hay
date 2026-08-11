@@ -1,0 +1,3 @@
+load "validation/cases/xtprobit_simulated/data/data.csv" as df
+let m = xtprobit(y ~ x, df, id="id")
+print(m)
