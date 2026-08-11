@@ -18,10 +18,10 @@ comparison:
     - coefficients
     - standard_errors
   tolerances:
-    coefficients: 1e-3
-    standard_errors: 1e-2
+    coefficients: 1e-8
+    standard_errors: 1e-8
 
-output_format: txt
+output_format: csv
 
 hayashi_script: cases/nls_logistic_simulated/hayashi/run.hay
 reference_scripts:

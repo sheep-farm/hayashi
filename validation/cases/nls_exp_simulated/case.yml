@@ -18,10 +18,10 @@ comparison:
     - coefficients
     - standard_errors
   tolerances:
-    coefficients: 1e-4
-    standard_errors: 1e-3
+    coefficients: 1e-6
+    standard_errors: 1e-8
 
-output_format: txt
+output_format: csv
 
 hayashi_script: cases/nls_exp_simulated/hayashi/run.hay
 reference_scripts:
@@ -33,5 +33,6 @@ notes: Simulated data from y = a * exp(b * x) + N(0, 0.1). Coefficients and
 
 result:
   summary: "Hayashi NLS exp matches R and Python references."
-  known_differences: []
+  known_differences:
+    - R nls converges to slightly different coefficients at the 1e-8 level; coefficient tolerance relaxed to 1e-6.
   issues_opened: []

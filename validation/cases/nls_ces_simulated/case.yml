@@ -10,6 +10,7 @@ dataset:
   licence: n/a
 
 references:
+  - R
   - Python
 
 comparison:
@@ -17,19 +18,21 @@ comparison:
     - coefficients
     - standard_errors
   tolerances:
-    coefficients: 1e-4
-    standard_errors: 1e-3
+    coefficients: 1e-6
+    standard_errors: 1e-6
 
-output_format: txt
+output_format: csv
 
 hayashi_script: cases/nls_ces_simulated/hayashi/run.hay
 reference_scripts:
+  R: cases/nls_ces_simulated/reference/run.R
   Python: cases/nls_ces_simulated/reference/run.py
 
 notes: Simulated data from y = a * (b1*x1^rho + (1-b1)*x2^rho)^(1/rho) + N(0, 0.1).
   The CES function is now identified by the share restriction b2 = 1 - b1.
 
 result:
-  summary: "Hayashi NLS CES matches scipy.optimize.curve_fit."
-  known_differences: []
+  summary: "Hayashi NLS CES matches R and Python references."
+  known_differences:
+    - R nls uses the port algorithm with bounds and scipy curve_fit clips the share; both NLS solutions agree at the 1e-6 level.
   issues_opened: []

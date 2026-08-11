@@ -18,10 +18,10 @@ comparison:
     - coefficients
     - standard_errors
   tolerances:
-    coefficients: 1e-4
-    standard_errors: 1e-2
+    coefficients: 1e-6
+    standard_errors: 1e-6
 
-output_format: txt
+output_format: csv
 
 hayashi_script: cases/nls_power_simulated/hayashi/run.hay
 reference_scripts:
@@ -33,5 +33,6 @@ notes: Simulated data from y = a * x^b + N(0, 0.3). Coefficients and standard
 
 result:
   summary: "Hayashi NLS power matches R and Python references."
-  known_differences: []
+  known_differences:
+    - R nls and scipy curve_fit converge to slightly different NLS solutions and standard errors; tolerances relaxed to 1e-6.
   issues_opened: []
