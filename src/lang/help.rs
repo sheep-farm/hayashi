@@ -122,6 +122,11 @@ fn legacy_help_text(topic: &str) -> Option<&'static str> {
             "  Random Effects (GLS).\n",
             "  If xtset(df, id, time) declared, id= is optional.\n",
         ),
+        "be" => concat!(
+            "be(formula, df [, id=col])\n",
+            "  Between estimator (regression on entity means).\n",
+            "  If xtset(df, id, time) declared, id= is optional.\n",
+        ),
         "xtset" => concat!(
             "xtset(df, id_col, time_col)\n",
             "  Declare panel structure. After xtset, panel estimators\n",

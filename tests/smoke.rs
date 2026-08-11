@@ -3098,6 +3098,37 @@ re(output ~ capital + labor, panel)
 }
 
 #[test]
+fn panel_be_basic() {
+    assert_ok_contains(
+        "panel_be",
+        r#"
+input panel
+output capital labor firm year
+10.2 5 8 1 2019
+11.0 5 9 1 2020
+12.5 6 9 1 2021
+11.8 5 10 1 2022
+19.3 10 12 2 2019
+20.1 10 13 2 2020
+23.1 12 14 2 2021
+20.7 11 13 2 2022
+14.6 7 10 3 2019
+15.3 7 11 3 2020
+17.9 8 11 3 2021
+15.2 7 12 3 2022
+24.8 13 15 4 2019
+25.5 13 16 4 2020
+27.3 14 16 4 2021
+26.1 14 17 4 2022
+end
+xtset(panel, firm, year)
+be(output ~ capital + labor, panel)
+"#,
+        "Between Estimator",
+    );
+}
+
+#[test]
 fn panel_hausman() {
     assert_ok_contains(
         "panel_hausman",

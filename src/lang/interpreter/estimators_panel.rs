@@ -50,6 +50,7 @@ impl Interpreter {
             "akaike_weights" | "aic_weights" => self.akaike_weights(func, args, opts, opt_map),
             "lrtest" | "lr_test" => self.lrtest(func, args, opts, opt_map),
             "fe" => self.fe(func, args, opts, opt_map),
+            "be" => self.be(func, args, opts, opt_map),
             "re" => self.re(func, args, opts, opt_map),
             "ftest_fe" => self.ftest_fe(func, args, opts, opt_map),
             "pesaran_cd" | "cd_test" => self.pesaran_cd(func, args, opts, opt_map),
@@ -1345,6 +1346,34 @@ impl Interpreter {
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         Ok(Value::ReResult(Rc::new(result)))
+    }
+
+    pub(super) fn be(
+        &mut self,
+        _func: &str,
+        args: &[Expr],
+        _opts: &[Opt],
+        opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        let (formula_ast, df, _df_name, id_col) = self.extract_panel_args(args, opt_map)?;
+        let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+
+        let ids_owned: ndarray::Array1<i64>;
+        let ids = match df.get_int(&id_col) {
+            Ok(arr) => arr,
+            Err(_) => {
+                let floats = df.get(id_col.as_str()).map_err(|_| {
+                    HayashiError::Runtime(format!("column '{id_col}' must be integer for be()"))
+                })?;
+                ids_owned = floats.mapv(|v| v as i64);
+                &ids_owned
+            }
+        };
+
+        let result = greeners::BetweenEstimator::from_formula(&g_formula, &df, ids)
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+        Ok(Value::BetweenResult(Rc::new(result)))
     }
 
     pub(super) fn ftest_fe(
