@@ -601,6 +601,12 @@ cases:
     FGLS procedure used by Hayashi/Greeners.
   dimension: numerical
   status: pass
+- id: xtlogit_simulated
+  notes: Simulated panel with N=50 groups and T=4 periods. GEE logit with exchangeable
+    working correlation. Only coefficients compared; standard errors depend on the
+    sandwich estimator convention used by each package.
+  dimension: numerical
+  status: pass
 - id: xtsum_wooldridge_wagepan
   notes: Overall, between, and within panel summary for lwage.
   dimension: numerical

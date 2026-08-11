@@ -1,0 +1,3 @@
+load "validation/cases/xtlogit_simulated/data/data.csv" as df
+let m = xtlogit(y ~ x, df, id="id")
+print(m)

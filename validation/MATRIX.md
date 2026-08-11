@@ -57,7 +57,7 @@
 | mlogit | AER::TravelMode | R, Python | pass | — | Multinomial logit of chosen travel mode (air=1, train=2, bus=3, car=4) on income, wait time, vehicle cost and travel time. Alternative-specific attributes are averaged per individual to make them individual-specific covariates. |
 | negbin | wooldridge::fertil2 | R, Python | pass | — | Negative binomial regression for number of children on age, education, electric and urban indicators. Dispersion parameter (alpha) is not compared because Hayashi does not report it; coefficient tolerance is 2e-1 due to different alpha estimates. |
 | nls | simulated | R, Python | pass | — | Nonlinear least squares exponential model on simulated data. Reference matches y = a * exp(b * x) + N(0, 0.1) against R `nls` and Python `curve_fit`. |
-| nls | simulated | R:passed *, Python:passed * | pass | — | Simulated data from y = a / (1 + exp(-b*(x-c))) + N(0, 0.2). Coefficients and standard errors compared against R `nls` and Python `scipy.optimize.curve_fit`. |
+| nls | simulated | R, Python | pass | — | Simulated data from y = a / (1 + exp(-b*(x-c))) + N(0, 0.2). Coefficients and standard errors compared against R `nls` and Python `scipy.optimize.curve_fit`. |
 | nls | simulated | R, Python | pass | — | Simulated data from y = a * x^b + N(0, 0.3). Coefficients and standard errors compared against R `nls` and Python `scipy.optimize.curve_fit`. |
 | ologit | wooldridge::beauty | R, Python | pass | — | Ordered logit of looks (2, 3, 4) on female, educ, exper, black. |
 | ols | wooldridge::wagepan | R, Python | pass | — | OLS wage equation with one-way cluster-robust standard errors by worker id. |
@@ -129,6 +129,7 @@
 | varma | simulated | Python | pass | — | Bivariate VARMA(1,1) with known AR and MA matrices. Hayashi uses the Hannan-Rissanen algorithm; the Python reference uses statsmodels VARMAX with no trend. Coefficients are compared (standard errors are not computed by the current Hayashi VARMA implementation). |
 | wls | wooldridge::hprice1 | R, Python | pass | — | WLS with weights generated inside Hayashi to avoid sandbox file issues. |
 | xtgls | wooldridge::wagepan | R, Python | pass | — | Panel feasible GLS with panel-level heteroskedasticity (Parks/Kmenta, Stata xtgls panels(heteroskedastic)). R and Python references implement the same two-step FGLS procedure used by Hayashi/Greeners. |
+| xtlogit | simulated | Python:passed * | pass | — | Simulated panel with N=50 groups and T=4 periods. GEE logit with exchangeable working correlation. Only coefficients compared; standard errors depend on the sandwich estimator convention used by each package. |
 | descriptive | wooldridge::wagepan | R, Python | pass | — | Overall, between, and within panel summary for lwage. |
 | zinb | wooldridge::affairs | R, Python | pass | 123 | ZINB model of number of affairs on demographic predictors. |
 | zip | wooldridge::affairs | R, Python | pass | 121 | ZIP model of number of affairs on demographic predictors. |
