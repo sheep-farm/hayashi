@@ -247,6 +247,12 @@ cases:
     are averaged per individual to make them individual-specific covariates.
   dimension: numerical
   status: pass
+- id: modwt_simulated
+  notes: Simulated series (trend + 16-period sine + noise). Greeners MODWT uses unnormalised
+    Haar filters, equivalent to `pywt.swt(..., norm=False)`. `pywt` returns coefficients
+    coarse-to-fine; the reference reverses them to match Greeners' W_1 (finest) convention.
+  dimension: numerical
+  status: pass
 - id: nbreg_fertil2
   notes: Negative binomial regression for number of children on age, education, electric
     and urban indicators. Dispersion parameter (alpha) is not compared because Hayashi

@@ -1,0 +1,6 @@
+load "validation/cases/modwt_simulated/data/data.csv" as df
+let m = modwt(df, y, scales=3)
+let e = m.energy
+print("W_1=" + str(e[0]))
+print("W_2=" + str(e[1]))
+print("W_3=" + str(e[2]))
