@@ -258,6 +258,16 @@ cases:
     y = a * exp(b * x) + N(0, 0.1) against R `nls` and Python `curve_fit`.
   dimension: numerical
   status: pass
+- id: nls_logistic_simulated
+  notes: Simulated data from y = a / (1 + exp(-b*(x-c))) + N(0, 0.2). Coefficients
+    and standard errors compared against R `nls` and Python `scipy.optimize.curve_fit`.
+  dimension: numerical
+  status: pass
+- id: nls_power_simulated
+  notes: Simulated data from y = a * x^b + N(0, 0.3). Coefficients and standard errors
+    compared against R `nls` and Python `scipy.optimize.curve_fit`.
+  dimension: numerical
+  status: pass
 - id: ologit_beauty
   notes: Ordered logit of looks (2, 3, 4) on female, educ, exper, black.
   dimension: numerical
