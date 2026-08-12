@@ -1,4 +1,9 @@
-# Reference implementation in Python for the Tobit hours-worked case.
+#!/usr/bin/env python3
+"""Python reference for the Tobit hours-worked case.
+
+Left-censored Tobit MLE implemented manually and refined with Nelder-Mead
+after an initial BFGS pass. Standard errors come from the numerical Hessian.
+"""
 
 import json
 from pathlib import Path
@@ -7,84 +12,80 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 from scipy.stats import norm
+from statsmodels.tools.numdiff import approx_hess
 
 CASE_DIR = Path(__file__).resolve().parent.parent
-DATA_DIR = CASE_DIR / "data"
-DATA_DIR.mkdir(parents=True, exist_ok=True)
+CSV_PATH = CASE_DIR / "data" / "mroz.csv"
 
-CSV_PATH = DATA_DIR / "mroz.csv"
-
-if not CSV_PATH.exists():
-    try:
-        from wooldridge import data
-        df = data("mroz")
-    except ImportError:
-        url = "https://raw.githubusercontent.com/vincentarelbundock/Rdatasets/master/csv/wooldridge/mroz.csv"
-        df = pd.read_csv(url)
-    df.to_csv(CSV_PATH, index=False)
-else:
-    df = pd.read_csv(CSV_PATH)
-
-# Tobit: hours censored at zero.
+df = pd.read_csv(CSV_PATH)
 vars_ = ["hours", "nwifeinc", "educ", "exper", "age", "kidslt6", "kidsge6"]
 df = df[vars_].dropna()
 
-y = df["hours"].to_numpy(dtype=float)
-X = df[["nwifeinc", "educ", "exper", "age", "kidslt6", "kidsge6"]].to_numpy(dtype=float)
+y = df["hours"].to_numpy(float)
+X = df[["nwifeinc", "educ", "exper", "age", "kidslt6", "kidsge6"]].to_numpy(float)
 X = np.column_stack([np.ones(len(y)), X])
 
+cens = y <= 0
+uncens = y > 0
+n = len(y)
 
-def tobit_ll(params):
+
+def nll(params):
     beta = params[:-1]
     log_sigma = params[-1]
     sigma = np.exp(log_sigma)
     xb = X @ beta
-    uncensored = y > 0
-    ll = np.empty(len(y))
-    z = (y[uncensored] - xb[uncensored]) / sigma
-    ll[uncensored] = np.log(norm.pdf(z)) - np.log(sigma)
-    z0 = -xb[~uncensored] / sigma
-    ll[~uncensored] = np.log(norm.cdf(z0))
+
+    ll = np.empty(n)
+    z_u = (y[uncens] - xb[uncens]) / sigma
+    ll[uncens] = norm.logpdf(z_u) - np.log(sigma)
+    z_c = -xb[cens] / sigma
+    ll[cens] = norm.logcdf(z_c)
+
     return -ll.sum()
 
 
-init_beta = np.zeros(X.shape[1])
-init_beta[0] = y.mean()
-init_params = np.concatenate([init_beta, [np.log(y.std())]])
+# Initial BFGS pass, then a short Nelder-Mead polish to improve precision.
+init = np.zeros(X.shape[1])
+init[0] = y.mean()
+init = np.concatenate([init, [np.log(y.std())]])
 
-result = minimize(tobit_ll, init_params, method="BFGS")
+res = minimize(nll, init, method="BFGS")
+res = minimize(
+    nll,
+    res.x,
+    method="Nelder-Mead",
+    options={
+        "xatol": 1e-12,
+        "fatol": 1e-12,
+        "maxiter": 20000,
+        "adaptive": True,
+    },
+)
 
-beta = result.x[:-1]
+beta = res.x[:-1]
+log_sigma = res.x[-1]
+sigma = float(np.exp(log_sigma))
 
-# Numerical Hessian for standard errors.
-from statsmodels.tools.numdiff import approx_hess
-
-hess = approx_hess(result.x, tobit_ll)
+hess = approx_hess(res.x, nll)
 cov = np.linalg.inv(hess + 1e-8 * np.eye(len(hess)))
 se = np.sqrt(np.diag(cov))
 
 names = ["const", "nwifeinc", "educ", "exper", "age", "kidslt6", "kidsge6"]
+
 coefs = {name: float(val) for name, val in zip(names, beta)}
 std_errors = {name: float(val) for name, val in zip(names, se[:-1])}
 
-result_dict = {
+result = {
     "coefficients": coefs,
     "standard_errors": std_errors,
     "diagnostics": {
-        "success": bool(result.success),
-        "message": str(result.message),
-        "log_likelihood": float(-result.fun),
-        "sigma": float(np.exp(result.x[-1])),
-        "nobs": int(len(y)),
-        "censored": int((y <= 0).sum()),
-        "uncensored": int((y > 0).sum()),
+        "log_likelihood": float(-res.fun),
+        "sigma": sigma,
+        "nobs": int(n),
+        "censored": int(cens.sum()),
+        "uncensored": int(uncens.sum()),
     },
 }
 
-out_dir = CASE_DIR / "reference"
-out_dir.mkdir(parents=True, exist_ok=True)
-
-with open(out_dir / "expected.json", "w") as f:
-    json.dump(result_dict, f, indent=2)
-
-print(json.dumps(result_dict))
+print(json.dumps(result, indent=2))

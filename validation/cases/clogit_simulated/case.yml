@@ -11,6 +11,7 @@ dataset:
 
 references:
   - R
+  - Python
 
 comparison:
   quantities:
@@ -25,6 +26,7 @@ output_format: txt
 hayashi_script: cases/clogit_simulated/hayashi/run.hay
 reference_scripts:
   R: cases/clogit_simulated/reference/run.R
+  Python: cases/clogit_simulated/reference/run.py
 
 notes: Simulated matched groups with group fixed effects and a single endogenous regressor. R reference is survival::clogit; groups without within-group variation are dropped at generation time.
 

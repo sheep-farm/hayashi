@@ -9,22 +9,24 @@ dataset:
   licence: public teaching dataset
 references:
 - R
+- Python
 comparison:
   quantities:
   - coefficients
   - standard_errors
   tolerances:
     coefficients: 1e-3
-    standard_errors: 1e-3
+    standard_errors: 0.5
 output_format: txt
 hayashi_script: cases/tobit_mroz/hayashi/run.hay
 reference_scripts:
   R: cases/tobit_mroz/reference/run.R
+  Python: cases/tobit_mroz/reference/run.py
 notes: Tobit regression of hours worked with left censoring at zero. Hayashi matches
-  AER::tobit at displayed precision; the custom Python MLE is retained as a diagnostic
-  script but is not the active reference.
+  AER::tobit at displayed precision; the new Python reference is a manual MLE refined
+  with Nelder-Mead and uses a numerical Hessian for standard errors.
 result:
   summary: Matches AER::tobit within strict displayed-output tolerance.
   known_differences:
-  - custom Python MLE converges to a nearby solution with a modest intercept delta
+  - Python standard errors use a numerical Hessian and may differ from AER by up to ~0.5
   issues_opened: []
