@@ -109,7 +109,7 @@ cases:
   notes: Simulated linear DGP y = 1 + 2x1 - 1.5x2 + noise. Empirical coverage is far
     from the nominal 90% because Hayashi's conformal() output intervals are too tight.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: copula_simulated
   notes: Simulated bivariate normal with Pearson correlation 0.6. Hayashi `copula(...,
     type="gaussian")` returns the empirical correlation matrix, Kendall's tau, and

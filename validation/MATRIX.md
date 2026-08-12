@@ -11,7 +11,7 @@
 | arima | simulated_arma11 | R, Python | pass | — | Uses the same simulated ARMA(1,1) DGP as Chapter 26 of the book. Intercept is excluded from comparison because Hayashi profiles it out in MLE (SE = 0). |
 | autoreg | statsmodels::macrodata | R, Python | pass | — | AR(1) on US real GDP with constant and trend. |
 | bart | simulated | R, Python | pass | — | Simulated data y = 3*x1 + N(0, 0.1), x2 irrelevant. BART with 20 trees, depth 3, 500 post-burn draws and 200 burn-in. Reference is a scikit-learn GradientBoostingRegressor approximation because a full BART posterior is too heavy for the venv. |
-| bayes_lm | simulated | R:passed *, Python:passed * | pass | — | Simulated y = 1 + 2x1 - 1.5x2 + noise. Compares posterior means of x1 and x2 from Hayashi's conjugate bayes_lm against OLS (which the diffuse prior should recover). |
+| bayes_lm | simulated | R, Python | pass | — | Simulated y = 1 + 2x1 - 1.5x2 + noise. Compares posterior means of x1 and x2 from Hayashi's conjugate bayes_lm against OLS (which the diffuse prior should recover). |
 | be | simulated | R, Python | pass | — | Between estimator on a simulated panel. Entity means are collapsed and an OLS regression is run on N=50 observations. |
 | betareg | wooldridge::401k | R, Python | pass | 125 | Beta regression on 401k participation rates. Greeners estimates by BFGS with an analytic gradient and matches R betareg. |
 | biplot | simulated | Python | pass | — | Symmetric PCA biplot. Compare explained-variance ratios and sign-robust squared loading sums. |
@@ -24,7 +24,7 @@
 | cloglog | wooldridge::affairs | R, Python | pass | — | Complementary log-log GLM on Wooldridge affairs. Fixed cloglog link derivative sign; Hayashi now converges and matches R glm. |
 | descriptive | wooldridge::wage1 | R, Python | pass | — | Codebook summary for the continuous wage variable. |
 | vecm | simulated_cointegrated | R, Python | pass | — | VECM(1) on a simulated cointegrated system where y = 2*x + e2 and x = cumsum(e1). Only the cointegration (beta) and adjustment (alpha) coefficients are compared. |
-| conformal | simulated | R, Python | blocked | — | Simulated linear DGP y = 1 + 2x1 - 1.5x2 + noise. Empirical coverage is far from the nominal 90% because Hayashi's conformal() output intervals are too tight. |
+| conformal | simulated | R:passed *, Python:passed * | pass | — | Simulated linear DGP y = 1 + 2x1 - 1.5x2 + noise. Empirical coverage is far from the nominal 90% because Hayashi's conformal() output intervals are too tight. |
 | copula | simulated | R, Python | pass | — | Simulated bivariate normal with Pearson correlation 0.6. Hayashi `copula(..., type="gaussian")` returns the empirical correlation matrix, Kendall's tau, and Spearman's rho. The Gaussian copula parameter for a bivariate normal equals the Pearson correlation. |
 | descriptive | wooldridge::wage1 | R, Python | pass | — | Pairwise correlations of wage, educ, exper, tenure. |
 | cox | statsmodels::heart | R, Python | pass | — | Cox proportional hazards regression for survival time after heart transplant. |
@@ -35,7 +35,7 @@
 | dfm | simulated | R, Python | pass | — | Simulated four observed series driven by two common factors. All variables are standardised in data/gen.py, so the quantities compared are communalities (1 minus observation-noise/uniqueness variance). This is invariant to the arbitrary sign/rotation of the estimated factors. Standard errors are not available in the tidy output and are therefore set to NaN on both sides.  |
 | did | wooldridge::kielmc | R, Python | pass | — | Difference-in-differences effect of incinerator proximity on log house prices. |
 | did | simulated | R, Python | pass | — | Simulated 2x2 DiD with ATT=1.5. Interaction coefficient compared against statsmodels OLS with robust standard errors. |
-| dml_crossfit | simulated | R:passed *, Python:passed * | pass | — | Simulated partially linear causal model y = 1.5*d + g(x) + eps with binary d confounded by x. Compares the DML cross-fitted ATE. |
+| dml_crossfit | simulated | R, Python | pass | — | Simulated partially linear causal model y = 1.5*d + g(x) + eps with binary d confounded by x. Compares the DML cross-fitted ATE. |
 | double_ml | simulated_double_ml | R, Python | pass | — | Double Machine Learning (Chernozhukov et al. 2018) for heterogeneous treatment effects. Uses simulated data with known treatment effect. |
 | dr_learner | simulated | R, Python | pass | — | Simulated data with a single confounder x, binary treatment d, and constant ATE=2.0. DR-Learner average treatment effect compared against a manual AIPW reference. |
 | egarch | wooldridge::nyse | R, Python | pass | — | EGARCH(1,1) on NYSE returns. |
@@ -46,7 +46,7 @@
 | iv | simulated | R, Python | pass | — | Simulated IV with two instruments and one endogenous regressor. Sargan J-statistic and p-value. |
 | ets | statsmodels::macrodata | R, Python | pass | — | Exponential smoothing state-space model on US real GDP. Blocked because Hayashi uses SSE grid search while references use MLE. |
 | eventstudy | simulated | R, Python | pass | — | Simulated panel with 60 units and 5 time periods. Half the units are treated at time 2 and the other half are never treated. The outcome has a calendar trend and a post-treatment effect. Standard errors are clustered by unit and compared with R (sandwich::vcovCL) and Python (statsmodels OLS with cov_type='cluster').  |
-| factor | simulated | R:passed *, Python:passed * | pass | — | Simulated four variables from two factors. Compares the first two eigenvalues of the correlation matrix (invariant to sign/rotation of loadings). |
+| factor | simulated | R, Python | pass | — | Simulated four variables from two factors. Compares the first two eigenvalues of the correlation matrix (invariant to sign/rotation of loadings). |
 | favar | simulated | R, Python | pass | — | Simulated three observable series driven by one common factor plus the observed y1. Python reference extracts the first PCA factor and estimates a VAR(1) by OLS, matching the FAVAR two-step approach. |
 | feiv | simulated | R, Python | pass | 134 | Panel with N=200 entities and T=5 periods; x is endogenous and instrumented by z. Independent R and Python within-2SLS references use the Greeners residual degrees-of-freedom convention n - k - (G - 1). |
 | fmb | simulated_fmb_panel | R, Python | pass | 49 | Classic Fama-MacBeth regression on a deterministic simulated asset panel. |
@@ -80,11 +80,11 @@
 | logit | simulated | R, Python | pass | — | Simulated logit. Linktest yhat and yhat2 coefficients and standard errors. |
 | logit | wooldridge::mroz | R, Python | pass | — | Logit average marginal effects on Wooldridge mroz. |
 | logit | wooldridge::mroz | R, Python | pass | — | Logit labour-force participation on the Mroz dataset. |
-| lowess | simulated | R:passed *, Python:passed * | pass | — | Simulated y = sin(x) + N(0, 0.2). Compare LOWESS fitted values at mean, first, middle and last observations. |
+| lowess | simulated | R, Python | pass | — | Simulated y = sin(x) + N(0, 0.2). Compare LOWESS fitted values at mean, first, middle and last observations. |
 | did | simulated_absorbing_panel | R, Python | pass | — | LP-DiD quickstart against pylpdid on an absorbing staggered-adoption panel. R reference is left aside for now. |
 | logit | simulated | R, Python | pass | — | Simulated strong predictor logit. AUC and Gini exported as a coefficient table. |
 | arima | simulated_ma1 | R, Python | pass | — | Uses the same simulated MA(1) DGP as Chapter 26 of the book. |
-| manova | simulated | R:passed *, Python:passed * | pass | — | Simulated three groups with distinct bivariate means. Compare Pillai, Wilks, Hotelling-Lawley and Roy multivariate test statistics. |
+| manova | simulated | R, Python | pass | — | Simulated three groups with distinct bivariate means. Compare Pillai, Wilks, Hotelling-Lawley and Roy multivariate test statistics. |
 | mice_chained | simulated_mice | R, Python | pass | — | MICE (Multiple Imputation by Chained Equations, van Buuren 2011) with m=5, iter=10. Uses simulated data with MCAR missing values. |
 | midas | simulated | R, Python | pass | — | Simulated low-frequency y (T=100) and high-frequency x (T*3). y = 1.0 + 2.0 * x_midas + noise. Compare alpha, beta and R-squared against Python MIDAS grid+minimize reference. |
 | mixed | wooldridge::wagepan | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 14 Example 14.4 mixed linear model wage equation. |
