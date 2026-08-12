@@ -1,0 +1,9 @@
+load "validation/cases/mlp_simulated/data/data.csv" as df
+let m = mlp(y ~ x1 + x2, df, hidden=10, lr=0.01, epochs=200)
+let out = dataframe({
+  "variable": ["r_squared"],
+  "coef": [m.fit.r_squared],
+  "std_err": [0.0/0.0]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

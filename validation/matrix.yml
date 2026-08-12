@@ -342,6 +342,12 @@ cases:
     are averaged per individual to make them individual-specific covariates.
   dimension: numerical
   status: pass
+- id: mlp_simulated
+  notes: Simulated linear-ish y from x1 and x2 with small noise. Compare R-squared
+    against scikit-learn MLPRegressor (logistic activation, adam solver). Only Python
+    reference because R lacks an equivalent stable MLP package for this use.
+  dimension: numerical
+  status: pass
 - id: modwt_simulated
   notes: Simulated series (trend + 16-period sine + noise). Greeners MODWT uses unnormalised
     Haar filters, equivalent to `pywt.swt(..., norm=False)`. `pywt` returns coefficients

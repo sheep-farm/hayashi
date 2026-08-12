@@ -75,6 +75,7 @@
 | mice_chained | simulated_mice | R, Python | pass | — | MICE (Multiple Imputation by Chained Equations, van Buuren 2011) with m=5, iter=10. Uses simulated data with MCAR missing values. |
 | mixed | wooldridge::wagepan | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 14 Example 14.4 mixed linear model wage equation. |
 | mlogit | AER::TravelMode | R, Python | pass | — | Multinomial logit of chosen travel mode (air=1, train=2, bus=3, car=4) on income, wait time, vehicle cost and travel time. Alternative-specific attributes are averaged per individual to make them individual-specific covariates. |
+| mlp | simulated | Python:passed * | pass | — | Simulated linear-ish y from x1 and x2 with small noise. Compare R-squared against scikit-learn MLPRegressor (logistic activation, adam solver). Only Python reference because R lacks an equivalent stable MLP package for this use. |
 | modwt | simulated | R, Python | pass | — | Simulated series (trend + 16-period sine + noise). Greeners MODWT uses unnormalised Haar filters, equivalent to `pywt.swt(..., norm=False)`. `pywt` returns coefficients coarse-to-fine; the reference reverses them to match Greeners' W_1 (finest) convention. |
 | nardl | simulated | R, Python | pass | — | Simulated NARDL(1,1) with asymmetric long-run multipliers and short-run dynamics. y and x are random walks with positive and negative shock decomposition. |
 | negbin | wooldridge::fertil2 | R, Python | pass | — | Negative binomial regression for number of children on age, education, electric and urban indicators. Dispersion parameter (alpha) is not compared because Hayashi does not report it; coefficient tolerance is 2e-1 due to different alpha estimates. |
@@ -133,7 +134,7 @@
 | portsort | simulated | Python, R | pass | — | Five equal-count portfolios sorted by size. Compare mean returns and high-low spread. |
 | probit | wooldridge::mroz | R, Python | pass | — | Probit labour-force participation on the Mroz dataset. |
 | psm | wooldridge::jtrain3 | R, Python | pass | — | 1:1 nearest-neighbor propensity score matching with caliper 0.2 and bootstrap SE. |
-| pstr | simulated | R:passed *, Python:passed * | pass | — | Simulated panel with N=50, T=10. y = beta0*x + beta1*x*g(q; gamma=5, c=0.5) + FE + noise. Gamma, c, beta0_x and beta1_x compared against grid-search references. |
+| pstr | simulated | R, Python | pass | — | Simulated panel with N=50, T=10. y = beta0*x + beta1*x*g(q; gamma=5, c=0.5) + FE + noise. Gamma, c, beta0_x and beta1_x compared against grid-search references. |
 | pvar | simulated | R, Python | pass | — | Simulated bivariate panel VAR with N=50 and T=100. Hayashi GMM and within-OLS references agree within moderate tolerance due to the Nickell bias in within estimation. |
 | qreg | simulated | R, Python | pass | — | Simulated heteroskedastic data y = 1 + 2x + (1 + 0.5x) * (Exponential(1)-1). Quantile regression at tau=0.75 compared against statsmodels. boot=0 to avoid bootstrap overhead. |
 | qrf | simulated | R, Python | pass | — | Simulated heteroskedastic data y = 3*x1 + N(0, 0.1*(1+0.5*x1)). QRF at tau=0.75 with 50 trees, depth 5. OOB R^2 compared against quantile_forest.RandomForestQuantileRegressor. |
