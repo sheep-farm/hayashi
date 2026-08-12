@@ -1,0 +1,50 @@
+\chapter{Métodos Recentes}
+
+\section{DiD linear com adoção escalonada}
+
+`lpdid` (DiD por Projeções Locais) e `eventstudy` estimam efeitos de
+tratamento em desenhos com adoção escalonada. `eventstudy` constrói
+dummies de tempo do evento em relação ao tratamento e omite o período de
+referência.
+
+\begin{lstlisting}[caption={Event study}]
+let m_e = eventstudy(y ~ x, df, time=ano, ref=-1,
+                     min=-5, max=5)
+print(m_e)
+\end{lstlisting}
+
+Os coeficientes de cada dummy de tempo do evento mostram o caminho
+médio do resultado em relação ao período de tratamento.
+
+\section{Synthetic DiD e CUPED}
+
+Synthetic DiD combina a ideia de controle sintético com diferenças em
+diferenças. `synthdid` estima pesos de unidade e tempo a partir dos
+resultados pré-tratamento e reporta o ATT.
+
+\begin{lstlisting}[caption={Synthetic DiD}]
+let m_sd = synthdid(df, y, treated, 10, unit="state", period="year")
+print(m_sd)
+\end{lstlisting}
+
+CUPED ajusta o resultado com covariáveis pré-tratamento para reduzir a
+variância em experimentos randomizados.
+
+\begin{lstlisting}[caption={CUPED}]
+let m_c = cuped(y ~ x, df, treated="treated")
+print(m_c)
+\end{lstlisting}
+
+\section{Regressão MIDAS}
+
+Mixed Data Sampling (Ghysels, Santa-Clara e Valkanov, 2004) regrediz uma
+variável de baixa frequência sobre defasagens de alta frequência, com
+pesos restritos por um polinômio de Almon.
+
+\begin{lstlisting}[caption={MIDAS}]
+let m_midas = midas(y ~ x, df, freq=3, lags=12, poly=2)
+print(m_midas)
+\end{lstlisting}
+
+É útil para nowcasting: usar preditores mensais para prever um alvo
+trimestral.
