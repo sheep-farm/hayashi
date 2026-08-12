@@ -1,0 +1,108 @@
+\chapter{Testes Diagnósticos}
+
+\section{Após uma regressão}
+
+`test(model, ...)` e outros comandos de diagnóstico verificam se os
+pressupostos por trás de um estimador são plausíveis. Este capítulo
+cobre os testes pós-estimação e autônomos mais comuns.
+
+\section{Heterocedasticidade}
+
+\begin{lstlisting}[caption={Testes de White e Breusch-Pagan}]
+test(m, "white")     // Teste de White
+test(m, "bp")        // Breusch-Pagan
+\end{lstlisting}
+
+White é um teste geral baseado na regressão dos resíduos quadrados
+sobre produtos cruzados e quadrados de $X$. Breusch-Pagan é um teste
+multiplicador de Lagrange sob normalidade.
+
+\section{Autocorrelação}
+
+\begin{lstlisting}[caption={Testes de autocorrelação}]
+test(m, "dw")        // Durbin-Watson
+test(m, "bg")        // Breusch-Godfrey LM
+cusumtest(m)         // CUSUM de estabilidade
+\end{lstlisting}
+
+Durbin-Watson testa autocorrelação de primeira ordem nos resíduos de
+OLS. Breusch-Godfrey testa até um defasamento especificado.
+`cusumtest` verifica se resíduos recursivos permanecem dentro dos
+limites de 5\%.
+
+\section{Normalidade}
+
+\begin{lstlisting}[caption={Testes de normalidade}]
+swilk(df, y)         // Shapiro-Wilk
+sfrancia(df, y)      // Shapiro-Francia
+sktest(df, y)        // Assimetria/curtose (Jarque-Bera + D'Agostino)
+jb(m)                // Jarque-Bera nos resíduos
+\end{lstlisting}
+
+\section{Especificação}
+
+\begin{lstlisting}[caption={RESET e link test}]
+reset(m)             // Ramsey RESET
+linktest(m)          // Link test para logit/probit
+\end{lstlisting}
+
+RESET adiciona potências dos valores ajustados à regressão; um
+coeficiente significativo indica não-linearidade omitida. `linktest` é
+o análogo para modelos GLM.
+
+\section{Outliers e influência}
+
+\begin{lstlisting}[caption={Diagnósticos de influência}]
+influence(m)         // DFFITS, alavancagem
+leverage(m)          // alavancagem
+cooks(m)             // distância de Cook
+\end{lstlisting}
+
+Alta alavancagem significa que uma observação tem regressores pouco
+comuns. Alto DFFITS ou distância de Cook significa que uma observação
+altera os coeficientes ajustados.
+
+\section{Multicolinearidade}
+
+\begin{lstlisting}[caption={VIF}]
+vif(m)               // fatores de inflação de variância
+\end{lstlisting}
+
+Um VIF acima de 10 (ou às vezes 5) sugere multicolinearidade
+problemática.
+
+\section{Raiz unitária}
+
+\begin{lstlisting}[caption={Testes de raiz unitária}]
+adf(df, y)           // Dickey-Fuller Aumentado
+kpss(df, y)          // KPSS (nula de estacionariedade)
+pp(df, y)            // Phillips-Perron
+zivot(df, y)         // Zivot-Andrews (quebra estrutural)
+\end{lstlisting}
+
+ADF, PP e KPSS são os três testes clássicos. KPSS tem nula de
+estacionariedade, complementando ADF e PP, que têm nula de raiz
+unitária.
+
+\section{Cointegração}
+
+\begin{lstlisting}[caption={Testes de cointegração}]
+engle_granger(df, y, x, lags=1)   // equação única
+johansen(df, y, x, lags=1)        // multivariado
+\end{lstlisting}
+
+Engle-Granger é simples mas assume um único vetor de cointegração.
+Johansen testa o número de vetores de cointegração em um sistema
+multivariado.
+
+\section{Testes não paramétricos}
+
+\begin{lstlisting}[caption={Testes não paramétricos}]
+spearman(df, x, y)        // Correlação de Spearman
+ranksum(df, x, by=group)  // Wilcoxon rank-sum
+kruskal(df, y, by=group)  // Kruskal-Wallis
+signrank(df, x, y)        // Wilcoxon signed-rank
+\end{lstlisting}
+
+São alternativas livres de distribuição para testes t, ANOVA e
+correlação de Pearson.
