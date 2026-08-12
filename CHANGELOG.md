@@ -13,9 +13,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Validation
 
-- Validation matrix now covers 215 cases spanning all 115 implemented estimators. 199 cases pass against R/Python references; 15 are documented as `not-supported` and 1 as `blocked` due to lack of stable reference implementations.
+- Validation matrix now covers 215 cases across 115 implemented estimators. 199 cases pass against R/Python references; 15 are documented as `not-supported` and 1 as `blocked` due to lack of stable reference implementations. Several families remain thinly or convention-sensitive validated; see `KNOWN_GAPS.md` for details.
 - Added `nls_exp_simulated`, `nls_power_simulated`, `nls_logistic_simulated`, `nls_cobb_douglas_simulated`, `copula_simulated`, `spatial_sar_simulated`, `spatial_sem_simulated`, `xtlogit_simulated`, `xtprobit_simulated`, `xtpoisson_simulated`, `modwt_simulated`, `did_simulated`, `qreg_simulated`, `synthdid_simulated`, and finalised coverage for estimators previously marked as unvalidated in #128.
-- Estimators with single-language or algorithm-matched references: `clogit` (R), `kalman` (R), `tobit` (R), `be` (Python), `cpoisson` (Python), `elasticnet` (Python), `feiv` (Python), `garch` (Python), `lpdid` (Python), `three_sls` (Python), `varma` (Python).
+- Estimators with single-language or algorithm-matched references: `clogit` (R), `kalman` (R), `tobit` (R), `cpoisson` (Python), `elasticnet` (Python), `feiv` (Python), `garch` (Python), `lpdid` (Python), `three_sls` (Python), `varma` (Python).
 - Thin or convention-sensitive coverage remains for `kalman`, `svar` (Cholesky), `sysgmm`, `pcse`, and `xtgls`.
 
 ### Added

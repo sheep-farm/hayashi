@@ -4,8 +4,8 @@ This document tracks estimator families that are implemented and exposed to user
 
 ## Status of the validation programme
 
-- As of this update, `validation/matrix.yml` contains 123 cases.
-- All 123 cases are currently `pass`.
+- As of this update, `validation/matrix.yml` contains 215 cases.
+- 199 cases are currently `pass`; 15 are documented as `not-supported` and 1 as `blocked`.
 - The cases compare Hayashi output against R and/or Python reference implementations (statsmodels, linearmodels, wooldridge, etc.) with family-specific tolerances.
 
 ## Implemented estimators not yet in the validation matrix
@@ -31,9 +31,9 @@ These families appear in the matrix, but the coverage should be described carefu
 - `ab` (Arellano-Bond), `sysgmm` (Blundell-Bond), `pcse`, `xtgls` — dynamic-panel/GMM and panel-GLS cases are present, but the references implement the same two-step procedures used by Hayashi/Greeners; other packages (e.g. `plm::pgmm`) use different instrument and weighting conventions, so results may not be portable across implementations.
 - `km` (Kaplan-Meier), `cox`, `psm`, `synth`, `did`, `rd`, `fuzzy_rd`, `qreg`, `rlm`, `gee`, `gmm`, `iv` — have at least one case, but often rely on simulated or selected real datasets; broader coverage is desirable.
 
-## Documentation / API drift
+## Implemented but not yet validated
 
-- `be` (between estimator) was listed in the README and docs but had no dispatch/implementation path. It has been removed from the user-facing command list for 0.2.10 and will be re-added only after it is implemented and validated.
+- `be` (between estimator) is implemented in `src/lang/interpreter/estimators_panel.rs` and exposed through `help()`, but has no empirical validation case yet. It should be treated as an unvalidated command until a reference case is added.
 
 ## Recommendation for release notes
 
