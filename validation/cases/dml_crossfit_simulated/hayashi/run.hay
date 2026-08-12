@@ -1,0 +1,10 @@
+load "validation/cases/dml_crossfit_simulated/data/data.csv" as df
+let df2 = mutate(df, dvar = dvar - 0.5)
+let m = dml_crossfit(y ~ dvar, df2, x="x1,x2", folds=5)
+let out = dataframe({
+  "variable": ["theta"],
+  "coef": [m.fit.theta],
+  "std_err": [m.fit.se]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

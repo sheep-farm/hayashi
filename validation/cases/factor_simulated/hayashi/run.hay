@@ -1,0 +1,9 @@
+load "validation/cases/factor_simulated/data/data.csv" as df
+let m = factor(df, x1, x2, x3, x4, n=2)
+let out = dataframe({
+  "variable": ["eigen_1", "eigen_2"],
+  "coef": [m.eigenvalues[0], m.eigenvalues[1]],
+  "std_err": [0.0, 0.0]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

@@ -39,6 +39,12 @@ cases:
     approximation because a full BART posterior is too heavy for the venv.
   dimension: numerical
   status: pass
+- id: bayes_lm_simulated
+  notes: Simulated y = 1 + 2x1 - 1.5x2 + noise. Compares posterior means of x1 and
+    x2 from Hayashi's conjugate bayes_lm against OLS (which the diffuse prior should
+    recover).
+  dimension: numerical
+  status: pass
 - id: be_simulated
   notes: Between estimator on a simulated panel. Entity means are collapsed and an
     OLS regression is run on N=50 observations.
@@ -99,6 +105,11 @@ cases:
     Only the cointegration (beta) and adjustment (alpha) coefficients are compared.
   dimension: numerical
   status: pass
+- id: conformal_simulated
+  notes: Simulated linear DGP y = 1 + 2x1 - 1.5x2 + noise. Empirical coverage is far
+    from the nominal 90% because Hayashi's conformal() output intervals are too tight.
+  dimension: numerical
+  status: blocked
 - id: copula_simulated
   notes: Simulated bivariate normal with Pearson correlation 0.6. Hayashi `copula(...,
     type="gaussian")` returns the empirical correlation matrix, Kendall's tau, and
@@ -159,6 +170,11 @@ cases:
     statsmodels OLS with robust standard errors.
   dimension: numerical
   status: pass
+- id: dml_crossfit_simulated
+  notes: Simulated partially linear causal model y = 1.5*d + g(x) + eps with binary
+    d confounded by x. Compares the DML cross-fitted ATE.
+  dimension: numerical
+  status: pass
 - id: double_ml_simulated
   notes: Double Machine Learning (Chernozhukov et al. 2018) for heterogeneous treatment
     effects. Uses simulated data with known treatment effect.
@@ -212,6 +228,11 @@ cases:
     cov_type=''cluster'').
 
     '
+  dimension: numerical
+  status: pass
+- id: factor_simulated
+  notes: Simulated four variables from two factors. Compares the first two eigenvalues
+    of the correlation matrix (invariant to sign/rotation of loadings).
   dimension: numerical
   status: pass
 - id: favar_simulated
@@ -371,6 +392,11 @@ cases:
   notes: Logit labour-force participation on the Mroz dataset.
   dimension: numerical
   status: pass
+- id: lowess_simulated
+  notes: Simulated y = sin(x) + N(0, 0.2). Compare LOWESS fitted values at mean, first,
+    middle and last observations.
+  dimension: numerical
+  status: pass
 - id: lpdid_pylpdid_quickstart
   notes: LP-DiD quickstart against pylpdid on an absorbing staggered-adoption panel.
     R reference is left aside for now.
@@ -383,6 +409,11 @@ cases:
   status: pass
 - id: ma_book
   notes: Uses the same simulated MA(1) DGP as Chapter 26 of the book.
+  dimension: numerical
+  status: pass
+- id: manova_simulated
+  notes: Simulated three groups with distinct bivariate means. Compare Pillai, Wilks,
+    Hotelling-Lawley and Roy multivariate test statistics.
   dimension: numerical
   status: pass
 - id: mice_chained_simulated
