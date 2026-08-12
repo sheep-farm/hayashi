@@ -10,6 +10,7 @@ dataset:
   licence: n/a
 
 references:
+  - R
   - Python
 
 comparison:
@@ -17,18 +18,20 @@ comparison:
     - coefficients.mse
     - coefficients.r_squared
   tolerances:
-    coefficients.mse: 0.2
-    coefficients.r_squared: 0.02
+    coefficients.mse: 0.5
+    coefficients.r_squared: 0.05
 
 output_format: csv
 
 hayashi_script: cases/bart_simulated/hayashi/run.hay
 reference_scripts:
+  R: cases/bart_simulated/reference/run.R
   Python: cases/bart_simulated/reference/run.py
 
 notes: Simulated data y = 3*x1 + N(0, 0.1), x2 irrelevant. BART with 20 trees, depth 3, 500 post-burn draws and 200 burn-in. Reference is a scikit-learn GradientBoostingRegressor approximation because a full BART posterior is too heavy for the venv.
 
 result:
   summary: ""
-  known_differences: []
+  known_differences:
+    - R reference uses the gbm package, whose stochastic boosting differs slightly from scikit-learn's GradientBoostingRegressor.
   issues_opened: []

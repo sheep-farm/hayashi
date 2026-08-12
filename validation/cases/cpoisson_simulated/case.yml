@@ -10,6 +10,7 @@ dataset:
   licence: n/a
 
 references:
+  - R
   - Python
 
 comparison:
@@ -24,6 +25,7 @@ output_format: txt
 
 hayashi_script: cases/cpoisson_simulated/hayashi/run.hay
 reference_scripts:
+  R: cases/cpoisson_simulated/reference/run.R
   Python: cases/cpoisson_simulated/reference/run.py
 
 notes: Simulated panel counts with group fixed effects; the reference implements the exact conditional Poisson likelihood (multinomial fixed-total) using analytic gradient and Hessian.

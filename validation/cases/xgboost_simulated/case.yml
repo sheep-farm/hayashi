@@ -10,6 +10,7 @@ dataset:
   licence: n/a
 
 references:
+  - R
   - Python
 
 comparison:
@@ -24,6 +25,7 @@ output_format: csv
 
 hayashi_script: cases/xgboost_simulated/hayashi/run.hay
 reference_scripts:
+  R: cases/xgboost_simulated/reference/run.R
   Python: cases/xgboost_simulated/reference/run.py
 
 notes: Simulated data y = 3*x1 + N(0, 0.1), x2 irrelevant. XGBoost with 50 trees, learning rate 0.1, max depth 3, default regularization. MSE and R^2 compared against xgboost.XGBRegressor.

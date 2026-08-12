@@ -10,6 +10,7 @@ dataset:
   licence: n/a
 
 references:
+  - R
   - Python
 
 comparison:
@@ -22,6 +23,7 @@ output_format: csv
 
 hayashi_script: cases/dr_learner_simulated/hayashi/run.hay
 reference_scripts:
+  R: cases/dr_learner_simulated/reference/run.R
   Python: cases/dr_learner_simulated/reference/run.py
 
 notes: Simulated data with a single confounder x, binary treatment d, and constant ATE=2.0. DR-Learner average treatment effect compared against a manual AIPW reference.

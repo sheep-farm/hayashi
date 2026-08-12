@@ -10,6 +10,7 @@ dataset:
   licence: n/a
 
 references:
+  - R
   - Python
 
 comparison:
@@ -17,18 +18,20 @@ comparison:
     - coefficients.mse
     - coefficients.r_squared
   tolerances:
-    coefficients.mse: 0.05
-    coefficients.r_squared: 0.01
+    coefficients.mse: 0.1
+    coefficients.r_squared: 0.05
 
 output_format: csv
 
 hayashi_script: cases/gbm_simulated/hayashi/run.hay
 reference_scripts:
+  R: cases/gbm_simulated/reference/run.R
   Python: cases/gbm_simulated/reference/run.py
 
 notes: Simulated data y = 3*x1 + N(0, 0.1), x2 irrelevant. Gradient Boosting with 50 trees, learning rate 0.1, max depth 3. MSE and R^2 compared against scikit-learn.
 
 result:
   summary: ""
-  known_differences: []
+  known_differences:
+    - R reference uses the gbm package, whose boosting implementation differs slightly from scikit-learn's GradientBoostingRegressor.
   issues_opened: []

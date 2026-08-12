@@ -8,8 +8,10 @@ dataset:
   source: DGP from book_pt_BR/codes/30_garch.hay
   size: 500 observations
 references:
+- R
 - Python
 reference_scripts:
+  R: cases/garch_book/reference/run.R
   Python: cases/garch_book/reference/run.py
 hayashi_script: cases/garch_book/hayashi/run.hay
 output_format: txt

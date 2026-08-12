@@ -10,6 +10,7 @@ dataset:
   licence: n/a
 
 references:
+  - R
   - Python
 
 comparison:
@@ -22,6 +23,7 @@ output_format: csv
 
 hayashi_script: cases/favar_simulated/hayashi/run.hay
 reference_scripts:
+  R: cases/favar_simulated/reference/run.R
   Python: cases/favar_simulated/reference/run.py
 
 notes: Simulated three observable series driven by one common factor plus the observed y1. Python reference extracts the first PCA factor and estimates a VAR(1) by OLS, matching the FAVAR two-step approach.

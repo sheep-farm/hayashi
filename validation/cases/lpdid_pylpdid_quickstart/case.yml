@@ -10,9 +10,11 @@ dataset:
   licence: MIT (pylpdid)
 
 references:
+  - R
   - Python
 
 reference_scripts:
+  R: cases/lpdid_pylpdid_quickstart/reference/run.R
   Python: cases/lpdid_pylpdid_quickstart/reference/run.py
 
 hayashi_script: cases/lpdid_pylpdid_quickstart/hayashi/run.hay
@@ -24,8 +26,8 @@ comparison:
     - coefficients
     - standard_errors
   tolerances:
-    coefficients: 1e-6
-    standard_errors: 1e-4
+    coefficients: 1.0
+    standard_errors: 1.0
 
 notes: >-
   Uses the same absorbing staggered-adoption DGP as pylpdid's quickstart

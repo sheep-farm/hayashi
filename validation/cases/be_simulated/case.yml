@@ -10,6 +10,7 @@ dataset:
   licence: n/a
 
 references:
+  - R
   - Python
 
 comparison:
@@ -24,6 +25,7 @@ output_format: txt
 
 hayashi_script: cases/be_simulated/hayashi/run.hay
 reference_scripts:
+  R: cases/be_simulated/reference/run.R
   Python: cases/be_simulated/reference/run.py
 
 notes: Panel with N=50 entities and T=4 periods. The between estimator collapses each entity to its temporal means and runs OLS on the collapsed data.

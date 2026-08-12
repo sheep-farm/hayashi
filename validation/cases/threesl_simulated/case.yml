@@ -10,6 +10,7 @@ dataset:
   licence: n/a
 
 references:
+  - R
   - Python
 
 comparison:
@@ -18,12 +19,13 @@ comparison:
     - standard_errors
   tolerances:
     coefficients: 1e-4
-    standard_errors: 1e-4
+    standard_errors: 1e-3
 
 output_format: csv
 
 hayashi_script: cases/threesl_simulated/hayashi/run.hay
 reference_scripts:
+  R: cases/threesl_simulated/reference/run.R
   Python: cases/threesl_simulated/reference/run.py
 
 notes: Simultaneous two-equation system with correlated errors. Each equation includes an
@@ -32,6 +34,7 @@ notes: Simultaneous two-equation system with correlated errors. Each equation in
   with an explicit constant column.
 
 result:
-  summary: "Hayashi 3SLS matches the linearmodels IV3SLS reference."
-  known_differences: []
+  summary: "Hayashi 3SLS matches the linearmodels and systemfit references."
+  known_differences:
+    - R systemfit standard errors differ in the third decimal from the Python linearmodels reference.
   issues_opened: []
