@@ -1,0 +1,10 @@
+load "validation/cases/xgboost_simulated/data/data.csv" as df
+let m = xgboost(y ~ x1 + x2, df, trees=50, lr=0.1, depth=3)
+let nan = 0.0/0.0
+let out = dataframe({
+  "variable": ["mse", "r_squared"],
+  "coef": [m.fit.mse, m.fit.r_squared],
+  "std_err": [nan, nan]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")
