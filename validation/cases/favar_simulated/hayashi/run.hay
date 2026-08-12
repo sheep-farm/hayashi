@@ -1,0 +1,11 @@
+load "validation/cases/favar_simulated/data/data.csv" as df
+let m = favar(y1 ~ y2 + y3, df, observed="y1", factors=1, lags=1, irf=0)
+let eq1 = m.var_coeffs["const"]
+let eq2 = m.var_coeffs["L1.F1"]
+let out0 = dataframe({
+  "variable": ["const_F1", "L1.F1_F1", "L1.y1_F1", "const_y1", "L1.F1_y1", "L1.y1_y1"],
+  "coef": [eq1[0], eq1[1], eq1[2], eq2[0], eq2[1], eq2[2]],
+  "std_err": [0.0/0.0, 0.0/0.0, 0.0/0.0, 0.0/0.0, 0.0/0.0, 0.0/0.0]
+})
+let out = select(out0, "variable", "coef", "std_err")
+export(out, "csv", "/dev/stdout")

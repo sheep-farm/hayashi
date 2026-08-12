@@ -147,6 +147,12 @@ cases:
     uses SSE grid search while references use MLE.
   dimension: numerical
   status: pass
+- id: favar_simulated
+  notes: Simulated three observable series driven by one common factor plus the observed
+    y1. Python reference extracts the first PCA factor and estimates a VAR(1) by OLS,
+    matching the FAVAR two-step approach.
+  dimension: numerical
+  status: pass
 - id: feiv_simulated
   notes: Panel with N=200 entities and T=5 periods; x is endogenous and instrumented
     by z. Independent R and Python within-2SLS references use the Greeners residual
@@ -191,6 +197,11 @@ cases:
 - id: hausman_robust_wooldridge_wagepan
   notes: Robust Hausman test (Cameron-Trivedi 2005, Wooldridge 2010) with cluster-robust
     covariance.
+  dimension: numerical
+  status: pass
+- id: hawkes_simulated
+  notes: Simulated self-exciting Hawkes process. Python reference fits the same MLE
+    via L-BFGS-B.
   dimension: numerical
   status: pass
 - id: heckman_mroz
@@ -289,6 +300,13 @@ cases:
     coarse-to-fine; the reference reverses them to match Greeners' W_1 (finest) convention.
   dimension: numerical
   status: pass
+- id: msvar_simulated
+  notes: Simulated bivariate MS-VAR with 2 regimes and 1 lag. Python reference supplies
+    the true data-generating parameters. The case is currently blocked because the
+    Hayashi msvar estimator does not recover the regime-specific intercepts or the
+    common AR matrix on these data (it collapses to a single pooled-like estimate).
+  dimension: numerical
+  status: blocked
 - id: nardl_simulated
   notes: Simulated NARDL(1,1) with asymmetric long-run multipliers and short-run dynamics.
     y and x are random walks with positive and negative shock decomposition.
@@ -558,6 +576,13 @@ cases:
     SE.
   dimension: numerical
   status: pass
+- id: pstr_simulated
+  notes: Simulated panel data with a two-cluster transition variable. Python reference
+    uses a grid search over (gamma, c) with OLS conditional on the transition function.
+    Blocked because the Hayashi pstr estimates are far from the true transition threshold/c
+    and from the independent Python grid reference.
+  dimension: numerical
+  status: blocked
 - id: pvar_simulated
   notes: Simulated bivariate panel VAR with N=50 and T=100. Hayashi GMM and within-OLS
     references agree within moderate tolerance due to the Nickell bias in within estimation.
@@ -679,6 +704,12 @@ cases:
   status: pass
 - id: ttest_wooldridge_wage1
   notes: One-sample t-test of wage mean against mu=5.
+  dimension: numerical
+  status: pass
+- id: tvp_simulated
+  notes: Simulated TVP data with smooth intercept and slope drift. The reference is
+    the true final coefficient vector because Greeners TVP uses a simple Kalman-grid
+    implementation with no readily available reference implementation.
   dimension: numerical
   status: pass
 - id: var_book

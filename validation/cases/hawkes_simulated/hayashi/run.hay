@@ -1,0 +1,9 @@
+load "validation/cases/hawkes_simulated/data/data.csv" as df
+let m = hawkes(df, "time", T=200)
+let out0 = dataframe({
+  "variable": ["mu", "alpha", "beta", "branching_ratio"],
+  "coef": [m.fit.mu, m.fit.alpha, m.fit.beta, m.fit.branching_ratio],
+  "std_err": [0.0/0.0, 0.0/0.0, 0.0/0.0, 0.0/0.0]
+})
+let out = select(out0, "variable", "coef", "std_err")
+export(out, "csv", "/dev/stdout")
