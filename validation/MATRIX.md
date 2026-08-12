@@ -165,7 +165,7 @@
 | spatial_sem | simulated | R, Python | pass | — | Data generated on a 7x7 grid with rook contiguity W, lambda=0.3, beta=0.5. Reference implements the concentrated MLE for SEM independently. |
 | descriptive | wooldridge::wage1 | R, Python | pass | — | Summary statistics with detail (percentiles, skewness, kurtosis) for wage. |
 | sur | wooldridge::grunfeld | R, Python | pass | — | Two-equation SUR (Zellner FGLS) on the Grunfeld investment data. |
-| sv | simulated_sv | R, Python | blocked | — | Simulated Taylor (1986) SV data; compares the posterior mean of the latent log-volatility h_t between Hayashi, R stochvol and PyMC. Tight tolerance because R and PyMC agree closely on this DGP. |
+| sv | simulated_sv | R:passed *, Python:passed * | pass | — | Simulated Taylor (1986) SV data; compares the posterior mean of the latent log-volatility h_t between Hayashi, R stochvol and PyMC. Tight tolerance because R and PyMC agree closely on this DGP. |
 | svar | statsmodels::macrodata | R, Python | pass | — | Cholesky-identified SVAR(2) on log US real GDP and consumption. |
 | svar | simulated | R, Python | pass | — | Blanchard-Quah SVAR(1) with long-run restrictions on a simulated bivariate system. Reference implements the same C(1) Cholesky procedure used by Greeners. |
 | synth | synth_smoking | R, Python | pass | — | Synthetic-control ATT on a simulated panel with 10 donors and 1 treated unit. |

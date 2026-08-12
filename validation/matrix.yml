@@ -826,7 +826,7 @@ cases:
     log-volatility h_t between Hayashi, R stochvol and PyMC. Tight tolerance because
     R and PyMC agree closely on this DGP.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: svar_macro
   notes: Cholesky-identified SVAR(2) on log US real GDP and consumption.
   dimension: numerical

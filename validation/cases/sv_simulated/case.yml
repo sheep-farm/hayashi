@@ -1,7 +1,7 @@
 id: sv_simulated
 title: Stochastic volatility on simulated data
 estimator_family: sv
-status: blocked
+status: active
 dimension: numerical
 dataset:
   name: simulated_sv
