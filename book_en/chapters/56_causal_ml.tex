@@ -1,0 +1,124 @@
+\chapter{Causal Machine Learning}
+
+\section{From prediction to treatment effects}
+
+Machine-learning estimators can also be used for causal inference when
+the goal is to estimate a treatment effect $Y(1) - Y(0)$. The commands in
+this chapter target two quantities:
+
+\begin{itemize}
+\item the \textbf{Average Treatment Effect} (ATE)
+\item the \textbf{Conditional Average Treatment Effect} (CATE),
+      $\tau(x) = \E[Y(1) - Y(0) \mid X = x]$
+\end{itemize}
+
+They all require a treatment indicator `d` and a set of covariates `x`.
+They do not replace a clear research design, but they can help discover
+heterogeneous effects and improve precision.
+
+\section{Causal Forest}
+
+Causal Forest (Athey and Wager, 2018) adapts Random Forest to estimate
+heterogeneous treatment effects directly. It splits on covariates to
+maximise the variance of estimated treatment effects across leaves.
+
+\begin{lstlisting}[caption={Causal Forest}]
+set_seed(42)
+let n = 1000
+generate df x1 = rnormal(n)
+generate df x2 = rnormal(n)
+generate df d = (0.5 + 0.3*x1 > runiform(n))
+generate df y = 1 + 2*x1 - x2 + d*(0.5 + 0.4*x1) + rnormal(n)
+
+let m_cf = causalforest(y ~ d, df, x="x1,x2", trees=200, depth=5)
+print(m_cf)
+\end{lstlisting}
+
+The output includes:
+
+\begin{itemize}
+\item the estimated ATE
+\item a CATE distribution (mean, quartiles)
+\item variable importance
+\end{itemize}
+
+\section{DR-Learner and TMLE}
+
+The \textbf{DR-Learner} (Kennedy, 2023) and \textbf{TMLE} (van der Laan
+and Rubin, 2006) are doubly-robust approaches. Each constructs a pseudo-
+outcome from estimated nuisance functions and then regresses it on
+covariates to recover the CATE or ATE.
+
+\begin{lstlisting}[caption={DR-Learner}]
+let m_dr = dr_learner(y ~ d, df, x="x1,x2", folds=5)
+print(m_dr)
+\end{lstlisting}
+
+\begin{lstlisting}[caption={TMLE}]
+let m_tmle = tmle(y ~ d, df, w="x1,x2")
+print(m_tmle)
+\end{lstlisting}
+
+Doubly-robust methods are attractive because the ATE remains consistent
+if either the propensity score or the outcome model is well specified.
+
+\section{Orthogonal Random Forest}
+
+ORF (Oprescu, Syrgkanis, and Wu, 2019) residualises treatment and
+outcome with respect to confounders before running a forest on the
+residualised signals.
+
+\begin{lstlisting}[caption={Orthogonal Random Forest}]
+let m_orf = orf(y ~ d, df, x="x1,x2", w="x1,x2", trees=100, depth=5)
+print(m_orf)
+\end{lstlisting}
+
+It is useful when the treatment is not randomised and the relevant
+heterogeneity comes from a subset of covariates.
+
+\section{Bayesian Synthetic Control}
+
+`bsc` implements a Bayesian version of the synthetic-control estimator.
+It is appropriate when a single treated unit is compared against several
+donor units and the goal is a counterfactual path with credible
+intervals.
+
+\begin{lstlisting}[caption={Bayesian synthetic control}]
+// df has columns y, c1, c2, ..., t
+let m_bsc = bsc(df, y, "c1,c2", 25, prior=1.0)
+print(m_bsc)
+\end{lstlisting}
+
+The output reports the treatment effect $\tau$, its standard deviation,
+a 95\% credible interval, and the synthetic-control weights.
+
+\section{Double Machine Learning}
+
+`dml_crossfit` estimates the ATE in a partially linear model
+
+\[
+Y = \theta D + g(X) + \varepsilon
+\]
+
+using K-fold cross-fitting for the nuisance function $g(X)$.
+
+\begin{lstlisting}[caption={Double Machine Learning}]
+let m_dml = dml_crossfit(y ~ d, df, x="x1,x2", folds=5)
+print(m_dml)
+\end{lstlisting}
+
+Because the nuisance is estimated on a separate fold, the resulting ATE
+has a standard $\sqrt{n}$-rate distribution and honest standard errors.
+
+\section{Choosing a method}
+
+\begin{itemize}
+\item \textbf{Heterogeneous effects:} Causal Forest or ORF
+\item \textbf{Doubly-robust ATE:} DR-Learner, TMLE, DML
+\item \textbf{Single treated unit:} BSC
+\end{itemize}
+
+All of these commands are \textit{experimental}. Validation against
+reference implementations is partial or not supported for some of them.
+Use them for exploration and as complements to a clear design, not as
+substitutes for it.

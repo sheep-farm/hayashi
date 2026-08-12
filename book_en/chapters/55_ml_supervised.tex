@@ -1,0 +1,115 @@
+\chapter{Supervised Machine Learning}
+
+\section{Why machine learning in an econometrics language?}
+
+Classical econometrics excels when the goal is inference: estimating a
+parameter, testing a hypothesis, or recovering a causal effect. Machine
+learning is most useful when the goal is prediction: finding a flexible
+function $\hat f(X)$ that approximates $Y$ well out of sample.
+
+\hayashi{} bridges the two. Its ML commands use the same formula syntax as
+OLS or logit, and they return model objects that work with `predict`,
+`glance`, and `tidy`.
+
+This chapter covers tree-based methods, neural networks, and a Gaussian
+process. It is not a full machine-learning course; it shows how to
+estimate, interpret, and compare these models inside \hayashi{}.
+
+\section{Random Forest}
+
+Random Forest (Breiman, 2001) fits an ensemble of decision trees on
+bootstrap samples, averaging their predictions to reduce variance.
+
+\begin{lstlisting}[caption={Random forest regression}]
+set_seed(42)
+let n = 500
+generate df x1 = rnormal(n)
+generate df x2 = rnormal(n)
+generate df y = 2 + 0.5*x1 - 0.3*x2 + 0.4*x1*x2 + rnormal(n)
+
+let m_rf = rf(y ~ x1 + x2, df, trees=200, depth=10)
+print(m_rf)
+
+let g = glance(m_rf)
+print(g)
+\end{lstlisting}
+
+Key outputs:
+
+\begin{itemize}
+\item \texttt{r2} and \texttt{oob\_r2}: in-sample and out-of-bag $R^2$
+\item feature importance: reduction in impurity attributable to each regressor
+\end{itemize}
+
+Use `predict(df, yhat = m_rf)` to obtain fitted values on a DataFrame.
+
+\section{Gradient Boosting and XGBoost}
+
+Gradient Boosting builds trees sequentially, each one fitting the
+residuals of the previous ensemble. XGBoost (Chen and Guestrin, 2016)
+extends this with second-order information and regularization.
+
+\begin{lstlisting}[caption={XGBoost regression}]
+let m_xgb = xgboost(y ~ x1 + x2, df, trees=100, depth=4, lr=0.1)
+print(glance(m_xgb))
+\end{lstlisting}
+
+Boosting tends to outperform Random Forest on structured tabular data,
+but it is more sensitive to hyper-parameters and can overfit.
+
+\section{Multilayer Perceptron}
+
+The `mlp` command fits a single-hidden-layer feed-forward network with
+sigmoid activation and back-propagation with momentum.
+
+\begin{lstlisting}[caption={Neural network}]
+let m_mlp = mlp(y ~ x1 + x2, df, hidden=20, lr=0.01, epochs=500)
+print(glance(m_mlp))
+\end{lstlisting}
+
+It is useful for uncovering nonlinear interactions, but it offers less
+transparency than trees and often needs tuning.
+
+\section{LSTM and Transformer for series}
+
+For time-series, `lstm` and `transformer` use sequence windows to
+predict the next value. They standardise the target internally.
+
+\begin{lstlisting}[caption={LSTM forecast}]
+let n = 200
+generate df y = 0.1*(_n - n/2) + 0.5*sin(2*pi()*_n/20) + rnormal(n)
+let m_lstm = lstm(df, y, seqlen=10, hidden=10, epochs=100, forecast=5)
+print(m_lstm)
+\end{lstlisting}
+
+These models are deterministic once the seed is set, but their
+predictive quality is convention-sensitive. They are experimental.
+
+\section{Gaussian Process}
+
+A Gaussian Process defines a distribution over functions. It is
+non-parametric in the sense that it does not fix a functional form, and
+it reports uncertainty around each prediction.
+
+\begin{lstlisting}[caption={Gaussian process regression}]
+let m_gp = gp(y ~ x1 + x2, df)
+print(m_gp)
+\end{lstlisting}
+
+GP is attractive for small datasets and when uncertainty propagation
+matters. It is slower and more memory-intensive than tree methods.
+
+\section{When to prefer which?}
+
+\begin{itemize}
+\item \textbf{Interpretability + robustness:} Random Forest or Gradient Boosting
+\item \textbf{Predictive accuracy with tuning:} XGBoost
+\item \textbf{Nonlinear smooth functions:} MLP or GP
+\item \textbf{Sequences:} LSTM / Transformer
+\item \textbf{Uncertainty:} GP or BART
+\end{itemize}
+
+All commands accept a standard Hayashi formula and return an object
+compatible with `predict` and `glance`. Standard errors are generally not
+reported because these methods are not designed for direct inference on
+individual coefficients.
