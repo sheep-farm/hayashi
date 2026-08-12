@@ -331,6 +331,12 @@ cases:
     iter=10. Uses simulated data with MCAR missing values.
   dimension: numerical
   status: pass
+- id: midas_simulated
+  notes: Simulated low-frequency y (T=100) and high-frequency x (T*3). y = 1.0 + 2.0
+    * x_midas + noise. Compare alpha, beta and R-squared against Python MIDAS grid+minimize
+    reference.
+  dimension: numerical
+  status: pass
 - id: mixed_wooldridge_wagepan_ch14
   notes: Wooldridge Introductory Econometrics Chapter 14 Example 14.4 mixed linear
     model wage equation.

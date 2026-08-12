@@ -1319,6 +1319,61 @@ impl Interpreter {
         Ok((formula_ast, df))
     }
 
+    /// Extract formula and (optionally separate) low/high-frequency DataFrames for MIDAS.
+    fn extract_midas_args(
+        &mut self,
+        args: &[Expr],
+        opts: &[Opt],
+        opt_map: &HashMap<String, Value>,
+    ) -> Result<(Formula, Arc<greeners::DataFrame>, Arc<greeners::DataFrame>)> {
+        if args.is_empty() {
+            return Err(HayashiError::Runtime(
+                "midas: missing formula argument".into(),
+            ));
+        }
+        let formula_ast = self.resolve_formula(&args[0])?;
+
+        // Legacy: second positional argument is the only DataFrame.
+        if let Some(y_df_name) = opt_map.get("y_df").and_then(|v| match v {
+            Value::Str(s) => Some(s.clone()),
+            _ => None,
+        }) {
+            let x_df_name = opt_map.get("x_df").and_then(|v| match v {
+                Value::Str(s) => Some(s.clone()),
+                _ => None,
+            }).ok_or_else(|| HayashiError::Runtime(
+                "midas: x_df option required when y_df is provided".into(),
+            ))?;
+            let y_df = match self.env.get(&y_df_name) {
+                Some(Value::DataFrame(df)) => df.clone(),
+                _ => return Err(self.rt_err(format!("'{y_df_name}' is not a DataFrame"))),
+            };
+            let x_df = match self.env.get(&x_df_name) {
+                Some(Value::DataFrame(df)) => df.clone(),
+                _ => return Err(self.rt_err(format!("'{x_df_name}' is not a DataFrame"))),
+            };
+            let y_df = self.maybe_filter_df(&y_df, opts)?;
+            let x_df = self.maybe_filter_df(&x_df, opts)?;
+            return Ok((formula_ast, y_df, x_df));
+        }
+
+        // Fall back to single DataFrame for the legacy interface.
+        let df_name = match &args[1] {
+            Expr::Var(name) => name.clone(),
+            _ => {
+                return Err(HayashiError::Type(
+                    "second argument must be a DataFrame variable".into(),
+                ))
+            }
+        };
+        let df = match self.env.get(&df_name) {
+            Some(Value::DataFrame(df)) => df.clone(),
+            _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
+        };
+        let df = self.maybe_filter_df(&df, opts)?;
+        Ok((formula_ast, df.clone(), df))
+    }
+
     // ── Formula materialization ─────────────────────────────────────────────
 
     /// Safe default for formula-based estimators. No-intercept support requires

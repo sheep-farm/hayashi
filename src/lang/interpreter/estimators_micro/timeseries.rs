@@ -1,4 +1,5 @@
 use super::super::*;
+use crate::lang::ast::{Expr as AstExpr, RhsTerm};
 use crate::lang::dap::model_expansion;
 
 impl Interpreter {
@@ -9,8 +10,10 @@ impl Interpreter {
         opts: &[Opt],
         opt_map: &HashMap<String, Value>,
     ) -> Result<Value> {
-        let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
-        let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+        // MIDAS can take data from two DataFrames of different lengths.
+        // Legacy: midas(y ~ x, df, ...)
+        // New:     midas(y ~ x, y_df="low", x_df="high", ...)
+        let (formula_ast, y_df, x_df) = self.extract_midas_args(args, opts, opt_map)?;
 
         let freq = match opt_map.get("freq") {
             Some(Value::Int(v)) => *v as usize,
@@ -28,17 +31,25 @@ impl Interpreter {
             _ => 2,
         };
 
-        if g_formula.independents.len() != 1 {
-            return Err(HayashiError::Runtime(
-                "midas: exactly one high-frequency regressor required".into(),
-            ));
-        }
-
-        let y_col = &g_formula.dependent;
-        let x_col = &g_formula.independents[0];
+        let y_col = &formula_ast.lhs;
+        let x_col = match formula_ast.rhs.first() {
+            Some(RhsTerm::Expr(expr)) => match expr.as_ref() {
+                AstExpr::Var(name) => name.as_str(),
+                _ => {
+                    return Err(HayashiError::Runtime(
+                        "midas: high-frequency regressor must be a simple variable".into(),
+                    ));
+                }
+            },
+            _ => {
+                return Err(HayashiError::Runtime(
+                    "midas: exactly one high-frequency regressor required".into(),
+                ));
+            }
+        };
 
         let y_vec: Vec<f64> = {
-            let col = df
+            let col = y_df
                 .get_column(y_col)
                 .map_err(|e| HayashiError::Runtime(e.to_string()))?;
             col.as_float()
@@ -48,7 +59,7 @@ impl Interpreter {
                 .to_vec()
         };
         let x_vec: Vec<f64> = {
-            let col = df
+            let col = x_df
                 .get_column(x_col)
                 .map_err(|e| HayashiError::Runtime(e.to_string()))?;
             col.as_float()

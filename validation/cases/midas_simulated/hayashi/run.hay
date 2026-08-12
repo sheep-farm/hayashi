@@ -1,0 +1,10 @@
+load "validation/cases/midas_simulated/data/ylow.csv" as ylow
+load "validation/cases/midas_simulated/data/xhigh.csv" as xhigh
+let m = midas(y ~ x, y_df="ylow", x_df="xhigh", freq=3, lags=12, poly=2)
+let out = dataframe({
+  "variable": ["alpha", "beta", "r_squared"],
+  "coef": [m.fit.alpha, m.fit.beta, m.fit.r_squared],
+  "std_err": [0.0/0.0, 0.0/0.0, 0.0/0.0]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")
