@@ -1,0 +1,81 @@
+\chapter{Modelos Bayesianos e de Fronteira}
+
+\section{Regressão linear bayesiana}
+
+`bayes_lm` implementa regressão linear bayesiana com priori conjugada
+Normal-Inversa-Gamma. Com uma priori fraca, recupera as médias
+posteriori do OLS, mas também reporta desvios padrão posteriores,
+intervalos credíveis e a probabilidade de cada coeficiente ser positivo.
+
+\begin{lstlisting}[caption={Regressão linear bayesiana}]
+set_seed(42)
+let n = 200
+generate df x1 = rnormal(n)
+generate df x2 = rnormal(n)
+generate df y = 1 + 2*x1 - 1.5*x2 + rnormal(n, 0, 2)
+
+let m_bayes = bayes_lm(y ~ x1 + x2, df)
+print(m_bayes)
+\end{lstlisting}
+
+A média posterior de cada coeficiente é a média ponderada entre a média
+a priori e a estimativa OLS, com mais peso nos dados à medida que a
+amostra cresce. O intervalo credível de 95\% é reportado para cada
+regressor.
+
+\section{Análise de fronteira estocástica}
+
+Modelos de fronteira estocástica separam ruído estatístico de
+ineficiência técnica ou de custo. A fronteira de produção é
+
+\[
+y = X\beta + v - u, \qquad u \ge 0
+\]
+
+onde $v$ é o ruído e $u$ é a ineficiência. `sfa_production` estima
+$\beta$, $\sigma_v$, $\sigma_u$ e a eficiência técnica média.
+
+\begin{lstlisting}[caption={Fronteira de produção estocástica}]
+let n = 300
+generate df x1 = rnormal(n)
+generate df x2 = rnormal(n)
+generate df v  = rnormal(n, 0, 0.3)
+generate df u  = abs(rnormal(n, 0, 0.5))
+generate df y  = 1 + 0.8*x1 + 0.6*x2 + v - u
+
+let m_sfa = sfa_production(y ~ x1 + x2, df)
+print(m_sfa)
+\end{lstlisting}
+
+Para uma fronteira de custo, o termo de ineficiência é somado em vez de
+subtraído:
+
+\begin{lstlisting}[caption={Fronteira de custo estocástica}]
+let m_sfac = sfa_cost(y ~ x1 + x2, df)
+print(m_sfac)
+\end{lstlisting}
+
+\section{Fronteira estocástica bayesiana}
+
+`bayes_sfa_production` e `bayes_sfa_cost` implementam um amostrador de
+Gibbs com prioris conjugadas fracas. Eles reportam médias posteriores,
+desvios padrão e intervalos credíveis de 95\% para os coeficientes de
+regressão e os parâmetros de variância.
+
+\begin{lstlisting}[caption={SFA bayesiano}]
+let m_bsfa = bayes_sfa_production(y ~ x1 + x2, df, burn=500, draws=1000)
+print(m_bsfa)
+\end{lstlisting}
+
+São mais robustos em amostras pequenas que SFA por máxima
+verossimilhança, mas a convergência deve ser verificada rodando a
+cadeira com diferentes valores iniciais e comparando as posteriores.
+
+\section{Quando usar cada um}
+
+\begin{itemize}
+\item \textbf{Inferência padrão com incerteza:} `bayes_lm`
+\item \textbf{Eficiência de produção:} `sfa_production`
+\item \textbf{Eficiência de custo:} `sfa_cost`
+\item \textbf{SFA em amostras pequenas ou posteriori completa:} `bayes_sfa_production`
+\end{itemize}

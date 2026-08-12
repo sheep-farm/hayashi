@@ -1,0 +1,92 @@
+\chapter{Advanced Volatility and Dependence}
+
+\section{Beyond GARCH}
+
+Chapter~31 covered GARCH, EGARCH and GJR-GARCH. This chapter treats
+stochastic volatility, dynamic correlations, copulas, wavelets, and
+self-exciting point processes.
+
+\section{Stochastic Volatility}
+
+GARCH models the conditional variance as a deterministic function of
+past squared errors. Stochastic Volatility (Taylor, 1986) treats the
+log-volatility as a latent AR(1) process:
+
+\[
+y_t = \exp(h_t/2) \varepsilon_t, \qquad
+h_t = \mu + \phi(h_{t-1} - \mu) + \eta_t
+\]
+
+\begin{lstlisting}[caption={Stochastic Volatility}]
+let n = 500
+generate df y = 0.02 + rnormal(n, 0, exp(0.5*rnormal(n, 0, 1)))
+
+let m_sv = sv(df, y, iter=500)
+print(m_sv)
+\end{lstlisting}
+
+`sv` reports $\mu$, $\phi$ (persistence), $\sigma_\eta$ (vol-of-vol),
+and the conditional volatility path.
+
+\section{Dynamic Conditional Correlation}
+
+DCC-GARCH (Engle, 2002) combines univariate GARCH(1,1) models with a
+dynamic equation for the conditional correlation matrix. It is useful
+for modelling time-varying dependence between returns.
+
+\begin{lstlisting}[caption={DCC-GARCH}]
+let m_dcc = dcc_garch(y1 ~ y2, df)
+print(m_dcc)
+\end{lstlisting}
+
+The output includes the DCC parameters ($\alpha$, $\beta$), univariate
+GARCH parameters, conditional volatilities, and dynamic correlation
+matrices.
+
+\section{Copulas}
+
+`copula` estimates a bivariate dependence model via Sklar's theorem. It
+separates marginal distributions from the copula that links them.
+
+\begin{lstlisting}[caption={Copula}]
+let m_cop = copula(y1 ~ y2, df, type="gaussian")
+print(m_cop)
+\end{lstlisting}
+
+Available copulas include Gaussian, Clayton, Gumbel, and Frank. The
+output reports Kendall's $\tau$, Spearman's $\rho$, and the copula
+parameter.
+
+`tv_copula` extends this with time-varying dependence driven by a
+GARCH-like dynamics for the copula parameter.
+
+\begin{lstlisting}[caption={Time-varying copula}]
+let m_tvc = tvcopula(y1 ~ y2, df, type="gaussian")
+print(m_tvc)
+\end{lstlisting}
+
+\section{Wavelets}
+
+Maximal Overlap Discrete Wavelet Transform (MODWT) decomposes a series
+into time-frequency components without decimation.
+
+\begin{lstlisting}[caption={MODWT}]
+let m_modwt = modwt(df, y, scales=4)
+print(m_modwt)
+\end{lstlisting}
+
+Useful for isolating cyclical components at different frequencies.
+
+\section{Hawkes processes}
+
+A Hawkes process is a self-exciting point process. Each event increases
+the conditional intensity of future events by an amount that decays
+exponentially.
+
+\begin{lstlisting}[caption={Hawkes process}]
+let m_hawkes = hawkes(df, time, T=100)
+print(m_hawkes)
+\end{lstlisting}
+
+The branching ratio $\eta = \alpha / \beta$ tells how much each event
+contributes to future events. $\eta < 1$ is required for stationarity.

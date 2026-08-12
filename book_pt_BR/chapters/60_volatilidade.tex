@@ -1,0 +1,93 @@
+\chapter{Volatilidade e Dependência Avançadas}
+
+\section{Além do GARCH}
+
+O Capítulo~31 cobriu GARCH, EGARCH e GJR-GARCH. Este capítulo trata de
+volatilidade estocástica, correlações dinâmicas, copulas, wavelets e
+processos de pontos auto-excitantes.
+
+\section{Volatilidade Estocástica}
+
+Modelos GARCH modelam a variância condicional como função
+determinística de erros quadrados passados. A Volatilidade Estocástica
+(Taylor, 1986) trata o log-volatilidade como um processo AR(1) latente:
+
+\[
+y_t = \exp(h_t/2) \varepsilon_t, \qquad
+h_t = \mu + \phi(h_{t-1} - \mu) + \eta_t
+\]
+
+\begin{lstlisting}[caption={Volatilidade Estocástica}]
+let n = 500
+generate df y = 0.02 + rnormal(n, 0, exp(0.5*rnormal(n, 0, 1)))
+
+let m_sv = sv(df, y, iter=500)
+print(m_sv)
+\end{lstlisting}
+
+`sv` reporta $\mu$, $\phi$ (persistência), $\sigma_\eta$
+(volatilidade-da-volatilidade) e o caminho de volatilidade condicional.
+
+\section{Correlação Condicional Dinâmica}
+
+DCC-GARCH (Engle, 2002) combina modelos GARCH(1,1) univariados com uma
+equação dinâmica para a matriz de correlação condicional. É útil para
+modelar dependência variante no tempo entre retornos.
+
+\begin{lstlisting}[caption={DCC-GARCH}]
+let m_dcc = dcc_garch(y1 ~ y2, df)
+print(m_dcc)
+\end{lstlisting}
+
+A saída inclui os parâmetros DCC ($\alpha$, $\beta$), os parâmetros
+GARCH univariados, volatilidades condicionais e matrizes de correlação
+dinâmica.
+
+\section{Copulas}
+
+`copula` estima um modelo bivariado de dependência via Teorema de
+Sklar. Separa as distribuições marginais da copula que as une.
+
+\begin{lstlisting}[caption={Copula}]
+let m_cop = copula(y1 ~ y2, df, type="gaussian")
+print(m_cop)
+\end{lstlisting}
+
+As copulas disponíveis incluem Gaussiana, Clayton, Gumbel e Frank. A
+saída reporta o $\tau$ de Kendall, o $\rho$ de Spearman e o parâmetro
+da copula.
+
+`tv_copula` estende isso com dependência variante no tempo impulsionada
+por uma dinâmica tipo GARCH para o parâmetro da copula.
+
+\begin{lstlisting}[caption={Copula de dependência variante no tempo}]
+let m_tvc = tvcopula(y1 ~ y2, df, type="gaussian")
+print(m_tvc)
+\end{lstlisting}
+
+\section{Wavelets}
+
+A Transformada Wavelet de Máxima Sobreposição Discreta (MODWT)
+decompõe uma série em componentes tempo-frequência sem decimação.
+
+\begin{lstlisting}[caption={MODWT}]
+let m_modwt = modwt(df, y, scales=4)
+print(m_modwt)
+\end{lstlisting}
+
+Útil para isolar componentes cíclicos em diferentes frequências.
+
+\section{Processos de Hawkes}
+
+Um processo de Hawkes é um processo de pontos auto-excitante. Cada
+evento aumenta a intensidade condicional de eventos futuros por uma
+quantidade que decai exponencialmente.
+
+\begin{lstlisting}[caption={Processo de Hawkes}]
+let m_hawkes = hawkes(df, time, T=100)
+print(m_hawkes)
+\end{lstlisting}
+
+A taxa de ramificação $\eta = \alpha / \beta$ indica quanto cada
+evento contribui para eventos futuros. $\eta < 1$ é necessário para
+estacionariedade.
