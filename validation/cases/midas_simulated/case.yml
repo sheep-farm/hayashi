@@ -10,6 +10,7 @@ dataset:
   licence: n/a
 
 references:
+  - R
   - Python
 
 comparison:
@@ -22,9 +23,10 @@ output_format: csv
 
 hayashi_script: cases/midas_simulated/hayashi/run.hay
 reference_scripts:
+  R: cases/midas_simulated/reference/run.R
   Python: cases/midas_simulated/reference/run.py
 
-notes: Simulated low-frequency y (T=100) and high-frequency x (T*3). y = 1.0 + 2.0 * x_midas + noise. Compare alpha, beta and R-squared against Python MIDAS grid+minimize reference.
+notes: Simulated low-frequency y (T=100) and high-frequency x (T*3). y = 1.0 + 2.0 * x_midas + noise. Compare alpha, beta and R-squared against R optim and Python MIDAS grid+minimize references.
 
 result:
   summary: "Hayashi MIDAS with two DataFrames matches Python reference."
