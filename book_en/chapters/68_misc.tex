@@ -1,0 +1,91 @@
+\chapter{Other Estimators and Aliases}
+
+\section{Commands not covered in detail}
+
+This chapter collects additional commands and aliases that are
+implemented in \hayashi{} but not treated in a dedicated chapter.
+
+\section{Additional discrete and panel models}
+
+\begin{itemize}
+\item \texttt{cmnlogit}: conditional multinomial logit
+\item \texttt{clogit}: conditional logit
+\item \texttt{cpoisson}: conditional Poisson / PPML
+\item \texttt{panel\_tobit}: panel Tobit with random effects
+\item \texttt{panel\_heckman}: panel Heckman selection
+\item \texttt{panel\_qreg}: panel quantile regression
+\item \texttt{sysgmm}: system GMM
+\end{itemize}
+
+\section{Additional time series}
+
+\begin{itemize}
+\item \texttt{varma}: VARMA/VARMAX
+\item \texttt{svar\_irf} / \texttt{sirf}: structural VAR impulse responses
+\item \texttt{svar\_fevd} / \texttt{sfevd}: structural forecast-error variance
+      decomposition
+\item \texttt{qvar}: quantile VAR
+\item \texttt{tvar}: threshold VAR
+\item \texttt{mstl}: multiple-seasonal STL decomposition
+\item \texttt{modwt}: maximal overlap discrete wavelet transform
+\item \texttt{decompose}: classical time-series decomposition
+\item \texttt{dfm}: dynamic factor model
+\item \texttt{midas}: mixed-data-sampling regression
+\item \texttt{hawkes}: self-exciting point process
+\end{itemize}
+
+\section{Additional spatial variants}
+
+\begin{itemize}
+\item \texttt{spatial\_sar}, \texttt{spatial\_sem}, \texttt{spatial\_durbin},
+      \texttt{spatial\_panel\_sar}, \texttt{spatial\_panel\_sem},
+      \texttt{spatial\_durbin\_error}: the spatial variants are also
+      available under the aliases \texttt{sdm} and \texttt{sdem}.
+\end{itemize}
+
+\section{Additional tests and diagnostics}
+
+\begin{itemize}
+\item \texttt{breusch\_godfrey} / \texttt{bg} / \texttt{bgodfrey}:
+      Breusch-Godfrey serial-correlation LM test
+\item \texttt{durbinwatson} / \texttt{dw}: Durbin-Watson test
+\item \texttt{phillips\_perron} / \texttt{pp}: Phillips-Perron unit-root test
+\item \texttt{zivot\_andrews} / \texttt{za}: Zivot-Andrews unit-root test with
+      a structural break
+\item \texttt{engle\_granger}: Engle-Granger cointegration test
+\item \texttt{anderson\_darling} / \texttt{adtest}: Anderson-Darling normality
+      test
+\item \texttt{lilliefors}: Lilliefors normality test
+\item \texttt{harvey\_collier}: Harvey-Collier misspecification test
+\item \texttt{sktest}: skewness/kurtosis test
+\item \texttt{spearman}, \texttt{wilcoxon\_rs}, \texttt{wilcoxon\_signed\_rank},
+      \texttt{kruskal\_wallis}: non-parametric tests
+\item \texttt{proptest}, \texttt{proptest2}, \texttt{propci}, \texttt{chi2\_2x2},
+      \texttt{multipletests}: proportion and multiple-testing commands
+\end{itemize}
+
+\section{Post-estimation tests}
+
+\begin{itemize}
+\item \texttt{estat\_overid} / \texttt{sargan}: Sargan/Hansen J over-
+      identification test
+\item \texttt{estat\_endog} / \texttt{dwh}: Durbin-Wu-Hausman endogeneity test
+\item \texttt{estat\_classification}: classification table for logit/probit
+\item \texttt{estat\_gof} / \texttt{hltest}: Hosmer-Lemeshow goodness-of-fit
+\end{itemize}
+
+\section{Aliases}
+
+Many estimators have aliases for convenience. The most common are:
+
+\begin{itemize}
+\item \texttt{reg} for \texttt{ols}, \texttt{frontier} for \texttt{sfa\_production}
+\item \texttt{neural\_net} for \texttt{mlp}, \texttt{xgb} for \texttt{xgboost}
+\item \texttt{causal\_forest} for \texttt{causalforest}, \texttt{random\_forest} for \texttt{rf}
+\item \texttt{gaussian\_process} for \texttt{gp}, \texttt{bayesian\_trees} for \texttt{bart}
+\item \texttt{gmm\_clustering} for \texttt{gmm\_clust}, \texttt{pca\_biplot} for \texttt{biplot}
+\item \texttt{three\_sls}, \texttt{threesl}, \texttt{3sls}, \texttt{reg3}: aliases for the
+      same 3SLS estimator
+\end{itemize}
+
+Use the quick-reference appendix for the full matrix of commands.
