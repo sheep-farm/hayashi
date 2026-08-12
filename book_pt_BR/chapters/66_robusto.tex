@@ -1,0 +1,89 @@
+\chapter{Métodos Robustos, Flexíveis e Imputação}
+
+\section{M-estimadores robustos}
+
+`rlm` ajusta um modelo linear com M-estimadores que reduzem o peso de
+outliers. O padrão é uma perda de Huber com constante de ajuste, que
+dá comportamento tipo OLS no centro e tipo L1 nas caudas.
+
+\begin{lstlisting}[caption={Regressão robusta}]
+let m_rlm = rlm(y ~ x1 + x2, df)
+print(m_rlm)
+\end{lstlisting}
+
+Use `rlm` quando os dados contiverem outliers influentes, mas a maior
+parte da distribuição for aproximadamente normal.
+
+\section{Modelos Lineares Generalizados}
+
+`glm` ajusta um preditor linear através de uma função de ligação.
+Generaliza o OLS para famílias exponenciais como Poisson, Binomial e
+Gamma.
+
+\begin{lstlisting}[caption={GLM}]
+let m_glm = glm(y ~ x1 + x2, df, family=poisson, link=log)
+print(m_glm)
+\end{lstlisting}
+
+Famílias disponíveis incluem `gaussian`, `poisson`, `binomial`, `gamma`,
+`inverse_gaussian` e `negative_binomial`. Ligações incluem `identity`,
+`log`, `logit`, `probit`, `cloglog` e `inverse`.
+
+\section{GEE}
+
+Equações de Estimação Generalizadas ajustam um modelo marginal
+considerando a correlação intra-grupo. É o análogo médio-populacional
+dos modelos mistos.
+
+\begin{lstlisting}[caption={GEE}]
+let m_gee = gee(y ~ x1 + x2, df, id="grupo", family=poisson)
+print(m_gee)
+\end{lstlisting}
+
+Estruturas de correlação incluem `independence`, `exchangeable`, `ar1` e
+`unstructured`.
+
+\section{Regressão Beta}
+
+`betareg` é apropriada quando a variável dependente é limitada em
+$(0,1)$.
+
+\begin{lstlisting}[caption={Regressão Beta}]
+let m_beta = betareg(share ~ x1 + x2, df)
+print(m_beta)
+\end{lstlisting}
+
+Ela modela a média por uma ligação logit e a dispersão por um parâmetro
+de precisão separado.
+
+\section{GAM e lowess}
+
+`gam` ajusta um modelo aditivo generalizado com splines de suavização
+para efeitos não lineares.
+
+\begin{lstlisting}[caption={GAM}]
+let m_gam = gam(y ~ x1 + s(x2) + x3, df)
+print(m_gam)
+\end{lstlisting}
+
+`lowess` é um suavizador polinomial local para exploração visual e
+regressão parcial.
+
+\begin{lstlisting}[caption={Lowess}]
+let m_low = lowess(df, y, x2, frac=0.3)
+print(m_low)
+\end{lstlisting}
+
+\section{Imputação múltipla}
+
+`mice` realiza imputação múltipla por equações encadeadas. Preenche
+valores ausentes usando uma sequência de modelos condicionais e retorna
+um conjunto de DataFrames completos.
+
+\begin{lstlisting}[caption={MICE}]
+let m_mice = mice(df, vars=["y", "x1", "x2"], m=5)
+print(m_mice)
+\end{lstlisting}
+
+As regras de Rubin combinam os resultados de cada conjunto imputado em
+uma única estimativa com variância que reflete a incerteza da imputação.

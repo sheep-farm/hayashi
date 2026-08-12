@@ -1,0 +1,56 @@
+\chapter{State-Space, Exponential Smoothing and Mixed Models}
+
+\section{Unobserved Components}
+
+`ucm` decomposes a series into a trend, a seasonal, a cycle, and an
+irregular component, each with its own variance.
+
+\begin{lstlisting}[caption={UCM}]
+let m_ucm = ucm(df, y)
+print(m_ucm)
+\end{lstlisting}
+
+The model is useful for seasonal adjustment and for extracting a latent
+business-cycle component.
+
+\section{Exponential smoothing}
+
+`ets` fits an Error-Trend-Seasonal model; `hwes` or `holtwinters`
+provides the Holt-Winters additive variant; `ses` is simple exponential
+smoothing.
+
+\begin{lstlisting}[caption={Holt-Winters}]
+let m_hw = holtwinters(df, y, trend="add", seasonal="add", period=12)
+print(m_hw)
+\end{lstlisting}
+
+The command estimates the smoothing parameters ($\alpha$, $\beta$,
+$\gamma$) and reports the fitted level, trend, and seasonal components.
+
+\section{Mixed models}
+
+`mixed` or `mixedlm` fits a linear mixed model with random intercepts
+and/or random slopes. The fixed effects are interpreted as in `fe` or
+`re`, while the random effects capture unobserved heterogeneity.
+
+\begin{lstlisting}[caption={Linear mixed model}]
+let m_mixed = mixed(y ~ x1 + x2, df, id="school")
+print(m_mixed)
+\end{lstlisting}
+
+The output reports fixed-effect coefficients, variance components, and
+empirical-Bayes predictions of the random effects.
+
+\section{Kalman and structural time series}
+
+`kalman` (Chapter~54) and `ucm` are the main state-space tools.
+Additional structural commands include:
+
+\begin{itemize}
+\item `msauto` / `markov_ar` for Markov-switching autoregressions
+\item `structural_ts` for generic structural time-series
+\end{itemize}
+
+These models are estimated by maximum likelihood or quasi-MLE. Check the
+reported log-likelihood and information criteria when comparing
+specifications.
