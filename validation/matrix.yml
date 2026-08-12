@@ -49,6 +49,11 @@ cases:
     an analytic gradient and matches R betareg.
   dimension: numerical
   status: pass
+- id: biplot_simulated
+  notes: Symmetric PCA biplot. Compare explained-variance ratios and sign-robust squared
+    loading sums.
+  dimension: numerical
+  status: pass
 - id: causal_impact_simulated
   notes: Bayesian structural time series for counterfactual inference (Brodersen 2015).
     Uses simulated data with known treatment effect.
@@ -101,6 +106,16 @@ cases:
   notes: Simulated panel counts with group fixed effects; the reference implements
     the exact conditional Poisson likelihood (multinomial fixed-total) using analytic
     gradient and Hessian.
+  dimension: numerical
+  status: pass
+- id: cuped_simulated
+  notes: Simulated A/B test with pre-experiment covariate. Compare CUPED-adjusted
+    ATE.
+  dimension: numerical
+  status: pass
+- id: dbscan_simulated
+  notes: Three dense 2D blobs plus five isolated noise points. Compare cluster and
+    noise counts.
   dimension: numerical
   status: pass
 - id: dcc_garch_nyse
@@ -179,6 +194,11 @@ cases:
     significance test.
   dimension: numerical
   status: pass
+- id: fuzzy_rd_simulated
+  notes: Fuzzy RD with 70% compliance at the cutoff. Compare local average treatment
+    effect (LATE).
+  dimension: numerical
+  status: pass
 - id: garch_book
   notes: Uses the same simulated GARCH(1,1) DGP as Chapter 30 of the book. MLE tolerances
     are looser because the optimizer may stop at slightly different points.
@@ -210,6 +230,10 @@ cases:
   notes: GMM returns to schooling with nearc4 as instrument for education.
   dimension: numerical
   status: pass
+- id: gmm_clust_simulated
+  notes: Two Gaussian clusters. Compare sorted component means.
+  dimension: numerical
+  status: pass
 - id: hausman_robust_wooldridge_wagepan
   notes: Robust Hausman test (Cameron-Trivedi 2005, Wooldridge 2010) with cluster-robust
     covariance.
@@ -220,6 +244,10 @@ cases:
     via L-BFGS-B.
   dimension: numerical
   status: pass
+- id: hclust_simulated
+  notes: Three well-separated 2D blobs. Ward linkage with cut=3.0 and cophenetic correlation.
+  dimension: numerical
+  status: pass
 - id: heckman_mroz
   notes: Two-step Heckman (Heckit) on the Mroz dataset. SEs are approximate because
     the reference implementations are two-step.
@@ -228,6 +256,10 @@ cases:
 - id: influence_simulated
   notes: Simulated OLS with an outlier. Hayashi exposes DFFITS; reference uses max
     |DFFITS| (Cook's D not exported).
+  dimension: numerical
+  status: pass
+- id: isotonic_simulated
+  notes: Simulated three-step data. PAVA fitted values at x=1,50,100 compared.
   dimension: numerical
   status: pass
 - id: iv_card
@@ -576,6 +608,11 @@ cases:
   notes: Poisson regression for number of children on the fertil2 dataset.
   dimension: numerical
   status: pass
+- id: portsort_simulated
+  notes: Five equal-count portfolios sorted by size. Compare mean returns and high-low
+    spread.
+  dimension: numerical
+  status: pass
 - id: probit_mroz
   notes: Probit labour-force participation on the Mroz dataset.
   dimension: numerical
@@ -709,6 +746,10 @@ cases:
     script but is not the active reference.
   dimension: numerical
   status: pass
+- id: tsne_simulated
+  notes: t-SNE embedding of three 3D blobs; cluster quality measured via K-Means inertia.
+  dimension: numerical
+  status: pass
 - id: ttest_wooldridge_wage1
   notes: One-sample t-test of wage mean against mu=5.
   dimension: numerical
@@ -717,6 +758,10 @@ cases:
   notes: Simulated TVP data with smooth intercept and slope drift. The reference is
     the true final coefficient vector because Greeners TVP uses a simple Kalman-grid
     implementation with no readily available reference implementation.
+  dimension: numerical
+  status: pass
+- id: umap_simulated
+  notes: UMAP embedding of three 3D blobs; cluster quality measured via K-Means inertia.
   dimension: numerical
   status: pass
 - id: var_book

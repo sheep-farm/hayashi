@@ -1,0 +1,10 @@
+load "validation/cases/cuped_simulated/data/data.csv" as df
+let m = cuped(y ~ pre_y, df, treated="treated")
+let nan = 0.0 / 0.0
+let out = dataframe({
+  "variable": ["treatment_effect", "unadjusted_effect", "theta", "variance_reduction"],
+  "coef": [m.fit.treatment_effect, m.fit.unadjusted_effect, m.fit.theta, m.fit.variance_reduction],
+  "std_err": [nan, nan, nan, nan]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")
