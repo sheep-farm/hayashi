@@ -1,0 +1,21 @@
+id: spectral_simulated
+title: Spectral clustering (not supported for validation)
+estimator_family: spectral
+status: not-supported
+dimension: numerical
+dataset:
+  name: simulated
+  source: n/a
+  licence: n/a
+references: []
+comparison:
+  quantities: []
+  tolerances: {}
+output_format: csv
+hayashi_script: cases/spectral_simulated/hayashi/run.hay
+reference_scripts: {}
+notes: "Results are sensitive to random k-means initialisation and normalised Laplacian details; no deterministic numeric reference."
+result:
+  summary: "Results are sensitive to random k-means initialisation and normalised Laplacian details; no deterministic numeric reference."
+  known_differences: []
+  issues_opened: []

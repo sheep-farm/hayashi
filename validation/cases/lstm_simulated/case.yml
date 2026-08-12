@@ -1,0 +1,21 @@
+id: lstm_simulated
+title: LSTM recurrent network (not supported for validation)
+estimator_family: lstm
+status: not-supported
+dimension: numerical
+dataset:
+  name: simulated
+  source: n/a
+  licence: n/a
+references: []
+comparison:
+  quantities: []
+  tolerances: {}
+output_format: csv
+hayashi_script: cases/lstm_simulated/hayashi/run.hay
+reference_scripts: {}
+notes: "PyTorch/TensorFlow stochastic training is not reproducible enough for numerical validation."
+result:
+  summary: "PyTorch/TensorFlow stochastic training is not reproducible enough for numerical validation."
+  known_differences: []
+  issues_opened: []

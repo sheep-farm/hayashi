@@ -1,0 +1,21 @@
+id: fcoef_simulated
+title: Functional coefficients (not supported for validation)
+estimator_family: fcoef
+status: not-supported
+dimension: numerical
+dataset:
+  name: simulated
+  source: n/a
+  licence: n/a
+references: []
+comparison:
+  quantities: []
+  tolerances: {}
+output_format: csv
+hayashi_script: cases/fcoef_simulated/hayashi/run.hay
+reference_scripts: {}
+notes: "No standard R/Python package for the same functional-coefficient estimator."
+result:
+  summary: "No standard R/Python package for the same functional-coefficient estimator."
+  known_differences: []
+  issues_opened: []

@@ -1,0 +1,21 @@
+id: bvar_simulated
+title: Bayesian VAR (not supported for validation)
+estimator_family: bvar
+status: not-supported
+dimension: numerical
+dataset:
+  name: simulated
+  source: n/a
+  licence: n/a
+references: []
+comparison:
+  quantities: []
+  tolerances: {}
+output_format: csv
+hayashi_script: cases/bvar_simulated/hayashi/run.hay
+reference_scripts: {}
+notes: "R mfbvar/bvar packages fail to install; PyMC implementation is too heavy for a deterministic CI reference."
+result:
+  summary: "R mfbvar/bvar packages fail to install; PyMC implementation is too heavy for a deterministic CI reference."
+  known_differences: []
+  issues_opened: []

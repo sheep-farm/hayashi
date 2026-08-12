@@ -1,5 +1,5 @@
 id: influence_simulated
-title: Influence diagnostics (max |DFFITS|)
+title: Influence diagnostics (maximum absolute DFFITS)
 estimator_family: ols
 status: active
 dimension: numerical
@@ -22,7 +22,7 @@ hayashi_script: cases/influence_simulated/hayashi/run.hay
 reference_scripts:
   R: cases/influence_simulated/reference/run.R
   Python: cases/influence_simulated/reference/run.py
-notes: Simulated OLS with an outlier. Hayashi exposes DFFITS; reference uses max |DFFITS| (Cook's D not exported).
+notes: Simulated OLS with an outlier. Hayashi exposes DFFITS; reference uses the maximum absolute DFFITS value (Cook's D not exported).
 result:
   summary: ""
   known_differences:

@@ -1,0 +1,9 @@
+load "validation/cases/doublesort_simulated/data/data.csv" as df
+let m = doublesort(df, ret, size, bm, n1=5, n2=5)
+let out = dataframe({
+  "variable": ["low_size_high_bm"],
+  "coef": [m.means.High[0]],
+  "std_err": [0.0]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

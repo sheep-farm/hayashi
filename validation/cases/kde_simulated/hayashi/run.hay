@@ -1,0 +1,9 @@
+load "validation/cases/kde_simulated/data/data.csv" as df
+let m = kde(df, x, bw=0.5, kernel="gaussian")
+let out = dataframe({
+  "variable": ["bandwidth", "peak_density", "peak_x"],
+  "coef": [m.fit.bandwidth, m.fit.peak_density, m.fit.peak_x],
+  "std_err": [0.0, 0.0, 0.0]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

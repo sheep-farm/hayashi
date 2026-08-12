@@ -1,0 +1,21 @@
+id: bayes_sfa_production_simulated
+title: Bayesian stochastic production frontier (not supported for validation)
+estimator_family: bayes_sfa_production
+status: not-supported
+dimension: numerical
+dataset:
+  name: simulated
+  source: n/a
+  licence: n/a
+references: []
+comparison:
+  quantities: []
+  tolerances: {}
+output_format: csv
+hayashi_script: cases/bayes_sfa_production_simulated/hayashi/run.hay
+reference_scripts: {}
+notes: "No stable R/Python reference with half-normal inefficiency MCMC available; PyMC implementation too heavy and fragile for the validation venv."
+result:
+  summary: "No stable R/Python reference with half-normal inefficiency MCMC available; PyMC implementation too heavy and fragile for the validation venv."
+  known_differences: []
+  issues_opened: []

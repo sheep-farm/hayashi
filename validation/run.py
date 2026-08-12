@@ -1446,7 +1446,7 @@ def render_matrix_md(cases: list[dict[str, Any]]) -> str:
         status = case.get("status", "not-started")
         issue = case.get("result", {}).get("issues_opened", [])
         issue_str = ", ".join(str(i) for i in issue) if issue else "—"
-        notes = case.get("notes", "").replace("\n", " ")
+        notes = case.get("notes", "").strip().replace("\n", " ")
         lines.append(f"| {family} | {dataset} | {refs} | {status} | {issue_str} | {notes} |")
 
     lines.extend([
@@ -1492,7 +1492,7 @@ def _case_matrix_metadata(case: dict[str, Any]) -> tuple[str, str, str, str, str
     status = case.get("status", "not-started")
     issue = case.get("result", {}).get("issues_opened", [])
     issue_str = ", ".join(str(i) for i in issue) if issue else "—"
-    notes = case.get("notes", "").replace("\n", " ")
+    notes = case.get("notes", "").strip().replace("\n", " ")
     return family, dataset, status, issue_str, notes
 
 

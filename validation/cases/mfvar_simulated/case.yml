@@ -1,0 +1,21 @@
+id: mfvar_simulated
+title: Mixed-frequency VAR (not supported for validation)
+estimator_family: mfvar
+status: not-supported
+dimension: numerical
+dataset:
+  name: simulated
+  source: n/a
+  licence: n/a
+references: []
+comparison:
+  quantities: []
+  tolerances: {}
+output_format: csv
+hayashi_script: cases/mfvar_simulated/hayashi/run.hay
+reference_scripts: {}
+notes: "R mfbvar package failed to install in the previous session."
+result:
+  summary: "R mfbvar package failed to install in the previous session."
+  known_differences: []
+  issues_opened: []

@@ -1,0 +1,21 @@
+id: tvp_var_simulated
+title: Time-varying parameter VAR (not supported for validation)
+estimator_family: tvp_var
+status: not-supported
+dimension: numerical
+dataset:
+  name: simulated
+  source: n/a
+  licence: n/a
+references: []
+comparison:
+  quantities: []
+  tolerances: {}
+output_format: csv
+hayashi_script: cases/tvp_var_simulated/hayashi/run.hay
+reference_scripts: {}
+notes: "No stable PyMC or R TVP reference implementation in the venv."
+result:
+  summary: "No stable PyMC or R TVP reference implementation in the venv."
+  known_differences: []
+  issues_opened: []
