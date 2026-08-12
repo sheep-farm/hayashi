@@ -1,0 +1,10 @@
+load "validation/cases/gp_simulated/data/data.csv" as df
+let m = gp(y ~ x, df)
+let f = m.fit
+let out = dataframe({
+  "variable": ["r2", "mse"],
+  "coef": [f["r_squared"], f["mse"]],
+  "std_err": [0.0, 0.0]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

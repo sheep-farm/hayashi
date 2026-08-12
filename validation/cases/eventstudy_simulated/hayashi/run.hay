@@ -1,0 +1,4 @@
+load "validation/cases/eventstudy_simulated/data/data.csv" as df
+let m = eventstudy(y ~ event_time, df, ref=-1, min=-2, max=2, cluster="unit")
+let out = select(m.event_coefficients, "variable", "coef", "std_err")
+export(out, "csv", "/dev/stdout")

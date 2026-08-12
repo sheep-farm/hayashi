@@ -598,19 +598,23 @@ fn model_view_from_dfm(m: &DFMModel) -> ModelView {
         )),
     );
 
+    let n = r.n_vars;
+    let params = r.sigma_obs.mapv(|x| 1.0 - x);
+    let std_errors = Array1::from_elem(n, f64::NAN);
+    let test_values = Array1::zeros(n);
+    let p_values = Array1::ones(n);
+
     ModelView {
         type_name: "DFMResult".into(),
         summary: format!(
             "Dynamic Factor Model(factors={}, n={})",
             r.n_factors, r.n_obs
         ),
-        variable_names: (0..r.n_factors)
-            .map(|i| format!("Factor{}", i + 1))
-            .collect(),
-        params: Array1::zeros(r.n_factors),
-        std_errors: Array1::zeros(r.n_factors),
-        test_values: Array1::zeros(r.n_factors),
-        p_values: Array1::ones(r.n_factors),
+        variable_names: m.var_names.clone(),
+        params,
+        std_errors,
+        test_values,
+        p_values,
         conf_lower: None,
         conf_upper: None,
         fit,

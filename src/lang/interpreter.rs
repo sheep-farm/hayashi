@@ -1338,12 +1338,17 @@ impl Interpreter {
             Value::Str(s) => Some(s.clone()),
             _ => None,
         }) {
-            let x_df_name = opt_map.get("x_df").and_then(|v| match v {
-                Value::Str(s) => Some(s.clone()),
-                _ => None,
-            }).ok_or_else(|| HayashiError::Runtime(
-                "midas: x_df option required when y_df is provided".into(),
-            ))?;
+            let x_df_name = opt_map
+                .get("x_df")
+                .and_then(|v| match v {
+                    Value::Str(s) => Some(s.clone()),
+                    _ => None,
+                })
+                .ok_or_else(|| {
+                    HayashiError::Runtime(
+                        "midas: x_df option required when y_df is provided".into(),
+                    )
+                })?;
             let y_df = match self.env.get(&y_df_name) {
                 Some(Value::DataFrame(df)) => df.clone(),
                 _ => return Err(self.rt_err(format!("'{y_df_name}' is not a DataFrame"))),

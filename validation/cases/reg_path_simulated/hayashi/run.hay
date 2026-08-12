@@ -1,0 +1,8 @@
+load "validation/cases/reg_path_simulated/data/data.csv" as df
+set_seed(42)
+let m = reg_path(y ~ x1 + x2, df, type="elasticnet", alpha=0.5, nlambda=20)
+let c = m.optimal_coefs.coefficient
+print("variable,coef,std_err")
+print(f"_cons,{m.fit.optimal_intercept},0.0")
+print(f"x1,{c[1]},0.0")
+print(f"x2,{c[2]},0.0")

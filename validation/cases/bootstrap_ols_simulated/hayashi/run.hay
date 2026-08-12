@@ -1,0 +1,11 @@
+load "validation/cases/bootstrap_ols_simulated/data/data.csv" as df
+set_seed(42)
+let m = bootstrap(ols, y ~ x, df, n=2000)
+let repl = m.fit.replicates
+let mean_cons = mean(repl._cons)
+let mean_x = mean(repl.x)
+let se_cons = sd(repl._cons)
+let se_x = sd(repl.x)
+print("variable,coef,std_err")
+print(f"_cons,{mean_cons},{se_cons}")
+print(f"x,{mean_x},{se_x}")

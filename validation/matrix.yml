@@ -54,6 +54,12 @@ cases:
     loading sums.
   dimension: numerical
   status: pass
+- id: bootstrap_ols_simulated
+  notes: Simulated OLS data (y = 1 + 2x + noise). Hayashi bootstrap(ols, ...) is compared
+    with R boot::boot and a Python statsmodels OLS pairs bootstrap; quantities are
+    the mean and standard deviation of the bootstrap slope and intercept distributions.
+  dimension: numerical
+  status: pass
 - id: causal_impact_simulated
   notes: Bayesian structural time series for counterfactual inference (Brodersen 2015).
     Uses simulated data with known treatment effect.
@@ -123,6 +129,21 @@ cases:
     DCC-GARCH(1,1) model.
   dimension: numerical
   status: pass
+- id: dfm_simulated
+  notes: 'Simulated four observed series driven by two common factors. All variables
+    are
+
+    standardised in data/gen.py, so the quantities compared are communalities
+
+    (1 minus observation-noise/uniqueness variance). This is invariant to the
+
+    arbitrary sign/rotation of the estimated factors. Standard errors are not
+
+    available in the tidy output and are therefore set to NaN on both sides.
+
+    '
+  dimension: numerical
+  status: pass
 - id: did_kielmc
   notes: Difference-in-differences effect of incinerator proximity on log house prices.
   dimension: numerical
@@ -171,6 +192,20 @@ cases:
 - id: ets_gdp
   notes: Exponential smoothing state-space model on US real GDP. Blocked because Hayashi
     uses SSE grid search while references use MLE.
+  dimension: numerical
+  status: pass
+- id: eventstudy_simulated
+  notes: 'Simulated panel with 60 units and 5 time periods. Half the units are treated
+
+    at time 2 and the other half are never treated. The outcome has a calendar
+
+    trend and a post-treatment effect. Standard errors are clustered by unit and
+
+    compared with R (sandwich::vcovCL) and Python (statsmodels OLS with
+
+    cov_type=''cluster'').
+
+    '
   dimension: numerical
   status: pass
 - id: favar_simulated
@@ -232,6 +267,12 @@ cases:
   status: pass
 - id: gmm_clust_simulated
   notes: Two Gaussian clusters. Compare sorted component means.
+  dimension: numerical
+  status: pass
+- id: gp_simulated
+  notes: Simulated 1-D regression with a fixed seed; compares training-set R2 and
+    MSE between Hayashi, R kernlab and Python sklearn. Tolerances reflect different
+    hyperparameter-optimisation conventions.
   dimension: numerical
   status: pass
 - id: hausman_robust_wooldridge_wagepan
@@ -659,6 +700,20 @@ cases:
   notes: Median quantile regression of wage on education, experience, and tenure.
   dimension: numerical
   status: pass
+- id: qvar_simulated
+  notes: 'Simulated bivariate VAR(1) process. Both R (quantreg::rq) and Python
+
+    (statsmodels QuantReg) are run separately for each equation at the median
+
+    (tau=0.5). Quantile-regression standard errors are algorithm- and
+
+    implementation-specific, so only coefficients are compared and std_err is
+
+    set to NaN.
+
+    '
+  dimension: numerical
+  status: pass
 - id: rdd_book
   notes: Sharp RDD with local linear regression, triangular kernel and Imbens-Kalyanaraman
     bandwidth.
@@ -666,6 +721,12 @@ cases:
   status: pass
 - id: re_grunfeld
   notes: Random-effects investment demand model (Grunfeld).
+  dimension: numerical
+  status: pass
+- id: reg_path_simulated
+  notes: Simulated data where y = 0.5 + x1 + noise and x2 is noise. Hayashi reg_path
+    selects an elastic-net lambda by BIC; references fit glmnet and sklearn ElasticNet
+    at the same optimal lambda and standardisation.
   dimension: numerical
   status: pass
 - id: rf_simulated
@@ -681,6 +742,12 @@ cases:
 - id: rlm_wage1
   notes: Huber robust linear regression of log wage on education, experience, and
     tenure.
+  dimension: numerical
+  status: pass
+- id: rolling_ols_simulated
+  notes: Simulated linear trend (y = 1 + 2x + noise). Compares the last-window rolling
+    OLS coefficients produced by Hayashi's rolling() against a zoo::rollapply reference
+    and a statsmodels OLS fit on the final window.
   dimension: numerical
   status: pass
 - id: setar_simulated
