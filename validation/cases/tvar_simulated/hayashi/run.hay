@@ -1,0 +1,24 @@
+load "validation/cases/tvar_simulated/data/data.csv" as df
+
+let m = tvar(y1 ~ y2, df, q="q", lags=1, delay=1)
+
+let out0 = dataframe({
+  "variable": [
+    "low_y1_L1.y1", "low_y1_L1.y2", "low_y2_L1.y1", "low_y2_L1.y2",
+    "high_y1_L1.y1", "high_y1_L1.y2", "high_y2_L1.y1", "high_y2_L1.y2"
+  ],
+  "coef": [
+    m.coeffs_low["L1.y1"][0], m.coeffs_low["L1.y2"][0],
+    m.coeffs_low["L1.y1"][1], m.coeffs_low["L1.y2"][1],
+    m.coeffs_high["L1.y1"][0], m.coeffs_high["L1.y2"][0],
+    m.coeffs_high["L1.y1"][1], m.coeffs_high["L1.y2"][1]
+  ],
+  "std_err": [
+    m.se_low["L1.y1"][0], m.se_low["L1.y2"][0],
+    m.se_low["L1.y1"][1], m.se_low["L1.y2"][1],
+    m.se_high["L1.y1"][0], m.se_high["L1.y2"][0],
+    m.se_high["L1.y1"][1], m.se_high["L1.y2"][1]
+  ]
+})
+let out = select(out0, "variable", "coef", "std_err")
+export(out, "csv", "/dev/stdout")

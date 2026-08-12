@@ -1,0 +1,10 @@
+load "validation/cases/grf_simulated/data/data.csv" as df
+let m = grf(y ~ treated, df, x="x1,x2", trees=200, depth=4)
+let nan = 0.0/0.0
+let out = dataframe({
+  "variable": ["ate"],
+  "coef": [m.fit.ate],
+  "std_err": [m.fit.ate_se]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

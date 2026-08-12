@@ -65,6 +65,12 @@ cases:
     Uses simulated data with known treatment effect.
   dimension: numerical
   status: pass
+- id: causalforest_simulated
+  notes: Simulated data y = 1 + 2*x1 - x2 + 0.5*treated + N(0,1). Hayashi causalforest()
+    reports the average treatment effect. R reference uses grf::causal_forest; Python
+    uses econml.grf.CausalForest.
+  dimension: numerical
+  status: pass
 - id: centile_wooldridge_wage1
   notes: Centiles 10, 25, 50, 75, 90 for the wage variable.
   dimension: numerical
@@ -275,6 +281,12 @@ cases:
     hyperparameter-optimisation conventions.
   dimension: numerical
   status: pass
+- id: grf_simulated
+  notes: Simulated data y = 1 + 2*x1 - x2 + 0.5*treated + N(0,1). Hayashi grf() reports
+    the average treatment effect. R reference uses grf::causal_forest to match the
+    ATE quantity; Python uses econml.grf.CausalForest.
+  dimension: numerical
+  status: pass
 - id: hausman_robust_wooldridge_wagepan
   notes: Robust Hausman test (Cameron-Trivedi 2005, Wooldridge 2010) with cluster-robust
     covariance.
@@ -322,6 +334,12 @@ cases:
     schooling for married women.
   dimension: numerical
   status: pass
+- id: johansen_break_simulated
+  notes: Structural-break Johansen test. Python statsmodels.tsa.vecm (coint_johansen)
+    does not support exogenous break dummies, so a comparable Python reference trace
+    statistic cannot be produced.
+  dimension: numerical
+  status: blocked
 - id: kalman_nyse
   notes: Local-level Kalman filter on NYSE returns. Hayashi estimates sigma_obs and
     sigma_state by MLE and returns a printable result object.
@@ -399,6 +417,13 @@ cases:
   notes: Simulated series (trend + 16-period sine + noise). Greeners MODWT uses unnormalised
     Haar filters, equivalent to `pywt.swt(..., norm=False)`. `pywt` returns coefficients
     coarse-to-fine; the reference reverses them to match Greeners' W_1 (finest) convention.
+  dimension: numerical
+  status: pass
+- id: msvar_simulated
+  notes: Simulated two-regime VAR with known intercepts and transition matrix; compares
+    regime-specific y1 intercepts and transition probabilities against R MSwM and
+    Python statsmodels MarkovRegression. Tolerances reflect label/algorithm sensitivity
+    in regime-switching models.
   dimension: numerical
   status: pass
 - id: nardl_simulated
@@ -616,6 +641,12 @@ cases:
     education, experience and black indicators.
   dimension: numerical
   status: pass
+- id: orf_simulated
+  notes: Simulated data y = 1 + 2*x1 - x2 + 0.5*treated + 0.3*w1 - 0.2*w2 + N(0,1).
+    Hayashi orf() reports the average treatment effect. R reference uses grf::causal_forest
+    on the full set of covariates; Python uses econml.orf.DROrthoForest.
+  dimension: numerical
+  status: pass
 - id: panel_fe_cluster_wagepan
   notes: Panel fixed-effects wage equation with worker-clustered standard errors using
     explicit within-transformed CR1 reference implementations. Tolerance reflects
@@ -691,6 +722,12 @@ cases:
     bootstrap overhead.
   dimension: numerical
   status: pass
+- id: qrf_inf_simulated
+  notes: Simulated heteroskedastic data y = 3*x1 + N(0, 0.1*(1+0.5*x1)), with x2 irrelevant.
+    qrf_inf() at q=0.75 with 50 trees, depth 5, 50 bootstrap samples. OOB R^2 compared
+    against grf::quantile_forest and quantile_forest.RandomForestQuantileRegressor.
+  dimension: numerical
+  status: pass
 - id: qrf_simulated
   notes: Simulated heteroskedastic data y = 3*x1 + N(0, 0.1*(1+0.5*x1)). QRF at tau=0.75
     with 50 trees, depth 5. OOB R^2 compared against quantile_forest.RandomForestQuantileRegressor.
@@ -755,6 +792,11 @@ cases:
     may differ slightly from R tsDyn; tolerances are relaxed accordingly.
   dimension: numerical
   status: pass
+- id: sfa_production_simulated
+  notes: Simulated Cobb-Douglas production frontier with negligible inefficiency so
+    MLE/OLS references align with Hayashi.
+  dimension: numerical
+  status: pass
 - id: spatial_durbin_simulated
   notes: Data generated on a 7x7 grid with rook contiguity W, rho=0.3, beta=0.5, theta=0.2.
     Only rho is compared because the intercept and spatially lagged intercept are
@@ -779,6 +821,12 @@ cases:
   notes: Two-equation SUR (Zellner FGLS) on the Grunfeld investment data.
   dimension: numerical
   status: pass
+- id: sv_simulated
+  notes: Simulated Taylor (1986) SV data; compares the posterior mean of the latent
+    log-volatility h_t between Hayashi, R stochvol and PyMC. Tight tolerance because
+    R and PyMC agree closely on this DGP.
+  dimension: numerical
+  status: blocked
 - id: svar_macro
   notes: Cholesky-identified SVAR(2) on log US real GDP and consumption.
   dimension: numerical
@@ -824,6 +872,11 @@ cases:
     with an explicit constant column.
   dimension: numerical
   status: pass
+- id: tmle_simulated
+  notes: Simulated data with true ATE 0.7; compares TMLE point estimate and standard
+    error against R tmle and a manual Python implementation.
+  dimension: numerical
+  status: pass
 - id: tobit_mroz
   notes: Tobit regression of hours worked with left censoring at zero. Hayashi matches
     AER::tobit at displayed precision; the custom Python MLE is retained as a diagnostic
@@ -836,6 +889,11 @@ cases:
   status: pass
 - id: ttest_wooldridge_wage1
   notes: One-sample t-test of wage mean against mu=5.
+  dimension: numerical
+  status: pass
+- id: tvar_simulated
+  notes: Simulated bivariate TVAR with exogenous threshold q; references use no-intercept
+    regime OLS to match Hayashi's output.
   dimension: numerical
   status: pass
 - id: tvp_simulated

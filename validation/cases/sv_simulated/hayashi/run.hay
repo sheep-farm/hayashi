@@ -1,0 +1,9 @@
+load "validation/cases/sv_simulated/data/data.csv" as df
+let m = sv(df, y, iter=100)
+let out = dataframe({
+  "variable": ["mean_ht"],
+  "coef": [mean(m.log_vol)],
+  "std_err": [0.0]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

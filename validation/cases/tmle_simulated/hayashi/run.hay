@@ -1,0 +1,10 @@
+load "validation/cases/tmle_simulated/data/data.csv" as df
+let m = tmle(y ~ t, df, w="x1,x2")
+let f = m.fit
+let out = dataframe({
+  "variable": ["ate", "se"],
+  "coef": [f["ate"], f["se"]],
+  "std_err": [0.0, 0.0]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

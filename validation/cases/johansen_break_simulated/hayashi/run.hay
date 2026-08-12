@@ -1,0 +1,11 @@
+load "validation/cases/johansen_break_simulated/data/data.csv" as df
+
+let m = johansen_break(y1 ~ y2, df, lags=1, breaks=[100])
+
+let out0 = dataframe({
+  "variable": ["rank", "trace_0", "trace_1"],
+  "coef": [m.fit.cointegration_rank, m.trace_stats[0], m.trace_stats[1]],
+  "std_err": [0.0, 0.0, 0.0]
+})
+let out = select(out0, "variable", "coef", "std_err")
+export(out, "csv", "/dev/stdout")
