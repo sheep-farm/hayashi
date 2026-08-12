@@ -3,11 +3,17 @@
 All notable changes to Hayashi are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased] — dev
+## [Unreleased]
+
+## [0.2.10] — 2026-08-13
+
+### Changed
+
+- Bumped `greeners` dependency to `1.6.1`, which fixes the SV latent log-volatility level (Harvey-Ruiz-Shephard QMLE with level bias correction) and the conformal prediction quantile-rank calculation.
 
 ### Validation
 
-- Validation matrix now covers 138 cases, all passing.
+- Validation matrix now covers 215 cases spanning all 115 implemented estimators. 199 cases pass against R/Python references; 15 are documented as `not-supported` and 1 as `blocked` due to lack of stable reference implementations.
 - Added `nls_exp_simulated`, `nls_power_simulated`, `nls_logistic_simulated`, `nls_cobb_douglas_simulated`, `copula_simulated`, `spatial_sar_simulated`, `spatial_sem_simulated`, `xtlogit_simulated`, `xtprobit_simulated`, `xtpoisson_simulated`, `modwt_simulated`, `did_simulated`, `qreg_simulated`, `synthdid_simulated`, and finalised coverage for estimators previously marked as unvalidated in #128.
 - Estimators with single-language or algorithm-matched references: `clogit` (R), `kalman` (R), `tobit` (R), `be` (Python), `cpoisson` (Python), `elasticnet` (Python), `feiv` (Python), `garch` (Python), `lpdid` (Python), `three_sls` (Python), `varma` (Python).
 - Thin or convention-sensitive coverage remains for `kalman`, `svar` (Cholesky), `sysgmm`, `pcse`, and `xtgls`.

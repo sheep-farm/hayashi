@@ -3,7 +3,7 @@
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
 [![Docs: CC BY-SA 4.0](https://img.shields.io/badge/Docs-CC%20BY--SA%204.0-lightgrey.svg)](LICENSE-BOOKS.md)
 [![Rust](https://img.shields.io/badge/Rust-2021-orange.svg)](https://www.rust-lang.org)
-[![Version](https://img.shields.io/badge/version-0.2.8-blue.svg)](Cargo.toml)
+[![Version](https://img.shields.io/badge/version-0.2.10-blue.svg)](Cargo.toml)
 [![crates.io](https://img.shields.io/crates/v/hayashi-lang.svg)](https://crates.io/crates/hayashi-lang)
 [![CI](https://github.com/sheep-farm/hayashi/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/sheep-farm/hayashi/actions/workflows/ci.yml?query=branch%3Amaster)
 
@@ -293,8 +293,20 @@ export(m, "html", "table.html")
 | VAR | `var` `vecm` `varma` `svar` `irf` `fevd` |
 | Causal | `did` `rd` `fuzzy_rd` `synth` `psm` |
 | Finance | `fmb` `portsort` `doublesort` |
-| Robust / flexible | `rlm` `gee` `glm` `betareg` `mixed` `lowess` `gam` |
-| Systems / factors | `sur` `three_sls` `pca` `factor` `dfm` |
+| Robust / flexible | `rlm` `gee` `glm` `betareg` `mixed` `lowess` `gam` `isotonic` |
+| Systems / factors | `sur` `three_sls` `pca` `factor` `dfm` `manova` `cancorr` |
+
+### Machine learning, clustering, and spatial
+
+Hayashi also exposes a growing set of ML, clustering, spatial, and Bayesian estimators:
+
+| Category | Commands |
+|---|---|
+| Machine learning | `rf` `gbm` `qrf` `xgboost` `mlp` `lstm` `transformer` `bart` `gp` |
+| Causal ML | `causalforest` `grf` `dr_learner` `tmle` `orf` `bsc` `dml_crossfit` |
+| Clustering / unsupervised | `kmeans` `dbscan` `hclust` `tsne` `umap` `spectral` `gmm_clust` `biplot` `kde` |
+| Spatial | `spatial_sar` `spatial_sem` `spatial_durbin` `spatial_panel_sar` `spatial_panel_sem` `spatial_durbin_error` |
+| Bayesian / frontier | `bayes_lm` `bayes_sfa_production` `bayes_sfa_cost` `sfa_production` `sfa_cost` |
 
 Common options include `if=` for subsamples and `cov=`/`cluster=`/`nw=` where supported. Core regression estimators auto-detect and drop perfectly collinear variables (Stata-style `(omitted)` display).
 
@@ -450,6 +462,9 @@ hay validate
 
 See `validation/README.md` for the full protocol and `validation/MATRIX.md` for
 the current status of every case.
+
+The matrix now covers **215 cases across 115 estimators**, with 199 passing
+against R and Python reference implementations.
 
 ## Graphs
 
