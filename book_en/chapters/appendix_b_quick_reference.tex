@@ -456,6 +456,51 @@ Event study         & \texttt{eventstudy(y \textasciitilde{} et, df, ref=-1)} \\
 \end{tabular}
 \end{center}
 
+\section{Machine learning and causal ML}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Method} & \textbf{Syntax} \\
+\midrule
+Random forest       & \texttt{rf(y \textasciitilde{} x1 + x2, df, trees=100)} \\
+Gradient boosting   & \texttt{gbm(y \textasciitilde{} x1 + x2, df, trees=100)} \\
+Quantile RF         & \texttt{qrf(y \textasciitilde{} x1 + x2, df, quantiles="0.1,0.5,0.9")} \\
+XGBoost             & \texttt{xgboost(y \textasciitilde{} x1 + x2, df)} \\
+MLP                 & \texttt{mlp(y \textasciitilde{} x1 + x2, df, hidden=10)} \\
+LSTM                & \texttt{lstm(df, y, hidden=10, seqlen=12, forecast=5)} \\
+Transformer         & \texttt{transformer(df, y, d\_model=8, seqlen=12)} \\
+BART                & \texttt{bart(y \textasciitilde{} x1 + x2, df, trees=20)} \\
+Gaussian process    & \texttt{gp(y \textasciitilde{} x1 + x2, df)} \\
+\midrule
+Causal forest       & \texttt{causalforest(y \textasciitilde{} treated, df, x="x1,x2")} \\
+Generalized RF      & \texttt{grf(y \textasciitilde{} treated, df, x="x1,x2")} \\
+DR-Learner          & \texttt{dr\_learner(y \textasciitilde{} treated, df, x="x1,x2")} \\
+TMLE                & \texttt{tmle(y \textasciitilde{} treated, df, w="x1,x2")} \\
+ORF                 & \texttt{orf(y \textasciitilde{} treated, df, x="x1,x2", w="w1")} \\
+Bayesian SC         & \texttt{bsc(df, y, "x1,x2", 5)} \\
+DML cross-fit       & \texttt{dml\_crossfit(y \textasciitilde{} d, df, x="x1,x2")} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Spatial econometrics}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Model} & \textbf{Syntax} \\
+\midrule
+Spatial SAR         & \texttt{spatial\_sar(y \textasciitilde{} x1 + x2, df, w=W)} \\
+Spatial SEM         & \texttt{spatial\_sem(y \textasciitilde{} x1 + x2, df, w=W)} \\
+Spatial Durbin      & \texttt{spatial\_durbin(y \textasciitilde{} x1 + x2, df, w=W)} \\
+Spatial panel SAR   & \texttt{spatial\_panel\_sar(y \textasciitilde{} x, df, w=W, id="e")} \\
+Spatial panel SEM   & \texttt{spatial\_panel\_sem(y \textasciitilde{} x, df, w=W, id="e")} \\
+Spatial Durbin error & \texttt{spatial\_durbin\_error(y \textasciitilde{} x, df, w=W, id="e")} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
 \section{Presenting results}
 
 \begin{center}
