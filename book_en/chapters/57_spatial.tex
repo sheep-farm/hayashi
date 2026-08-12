@@ -94,7 +94,7 @@ In a Spatial Durbin model the coefficient on $x$ is not the total effect.
 The total effect on unit $i$ includes the direct impact $\beta$ plus the
 indirect impact that travels through the network via $\theta$ and $\rho$.
 
-\hayashi{} reports direct, indirect, and total effects in the `m_sdm`
+\hayashi{} reports direct, indirect, and total effects in the \texttt{m\_sdm}
 summary when available.
 
 \section{Practical notes}
@@ -105,6 +105,6 @@ summary when available.
 \item Larger samples are needed for spatial MLE than for OLS.
 \item Cross-section spatial models assume a stable network. Panel spatial
       models add fixed effects but still require a time-invariant $W$.
-\item The `spatial_durbin_error` model combines spatially lagged
+\item The \texttt{spatial\_durbin\_error} model combines spatially lagged
       regressors with a spatial error term.
 \end{itemize}

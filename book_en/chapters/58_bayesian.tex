@@ -2,7 +2,7 @@
 
 \section{Bayesian linear regression}
 
-`bayes_lm` implements conjugate Normal-Inverse-Gamma Bayesian linear
+\texttt{bayes\_lm} implements conjugate Normal-Inverse-Gamma Bayesian linear
 regression. With a weak prior it recovers OLS posterior means, but it
 also reports posterior standard deviations, credible intervals, and the
 probability that each coefficient is positive.
@@ -32,7 +32,7 @@ cost inefficiency. The production frontier is
 y = X\beta + v - u, \qquad u \ge 0
 \]
 
-where $v$ is noise and $u$ is inefficiency. `sfa_production` estimates
+where $v$ is noise and $u$ is inefficiency. \texttt{sfa\_production} estimates
 $\beta$, $\sigma_v$, $\sigma_u$, and the mean technical efficiency.
 
 \begin{lstlisting}[caption={Stochastic production frontier}]
@@ -57,7 +57,7 @@ print(m_sfac)
 
 \section{Bayesian stochastic frontier}
 
-`bayes_sfa_production` and `bayes_sfa_cost` implement a Gibbs sampler
+\texttt{bayes\_sfa\_production} and \texttt{bayes\_sfa\_cost} implement a Gibbs sampler
 with weak conjugate priors. They report posterior means, standard
 deviations, and 95\% credible intervals for the regression coefficients
 and variance parameters.
@@ -74,8 +74,8 @@ values and comparing posteriors.
 \section{When to use each}
 
 \begin{itemize}
-\item \textbf{Standard inference with uncertainty:} `bayes_lm`
-\item \textbf{Production efficiency:} `sfa_production`
-\item \textbf{Cost efficiency:} `sfa_cost`
-\item \textbf{Small-sample SFA or full posterior:} `bayes_sfa_production`
+\item \textbf{Standard inference with uncertainty:} \texttt{bayes\_lm}
+\item \textbf{Production efficiency:} \texttt{sfa\_production}
+\item \textbf{Cost efficiency:} \texttt{sfa\_cost}
+\item \textbf{Small-sample SFA or full posterior:} \texttt{bayes\_sfa\_production}
 \end{itemize}

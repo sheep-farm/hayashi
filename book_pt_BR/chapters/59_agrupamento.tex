@@ -21,13 +21,13 @@ let m_km = kmeans(df, x="x1,x2", k=3)
 print(m_km)
 \end{lstlisting}
 
-Use `m_km.labels` para ler o cluster atribuído e `m_km.centroids` para
+Use \texttt{m\_km.labels} para ler o cluster atribuído e \texttt{m\_km.centroids} para
 inspecionar as médias dos clusters.
 
 \section{Agrupamento hierárquico e DBSCAN}
 
 Agrupamento hierárquico constrói uma árvore de grupos aninhados.
-`hclust` pode ser cortado em qualquer número de grupos.
+\texttt{hclust} pode ser cortado em qualquer número de grupos.
 
 \begin{lstlisting}[caption={Agrupamento hierárquico}]
 let m_hc = hclust(df, x="x1,x2", k=3, linkage="ward")
@@ -79,7 +79,7 @@ print(m_sc)
 
 \section{PCA, fator e biplot}
 
-PCA e análise fatorial reduzem a dimensionalidade linearmente. `biplot`
+PCA e análise fatorial reduzem a dimensionalidade linearmente. \texttt{biplot}
 visualiza observações e variáveis no mesmo espaço de PCA.
 
 \begin{lstlisting}[caption={PCA}]
@@ -94,7 +94,7 @@ print(m_biplot)
 
 \section{Estimativa de densidade kernel}
 
-`kde` estima a densidade de uma única variável com um kernel escolhido.
+\texttt{kde} estima a densidade de uma única variável com um kernel escolhido.
 
 \begin{lstlisting}[caption={KDE}]
 let m_kde = kde(df, x1, bw=0.5, kernel="gaussian")

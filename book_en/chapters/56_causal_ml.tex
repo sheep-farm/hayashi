@@ -12,7 +12,7 @@ this chapter target two quantities:
       $\tau(x) = \E[Y(1) - Y(0) \mid X = x]$
 \end{itemize}
 
-They all require a treatment indicator `d` and a set of covariates `x`.
+They all require a treatment indicator \texttt{d} and a set of covariates \texttt{x}.
 They do not replace a clear research design, but they can help discover
 heterogeneous effects and improve precision.
 
@@ -78,7 +78,7 @@ heterogeneity comes from a subset of covariates.
 
 \section{Bayesian Synthetic Control}
 
-`bsc` implements a Bayesian version of the synthetic-control estimator.
+\texttt{bsc} implements a Bayesian version of the synthetic-control estimator.
 It is appropriate when a single treated unit is compared against several
 donor units and the goal is a counterfactual path with credible
 intervals.
@@ -94,7 +94,7 @@ a 95\% credible interval, and the synthetic-control weights.
 
 \section{Double Machine Learning}
 
-`dml_crossfit` estimates the ATE in a partially linear model
+\texttt{dml\_crossfit} estimates the ATE in a partially linear model
 
 \[
 Y = \theta D + g(X) + \varepsilon

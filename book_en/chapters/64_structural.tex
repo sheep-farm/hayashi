@@ -17,7 +17,7 @@ useful for inference.
 
 \section{Three-stage least squares}
 
-`three_sls` extends SUR to models with endogenous regressors. It is 2SLS
+\texttt{three\_sls} extends SUR to models with endogenous regressors. It is 2SLS
 followed by a GLS step on the transformed residuals.
 
 \begin{lstlisting}[caption={3SLS}]
@@ -41,7 +41,7 @@ F-statistics.
 
 \section{Canonical correlation}
 
-`cancorr` finds linear combinations of $X$ and $Y$ that maximise
+\texttt{cancorr} finds linear combinations of $X$ and $Y$ that maximise
 correlation.
 
 \begin{lstlisting}[caption={Canonical correlation}]
@@ -51,7 +51,7 @@ print(m_can)
 
 \section{Factor-augmented models}
 
-`favar` augments a small VAR with principal-components factors extracted
+\texttt{favar} augments a small VAR with principal-components factors extracted
 from a large panel. It is useful when the number of candidate predictors
 exceeds the number of observations.
 
@@ -60,7 +60,7 @@ let m_favar = favar(y1 ~ y2 + y3, df, observed="rate", factors=2)
 print(m_favar)
 \end{lstlisting}
 
-`fapanel` adds estimated factors to a panel regression.
+\texttt{fapanel} adds estimated factors to a panel regression.
 
 \begin{lstlisting}[caption={Factor-augmented panel}]
 let m_fapanel = fapanel(y ~ x1 + x2, df, aux="aux_df",
@@ -70,7 +70,7 @@ print(m_fapanel)
 
 \section{Fully Modified OLS}
 
-`fmols` estimates a cointegrating regression with non-parametric
+\texttt{fmols} estimates a cointegrating regression with non-parametric
 corrections for endogeneity and serial correlation in the long-run
 covariance.
 

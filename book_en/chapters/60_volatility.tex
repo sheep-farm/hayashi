@@ -25,7 +25,7 @@ let m_sv = sv(df, y, iter=500)
 print(m_sv)
 \end{lstlisting}
 
-`sv` reports $\mu$, $\phi$ (persistence), $\sigma_\eta$ (vol-of-vol),
+\texttt{sv} reports $\mu$, $\phi$ (persistence), $\sigma_\eta$ (vol-of-vol),
 and the conditional volatility path.
 
 \section{Dynamic Conditional Correlation}
@@ -45,7 +45,7 @@ matrices.
 
 \section{Copulas}
 
-`copula` estimates a bivariate dependence model via Sklar's theorem. It
+\texttt{copula} estimates a bivariate dependence model via Sklar's theorem. It
 separates marginal distributions from the copula that links them.
 
 \begin{lstlisting}[caption={Copula}]
@@ -57,7 +57,7 @@ Available copulas include Gaussian, Clayton, Gumbel, and Frank. The
 output reports Kendall's $\tau$, Spearman's $\rho$, and the copula
 parameter.
 
-`tv_copula` extends this with time-varying dependence driven by a
+\texttt{tv\_copula} extends this with time-varying dependence driven by a
 GARCH-like dynamics for the copula parameter.
 
 \begin{lstlisting}[caption={Time-varying copula}]

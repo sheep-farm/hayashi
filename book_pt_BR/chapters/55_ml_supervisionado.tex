@@ -10,7 +10,7 @@ bem fora da amostra.
 
 \hayashi{} faz a ponte entre os dois. Seus comandos de ML usam a mesma
 sintaxe de fórmula do OLS ou logit e retornam objetos compatíveis com
-`predict`, `glance` e `tidy`.
+\texttt{predict}, \texttt{glance} e \texttt{tidy}.
 
 Este capítulo cobre métodos baseados em árvores, redes neurais e um
 processo gaussiano. Não é um curso completo de ML; mostra como estimar,
@@ -43,7 +43,7 @@ Principais saídas:
       regressor
 \end{itemize}
 
-Use `predict(df, yhat = m_rf)` para obter valores ajustados em um
+Use \texttt{predict(df, yhat = m\_rf)} para obter valores ajustados em um
 DataFrame.
 
 \section{Gradient Boosting e XGBoost}
@@ -62,7 +62,7 @@ mas é mais sensível a hiperparâmetros e pode sofrer overfit.
 
 \section{Perceptron Multicamadas}
 
-O comando `mlp` ajusta uma rede feed-forward com uma camada oculta,
+O comando \texttt{mlp} ajusta uma rede feed-forward com uma camada oculta,
 função de ativação sigmoide e backpropagation com momentum.
 
 \begin{lstlisting}[caption={Rede neural}]
@@ -75,7 +75,7 @@ transparência que árvores e geralmente precisa de ajustes.
 
 \section{LSTM e Transformer para séries}
 
-Para séries temporais, `lstm` e `transformer` usam janelas de
+Para séries temporais, \texttt{lstm} e \texttt{transformer} usam janelas de
 observações para prever o próximo valor. Eles padronizam o alvo
 internamente.
 
@@ -115,6 +115,6 @@ baseados em árvores.
 \end{itemize}
 
 Todos os comandos aceitam uma fórmula padrão do \hayashi{} e retornam um
-objeto compatível com `predict` e `glance`. Erros padrão geralmente não
+objeto compatível com \texttt{predict} e \texttt{glance}. Erros padrão geralmente não
 são reportados porque esses métodos não são projetados para inferência
 direta sobre coeficientes individuais.

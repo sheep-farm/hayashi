@@ -25,7 +25,7 @@ let m_sv = sv(df, y, iter=500)
 print(m_sv)
 \end{lstlisting}
 
-`sv` reporta $\mu$, $\phi$ (persistência), $\sigma_\eta$
+\texttt{sv} reporta $\mu$, $\phi$ (persistência), $\sigma_\eta$
 (volatilidade-da-volatilidade) e o caminho de volatilidade condicional.
 
 \section{Correlação Condicional Dinâmica}
@@ -45,7 +45,7 @@ dinâmica.
 
 \section{Copulas}
 
-`copula` estima um modelo bivariado de dependência via Teorema de
+\texttt{copula} estima um modelo bivariado de dependência via Teorema de
 Sklar. Separa as distribuições marginais da copula que as une.
 
 \begin{lstlisting}[caption={Copula}]
@@ -57,7 +57,7 @@ As copulas disponíveis incluem Gaussiana, Clayton, Gumbel e Frank. A
 saída reporta o $\tau$ de Kendall, o $\rho$ de Spearman e o parâmetro
 da copula.
 
-`tv_copula` estende isso com dependência variante no tempo impulsionada
+\texttt{tv\_copula} estende isso com dependência variante no tempo impulsionada
 por uma dinâmica tipo GARCH para o parâmetro da copula.
 
 \begin{lstlisting}[caption={Copula de dependência variante no tempo}]

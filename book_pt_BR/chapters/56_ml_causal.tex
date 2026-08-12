@@ -12,8 +12,8 @@ $Y(1) - Y(0)$. Os comandos deste capítulo visam duas quantidades:
       $\tau(x) = \E[Y(1) - Y(0) \mid X = x]$
 \end{itemize}
 
-Todos exigem um indicador de tratamento `d` e um conjunto de covariáveis
-`x`. Eles não substituem um desenho de pesquisa claro, mas podem ajudar
+Todos exigem um indicador de tratamento \texttt{d} e um conjunto de covariáveis
+\texttt{x}. Eles não substituem um desenho de pesquisa claro, mas podem ajudar
 a descobrir efeitos heterogêneos e melhorar a precisão.
 
 \section{Causal Forest}
@@ -80,7 +80,7 @@ relevante vem de um subconjunto de covariáveis.
 
 \section{Controle Sintético Bayesiano}
 
-`bsc` implementa uma versão bayesiana do estimador de controle
+\texttt{bsc} implementa uma versão bayesiana do estimador de controle
 sintético. É apropriado quando uma única unidade tratada é comparada a
 várias unidades doadoras e o objetivo é um contrafactual com
 intervalos credíveis.
@@ -96,7 +96,7 @@ intervalo credível de 95\% e os pesos do controle sintético.
 
 \section{Double Machine Learning}
 
-`dml_crossfit` estima o ATE no modelo parcialmente linear
+\texttt{dml\_crossfit} estima o ATE no modelo parcialmente linear
 
 \[
 Y = \theta D + g(X) + \varepsilon

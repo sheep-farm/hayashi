@@ -2,7 +2,7 @@
 
 \section{M-estimadores robustos}
 
-`rlm` ajusta um modelo linear com M-estimadores que reduzem o peso de
+\texttt{rlm} ajusta um modelo linear com M-estimadores que reduzem o peso de
 outliers. O padrão é uma perda de Huber com constante de ajuste, que
 dá comportamento tipo OLS no centro e tipo L1 nas caudas.
 
@@ -11,12 +11,12 @@ let m_rlm = rlm(y ~ x1 + x2, df)
 print(m_rlm)
 \end{lstlisting}
 
-Use `rlm` quando os dados contiverem outliers influentes, mas a maior
+Use \texttt{rlm} quando os dados contiverem outliers influentes, mas a maior
 parte da distribuição for aproximadamente normal.
 
 \section{Modelos Lineares Generalizados}
 
-`glm` ajusta um preditor linear através de uma função de ligação.
+\texttt{glm} ajusta um preditor linear através de uma função de ligação.
 Generaliza o OLS para famílias exponenciais como Poisson, Binomial e
 Gamma.
 
@@ -25,9 +25,9 @@ let m_glm = glm(y ~ x1 + x2, df, family=poisson, link=log)
 print(m_glm)
 \end{lstlisting}
 
-Famílias disponíveis incluem `gaussian`, `poisson`, `binomial`, `gamma`,
-`inverse_gaussian` e `negative_binomial`. Ligações incluem `identity`,
-`log`, `logit`, `probit`, `cloglog` e `inverse`.
+Famílias disponíveis incluem \texttt{gaussian}, \texttt{poisson}, \texttt{binomial}, \texttt{gamma},
+\texttt{inverse\_gaussian} e \texttt{negative\_binomial}. Ligações incluem \texttt{identity},
+\texttt{log}, \texttt{logit}, \texttt{probit}, \texttt{cloglog} e \texttt{inverse}.
 
 \section{GEE}
 
@@ -40,12 +40,12 @@ let m_gee = gee(y ~ x1 + x2, df, id="grupo", family=poisson)
 print(m_gee)
 \end{lstlisting}
 
-Estruturas de correlação incluem `independence`, `exchangeable`, `ar1` e
-`unstructured`.
+Estruturas de correlação incluem \texttt{independence}, \texttt{exchangeable}, \texttt{ar1} e
+\texttt{unstructured}.
 
 \section{Regressão Beta}
 
-`betareg` é apropriada quando a variável dependente é limitada em
+\texttt{betareg} é apropriada quando a variável dependente é limitada em
 $(0,1)$.
 
 \begin{lstlisting}[caption={Regressão Beta}]
@@ -58,7 +58,7 @@ de precisão separado.
 
 \section{GAM e lowess}
 
-`gam` ajusta um modelo aditivo generalizado com splines de suavização
+\texttt{gam} ajusta um modelo aditivo generalizado com splines de suavização
 para efeitos não lineares.
 
 \begin{lstlisting}[caption={GAM}]
@@ -66,7 +66,7 @@ let m_gam = gam(y ~ x1 + s(x2) + x3, df)
 print(m_gam)
 \end{lstlisting}
 
-`lowess` é um suavizador polinomial local para exploração visual e
+\texttt{lowess} é um suavizador polinomial local para exploração visual e
 regressão parcial.
 
 \begin{lstlisting}[caption={Lowess}]
@@ -76,7 +76,7 @@ print(m_low)
 
 \section{Imputação múltipla}
 
-`mice` realiza imputação múltipla por equações encadeadas. Preenche
+\texttt{mice} realiza imputação múltipla por equações encadeadas. Preenche
 valores ausentes usando uma sequência de modelos condicionais e retorna
 um conjunto de DataFrames completos.
 

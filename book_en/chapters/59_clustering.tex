@@ -24,12 +24,12 @@ let m_km = kmeans(df, x="x1,x2", k=3)
 print(m_km)
 \end{lstlisting}
 
-Use `m_km.labels` to read the assigned cluster and `m_km.centroids` to
+Use \texttt{m\_km.labels} to read the assigned cluster and \texttt{m\_km.centroids} to
 inspect the cluster means.
 
 \section{Hierarchical clustering and DBSCAN}
 
-Hierarchical clustering builds a tree of nested clusters. `hclust`
+Hierarchical clustering builds a tree of nested clusters. \texttt{hclust}
 can be cut at any number of groups.
 
 \begin{lstlisting}[caption={Hierarchical clustering}]
@@ -81,7 +81,7 @@ print(m_sc)
 
 \section{PCA, factor, and biplot}
 
-PCA and factor analysis reduce dimensionality linearly. `biplot`
+PCA and factor analysis reduce dimensionality linearly. \texttt{biplot}
 visualises observations and variables in the same PCA space.
 
 \begin{lstlisting}[caption={PCA}]
@@ -96,7 +96,7 @@ print(m_biplot)
 
 \section{Kernel density estimation}
 
-`kde` estimates the density of a single variable with a chosen kernel.
+\texttt{kde} estimates the density of a single variable with a chosen kernel.
 
 \begin{lstlisting}[caption={KDE}]
 let m_kde = kde(df, x1, bw=0.5, kernel="gaussian")

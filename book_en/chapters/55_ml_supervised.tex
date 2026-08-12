@@ -8,8 +8,8 @@ learning is most useful when the goal is prediction: finding a flexible
 function $\hat f(X)$ that approximates $Y$ well out of sample.
 
 \hayashi{} bridges the two. Its ML commands use the same formula syntax as
-OLS or logit, and they return model objects that work with `predict`,
-`glance`, and `tidy`.
+OLS or logit, and they return model objects that work with \texttt{predict},
+\texttt{glance}, and \texttt{tidy}.
 
 This chapter covers tree-based methods, neural networks, and a Gaussian
 process. It is not a full machine-learning course; it shows how to
@@ -41,7 +41,7 @@ Key outputs:
 \item feature importance: reduction in impurity attributable to each regressor
 \end{itemize}
 
-Use `predict(df, yhat = m_rf)` to obtain fitted values on a DataFrame.
+Use \texttt{predict(df, yhat = m\_rf)} to obtain fitted values on a DataFrame.
 
 \section{Gradient Boosting and XGBoost}
 
@@ -59,7 +59,7 @@ but it is more sensitive to hyper-parameters and can overfit.
 
 \section{Multilayer Perceptron}
 
-The `mlp` command fits a single-hidden-layer feed-forward network with
+The \texttt{mlp} command fits a single-hidden-layer feed-forward network with
 sigmoid activation and back-propagation with momentum.
 
 \begin{lstlisting}[caption={Neural network}]
@@ -72,7 +72,7 @@ transparency than trees and often needs tuning.
 
 \section{LSTM and Transformer for series}
 
-For time-series, `lstm` and `transformer` use sequence windows to
+For time-series, \texttt{lstm} and \texttt{transformer} use sequence windows to
 predict the next value. They standardise the target internally.
 
 \begin{lstlisting}[caption={LSTM forecast}]
@@ -110,6 +110,6 @@ matters. It is slower and more memory-intensive than tree methods.
 \end{itemize}
 
 All commands accept a standard Hayashi formula and return an object
-compatible with `predict` and `glance`. Standard errors are generally not
+compatible with \texttt{predict} and \texttt{glance}. Standard errors are generally not
 reported because these methods are not designed for direct inference on
 individual coefficients.

@@ -2,7 +2,7 @@
 
 \section{Componentes não observados}
 
-`ucm` decompõe uma série em tendência, sazonalidade, ciclo e componente
+\texttt{ucm} decompõe uma série em tendência, sazonalidade, ciclo e componente
 irregular, cada um com sua própria variância.
 
 \begin{lstlisting}[caption={UCM}]
@@ -15,8 +15,8 @@ latente de ciclo de negócios.
 
 \section{Suavização exponencial}
 
-`ets` ajusta um modelo Error-Trend-Seasonal; `hwes` ou `holtwinters`
-fornece a variante aditiva de Holt-Winters; `ses` é a suavização
+\texttt{ets} ajusta um modelo Error-Trend-Seasonal; \texttt{hwes} ou \texttt{holtwinters}
+fornece a variante aditiva de Holt-Winters; \texttt{ses} é a suavização
 exponencial simples.
 
 \begin{lstlisting}[caption={Holt-Winters}]
@@ -30,9 +30,9 @@ sazonalidade.
 
 \section{Modelos mistos}
 
-`mixed` ou `mixedlm` ajusta um modelo linear misto com interceptos
+\texttt{mixed} ou \texttt{mixedlm} ajusta um modelo linear misto com interceptos
 aleatórios e/ou inclinações aleatórias. Os efeitos fixos são
-interpretados como em `fe` ou `re`, enquanto os efeitos aleatórios
+interpretados como em \texttt{fe} ou \texttt{re}, enquanto os efeitos aleatórios
 capturam heterogeneidade não observada.
 
 \begin{lstlisting}[caption={Modelo linear misto}]
@@ -45,12 +45,12 @@ e predições de empirical Bayes para os efeitos aleatórios.
 
 \section{Kalman e séries temporais estruturais}
 
-`kalman` (Capítulo~54) e `ucm` são as principais ferramentas de
+\texttt{kalman} (Capítulo~54) e \texttt{ucm} são as principais ferramentas de
 espaço de estados. Comandos estruturais adicionais incluem:
 
 \begin{itemize}
-\item `msauto` / `markov_ar` para autorregressões com mudança de Markov
-\item `structural_ts` para séries temporais estruturais genéricas
+\item \texttt{msauto} / \texttt{markov\_ar} para autorregressões com mudança de Markov
+\item \texttt{structural\_ts} para séries temporais estruturais genéricas
 \end{itemize}
 
 Esses modelos são estimados por máxima verossimilhança ou QMLE. Verifique

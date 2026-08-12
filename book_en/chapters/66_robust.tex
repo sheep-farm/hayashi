@@ -2,7 +2,7 @@
 
 \section{Robust M-estimation}
 
-`rlm` fits a linear model with M-estimators that down-weight outliers.
+\texttt{rlm} fits a linear model with M-estimators that down-weight outliers.
 The default is a Huber loss with a tuning constant, which gives OLS-like
 behaviour near the centre and L1-like behaviour in the tails.
 
@@ -11,12 +11,12 @@ let m_rlm = rlm(y ~ x1 + x2, df)
 print(m_rlm)
 \end{lstlisting}
 
-Use `rlm` when the data contain influential outliers but the majority of
+Use \texttt{rlm} when the data contain influential outliers but the majority of
 the distribution is approximately normal.
 
 \section{Generalised Linear Models}
 
-`glm` fits a linear predictor through a link function. It generalises
+\texttt{glm} fits a linear predictor through a link function. It generalises
 OLS to exponential families such as Poisson, Binomial, and Gamma.
 
 \begin{lstlisting}[caption={GLM}]
@@ -24,9 +24,9 @@ let m_glm = glm(y ~ x1 + x2, df, family=poisson, link=log)
 print(m_glm)
 \end{lstlisting}
 
-Available families include `gaussian`, `poisson`, `binomial`, `gamma`,
-`inverse_gaussian`, and `negative_binomial`. Links include `identity`,
-`log`, `logit`, `probit`, `cloglog`, and `inverse`.
+Available families include \texttt{gaussian}, \texttt{poisson}, \texttt{binomial}, \texttt{gamma},
+\texttt{inverse\_gaussian}, and \texttt{negative\_binomial}. Links include \texttt{identity},
+\texttt{log}, \texttt{logit}, \texttt{probit}, \texttt{cloglog}, and \texttt{inverse}.
 
 \section{GEE}
 
@@ -39,12 +39,12 @@ let m_gee = gee(y ~ x1 + x2, df, id="group", family=poisson)
 print(m_gee)
 \end{lstlisting}
 
-Correlation structures include `independence`, `exchangeable`, `ar1`, and
-`unstructured`.
+Correlation structures include \texttt{independence}, \texttt{exchangeable}, \texttt{ar1}, and
+\texttt{unstructured}.
 
 \section{Beta regression}
 
-`betareg` is appropriate when the dependent variable is bounded in
+\texttt{betareg} is appropriate when the dependent variable is bounded in
 $(0,1)$.
 
 \begin{lstlisting}[caption={Beta regression}]
@@ -57,7 +57,7 @@ separate precision parameter.
 
 \section{GAM and lowess}
 
-`gam` fits a generalised additive model with smoothing splines for
+\texttt{gam} fits a generalised additive model with smoothing splines for
 nonlinear effects.
 
 \begin{lstlisting}[caption={GAM}]
@@ -65,7 +65,7 @@ let m_gam = gam(y ~ x1 + s(x2) + x3, df)
 print(m_gam)
 \end{lstlisting}
 
-`lowess` is a local polynomial smoother for visual exploration and
+\texttt{lowess} is a local polynomial smoother for visual exploration and
 partial regression.
 
 \begin{lstlisting}[caption={Lowess}]
@@ -75,7 +75,7 @@ print(m_low)
 
 \section{Multiple imputation}
 
-`mice` performs multiple imputation by chained equations. It fills in
+\texttt{mice} performs multiple imputation by chained equations. It fills in
 missing values using a sequence of conditional models and returns a set
 of completed datasets.
 

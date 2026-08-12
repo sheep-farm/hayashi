@@ -2,7 +2,7 @@
 
 \section{Regressão linear bayesiana}
 
-`bayes_lm` implementa regressão linear bayesiana com priori conjugada
+\texttt{bayes\_lm} implementa regressão linear bayesiana com priori conjugada
 Normal-Inversa-Gamma. Com uma priori fraca, recupera as médias
 posteriori do OLS, mas também reporta desvios padrão posteriores,
 intervalos credíveis e a probabilidade de cada coeficiente ser positivo.
@@ -32,7 +32,7 @@ ineficiência técnica ou de custo. A fronteira de produção é
 y = X\beta + v - u, \qquad u \ge 0
 \]
 
-onde $v$ é o ruído e $u$ é a ineficiência. `sfa_production` estima
+onde $v$ é o ruído e $u$ é a ineficiência. \texttt{sfa\_production} estima
 $\beta$, $\sigma_v$, $\sigma_u$ e a eficiência técnica média.
 
 \begin{lstlisting}[caption={Fronteira de produção estocástica}]
@@ -57,7 +57,7 @@ print(m_sfac)
 
 \section{Fronteira estocástica bayesiana}
 
-`bayes_sfa_production` e `bayes_sfa_cost` implementam um amostrador de
+\texttt{bayes\_sfa\_production} e \texttt{bayes\_sfa\_cost} implementam um amostrador de
 Gibbs com prioris conjugadas fracas. Eles reportam médias posteriores,
 desvios padrão e intervalos credíveis de 95\% para os coeficientes de
 regressão e os parâmetros de variância.
@@ -74,8 +74,8 @@ cadeira com diferentes valores iniciais e comparando as posteriores.
 \section{Quando usar cada um}
 
 \begin{itemize}
-\item \textbf{Inferência padrão com incerteza:} `bayes_lm`
-\item \textbf{Eficiência de produção:} `sfa_production`
-\item \textbf{Eficiência de custo:} `sfa_cost`
-\item \textbf{SFA em amostras pequenas ou posteriori completa:} `bayes_sfa_production`
+\item \textbf{Inferência padrão com incerteza:} \texttt{bayes\_lm}
+\item \textbf{Eficiência de produção:} \texttt{sfa\_production}
+\item \textbf{Eficiência de custo:} \texttt{sfa\_cost}
+\item \textbf{SFA em amostras pequenas ou posteriori completa:} \texttt{bayes\_sfa\_production}
 \end{itemize}

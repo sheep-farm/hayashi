@@ -2,14 +2,14 @@
 
 \section{Time-varying parameters}
 
-In `tvp` the coefficient vector is a random walk observed with noise:
+In \texttt{tvp} the coefficient vector is a random walk observed with noise:
 
 \[
 y_t = x_t'\beta_t + \varepsilon_t, \qquad
 \beta_t = \beta_{t-1} + \eta_t
 \]
 
-`tvp` estimates the variances of $\varepsilon_t$ and $\eta_t$ by MLE and
+\texttt{tvp} estimates the variances of $\varepsilon_t$ and $\eta_t$ by MLE and
 reports the smoothed path of $\beta_t$.
 
 \begin{lstlisting}[caption={Time-varying parameter regression}]
@@ -21,12 +21,12 @@ let m_tvp = tvp(y ~ x, df)
 print(m_tvp)
 \end{lstlisting}
 
-Use `tvp_var` for a full vector autoregression with time-varying
+Use \texttt{tvp\_var} for a full vector autoregression with time-varying
 coefficients.
 
 \section{Threshold and Markov-switching VAR}
 
-`setar` allows two AR regimes split by a threshold value of the lagged
+\texttt{setar} allows two AR regimes split by a threshold value of the lagged
 dependent variable.
 
 \begin{lstlisting}[caption={SETAR}]
@@ -34,7 +34,7 @@ let m_setar = setar(y, df, order=2, delay=1)
 print(m_setar)
 \end{lstlisting}
 
-`msvar` allows the coefficients themselves to switch according to a
+\texttt{msvar} allows the coefficients themselves to switch according to a
 latent Markov chain.
 
 \begin{lstlisting}[caption={Markov-switching VAR}]
@@ -44,7 +44,7 @@ print(m_msvar)
 
 \section{Asymmetric and nonlinear dynamics}
 
-`nardl` decomposes a regressor into positive and negative partial sums,
+\texttt{nardl} decomposes a regressor into positive and negative partial sums,
 allowing asymmetric long-run responses.
 
 \begin{lstlisting}[caption={NARDL}]
@@ -52,7 +52,7 @@ let m_nardl = nardl(y ~ x, df, lags=1)
 print(m_nardl)
 \end{lstlisting}
 
-`pstr` does the same in a panel, with coefficients that change smoothly
+\texttt{pstr} does the same in a panel, with coefficients that change smoothly
 according to a logistic transition function of an observed variable.
 
 \begin{lstlisting}[caption={Panel Smooth Transition Regression}]
@@ -62,7 +62,7 @@ print(m_pstr)
 
 \section{Functional coefficients}
 
-`fcoef` estimates coefficients that vary smoothly with a moderator
+\texttt{fcoef} estimates coefficients that vary smoothly with a moderator
 variable $z$, using local linear kernel regression.
 
 \begin{lstlisting}[caption={Functional coefficient model}]
@@ -72,7 +72,7 @@ print(m_fcoef)
 
 \section{Bayesian VAR and mixed-frequency VAR}
 
-`bvar` estimates a VAR with a Minnesota prior, shrinking own lags
+\texttt{bvar} estimates a VAR with a Minnesota prior, shrinking own lags
 towards 1 and cross-lags towards 0.
 
 \begin{lstlisting}[caption={Bayesian VAR}]
@@ -80,7 +80,7 @@ let m_bvar = bvar(y1 ~ y2, df, lags=1)
 print(m_bvar)
 \end{lstlisting}
 
-`mfvar` combines low- and high-frequency variables using an exponential
+\texttt{mfvar} combines low- and high-frequency variables using an exponential
 Almon MIDAS aggregation.
 
 \begin{lstlisting}[caption={Mixed-frequency VAR}]
@@ -90,7 +90,7 @@ print(m_mfvar)
 
 \section{Panel VAR}
 
-`pvar` estimates a panel VAR using Arellano-Bond style GMM: lagged
+\texttt{pvar} estimates a panel VAR using Arellano-Bond style GMM: lagged
 levels instrument first-differenced equations.
 
 \begin{lstlisting}[caption={Panel VAR}]

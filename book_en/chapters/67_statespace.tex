@@ -2,7 +2,7 @@
 
 \section{Unobserved Components}
 
-`ucm` decomposes a series into a trend, a seasonal, a cycle, and an
+\texttt{ucm} decomposes a series into a trend, a seasonal, a cycle, and an
 irregular component, each with its own variance.
 
 \begin{lstlisting}[caption={UCM}]
@@ -15,8 +15,8 @@ business-cycle component.
 
 \section{Exponential smoothing}
 
-`ets` fits an Error-Trend-Seasonal model; `hwes` or `holtwinters`
-provides the Holt-Winters additive variant; `ses` is simple exponential
+\texttt{ets} fits an Error-Trend-Seasonal model; \texttt{hwes} or \texttt{holtwinters}
+provides the Holt-Winters additive variant; \texttt{ses} is simple exponential
 smoothing.
 
 \begin{lstlisting}[caption={Holt-Winters}]
@@ -29,9 +29,9 @@ $\gamma$) and reports the fitted level, trend, and seasonal components.
 
 \section{Mixed models}
 
-`mixed` or `mixedlm` fits a linear mixed model with random intercepts
-and/or random slopes. The fixed effects are interpreted as in `fe` or
-`re`, while the random effects capture unobserved heterogeneity.
+\texttt{mixed} or \texttt{mixedlm} fits a linear mixed model with random intercepts
+and/or random slopes. The fixed effects are interpreted as in \texttt{fe} or
+\texttt{re}, while the random effects capture unobserved heterogeneity.
 
 \begin{lstlisting}[caption={Linear mixed model}]
 let m_mixed = mixed(y ~ x1 + x2, df, id="school")
@@ -43,12 +43,12 @@ empirical-Bayes predictions of the random effects.
 
 \section{Kalman and structural time series}
 
-`kalman` (Chapter~54) and `ucm` are the main state-space tools.
+\texttt{kalman} (Chapter~54) and \texttt{ucm} are the main state-space tools.
 Additional structural commands include:
 
 \begin{itemize}
-\item `msauto` / `markov_ar` for Markov-switching autoregressions
-\item `structural_ts` for generic structural time-series
+\item \texttt{msauto} / \texttt{markov\_ar} for Markov-switching autoregressions
+\item \texttt{structural\_ts} for generic structural time-series
 \end{itemize}
 
 These models are estimated by maximum likelihood or quasi-MLE. Check the
