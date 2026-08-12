@@ -622,6 +622,11 @@ cases:
     SE.
   dimension: numerical
   status: pass
+- id: pstr_simulated
+  notes: Simulated panel with N=50, T=10. y = beta0*x + beta1*x*g(q; gamma=5, c=0.5)
+    + FE + noise. Gamma, c, beta0_x and beta1_x compared against grid-search references.
+  dimension: numerical
+  status: pass
 - id: pvar_simulated
   notes: Simulated bivariate panel VAR with N=50 and T=100. Hayashi GMM and within-OLS
     references agree within moderate tolerance due to the Nickell bias in within estimation.

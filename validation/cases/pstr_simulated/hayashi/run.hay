@@ -1,0 +1,9 @@
+load "validation/cases/pstr_simulated/data/data.csv" as df
+let m = pstr(y ~ x, df, q="q", id="id")
+let out = dataframe({
+  "variable": ["gamma", "c", "beta0_x", "beta1_x"],
+  "coef": [m.fit.gamma, m.fit.c, (m.regime0["coef"])[1], (m.regime1["coef"])[1]],
+  "std_err": [0.0, 0.0, (m.regime0["std_err"])[1], (m.regime1["std_err"])[1]]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")
