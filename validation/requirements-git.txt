@@ -1,0 +1,3 @@
+# Direct-from-git dependencies that cannot be hashed with pip.
+# These are installed separately from validation/requirements.txt in CI.
+pylpdid @ git+https://github.com/Daniel-Uhr/pylpdid.git@03d9cfd46eea61276829812ed357da6c7b32a2a7
