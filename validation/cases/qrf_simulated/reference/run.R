@@ -1,8 +1,5 @@
 library(jsonlite)
 
-if (!requireNamespace("quantregForest", quietly = TRUE)) {
-  install.packages("quantregForest", repos = "https://cloud.r-project.org")
-}
 library(quantregForest)
 
 set.seed(42)

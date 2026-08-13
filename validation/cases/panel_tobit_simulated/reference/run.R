@@ -1,10 +1,6 @@
 df <- read.csv("validation/cases/panel_tobit_simulated/data/data.csv")
 
 # Pooled Tobit as reference (coefficients should be close to panel RE Tobit)
-if (!requireNamespace("censReg", quietly = TRUE)) {
-  install.packages("censReg", repos = "https://cloud.r-project.org")
-}
-
 fit <- censReg::censReg(y ~ x, data = df, left = 0)
 sm <- summary(fit)
 

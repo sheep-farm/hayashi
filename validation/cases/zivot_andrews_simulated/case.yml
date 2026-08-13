@@ -15,7 +15,6 @@ comparison:
   tolerances:
     fit.statistic: 0.1
 output_format: json
-
 hayashi_script: cases/zivot_andrews_simulated/hayashi/run.hay
 reference_scripts:
   R: cases/zivot_andrews_simulated/reference/run.R

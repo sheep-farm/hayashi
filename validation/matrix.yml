@@ -129,7 +129,7 @@ cases:
   dimension: numerical
   status: pass
 - id: condnum_simulated
-  notes: Condition number of regressor matrix on simulated OLS residuals.
+  notes: Condition number of the OLS regressor matrix on simulated data.
   dimension: numerical
   status: pass
 - id: conformal_simulated
@@ -416,11 +416,13 @@ cases:
   dimension: numerical
   status: pass
 - id: johansen_break_simulated
-  notes: Structural-break Johansen test. Python statsmodels.tsa.vecm (coint_johansen)
-    does not support exogenous break dummies, so a comparable Python reference trace
-    statistic cannot be produced.
+  notes: Structural-break Johansen test. Python statsmodels.tsa.vecm coint_johansen
+    does not support exogenous break dummies. R urca::ca.jo accepts the dummy but
+    uses conventional rather than Hayashi's break-adjusted rank critical values.
+    Neither provides a fully comparable reference for the declared rank-and-trace
+    contract.
   dimension: numerical
-  status: blocked
+  status: not-supported
 - id: kalman_nyse
   notes: Local-level Kalman filter on NYSE returns. Hayashi now estimates sigma_obs
     and sigma_state by maximum likelihood and returns a printable result object. sigma_state
@@ -524,7 +526,7 @@ cases:
     against R nnet and scikit-learn MLPRegressor. Tolerance is relaxed because different
     initialisation and optimisers produce different R-squared.
   dimension: numerical
-  status: pass
+  status: fail
 - id: modwt_simulated
   notes: Simulated series (trend + 16-period sine + noise). Greeners MODWT uses unnormalised
     Haar filters, equivalent to pywt.swt(..., norm=False). Wavelet energies are compared
@@ -542,7 +544,7 @@ cases:
   notes: Simulated NARDL(1,1) with asymmetric long-run multipliers and short-run dynamics.
     y and x are random walks with positive and negative shock decomposition.
   dimension: numerical
-  status: pass
+  status: fail
 - id: nbreg_fertil2
   notes: Negative binomial regression for number of children on age, education, electric
     and urban indicators.
@@ -552,7 +554,7 @@ cases:
   notes: Simulated data from y = a * (b1*x1^rho + (1-b1)*x2^rho)^(1/rho) + N(0, 0.1).
     The CES function is now identified by the share restriction b2 = 1 - b1.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: nls_cobb_douglas_simulated
   notes: Simulated data from y = a * x1^b1 * x2^b2 + N(0, 0.3). Coefficients and standard
     errors compared against R `nls` and Python `curve_fit`.
@@ -792,7 +794,7 @@ cases:
   notes: Simulated panel with N=50, T=4, random effects, left-censored at 0. Coefficients
     and standard errors compared against pooled Tobit (censReg and MLE).
   dimension: numerical
-  status: pass
+  status: fail
 - id: pca_wooldridge_wage1
   notes: 'PCA is run on educ, exper, tenure, and wage with centering and unit-variance
 
@@ -830,7 +832,7 @@ cases:
   notes: Simulated panel with N=50, T=10. y = beta0*x + beta1*x*g(q; gamma=5, c=0.5)
     + FE + noise. Gamma, c, beta0_x and beta1_x compared against grid-search references.
   dimension: numerical
-  status: pass
+  status: fail
 - id: pvar_simulated
   notes: Simulated bivariate panel VAR with N=50 and T=100. Hayashi GMM and within-OLS
     references agree within moderate tolerance due to the Nickell bias in within estimation.
@@ -927,7 +929,7 @@ cases:
     The Durbin model is highly collinear; only the spatial autoregressive parameter
     is compared.
   dimension: numerical
-  status: pass
+  status: blocked
 - id: spatial_panel_sar_simulated
   notes: R spatialreg/spdep packages failed to install in previous sessions.
   dimension: numerical
@@ -936,12 +938,12 @@ cases:
   notes: Data generated on a 7x7 grid with rook contiguity W, rho=0.3, beta=0.5. Reference
     implements the same concentrated MLE independently.
   dimension: numerical
-  status: pass
+  status: fail
 - id: spatial_sem_simulated
   notes: Data generated on a 7x7 grid with rook contiguity W, lambda=0.1, beta=0.5.
     Reference implements the same concentrated MLE independently.
   dimension: numerical
-  status: pass
+  status: fail
 - id: spectral_simulated
   notes: Results are sensitive to random k-means initialisation and normalised Laplacian
     details; no deterministic numeric reference.
@@ -1074,7 +1076,7 @@ cases:
   dimension: numerical
   status: pass
 - id: vif_simulated
-  notes: Variance Inflation Factor on simulated OLS residuals.
+  notes: Variance inflation factors for the OLS regressor matrix on simulated data.
   dimension: numerical
   status: pass
 - id: weak_iv_simulated
@@ -1105,17 +1107,17 @@ cases:
   notes: Simulated panel with N=50 groups and T=4 periods. GEE logit with exchangeable
     working correlation; coefficients and sandwich standard errors compared.
   dimension: numerical
-  status: pass
+  status: fail
 - id: xtpoisson_simulated
   notes: Simulated panel with N=50 groups and T=4 periods. GEE Poisson with exchangeable
     working correlation; coefficients and sandwich standard errors compared.
   dimension: numerical
-  status: pass
+  status: fail
 - id: xtprobit_simulated
   notes: Simulated panel with N=50 groups and T=4 periods. GEE probit with exchangeable
     working correlation; coefficients and sandwich standard errors compared.
   dimension: numerical
-  status: pass
+  status: fail
 - id: xtsum_wooldridge_wagepan
   notes: Overall, between, and within panel summary for lwage.
   dimension: numerical

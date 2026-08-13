@@ -1,8 +1,5 @@
 library(jsonlite)
 
-if (!requireNamespace("gbm", quietly = TRUE)) {
-  install.packages("gbm", repos = "https://cloud.r-project.org")
-}
 library(gbm)
 
 set.seed(42)

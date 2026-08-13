@@ -27,7 +27,7 @@
 | cloglog | wooldridge::affairs | R, Python | pass | — | Complementary log-log GLM on Wooldridge affairs. A sign error in the Greeners cloglog derivative caused IRLS divergence; the derivative is now positive and the model converges to the same estimates as R glm and statsmodels. |
 | descriptive | wooldridge::wage1 | R, Python | pass | — | Codebook summary for the continuous wage variable. |
 | vecm | simulated_cointegrated | R, Python | pass | — | VECM(1) on a simulated cointegrated system where y = 2*x + e2 and x = cumsum(e1). The cointegration (beta) and adjustment (alpha) coefficients and standard errors are compared. Beta SEs are approximate Engle-Granger/OLS proxies; alpha SEs are OLS conditional SEs given the estimated beta. The 5e-1 tolerance accommodates the bootstrap SEs produced by Hayashi. |
-| diagnostics | simulated | R | pass | — | Condition number of regressor matrix on simulated OLS residuals. |
+| diagnostics | simulated | R | pass | — | Condition number of the OLS regressor matrix on simulated data. |
 | conformal | simulated | R, Python | pass | — | Simulated linear DGP y = 1 + 2x1 - 1.5x2 + noise. Compares split-conformal empirical coverage and conformal quantile. |
 | copula | simulated | R, Python | pass | — | Simulated bivariate normal with Pearson correlation 0.6. Dependence measures exported as a coefficient table; standard errors are not defined for copula summary statistics. |
 | descriptive | wooldridge::wage1 | R, Python | pass | — | Pairwise correlations of wage, educ, exper, tenure. |
@@ -84,7 +84,7 @@
 | iv | wooldridge::mroz | R, Python | pass | 95 | IV returns-to-schooling equation with HC1 heteroskedasticity-robust standard errors. |
 | iv | wooldridge::mroz | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 15, Example 15.1 returns to schooling IV equation for married women. |
 | diagnostics | simulated | R, Python | pass | — | Jarque-Bera normality test on a simulated random sample. |
-| johansen_break | simulated | R, Python | blocked | — | Structural-break Johansen test. Python statsmodels.tsa.vecm (coint_johansen) does not support exogenous break dummies, so a comparable Python reference trace statistic cannot be produced. |
+| johansen_break | simulated | R, Python | not-supported | — | Structural-break Johansen test. Python statsmodels.tsa.vecm coint_johansen does not support exogenous break dummies. R urca::ca.jo accepts the dummy but uses conventional rather than Hayashi's break-adjusted rank critical values. Neither provides a fully comparable reference for the declared rank-and-trace contract. |
 | kalman | wooldridge::nyse | R, Python | pass | — | Local-level Kalman filter on NYSE returns. Hayashi now estimates sigma_obs and sigma_state by maximum likelihood and returns a printable result object. sigma_state is very small and the likelihood is flat in that direction, so the absolute tolerance is set to 1e-3. |
 | kde | simulated | R, Python | pass | — | Simulated N(2, 1.5). Compares fixed bandwidth, peak density and peak x of a Gaussian KDE. |
 | km | survival::aml | R, Python | pass | 113 | Kaplan-Meier right-continuous survival probabilities at seven checkpoints on survival::aml. |
@@ -105,12 +105,12 @@
 | midas | simulated | R, Python | pass | — | Simulated low-frequency y (T=100) and high-frequency x (T*3). y = 1.0 + 2.0 * x_midas + noise. Compare alpha, beta and R-squared against R optim and Python MIDAS grid+minimize references. |
 | mixed | wooldridge::wagepan | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 14, Example 14.4 mixed linear model wage equation. |
 | mlogit | AER::TravelMode | R, Python | pass | — | Multinomial logit of chosen travel mode (air=1, train=2, bus=3, car=4) on income, wait time, vehicle cost and travel time. |
-| mlp | simulated | R, Python | pass | — | Simulated linear-ish y from x1 and x2 with small noise. Compare R-squared against R nnet and scikit-learn MLPRegressor. Tolerance is relaxed because different initialisation and optimisers produce different R-squared. |
+| mlp | simulated | R, Python | fail | — | Simulated linear-ish y from x1 and x2 with small noise. Compare R-squared against R nnet and scikit-learn MLPRegressor. Tolerance is relaxed because different initialisation and optimisers produce different R-squared. |
 | modwt | simulated | R, Python | pass | — | Simulated series (trend + 16-period sine + noise). Greeners MODWT uses unnormalised Haar filters, equivalent to pywt.swt(..., norm=False). Wavelet energies are compared as coefficient-like quantities; standard errors are not meaningful. |
 | msvar | simulated_msvar | R, Python | pass | — | Simulated two-regime VAR with known intercepts and transition matrix; compares regime-specific y1 intercepts and transition probabilities against R MSwM and Python statsmodels MarkovRegression. Tolerances reflect label/algorithm sensitivity in regime-switching models. |
-| nardl | simulated | R, Python | pass | — | Simulated NARDL(1,1) with asymmetric long-run multipliers and short-run dynamics. y and x are random walks with positive and negative shock decomposition. |
+| nardl | simulated | R, Python | fail | — | Simulated NARDL(1,1) with asymmetric long-run multipliers and short-run dynamics. y and x are random walks with positive and negative shock decomposition. |
 | negbin | wooldridge::fertil2 | R, Python | pass | — | Negative binomial regression for number of children on age, education, electric and urban indicators. |
-| nls | simulated | R, Python | pass | — | Simulated data from y = a * (b1*x1^rho + (1-b1)*x2^rho)^(1/rho) + N(0, 0.1). The CES function is now identified by the share restriction b2 = 1 - b1. |
+| nls | simulated | R, Python | blocked | — | Simulated data from y = a * (b1*x1^rho + (1-b1)*x2^rho)^(1/rho) + N(0, 0.1). The CES function is now identified by the share restriction b2 = 1 - b1. |
 | nls | simulated | R, Python | pass | — | Simulated data from y = a * x1^b1 * x2^b2 + N(0, 0.3). Coefficients and standard errors compared against R `nls` and Python `curve_fit`. |
 | nls | simulated | R, Python | pass | — | Simulated data from y = a * exp(b * x) + N(0, 0.1). Coefficients and standard errors compared against R `nls` and Python `scipy.optimize.curve_fit`. |
 | nls | simulated | R, Python | pass | — | Simulated data from y = a / (1 + exp(-b*(x-c))) + N(0, 0.2). Coefficients and standard errors compared against R `nls` and Python `scipy.optimize.curve_fit`. |
@@ -159,14 +159,14 @@
 | panel_fe | wooldridge::wagepan | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 14, Example 14.4 panel fixed-effects wage equation. |
 | panel_heckman | simulated_panel_heckman | R, Python | pass | — | Panel Heckman selection model (two-step) with selection equation and outcome equation. Uses simulated panel data with known selection mechanism. |
 | panel_qreg | simulated | R, Python | pass | — | Simulated panel with entity fixed effects and heteroskedastic errors. References demean the data and run quantile regression without an intercept; standard errors are convention-sensitive. |
-| panel | simulated | R, Python | pass | — | Simulated panel with N=50, T=4, random effects, left-censored at 0. Coefficients and standard errors compared against pooled Tobit (censReg and MLE). |
+| panel | simulated | R, Python | fail | — | Simulated panel with N=50, T=4, random effects, left-censored at 0. Coefficients and standard errors compared against pooled Tobit (censReg and MLE). |
 | pca | wooldridge::wage1 | R, Python | pass | — | PCA is run on educ, exper, tenure, and wage with centering and unit-variance scaling. Loadings are compared in absolute value because each eigenvector's sign is arbitrary. Hayashi displays four decimal places, so tolerances allow for output rounding. |
 | pcse | wooldridge::wagepan | R, Python | pass | 99, 103 | PCSE estimation of log wage on education, experience, and dummies using the Hayashi/Greeners Beck-Katz covariance convention. |
 | poisson | wooldridge::fertil2 | R, Python | pass | — | Poisson regression for number of children on the fertil2 dataset. |
 | portsort | simulated | Python, R | pass | — | Five equal-count portfolios sorted by size. Compare mean returns and high-low spread. |
 | probit | wooldridge::mroz | R, Python | pass | — | Probit labour-force participation on the Mroz dataset. |
 | psm | wooldridge::jtrain3 | R, Python | pass | — | R, Python, and Hayashi use the same absolute-caliper, no-replacement matching protocol; ATT agrees and bootstrap SEs are within tolerance. |
-| pstr | simulated | R, Python | pass | — | Simulated panel with N=50, T=10. y = beta0*x + beta1*x*g(q; gamma=5, c=0.5) + FE + noise. Gamma, c, beta0_x and beta1_x compared against grid-search references. |
+| pstr | simulated | R, Python | fail | — | Simulated panel with N=50, T=10. y = beta0*x + beta1*x*g(q; gamma=5, c=0.5) + FE + noise. Gamma, c, beta0_x and beta1_x compared against grid-search references. |
 | pvar | simulated | R, Python | pass | — | Simulated bivariate panel VAR with N=50 and T=100. Hayashi GMM and within-OLS references agree within moderate tolerance due to the Nickell bias in within estimation. |
 | qreg | simulated | R, Python | pass | — | Simulated heteroskedastic data. Quantile regression at tau=0.75 with bootstrap standard errors compared against R quantreg and statsmodels. |
 | qrf_inf | simulated | R, Python | pass | — | Simulated heteroskedastic data y = 3*x1 + N(0, 0.1*(1+0.5*x1)), with x2 irrelevant. qrf_inf() at q=0.75 with 50 trees, depth 5, 50 bootstrap samples. OOB R^2 compared against grf::quantile_forest and quantile_forest.RandomForestQuantileRegressor. |
@@ -184,10 +184,10 @@
 | setar | simulated | R, Python | pass | — | Simulated SETAR(1,1,1) with two regimes split by y_{t-1}. Hayashi grid search may differ slightly from R tsDyn; tolerances are relaxed accordingly. |
 | sfa | simulated | R, Python | pass | — | Simulated Cobb-Douglas production frontier with negligible inefficiency so MLE/OLS references align with Hayashi. |
 | spatial_durbin_error | simulated |  | not-supported | — | R spatialreg/spdep packages failed to install in previous sessions. |
-| spatial_durbin | simulated | R, Python | pass | — | Data generated on a 7x7 grid with rook contiguity W, rho=-0.95, beta=0.5. The Durbin model is highly collinear; only the spatial autoregressive parameter is compared. |
+| spatial_durbin | simulated | R, Python | blocked | — | Data generated on a 7x7 grid with rook contiguity W, rho=-0.95, beta=0.5. The Durbin model is highly collinear; only the spatial autoregressive parameter is compared. |
 | spatial_panel_sar | simulated |  | not-supported | — | R spatialreg/spdep packages failed to install in previous sessions. |
-| spatial_sar | simulated | R, Python | pass | — | Data generated on a 7x7 grid with rook contiguity W, rho=0.3, beta=0.5. Reference implements the same concentrated MLE independently. |
-| spatial_sem | simulated | R, Python | pass | — | Data generated on a 7x7 grid with rook contiguity W, lambda=0.1, beta=0.5. Reference implements the same concentrated MLE independently. |
+| spatial_sar | simulated | R, Python | fail | — | Data generated on a 7x7 grid with rook contiguity W, rho=0.3, beta=0.5. Reference implements the same concentrated MLE independently. |
+| spatial_sem | simulated | R, Python | fail | — | Data generated on a 7x7 grid with rook contiguity W, lambda=0.1, beta=0.5. Reference implements the same concentrated MLE independently. |
 | spectral | simulated |  | not-supported | — | Results are sensitive to random k-means initialisation and normalised Laplacian details; no deterministic numeric reference. |
 | descriptive | wooldridge::wage1 | R, Python | pass | — | Summary statistics with detail (percentiles, skewness, kurtosis) for wage. |
 | sur | wooldridge::grunfeld | R, Python | pass | — | Two-equation SUR (Zellner FGLS) on the Grunfeld investment data. |
@@ -215,15 +215,15 @@
 | var | simulated_var1 | R, Python | pass | — | Uses the same simulated bivariate VAR(1) DGP as Chapter 28 of the book. |
 | var | statsmodels::macrodata | R, Python | pass | — | VAR(2) on US real GDP and consumption. |
 | varma | simulated | R, Python | pass | — | Bivariate VARMA(1,1) with known AR and MA matrices. Hayashi uses the Hannan-Rissanen algorithm; the Python reference uses statsmodels VARMAX with no trend. Coefficients are compared (standard errors are not computed by the current Hayashi VARMA implementation). |
-| diagnostics | simulated | R | pass | — | Variance Inflation Factor on simulated OLS residuals. |
+| diagnostics | simulated | R | pass | — | Variance inflation factors for the OLS regressor matrix on simulated data. |
 | iv | simulated | R, Python | pass | — | Simulated weak instrument. First-stage partial F and p-value. |
 | diagnostics | simulated | R | pass | — | White heteroskedasticity test on simulated OLS residuals. |
 | wls | wooldridge::hprice1 | R, Python | pass | — | WLS with weights generated inside Hayashi to avoid sandbox file issues. |
 | xgboost | simulated | R, Python | pass | — | Simulated data y = 3*x1 + N(0, 0.1), x2 irrelevant. XGBoost with 50 trees, learning rate 0.1, max depth 3, default regularization. MSE and R^2 compared against xgboost.XGBRegressor. |
 | xtgls | wooldridge::wagepan | R, Python | pass | — | Panel feasible GLS with panel-level heteroskedasticity (Parks/Kmenta, Stata xtgls panels(heteroskedastic)). R and Python references implement the same two-step FGLS procedure used by Hayashi/Greeners. |
-| xtlogit | simulated | R, Python | pass | — | Simulated panel with N=50 groups and T=4 periods. GEE logit with exchangeable working correlation; coefficients and sandwich standard errors compared. |
-| xtpoisson | simulated | R, Python | pass | — | Simulated panel with N=50 groups and T=4 periods. GEE Poisson with exchangeable working correlation; coefficients and sandwich standard errors compared. |
-| xtprobit | simulated | R, Python | pass | — | Simulated panel with N=50 groups and T=4 periods. GEE probit with exchangeable working correlation; coefficients and sandwich standard errors compared. |
+| xtlogit | simulated | R, Python | fail | — | Simulated panel with N=50 groups and T=4 periods. GEE logit with exchangeable working correlation; coefficients and sandwich standard errors compared. |
+| xtpoisson | simulated | R, Python | fail | — | Simulated panel with N=50 groups and T=4 periods. GEE Poisson with exchangeable working correlation; coefficients and sandwich standard errors compared. |
+| xtprobit | simulated | R, Python | fail | — | Simulated panel with N=50 groups and T=4 periods. GEE probit with exchangeable working correlation; coefficients and sandwich standard errors compared. |
 | descriptive | wooldridge::wagepan | R, Python | pass | — | Overall, between, and within panel summary for lwage. |
 | zinb | wooldridge::affairs | R, Python | pass | 123 | ZINB model of number of affairs on demographic predictors. |
 | zip | wooldridge::affairs | R, Python | pass | 121 | ZIP model of number of affairs on demographic predictors. |
@@ -235,13 +235,14 @@
 - `partial` — Hayashi matches at least one reference, but other declared references failed or are missing; exits non-zero unless `--allow-partial` is passed.
 - `fail` — Hayashi differs from at least one reference beyond tolerances.
 - `blocked` — no declared reference could run; the case cannot be judged.
-- `not-supported` — estimator/workflow not supported yet.
+- `not-supported` — the validation programme cannot currently test the stated estimator/workflow contract; this does not necessarily mean Hayashi lacks the command.
 - `not-started` — registered but not implemented.
 
-The Reference column shows per-reference status as `name:status`,
-where `*` marks the reference used for comparison. A declared
-reference that fails or is missing no longer blocks comparison when
-`--allow-partial` is used; otherwise partial cases fail the runner.
+The Reference column lists declared reference implementations, or
+per-reference execution details when a runner result records them.
+A declared reference that fails or is missing no longer blocks
+comparison when `--allow-partial` is used; otherwise partial cases
+fail the runner.
 
 This matrix is generated from `validation/matrix.yml` by `validation/run.py`.
 

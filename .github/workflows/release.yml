@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Checkout Greeners dependency
-        run: git clone --depth 1 --branch develop https://github.com/sheep-farm/Greeners.git ../Greeners
+        run: bash scripts/checkout-greeners.sh
         shell: bash
 
       - uses: dtolnay/rust-toolchain@stable

@@ -1,8 +1,5 @@
 library(jsonlite)
 
-if (!requireNamespace("grf", quietly = TRUE)) {
-  install.packages("grf", repos = "https://cloud.r-project.org")
-}
 library(grf)
 
 set.seed(42)

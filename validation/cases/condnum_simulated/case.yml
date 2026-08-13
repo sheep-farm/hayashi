@@ -18,7 +18,7 @@ output_format: json
 hayashi_script: cases/condnum_simulated/hayashi/run.hay
 reference_scripts:
   R: cases/condnum_simulated/reference/run.R
-notes: Condition number of regressor matrix on simulated OLS residuals.
+notes: Condition number of the OLS regressor matrix on simulated data.
 result:
   summary: ''
   known_differences: []
