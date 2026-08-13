@@ -1,7 +1,7 @@
 id: ols_wooldridge_barium_ch10
 title: OLS barium chloride import equation on Wooldridge barium (Chapter 10, Example 10.5)
 estimator_family: ols
-status: active
+status: pass
 dimension: numerical
 
 dataset:

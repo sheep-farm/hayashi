@@ -1,7 +1,7 @@
 id: ols_wooldridge_hprice2_ch6
 title: OLS log housing price equation with rooms quadratic on Wooldridge hprice2 (Chapter 6, Example 6.2)
 estimator_family: ols
-status: active
+status: pass
 dimension: numerical
 
 dataset:

@@ -1,7 +1,7 @@
 id: mixed_wooldridge_wagepan_ch14
 title: Mixed linear model wage equation on Wooldridge wagepan (Chapter 14, Example 14.4)
 estimator_family: mixed
-status: active
+status: pass
 dimension: numerical
 
 dataset:

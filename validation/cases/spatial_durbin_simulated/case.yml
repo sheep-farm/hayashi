@@ -1,7 +1,7 @@
 id: spatial_durbin_simulated
 title: Spatial Durbin model on simulated grid data
 estimator_family: spatial_durbin
-status: active
+status: pass
 dimension: numerical
 
 dataset:

@@ -1,7 +1,7 @@
 id: panel_fe_cluster_wagepan
 title: Panel fixed-effects wage equation with entity-clustered SEs on Wooldridge wagepan
 estimator_family: panel_fe
-status: active
+status: pass
 dimension: numerical
 
 dataset:

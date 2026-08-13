@@ -1,7 +1,7 @@
 id: dfm_simulated
 title: Dynamic factor model on simulated data
 estimator_family: dfm
-status: active
+status: pass
 dimension: numerical
 
 dataset:

@@ -1,7 +1,7 @@
 id: ols_wooldridge_bwght_ch5
 title: OLS birth weight equation on Wooldridge bwght (Chapter 5, Example 5.2)
 estimator_family: ols
-status: active
+status: pass
 dimension: numerical
 
 dataset:

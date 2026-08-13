@@ -1,7 +1,7 @@
 id: panel_qreg_simulated
 title: Panel quantile regression on simulated fixed-effects data
 estimator_family: panel_qreg
-status: active
+status: pass
 dimension: numerical
 
 dataset:

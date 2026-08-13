@@ -1,7 +1,7 @@
 id: xtpoisson_simulated
 title: Panel Poisson via GEE on simulated data
 estimator_family: xtpoisson
-status: active
+status: pass
 dimension: numerical
 
 dataset:

@@ -1,7 +1,7 @@
 id: nardl_simulated
 title: Nonlinear ARDL (NARDL) on simulated cointegrated data
 estimator_family: nardl
-status: active
+status: pass
 dimension: numerical
 
 dataset:

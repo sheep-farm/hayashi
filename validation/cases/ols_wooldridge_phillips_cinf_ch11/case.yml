@@ -1,7 +1,7 @@
 id: ols_wooldridge_phillips_cinf_ch11
 title: OLS expectations-augmented Phillips curve on Wooldridge phillips (Chapter 11, Example 11.5)
 estimator_family: ols
-status: active
+status: pass
 dimension: numerical
 
 dataset:

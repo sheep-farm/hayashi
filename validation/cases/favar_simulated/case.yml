@@ -1,7 +1,7 @@
 id: favar_simulated
 title: Factor-augmented VAR on simulated data
 estimator_family: favar
-status: active
+status: pass
 dimension: numerical
 
 dataset:

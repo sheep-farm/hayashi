@@ -1,7 +1,7 @@
 id: xtsum_wooldridge_wagepan
 title: Panel summary (xtsum) for Wooldridge wagepan lwage
 estimator_family: descriptive
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: wooldridge::wagepan

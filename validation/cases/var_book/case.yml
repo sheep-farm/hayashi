@@ -1,7 +1,7 @@
 id: var_book
 title: VAR(1) on simulated data from the Hayashi book
 estimator_family: var
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated_var1

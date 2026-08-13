@@ -1,7 +1,7 @@
 id: ols_wooldridge_401k_ch3
 title: OLS 401(k) participation equation on Wooldridge 401k (Chapter 3, Example 3.3)
 estimator_family: ols
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: wooldridge::401k

@@ -1,7 +1,7 @@
 id: nls_ces_simulated
 title: Nonlinear least squares CES model on simulated data
 estimator_family: nls
-status: active
+status: pass
 dimension: numerical
 
 dataset:

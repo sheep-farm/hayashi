@@ -1,7 +1,7 @@
 id: anova_wooldridge_wage1
 title: One-way ANOVA of wage by education in Wooldridge wage1
 estimator_family: descriptive
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: wooldridge::wage1

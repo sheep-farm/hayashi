@@ -1,7 +1,7 @@
 id: autoreg_gdp
 title: AR(1) on US real GDP with constant and trend
 estimator_family: autoreg
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: statsmodels::macrodata

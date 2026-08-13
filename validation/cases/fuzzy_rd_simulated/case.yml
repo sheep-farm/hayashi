@@ -1,7 +1,7 @@
 id: fuzzy_rd_simulated
 title: Fuzzy regression discontinuity on simulated data
 estimator_family: rd
-status: active
+status: pass
 dimension: numerical
 
 dataset:

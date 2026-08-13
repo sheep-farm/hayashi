@@ -1,7 +1,7 @@
 id: hclust_simulated
 title: Hierarchical clustering on simulated blobs
 estimator_family: hclust
-status: active
+status: pass
 dimension: numerical
 
 dataset:

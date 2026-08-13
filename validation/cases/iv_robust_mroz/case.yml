@@ -1,7 +1,7 @@
 id: iv_robust_mroz
 title: IV returns to schooling with robust SEs on Wooldridge mroz
 estimator_family: iv
-status: active
+status: pass
 dimension: numerical
 
 dataset:

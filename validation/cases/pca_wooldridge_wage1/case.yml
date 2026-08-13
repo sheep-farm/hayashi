@@ -1,7 +1,7 @@
 id: pca_wooldridge_wage1
 title: PCA on Wooldridge wage1 variables
 estimator_family: pca
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: wooldridge::wage1

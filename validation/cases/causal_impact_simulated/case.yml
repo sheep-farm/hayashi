@@ -1,7 +1,7 @@
 id: causal_impact_simulated
 title: Causal Impact on simulated time series
 estimator_family: causal_impact
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated_causal_impact

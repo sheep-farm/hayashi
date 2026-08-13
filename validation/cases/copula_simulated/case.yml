@@ -1,7 +1,7 @@
 id: copula_simulated
 title: Gaussian copula on simulated bivariate normal data
 estimator_family: copula
-status: active
+status: pass
 dimension: numerical
 
 dataset:

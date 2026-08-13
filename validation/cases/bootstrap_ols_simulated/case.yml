@@ -1,7 +1,7 @@
 id: bootstrap_ols_simulated
 title: Bootstrap OLS on simulated data
 estimator_family: bootstrap
-status: active
+status: pass
 dimension: numerical
 
 dataset:

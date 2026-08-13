@@ -1,7 +1,7 @@
 id: gmm_card
 title: GMM returns to schooling on Wooldridge card
 estimator_family: gmm
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: wooldridge::card

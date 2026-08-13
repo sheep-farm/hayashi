@@ -1,7 +1,7 @@
 id: correlate_wooldridge_wage1
 title: Correlation matrix for Wooldridge wage1
 estimator_family: descriptive
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: wooldridge::wage1

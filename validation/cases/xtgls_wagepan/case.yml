@@ -1,7 +1,7 @@
 id: xtgls_wagepan
 title: Panel feasible GLS on Wooldridge wagepan
 estimator_family: xtgls
-status: active
+status: pass
 dimension: numerical
 
 dataset:

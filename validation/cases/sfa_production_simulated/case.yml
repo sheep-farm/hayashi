@@ -1,7 +1,7 @@
 id: sfa_production_simulated
 title: Stochastic frontier production on simulated Cobb-Douglas data
 estimator_family: sfa
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated

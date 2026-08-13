@@ -1,7 +1,7 @@
 id: setar_simulated
 title: Self-exciting threshold autoregression on simulated data
 estimator_family: setar
-status: active
+status: pass
 dimension: numerical
 
 dataset:

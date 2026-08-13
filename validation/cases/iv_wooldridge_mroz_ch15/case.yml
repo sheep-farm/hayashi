@@ -1,7 +1,7 @@
 id: iv_wooldridge_mroz_ch15
 title: IV returns to schooling for married women on Wooldridge mroz (Chapter 15, Example 15.1)
 estimator_family: iv
-status: active
+status: pass
 dimension: numerical
 
 dataset:

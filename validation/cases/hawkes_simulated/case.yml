@@ -1,7 +1,7 @@
 id: hawkes_simulated
 title: Hawkes process on simulated event times
 estimator_family: hawkes
-status: active
+status: pass
 dimension: numerical
 
 dataset:

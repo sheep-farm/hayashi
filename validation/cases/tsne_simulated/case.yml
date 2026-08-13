@@ -1,7 +1,7 @@
 id: tsne_simulated
 title: t-SNE on simulated 3D blobs
 estimator_family: tsne
-status: active
+status: pass
 dimension: numerical
 
 dataset:

@@ -1,7 +1,7 @@
 id: svar_macro
 title: Structural VAR on US real GDP and consumption
 estimator_family: svar
-status: active
+status: pass
 dimension: numerical
 
 dataset:

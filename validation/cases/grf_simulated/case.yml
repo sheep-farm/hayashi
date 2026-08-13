@@ -1,7 +1,7 @@
 id: grf_simulated
 title: Generalized Random Forest (GRF) ATE on simulated data
 estimator_family: grf
-status: active
+status: pass
 dimension: numerical
 
 dataset:

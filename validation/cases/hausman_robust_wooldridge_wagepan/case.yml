@@ -1,7 +1,7 @@
 id: hausman_robust_wooldridge_wagepan
 title: Robust Hausman test on Wooldridge wagepan
 estimator_family: hausman_robust
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: wooldridge::wagepan

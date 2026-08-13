@@ -1,7 +1,7 @@
 id: ols_wooldridge_phillips_ch10
 title: OLS static Phillips curve on Wooldridge phillips (Chapter 10, Example 10.1)
 estimator_family: ols
-status: active
+status: pass
 dimension: numerical
 
 dataset:

@@ -1,7 +1,7 @@
 id: sysgmm_wagepan
 title: System GMM (Blundell-Bond) on Wooldridge wagepan
 estimator_family: sysgmm
-status: active
+status: pass
 dimension: numerical
 
 dataset:

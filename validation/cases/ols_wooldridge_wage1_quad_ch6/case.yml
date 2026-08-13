@@ -1,7 +1,7 @@
 id: ols_wooldridge_wage1_quad_ch6
 title: OLS wage equation with experience quadratic on Wooldridge wage1 (Chapter 6, Section 6.2)
 estimator_family: ols
-status: active
+status: pass
 dimension: numerical
 
 dataset:

@@ -1,7 +1,7 @@
 id: cpoisson_simulated
 title: Conditional Poisson on simulated panel data
 estimator_family: cpoisson
-status: active
+status: pass
 dimension: numerical
 
 dataset:

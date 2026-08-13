@@ -1,7 +1,7 @@
 id: estat_overid_simulated
 title: Sargan overidentification test in IV
 estimator_family: iv
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated

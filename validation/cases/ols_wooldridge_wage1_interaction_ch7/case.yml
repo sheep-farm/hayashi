@@ -1,7 +1,7 @@
 id: ols_wooldridge_wage1_interaction_ch7
 title: OLS hourly wage equation with marriage-gender interactions on Wooldridge wage1 (Chapter 7, Example 7.6)
 estimator_family: ols
-status: active
+status: pass
 dimension: numerical
 
 dataset:

@@ -1,7 +1,7 @@
 id: rlm_wage1
 title: Robust linear model on Wooldridge wage1
 estimator_family: rlm
-status: active
+status: pass
 dimension: numerical
 
 dataset:

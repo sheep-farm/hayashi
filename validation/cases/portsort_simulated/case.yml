@@ -1,7 +1,7 @@
 id: portsort_simulated
 title: Portfolio sorts on simulated returns
 estimator_family: portsort
-status: active
+status: pass
 dimension: numerical
 
 dataset:

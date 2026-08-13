@@ -1,7 +1,7 @@
 id: arima_book
 title: ARIMA(1,1,0) on a simulated random walk
 estimator_family: arima
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated_rw

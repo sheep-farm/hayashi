@@ -1,7 +1,7 @@
 id: ftest_robust_wooldridge_wage1
 title: Robust F-test on Wooldridge wage1
 estimator_family: ftest_robust
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: wooldridge::wage1

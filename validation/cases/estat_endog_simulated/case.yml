@@ -1,7 +1,7 @@
 id: estat_endog_simulated
 title: Durbin-Wu-Hausman endogeneity test in IV
 estimator_family: iv
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated

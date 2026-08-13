@@ -1,7 +1,7 @@
 id: ttest_wooldridge_wage1
 title: One-sample t-test for Wooldridge wage1 wage
 estimator_family: descriptive
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: wooldridge::wage1

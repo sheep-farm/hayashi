@@ -1,7 +1,7 @@
 id: ols_wooldridge_crime1_ch3
 title: OLS arrest records equation on Wooldridge crime1 (Chapter 3, Example 3.5)
 estimator_family: ols
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: wooldridge::crime1

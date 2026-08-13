@@ -1,7 +1,7 @@
 id: causalforest_simulated
 title: Causal Forest for conditional ATE on simulated data
 estimator_family: causalforest
-status: active
+status: pass
 dimension: numerical
 
 dataset:

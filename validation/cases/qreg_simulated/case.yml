@@ -1,7 +1,7 @@
 id: qreg_simulated
 title: Quantile regression at tau=0.75 on simulated heteroskedastic data
 estimator_family: qreg
-status: active
+status: pass
 dimension: numerical
 
 dataset:

@@ -1,7 +1,7 @@
 id: modwt_simulated
 title: MODWT (Haar) on simulated time series
 estimator_family: modwt
-status: active
+status: pass
 dimension: numerical
 
 dataset:

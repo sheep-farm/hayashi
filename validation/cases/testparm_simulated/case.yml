@@ -1,7 +1,7 @@
 id: testparm_simulated
 title: Joint F-test for two OLS regressors
 estimator_family: ols
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated

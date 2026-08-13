@@ -1,7 +1,7 @@
 id: ols_newey_west_phillips
 title: OLS Phillips curve with Newey-West SEs on Wooldridge phillips
 estimator_family: ols
-status: active
+status: pass
 dimension: numerical
 
 dataset:

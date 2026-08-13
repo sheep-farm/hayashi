@@ -1,7 +1,7 @@
 id: did_simulated
 title: Difference-in-Differences on simulated 2x2 data
 estimator_family: did
-status: active
+status: pass
 dimension: numerical
 
 dataset:

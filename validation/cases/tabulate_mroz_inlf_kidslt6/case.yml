@@ -1,7 +1,7 @@
 id: tabulate_mroz_inlf_kidslt6
 title: Cross-tabulation of inlf by kidslt6 in Wooldridge mroz
 estimator_family: descriptive
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: wooldridge::mroz

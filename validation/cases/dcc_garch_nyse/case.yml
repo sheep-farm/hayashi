@@ -1,7 +1,7 @@
 id: dcc_garch_nyse
 title: DCC-GARCH on NYSE returns
 estimator_family: dcc_garch
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: wooldridge::nyse

@@ -1,7 +1,7 @@
 id: bart_simulated
 title: Bayesian Additive Regression Trees on simulated data
 estimator_family: bart
-status: active
+status: pass
 dimension: numerical
 
 dataset:

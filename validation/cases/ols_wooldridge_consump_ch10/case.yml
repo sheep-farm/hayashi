@@ -1,7 +1,7 @@
 id: ols_wooldridge_consump_ch10
 title: OLS consumption growth on income growth on Wooldridge consump (Chapter 10, Example 10.4)
 estimator_family: ols
-status: active
+status: pass
 dimension: numerical
 
 dataset:

@@ -1,7 +1,7 @@
 id: gbm_simulated
 title: Gradient Boosting regression on simulated data
 estimator_family: gbm
-status: active
+status: pass
 dimension: numerical
 
 dataset:

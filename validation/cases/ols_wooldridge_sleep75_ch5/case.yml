@@ -2,7 +2,7 @@ id: ols_wooldridge_sleep75_ch5
 title: OLS sleep equation on Wooldridge sleep75 (Chapter 5, Problem 3.3 / Example
   5.3)
 estimator_family: ols
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: wooldridge::sleep75

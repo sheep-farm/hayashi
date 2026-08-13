@@ -1,7 +1,7 @@
 id: ols_wooldridge_nyse_ch11
 title: OLS efficient markets hypothesis on Wooldridge nyse (Chapter 11, Example 11.4)
 estimator_family: ols
-status: active
+status: pass
 dimension: numerical
 
 dataset:

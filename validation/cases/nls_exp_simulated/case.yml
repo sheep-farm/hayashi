@@ -1,7 +1,7 @@
 id: nls_exp_simulated
 title: Nonlinear least squares exponential model on simulated data
 estimator_family: nls
-status: active
+status: pass
 dimension: numerical
 
 dataset:

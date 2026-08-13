@@ -1,7 +1,7 @@
 id: glm_wooldridge_fertil2_poisson
 title: GLM Poisson children count on Wooldridge fertil2
 estimator_family: glm
-status: active
+status: pass
 dimension: numerical
 
 dataset:

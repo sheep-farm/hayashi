@@ -1,7 +1,7 @@
 id: kmeans_simulated
 title: K-Means clustering on simulated data
 estimator_family: kmeans
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated_kmeans

@@ -1,7 +1,7 @@
 id: xtlogit_simulated
 title: Panel logit via GEE on simulated data
 estimator_family: xtlogit
-status: active
+status: pass
 dimension: numerical
 
 dataset:

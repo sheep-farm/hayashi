@@ -1,7 +1,7 @@
 id: ols_wooldridge_twoyear_ch4
 title: OLS returns to two- and four-year colleges on Wooldridge twoyear (Chapter 4, Example 4.10)
 estimator_family: ols
-status: active
+status: pass
 dimension: numerical
 
 dataset:

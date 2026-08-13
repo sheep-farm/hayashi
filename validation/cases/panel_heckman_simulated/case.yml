@@ -1,7 +1,7 @@
 id: panel_heckman_simulated
 title: Panel Heckman selection model on simulated data
 estimator_family: panel_heckman
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated_panel_heckman

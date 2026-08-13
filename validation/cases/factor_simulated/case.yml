@@ -1,7 +1,7 @@
 id: factor_simulated
 title: Factor analysis on simulated two-factor data
 estimator_family: factor
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated

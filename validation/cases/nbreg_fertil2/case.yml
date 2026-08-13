@@ -1,7 +1,7 @@
 id: nbreg_fertil2
 title: Negative binomial regression on Wooldridge fertil2
 estimator_family: negbin
-status: active
+status: pass
 dimension: numerical
 
 dataset:

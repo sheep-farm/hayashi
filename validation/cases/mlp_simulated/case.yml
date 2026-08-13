@@ -1,7 +1,7 @@
 id: mlp_simulated
 title: Multilayer Perceptron on simulated data
 estimator_family: mlp
-status: active
+status: pass
 dimension: numerical
 
 dataset:

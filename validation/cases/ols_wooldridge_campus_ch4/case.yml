@@ -1,7 +1,7 @@
 id: ols_wooldridge_campus_ch4
 title: OLS campus crime equation on Wooldridge campus (Chapter 4, Example 4.4)
 estimator_family: ols
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: wooldridge::campus

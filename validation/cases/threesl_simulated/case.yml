@@ -1,7 +1,7 @@
 id: threesl_simulated
 title: Three-stage least squares on a simple simultaneous system
 estimator_family: three_sls
-status: active
+status: pass
 dimension: numerical
 
 dataset:

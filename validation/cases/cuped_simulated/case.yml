@@ -1,7 +1,7 @@
 id: cuped_simulated
 title: CUPED adjustment on simulated experiment
 estimator_family: cuped
-status: active
+status: pass
 dimension: numerical
 
 dataset:

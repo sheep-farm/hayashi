@@ -1,7 +1,7 @@
 id: sur_grunfeld
 title: Seemingly Unrelated Regressions on Wooldridge grunfeld
 estimator_family: sur
-status: active
+status: pass
 dimension: numerical
 
 dataset:

@@ -1,7 +1,7 @@
 id: nls_power_simulated
 title: Nonlinear least squares power model on simulated data
 estimator_family: nls
-status: active
+status: pass
 dimension: numerical
 
 dataset:

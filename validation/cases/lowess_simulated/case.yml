@@ -1,7 +1,7 @@
 id: lowess_simulated
 title: LOWESS smoothing on simulated sine data
 estimator_family: lowess
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated

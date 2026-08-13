@@ -1,7 +1,7 @@
 id: eventstudy_simulated
 title: Event study with grouped standard errors on simulated data
 estimator_family: eventstudy
-status: active
+status: pass
 dimension: numerical
 
 dataset:

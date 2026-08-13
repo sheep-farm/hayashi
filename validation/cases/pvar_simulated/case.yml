@@ -1,7 +1,7 @@
 id: pvar_simulated
 title: Panel VAR on simulated dynamic panel data
 estimator_family: pvar
-status: active
+status: pass
 dimension: numerical
 
 dataset:

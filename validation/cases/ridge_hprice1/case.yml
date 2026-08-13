@@ -1,7 +1,7 @@
 id: ridge_hprice1
 title: Ridge regression on Wooldridge hprice1
 estimator_family: ridge
-status: active
+status: pass
 dimension: numerical
 
 dataset:

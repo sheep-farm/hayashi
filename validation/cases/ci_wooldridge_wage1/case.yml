@@ -1,7 +1,7 @@
 id: ci_wooldridge_wage1
 title: Confidence interval for Wooldridge wage1 wage
 estimator_family: descriptive
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: wooldridge::wage1

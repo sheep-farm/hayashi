@@ -1,7 +1,7 @@
 id: biplot_simulated
 title: PCA biplot on simulated collinear data
 estimator_family: biplot
-status: active
+status: pass
 dimension: numerical
 
 dataset:

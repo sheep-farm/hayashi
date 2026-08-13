@@ -1,7 +1,7 @@
 id: cloglog_wooldridge_affairs
 title: Complementary log-log on Wooldridge affairs
 estimator_family: cloglog
-status: active
+status: pass
 dimension: numerical
 
 dataset:

@@ -1,7 +1,7 @@
 id: qrf_simulated
 title: Quantile Regression Forest at tau=0.75 on simulated heteroskedastic data
 estimator_family: qrf
-status: active
+status: pass
 dimension: numerical
 
 dataset:

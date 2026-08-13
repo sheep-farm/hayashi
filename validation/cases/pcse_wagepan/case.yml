@@ -1,7 +1,7 @@
 id: pcse_wagepan
 title: Panel-corrected standard errors on Wooldridge wagepan
 estimator_family: pcse
-status: active
+status: pass
 dimension: numerical
 
 dataset:

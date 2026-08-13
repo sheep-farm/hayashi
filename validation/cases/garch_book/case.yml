@@ -1,7 +1,7 @@
 id: garch_book
 title: GARCH(1,1) on simulated data from the Hayashi book
 estimator_family: garch
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated_garch11

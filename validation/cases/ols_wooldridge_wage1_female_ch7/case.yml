@@ -2,7 +2,7 @@ id: ols_wooldridge_wage1_female_ch7
 title: OLS hourly wage equation with female dummy on Wooldridge wage1 (Chapter 7,
   Example 7.1)
 estimator_family: ols
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: wooldridge::wage1

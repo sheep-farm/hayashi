@@ -1,7 +1,7 @@
 id: ols_wooldridge_kielmc_ch13
 title: OLS difference-in-differences housing price equation on Wooldridge kielmc (Chapter 13, Example 13.1)
 estimator_family: ols
-status: active
+status: pass
 dimension: numerical
 
 dataset:

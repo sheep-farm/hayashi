@@ -1,7 +1,7 @@
 id: clogit_simulated
 title: Conditional logit on simulated panel data
 estimator_family: clogit
-status: active
+status: pass
 dimension: numerical
 
 dataset:

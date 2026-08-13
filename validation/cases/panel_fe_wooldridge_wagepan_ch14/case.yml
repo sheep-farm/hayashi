@@ -1,7 +1,7 @@
 id: panel_fe_wooldridge_wagepan_ch14
 title: Panel fixed-effects wage equation on Wooldridge wagepan (Chapter 14, Example 14.4)
 estimator_family: panel_fe
-status: active
+status: pass
 dimension: numerical
 
 dataset:

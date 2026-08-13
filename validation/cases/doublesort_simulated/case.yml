@@ -1,7 +1,7 @@
 id: doublesort_simulated
 title: Double portfolio sort on simulated finance data
 estimator_family: doublesort
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated

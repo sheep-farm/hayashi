@@ -1,7 +1,7 @@
 id: gp_simulated
 title: Gaussian process regression on simulated 1-D data
 estimator_family: gp
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated

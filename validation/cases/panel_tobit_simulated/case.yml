@@ -1,7 +1,7 @@
 id: panel_tobit_simulated
 title: Panel Tobit with random effects on simulated censored panel data
 estimator_family: panel
-status: active
+status: pass
 dimension: numerical
 
 dataset:

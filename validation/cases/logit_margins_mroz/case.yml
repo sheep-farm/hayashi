@@ -1,7 +1,7 @@
 id: logit_margins_mroz
 title: Logit average marginal effects on Wooldridge mroz
 estimator_family: logit
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: wooldridge::mroz

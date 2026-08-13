@@ -1,7 +1,7 @@
 id: isotonic_simulated
 title: Isotonic regression on simulated step data
 estimator_family: isotonic
-status: active
+status: pass
 dimension: numerical
 
 dataset:

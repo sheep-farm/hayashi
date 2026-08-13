@@ -1,7 +1,7 @@
 id: umap_simulated
 title: UMAP on simulated 3D blobs
 estimator_family: umap
-status: active
+status: pass
 dimension: numerical
 
 dataset:

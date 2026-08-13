@@ -1,7 +1,7 @@
 id: zinb_affairs
 title: Zero-inflated negative binomial on Wooldridge affairs
 estimator_family: zinb
-status: active
+status: pass
 dimension: numerical
 
 dataset:

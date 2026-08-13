@@ -1,7 +1,7 @@
 id: synth_smoking
 title: Synthetic control on simulated smoking-style panel
 estimator_family: synth
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: synth_smoking

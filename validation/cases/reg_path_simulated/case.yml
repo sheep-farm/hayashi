@@ -1,7 +1,7 @@
 id: reg_path_simulated
 title: Regularisation path (elastic net) on simulated data
 estimator_family: reg_path
-status: active
+status: pass
 dimension: numerical
 
 dataset:

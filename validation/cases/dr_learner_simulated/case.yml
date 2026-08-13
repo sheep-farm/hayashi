@@ -1,7 +1,7 @@
 id: dr_learner_simulated
 title: Doubly-Robust Learner on simulated data
 estimator_family: dr_learner
-status: active
+status: pass
 dimension: numerical
 
 dataset:

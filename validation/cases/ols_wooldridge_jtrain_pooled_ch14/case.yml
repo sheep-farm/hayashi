@@ -1,7 +1,7 @@
 id: ols_wooldridge_jtrain_pooled_ch14
 title: OLS pooled job training scrap equation on Wooldridge jtrain (Chapter 14, Example 14.3)
 estimator_family: ols
-status: active
+status: pass
 dimension: numerical
 
 dataset:

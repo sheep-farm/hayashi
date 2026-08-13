@@ -1,7 +1,7 @@
 id: rolling_ols_simulated
 title: Rolling OLS on simulated time-series data
 estimator_family: rolling
-status: active
+status: pass
 dimension: numerical
 
 dataset:

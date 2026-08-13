@@ -1,7 +1,7 @@
 id: tvar_simulated
 title: Threshold VAR on simulated bivariate data
 estimator_family: tvar
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated

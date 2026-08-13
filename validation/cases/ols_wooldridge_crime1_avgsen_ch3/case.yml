@@ -2,7 +2,7 @@ id: ols_wooldridge_crime1_avgsen_ch3
 title: OLS arrest records equation with average sentence on Wooldridge crime1 (Chapter
   3, Example 3.5)
 estimator_family: ols
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: wooldridge::crime1

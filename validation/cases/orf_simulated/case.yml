@@ -1,7 +1,7 @@
 id: orf_simulated
 title: Orthogonal Random Forest (ORF) ATE on simulated data
 estimator_family: orf
-status: active
+status: pass
 dimension: numerical
 
 dataset:

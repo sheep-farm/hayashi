@@ -197,7 +197,7 @@ Public surface:
 
 ## 5. Tests and validation
 
-- `tests/smoke.rs` (12 968 lines, ~722 unit tests) covers margins, parser,
+- `tests/smoke.rs` (12 968 lines, ~776 unit tests) covers margins, parser,
   scoping, expressions, data manipulation, estimation, post-estimation,
   and finance examples.
 - `tests/dap.rs` has 5 tests, all `#[ignore]` because they need an
@@ -208,7 +208,7 @@ Public surface:
   implementations. `validation/run.py` orchestrates discovery, execution,
   parsing, and tolerance-based comparison; `validation/matrix.yml` is the
   registry; `validation/MATRIX.md` is the human-readable dashboard.
-- Current validation: 123 cases, all `pass`.
+- Current validation: 226 cases, 200 `pass`, 14 `not-supported`, 1 `blocked`.
 
 ### 5.1 CI
 

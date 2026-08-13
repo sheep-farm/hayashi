@@ -1,7 +1,7 @@
 id: estat_gof_simulated
 title: Hosmer-Lemeshow goodness-of-fit for a logit model
 estimator_family: logit
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated

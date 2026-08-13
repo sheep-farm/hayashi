@@ -1,7 +1,7 @@
 id: bayes_lm_simulated
 title: Bayesian linear regression on simulated data
 estimator_family: bayes_lm
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated

@@ -1,7 +1,7 @@
 id: km_aml
 title: Kaplan-Meier survival checkpoints on acute myelogenous leukaemia remission data
 estimator_family: km
-status: active
+status: pass
 dimension: numerical
 
 dataset:

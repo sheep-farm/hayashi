@@ -1,7 +1,7 @@
 id: ols_wooldridge_meap93_ch4
 title: OLS math pass rate equation on Wooldridge meap93 (Chapter 4, Examples 4.2/4.10)
 estimator_family: ols
-status: active
+status: pass
 dimension: numerical
 
 dataset:

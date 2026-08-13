@@ -1,7 +1,7 @@
 id: psm_jtrain3
 title: Propensity score matching on Wooldridge jtrain3
 estimator_family: psm
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: wooldridge::jtrain3

@@ -2,7 +2,7 @@ id: ols_wooldridge_attend_ch6
 title: OLS attendance effects on exam score on Wooldridge attend (Chapter 6, Example
   6.3)
 estimator_family: ols
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: wooldridge::attend

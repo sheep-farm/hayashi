@@ -1,7 +1,7 @@
 id: ols_twoway_cluster_wagepan
 title: OLS wage equation with two-way clustered SEs on Wooldridge wagepan
 estimator_family: ols
-status: active
+status: pass
 dimension: numerical
 
 dataset:

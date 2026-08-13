@@ -1,7 +1,7 @@
 id: codebook_wooldridge_wage1
 title: Codebook for Wooldridge wage1 wage variable
 estimator_family: descriptive
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: wooldridge::wage1

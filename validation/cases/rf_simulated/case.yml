@@ -1,7 +1,7 @@
 id: rf_simulated
 title: Random forest regression on simulated data
 estimator_family: rf
-status: active
+status: pass
 dimension: numerical
 
 dataset:

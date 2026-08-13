@@ -1,7 +1,7 @@
 id: mlogit_mode
 title: Multinomial logit on travel mode choice data
 estimator_family: mlogit
-status: active
+status: pass
 dimension: numerical
 
 dataset:

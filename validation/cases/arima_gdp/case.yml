@@ -1,7 +1,7 @@
 id: arima_gdp
 title: ARIMA(1,1,1) on log US real GDP
 estimator_family: arima
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: statsmodels::macrodata

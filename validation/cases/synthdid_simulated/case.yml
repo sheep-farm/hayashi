@@ -1,7 +1,7 @@
 id: synthdid_simulated
 title: Synthetic Difference-in-Differences on simulated panel data
 estimator_family: synthdid
-status: active
+status: pass
 dimension: numerical
 
 dataset:

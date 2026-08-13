@@ -1,7 +1,7 @@
 id: ols_hc3_wooldridge_wage1
 title: OLS log-wage equation with HC3 robust SEs on Wooldridge wage1
 estimator_family: ols
-status: active
+status: pass
 dimension: numerical
 
 dataset:

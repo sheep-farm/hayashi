@@ -1,7 +1,7 @@
 id: elasticnet_hprice1
 title: Elastic Net regression on Wooldridge hprice1
 estimator_family: elasticnet
-status: active
+status: pass
 dimension: numerical
 
 dataset:

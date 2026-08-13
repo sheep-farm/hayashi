@@ -1,7 +1,7 @@
 id: iv_cluster_card
 title: IV returns to schooling with region-clustered SEs on Wooldridge card
 estimator_family: iv
-status: active
+status: pass
 dimension: numerical
 
 dataset:

@@ -1,7 +1,7 @@
 id: ols_wooldridge_vote1_ch2
 title: OLS election outcomes on campaign share on Wooldridge vote1 (Chapter 2, Examples 2.5/2.9)
 estimator_family: ols
-status: active
+status: pass
 dimension: numerical
 
 dataset:

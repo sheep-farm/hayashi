@@ -1,7 +1,7 @@
 id: mice_chained_simulated
 title: MICE chained equations on simulated data with missing values
 estimator_family: mice_chained
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated_mice

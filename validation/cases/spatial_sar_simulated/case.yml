@@ -1,7 +1,7 @@
 id: spatial_sar_simulated
 title: Spatial autoregressive (SAR) model on simulated grid data
 estimator_family: spatial_sar
-status: active
+status: pass
 dimension: numerical
 
 dataset:

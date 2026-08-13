@@ -1,7 +1,7 @@
 id: ols_wooldridge_intdef_ch10
 title: OLS interest rates on inflation and deficits on Wooldridge intdef (Chapter 10, Example 10.2)
 estimator_family: ols
-status: active
+status: pass
 dimension: numerical
 
 dataset:

@@ -1,7 +1,7 @@
 id: ols_wooldridge_ceosal1_roe_ch2
 title: OLS CEO salary on return on equity on Wooldridge ceosal1 (Chapter 2, Example 2.3)
 estimator_family: ols
-status: active
+status: pass
 dimension: numerical
 
 dataset:

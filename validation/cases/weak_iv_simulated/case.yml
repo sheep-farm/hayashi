@@ -1,7 +1,7 @@
 id: weak_iv_simulated
 title: Weak instrument first-stage F
 estimator_family: iv
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated

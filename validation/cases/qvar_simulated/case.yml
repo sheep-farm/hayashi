@@ -1,7 +1,7 @@
 id: qvar_simulated
 title: Quantile VAR on simulated data
 estimator_family: qvar
-status: active
+status: pass
 dimension: numerical
 
 dataset:

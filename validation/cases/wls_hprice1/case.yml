@@ -1,7 +1,7 @@
 id: wls_hprice1
 title: WLS housing price equation on Wooldridge hprice1
 estimator_family: wls
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: wooldridge::hprice1

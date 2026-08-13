@@ -1,7 +1,7 @@
 id: fmb_simulated
 title: Fama-MacBeth regression on a deterministic simulated panel
 estimator_family: fmb
-status: active
+status: pass
 dimension: numerical
 
 dataset:

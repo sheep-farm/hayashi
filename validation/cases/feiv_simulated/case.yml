@@ -1,7 +1,7 @@
 id: feiv_simulated
 title: Fixed-effects IV on simulated panel data
 estimator_family: feiv
-status: active
+status: pass
 dimension: numerical
 
 dataset:

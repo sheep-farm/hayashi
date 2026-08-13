@@ -1,7 +1,7 @@
 id: influence_simulated
 title: Influence diagnostics (maximum absolute DFFITS)
 estimator_family: ols
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated

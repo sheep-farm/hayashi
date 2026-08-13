@@ -1,7 +1,7 @@
 id: glsar_hprice1
 title: GLSAR(1) on Wooldridge hprice1
 estimator_family: glsar
-status: active
+status: pass
 dimension: numerical
 
 dataset:

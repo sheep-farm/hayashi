@@ -1,7 +1,7 @@
 id: ols_wooldridge_htv_ch9
 title: OLS education equation on Wooldridge htv (Chapter 9, Example 9.3)
 estimator_family: ols
-status: active
+status: pass
 dimension: numerical
 
 dataset:

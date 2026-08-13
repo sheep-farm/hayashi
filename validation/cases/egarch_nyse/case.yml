@@ -1,7 +1,7 @@
 id: egarch_nyse
 title: EGARCH(1,1) on NYSE returns
 estimator_family: egarch
-status: active
+status: pass
 dimension: numerical
 
 dataset:

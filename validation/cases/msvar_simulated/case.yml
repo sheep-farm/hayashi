@@ -1,7 +1,7 @@
 id: msvar_simulated
 title: Markov-switching VAR on simulated bivariate data
 estimator_family: msvar
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated_msvar

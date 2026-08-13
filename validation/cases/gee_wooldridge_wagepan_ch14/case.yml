@@ -1,7 +1,7 @@
 id: gee_wooldridge_wagepan_ch14
 title: GEE wage equation on Wooldridge wagepan (Chapter 14, Example 14.4)
 estimator_family: gee
-status: active
+status: pass
 dimension: numerical
 
 dataset:

@@ -1,7 +1,7 @@
 id: dml_crossfit_simulated
 title: Double Machine Learning with cross-fitting on simulated data
 estimator_family: dml_crossfit
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated

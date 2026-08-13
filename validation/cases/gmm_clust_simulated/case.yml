@@ -1,7 +1,7 @@
 id: gmm_clust_simulated
 title: Gaussian mixture clustering on simulated blobs
 estimator_family: gmm_clust
-status: active
+status: pass
 dimension: numerical
 
 dataset:

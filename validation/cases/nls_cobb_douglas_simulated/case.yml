@@ -1,7 +1,7 @@
 id: nls_cobb_douglas_simulated
 title: Nonlinear least squares Cobb-Douglas model on simulated data
 estimator_family: nls
-status: active
+status: pass
 dimension: numerical
 
 dataset:

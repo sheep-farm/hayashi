@@ -1,7 +1,7 @@
 id: qrf_inf_simulated
 title: Quantile Regression Forest inference at tau=0.75 on simulated heteroskedastic data
 estimator_family: qrf_inf
-status: active
+status: pass
 dimension: numerical
 
 dataset:

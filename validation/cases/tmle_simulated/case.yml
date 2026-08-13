@@ -1,7 +1,7 @@
 id: tmle_simulated
 title: Targeted maximum likelihood estimation on simulated observational data
 estimator_family: tmle
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated_tmle

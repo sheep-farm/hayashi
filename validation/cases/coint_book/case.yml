@@ -1,7 +1,7 @@
 id: coint_book
 title: Bivariate cointegrated system from the Hayashi book
 estimator_family: vecm
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated_cointegrated

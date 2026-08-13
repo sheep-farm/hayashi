@@ -1,7 +1,7 @@
 id: ols_wooldridge_hprice1_ch4
 title: OLS log housing price equation on Wooldridge hprice1 (Chapter 4, Section 4.5)
 estimator_family: ols
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: wooldridge::hprice1

@@ -1,7 +1,7 @@
 id: probit_mroz
 title: Probit labour-force participation on Wooldridge mroz
 estimator_family: probit
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: wooldridge::mroz

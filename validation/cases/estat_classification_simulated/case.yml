@@ -1,7 +1,7 @@
 id: estat_classification_simulated
 title: Classification metrics from a logit model
 estimator_family: logit
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated

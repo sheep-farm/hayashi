@@ -1,7 +1,7 @@
 id: kde_simulated
 title: Kernel density estimation on simulated Gaussian data
 estimator_family: kde
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated

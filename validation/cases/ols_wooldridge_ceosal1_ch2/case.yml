@@ -1,7 +1,7 @@
 id: ols_wooldridge_ceosal1_ch2
 title: OLS CEO salary equation on Wooldridge ceosal1 (Chapter 2, Example 2.11)
 estimator_family: ols
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: wooldridge::ceosal1

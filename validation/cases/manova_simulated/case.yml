@@ -1,7 +1,7 @@
 id: manova_simulated
 title: MANOVA on simulated three-group bivariate data
 estimator_family: manova
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated

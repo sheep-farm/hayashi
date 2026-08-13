@@ -1,7 +1,7 @@
 id: conformal_simulated
 title: Conformal prediction on simulated linear data
 estimator_family: conformal
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated

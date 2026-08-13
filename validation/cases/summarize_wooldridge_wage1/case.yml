@@ -1,7 +1,7 @@
 id: summarize_wooldridge_wage1
 title: Summary statistics for Wooldridge wage1
 estimator_family: descriptive
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: wooldridge::wage1

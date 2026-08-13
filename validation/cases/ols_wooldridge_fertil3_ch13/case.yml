@@ -1,7 +1,7 @@
 id: ols_wooldridge_fertil3_ch13
 title: OLS fertility distributed lag equation on Wooldridge fertil3 (Chapter 13, Example 13.3)
 estimator_family: ols
-status: active
+status: pass
 dimension: numerical
 
 dataset:

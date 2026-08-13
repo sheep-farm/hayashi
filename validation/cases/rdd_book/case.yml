@@ -1,7 +1,7 @@
 id: rdd_book
 title: Sharp regression discontinuity on simulated book DGP
 estimator_family: rdd
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: rdd_book

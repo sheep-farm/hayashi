@@ -1,7 +1,7 @@
 id: double_ml_simulated
 title: Double Machine Learning on simulated data
 estimator_family: double_ml
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated_double_ml

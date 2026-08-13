@@ -1,7 +1,7 @@
 id: var_macro
 title: VAR(2) on US real GDP and consumption
 estimator_family: var
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: statsmodels::macrodata

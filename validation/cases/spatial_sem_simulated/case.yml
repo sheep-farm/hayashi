@@ -1,7 +1,7 @@
 id: spatial_sem_simulated
 title: Spatial error (SEM) model on simulated grid data
 estimator_family: spatial_sem
-status: active
+status: pass
 dimension: numerical
 
 dataset:

@@ -1,7 +1,7 @@
 id: svec_simulated
 title: Structural VAR with long-run restrictions on simulated data
 estimator_family: svar
-status: active
+status: pass
 dimension: numerical
 
 dataset:

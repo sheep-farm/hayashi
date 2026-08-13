@@ -1,7 +1,7 @@
 id: heckman_mroz
 title: Heckman two-step selection model on Wooldridge mroz
 estimator_family: heckman
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: wooldridge::mroz

@@ -1,7 +1,7 @@
 id: ets_gdp
 title: ETS on US real GDP
 estimator_family: ets
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: statsmodels::macrodata

@@ -1,7 +1,7 @@
 id: dbscan_simulated
 title: DBSCAN clustering on simulated blobs
 estimator_family: dbscan
-status: active
+status: pass
 dimension: numerical
 
 dataset:
