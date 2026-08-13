@@ -2301,7 +2301,7 @@ impl Interpreter {
             r.test_statistic, r.lags_used, r.is_stationary
         );
         let fit = model_expansion::fit_dict(&[
-            ("test_statistic", Value::Float(r.test_statistic)),
+            ("statistic", Value::Float(r.test_statistic)),
             (
                 "p_value",
                 match r.p_value {
@@ -2398,7 +2398,7 @@ impl Interpreter {
             r.test_statistic, r.regression, r.lags_used, r.is_stationary
         );
         let fit = model_expansion::fit_dict(&[
-            ("test_statistic", Value::Float(r.test_statistic)),
+            ("statistic", Value::Float(r.test_statistic)),
             ("cv_10pct", Value::Float(cv10)),
             ("cv_5pct", Value::Float(cv5)),
             ("cv_2_5pct", Value::Float(cv25)),
@@ -2485,6 +2485,7 @@ impl Interpreter {
             r.z_alpha, r.z_t, r.is_stationary
         );
         let fit = model_expansion::fit_dict(&[
+            ("statistic", Value::Float(r.z_t)),
             ("z_alpha", Value::Float(r.z_alpha)),
             ("z_t", Value::Float(r.z_t)),
             ("cv_1pct", Value::Float(cv1)),
@@ -2657,7 +2658,7 @@ impl Interpreter {
             r.f_statistic, r.p_value, r.lags
         );
         let fit = model_expansion::fit_dict(&[
-            ("f_statistic", Value::Float(r.f_statistic)),
+            ("statistic", Value::Float(r.f_statistic)),
             ("p_value", Value::Float(r.p_value)),
             ("df_num", Value::Int(r.df_num as i64)),
             ("df_denom", Value::Int(r.df_denom as i64)),
@@ -2750,7 +2751,7 @@ impl Interpreter {
             r.adf_statistic, r.is_cointegrated
         );
         let fit = model_expansion::fit_dict(&[
-            ("adf_statistic", Value::Float(r.adf_statistic)),
+            ("statistic", Value::Float(r.adf_statistic)),
             ("cv_1pct", Value::Float(cv1)),
             ("cv_5pct", Value::Float(cv5)),
             ("cv_10pct", Value::Float(cv10)),

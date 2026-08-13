@@ -1412,7 +1412,7 @@ impl Interpreter {
                     }
                 }
             }
-            (Value::Dict(_) | Value::List(_) | Value::Series(_), "json") => {
+            (Value::Dict(_) | Value::List(_) | Value::Series(_) | Value::DiagResult(_) | Value::ModelResult { .. }, "json") => {
                 let mut temp: Vec<(usize, usize)> = Vec::new();
                 let json_val = crate::lang::plugin::value_to_json(&val, false, &mut temp);
                 let mut content = serde_json::to_string_pretty(&json_val)

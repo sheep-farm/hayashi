@@ -643,6 +643,20 @@ pub fn value_to_json(
             map.insert("__plot_format__".to_string(), serde_json::json!(format));
             serde_json::Value::Object(map)
         }
+        Value::DiagResult(r) => {
+            let mut map = serde_json::Map::new();
+            for (k, v) in r.fields.iter() {
+                map.insert(k.clone(), value_to_json(v, use_arrow, temp_boxes));
+            }
+            serde_json::Value::Object(map)
+        }
+        Value::ModelResult { fields, .. } => {
+            let mut map = serde_json::Map::new();
+            for (k, v) in fields.iter() {
+                map.insert(k.clone(), value_to_json(v, use_arrow, temp_boxes));
+            }
+            serde_json::Value::Object(map)
+        }
         _ => serde_json::Value::Null,
     }
 }

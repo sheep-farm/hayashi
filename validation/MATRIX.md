@@ -240,6 +240,11 @@ This matrix is generated from `validation/matrix.yml` by `validation/run.py`.
 | diagnostics | simulated | R | pass | — | Ramsey RESET specification test on simulated OLS residuals. |
 | diagnostics | simulated | R | pass | — | Variance Inflation Factor on simulated OLS residuals. |
 | diagnostics | simulated | R | pass | — | Condition number of regressor matrix on simulated OLS residuals. |
+| diagnostics | simulated | R | pass | — | Shapiro-Wilk normality test on a simulated random sample. |
+| diagnostics | simulated | R | pass | — | Ljung-Box autocorrelation test on a simulated AR(1) series. |
+| diagnostics | simulated | R | pass | — | Harvey-Collier recursive t test on simulated OLS residuals. |
+| diagnostics | simulated | R | pass | — | Granger causality test on simulated AR(1) series. |
+| diagnostics | simulated | R | pass | — | Zivot-Andrews structural-break unit-root test on a simulated random walk. |
 
 This matrix covers the core empirical estimators. Some commands are
 intentionally excluded for the reasons described in the "Estimators not

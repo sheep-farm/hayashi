@@ -3791,7 +3791,7 @@ impl Interpreter {
         let fields = vec![(
             "fit".into(),
             model_expansion::fit_dict(&[
-                ("w", Value::Float(res.w)),
+                ("statistic", Value::Float(res.w)),
                 ("p_value", Value::Float(res.p_value)),
                 ("n_obs", Value::Int(res.n_obs as i64)),
             ]),
@@ -3874,7 +3874,7 @@ impl Interpreter {
         let fields = vec![(
             "fit".into(),
             model_expansion::fit_dict(&[
-                ("w_prime", Value::Float(res.w_prime)),
+                ("statistic", Value::Float(res.w_prime)),
                 ("p_value", Value::Float(res.p_value)),
                 ("n_obs", Value::Int(res.n_obs as i64)),
             ]),
@@ -4059,7 +4059,10 @@ impl Interpreter {
         let summary = format!("Harvey-Collier(t={:.4}, p={:.4})", t, p);
         let fields = vec![(
             "fit".into(),
-            model_expansion::fit_dict(&[("t_stat", Value::Float(t)), ("p_value", Value::Float(p))]),
+            model_expansion::fit_dict(&[
+                ("statistic", Value::Float(t)),
+                ("p_value", Value::Float(p)),
+            ]),
         )];
         Ok(model_expansion::model_result(
             display,

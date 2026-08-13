@@ -1,0 +1,4 @@
+load "validation/cases/swilk_simulated/data/data.csv" as df
+let r = swilk(df, x)
+let t = tidy(r)
+export(t, "json", "/dev/stdout")

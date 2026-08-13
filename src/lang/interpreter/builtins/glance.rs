@@ -15,6 +15,19 @@ impl Interpreter {
                     ));
                 }
                 let val = self.eval_expr(&args[0])?;
+
+                // Diagnostic and generic model results already expose their
+                // structured fields as a dict; glance() just returns it.
+                if let Value::DiagResult(r) = &val {
+                    return Ok(Value::Dict(Arc::new(r.fields.clone())));
+                }
+                if let Value::ModelResult { fields, .. } = &val {
+                    return Ok(Value::Dict(Arc::new(fields.as_ref().clone())));
+                }
+                if let Value::Dict(d) = val {
+                    return Ok(Value::Dict(d));
+                }
+
                 let mut map = std::collections::HashMap::<String, Value>::new();
 
                 if let Some(mv) = val.to_model_view() {

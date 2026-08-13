@@ -1,0 +1,5 @@
+load "validation/cases/harveycollier_simulated/data/data.csv" as df
+let m = ols(y ~ x + z, df)
+let r = harveycollier(m)
+let t = tidy(r)
+export(t, "json", "/dev/stdout")

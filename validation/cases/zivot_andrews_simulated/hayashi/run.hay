@@ -1,0 +1,4 @@
+load "validation/cases/zivot_andrews_simulated/data/data.csv" as df
+let r = zivot_andrews(df, x)
+let t = tidy(r)
+export(t, "json", "/dev/stdout")

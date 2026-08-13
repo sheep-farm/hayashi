@@ -1112,3 +1112,23 @@ cases:
   notes: Condition number of regressor matrix on simulated OLS residuals.
   dimension: numerical
   status: active
+- id: swilk_simulated
+  notes: Shapiro-Wilk normality test on a simulated random sample.
+  dimension: numerical
+  status: active
+- id: ljungbox_simulated
+  notes: Ljung-Box autocorrelation test on a simulated AR(1) series.
+  dimension: numerical
+  status: active
+- id: harveycollier_simulated
+  notes: Harvey-Collier recursive t test on simulated OLS residuals.
+  dimension: numerical
+  status: active
+- id: granger_simulated
+  notes: Granger causality test on simulated AR(1) series.
+  dimension: numerical
+  status: active
+- id: zivot_andrews_simulated
+  notes: Zivot-Andrews structural-break unit-root test on a simulated random walk.
+  dimension: numerical
+  status: active

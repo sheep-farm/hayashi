@@ -1,0 +1,4 @@
+load "validation/cases/granger_simulated/data/data.csv" as df
+let r = granger(df, y, x, lags=4)
+let t = tidy(r)
+export(t, "json", "/dev/stdout")
