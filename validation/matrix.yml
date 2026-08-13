@@ -128,6 +128,10 @@ cases:
     the bootstrap SEs produced by Hayashi.
   dimension: numerical
   status: pass
+- id: condnum_simulated
+  notes: Condition number of regressor matrix on simulated OLS residuals.
+  dimension: numerical
+  status: pass
 - id: conformal_simulated
   notes: Simulated linear DGP y = 1 + 2x1 - 1.5x2 + noise. Compares split-conformal
     empirical coverage and conformal quantile.
@@ -203,6 +207,10 @@ cases:
 - id: dr_learner_simulated
   notes: Simulated data with a single confounder x, binary treatment d, and constant
     ATE=2.0. DR-Learner average treatment effect compared against a manual AIPW reference.
+  dimension: numerical
+  status: pass
+- id: dw_simulated
+  notes: Durbin-Watson test for first-order autocorrelation on simulated OLS residuals.
   dimension: numerical
   status: pass
 - id: egarch_nyse
@@ -342,10 +350,18 @@ cases:
     hyperparameter-optimisation conventions.
   dimension: numerical
   status: pass
+- id: granger_simulated
+  notes: Granger causality test on simulated AR(1) series.
+  dimension: numerical
+  status: pass
 - id: grf_simulated
   notes: Simulated data y = 1 + 2*x1 - x2 + 0.5*treated + N(0,1). Hayashi grf() reports
     the average treatment effect. R reference uses grf::causal_forest to match the
     ATE quantity; Python uses econml.grf.CausalForest.
+  dimension: numerical
+  status: pass
+- id: harveycollier_simulated
+  notes: Harvey-Collier recursive t test on simulated OLS residuals.
   dimension: numerical
   status: pass
 - id: hausman_robust_wooldridge_wagepan
@@ -395,6 +411,10 @@ cases:
     schooling IV equation for married women.
   dimension: numerical
   status: pass
+- id: jb_simulated
+  notes: Jarque-Bera normality test on a simulated random sample.
+  dimension: numerical
+  status: pass
 - id: johansen_break_simulated
   notes: Structural-break Johansen test. Python statsmodels.tsa.vecm (coint_johansen)
     does not support exogenous break dummies, so a comparable Python reference trace
@@ -429,6 +449,10 @@ cases:
   status: pass
 - id: linktest_simulated
   notes: Simulated logit. Linktest yhat and yhat2 coefficients and standard errors.
+  dimension: numerical
+  status: pass
+- id: ljungbox_simulated
+  notes: Ljung-Box autocorrelation test on a simulated AR(1) series.
   dimension: numerical
   status: pass
 - id: logit_margins_mroz
@@ -859,6 +883,10 @@ cases:
     at the same optimal lambda and standardisation.
   dimension: numerical
   status: pass
+- id: reset_simulated
+  notes: Ramsey RESET specification test on simulated OLS residuals.
+  dimension: numerical
+  status: pass
 - id: rf_simulated
   notes: Simulated data y = 3*x1 + N(0, 0.1). In-sample R² compared against scikit-learn.
     Standard errors are not defined for an out-of-bag R² summary.
@@ -940,6 +968,10 @@ cases:
 - id: svec_simulated
   notes: Simulated stable VAR(1) with 250 observations. Blanchard-Quah long-run identification
     via lower Cholesky of the long-run covariance.
+  dimension: numerical
+  status: pass
+- id: swilk_simulated
+  notes: Shapiro-Wilk normality test on a simulated random sample.
   dimension: numerical
   status: pass
 - id: synth_smoking
@@ -1041,8 +1073,16 @@ cases:
     are compared (standard errors are not computed by the current Hayashi VARMA implementation).
   dimension: numerical
   status: pass
+- id: vif_simulated
+  notes: Variance Inflation Factor on simulated OLS residuals.
+  dimension: numerical
+  status: pass
 - id: weak_iv_simulated
   notes: Simulated weak instrument. First-stage partial F and p-value.
+  dimension: numerical
+  status: pass
+- id: white_simulated
+  notes: White heteroskedasticity test on simulated OLS residuals.
   dimension: numerical
   status: pass
 - id: wls_hprice1
@@ -1086,46 +1126,6 @@ cases:
   status: pass
 - id: zip_affairs
   notes: ZIP model of number of affairs on demographic predictors.
-  dimension: numerical
-  status: pass
-- id: jb_simulated
-  notes: Jarque-Bera normality test on a simulated random sample.
-  dimension: numerical
-  status: pass
-- id: dw_simulated
-  notes: Durbin-Watson test for first-order autocorrelation on simulated OLS residuals.
-  dimension: numerical
-  status: pass
-- id: white_simulated
-  notes: White heteroskedasticity test on simulated OLS residuals.
-  dimension: numerical
-  status: pass
-- id: reset_simulated
-  notes: Ramsey RESET specification test on simulated OLS residuals.
-  dimension: numerical
-  status: pass
-- id: vif_simulated
-  notes: Variance Inflation Factor on simulated OLS residuals.
-  dimension: numerical
-  status: pass
-- id: condnum_simulated
-  notes: Condition number of regressor matrix on simulated OLS residuals.
-  dimension: numerical
-  status: pass
-- id: swilk_simulated
-  notes: Shapiro-Wilk normality test on a simulated random sample.
-  dimension: numerical
-  status: pass
-- id: ljungbox_simulated
-  notes: Ljung-Box autocorrelation test on a simulated AR(1) series.
-  dimension: numerical
-  status: pass
-- id: harveycollier_simulated
-  notes: Harvey-Collier recursive t test on simulated OLS residuals.
-  dimension: numerical
-  status: pass
-- id: granger_simulated
-  notes: Granger causality test on simulated AR(1) series.
   dimension: numerical
   status: pass
 - id: zivot_andrews_simulated

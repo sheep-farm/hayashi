@@ -27,6 +27,7 @@
 | cloglog | wooldridge::affairs | R, Python | pass | — | Complementary log-log GLM on Wooldridge affairs. A sign error in the Greeners cloglog derivative caused IRLS divergence; the derivative is now positive and the model converges to the same estimates as R glm and statsmodels. |
 | descriptive | wooldridge::wage1 | R, Python | pass | — | Codebook summary for the continuous wage variable. |
 | vecm | simulated_cointegrated | R, Python | pass | — | VECM(1) on a simulated cointegrated system where y = 2*x + e2 and x = cumsum(e1). The cointegration (beta) and adjustment (alpha) coefficients and standard errors are compared. Beta SEs are approximate Engle-Granger/OLS proxies; alpha SEs are OLS conditional SEs given the estimated beta. The 5e-1 tolerance accommodates the bootstrap SEs produced by Hayashi. |
+| diagnostics | simulated | R | pass | — | Condition number of regressor matrix on simulated OLS residuals. |
 | conformal | simulated | R, Python | pass | — | Simulated linear DGP y = 1 + 2x1 - 1.5x2 + noise. Compares split-conformal empirical coverage and conformal quantile. |
 | copula | simulated | R, Python | pass | — | Simulated bivariate normal with Pearson correlation 0.6. Dependence measures exported as a coefficient table; standard errors are not defined for copula summary statistics. |
 | descriptive | wooldridge::wage1 | R, Python | pass | — | Pairwise correlations of wage, educ, exper, tenure. |
@@ -42,6 +43,7 @@
 | double_ml | simulated_double_ml | R, Python | pass | — | Double Machine Learning (Chernozhukov et al. 2018) for heterogeneous treatment effects. Uses simulated data with known treatment effect. |
 | doublesort | simulated | R, Python | pass | — | Simulated return data with size and book-to-market. Compares the mean return of the small-size / high-BM (low size, high bm) portfolio from a 5x5 double sort. |
 | dr_learner | simulated | R, Python | pass | — | Simulated data with a single confounder x, binary treatment d, and constant ATE=2.0. DR-Learner average treatment effect compared against a manual AIPW reference. |
+| diagnostics | simulated | R | pass | — | Durbin-Watson test for first-order autocorrelation on simulated OLS residuals. |
 | egarch | wooldridge::nyse | R, Python | pass | — | EGARCH(1,1) on NYSE returns. |
 | elasticnet | wooldridge::hprice1 | R, Python | pass | — | Elastic Net regression of log house price on log lot size, log square footage, bedrooms and colonial dummy. |
 | logit | simulated | R, Python | pass | — | Simulated logit. Sensitivity, specificity and correct rate at threshold 0.5. |
@@ -68,7 +70,9 @@
 | gmm | wooldridge::card | R, Python | pass | — | R and Python use robust two-step GMM references with matching covariance conventions; current Hayashi estimates match both within tolerance. |
 | gmm_clust | simulated | Python | pass | — | Two Gaussian clusters. Compare sorted component means. |
 | gp | simulated | R, Python | pass | — | Simulated 1-D regression with a fixed seed; compares training-set R2 and MSE between Hayashi, R kernlab and Python sklearn. Tolerances reflect different hyperparameter-optimisation conventions. |
+| diagnostics | simulated | R | pass | — | Granger causality test on simulated AR(1) series. |
 | grf | simulated | R, Python | pass | — | Simulated data y = 1 + 2*x1 - x2 + 0.5*treated + N(0,1). Hayashi grf() reports the average treatment effect. R reference uses grf::causal_forest to match the ATE quantity; Python uses econml.grf.CausalForest. |
+| diagnostics | simulated | R | pass | — | Harvey-Collier recursive t test on simulated OLS residuals. |
 | hausman_robust | wooldridge::wagepan | R, Python | pass | — | Robust Hausman test (Cameron-Trivedi 2005, Wooldridge 2010) with cluster-robust covariance. |
 | hawkes | simulated | R, Python | pass | — | Simulated self-exciting Hawkes process. Python reference fits the same MLE via L-BFGS-B. |
 | hclust | simulated | Python | pass | — | Three well-separated 2D blobs. Ward linkage with cut=3.0 and cophenetic correlation. |
@@ -79,6 +83,7 @@
 | iv | wooldridge::card | R, Python | pass | 97 | IV returns-to-schooling equation with one-way clustered standard errors by Census region. |
 | iv | wooldridge::mroz | R, Python | pass | 95 | IV returns-to-schooling equation with HC1 heteroskedasticity-robust standard errors. |
 | iv | wooldridge::mroz | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 15, Example 15.1 returns to schooling IV equation for married women. |
+| diagnostics | simulated | R, Python | pass | — | Jarque-Bera normality test on a simulated random sample. |
 | johansen_break | simulated | R, Python | blocked | — | Structural-break Johansen test. Python statsmodels.tsa.vecm (coint_johansen) does not support exogenous break dummies, so a comparable Python reference trace statistic cannot be produced. |
 | kalman | wooldridge::nyse | R, Python | pass | — | Local-level Kalman filter on NYSE returns. Hayashi now estimates sigma_obs and sigma_state by maximum likelihood and returns a printable result object. sigma_state is very small and the likelihood is flat in that direction, so the absolute tolerance is set to 1e-3. |
 | kde | simulated | R, Python | pass | — | Simulated N(2, 1.5). Compares fixed bandwidth, peak density and peak x of a Gaussian KDE. |
@@ -86,6 +91,7 @@
 | kmeans | simulated_kmeans | R, Python | pass | — | K-Means clustering (MacQueen 1967) with k-means++ initialization. Uses simulated 2D data with 3 Gaussian clusters. |
 | lasso | wooldridge::hprice1 | R, Python | pass | — | Lasso regression of house price on lot size, square footage and bedrooms. |
 | logit | simulated | R, Python | pass | — | Simulated logit. Linktest yhat and yhat2 coefficients and standard errors. |
+| diagnostics | simulated | R | pass | — | Ljung-Box autocorrelation test on a simulated AR(1) series. |
 | logit | wooldridge::mroz | R, Python | pass | — | Logit average marginal effects and delta-method standard errors match R/statsmodels within tolerance. |
 | logit | wooldridge::mroz | R, Python | pass | — | Logit labour-force participation on the Mroz dataset. |
 | lowess | simulated | R, Python | pass | — | Simulated y = sin(x) + N(0, 0.2). Compare LOWESS fitted values at mean, first, middle and last observations. |
@@ -170,6 +176,7 @@
 | rdd | rdd_book | R, Python | pass | — | Sharp RDD with local linear regression, triangular kernel and Imbens-Kalyanaraman bandwidth. |
 | re | grunfeld | R, Python | pass | 101 | Random-effects investment demand model (Grunfeld). |
 | reg_path | simulated | R, Python | pass | — | Simulated data where y = 0.5 + x1 + noise and x2 is noise. Hayashi reg_path selects an elastic-net lambda by BIC; references fit glmnet and sklearn ElasticNet at the same optimal lambda and standardisation. |
+| diagnostics | simulated | R | pass | — | Ramsey RESET specification test on simulated OLS residuals. |
 | rf | simulated | R, Python | pass | — | Simulated data y = 3*x1 + N(0, 0.1). In-sample R² compared against scikit-learn. Standard errors are not defined for an out-of-bag R² summary. |
 | ridge | wooldridge::hprice1 | R, Python | pass | 106 | Ridge regression of log house price on log lot size, log square footage, bedrooms and colonial dummy. |
 | rlm | wooldridge::wage1 | R, Python | pass | — | Huber robust linear regression of log wage on education, experience, and tenure. |
@@ -187,6 +194,7 @@
 | sv | simulated_sv | R, Python | pass | — | Simulated Taylor (1986) SV data; compares the posterior mean of the latent log-volatility h_t between Hayashi, R stochvol and PyMC. Tight tolerance because R and PyMC agree closely on this DGP. |
 | svar | statsmodels::macrodata | R, Python | pass | — | Cholesky-identified SVAR(2) on log US real GDP and consumption. |
 | svar | simulated | R, Python | pass | — | Simulated stable VAR(1) with 250 observations. Blanchard-Quah long-run identification via lower Cholesky of the long-run covariance. |
+| diagnostics | simulated | R | pass | — | Shapiro-Wilk normality test on a simulated random sample. |
 | synth | synth_smoking | R, Python | pass | — | R, Python, and Hayashi implement the same outcome-only simplex SCM and agree on ATT within tolerance. |
 | synthdid | simulated | R, Python | pass | — | Simulated panel with 20 units, 10 periods, treatment begins at period 6 for unit 0 with ATT=2.0. Reference uses a simple synthetic-control-style pre-treatment weighting and computes the post-treatment mean gap. The ATT has no standard error. |
 | sysgmm | wooldridge::wagepan | R, Python | pass | 117 | System GMM (Blundell-Bond) two-step on Wooldridge wagepan with lags=2. R and Python references explicitly implement the same two-step System GMM procedure used by Hayashi/Greeners; plm::pgmm is not used as the active R oracle because it uses different instrument and weighting conventions. |
@@ -207,7 +215,9 @@
 | var | simulated_var1 | R, Python | pass | — | Uses the same simulated bivariate VAR(1) DGP as Chapter 28 of the book. |
 | var | statsmodels::macrodata | R, Python | pass | — | VAR(2) on US real GDP and consumption. |
 | varma | simulated | R, Python | pass | — | Bivariate VARMA(1,1) with known AR and MA matrices. Hayashi uses the Hannan-Rissanen algorithm; the Python reference uses statsmodels VARMAX with no trend. Coefficients are compared (standard errors are not computed by the current Hayashi VARMA implementation). |
+| diagnostics | simulated | R | pass | — | Variance Inflation Factor on simulated OLS residuals. |
 | iv | simulated | R, Python | pass | — | Simulated weak instrument. First-stage partial F and p-value. |
+| diagnostics | simulated | R | pass | — | White heteroskedasticity test on simulated OLS residuals. |
 | wls | wooldridge::hprice1 | R, Python | pass | — | WLS with weights generated inside Hayashi to avoid sandbox file issues. |
 | xgboost | simulated | R, Python | pass | — | Simulated data y = 3*x1 + N(0, 0.1), x2 irrelevant. XGBoost with 50 trees, learning rate 0.1, max depth 3, default regularization. MSE and R^2 compared against xgboost.XGBRegressor. |
 | xtgls | wooldridge::wagepan | R, Python | pass | — | Panel feasible GLS with panel-level heteroskedasticity (Parks/Kmenta, Stata xtgls panels(heteroskedastic)). R and Python references implement the same two-step FGLS procedure used by Hayashi/Greeners. |
@@ -217,6 +227,7 @@
 | descriptive | wooldridge::wagepan | R, Python | pass | — | Overall, between, and within panel summary for lwage. |
 | zinb | wooldridge::affairs | R, Python | pass | 123 | ZINB model of number of affairs on demographic predictors. |
 | zip | wooldridge::affairs | R, Python | pass | 121 | ZIP model of number of affairs on demographic predictors. |
+| diagnostics | simulated | R | pass | — | Zivot-Andrews structural-break unit-root test on a simulated random walk. |
 
 ## Status legend
 
@@ -233,18 +244,6 @@ reference that fails or is missing no longer blocks comparison when
 `--allow-partial` is used; otherwise partial cases fail the runner.
 
 This matrix is generated from `validation/matrix.yml` by `validation/run.py`.
-
-| diagnostics | simulated | R, Python | pass | — | Jarque-Bera normality test on a simulated random sample. |
-| diagnostics | simulated | R | pass | — | Durbin-Watson test for first-order autocorrelation on simulated OLS residuals. |
-| diagnostics | simulated | R | pass | — | White heteroskedasticity test on simulated OLS residuals. |
-| diagnostics | simulated | R | pass | — | Ramsey RESET specification test on simulated OLS residuals. |
-| diagnostics | simulated | R | pass | — | Variance Inflation Factor on simulated OLS residuals. |
-| diagnostics | simulated | R | pass | — | Condition number of regressor matrix on simulated OLS residuals. |
-| diagnostics | simulated | R | pass | — | Shapiro-Wilk normality test on a simulated random sample. |
-| diagnostics | simulated | R | pass | — | Ljung-Box autocorrelation test on a simulated AR(1) series. |
-| diagnostics | simulated | R | pass | — | Harvey-Collier recursive t test on simulated OLS residuals. |
-| diagnostics | simulated | R | pass | — | Granger causality test on simulated AR(1) series. |
-| diagnostics | simulated | R | pass | — | Zivot-Andrews structural-break unit-root test on a simulated random walk. |
 
 This matrix covers the core empirical estimators. Some commands are
 intentionally excluded for the reasons described in the "Estimators not

@@ -9,7 +9,6 @@ dataset:
   licence: n/a
 references:
 - R
-- Python
 comparison:
   quantities:
   - x
