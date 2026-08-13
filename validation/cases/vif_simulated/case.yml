@@ -1,7 +1,7 @@
 id: vif_simulated
 title: VIF test on simulated data
 estimator_family: diagnostics
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated

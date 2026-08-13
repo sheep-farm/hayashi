@@ -1,7 +1,7 @@
 id: dw_simulated
 title: Durbin-Watson test on simulated data
 estimator_family: diagnostics
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated

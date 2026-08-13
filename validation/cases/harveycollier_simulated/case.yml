@@ -1,7 +1,7 @@
 id: harveycollier_simulated
 title: Harvey-Collier recursive t test on simulated data
 estimator_family: diagnostics
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated

@@ -1,7 +1,7 @@
 id: granger_simulated
 title: Granger causality test on simulated data
 estimator_family: diagnostics
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated

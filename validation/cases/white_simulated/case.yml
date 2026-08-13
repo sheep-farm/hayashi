@@ -1,7 +1,7 @@
 id: white_simulated
 title: White heteroskedasticity test on simulated data
 estimator_family: diagnostics
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated

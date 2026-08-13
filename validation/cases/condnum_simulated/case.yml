@@ -1,7 +1,7 @@
 id: condnum_simulated
 title: Condition number test on simulated data
 estimator_family: diagnostics
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated

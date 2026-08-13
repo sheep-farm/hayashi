@@ -1,7 +1,7 @@
 id: reset_simulated
 title: Ramsey RESET test on simulated data
 estimator_family: diagnostics
-status: active
+status: pass
 dimension: numerical
 dataset:
   name: simulated
