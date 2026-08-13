@@ -16,6 +16,8 @@ comparison:
   tolerances:
     fit.statistic: 0.001
     fit.p_value: 0.1
+output_format: json
+
 hayashi_script: cases/swilk_simulated/hayashi/run.hay
 reference_scripts:
   R: cases/swilk_simulated/reference/run.R

@@ -16,6 +16,8 @@ comparison:
   tolerances:
     fit.statistic: 0.1
     fit.p_value: 0.05
+output_format: json
+
 hayashi_script: cases/granger_simulated/hayashi/run.hay
 reference_scripts:
   R: cases/granger_simulated/reference/run.R

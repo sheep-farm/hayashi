@@ -26,3 +26,4 @@ result <- list(
 out_dir <- "validation/cases/dw_simulated/reference"
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 write_json(result, file.path(out_dir, "expected.json"), pretty = TRUE, digits = NA, auto_unbox = TRUE)
+cat(toJSON(result, auto_unbox = TRUE, digits = 15))
