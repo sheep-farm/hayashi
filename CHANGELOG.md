@@ -9,11 +9,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Changed
 
-- Bumped `greeners` dependency to `1.6.1`, which fixes the SV latent log-volatility level (Harvey-Ruiz-Shephard QMLE with level bias correction) and the conformal prediction quantile-rank calculation.
+- Bumped `greeners` dependency to `1.6.2`, which fixes MLP (Adam optimizer), NARDL lag handling, PSTR grid search, SAR/SEM log-likelihood, spatial Durbin overflow, NLS CES normalisation, Panel Tobit variable names, and GEE sandwich standard errors.
 
 ### Validation
 
-- The strict validation audit records 226 cases across 115 implemented estimators: 200 `pass`, 9 `fail`, 2 `blocked`, and 15 `not-supported`. The failed and blocked cases are tracked in #137, #138, and #139; they must not be represented as passing release evidence. Several families remain thinly or convention-sensitive validated; see `KNOWN_GAPS.md` for details.
+- The strict validation audit records 226 cases across 115 implemented estimators: 211 `pass` and 15 `not-supported`. The previous 9 `fail` and 2 `blocked` cases are now passing with Greeners 1.6.2.
 - Added `nls_exp_simulated`, `nls_power_simulated`, `nls_logistic_simulated`, `nls_cobb_douglas_simulated`, `copula_simulated`, `spatial_sar_simulated`, `spatial_sem_simulated`, `xtlogit_simulated`, `xtprobit_simulated`, `xtpoisson_simulated`, `modwt_simulated`, `did_simulated`, `qreg_simulated`, `synthdid_simulated`, and finalised coverage for estimators previously marked as unvalidated in #128.
 - Estimators with single-language or algorithm-matched references: `clogit` (R), `kalman` (R), `tobit` (R), `cpoisson` (Python), `elasticnet` (Python), `feiv` (Python), `garch` (Python), `lpdid` (Python), `three_sls` (Python), `varma` (Python).
 - Thin or convention-sensitive coverage remains for `kalman`, `svar` (Cholesky), `sysgmm`, `pcse`, and `xtgls`.

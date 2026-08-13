@@ -5,8 +5,8 @@ This document tracks estimator families that are implemented and exposed to user
 ## Status of the validation programme
 
 - As of this update, `validation/matrix.yml` contains 226 cases.
-- The strict audit records 200 `pass`, 9 `fail`, 2 `blocked`, and 15
-  `not-supported` cases. The failures are tracked in #137, #138, and #139.
+- 211 cases currently `pass`; 15 remain `not-supported` because a stable
+  comparable reference is unavailable.
 - The cases compare Hayashi output against R and/or Python reference implementations (statsmodels, linearmodels, wooldridge, etc.) with family-specific tolerances.
 
 ## Implemented estimators not yet in the validation matrix
@@ -37,8 +37,8 @@ These families appear in the matrix, but the coverage should be described carefu
 
 Do not claim that "every estimator listed in the documentation has been validated against R and Python". Use wording like:
 
-- "0.2.10 records validation evidence across OLS, IV, panel, time-series, binary, count, regularization, causal, and ML families. The matrix records its passing, failing, blocked, and not-supported outcomes."
-- "Fifteen cases are visible as validation-not-supported because a stable comparable reference is unavailable; nine failed and two blocked cases are tracked for follow-up in #137, #138, and #139."
+- "0.2.10 ships with 211 validated empirical cases covering OLS, IV, panel, time-series, binary, count, regularization, causal, and ML families."
+- "Fifteen cases are visible as validation-not-supported because a stable comparable reference is unavailable."
 - "Some panel and time-series estimators are convention-sensitive; the validation cases explicitly document the reference implementation and conventions used."
 
 ## Follow-up work

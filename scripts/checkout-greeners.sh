@@ -2,8 +2,8 @@
 
 set -euo pipefail
 
-readonly GREENERS_TAG="v1.6.1"
-readonly GREENERS_REV="5568d757b234c813ac59872df5f975a246eb1c06"
+readonly GREENERS_TAG="v1.6.2"
+readonly GREENERS_REV="ada1c6c828e04565d1acff3974d105ede6b937bc"
 readonly GREENERS_URL="https://github.com/sheep-farm/Greeners.git"
 readonly GREENERS_DIR="${GREENERS_DIR:-${GITHUB_WORKSPACE:-$PWD}/../Greeners}"
 
