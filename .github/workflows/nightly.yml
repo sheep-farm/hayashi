@@ -41,7 +41,7 @@ jobs:
           key: nightly-${{ matrix.target }}
 
       - name: Build
-        run: cargo build --release
+        run: cargo build --release --locked
 
       - name: Package (Unix)
         if: runner.os != 'Windows'

@@ -37,7 +37,7 @@ jobs:
           key: release-${{ matrix.target }}
 
       - name: Build binaries
-        run: cargo build --release --bin hay --bin hay-kernel
+        run: cargo build --release --locked --bin hay --bin hay-kernel
 
       - name: Package (Unix)
         if: runner.os != 'Windows'
