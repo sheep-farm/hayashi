@@ -1088,3 +1088,27 @@ cases:
   notes: ZIP model of number of affairs on demographic predictors.
   dimension: numerical
   status: pass
+- id: jb_simulated
+  notes: Jarque-Bera normality test on a simulated random sample.
+  dimension: numerical
+  status: active
+- id: dw_simulated
+  notes: Durbin-Watson test for first-order autocorrelation on simulated OLS residuals.
+  dimension: numerical
+  status: active
+- id: white_simulated
+  notes: White heteroskedasticity test on simulated OLS residuals.
+  dimension: numerical
+  status: active
+- id: reset_simulated
+  notes: Ramsey RESET specification test on simulated OLS residuals.
+  dimension: numerical
+  status: active
+- id: vif_simulated
+  notes: Variance Inflation Factor on simulated OLS residuals.
+  dimension: numerical
+  status: active
+- id: condnum_simulated
+  notes: Condition number of regressor matrix on simulated OLS residuals.
+  dimension: numerical
+  status: active

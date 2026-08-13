@@ -234,6 +234,13 @@ reference that fails or is missing no longer blocks comparison when
 
 This matrix is generated from `validation/matrix.yml` by `validation/run.py`.
 
+| diagnostics | simulated | R, Python | pass | — | Jarque-Bera normality test on a simulated random sample. |
+| diagnostics | simulated | R | pass | — | Durbin-Watson test for first-order autocorrelation on simulated OLS residuals. |
+| diagnostics | simulated | R | pass | — | White heteroskedasticity test on simulated OLS residuals. |
+| diagnostics | simulated | R | pass | — | Ramsey RESET specification test on simulated OLS residuals. |
+| diagnostics | simulated | R | pass | — | Variance Inflation Factor on simulated OLS residuals. |
+| diagnostics | simulated | R | pass | — | Condition number of regressor matrix on simulated OLS residuals. |
+
 This matrix covers the core empirical estimators. Some commands are
 intentionally excluded for the reasons described in the "Estimators not
 covered by validation" section of the README.

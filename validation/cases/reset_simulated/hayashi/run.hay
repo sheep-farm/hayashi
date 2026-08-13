@@ -1,0 +1,4 @@
+load "validation/cases/reset_simulated/data/data.csv" as df
+let m = ols(y ~ x + z, df)
+let r = reset(m, power=2)
+export(r, "json", "/dev/stdout")

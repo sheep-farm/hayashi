@@ -1,0 +1,4 @@
+load "validation/cases/condnum_simulated/data/data.csv" as df
+let m = ols(y ~ x + z, df)
+let r = condnum(m)
+export(r, "json", "/dev/stdout")

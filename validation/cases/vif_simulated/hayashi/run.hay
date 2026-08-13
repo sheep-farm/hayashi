@@ -1,0 +1,5 @@
+load "validation/cases/vif_simulated/data/data.csv" as df
+let m = ols(y ~ x + z, df)
+let r = vif(m)
+let out = {"x": r.vif[1], "z": r.vif[2]}
+export(out, "json", "/dev/stdout")
