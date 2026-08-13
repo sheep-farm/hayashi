@@ -1,6 +1,8 @@
 library(jsonlite)
-setwd("/home/flavio/Documents/GitHub/hayashi")
-df <- read.csv("validation/cases/portsort_simulated/data/data.csv")
+args <- commandArgs(trailingOnly = FALSE)
+script_path <- sub("^--file=", "", args[grep("^--file=", args)][1])
+case_dir <- normalizePath(file.path(dirname(script_path), ".."))
+df <- read.csv(file.path(case_dir, "data", "data.csv"))
 df <- df[order(df$size), ]
 n <- 5
 N <- nrow(df)
@@ -23,4 +25,4 @@ result <- list(
 )
 result$coefficients[["hl_mean"]] <- means[5] - means[1]
 result$standard_errors[["hl_mean"]] <- NA_real_
-cat(toJSON(result, pretty = FALSE, digits = 10, auto_unbox = TRUE))
+cat(toJSON(result, pretty = FALSE, digits = 15, auto_unbox = TRUE))

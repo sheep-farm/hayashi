@@ -1,17 +1,12 @@
 # Reference implementation in Python for the Jarque-Bera normality test.
 
 import json
-import numpy as np
+import pandas as pd
 from scipy import stats
 from pathlib import Path
 
-rng = np.random.default_rng(42)
-n = 200
-x = rng.normal(loc=5.0, scale=2.0, size=n)
-
 data_dir = Path("validation/cases/jb_simulated/data")
-data_dir.mkdir(parents=True, exist_ok=True)
-np.savetxt(data_dir / "data.csv", np.column_stack([x]), delimiter=",", header="x", comments="", fmt="%.17g")
+x = pd.read_csv(data_dir / "data.csv")["x"].to_numpy()
 
 stat, p = stats.jarque_bera(x)
 

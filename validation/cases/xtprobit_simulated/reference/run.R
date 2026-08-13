@@ -1,6 +1,3 @@
-if (!requireNamespace("geepack", quietly = TRUE)) {
-  install.packages("geepack", repos = "https://cloud.r-project.org")
-}
 library(geepack)
 
 df <- read.csv(file.path("validation", "cases", "xtprobit_simulated", "data", "data.csv"))

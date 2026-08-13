@@ -1,6 +1,8 @@
 # Independent base-R MODWT (stationary wavelet) reference using Haar filters.
 
-case_dir <- "validation/cases/modwt_simulated"
+args <- commandArgs(trailingOnly = FALSE)
+script_path <- sub("^--file=", "", args[grep("^--file=", args)][1])
+case_dir <- normalizePath(file.path(dirname(script_path), ".."))
 df <- read.csv(file.path(case_dir, "data", "data.csv"))
 y <- df$y
 n <- length(y)
@@ -40,4 +42,3 @@ result <- list(
 json_str <- jsonlite::toJSON(result, auto_unbox = TRUE, digits = 15, na = "null", pretty = FALSE)
 json_str <- gsub(":null", ":NaN", json_str, fixed = TRUE)
 cat(json_str)
-

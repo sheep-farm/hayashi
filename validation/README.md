@@ -44,10 +44,10 @@ Hayashi or reference estimators.
 
 Exit codes:
 
-- `0` — all selected cases passed.
+- `0` — selected cases completed with no failed, blocked, partial, or not-started result.
 - `0` — metadata is consistent when `--check` is passed.
 - `0` — validation blocked, but `--allow-blocked` was passed.
-- `1` — at least one case failed, or a case is blocked without `--allow-blocked`.
+- `1` — at least one case failed, was blocked without `--allow-blocked`, was partial without `--allow-partial`, or was not started.
 - `1` — metadata is inconsistent when `--check` is passed.
 
 The same options can be passed through `hay validate`, for example
@@ -56,9 +56,14 @@ The same options can be passed through `hay validate`, for example
 ## Requirements
 
 - Hayashi CLI (`hay`) built from the repository.
-- R with `Rscript` and the packages listed in `DESCRIPTION` (`wooldridge`, `jsonlite`, `MASS`, `glmnet`, `systemfit`).
+- R with `Rscript` and every package listed in `DESCRIPTION`.
 - Python 3 with the packages listed in `requirements.txt`.
 - Stata is optional and only used when `stata` is found in `$PATH`.
+
+The workflow pins the Greeners numerical-engine revision. The R and Python
+package sets are declared here but are not yet version-locked; #140 tracks the
+lockfile policy and CI restoration needed for a fully pinned reference
+environment.
 
 Install Python dependencies:
 
@@ -69,16 +74,20 @@ pip install -r validation/requirements.txt
 Install R dependencies:
 
 ```bash
-Rscript -e 'install.packages(c("wooldridge", "jsonlite", "MASS", "glmnet", "systemfit"), repos="https://cloud.r-project.org/")'
+Rscript -e 'd <- read.dcf("validation/DESCRIPTION"); pkgs <- trimws(strsplit(d[1, "Imports"], ",")[[1]]); install.packages(pkgs, repos="https://cloud.r-project.org/")'
 ```
 
 ## Reference implementation coverage
 
 Most cases provide both an R and a Python reference implementation. The
-validation runner runs every declared reference, blocks the case if any
-declared reference fails or is missing, and compares Hayashi independently
-against every reference that ran successfully. The generated matrix marks
-each reference used for comparison with `*`. A few cases implement the
+validation runner runs every declared reference and compares Hayashi
+independently against every reference that runs successfully. A case is
+`blocked` when no declared reference runs. It is `partial` when at least one
+reference runs but another declared reference fails or is missing; partial
+results exit non-zero unless `--allow-partial` is passed. `MATRIX.md` lists the
+declared references and recorded case status. When a runner result records
+per-reference execution details, `MATRIX.md` renders them in the Reference
+column. A few cases implement the
 estimator manually in base R/Python because no suitable packaged reference is
 available; each case's `README.md` documents the exact packages and
 implementation choices.
@@ -111,17 +120,24 @@ validation/
 
 ## Status values
 
-`case.yml` and `matrix.yml` carry different status meanings. The case manifest
-status controls lifecycle (`active`, `not-started`, `blocked`, or
-`not-supported`). The registry status records the last observed run result
-(`pass`, `fail`, `blocked`, or `not-started`). The metadata check rejects
+`case.yml` declares whether the runner should execute a case. In the current
+schema, `pass` means the case is active and runnable; `blocked`,
+`not-supported`, and `not-started` cause the runner to skip it. A selected
+`not-started` case exits non-zero, so an unimplemented case cannot create a
+green validation result. `matrix.yml`
+records the last observed status and is regenerated after a run. The runner
+retains the manifest status before merging the recorded matrix status so a stale
+result cannot alter execution eligibility. The metadata check rejects
 contradictions such as a `not-started` case with a recorded `pass` result.
 
-- `pass` — Hayashi matches reference within declared tolerances.
+- `pass` — the recorded run matched reference within declared tolerances.
 - `fail` — Hayashi differs from reference beyond tolerances; an issue should
   be opened.
-- `blocked` — cannot run because of a missing feature or bug; link to issue.
-- `not-supported` — the estimator/workflow is not supported by Hayashi yet.
+- `blocked` — cannot be evaluated because a required dependency, feature, or
+  known defect prevents execution; link a repository defect to its issue.
+- `not-supported` — the validation programme cannot currently test the stated
+  estimator/workflow contract. This does not necessarily mean Hayashi lacks
+  the command.
 - `not-started` — case is registered but not implemented.
 
 ## Adding a new case
@@ -185,10 +201,10 @@ The validation programme covers four dimensions:
 Not every command in Hayashi is a validation case. The programme focuses on
 core empirical estimators and intentionally excludes some command categories:
 
-- **Diagnostic/test commands** (e.g., `adf`, `kpss`, `granger`,
-  `engle_granger`, `johansen`, `ljungbox`, `white`, `reset`, `bgodfrey`,
-  `archtest`, `hausman`) — validated indirectly through the estimators that use
-  them.
+- **Diagnostic/test commands without a dedicated case** (e.g., `adf`, `kpss`,
+  `engle_granger`, `johansen`, `bgodfrey`, `archtest`, `hausman`) — validated
+  indirectly through the estimators that use them. Diagnostics with a case,
+  such as `granger`, `ljungbox`, `white`, and `reset`, are listed in the matrix.
 - **Utility/data manipulation commands** (e.g., `generate`, `filter`,
   `summarize`, `load`, `export`) — covered by `cargo test`, not by empirical
   validation.

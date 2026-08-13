@@ -9,7 +9,6 @@ dataset:
   licence: n/a
 references:
 - R
-- Python
 comparison:
   quantities:
   - x
@@ -21,7 +20,7 @@ output_format: json
 hayashi_script: cases/vif_simulated/hayashi/run.hay
 reference_scripts:
   R: cases/vif_simulated/reference/run.R
-notes: Variance Inflation Factor on simulated OLS residuals.
+notes: Variance inflation factors for the OLS regressor matrix on simulated data.
 result:
   summary: ''
   known_differences: []

@@ -9,9 +9,6 @@ dir.create(ref_dir, recursive = TRUE, showWarnings = FALSE)
 
 df <- read.csv(file.path(data_dir, "macrodata.csv"))
 
-if (!requireNamespace("vars", quietly = TRUE)) {
-  install.packages("vars", repos = "http://cran.r-project.org")
-}
 library(vars)
 
 # Use log levels (same as VAR macro case)

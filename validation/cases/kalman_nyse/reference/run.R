@@ -14,9 +14,6 @@ nyse <- nyse[, c("price", "return")]
 nyse <- nyse[complete.cases(nyse), ]
 write.csv(nyse, file.path(data_dir, "nyse.csv"), row.names = FALSE)
 
-if (!requireNamespace("dlm", quietly = TRUE)) {
-  install.packages("dlm", repos = "http://cran.r-project.org")
-}
 library(dlm)
 
 # Local level model: y_t = mu_t + v_t, mu_t = mu_{t-1} + w_t

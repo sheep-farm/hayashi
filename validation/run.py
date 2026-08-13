@@ -1460,13 +1460,18 @@ def render_matrix_md(cases: list[dict[str, Any]]) -> str:
         ),
         "- `fail` — Hayashi differs from at least one reference beyond tolerances.",
         "- `blocked` — no declared reference could run; the case cannot be judged.",
-        "- `not-supported` — estimator/workflow not supported yet.",
+        (
+            "- `not-supported` — the validation programme cannot currently test "
+            "the stated estimator/workflow contract; this does not necessarily mean "
+            "Hayashi lacks the command."
+        ),
         "- `not-started` — registered but not implemented.",
         "",
-        "The Reference column shows per-reference status as `name:status`,",
-        "where `*` marks the reference used for comparison. A declared",
-        "reference that fails or is missing no longer blocks comparison when",
-        "`--allow-partial` is used; otherwise partial cases fail the runner.",
+        "The Reference column lists declared reference implementations, or",
+        "per-reference execution details when a runner result records them.",
+        "A declared reference that fails or is missing no longer blocks",
+        "comparison when `--allow-partial` is used; otherwise partial cases",
+        "fail the runner.",
         "",
         "This matrix is generated from `validation/matrix.yml` by `validation/run.py`.",
         "",
@@ -1725,9 +1730,9 @@ def run_cases(cases: list[dict[str, Any]], only_blocked: bool = False) -> str:
         # The registry status in matrix.yml is for reporting and should not
         # force a case to be skipped on a fresh run.
         declared_status = case.get("_manifest_status", case.get("status", "not-started"))
-        if declared_status in ("blocked", "not-supported"):
-            # Keep the declared status and skip execution; the case files
-            # should document why it is blocked/not-supported.
+        if declared_status in ("blocked", "not-supported", "not-started"):
+            # Keep declared non-runnable statuses and skip execution. Each
+            # case must document why it is blocked, not supported, or pending.
             status = declared_status
             failures = []
             summary = case.get("result", {}).get("summary", "")
@@ -1765,6 +1770,8 @@ def run_cases(cases: list[dict[str, Any]], only_blocked: bool = False) -> str:
             overall_status = "blocked"
         elif status == "partial" and overall_status not in ("fail", "blocked"):
             overall_status = "partial"
+        elif status == "not-started" and overall_status == "pass":
+            overall_status = "not-started"
         if failures:
             summary = "; ".join(failures)
         elif status == "partial" and ref_report:
@@ -1857,6 +1864,9 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     if "partial" in observed_statuses and not args.allow_partial:
         log("ERROR: validation partial (use --allow-partial to tolerate)")
+        return 1
+    if "not-started" in observed_statuses:
+        log("ERROR: validation not started")
         return 1
     return 0
 

@@ -7,7 +7,8 @@ df = pd.read_csv(Path(__file__).resolve().parent.parent / "data" / "data.csv")
 t = df["treated"].values
 pre = df["pre_y"].values
 y = df["y"].values
-theta = np.cov(y, pre)[0, 1] / np.var(pre)
+# Match R's cov()/var() sample-moment convention (both use n - 1).
+theta = np.cov(y, pre)[0, 1] / np.var(pre, ddof=1)
 y_adj = y - theta * (pre - pre.mean())
 ate = float(y_adj[t == 1].mean() - y_adj[t == 0].mean())
 unadj = float(y[t == 1].mean() - y[t == 0].mean())

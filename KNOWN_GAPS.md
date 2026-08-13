@@ -5,7 +5,8 @@ This document tracks estimator families that are implemented and exposed to user
 ## Status of the validation programme
 
 - As of this update, `validation/matrix.yml` contains 226 cases.
-- 200 cases are currently `pass`; 14 are documented as `not-supported` and 1 as `blocked`.
+- The strict audit records 200 `pass`, 9 `fail`, 2 `blocked`, and 15
+  `not-supported` cases. The failures are tracked in #137, #138, and #139.
 - The cases compare Hayashi output against R and/or Python reference implementations (statsmodels, linearmodels, wooldridge, etc.) with family-specific tolerances.
 
 ## Implemented estimators not yet in the validation matrix
@@ -14,8 +15,9 @@ These commands exist in the interpreter dispatch and are listed in user-facing d
 
 - `svec` — currently shares the same dispatch path as `svar` (`"svar" | "svec"`), so it is treated as a Cholesky-SVAR alias rather than a distinct validation target.
 
-The following estimators were previously in this list but are now covered by validation cases (`feiv_simulated`, `clogit_simulated`, `cpoisson_simulated`, `varma_simulated`, `threesl_simulated`):
+The following estimators were previously in this list but are now covered by validation cases (`be_simulated`, `feiv_simulated`, `clogit_simulated`, `cpoisson_simulated`, `varma_simulated`, `threesl_simulated`):
 
+- `be` — between estimator (`src/lang/interpreter/estimators_panel.rs`)
 - `feiv` — fixed-effects IV (`src/lang/interpreter/estimators_panel.rs`)
 - `clogit` — conditional logit (`src/lang/interpreter/estimators_panel.rs`)
 - `cpoisson` — conditional Poisson / PPML (`src/lang/interpreter/estimators_panel.rs`)
@@ -31,20 +33,17 @@ These families appear in the matrix, but the coverage should be described carefu
 - `ab` (Arellano-Bond), `sysgmm` (Blundell-Bond), `pcse`, `xtgls` — dynamic-panel/GMM and panel-GLS cases are present, but the references implement the same two-step procedures used by Hayashi/Greeners; other packages (e.g. `plm::pgmm`) use different instrument and weighting conventions, so results may not be portable across implementations.
 - `km` (Kaplan-Meier), `cox`, `psm`, `synth`, `did`, `rd`, `fuzzy_rd`, `qreg`, `rlm`, `gee`, `gmm`, `iv` — have at least one case, but often rely on simulated or selected real datasets; broader coverage is desirable.
 
-## Implemented but not yet validated
-
-- `be` (between estimator) is implemented in `src/lang/interpreter/estimators_panel.rs` and exposed through `help()`, but has no empirical validation case yet. It should be treated as an unvalidated command until a reference case is added.
-
 ## Recommendation for release notes
 
 Do not claim that "every estimator listed in the documentation has been validated against R and Python". Use wording like:
 
-- "0.2.10 ships with 123 validated empirical cases covering OLS, IV, panel, time-series, binary, count, regularization, causal, and ML families."
-- "Several families are implemented and documented but await dedicated validation cases; see `KNOWN_GAPS.md`."
+- "0.2.10 records validation evidence across OLS, IV, panel, time-series, binary, count, regularization, causal, and ML families. The matrix records its passing, failing, blocked, and not-supported outcomes."
+- "Fifteen cases are visible as validation-not-supported because a stable comparable reference is unavailable; nine failed and two blocked cases are tracked for follow-up in #137, #138, and #139."
 - "Some panel and time-series estimators are convention-sensitive; the validation cases explicitly document the reference implementation and conventions used."
 
 ## Follow-up work
 
+- Lock the R and Python reference environments; the current package sets are
+  declared but not version-pinned (#140).
 - Confirm that `svec` is intended solely as a Cholesky-SVAR alias, or implement/validate it as a distinct estimator if required.
-- Implement and validate `be` before restoring it to the public command list.
 - Expand thin cases (`kalman`, `svar` with non-Cholesky identification, broader dynamic panel references) where practical.

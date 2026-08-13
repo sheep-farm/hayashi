@@ -30,7 +30,7 @@ reference_scripts:
   Python: cases/cuped_simulated/reference/run.py
   R: cases/cuped_simulated/reference/run.R
 
-notes: Simulated A/B test with pre-experiment covariate. Compare CUPED-adjusted ATE.
+notes: Simulated A/B test with pre-experiment covariate. Compare CUPED-adjusted ATE; references use sample covariance and variance (n - 1) for theta.
 
 result:
   summary: ""

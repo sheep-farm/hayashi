@@ -16,6 +16,7 @@ comparison:
   tolerances:
     fit.q_stat: 1e-10
     fit.p_value: 1e-10
+output_format: json
 hayashi_script: cases/ljungbox_simulated/hayashi/run.hay
 reference_scripts:
   R: cases/ljungbox_simulated/reference/run.R

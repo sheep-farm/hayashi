@@ -15,9 +15,6 @@ dir.create(data_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(ref_dir, recursive = TRUE, showWarnings = FALSE)
 write.csv(df, file.path(data_dir, "401k.csv"), row.names = FALSE)
 
-if (!requireNamespace("betareg", quietly = TRUE)) {
-  install.packages("betareg", repos = "http://cran.r-project.org")
-}
 library(betareg)
 
 model <- betareg(prate ~ mrate + age + sole, data = df)

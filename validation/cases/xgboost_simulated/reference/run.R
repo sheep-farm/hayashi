@@ -1,8 +1,5 @@
 library(jsonlite)
 
-if (!requireNamespace("xgboost", quietly = TRUE)) {
-  install.packages("xgboost", repos = "https://cloud.r-project.org")
-}
 library(xgboost)
 
 set.seed(42)

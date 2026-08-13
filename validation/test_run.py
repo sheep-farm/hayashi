@@ -296,6 +296,22 @@ n = 753
         self.assertTrue(ref_report["R"]["used"])
         self.assertTrue(ref_report["Python"]["used"])
 
+    def test_run_cases_skips_not_started_case(self):
+        case = {
+            "id": "planned_example",
+            "title": "Planned example",
+            "status": "not-started",
+            "_manifest_status": "not-started",
+            "result": {"summary": "Case has not been implemented."},
+        }
+
+        with patch.object(self.module, "run_case") as run_case, patch.object(self.module, "log"):
+            status = self.module.run_cases([case])
+
+        self.assertEqual(status, "not-started")
+        self.assertEqual(case["status"], "not-started")
+        run_case.assert_not_called()
+
 
 class MainExitStatusTests(unittest.TestCase):
     def setUp(self):
@@ -390,6 +406,12 @@ class MainExitStatusTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 1)
         self.assertIn("ERROR: validation partial (use --allow-partial to tolerate)", messages)
+
+    def test_main_rejects_not_started(self):
+        exit_code, messages = self.run_main_with_status("not-started")
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("ERROR: validation not started", messages)
 
     def test_main_rejects_blocked_when_partial_is_allowed(self):
         exit_code, messages = self.run_main_with_status(
