@@ -257,12 +257,12 @@ Workflow: PRs target `dev`; `master` is release-only.
 
 ## 8. Design decisions, not fragilities
 
-- **Greeners path dependency**: using a local `../Greeners` path in
+<!-- - **Greeners path dependency**: using a local `../Greeners` path in
   `Cargo.toml` is a dev-only setup. Greeners could physically live inside
   Hayashi, but that would violate separation of concerns: Hayashi is the
   language/CLI layer, Greeners is the numerical engine. The CI clones
   Greeners to `../Greeners` from `develop` so the same responsibility
-  split is preserved in automated builds.
+  split is preserved in automated builds. -->
 - **`parallel for` does not capture `Rc` model results**: this is
   intentional. Each iteration is an independent, self-contained sandbox
   whose state must die at the end of the block. Preventing `Rc`-backed
