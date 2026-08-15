@@ -1,0 +1,15 @@
+load "validation/cases/gmm_overidentified_simulated/data/data.csv" as df
+
+let m = gmm(y ~ x + endog, ~ x + z1 + z2, df)
+let result = {
+    "coef_const": m.coefficients.coef[0],
+    "coef_x": m.coefficients.coef[1],
+    "coef_endog": m.coefficients.coef[2],
+    "se_const": m.coefficients.std_err[0],
+    "se_x": m.coefficients.std_err[1],
+    "se_endog": m.coefficients.std_err[2],
+    "j_stat": m.j_stat,
+    "df_overid": m.df_overid,
+    "n_obs": m.n_obs
+}
+export(result, "json", "/dev/stdout")

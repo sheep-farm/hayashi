@@ -69,6 +69,7 @@
 | glsar | wooldridge::hprice1 | R:passed *, Python:passed * | pass | — | R, Python, and Hayashi use the same iterative GLSAR(1) procedure and agree on coefficients and standard errors within tolerance. |
 | gmm | wooldridge::card | R:passed *, Python:passed * | pass | — | R and Python use robust two-step GMM references with matching covariance conventions; current Hayashi estimates match both within tolerance. |
 | gmm_clust | simulated | Python:passed * | pass | — | Two Gaussian clusters. Compare sorted component means. |
+| gmm | simulated overidentified IV-GMM DGP | R:passed *, Python:passed * | pass | https://github.com/sheep-farm/hayashi/issues/144 | The DGP has one endogenous regressor and two excluded, valid instruments, so L-K=1. R gmm and Python linearmodels use two-step heteroskedastic GMM. The maximum standard-error difference is 2.569e-6; 1e-5 accepts the asymptotically equivalent finite-sample covariance forms. Coefficients and the Hansen J statistic agree to numerical precision. |
 | gp | simulated | R:passed *, Python:passed * | pass | — | Simulated 1-D regression with a fixed seed; compares training-set R2 and MSE between Hayashi, R kernlab and Python sklearn. Tolerances reflect different hyperparameter-optimisation conventions. |
 | diagnostics | simulated | R:passed * | pass | — | Granger causality test on simulated AR(1) series. |
 | grf | simulated | R:passed *, Python:passed * | pass | — | Simulated data y = 1 + 2*x1 - x2 + 0.5*treated + N(0,1). Hayashi grf() reports the average treatment effect. R reference uses grf::causal_forest to match the ATE quantity; Python uses econml.grf.CausalForest. |
@@ -253,4 +254,3 @@ covered by validation" section of the README.
 Esta matriz abrange os estimadores empíricos centrais. Alguns comandos são
 deixados de fora intencionalmente pelos motivos descritos na seção
 "Estimators not covered by validation" do README.
-
