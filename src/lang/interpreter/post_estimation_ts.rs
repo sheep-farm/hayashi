@@ -587,7 +587,7 @@ impl Interpreter {
                     Expr::Var(n) => n.clone(),
                     _ => {
                         return Err(HayashiError::Type(
-                            "autoreg: primeiro argumento deve ser um DataFrame".into(),
+                            "autoreg(): first argument must be a DataFrame".into(),
                         ))
                     }
                 };
@@ -640,7 +640,7 @@ impl Interpreter {
                     Expr::Var(n) => n.clone(),
                     _ => {
                         return Err(HayashiError::Type(
-                            "ardl: segundo argumento deve ser um DataFrame".into(),
+                            "ardl(): second argument must be a DataFrame".into(),
                         ))
                     }
                 };
@@ -708,7 +708,7 @@ impl Interpreter {
                     Expr::Var(n) => n.clone(),
                     _ => {
                         return Err(HayashiError::Type(
-                            "kalman: primeiro argumento deve ser um DataFrame".into(),
+                            "kalman(): first argument must be a DataFrame".into(),
                         ))
                     }
                 };

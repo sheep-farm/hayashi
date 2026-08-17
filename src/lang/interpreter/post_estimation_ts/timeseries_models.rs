@@ -17,7 +17,7 @@ impl Interpreter {
             Value::DataFrame(d) => d,
             _ => {
                 return Err(HayashiError::Type(
-                    "primeiro argumento deve ser um DataFrame".into(),
+                    "vecm(): first argument must be a DataFrame".into(),
                 ))
             }
         };
@@ -70,7 +70,7 @@ impl Interpreter {
             Value::DataFrame(d) => d,
             _ => {
                 return Err(HayashiError::Type(
-                    "primeiro argumento deve ser um DataFrame".into(),
+                    "var(): first argument must be a DataFrame".into(),
                 ))
             }
         };
@@ -269,7 +269,7 @@ impl Interpreter {
             Value::DataFrame(d) => d,
             _ => {
                 return Err(HayashiError::Type(
-                    "primeiro argumento deve ser um DataFrame".into(),
+                    format!("{func}(): first argument must be a DataFrame"),
                 ))
             }
         };
@@ -278,7 +278,7 @@ impl Interpreter {
             Expr::Var(n) | Expr::Str(n) => n.clone(),
             _ => {
                 return Err(HayashiError::Type(
-                    "second argument must be o variable name".into(),
+                    format!("{func}(): second argument must be a variable name"),
                 ))
             }
         };

@@ -12,7 +12,8 @@ impl Interpreter {
     ) -> Result<Value> {
         if args.len() < 3 {
             return Err(HayashiError::Runtime(
-                "rd() requer (formula, cutoff, df [, bw=..., poly=..., kernel=...])".into(),
+                "rd() requires arguments: formula, cutoff, df [, bw=..., poly=..., kernel=...]"
+                    .into(),
             ));
         }
         let formula_ast = self.resolve_formula(&args[0])?;
@@ -92,7 +93,7 @@ impl Interpreter {
     ) -> Result<Value> {
         if args.len() < 4 {
             return Err(HayashiError::Runtime(
-                "fuzzy_rd() requer (formula, \"treatment\", cutoff, df [, bw=..., poly=...])"
+                "fuzzy_rd() requires arguments: formula, \"treatment\", cutoff, df [, bw=..., poly=...]"
                     .into(),
             ));
         }
@@ -184,7 +185,7 @@ impl Interpreter {
     ) -> Result<Value> {
         if args.len() < 2 {
             return Err(HayashiError::Runtime(
-                "psm() requer (formula, df [, k=..., caliper=..., replace=..., boot=...])".into(),
+                "psm() requires arguments: formula, df [, k=..., caliper=..., replace=..., boot=...]".into(),
             ));
         }
         let formula_ast = self.resolve_formula(&args[0])?;
@@ -289,7 +290,7 @@ impl Interpreter {
     ) -> Result<Value> {
         if args.len() < 4 {
             return Err(HayashiError::Runtime(
-                "synth() requer (outcome, treated_id, t0, df, id=col, time=col [, covs=[...]])"
+                "synth() requires arguments: outcome, treated_id, t0, df, id=col, time=col [, covs=[...]]"
                     .into(),
             ));
         }
@@ -333,7 +334,7 @@ impl Interpreter {
             Some(Value::Str(s)) => s.clone(),
             _ => {
                 return Err(HayashiError::Runtime(
-                    "synth(): id=coluna option is required".into(),
+                    "synth(): id=column option is required".into(),
                 ))
             }
         };
@@ -341,7 +342,7 @@ impl Interpreter {
             Some(Value::Str(s)) => s.clone(),
             _ => {
                 return Err(HayashiError::Runtime(
-                    "synth(): time=coluna option is required".into(),
+                    "synth(): time=column option is required".into(),
                 ))
             }
         };

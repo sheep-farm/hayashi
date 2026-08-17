@@ -2461,7 +2461,7 @@ impl Interpreter {
                 Value::Int(i) => Ok(i as usize),
                 Value::Float(f) => Ok(f as usize),
                 _ => Err(HayashiError::Type(
-                    "argumentos de proptest2() devem ser inteiros".into(),
+                    "proptest2() arguments must be integers".into(),
                 )),
             }
         };

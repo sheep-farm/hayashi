@@ -262,13 +262,13 @@ impl Interpreter {
         opt_map: &HashMap<String, Value>,
     ) -> Result<Value> {
         if args.len() < 2 {
-            return Err(HayashiError::Runtime("anova(df, outcome, by=grupo)".into()));
+            return Err(HayashiError::Runtime("anova(df, outcome, by=group)".into()));
         }
         let df_name = match &args[0] {
             Expr::Var(n) => n.clone(),
             _ => {
                 return Err(HayashiError::Type(
-                    "primeiro argumento deve ser DataFrame".into(),
+                    "anova(): first argument must be a DataFrame".into(),
                 ))
             }
         };
@@ -289,7 +289,7 @@ impl Interpreter {
             Some(Value::Str(s)) => s.clone(),
             None => {
                 return Err(HayashiError::Runtime(
-                    "anova() requer by=\"coluna_grupo\"".into(),
+                    "anova() requires by=\"group_column\"".into(),
                 ))
             }
             _ => return Err(HayashiError::Type("by= must be string".into())),
@@ -351,7 +351,7 @@ impl Interpreter {
             Some(Value::Str(s)) => s.clone(),
             None => {
                 return Err(HayashiError::Runtime(
-                    "manova requer by=\"coluna_grupo\"".into(),
+                    "manova() requires by=\"group_column\"".into(),
                 ))
             }
             _ => return Err(HayashiError::Type("manova: by= must be string".into())),
