@@ -1751,7 +1751,7 @@ impl Interpreter {
     ) -> Result<Value> {
         let n = self.stored_models.len();
         self.stored_models.clear();
-        println!("estclear: {n} modelos removidos");
+        println!("estclear: {n} models removed");
         Ok(Value::Int(n as i64))
     }
 

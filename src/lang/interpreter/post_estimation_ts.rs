@@ -323,7 +323,7 @@ impl Interpreter {
                             " Average Marginal Effects — {}",
                             r.model_name.to_uppercase()
                         );
-                        println!(" dP(Y=j)/dx — um painel por categoria");
+                        println!(" dP(Y=j)/dx — one panel per category");
                         println!("{sep2}");
                         // header
                         print!("{:<22}", "Variable");
@@ -884,12 +884,12 @@ impl Interpreter {
                         .insert(ss_name.clone(), slope_smooth)
                         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                     format!(
-                        "\nKalman ({}):  T={}  loglik={:.4}  σ_obs={:.4}  σ_state={:.4}  σ_slope={:.4}\n  → {filt_name}, {smooth_name}, {sf_name}, {ss_name} adicionadas a {df_name}\n",
+                        "\nKalman ({}):  T={}  loglik={:.4}  σ_obs={:.4}  σ_state={:.4}  σ_slope={:.4}\n  → {filt_name}, {smooth_name}, {sf_name}, {ss_name} added to {df_name}\n",
                         model_kind, n, ss_result.log_likelihood, sigma_obs, sigma_state, sigma_slope
                     )
                 } else {
                     format!(
-                        "\nKalman ({}):  T={}  loglik={:.4}  σ_obs={:.4}  σ_state={:.4}\n  → {filt_name}, {smooth_name} adicionadas a {df_name}\n",
+                        "\nKalman ({}):  T={}  loglik={:.4}  σ_obs={:.4}  σ_state={:.4}\n  → {filt_name}, {smooth_name} added to {df_name}\n",
                         model_kind, n, ss_result.log_likelihood, sigma_obs, sigma_state
                     )
                 };

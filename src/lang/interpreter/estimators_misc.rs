@@ -1633,7 +1633,7 @@ impl Interpreter {
             .map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
         let mut display = String::new();
         display.push_str(&format!(
-            "hpfilter: λ={lambda}  →  {trend_name} e {cycle_name} adicionadas a {df_name}\n"
+            "hpfilter: λ={lambda}  →  {trend_name} and {cycle_name} added to {df_name}\n"
         ));
         let summary = format!("HPFilter λ={lambda}, {var_name} → {trend_name}/{cycle_name}");
         let fit = model_expansion::fit_dict(&[

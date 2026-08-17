@@ -543,7 +543,7 @@ impl Interpreter {
         };
 
         let sep = "─".repeat(44);
-        println!("\nCondition Number (multicolinearidade global)");
+        println!("\nCondition Number (global multicollinearity)");
         println!("{sep}");
         if kappa.is_infinite() {
             println!("{:<20} {:>12}  {}", "κ(X)", "∞", diag);
@@ -640,9 +640,9 @@ impl Interpreter {
             .map_err(|e| self.rt_err(format!("white: {e}")))?;
 
         let sep = "─".repeat(54);
-        println!("\nWhite Test (heteroscedasticidade)");
+        println!("\nWhite Test (heteroskedasticity)");
         println!("{sep}");
-        println!("H₀: homocedasticidade");
+        println!("H₀: homoskedasticity");
         println!("{sep}");
         println!(
             "{:<24} {:>10} {:>10} {:>4}",
@@ -788,7 +788,7 @@ impl Interpreter {
         println!("{sep}");
         println!("H₀: residuals normally distributed");
         println!("{sep}");
-        println!("{:<18} {:>10} {:>10} {:>4}", "Teste", "JB", "p-value", "");
+        println!("{:<18} {:>10} {:>10} {:>4}", "Test", "JB", "p-value", "");
         println!("{sep}");
         println!(
             "{:<18} {:>10.4} {:>10.4} {:>4}",
@@ -937,7 +937,7 @@ impl Interpreter {
             res.lags, res.n_obs
         ));
         display.push_str(&format!("{sep}\n"));
-        display.push_str(&format!("H₀: sem efeitos ARCH de ordem {}\n", res.lags));
+        display.push_str(&format!("H₀: no ARCH effects of order {}\n", res.lags));
         display.push_str(&format!("{sep}\n"));
         display.push_str(&format!(
             "{:<22} {:>10} {:>10} {:>8}\n",
@@ -1378,7 +1378,7 @@ impl Interpreter {
     }
 
     fn ols_white(&self, ols: &super::models::OlsModel) -> Result<Value> {
-        println!("\n── Heteroscedasticidade (White)");
+        println!("\n── Heteroskedasticity (White)");
         match greeners::SpecificationTests::white_test(&ols.residuals, &ols.x) {
             Ok((lm, p, df)) => {
                 println!(
@@ -1430,7 +1430,7 @@ impl Interpreter {
     }
 
     fn ols_vif(&self, ols: &super::models::OlsModel) -> Result<Option<Value>> {
-        println!("\n── Multicolinearidade (VIF)");
+        println!("\n── Multicollinearity (VIF)");
         let names = ols.result.variable_names.as_deref().unwrap_or(&[]);
         let mut vif_var = Vec::new();
         let mut vif_val = Vec::new();
@@ -1575,7 +1575,7 @@ impl Interpreter {
     }
 
     fn garch_arch_test(&self, std_res: &ndarray::Array1<f64>) -> Result<Value> {
-        println!("\n── Efeitos ARCH Residuais (Engle LM, lags=5)");
+        println!("\n── ARCH Residual Effects (Engle LM, lags=5)");
         match greeners::Diagnostics::arch_test(std_res, 5) {
             Ok(r) => {
                 println!(
@@ -1801,7 +1801,7 @@ impl Interpreter {
         // CVs 5%: Osterwald-Lenum (1992) Tabela 1 — constant restrita
         let cv_5pct: &[f64] = &[9.24, 19.96, 34.91, 53.12, 76.07, 102.56, 131.70];
         println!("\n── Johansen Test (Trace)");
-        println!("   H₀: rank ≤ r   CVs 5%: Osterwald-Lenum (1992) Tabela 1");
+        println!("   H₀: rank ≤ r   CVs 5%: Osterwald-Lenum (1992) Table 1");
         println!(
             "   {:<6} {:>10} {:>12} {:>10} {:>6}",
             "H₀:r≤", "λ_max", "λ_trace", "CV 5%", ""
@@ -2119,7 +2119,7 @@ impl Interpreter {
 
         println!("\n── Tests Not Available");
         println!("   • Hausman FE vs RE: use hausman(fe_model, re_model)");
-        println!("   • BP LM test (H₀: sem individual effects): σ_e²/σ_u² acima sugere efeitos");
+        println!("   • BP LM test (H₀: no individual effects): σ_e²/σ_u² above suggests effects");
         println!("\n{thin}");
         println!("   *** p<0.01  ** p<0.05  * p<0.10");
         println!("{thick}\n");
@@ -2738,7 +2738,7 @@ impl Interpreter {
         display.push_str(&format!("{sep}\n"));
         display.push_str(&format!(
             "{:>5}  {:>12}  {:>12}  {:>8}\n",
-            "#", "p original", "p ajustado", "Rejeitar?"
+            "#", "p unadjusted", "p adjusted", "Reject?"
         ));
         display.push_str(&format!("{sep}\n"));
         for (i, ((p_orig, p_adj), rej)) in pvals
