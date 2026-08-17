@@ -2472,6 +2472,44 @@
       "Maintainer": "Jennifer Bryan <jenny@posit.co>",
       "Repository": "CRAN"
     },
+    "gmm": {
+      "Package": "gmm",
+      "Version": "1.9-1",
+      "Source": "Repository",
+      "Priority": null,
+      "Depends": [
+        "R (>= 2.10.0)",
+        "sandwich"
+      ],
+      "Imports": [
+        "stats",
+        "methods",
+        "grDevices",
+        "graphics"
+      ],
+      "LinkingTo": [
+        null
+      ],
+      "Suggests": [
+        "knitr",
+        "mvtnorm",
+        "car",
+        "stabledist",
+        "MASS",
+        "timeDate",
+        "timeSeries"
+      ],
+      "Enhances": [
+        null
+      ],
+      "License": "GPL (>= 2)",
+      "License_is_FOSS": null,
+      "License_restricts_use": null,
+      "OS_type": null,
+      "NeedsCompilation": "yes",
+      "Repository": "CRAN",
+      "Type": "source"
+    },
     "gplots": {
       "Package": "gplots",
       "Version": "3.3.0",

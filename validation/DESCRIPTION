@@ -21,6 +21,7 @@ Imports:
     gbm,
     geepack,
     glmnet,
+    gmm,
     grf,
     jsonlite,
     kernlab,

@@ -344,6 +344,14 @@ cases:
   notes: Two Gaussian clusters. Compare sorted component means.
   dimension: numerical
   status: pass
+- id: gmm_overidentified_simulated
+  notes: The DGP has one endogenous regressor and two excluded, valid instruments,
+    so L-K=1. R gmm and Python linearmodels use two-step heteroskedastic GMM. The
+    maximum standard-error difference is 2.569e-6; 1e-5 accepts the asymptotically
+    equivalent finite-sample covariance forms. Coefficients and the Hansen J statistic
+    agree to numerical precision.
+  dimension: numerical
+  status: pass
 - id: gp_simulated
   notes: Simulated 1-D regression with a fixed seed; compares training-set R2 and
     MSE between Hayashi, R kernlab and Python sklearn. Tolerances reflect different
