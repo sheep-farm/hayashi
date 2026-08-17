@@ -21,3 +21,8 @@ statsmodels>=0.14
 umap-learn>=0.5
 wooldridge>=0.0.2
 xgboost>=2.0
+
+# nvidia-nccl-cu12 is a Linux-only transitive dependency of xgboost. Pinning it
+# here with a platform marker keeps pip-compile from emitting an unconditional
+# pin that breaks validation on macOS and Windows.
+nvidia-nccl-cu12 ; sys_platform == "linux"
