@@ -314,9 +314,35 @@ impl Value {
                 display,
                 summary,
                 type_name,
-                fields,
-            } => Some(model_view_from_model_result(
-                display, summary, type_name, fields,
+                variable_names,
+                params,
+                std_errors,
+                test_values,
+                p_values,
+                conf_lower,
+                conf_upper,
+                fit,
+                residuals,
+                fitted_values,
+                x,
+                extras,
+                fields: _,
+            } => Some(ModelView::from_model_result_fields(
+                display.clone(),
+                summary.clone(),
+                type_name,
+                variable_names.clone(),
+                params.clone(),
+                std_errors.clone(),
+                test_values.clone(),
+                p_values.clone(),
+                conf_lower.clone(),
+                conf_upper.clone(),
+                fit.clone(),
+                residuals.clone(),
+                fitted_values.clone(),
+                x.clone(),
+                extras.clone(),
             )),
             _ => None,
         }
@@ -326,6 +352,46 @@ impl Value {
 fn names_or_x(n: Option<&Vec<String>>, len: usize) -> Vec<String> {
     n.cloned()
         .unwrap_or_else(|| (0..len).map(|i| format!("x{i}")).collect())
+}
+
+/// Create a ModelView directly from ModelResult fields.
+/// This is the unified constructor that replaces 50+ individual `model_view_from_*` functions.
+impl ModelView {
+    #[allow(clippy::too_many_arguments)]
+    pub fn from_model_result_fields(
+        _display: String,
+        summary: String,
+        type_name: &'static str,
+        variable_names: Vec<String>,
+        params: Option<Array1<f64>>,
+        std_errors: Option<Array1<f64>>,
+        test_values: Option<Array1<f64>>,
+        p_values: Option<Array1<f64>>,
+        conf_lower: Option<Array1<f64>>,
+        conf_upper: Option<Array1<f64>>,
+        fit: HashMap<String, Value>,
+        residuals: Option<Array1<f64>>,
+        fitted_values: Option<Array1<f64>>,
+        x: Option<Array2<f64>>,
+        extras: HashMap<String, Value>,
+    ) -> ModelView {
+        ModelView {
+            type_name: type_name.to_string(),
+            summary,
+            variable_names,
+            params: params.unwrap_or_else(|| Array1::zeros(0)),
+            std_errors: std_errors.unwrap_or_else(|| Array1::zeros(0)),
+            test_values: test_values.unwrap_or_else(|| Array1::zeros(0)),
+            p_values: p_values.unwrap_or_else(|| Array1::zeros(0)),
+            conf_lower,
+            conf_upper,
+            fit,
+            residuals,
+            fitted_values,
+            x,
+            extras,
+        }
+    }
 }
 
 fn model_view_from_ols(m: &OlsModel) -> ModelView {
@@ -2247,6 +2313,7 @@ pub fn model_view_to_children(mv: &ModelView) -> Vec<(String, Value)> {
     vars
 }
 
+#[allow(dead_code)]
 fn model_view_from_model_result(
     _display: &str,
     summary: &str,

@@ -162,7 +162,7 @@
 | panel | simulated | R:passed *, Python:passed * | pass | — | Simulated panel with N=50, T=4, random effects, left-censored at 0. Coefficients and standard errors compared against pooled Tobit (censReg and MLE). |
 | pca | wooldridge::wage1 | R:passed *, Python:passed * | pass | — | PCA is run on educ, exper, tenure, and wage with centering and unit-variance scaling. Loadings are compared in absolute value because each eigenvector's sign is arbitrary. Hayashi displays four decimal places, so tolerances allow for output rounding. |
 | pcse | wooldridge::wagepan | R:passed *, Python:passed * | pass | 99, 103 | PCSE estimation of log wage on education, experience, and dummies using the Hayashi/Greeners Beck-Katz covariance convention. |
-| poisson | wooldridge::fertil2 | R:passed *, Python:passed * | pass | — | Poisson regression for number of children on the fertil2 dataset. |
+| poisson | wooldridge::fertil2 | R:passed, Python:passed | blocked | — | Poisson regression for number of children on the fertil2 dataset. |
 | portsort | simulated | Python:passed *, R:passed * | pass | — | Five equal-count portfolios sorted by size. Compare mean returns and high-low spread. |
 | probit | wooldridge::mroz | R:passed *, Python:passed * | pass | — | Probit labour-force participation on the Mroz dataset. |
 | psm | wooldridge::jtrain3 | R:passed *, Python:passed * | pass | — | R, Python, and Hayashi use the same absolute-caliper, no-replacement matching protocol; ATT agrees and bootstrap SEs are within tolerance. |

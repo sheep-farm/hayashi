@@ -171,6 +171,74 @@ para isso).
   $\sim$4\,MB.
 \end{nota}
 
+\subsection*{Controle de inferência de tipos (\texttt{types=}, \texttt{na=}) para CSV/TSV}
+
+Para arquivos CSV e TSV, o \hayashi{} delega a inferência de tipos para o Greeners,
+que oferece controle explícito sobre os tipos de colunas e o tratamento de valores
+nulos.
+
+\subsubsection*{\texttt{types=} --- tipos de coluna explícitos}
+
+\begin{lstlisting}[caption={Tipos de coluna explícitos}]
+load "dados.csv" as df, types=[ticker:string, preco:float, data:date]
+\end{lstlisting}
+
+Formato: \texttt{types=[coluna:tipo, ...]}. Cada entrada é \texttt{coluna:tipo}
+onde \texttt{tipo} pode ser:
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Tipo} & \textbf{Significado} \\
+\midrule
+\texttt{int}       & Inteiro de 64 bits com sinal \\
+\texttt{float}    & Ponto flutuante de 64 bits (\texttt{NaN} para ausentes) \\
+\texttt{bool}     & Booleano (verdadeiro/falso) \\
+\texttt{string}   & Texto livre (alta cardinalidade) \\
+\texttt{categorical} & String de baixa cardinalidade com codificação inteira \\
+\texttt{date} / \texttt{datetime} & Data/hora ISO-8601 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Colunas não listadas em \texttt{types=} são inferidas automaticamente usando as
+regras padrão do Greeners.
+
+\textbf{Exemplo --- evitando inferência errada de \textit{tickers}:}
+
+\begin{lstlisting}[caption={Forçando \textit{ticker} e \textit{símbolo} como string}]
+load "tickers.csv" as df, types=[ticker:string, simbolo:string, preco:float]
+\end{lstlisting}
+
+Sem \texttt{types=}, \textit{tickers} como \texttt{T}, \texttt{F}, \texttt{NAN}
+seriam inferidos como \texttt{bool}/\texttt{float}. Com \texttt{types=}, eles
+permanecem strings.
+
+\subsubsection*{\texttt{na=} --- valores nulos customizados}
+
+\begin{lstlisting}[caption={Valores nulos customizados}]
+load "dados.csv" as df, na=["NA", "NaN", "NULL", "null", "", "."]
+\end{lstlisting}
+
+Valores que casem com qualquer string da lista são tratados como ausentes (nulo).
+Padrão: \texttt{["", "NA", ".", "NaN", "NULL", "null"]}.
+
+\textbf{Exemplo --- tratando strings vazias como ausentes:}
+
+\begin{lstlisting}[caption={Nulls customizados para dados de pesquisa}]
+load "pesquisa.csv" as df, na=["", "NA", "N/A", "null"]
+\end{lstlisting}
+
+\begin{nota}
+  Em arquivos Parquet grandes, o \textit{pushdown} de filtro é especialmente
+  eficaz: o predicado é avaliado durante o \textit{scan} do \textit{row group},
+  antes de qualquer dado ser decodificado para a memória. Em um arquivo de
+  837\,MB com 30 milhões de linhas e 8.292 \textit{tickers}, carregar
+  \texttt{columns=[ticker, date, adj\_close], where="ticker == \textbackslash"AAPL\textbackslash""}
+  reduziu o pico de RAM de $\sim$7{,}5\,GB (carga \textit{eager} completa) para
+  $\sim$4\,MB.
+\end{nota}
+
 \subsubsection*{\textit{Row group pruning} por estatísticas (Parquet)}
 
 Além do \texttt{RowFilter} (que avalia o predicado em cada linha durante o

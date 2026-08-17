@@ -162,6 +162,71 @@ two columns is not supported (use \texttt{generate} + \texttt{filter} for that).
   reduced peak RAM from $\sim$7.5\,GB (full eager load) to $\sim$4\,MB.
 \end{nota}
 
+\subsection*{Type inference control (\texttt{types=}, \texttt{na=}) for CSV/TSV}
+
+For CSV and TSV files, \hayashi{} delegates type inference to Greeners, which
+provides explicit control over column types and null value handling.
+
+\subsubsection*{\texttt{types=} --- explicit column types}
+
+\begin{lstlisting}[caption={Explicit column types}]
+load "data.csv" as df, types=[ticker:string, price:float, date:date]
+\end{lstlisting}
+
+Format: \texttt{types=[colname:type, ...]}. Each entry is \texttt{column:type}
+where \texttt{type} is one of:
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Type} & \textbf{Meaning} \\
+\midrule
+\texttt{int}       & 64-bit signed integer \\
+\texttt{float}    & 64-bit floating point (\texttt{NaN} for missing) \\
+\texttt{bool}     & Boolean (true/false) \\
+\texttt{string}   & Free text (high cardinality) \\
+\texttt{categorical} & Low-cardinality string with integer encoding \\
+\texttt{date} / \texttt{datetime} & ISO-8601 date/time \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Columns not listed in \texttt{types=} are inferred automatically using
+Greeners' default rules.
+
+\textbf{Example --- preventing ticker mis-inference:}
+
+\begin{lstlisting}[caption={Forcing ticker and symbol to string}]
+load "tickers.csv" as df, types=[ticker:string, symbol:string, price:float]
+\end{lstlisting}
+
+Without \texttt{types=}, tickers like \texttt{T}, \texttt{F}, \texttt{NAN} would be
+inferred as \texttt{bool}/\texttt{float}. With \texttt{types=}, they remain strings.
+
+\subsubsection*{\texttt{na=} --- custom null values}
+
+\begin{lstlisting}[caption={Custom null values}]
+load "data.csv" as df, na=["NA", "NaN", "NULL", "null", "", "."]
+\end{lstlisting}
+
+Values matching any string in the list are treated as missing (null). Defaults:
+\texttt{["", "NA", ".", "NaN", "NULL", "null"]}.
+
+\textbf{Example --- treating empty strings as missing:}
+
+\begin{lstlisting}[caption={Custom nulls for survey data}]
+load "survey.csv" as df, na=["", "NA", "N/A", "null"]
+\end{lstlisting}
+
+\begin{nota}
+  On large Parquet files, filter pushdown is especially effective: the
+  predicate is evaluated during the row-group scan, before any data is decoded
+  into memory. On an 837\,MB file with 30 million rows and 8{,}292 tickers,
+  loading with
+  \texttt{columns=[ticker, date, adj\_close], where="ticker == \textbackslash"AAPL\textbackslash""}
+  reduced peak RAM from $\sim$7.5\,GB (full eager load) to $\sim$4\,MB.
+\end{nota}
+
 \subsubsection*{Row group pruning by statistics (Parquet)}
 
 In addition to \texttt{RowFilter} (which evaluates the predicate on each row
