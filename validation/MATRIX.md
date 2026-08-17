@@ -157,15 +157,15 @@
 | orf | simulated | R, Python | pass | — | Simulated data y = 1 + 2*x1 - x2 + 0.5*treated + 0.3*w1 - 0.2*w2 + N(0,1). Hayashi orf() reports the average treatment effect. R reference uses grf::causal_forest on the full set of covariates; Python uses econml.orf.DROrthoForest. |
 | panel_fe | wooldridge::wagepan | R, Python | pass | 115 | Panel fixed-effects wage equation with worker-clustered standard errors using explicit within-transformed CR1 reference implementations. Tolerance reflects Hayashi's four-decimal text export. |
 | panel_fe | wooldridge::grunfeld | R, Python | pass | — | Panel fixed-effects investment demand model (Grunfeld). |
-| panel_fe | wooldridge::wagepan | R:passed *, Python:passed * | pass | — | Panel fixed-effects wage equation with time-clustered standard errors using explicit within-transformed CR1 reference implementations. |
-| panel_fe | wooldridge::wagepan | R:passed *, Python:passed * | pass | — | Panel fixed-effects wage equation with two-way (entity + time) clustered standard errors using explicit within-transformed CR1 reference implementations. |
+| panel_fe | wooldridge::wagepan | R, Python | pass | — | Panel fixed-effects wage equation with time-clustered standard errors using explicit within-transformed CR1 reference implementations. |
+| panel_fe | wooldridge::wagepan | R, Python | pass | — | Panel fixed-effects wage equation with two-way (entity + time) clustered standard errors using explicit within-transformed CR1 reference implementations. |
 | panel_fe | wooldridge::wagepan | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 14, Example 14.4 panel fixed-effects wage equation. |
 | panel_heckman | simulated_panel_heckman | R, Python | pass | — | Panel Heckman selection model (two-step) with selection equation and outcome equation. Uses simulated panel data with known selection mechanism. |
 | panel_qreg | simulated | R, Python | pass | — | Simulated panel with entity fixed effects and heteroskedastic errors. References demean the data and run quantile regression without an intercept; standard errors are convention-sensitive. |
 | panel | simulated | R, Python | pass | — | Simulated panel with N=50, T=4, random effects, left-censored at 0. Coefficients and standard errors compared against pooled Tobit (censReg and MLE). |
 | pca | wooldridge::wage1 | R, Python | pass | — | PCA is run on educ, exper, tenure, and wage with centering and unit-variance scaling. Loadings are compared in absolute value because each eigenvector's sign is arbitrary. Hayashi displays four decimal places, so tolerances allow for output rounding. |
 | pcse | wooldridge::wagepan | R, Python | pass | 99, 103 | PCSE estimation of log wage on education, experience, and dummies using the Hayashi/Greeners Beck-Katz covariance convention. |
-| poisson | wooldridge::fertil2 | R, Python | blocked | — | Poisson regression for number of children on the fertil2 dataset. |
+| poisson | wooldridge::fertil2 | R, Python | pass | — | Poisson regression for number of children on the fertil2 dataset. |
 | portsort | simulated | Python, R | pass | — | Five equal-count portfolios sorted by size. Compare mean returns and high-low spread. |
 | probit | wooldridge::mroz | R, Python | pass | — | Probit labour-force participation on the Mroz dataset. |
 | psm | wooldridge::jtrain3 | R, Python | pass | — | R, Python, and Hayashi use the same absolute-caliper, no-replacement matching protocol; ATT agrees and bootstrap SEs are within tolerance. |

@@ -830,7 +830,7 @@ cases:
 - id: poisson_fertil2
   notes: Poisson regression for number of children on the fertil2 dataset.
   dimension: numerical
-  status: blocked
+  status: pass
 - id: portsort_simulated
   notes: Five equal-count portfolios sorted by size. Compare mean returns and high-low
     spread.
