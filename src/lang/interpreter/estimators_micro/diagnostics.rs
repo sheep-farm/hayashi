@@ -245,7 +245,7 @@ impl Interpreter {
                 format!("   Stock-Yogo (2005): table available for L=1..10 (L={} out of range).\n   Rule of thumb (Staiger & Stock 1997): F > 10.\n", l)
             }
         } else {
-            format!("   Stock-Yogo (2005): critical values for k_endog=1 only.\n   Para k_endog={}, see tables in Andrews, Stock & Sun (2019).\n", k_endog)
+            format!("   Stock-Yogo (2005): critical values for k_endog=1 only.\n   For k_endog={}, see tables in Andrews, Stock & Sun (2019).\n", k_endog)
         };
 
         let thick = "═".repeat(70);

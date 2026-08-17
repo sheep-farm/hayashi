@@ -323,7 +323,7 @@ impl Interpreter {
                             " Average Marginal Effects — {}",
                             r.model_name.to_uppercase()
                         );
-                        println!(" dP(Y=j)/dx — um painel por categoria");
+                        println!(" dP(Y=j)/dx — one panel per category");
                         println!("{sep2}");
                         // header
                         print!("{:<22}", "Variable");
@@ -367,7 +367,7 @@ impl Interpreter {
                             println!();
                         }
                         println!("{sep}");
-                        println!("n = {n}   Categorias: {j}   Modelo: {}", r.model_name);
+                        println!("n = {n}   Categories: {j}   Model: {}", r.model_name);
                         println!("{sep2}\n");
                     }
 
@@ -587,7 +587,7 @@ impl Interpreter {
                     Expr::Var(n) => n.clone(),
                     _ => {
                         return Err(HayashiError::Type(
-                            "autoreg: primeiro argumento deve ser um DataFrame".into(),
+                            "autoreg(): first argument must be a DataFrame".into(),
                         ))
                     }
                 };
@@ -640,7 +640,7 @@ impl Interpreter {
                     Expr::Var(n) => n.clone(),
                     _ => {
                         return Err(HayashiError::Type(
-                            "ardl: segundo argumento deve ser um DataFrame".into(),
+                            "ardl(): second argument must be a DataFrame".into(),
                         ))
                     }
                 };
@@ -708,7 +708,7 @@ impl Interpreter {
                     Expr::Var(n) => n.clone(),
                     _ => {
                         return Err(HayashiError::Type(
-                            "kalman: primeiro argumento deve ser um DataFrame".into(),
+                            "kalman(): first argument must be a DataFrame".into(),
                         ))
                     }
                 };
@@ -808,7 +808,7 @@ impl Interpreter {
                     }
                     other => {
                         return Err(HayashiError::Runtime(format!(
-                            "kalman: modelo '{other}' desconhecido — use \"ll\" ou \"llt\""
+                            "kalman(): unknown model '{other}' — use \"ll\" or \"llt\""
                         )))
                     }
                 };
@@ -884,12 +884,12 @@ impl Interpreter {
                         .insert(ss_name.clone(), slope_smooth)
                         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
                     format!(
-                        "\nKalman ({}):  T={}  loglik={:.4}  σ_obs={:.4}  σ_state={:.4}  σ_slope={:.4}\n  → {filt_name}, {smooth_name}, {sf_name}, {ss_name} adicionadas a {df_name}\n",
+                        "\nKalman ({}):  T={}  loglik={:.4}  σ_obs={:.4}  σ_state={:.4}  σ_slope={:.4}\n  → {filt_name}, {smooth_name}, {sf_name}, {ss_name} added to {df_name}\n",
                         model_kind, n, ss_result.log_likelihood, sigma_obs, sigma_state, sigma_slope
                     )
                 } else {
                     format!(
-                        "\nKalman ({}):  T={}  loglik={:.4}  σ_obs={:.4}  σ_state={:.4}\n  → {filt_name}, {smooth_name} adicionadas a {df_name}\n",
+                        "\nKalman ({}):  T={}  loglik={:.4}  σ_obs={:.4}  σ_state={:.4}\n  → {filt_name}, {smooth_name} added to {df_name}\n",
                         model_kind, n, ss_result.log_likelihood, sigma_obs, sigma_state
                     )
                 };
@@ -1118,7 +1118,9 @@ impl Interpreter {
                 // nomes dos coeficientes via API do Greeners (sem parse de CSV)
                 let var_names: Vec<String> =
                     ols.result.variable_names.clone().ok_or_else(|| {
-                        HayashiError::Runtime("modelo sem variable_names — use from_formula".into())
+                        HayashiError::Runtime(
+                            "model has no variable_names — use from_formula".into(),
+                        )
                     })?;
 
                 let k = var_names.len();

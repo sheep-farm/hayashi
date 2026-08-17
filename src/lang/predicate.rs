@@ -295,7 +295,7 @@ fn make_cmp(col: String, op: &BinOp, lit: Literal) -> RowPredicate {
         BinOp::Lt => RowPredicate::Lt(col, lit),
         BinOp::GtEq => RowPredicate::Ge(col, lit),
         BinOp::LtEq => RowPredicate::Le(col, lit),
-        _ => unreachable!("make_cmp chamado com op inválido"),
+        _ => unreachable!("make_cmp called with invalid operator"),
     }
 }
 

@@ -21,6 +21,10 @@ struct LoadOptions {
     sep: Option<String>,
     columns: Option<Vec<String>>,
     predicate: Option<crate::lang::predicate::RowPredicate>,
+    types: Option<Vec<String>>,
+    na: Option<Vec<String>>,
+    #[allow(dead_code)]
+    encoding: Option<String>,
 }
 
 impl Interpreter {
@@ -411,9 +415,20 @@ impl Interpreter {
         let mut opt_sep: Option<String> = None;
         let mut opt_columns: Option<Vec<String>> = None;
         let mut opt_where: Option<String> = None;
+        let mut opt_types: Option<Vec<String>> = None;
+        let mut opt_na: Option<Vec<String>> = None;
+        let mut opt_encoding: Option<String> = None;
         for o in opts {
             if o.name == "columns" {
                 opt_columns = Some(extract_column_names(&o.value)?);
+                continue;
+            }
+            if o.name == "types" {
+                opt_types = Some(extract_column_names(&o.value)?);
+                continue;
+            }
+            if o.name == "na" {
+                opt_na = Some(extract_column_names(&o.value)?);
                 continue;
             }
             let val = match self.eval_expr(&o.value)? {
@@ -428,9 +443,10 @@ impl Interpreter {
                 "query" => opt_query = Some(val),
                 "sep" | "delimiter" => opt_sep = Some(val),
                 "where" => opt_where = Some(val),
+                "encoding" => opt_encoding = Some(val),
                 k => {
                     return Err(HayashiError::Runtime(format!(
-                        "load: unknown option '{k}' — use: sheet, table, query, sep, columns, where"
+                        "load: unknown option '{k}' — use: sheet, table, query, sep, columns, where, types, na, encoding"
                     )))
                 }
             }
@@ -446,6 +462,9 @@ impl Interpreter {
             sep: opt_sep,
             columns: opt_columns,
             predicate,
+            types: opt_types,
+            na: opt_na,
+            encoding: opt_encoding,
         })
     }
 
@@ -549,7 +568,14 @@ impl Interpreter {
                 let n = df.n_rows();
                 Ok((df, n))
             }
-            "tsv" | "tab" => crate::io::dsv::load_dsv(local_path, b'\t', opt_columns, predicate),
+            "tsv" | "tab" => crate::io::dsv::load_dsv(
+                local_path,
+                b'\t',
+                opt_columns,
+                predicate,
+                options.types.as_deref(),
+                options.na.as_deref(),
+            ),
             "parquet" | "pq" => {
                 crate::io::parquet::load_parquet(local_path, opt_columns, predicate)
             }
@@ -564,16 +590,14 @@ impl Interpreter {
                     }
                     None => b',',
                 };
-                if delim == b',' && opt_columns.is_none() && predicate.is_none() {
-                    // Caminho padrão (greeners): sem columns/where.
-                    let df =
-                        DataFrame::from_csv(local_path).map_err(|e| self.rt_err(e.to_string()))?;
-                    let n = df.n_rows();
-                    Ok((df, n))
-                } else {
-                    // Loader DSV do hayashi — suporta columns=/where=.
-                    crate::io::dsv::load_dsv(local_path, delim, opt_columns, predicate)
-                }
+                crate::io::dsv::load_dsv(
+                    local_path,
+                    delim,
+                    opt_columns,
+                    predicate,
+                    options.types.as_deref(),
+                    options.na.as_deref(),
+                )
             }
         }
     }

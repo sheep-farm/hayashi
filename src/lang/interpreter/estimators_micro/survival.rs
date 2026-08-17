@@ -18,7 +18,7 @@ impl Interpreter {
             Expr::Var(v) | Expr::Str(v) => v.clone(),
             _ => {
                 return Err(HayashiError::Type(
-                    "km(): first argument must be nome da coluna de tempo".into(),
+                    "km(): first argument must be the time column name".into(),
                 ))
             }
         };
@@ -26,7 +26,7 @@ impl Interpreter {
             Expr::Var(v) | Expr::Str(v) => v.clone(),
             _ => {
                 return Err(HayashiError::Type(
-                    "km(): second argument must be nome da coluna de evento".into(),
+                    "km(): second argument must be the event column name".into(),
                 ))
             }
         };
@@ -71,7 +71,7 @@ impl Interpreter {
             Some(Value::Str(s)) => s.clone(),
             None => {
                 return Err(HayashiError::Runtime(
-                    "cox() requires event=coluna option".into(),
+                    "cox() requires event=column option".into(),
                 ))
             }
             _ => return Err(HayashiError::Type("event= must be string".into())),

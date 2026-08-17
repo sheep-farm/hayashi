@@ -1,5 +1,6 @@
 use crate::lang::ast::{Expr, Spanned};
 use crate::lang::error::HayashiError;
+use ndarray::{Array1, Array2};
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -205,6 +206,7 @@ impl Series {
 // ── Value ────────────────────────────────────────────────────────────────────
 
 #[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
 pub enum Value {
     Float(f64),
     Int(i64),
@@ -285,10 +287,35 @@ pub enum Value {
     /// named children.  Used for estimators that do not yet have a dedicated
     /// `Value` variant, while still exposing every field to DAP and to the
     /// `var.field` / `var["field"]` syntax.
+    #[allow(clippy::large_enum_variant)]
     ModelResult {
         display: String,
         summary: String,
         type_name: &'static str,
+        /// Variable names (RHS + intercept if present)
+        variable_names: Vec<String>,
+        /// Coefficient estimates
+        params: Option<Array1<f64>>,
+        /// Standard errors
+        std_errors: Option<Array1<f64>>,
+        /// Test statistics (t or z)
+        test_values: Option<Array1<f64>>,
+        /// P-values
+        p_values: Option<Array1<f64>>,
+        /// Confidence intervals
+        conf_lower: Option<Array1<f64>>,
+        conf_upper: Option<Array1<f64>>,
+        /// Fit statistics (r2, aic, bic, log_lik, n_obs, etc.)
+        fit: HashMap<String, Value>,
+        /// Residuals (when available)
+        residuals: Option<Array1<f64>>,
+        /// Fitted values (when available)
+        fitted_values: Option<Array1<f64>>,
+        /// Design matrix (for diagnostics and predict)
+        x: Option<Array2<f64>>,
+        /// Estimator-specific extras (kind, y, eq_var_names, var_names, etc.)
+        extras: HashMap<String, Value>,
+        /// Structured fields for DAP/debug
         fields: Arc<HashMap<String, Value>>,
     },
     List(Arc<Vec<Value>>),
@@ -304,6 +331,155 @@ pub enum Value {
         format: String,
     },
     Nil,
+}
+
+impl Value {
+    /// Factory method to create a ModelResult from Greeners result fields.
+    /// This is the single entry point for converting any Greeners estimator result
+    /// into a unified Hayashi ModelResult.
+    ///
+    /// # Arguments
+    /// * `params` - Coefficient estimates
+    /// * `std_errors` - Standard errors
+    /// * `t_values` - Test statistics (t or z)
+    /// * `p_values` - P-values
+    /// * `conf_lower` - Confidence interval lower bounds (optional)
+    /// * `conf_upper` - Confidence interval upper bounds (optional)
+    /// * `r_squared` - R-squared (optional)
+    /// * `adj_r_squared` - Adjusted R-squared (optional)
+    /// * `f_statistic` - F-statistic (optional)
+    /// * `prob_f` - F-test p-value (optional)
+    /// * `log_likelihood` - Log-likelihood (optional)
+    /// * `aic` - AIC (optional)
+    /// * `bic` - BIC (optional)
+    /// * `sigma` - Residual standard error (optional)
+    /// * `n_obs` - Number of observations
+    /// * `n_vars` - Number of variables (params)
+    /// * `variable_names` - Variable names (optional)
+    /// * `type_name` - Estimator type name for display
+    /// * `display` - Full display string
+    /// * `residuals` - Residuals (optional)
+    /// * `fitted_values` - Fitted values (optional)
+    /// * `x` - Design matrix (optional)
+    #[allow(clippy::too_many_arguments)]
+    pub fn model_result(
+        params: Array1<f64>,
+        std_errors: Array1<f64>,
+        t_values: Array1<f64>,
+        p_values: Array1<f64>,
+        conf_lower: Option<Array1<f64>>,
+        conf_upper: Option<Array1<f64>>,
+        r_squared: Option<f64>,
+        adj_r_squared: Option<f64>,
+        f_statistic: Option<f64>,
+        prob_f: Option<f64>,
+        log_likelihood: Option<f64>,
+        aic: Option<f64>,
+        bic: Option<f64>,
+        sigma: Option<f64>,
+        n_obs: usize,
+        n_vars: usize,
+        variable_names: Option<Vec<String>>,
+        type_name: &'static str,
+        display: String,
+        residuals: Option<Array1<f64>>,
+        fitted_values: Option<Array1<f64>>,
+        x: Option<Array2<f64>>,
+    ) -> Value {
+        let summary = format!(
+            "{} (k={}, n={}), pseudo-R2={:.4}",
+            type_name,
+            n_vars,
+            n_obs,
+            r_squared.unwrap_or(f64::NAN)
+        );
+
+        let variable_names =
+            variable_names.unwrap_or_else(|| (0..n_vars).map(|i| format!("x{i}")).collect());
+
+        let params_opt = Some(params);
+        let std_errors_opt = Some(std_errors);
+        let test_values_opt = Some(t_values);
+        let p_values_opt = Some(p_values);
+
+        let mut fit = HashMap::new();
+        if let Some(r2) = r_squared {
+            fit.insert("r2".into(), Value::Float(r2));
+        }
+        if let Some(adj_r2) = adj_r_squared {
+            fit.insert("adj_r2".into(), Value::Float(adj_r2));
+        }
+        if let Some(f_stat) = f_statistic {
+            fit.insert("f_stat".into(), Value::Float(f_stat));
+        }
+        if let Some(pf) = prob_f {
+            fit.insert("prob_f".into(), Value::Float(pf));
+        }
+        if let Some(log_lik) = log_likelihood {
+            fit.insert("log_lik".into(), Value::Float(log_lik));
+        }
+        if let Some(aic_val) = aic {
+            fit.insert("aic".into(), Value::Float(aic_val));
+        }
+        if let Some(bic_val) = bic {
+            fit.insert("bic".into(), Value::Float(bic_val));
+        }
+        if let Some(sig) = sigma {
+            fit.insert("sigma".into(), Value::Float(sig));
+        }
+        fit.insert("n_obs".into(), Value::Int(n_obs as i64));
+
+        let extras = HashMap::new();
+
+        let fields: Arc<HashMap<String, Value>> = {
+            let mut m = HashMap::new();
+            m.insert("display".into(), Value::Str(display.clone()));
+            m.insert("summary".into(), Value::Str(summary.clone()));
+            m.insert("type_name".into(), Value::Str(type_name.to_string()));
+            m.insert(
+                "variable_names".into(),
+                Value::List(Arc::new(
+                    variable_names
+                        .iter()
+                        .map(|s| Value::Str(s.clone()))
+                        .collect(),
+                )),
+            );
+            if let Some(p) = &params_opt {
+                m.insert(
+                    "params".into(),
+                    Value::List(Arc::new(p.iter().map(|&v| Value::Float(v)).collect())),
+                );
+            }
+            if let Some(se) = &std_errors_opt {
+                m.insert(
+                    "std_errors".into(),
+                    Value::List(Arc::new(se.iter().map(|&v| Value::Float(v)).collect())),
+                );
+            }
+            m.insert("fit".into(), Value::Dict(Arc::new(fit.clone())));
+            Arc::new(m)
+        };
+
+        Value::ModelResult {
+            display,
+            summary,
+            type_name,
+            variable_names,
+            params: params_opt,
+            std_errors: std_errors_opt,
+            test_values: test_values_opt,
+            p_values: p_values_opt,
+            conf_lower,
+            conf_upper,
+            fit,
+            residuals,
+            fitted_values,
+            x,
+            extras,
+            fields,
+        }
+    }
 }
 
 // ── Send-safety for parallel for ───────────────────────────────────────────

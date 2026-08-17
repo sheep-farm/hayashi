@@ -1117,13 +1117,52 @@ pub fn array2_to_dataframe_named(arr: &Array2<f64>, col_names: &[String]) -> Val
     ))
 }
 
-/// Generic first-class model result constructor.  Stores the formatted Greeners
-/// output plus a named dict of children so DAP and `var.field` can inspect it
-/// without requiring a dedicated `Value` variant for every estimator.
+/// Generic first-class model result constructor (legacy signature for backward compatibility).
+/// Use `model_result_full` for the complete signature with all fields.
 pub fn model_result(
     display: impl Into<String>,
     summary: impl Into<String>,
     type_name: &'static str,
+    fields: Vec<(String, Value)>,
+) -> Value {
+    model_result_full(
+        display,
+        summary,
+        type_name,
+        Vec::new(),     // variable_names
+        None,           // params
+        None,           // std_errors
+        None,           // test_values
+        None,           // p_values
+        None,           // conf_lower
+        None,           // conf_upper
+        HashMap::new(), // fit
+        None,           // residuals
+        None,           // fitted_values
+        None,           // x
+        HashMap::new(), // extras
+        fields,
+    )
+}
+
+/// Full-featured model result constructor with all ModelResult fields.
+#[allow(clippy::too_many_arguments)]
+pub fn model_result_full(
+    display: impl Into<String>,
+    summary: impl Into<String>,
+    type_name: &'static str,
+    variable_names: Vec<String>,
+    params: Option<Array1<f64>>,
+    std_errors: Option<Array1<f64>>,
+    test_values: Option<Array1<f64>>,
+    p_values: Option<Array1<f64>>,
+    conf_lower: Option<Array1<f64>>,
+    conf_upper: Option<Array1<f64>>,
+    fit: HashMap<String, Value>,
+    residuals: Option<Array1<f64>>,
+    fitted_values: Option<Array1<f64>>,
+    x: Option<Array2<f64>>,
+    extras: HashMap<String, Value>,
     fields: Vec<(String, Value)>,
 ) -> Value {
     let map: HashMap<String, Value> = fields.into_iter().collect();
@@ -1131,6 +1170,18 @@ pub fn model_result(
         display: display.into(),
         summary: summary.into(),
         type_name,
+        variable_names,
+        params,
+        std_errors,
+        test_values,
+        p_values,
+        conf_lower,
+        conf_upper,
+        fit,
+        residuals,
+        fitted_values,
+        x,
+        extras,
         fields: Arc::new(map),
     }
 }

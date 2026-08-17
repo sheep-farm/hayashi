@@ -276,7 +276,7 @@ impl Interpreter {
             Some(Value::Str(s)) => vec![s.clone()],
             _ => {
                 return Err(HayashiError::Runtime(
-                    "cancorr requer yvars=[\"y1\",\"y2\"]".into(),
+                    "cancorr() requires yvars=[\"y1\",\"y2\"]".into(),
                 ))
             }
         };
@@ -576,7 +576,7 @@ impl Interpreter {
 
         for grp in &groups {
             if let Some(ref g) = grp {
-                println!("  grupo = {g}");
+                println!("  group = {g}");
             }
             for vname in &var_names {
                 let col = get_col_f64(&df, vname)?;
@@ -699,7 +699,7 @@ impl Interpreter {
             Some(Value::Str(s)) => s.clone(),
             _ => {
                 return Err(HayashiError::Runtime(
-                    "xtsum requer id=coluna_entidade".into(),
+                    "xtsum() requires id=entity_column".into(),
                 ))
             }
         };
@@ -1031,7 +1031,7 @@ impl Interpreter {
             Some(Value::Str(s)) => s.clone(),
             _ => {
                 return Err(HayashiError::Runtime(
-                    "ranksum requer by=coluna_grupo".into(),
+                    "ranksum() requires by=group_column".into(),
                 ))
             }
         };
@@ -1199,7 +1199,7 @@ impl Interpreter {
             Some(Value::Str(s)) => s.clone(),
             _ => {
                 return Err(HayashiError::Runtime(
-                    "kruskal requer by=coluna_grupo".into(),
+                    "kruskal() requires by=group_column".into(),
                 ))
             }
         };
@@ -1212,7 +1212,7 @@ impl Interpreter {
         let k = gvals.len();
         if k < 2 {
             return Err(HayashiError::Runtime(
-                "kruskal: precisa de pelo menos 2 grupos".into(),
+                "kruskal(): at least 2 groups are required".into(),
             ));
         }
         // Rank global com ties
@@ -1469,7 +1469,7 @@ impl Interpreter {
     ) -> Result<Value> {
         if args.len() < 2 {
             return Err(HayashiError::Runtime(
-                "bitest(successes, n, mu=0.5)  ou  bitest(df, var, mu=0)".into(),
+                "bitest(successes, n, mu=0.5) or bitest(df, var, mu=0)".into(),
             ));
         }
         // Suporta dois modos:
@@ -1481,7 +1481,11 @@ impl Interpreter {
                 let n_trials = match self.eval_expr(&args[1])? {
                     Value::Int(v) => v as usize,
                     Value::Float(v) => v as usize,
-                    _ => return Err(HayashiError::Type("segundo arg: n (inteiro)".into())),
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "bitest: second argument must be an integer (n)".into(),
+                        ))
+                    }
                 };
                 let mu = match opt_map.get("mu").or_else(|| opt_map.get("p")) {
                     Some(Value::Float(v)) => *v,
@@ -1633,7 +1637,7 @@ impl Interpreter {
             .map_err(|e: greeners::GreenersError| HayashiError::Runtime(e.to_string()))?;
         let mut display = String::new();
         display.push_str(&format!(
-            "hpfilter: λ={lambda}  →  {trend_name} e {cycle_name} adicionadas a {df_name}\n"
+            "hpfilter: λ={lambda}  →  {trend_name} and {cycle_name} added to {df_name}\n"
         ));
         let summary = format!("HPFilter λ={lambda}, {var_name} → {trend_name}/{cycle_name}");
         let fit = model_expansion::fit_dict(&[
@@ -2949,7 +2953,7 @@ impl Interpreter {
             Expr::Var(n) => n.clone(),
             _ => {
                 return Err(HayashiError::Type(
-                    "first argument must be nome do DataFrame".into(),
+                    "xtset(): first argument must be a DataFrame name".into(),
                 ))
             }
         };
@@ -2961,7 +2965,7 @@ impl Interpreter {
             Expr::Var(n) | Expr::Str(n) => n.clone(),
             _ => {
                 return Err(HayashiError::Type(
-                    "id_col deve ser identificador ou string".into(),
+                    "xtset(): id_col must be an identifier or string".into(),
                 ))
             }
         };
@@ -2970,7 +2974,7 @@ impl Interpreter {
                 Expr::Var(n) | Expr::Str(n) => n.clone(),
                 _ => {
                     return Err(HayashiError::Type(
-                        "time_col deve ser identificador ou string".into(),
+                        "xtset(): time_col must be an identifier or string".into(),
                     ))
                 }
             }

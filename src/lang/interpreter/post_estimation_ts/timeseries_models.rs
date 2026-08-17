@@ -17,7 +17,7 @@ impl Interpreter {
             Value::DataFrame(d) => d,
             _ => {
                 return Err(HayashiError::Type(
-                    "primeiro argumento deve ser um DataFrame".into(),
+                    "vecm(): first argument must be a DataFrame".into(),
                 ))
             }
         };
@@ -70,7 +70,7 @@ impl Interpreter {
             Value::DataFrame(d) => d,
             _ => {
                 return Err(HayashiError::Type(
-                    "primeiro argumento deve ser um DataFrame".into(),
+                    "var(): first argument must be a DataFrame".into(),
                 ))
             }
         };
@@ -128,7 +128,7 @@ impl Interpreter {
         let names = &model.var_names;
         let sep = "─".repeat(14 + k * 12);
 
-        println!("\nIRF — VAR({}) — {} passos", model.lags, steps);
+        println!("\nIRF — VAR({}) — {} steps", model.lags, steps);
 
         let mut h_vec = Vec::new();
         let mut impulse_vec = Vec::new();
@@ -136,7 +136,7 @@ impl Interpreter {
         let mut irf_vec = Vec::new();
 
         for j in 0..k {
-            println!("\n  Impulso: {}", names[j]);
+            println!("\n  Impulse: {}", names[j]);
             println!("  {sep}");
             let header: String = names
                 .iter()
@@ -268,18 +268,18 @@ impl Interpreter {
         let df = match self.eval_expr(&args[0])? {
             Value::DataFrame(d) => d,
             _ => {
-                return Err(HayashiError::Type(
-                    "primeiro argumento deve ser um DataFrame".into(),
-                ))
+                return Err(HayashiError::Type(format!(
+                    "{func}(): first argument must be a DataFrame"
+                )))
             }
         };
 
         let col_name = match &args[1] {
             Expr::Var(n) | Expr::Str(n) => n.clone(),
             _ => {
-                return Err(HayashiError::Type(
-                    "second argument must be o variable name".into(),
-                ))
+                return Err(HayashiError::Type(format!(
+                    "{func}(): second argument must be a variable name"
+                )))
             }
         };
 

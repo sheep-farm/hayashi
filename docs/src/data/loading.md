@@ -35,6 +35,53 @@ load "panel.parquet" as df, columns=[ticker, date, close], where="ticker == \"AA
 
 `query=` cannot be combined with `columns=` or `where=` — if you need custom SQL, write the projection and filter inside the query string yourself.
 
+## Type inference control (`types=`, `na=`)
+
+For CSV/TSV loads, Hayashi now delegates type inference to Greeners, which provides explicit control over column types and null value handling.
+
+### `types=` — explicit column types
+
+```
+load "data.csv" as df, types=[ticker:string, price:float, date:date]
+```
+
+Format: `types=[colname:type, ...]`. Each entry is `column:type` where `type` is one of:
+
+| Type | Meaning |
+|------|---------|
+| `int` | 64-bit signed integer |
+| `float` | 64-bit floating point (NaN for missing) |
+| `bool` | Boolean (true/false) |
+| `string` | Free text (high cardinality) |
+| `categorical` | Low-cardinality string with integer encoding |
+| `date` / `datetime` | ISO-8601 date/time |
+
+Columns not listed in `types=` are inferred automatically using Greeners' default rules.
+
+**Example — preventing ticker mis-inference:**
+
+```hay
+load "tickers.csv" as df, types=[ticker:string, symbol:string, price:float]
+```
+
+Without `types=`, tickers like `T`, `F`, `NAN` would be inferred as `bool`/`float`. With `types=`, they remain strings.
+
+### `na=` — custom null values
+
+```
+load "data.csv" as df, na=["NA", "NaN", "NULL", "null", "", "."]
+```
+
+Values matching any string in the list are treated as missing (null). Defaults: `["", "NA", ".", "NaN", "NULL", "null"]`.
+
+**Example — treating empty strings as missing:**
+
+```hay
+load "survey.csv" as df, na=["", "NA", "N/A", "null"]
+```
+
+---
+
 ## Column projection and row filtering (`columns=`, `where=`)
 
 For large datasets, loading every column and row into RAM can be wasteful or

@@ -1736,7 +1736,7 @@ impl Interpreter {
         let n = self.stored_models.len() + 1;
         self.stored_models.push(val);
         println!(
-            "eststo: modelo {n} armazenado ({} total)",
+            "eststo: model {n} stored ({} total)",
             self.stored_models.len()
         );
         Ok(Value::Int(n as i64))
@@ -1751,7 +1751,7 @@ impl Interpreter {
     ) -> Result<Value> {
         let n = self.stored_models.len();
         self.stored_models.clear();
-        println!("estclear: {n} modelos removidos");
+        println!("estclear: {n} models removed");
         Ok(Value::Int(n as i64))
     }
 
