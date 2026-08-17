@@ -1176,8 +1176,12 @@ def run_case(case: dict[str, Any], quiet: bool = False) -> tuple[str, list[str],
     # release) over a globally installed `hay`, so that local changes are
     # actually validated.
     hay_exe = str(ROOT_DIR / "target" / "debug" / "hay")
+    if sys.platform == "win32":
+        hay_exe += ".exe"
     if not Path(hay_exe).exists():
         hay_exe = str(ROOT_DIR / "target" / "release" / "hay")
+        if sys.platform == "win32":
+            hay_exe += ".exe"
     if not Path(hay_exe).exists() and check_executable("hay"):
         hay_exe = "hay"
 
