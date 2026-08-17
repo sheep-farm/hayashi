@@ -128,7 +128,7 @@ impl Interpreter {
         let names = &model.var_names;
         let sep = "─".repeat(14 + k * 12);
 
-        println!("\nIRF — VAR({}) — {} passos", model.lags, steps);
+        println!("\nIRF — VAR({}) — {} steps", model.lags, steps);
 
         let mut h_vec = Vec::new();
         let mut impulse_vec = Vec::new();
@@ -136,7 +136,7 @@ impl Interpreter {
         let mut irf_vec = Vec::new();
 
         for j in 0..k {
-            println!("\n  Impulso: {}", names[j]);
+            println!("\n  Impulse: {}", names[j]);
             println!("  {sep}");
             let header: String = names
                 .iter()

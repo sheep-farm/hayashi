@@ -367,7 +367,7 @@ impl Interpreter {
                             println!();
                         }
                         println!("{sep}");
-                        println!("n = {n}   Categorias: {j}   Modelo: {}", r.model_name);
+                        println!("n = {n}   Categories: {j}   Model: {}", r.model_name);
                         println!("{sep2}\n");
                     }
 

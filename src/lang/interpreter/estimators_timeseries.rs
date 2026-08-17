@@ -1177,13 +1177,13 @@ impl Interpreter {
         let sep = "─".repeat(40);
         let mut display = String::new();
         display.push_str(&format!(
-            "\nForecast de Volatilidade — {model_label}({}, {}) [{dist_label}]  {steps} passos\n",
+            "\nVolatility Forecast — {model_label}({}, {}) [{dist_label}]  {steps} steps\n",
             model.p, model.q
         ));
         display.push_str(&format!("{sep}\n"));
         display.push_str(&format!(
             "{:<6} {:>14} {:>14}\n",
-            "h", "var. condicional", "volatilidade"
+            "h", "variance", "volatility"
         ));
         display.push_str(&format!("{sep}\n"));
         for h in 0..steps {
@@ -3234,7 +3234,7 @@ impl Interpreter {
         let names = &model.var_result.var_names;
         let sep = "─".repeat(14 + k * 12);
         println!(
-            "\nSVAR Structural IRF — VAR({}) — id: {} — {} passos",
+            "\nSVAR Structural IRF — VAR({}) — id: {} — {} steps",
             model.var_result.lags, model.identification, steps
         );
         let mut h_vec = Vec::new();
@@ -3242,7 +3242,7 @@ impl Interpreter {
         let mut response_vec = Vec::new();
         let mut irf_vec = Vec::new();
         for j in 0..k {
-            println!("\n  Impulso: {}", names[j]);
+            println!("\n  Impulse: {}", names[j]);
             println!("  {sep}");
             let header: String = names
                 .iter()
@@ -3312,7 +3312,7 @@ impl Interpreter {
         let mut source_vec = Vec::new();
         let mut fevd_vec = Vec::new();
         for i in 0..k {
-            println!("\n  Resposta: {}", names[i]);
+            println!("\n  Response: {}", names[i]);
             println!("  {sep}");
             let header: String = names
                 .iter()
