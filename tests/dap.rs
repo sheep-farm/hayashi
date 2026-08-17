@@ -114,7 +114,6 @@ impl DapSession {
 }
 
 #[test]
-#[ignore = "requires interactive DAP client"]
 fn dap_breakpoint_and_variables() {
     let (mut session, _tmp) = DapSession::spawn("let x = 1\nlet y = 2\nlet z = x + y\n");
 
@@ -157,7 +156,6 @@ fn dap_breakpoint_and_variables() {
 }
 
 #[test]
-#[ignore = "requires interactive DAP client"]
 fn dap_runs_to_completion_without_breakpoints() {
     let (mut session, _tmp) = DapSession::spawn("let a = 10\n");
 
@@ -177,7 +175,6 @@ fn dap_runs_to_completion_without_breakpoints() {
 }
 
 #[test]
-#[ignore = "requires interactive DAP client"]
 fn dap_breakpoint_inside_expression_block() {
     let (mut session, _tmp) = DapSession::spawn("let df = {\n  raw = 1\n  raw\n}\n");
 
@@ -213,7 +210,6 @@ fn dap_breakpoint_inside_expression_block() {
 }
 
 #[test]
-#[ignore = "requires interactive DAP client"]
 fn dap_function_call_variables() {
     let script = "fn f(val) {\n    let y = val + 1\n    return y\n}\n\nlet a = 10\nlet b = f(a)\n";
     let (mut session, _tmp) = DapSession::spawn(script);
@@ -271,7 +267,6 @@ fn dap_function_call_variables() {
 }
 
 #[test]
-#[ignore = "requires interactive DAP client"]
 fn dap_print_output_event() {
     let script = "let a = 10\nprint(\"hello\")\nlet b = a + 1\n";
     let (mut session, _tmp) = DapSession::spawn(script);
