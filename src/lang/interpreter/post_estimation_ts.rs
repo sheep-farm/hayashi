@@ -808,7 +808,7 @@ impl Interpreter {
                     }
                     other => {
                         return Err(HayashiError::Runtime(format!(
-                            "kalman: modelo '{other}' desconhecido — use \"ll\" ou \"llt\""
+                            "kalman(): unknown model '{other}' — use \"ll\" or \"llt\""
                         )))
                     }
                 };
@@ -1118,7 +1118,9 @@ impl Interpreter {
                 // nomes dos coeficientes via API do Greeners (sem parse de CSV)
                 let var_names: Vec<String> =
                     ols.result.variable_names.clone().ok_or_else(|| {
-                        HayashiError::Runtime("modelo sem variable_names — use from_formula".into())
+                        HayashiError::Runtime(
+                            "model has no variable_names — use from_formula".into(),
+                        )
                     })?;
 
                 let k = var_names.len();

@@ -268,18 +268,18 @@ impl Interpreter {
         let df = match self.eval_expr(&args[0])? {
             Value::DataFrame(d) => d,
             _ => {
-                return Err(HayashiError::Type(
-                    format!("{func}(): first argument must be a DataFrame"),
-                ))
+                return Err(HayashiError::Type(format!(
+                    "{func}(): first argument must be a DataFrame"
+                )))
             }
         };
 
         let col_name = match &args[1] {
             Expr::Var(n) | Expr::Str(n) => n.clone(),
             _ => {
-                return Err(HayashiError::Type(
-                    format!("{func}(): second argument must be a variable name"),
-                ))
+                return Err(HayashiError::Type(format!(
+                    "{func}(): second argument must be a variable name"
+                )))
             }
         };
 
