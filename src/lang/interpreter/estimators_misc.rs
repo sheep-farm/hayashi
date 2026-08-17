@@ -576,7 +576,7 @@ impl Interpreter {
 
         for grp in &groups {
             if let Some(ref g) = grp {
-                println!("  grupo = {g}");
+                println!("  group = {g}");
             }
             for vname in &var_names {
                 let col = get_col_f64(&df, vname)?;
@@ -1469,7 +1469,7 @@ impl Interpreter {
     ) -> Result<Value> {
         if args.len() < 2 {
             return Err(HayashiError::Runtime(
-                "bitest(successes, n, mu=0.5)  ou  bitest(df, var, mu=0)".into(),
+                "bitest(successes, n, mu=0.5) or bitest(df, var, mu=0)".into(),
             ));
         }
         // Suporta dois modos:
@@ -1481,7 +1481,11 @@ impl Interpreter {
                 let n_trials = match self.eval_expr(&args[1])? {
                     Value::Int(v) => v as usize,
                     Value::Float(v) => v as usize,
-                    _ => return Err(HayashiError::Type("segundo arg: n (inteiro)".into())),
+                    _ => {
+                        return Err(HayashiError::Type(
+                            "bitest: second argument must be an integer (n)".into(),
+                        ))
+                    }
                 };
                 let mu = match opt_map.get("mu").or_else(|| opt_map.get("p")) {
                     Some(Value::Float(v)) => *v,
