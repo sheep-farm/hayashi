@@ -1,0 +1,8 @@
+// Panel FE validation target with two-way clustered standard errors.
+
+load "validation/cases/panel_fe_twoway_cluster_wagepan/data/wagepan.csv" as df
+
+xtset(df, nr, year)
+let m = fe(lwage ~ union + married + d81 + d82 + d83 + d84 + d85 + d86 + d87, df, cluster=nr, cluster2=year)
+
+export(m, "txt", "/dev/stdout")

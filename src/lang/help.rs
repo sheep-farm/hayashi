@@ -110,12 +110,15 @@ fn legacy_help_text(topic: &str) -> Option<&'static str> {
         "estclear" => "estclear()\n  Clear all models stored by eststo().\n\n  estclear()\n",
         "testparm" => "testparm(model, [\"x1\", \"x2\", ...])\n  Joint F-test that selected coefficients are all zero.\n  Supports OLS/WLS models.\n\n  testparm(m, [\"X1\", \"X2\"])\n",
         "fe" => concat!(
-            "fe(formula, df [, id=col])\n",
+            "fe(formula, df [, id=col] [, cluster=col] [, cluster2=col])\n",
             "  Fixed Effects (within estimator).\n",
-            "  If xtset(df, id, time) declared, id= is optional.\n\n",
+            "  If xtset(df, id, time) declared, id= is optional.\n",
+            "  cluster= enables entity-clustered standard errors (CR1).\n",
+            "  cluster2= enables two-way clustering (entity + time).\n\n",
             "  Example:\n",
             "    xtset(df, firm, year)\n",
-            "    let m = fe(Y ~ X1 + X2, df)\n",
+            "    let m = fe(Y ~ X1 + X2, df, cluster=firm)\n",
+            "    let m = fe(Y ~ X1 + X2, df, cluster=firm, cluster2=year)\n",
         ),
         "re" => concat!(
             "re(formula, df [, id=col])\n",

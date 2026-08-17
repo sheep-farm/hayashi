@@ -247,8 +247,9 @@ Workflow: PRs target `dev`; `master` is release-only.
    access to residuals / predict requires knowing which variant is which.
 2. **DAP tests ignored**: the DAP server is only tested manually; the
    automated tests are disabled.
-3. **`fe()` ignores `cluster=`**: documented as `not-supported` in the
-   validation matrix.
+3. **`fe()` `cluster=` support**: `cluster=` and `cluster2=` are supported
+   via `resolve_cov_full()`. Validation case `panel_fe_cluster_wagepan`
+   confirms the feature.
 4. **Validation only on Ubuntu**: R/Python reference numbers can differ
    slightly across platforms.
 5. **Error-language migration**: user-facing strings are being migrated

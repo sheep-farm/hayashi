@@ -155,12 +155,15 @@ pub const COMMAND_SPECS: &[CommandSpec] = &[
         name: "fe",
         aliases: &[],
         help: concat!(
-            "fe(formula, df [, id=col])\n",
+            "fe(formula, df [, id=col] [, cluster=col] [, cluster2=col])\n",
             "  Fixed Effects (within estimator).\n",
-            "  If xtset(df, id, time) declared, id= is optional.\n\n",
+            "  If xtset(df, id, time) declared, id= is optional.\n",
+            "  cluster= enables entity-clustered standard errors (CR1).\n",
+            "  cluster2= enables two-way clustering (entity + time).\n\n",
             "  Example:\n",
             "    xtset(df, firm, year)\n",
-            "    let m = fe(Y ~ X1 + X2, df)\n",
+            "    let m = fe(Y ~ X1 + X2, df, cluster=firm)\n",
+            "    let m = fe(Y ~ X1 + X2, df, cluster=firm, cluster2=year)\n",
         ),
     },
     CommandSpec {

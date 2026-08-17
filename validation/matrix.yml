@@ -773,6 +773,16 @@ cases:
   notes: Panel fixed-effects investment demand model (Grunfeld).
   dimension: numerical
   status: pass
+- id: panel_fe_time_cluster_wagepan
+  notes: Panel fixed-effects wage equation with time-clustered standard errors using
+    explicit within-transformed CR1 reference implementations.
+  dimension: numerical
+  status: pass
+- id: panel_fe_twoway_cluster_wagepan
+  notes: Panel fixed-effects wage equation with two-way (entity + time) clustered
+    standard errors using explicit within-transformed CR1 reference implementations.
+  dimension: numerical
+  status: pass
 - id: panel_fe_wooldridge_wagepan_ch14
   notes: Wooldridge Introductory Econometrics Chapter 14, Example 14.4 panel fixed-effects
     wage equation.
