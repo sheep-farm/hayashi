@@ -52,11 +52,11 @@ class MetadataCheckTests(unittest.TestCase):
         case_dir = self.validation_dir / "cases" / case_id
         (case_dir / "hayashi").mkdir(parents=True)
         (case_dir / "reference").mkdir()
-        (case_dir / "hayashi" / "run.hay").write_text("# hayashi script\n")
+        (case_dir / "hayashi" / "run.hay").write_text("# hayashi script\n", encoding="utf-8")
         if include_python_script:
-            (case_dir / "reference" / "run.py").write_text("print('{}')\n")
+            (case_dir / "reference" / "run.py").write_text("print('{}')\n", encoding="utf-8")
         if include_readme:
-            (case_dir / "README.md").write_text("# OLS example\n")
+            (case_dir / "README.md").write_text("# OLS example\n", encoding="utf-8")
         case = {
             "title": "OLS example",
             "estimator_family": "ols",
@@ -77,11 +77,11 @@ class MetadataCheckTests(unittest.TestCase):
             },
             "result": {"summary": "matches reference"},
         }
-        with open(case_dir / "case.yml", "w") as f:
+        with open(case_dir / "case.yml", "w", encoding="utf-8") as f:
             yaml.safe_dump(case, f, sort_keys=False)
 
     def write_matrix(self, entries: list[dict]) -> None:
-        with open(self.module.MATRIX_YML, "w") as f:
+        with open(self.module.MATRIX_YML, "w", encoding="utf-8") as f:
             yaml.safe_dump({"cases": entries}, f, sort_keys=False)
 
     def test_metadata_check_accepts_consistent_case(self):
@@ -99,7 +99,7 @@ class MetadataCheckTests(unittest.TestCase):
             "| ols | example | Python | pass | — | Example case. |",
             "| ols | example | Python:passed * | pass | — | Example case. |",
         )
-        self.module.MATRIX_MD.write_text(matrix_md)
+        self.module.MATRIX_MD.write_text(matrix_md, encoding="utf-8")
 
         findings = self.module.check_metadata(matrix, cases, registry_ids, discovered_ids)
 
@@ -116,7 +116,7 @@ class MetadataCheckTests(unittest.TestCase):
             }
         ])
         matrix, cases, registry_ids, discovered_ids = self.module.load_cases()
-        self.module.MATRIX_MD.write_text(self.module.render_matrix_md(cases))
+        self.module.MATRIX_MD.write_text(self.module.render_matrix_md(cases), encoding="utf-8")
 
         findings = self.module.check_metadata(matrix, cases, registry_ids, discovered_ids)
 
@@ -136,7 +136,7 @@ class MetadataCheckTests(unittest.TestCase):
             }
         ])
         matrix, cases, registry_ids, discovered_ids = self.module.load_cases()
-        self.module.MATRIX_MD.write_text(self.module.render_matrix_md(cases))
+        self.module.MATRIX_MD.write_text(self.module.render_matrix_md(cases), encoding="utf-8")
 
         findings = self.module.check_metadata(matrix, cases, registry_ids, discovered_ids)
 
@@ -152,7 +152,7 @@ class MetadataCheckTests(unittest.TestCase):
                 "status": "pass",
             }
         ])
-        self.module.MATRIX_MD.write_text("# stale\n")
+        self.module.MATRIX_MD.write_text("# stale\n", encoding="utf-8")
         matrix, cases, registry_ids, discovered_ids = self.module.load_cases()
 
         findings = self.module.check_metadata(matrix, cases, registry_ids, discovered_ids)
@@ -170,7 +170,7 @@ class MetadataCheckTests(unittest.TestCase):
             }
         ])
         matrix, cases, registry_ids, discovered_ids = self.module.load_cases()
-        self.module.MATRIX_MD.write_text(self.module.render_matrix_md(cases))
+        self.module.MATRIX_MD.write_text(self.module.render_matrix_md(cases), encoding="utf-8")
 
         findings = self.module.check_metadata(matrix, cases, registry_ids, discovered_ids)
 
@@ -187,7 +187,7 @@ class MetadataCheckTests(unittest.TestCase):
             }
         ])
         matrix, cases, registry_ids, discovered_ids = self.module.load_cases()
-        self.module.MATRIX_MD.write_text(self.module.render_matrix_md(cases))
+        self.module.MATRIX_MD.write_text(self.module.render_matrix_md(cases), encoding="utf-8")
 
         findings = self.module.check_metadata(matrix, cases, registry_ids, discovered_ids)
 
@@ -201,7 +201,7 @@ class MetadataCheckTests(unittest.TestCase):
         self.write_case()
         self.write_matrix([])
         matrix, cases, registry_ids, discovered_ids = self.module.load_cases()
-        self.module.MATRIX_MD.write_text(self.module.render_matrix_md(cases))
+        self.module.MATRIX_MD.write_text(self.module.render_matrix_md(cases), encoding="utf-8")
 
         findings = self.module.check_metadata(matrix, cases, registry_ids, discovered_ids)
 
@@ -271,8 +271,8 @@ n = 753
         case_id = "ols_example"
         case_dir = self.validation_dir / "cases" / case_id
         self.write_case(case_id=case_id, references=["R", "Python"])
-        (case_dir / "reference" / "run.R").write_text("# R reference\n")
-        case = yaml.safe_load((case_dir / "case.yml").read_text())
+        (case_dir / "reference" / "run.R").write_text("# R reference\n", encoding="utf-8")
+        case = yaml.safe_load((case_dir / "case.yml").read_text(encoding="utf-8"))
         case["id"] = case_id
         case["reference_scripts"]["R"] = f"cases/{case_id}/reference/run.R"
 
