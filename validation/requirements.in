@@ -26,3 +26,9 @@ xgboost>=2.0
 # here with a platform marker keeps pip-compile from emitting an unconditional
 # pin that breaks validation on macOS and Windows.
 nvidia-nccl-cu12 ; sys_platform == "linux"
+
+# Transitive dependencies that are platform-conditional in their parents.
+# Pinning them unconditionally lets --require-hashes work on Windows runners,
+# where pip-compile on Linux would otherwise omit them.
+colorama
+tzdata
