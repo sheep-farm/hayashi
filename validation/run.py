@@ -9,10 +9,12 @@ import argparse
 import json
 import math
 import os
+import re
 import shutil
 import subprocess
 import sys
-from pathlib import Path
+import tempfile
+from pathlib import Path, PureWindowsPath
 from typing import Any
 
 import yaml
@@ -1155,6 +1157,60 @@ def compare_against_references(
     return failures, failures_by_reference
 
 
+def _windows_path_for_hayashi(p: Path) -> str:
+    """Return a Windows-friendly absolute path string that Hayashi can load."""
+    # Use forward slashes; the Hayashi loader normalises them on Windows.
+    return str(p.resolve()).replace("\\", "/")
+
+
+def _prepare_windows_hayashi_script(
+    src: Path,
+    output_path: Path,
+) -> Path:
+    """Rewrite a Hayashi script so it can run on Windows.
+
+    Converts relative 'load' paths to absolute paths and replaces '/dev/stdout'
+    in 'export' calls with a concrete output file, because Windows has no
+    /dev/stdout special file.
+    """
+    text = src.read_text(encoding="utf-8")
+
+    # Make every quoted path that looks like a repository-relative file path
+    # absolute. This fixes 'load "validation/cases/.../data/...csv"' and any
+    # similar quoted strings.
+    def _absolutise_load_path(match: re.Match) -> str:
+        raw = match.group(1)
+        # Only rewrite plain relative paths that start inside the repo.
+        if raw.startswith("/") or re.search(r"^[a-zA-Z]:", raw):
+            return match.group(0)
+        repo_relative = Path(raw)
+        if repo_relative.is_absolute():
+            return match.group(0)
+        absolute = _windows_path_for_hayashi(ROOT_DIR / repo_relative)
+        return f'"{absolute}"'
+
+    text = re.sub(r'"(validation/cases/[^"]+)"', _absolutise_load_path, text)
+
+    # Replace export(..., "<fmt>", "/dev/stdout") with export(..., "<fmt>", "<out_path>").
+    text = re.sub(
+        r'(export\([^)]+,\s*"[^"]+",\s*)"/dev/stdout"',
+        lambda m: f'{m.group(1)}"{_windows_path_for_hayashi(output_path)}"',
+        text,
+    )
+
+    tmp = tempfile.NamedTemporaryFile(
+        mode="w",
+        suffix=".hay",
+        prefix=f"{src.stem}_",
+        dir=src.parent,
+        encoding="utf-8",
+        delete=False,
+    )
+    tmp.write(text)
+    tmp.close()
+    return Path(tmp.name)
+
+
 def run_case(case: dict[str, Any], quiet: bool = False) -> tuple[str, list[str], dict[str, dict]]:
     """Run a single validation case.
 
@@ -1279,10 +1335,32 @@ def run_case(case: dict[str, Any], quiet: bool = False) -> tuple[str, list[str],
         return "blocked", ["No reference implementation could run."], ref_report
 
     # Run Hayashi script using the binary selected earlier.
-    hay_script = str(VALIDATION_DIR / case.get("hayashi_script", f"cases/{case_id}/hayashi/run.hay"))
-    hay_res = run_command([hay_exe, hay_script], quiet=quiet)
+    hay_script = VALIDATION_DIR / case.get("hayashi_script", f"cases/{case_id}/hayashi/run.hay")
+    output_format = case.get("output_format", "csv")
+    family = case.get("estimator_family", "")
+
+    # Select the output file path Hayashi would write when not using stdout.
+    output_ext = {
+        "csv": "csv",
+        "json": "json",
+        "txt": "txt",
+        "margins": "txt",
+        "keyvalue": "txt",
+    }.get(output_format, output_format)
+    hay_output_path = hayashi_dir / f"output.{output_ext}"
+    hay_output_path.unlink(missing_ok=True)
+
+    if sys.platform == "win32":
+        hay_script = _prepare_windows_hayashi_script(hay_script, hay_output_path)
+
+    hay_res = run_command([hay_exe, str(hay_script)], quiet=quiet)
     if hay_res.returncode != 0:
         return "blocked", [f"Hayashi script failed:\n{hay_res.stderr}"], ref_report
+
+    # On Windows Hayashi cannot write to /dev/stdout; the rewritten script
+    # writes to a file and we read it back.
+    if sys.platform == "win32" and hay_output_path.exists():
+        hay_res.stdout = hay_output_path.read_text(encoding="utf-8", errors="replace")
 
     # ── Parse every declared reference output ────────────────────────
     reference_outputs: dict[str, dict[str, Any]] = {}
