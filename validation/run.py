@@ -546,7 +546,7 @@ def parse_hayashi_pcse(text: str) -> dict[str, dict[str, float]]:
     lines = text.splitlines()
     start_idx = -1
     for i, line in enumerate(lines):
-        if re.search(r"Variável\s+coef\s+PCSE", line):
+        if re.search(r"(Vari[aá]vel|Variable)\s+coef\s+PCSE", line, re.IGNORECASE):
             start_idx = i
             break
     if start_idx == -1:
