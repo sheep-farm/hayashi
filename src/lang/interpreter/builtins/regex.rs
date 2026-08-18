@@ -24,7 +24,7 @@ impl Interpreter {
                         )
                     }
                 };
-                Ok(Value::Bool(greeners::Transforms::regexm(&s, &pat)))
+                Ok(Value::Bool(greeners::transforms::Transforms::regexm(&s, &pat)))
             }
             "regexr" => {
                 if args.len() < 3 {
@@ -52,7 +52,7 @@ impl Interpreter {
                         )
                     }
                 };
-                Ok(Value::Str(greeners::Transforms::regexr(&s, &pat, &rep)))
+                Ok(Value::Str(greeners::transforms::Transforms::regexr(&s, &pat, &rep)))
             }
             "regexra" => {
                 if args.len() < 3 {
@@ -80,7 +80,7 @@ impl Interpreter {
                         )
                     }
                 };
-                Ok(Value::Str(greeners::Transforms::regexra(&s, &pat, &rep)))
+                Ok(Value::Str(greeners::transforms::Transforms::regexra(&s, &pat, &rep)))
             }
             "regexs" => {
                 if args.len() < 2 {
@@ -98,7 +98,7 @@ impl Interpreter {
                         )
                     }
                 };
-                match greeners::Transforms::regexs(&s, &pat) {
+                match greeners::transforms::Transforms::regexs(&s, &pat) {
                     Some(m) => Ok(Value::Str(m)),
                     None => Ok(Value::Str(String::new())),
                 }

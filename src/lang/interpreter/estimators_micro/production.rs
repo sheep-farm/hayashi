@@ -23,9 +23,9 @@ impl Interpreter {
         };
 
         let result = if model_type == "production" {
-            greeners::StochasticFrontier::fit_production(&y_vec, &x_mat, Some(var_names))
+            greeners::stochastic_frontier::StochasticFrontier::fit_production(&y_vec, &x_mat, Some(var_names))
         } else {
-            greeners::StochasticFrontier::fit_cost(&y_vec, &x_mat, Some(var_names))
+            greeners::stochastic_frontier::StochasticFrontier::fit_cost(&y_vec, &x_mat, Some(var_names))
         }
         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
@@ -116,9 +116,9 @@ impl Interpreter {
             "production"
         };
         let result = if model_type == "production" {
-            greeners::BayesianSFA::fit_production(&y_vec, &x_mat, Some(var_names), n_burn, n_draws)
+            greeners::bayesian_sfa::BayesianSFA::fit_production(&y_vec, &x_mat, Some(var_names), n_burn, n_draws)
         } else {
-            greeners::BayesianSFA::fit_cost(&y_vec, &x_mat, Some(var_names), n_burn, n_draws)
+            greeners::bayesian_sfa::BayesianSFA::fit_cost(&y_vec, &x_mat, Some(var_names), n_burn, n_draws)
         }
         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
@@ -185,7 +185,7 @@ impl Interpreter {
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         let var_names = g_formula.independents.clone();
 
-        let result = greeners::BayesianLinear::fit(&y_arr, &x_arr, Some(var_names))
+        let result = greeners::bayesian_linear::BayesianLinear::fit(&y_arr, &x_arr, Some(var_names))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let names: Vec<String> = std::iter::once("const".into())

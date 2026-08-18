@@ -831,7 +831,7 @@ impl Interpreter {
                             ))
                         }
                     };
-                    return Ok(Some(ColResult::Float(greeners::Transforms::regexm_vec(
+                    return Ok(Some(ColResult::Float(greeners::transforms::Transforms::regexm_vec(
                         &str_col.to_vec(),
                         &pattern,
                     ))));
@@ -1168,12 +1168,12 @@ impl Interpreter {
             .map(|a| self.eval_col_expr(a, df))
             .collect::<Result<_>>()?;
         Ok(Some(ColResult::Float(match func {
-            "rowmean" => greeners::Transforms::row_mean(&cols),
-            "rowsum" => greeners::Transforms::row_sum(&cols),
-            "rowmin" => greeners::Transforms::row_min(&cols),
-            "rowmax" => greeners::Transforms::row_max(&cols),
-            "rowtotal" => greeners::Transforms::row_total(&cols),
-            "rowmiss" => greeners::Transforms::row_miss(&cols),
+            "rowmean" => greeners::transforms::Transforms::row_mean(&cols),
+            "rowsum" => greeners::transforms::Transforms::row_sum(&cols),
+            "rowmin" => greeners::transforms::Transforms::row_min(&cols),
+            "rowmax" => greeners::transforms::Transforms::row_max(&cols),
+            "rowtotal" => greeners::transforms::Transforms::row_total(&cols),
+            "rowmiss" => greeners::transforms::Transforms::row_miss(&cols),
             _ => unreachable!(),
         })))
     }
@@ -1190,21 +1190,21 @@ impl Interpreter {
         match func {
             "rank" => {
                 let vals = self.eval_col_expr(&args[0], df)?;
-                Ok(Some(ColResult::Float(greeners::Transforms::rank(&vals))))
+                Ok(Some(ColResult::Float(greeners::transforms::Transforms::rank(&vals))))
             }
             "cumsum" => {
                 let vals = self.eval_col_expr(&args[0], df)?;
-                Ok(Some(ColResult::Float(greeners::Transforms::cumsum(&vals))))
+                Ok(Some(ColResult::Float(greeners::transforms::Transforms::cumsum(&vals))))
             }
             "std" | "standardize" | "zscore" => {
                 let vals = self.eval_col_expr(&args[0], df)?;
-                Ok(Some(ColResult::Float(greeners::Transforms::standardize(
+                Ok(Some(ColResult::Float(greeners::transforms::Transforms::standardize(
                     &vals,
                 ))))
             }
             "iqr" => {
                 let vals = self.eval_col_expr(&args[0], df)?;
-                let iqr_val = greeners::Transforms::iqr(&vals);
+                let iqr_val = greeners::transforms::Transforms::iqr(&vals);
                 Ok(Some(ColResult::Float(vec![iqr_val; df.n_rows()])))
             }
             _ => Ok(None),
@@ -1240,7 +1240,7 @@ impl Interpreter {
         match func {
             "group" => {
                 let strs = col_to_strings(df, &col_name)?;
-                Ok(Some(ColResult::Float(greeners::Transforms::group(&strs))))
+                Ok(Some(ColResult::Float(greeners::transforms::Transforms::group(&strs))))
             }
             "date" => {
                 let strs = col_to_strings(df, &col_name)?;
@@ -1302,7 +1302,7 @@ impl Interpreter {
         df: &DataFrame,
     ) -> Result<ColResult> {
         let vals = self.eval_col_expr(&args[0], df)?;
-        match greeners::Transforms::apply(&vals, func) {
+        match greeners::transforms::Transforms::apply(&vals, func) {
             Ok(result) => Ok(ColResult::Float(result)),
             Err(_) => {
                 if let Some(Value::UserFn(uf)) = self.env.get(func).cloned() {
@@ -1324,7 +1324,7 @@ impl Interpreter {
     ) -> Result<ColResult> {
         let a = self.eval_col_expr(&args[0], df)?;
         let b = self.eval_col_expr(&args[1], df)?;
-        match greeners::Transforms::apply2(&a, &b, func) {
+        match greeners::transforms::Transforms::apply2(&a, &b, func) {
             Ok(result) => Ok(ColResult::Float(result)),
             Err(_) => Err(HayashiError::Runtime(format!(
                 "function '{func}' not supported in generate"
@@ -1341,7 +1341,7 @@ impl Interpreter {
         let a = self.eval_col_expr(&args[0], df)?;
         let b = self.eval_col_expr(&args[1], df)?;
         let c = self.eval_col_expr(&args[2], df)?;
-        match greeners::Transforms::apply3(&a, &b, &c, func) {
+        match greeners::transforms::Transforms::apply3(&a, &b, &c, func) {
             Ok(result) => Ok(ColResult::Float(result)),
             Err(_) => Err(HayashiError::Runtime(format!(
                 "function '{func}' not supported in generate"
@@ -1719,7 +1719,7 @@ impl Interpreter {
                 let strs = self.eval_str_col(&args[0], df)?;
                 let pattern = self.eval_str_scalar(&args[1], "regexr: pattern")?;
                 let replacement = self.eval_str_scalar(&args[2], "regexr: replacement")?;
-                Ok(Some(ColResult::String(greeners::Transforms::regexr_vec(
+                Ok(Some(ColResult::String(greeners::transforms::Transforms::regexr_vec(
                     &strs,
                     &pattern,
                     &replacement,
@@ -1736,7 +1736,7 @@ impl Interpreter {
                 let replacement = self.eval_str_scalar(&args[2], "regexra: replacement")?;
                 Ok(Some(ColResult::String(
                     strs.iter()
-                        .map(|s| greeners::Transforms::regexra(s, &pattern, &replacement))
+                        .map(|s| greeners::transforms::Transforms::regexra(s, &pattern, &replacement))
                         .collect(),
                 )))
             }
@@ -1748,7 +1748,7 @@ impl Interpreter {
                 }
                 let strs = self.eval_str_col(&args[0], df)?;
                 let pattern = self.eval_str_scalar(&args[1], "regexs: pattern")?;
-                Ok(Some(ColResult::String(greeners::Transforms::regexs_vec(
+                Ok(Some(ColResult::String(greeners::transforms::Transforms::regexs_vec(
                     &strs, &pattern,
                 ))))
             }

@@ -35,7 +35,7 @@ impl Interpreter {
         let var_names = g_formula.independents.clone();
 
         let result =
-            greeners::RandomForest::fit(&y_arr, &x_arr, n_trees, max_depth, Some(var_names))
+            greeners::random_forest::RandomForest::fit(&y_arr, &x_arr, n_trees, max_depth, Some(var_names))
                 .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let summary = format!(
@@ -115,7 +115,7 @@ impl Interpreter {
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         let var_names = g_formula.independents.clone();
 
-        let result = greeners::GradientBoosting::fit(
+        let result = greeners::gradient_boosting::GradientBoosting::fit(
             &y_arr,
             &x_arr,
             n_trees,
@@ -195,7 +195,7 @@ impl Interpreter {
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         let var_names = g_formula.independents.clone();
 
-        let result = greeners::MLP::fit(&y_arr, &x_arr, n_hidden, lr, n_epochs, Some(var_names))
+        let result = greeners::mlp::MLP::fit(&y_arr, &x_arr, n_hidden, lr, n_epochs, Some(var_names))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let summary = format!(
@@ -282,7 +282,7 @@ impl Interpreter {
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         let var_names = g_formula.independents.clone();
 
-        let result = greeners::QRF::fit(
+        let result = greeners::qrf::QRF::fit(
             &y_arr,
             &x_arr,
             quantiles,
@@ -394,7 +394,7 @@ impl Interpreter {
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         let var_names = g_formula.independents.clone();
 
-        let result = greeners::XGBoost::fit(
+        let result = greeners::xgboost::XGBoost::fit(
             &y_arr,
             &x_arr,
             n_trees,
@@ -517,7 +517,7 @@ impl Interpreter {
             .ok_or_else(|| HayashiError::Runtime(format!("{func}: '{y_var}' must be numeric")))?;
         let y_arr = ndarray::Array1::from_vec(y_vals.to_vec());
 
-        let result = greeners::LSTM::fit(&y_arr, n_hidden, seq_len, lr, n_epochs, n_forecast)
+        let result = greeners::lstm::LSTM::fit(&y_arr, n_hidden, seq_len, lr, n_epochs, n_forecast)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let summary = format!(
@@ -633,7 +633,7 @@ impl Interpreter {
         }
 
         let result =
-            greeners::CausalForest::fit(&y_arr, &t_vec, &x_mat, n_trees, max_depth, Some(x_vars))
+            greeners::causal_forest::CausalForest::fit(&y_arr, &t_vec, &x_mat, n_trees, max_depth, Some(x_vars))
                 .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let summary = format!(
@@ -755,7 +755,7 @@ impl Interpreter {
             }
         }
 
-        let result = greeners::GRF::fit(&y_arr, &t_vec, &x_mat, n_trees, max_depth, Some(x_vars))
+        let result = greeners::grf::GRF::fit(&y_arr, &t_vec, &x_mat, n_trees, max_depth, Some(x_vars))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let summary = format!(
@@ -836,7 +836,7 @@ impl Interpreter {
         let var_names = g_formula.independents.clone();
 
         // Use x_arr itself as test set (in-sample intervals)
-        let result = greeners::ConformalPrediction::fit(
+        let result = greeners::conformal::ConformalPrediction::fit(
             &y_arr,
             &x_arr,
             &x_arr,
@@ -962,7 +962,7 @@ impl Interpreter {
             .ok_or_else(|| HayashiError::Runtime(format!("{func}: '{y_var}' must be numeric")))?;
         let y_arr = ndarray::Array1::from_vec(y_vals.to_vec());
 
-        let result = greeners::Transformer::fit(&y_arr, d_model, seq_len, lr, n_epochs, n_forecast)
+        let result = greeners::transformer::Transformer::fit(&y_arr, d_model, seq_len, lr, n_epochs, n_forecast)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let summary = format!(
@@ -1071,7 +1071,7 @@ impl Interpreter {
             }
         }
 
-        let result = greeners::DRLearner::fit(&y_arr, &t_vec, &x_mat, n_folds, Some(x_vars))
+        let result = greeners::dr_learner::DRLearner::fit(&y_arr, &t_vec, &x_mat, n_folds, Some(x_vars))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let summary = format!(
@@ -1157,7 +1157,7 @@ impl Interpreter {
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         let var_names = g_formula.independents.clone();
 
-        let result = greeners::BART::fit(
+        let result = greeners::bart::BART::fit(
             &y_arr,
             &x_arr,
             n_trees,
@@ -1186,7 +1186,7 @@ impl Interpreter {
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         let var_names = g_formula.independents.clone();
 
-        let result = greeners::GaussianProcess::fit(&y_arr, &x_arr, Some(var_names))
+        let result = greeners::gp::GaussianProcess::fit(&y_arr, &x_arr, Some(var_names))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         Ok(Value::GpResult(Rc::new(result)))
@@ -1257,7 +1257,7 @@ impl Interpreter {
             }
         }
 
-        let result = greeners::TMLE::fit(&y_arr, &t_vec, &w_mat)
+        let result = greeners::tmle::TMLE::fit(&y_arr, &t_vec, &w_mat)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let summary = format!(
@@ -1412,7 +1412,7 @@ impl Interpreter {
             }
         }
 
-        let result = greeners::OrthogonalForest::fit(
+        let result = greeners::orthogonal_forest::OrthogonalForest::fit(
             &y_arr,
             &t_vec,
             &x_mat,
@@ -1528,7 +1528,7 @@ impl Interpreter {
             }
         }
 
-        let result = greeners::SpectralClustering::fit(&x_mat, k, sigma, None)
+        let result = greeners::spectral::SpectralClustering::fit(&x_mat, k, sigma, None)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         Ok(Value::SpectralResult(Rc::new(result)))
@@ -1569,7 +1569,7 @@ impl Interpreter {
             .ok_or_else(|| HayashiError::Runtime(format!("{func}: '{x_var}' must be numeric")))?;
         let x_arr = ndarray::Array1::from_vec(x_vals.to_vec());
 
-        let result = greeners::IsotonicRegression::fit(&x_arr, &y_arr, !decreasing, None)
+        let result = greeners::isotonic::IsotonicRegression::fit(&x_arr, &y_arr, !decreasing, None)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         Ok(Value::IsotonicResult(Rc::new(result)))
@@ -1631,7 +1631,7 @@ impl Interpreter {
             }
         }
 
-        let result = greeners::MiceChained::fit(&data_mat, m, max_iter, Some(var_names))
+        let result = greeners::mice::MiceChained::fit(&data_mat, m, max_iter, Some(var_names))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let summary = format!(
@@ -1746,7 +1746,7 @@ impl Interpreter {
             }
         }
 
-        let result = greeners::KMeans::fit(&x_mat, k, None, None)
+        let result = greeners::kmeans::KMeans::fit(&x_mat, k, None, None)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         Ok(Value::KmeansResult(Rc::new(result)))
@@ -1818,7 +1818,7 @@ impl Interpreter {
             }
         }
 
-        let result = greeners::DBSCAN::fit(&x_mat, eps, min_pts)
+        let result = greeners::dbscan::DBSCAN::fit(&x_mat, eps, min_pts)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         Ok(Value::DbscanResult(Rc::new(result)))
@@ -1891,7 +1891,7 @@ impl Interpreter {
             }
         }
 
-        let result = greeners::GmmClustering::fit(&x_mat, k, max_iter, tol)
+        let result = greeners::gmm_clustering::GmmClustering::fit(&x_mat, k, max_iter, tol)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         Ok(Value::GmmClusteringResult(Rc::new(result)))
@@ -1928,7 +1928,7 @@ impl Interpreter {
         };
 
         let result =
-            greeners::RegPath::fit(&y_arr, &x_arr, &reg_type, alpha, n_lam, Some(var_names))
+            greeners::reg_path::RegPath::fit(&y_arr, &x_arr, &reg_type, alpha, n_lam, Some(var_names))
                 .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let summary = format!(
@@ -2030,7 +2030,7 @@ impl Interpreter {
             _ => None,
         };
 
-        let result = greeners::QrfInference::fit(
+        let result = greeners::qrf_inference::QrfInference::fit(
             &y_arr,
             &x_arr,
             quantiles,
@@ -2132,13 +2132,13 @@ impl Interpreter {
         let x_vars: Vec<String> = x_str.split(',').map(|s| s.trim().to_string()).collect();
         let linkage = match opt_map.get("linkage") {
             Some(Value::Str(s)) => match s.as_str() {
-                "ward" => greeners::Linkage::Ward,
-                "single" => greeners::Linkage::Single,
-                "complete" => greeners::Linkage::Complete,
-                "average" => greeners::Linkage::Average,
-                _ => greeners::Linkage::Ward,
+                "ward" => greeners::hierarchical::Linkage::Ward,
+                "single" => greeners::hierarchical::Linkage::Single,
+                "complete" => greeners::hierarchical::Linkage::Complete,
+                "average" => greeners::hierarchical::Linkage::Average,
+                _ => greeners::hierarchical::Linkage::Ward,
             },
-            _ => greeners::Linkage::Ward,
+            _ => greeners::hierarchical::Linkage::Ward,
         };
         let cut_height = match opt_map.get("cut") {
             Some(Value::Float(v)) => Some(*v),
@@ -2161,7 +2161,7 @@ impl Interpreter {
             }
         }
 
-        let result = greeners::HierarchicalClustering::fit(&x_mat, linkage, cut_height)
+        let result = greeners::hierarchical::HierarchicalClustering::fit(&x_mat, linkage, cut_height)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         Ok(Value::HierarchicalResult(Rc::new(result)))
@@ -2230,7 +2230,7 @@ impl Interpreter {
             }
         }
 
-        let result = greeners::TSNE::fit(&x_mat, perplexity, None, max_iter, lr)
+        let result = greeners::tsne::TSNE::fit(&x_mat, perplexity, None, max_iter, lr)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let dim_names: Vec<String> = vec!["dim0".into(), "dim1".into()];
@@ -2326,7 +2326,7 @@ impl Interpreter {
             }
         }
 
-        let result = greeners::UMAP::fit(&x_mat, n_neighbors, None, None, max_iter)
+        let result = greeners::umap::UMAP::fit(&x_mat, n_neighbors, None, None, max_iter)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let dim_names: Vec<String> = vec!["dim0".into(), "dim1".into()];
@@ -2398,11 +2398,11 @@ impl Interpreter {
         let x_vars: Vec<String> = x_str.split(',').map(|s| s.trim().to_string()).collect();
         let bp_type = match opt_map.get("type") {
             Some(Value::Str(s)) => match s.as_str() {
-                "form" => greeners::BiplotType::Form,
-                "covariance" => greeners::BiplotType::Covariance,
-                _ => greeners::BiplotType::Symmetric,
+                "form" => greeners::biplot::BiplotType::Form,
+                "covariance" => greeners::biplot::BiplotType::Covariance,
+                _ => greeners::biplot::BiplotType::Symmetric,
             },
-            _ => greeners::BiplotType::Symmetric,
+            _ => greeners::biplot::BiplotType::Symmetric,
         };
 
         let n = df.n_rows();
@@ -2420,7 +2420,7 @@ impl Interpreter {
             }
         }
 
-        let result = greeners::Biplot::fit(&x_mat, bp_type, Some(x_vars))
+        let result = greeners::biplot::Biplot::fit(&x_mat, bp_type, Some(x_vars))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let dim_names: Vec<String> = vec!["dim0".into(), "dim1".into()];

@@ -69,7 +69,7 @@ impl Interpreter {
                 .to_vec()
         };
 
-        let result = greeners::Midas::fit(
+        let result = greeners::midas::Midas::fit(
             &ndarray::Array1::from_vec(y_vec),
             &ndarray::Array1::from_vec(x_vec),
             freq,
@@ -133,7 +133,7 @@ impl Interpreter {
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         let var_names = g_formula.independents.clone();
 
-        let result = greeners::TVP::fit(&y_arr, &x_arr, Some(var_names))
+        let result = greeners::tvp::TVP::fit(&y_arr, &x_arr, Some(var_names))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let names = result.variable_names.as_deref().unwrap_or(&[]);
@@ -205,7 +205,7 @@ impl Interpreter {
                 .to_vec()
         };
 
-        let result = greeners::SETAR::fit(&ndarray::Array1::from_vec(y_vec), ar_order, delay)
+        let result = greeners::setar::SETAR::fit(&ndarray::Array1::from_vec(y_vec), ar_order, delay)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let names = model_expansion::ar_coef_names(result.ar_order);
@@ -300,7 +300,7 @@ impl Interpreter {
             }
         }
 
-        let result = greeners::MSVAR::fit(&y_mat, n_regimes, lags, Some(all_cols))
+        let result = greeners::ms_var::MSVAR::fit(&y_mat, n_regimes, lags, Some(all_cols))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let k = result.n_vars;
@@ -427,7 +427,7 @@ impl Interpreter {
         let obs_mat = ndarray::Array2::from_shape_vec((n, 1), obs_vals.to_vec())
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        let result = greeners::FAVAR::fit(
+        let result = greeners::favar::FAVAR::fit(
             &x_mat,
             &obs_mat,
             n_factors,
@@ -555,7 +555,7 @@ impl Interpreter {
             _ => vec![],
         };
 
-        let result = greeners::JohansenBreak::fit(&y_mat, lags, &break_points)
+        let result = greeners::johansen_break::JohansenBreak::fit(&y_mat, lags, &break_points)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let cv_names: Vec<String> = (0..result.cointegration_rank)
@@ -652,7 +652,7 @@ impl Interpreter {
             }
         }
 
-        let result = greeners::TvpVar::fit(&y_mat, lags, Some(all_cols))
+        let result = greeners::tvp_var::TvpVar::fit(&y_mat, lags, Some(all_cols))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let var_names = &result.var_names;
@@ -734,7 +734,7 @@ impl Interpreter {
             }
         }
 
-        let result = greeners::QuantileVAR::fit(&y_mat, lags, tau, n_boot, Some(all_cols))
+        let result = greeners::quantile_var::QuantileVAR::fit(&y_mat, lags, tau, n_boot, Some(all_cols))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let var_names = &result.var_names;
@@ -826,7 +826,7 @@ impl Interpreter {
         })?;
         let x_arr = ndarray::Array1::from_vec(vals.to_vec());
 
-        let result = greeners::MODWT::fit(&x_arr, scales)
+        let result = greeners::wavelet::MODWT::fit(&x_arr, scales)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let summary = format!(
@@ -883,17 +883,17 @@ impl Interpreter {
 
         let copula_type = match opt_map.get("type") {
             Some(Value::Str(s)) => match s.as_str() {
-                "gaussian" | "normal" => greeners::CopulaType::Gaussian,
-                "clayton" => greeners::CopulaType::Clayton,
-                "gumbel" => greeners::CopulaType::Gumbel,
-                "frank" => greeners::CopulaType::Frank,
+                "gaussian" | "normal" => greeners::copula::CopulaType::Gaussian,
+                "clayton" => greeners::copula::CopulaType::Clayton,
+                "gumbel" => greeners::copula::CopulaType::Gumbel,
+                "frank" => greeners::copula::CopulaType::Frank,
                 _ => {
                     return Err(HayashiError::Runtime(format!(
                         "{func}: type must be gaussian, clayton, gumbel, or frank"
                     )))
                 }
             },
-            _ => greeners::CopulaType::Gaussian,
+            _ => greeners::copula::CopulaType::Gaussian,
         };
 
         let mut all_cols: Vec<String> = vec![g_formula.dependent.clone()];
@@ -913,7 +913,7 @@ impl Interpreter {
             }
         }
 
-        let result = greeners::Copula::fit(&x_mat, copula_type, Some(all_cols))
+        let result = greeners::copula::Copula::fit(&x_mat, copula_type, Some(all_cols))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let var_names = &result.var_names;
@@ -994,7 +994,7 @@ impl Interpreter {
         let y_arr = ndarray::Array1::from_vec(y_vals.to_vec());
         let x_vec = ndarray::Array1::from_vec(x_vals.to_vec());
 
-        let result = greeners::NARDL::fit(&y_arr, &x_vec, lags)
+        let result = greeners::nardl::NARDL::fit(&y_arr, &x_vec, lags)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let summary = format!(
@@ -1071,7 +1071,7 @@ impl Interpreter {
             }
         }
 
-        let result = greeners::DCCGARCH::fit(&r_mat, Some(all_cols))
+        let result = greeners::dcc_garch::DCCGARCH::fit(&r_mat, Some(all_cols))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let var_names = &result.var_names;
@@ -1170,7 +1170,7 @@ impl Interpreter {
         })?;
         let q_arr = ndarray::Array1::from_vec(q_vals.to_vec());
 
-        let result = greeners::TVAR::fit(&y_mat, &q_arr, lags, max_delay, Some(all_cols))
+        let result = greeners::tvar::TVAR::fit(&y_mat, &q_arr, lags, max_delay, Some(all_cols))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let var_names = &result.var_names;
@@ -1294,7 +1294,7 @@ impl Interpreter {
             }
         }
 
-        let result = greeners::BVAR::fit(&y_mat, lags, lambda1, lambda2, lambda3, Some(all_cols))
+        let result = greeners::bvar::BVAR::fit(&y_mat, lags, lambda1, lambda2, lambda3, Some(all_cols))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let var_names = &result.var_names;
@@ -1358,16 +1358,16 @@ impl Interpreter {
 
         let copula_type = match opt_map.get("type") {
             Some(Value::Str(s)) => match s.as_str() {
-                "gaussian" | "normal" => greeners::TvCopulaType::Gaussian,
-                "clayton" => greeners::TvCopulaType::Clayton,
-                "gumbel" => greeners::TvCopulaType::Gumbel,
+                "gaussian" | "normal" => greeners::tv_copula::TvCopulaType::Gaussian,
+                "clayton" => greeners::tv_copula::TvCopulaType::Clayton,
+                "gumbel" => greeners::tv_copula::TvCopulaType::Gumbel,
                 _ => {
                     return Err(HayashiError::Runtime(format!(
                         "{func}: type must be gaussian, clayton, or gumbel"
                     )))
                 }
             },
-            _ => greeners::TvCopulaType::Gaussian,
+            _ => greeners::tv_copula::TvCopulaType::Gaussian,
         };
 
         let mut all_cols: Vec<String> = vec![g_formula.dependent.clone()];
@@ -1387,7 +1387,7 @@ impl Interpreter {
             }
         }
 
-        let result = greeners::TvCopula::fit(&x_mat, copula_type, Some(all_cols))
+        let result = greeners::tv_copula::TvCopula::fit(&x_mat, copula_type, Some(all_cols))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let summary = format!(
@@ -1472,7 +1472,7 @@ impl Interpreter {
         })?;
         let y_arr = ndarray::Array1::from_vec(vals.to_vec());
 
-        let result = greeners::SV::fit(&y_arr, n_iter, Some(var_name))
+        let result = greeners::sv::SV::fit(&y_arr, n_iter, Some(var_name))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let summary = format!(
@@ -1562,7 +1562,7 @@ impl Interpreter {
         })?;
         let event_times: Vec<f64> = vals.to_vec();
 
-        let result = greeners::Hawkes::fit(&event_times, t_window)
+        let result = greeners::hawkes::Hawkes::fit(&event_times, t_window)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let summary = format!(

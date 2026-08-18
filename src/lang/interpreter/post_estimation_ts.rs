@@ -76,19 +76,19 @@ impl Interpreter {
                         let mut x_use = bm.x.clone();
                         for (var, val) in &at_vals {
                             if let Some(idx) = bm.coef_names.iter().position(|n| n == var) {
-                                x_use = greeners::Margins::with_at(&x_use, idx, *val);
+                                x_use = greeners::margins::Margins::with_at(&x_use, idx, *val);
                             }
                         }
                         let vcov = Self::binary_mle_vcov(&bm.kind, &bm.result.params, &bm.y, &bm.x);
                         let mut ame_result = if bm.kind == "logit" {
                             match &vcov {
-                                Some(v) => greeners::Margins::ame_logit_with_vcov(
+                                Some(v) => greeners::margins::Margins::ame_logit_with_vcov(
                                     &bm.result.params,
                                     &x_use,
                                     &bm.coef_names,
                                     v,
                                 ),
-                                None => greeners::Margins::ame_logit(
+                                None => greeners::margins::Margins::ame_logit(
                                     &bm.result.params,
                                     &x_use,
                                     &bm.coef_names,
@@ -96,13 +96,13 @@ impl Interpreter {
                             }
                         } else {
                             match &vcov {
-                                Some(v) => greeners::Margins::ame_probit_with_vcov(
+                                Some(v) => greeners::margins::Margins::ame_probit_with_vcov(
                                     &bm.result.params,
                                     &x_use,
                                     &bm.coef_names,
                                     v,
                                 ),
-                                None => greeners::Margins::ame_probit(
+                                None => greeners::margins::Margins::ame_probit(
                                     &bm.result.params,
                                     &x_use,
                                     &bm.coef_names,
@@ -205,11 +205,11 @@ impl Interpreter {
                         let mut x_use = x.to_owned();
                         for (var, val) in &at_vals {
                             if let Some(idx) = names.iter().position(|n| n == var) {
-                                x_use = greeners::Margins::with_at(&x_use, idx, *val);
+                                x_use = greeners::margins::Margins::with_at(&x_use, idx, *val);
                             }
                         }
                         let ame_result =
-                            greeners::Margins::ame_exponential(&r.params, &x_use, names);
+                            greeners::margins::Margins::ame_exponential(&r.params, &x_use, names);
                         let at_label = if at_vals.is_empty() {
                             String::new()
                         } else {
@@ -252,11 +252,11 @@ impl Interpreter {
                         let mut x_use = x.to_owned();
                         for (var, val) in &at_vals {
                             if let Some(idx) = names.iter().position(|n| n == var) {
-                                x_use = greeners::Margins::with_at(&x_use, idx, *val);
+                                x_use = greeners::margins::Margins::with_at(&x_use, idx, *val);
                             }
                         }
                         let ame_result =
-                            greeners::Margins::ame_exponential(&r.params, &x_use, names);
+                            greeners::margins::Margins::ame_exponential(&r.params, &x_use, names);
                         let at_label = if at_vals.is_empty() {
                             String::new()
                         } else {
@@ -409,13 +409,13 @@ impl Interpreter {
                         let vcov = Self::binary_mle_vcov(&bm.kind, &bm.result.params, &bm.y, &bm.x);
                         let ame = if bm.kind == "logit" {
                             match &vcov {
-                                Some(v) => greeners::Margins::ame_logit_with_vcov(
+                                Some(v) => greeners::margins::Margins::ame_logit_with_vcov(
                                     &bm.result.params,
                                     &bm.x,
                                     &bm.coef_names,
                                     v,
                                 ),
-                                None => greeners::Margins::ame_logit(
+                                None => greeners::margins::Margins::ame_logit(
                                     &bm.result.params,
                                     &bm.x,
                                     &bm.coef_names,
@@ -423,13 +423,13 @@ impl Interpreter {
                             }
                         } else {
                             match &vcov {
-                                Some(v) => greeners::Margins::ame_probit_with_vcov(
+                                Some(v) => greeners::margins::Margins::ame_probit_with_vcov(
                                     &bm.result.params,
                                     &bm.x,
                                     &bm.coef_names,
                                     v,
                                 ),
-                                None => greeners::Margins::ame_probit(
+                                None => greeners::margins::Margins::ame_probit(
                                     &bm.result.params,
                                     &bm.x,
                                     &bm.coef_names,
@@ -772,7 +772,7 @@ impl Interpreter {
                 let ss_result = match model_kind.as_str() {
                     "ll" | "local_level" => {
                         // Local-level model: fit variances by MLE and return a result object.
-                        let result = greeners::LocalLevel::fit(&y_vec)
+                        let result = greeners::statespace::LocalLevel::fit(&y_vec)
                             .map_err(|e| self.rt_err(format!("kalman (ll): {e}")))?;
                         return Ok(Some(Value::LocalLevelResult(Rc::new(result))));
                     }

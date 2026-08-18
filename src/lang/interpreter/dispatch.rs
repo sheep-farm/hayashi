@@ -74,7 +74,7 @@ impl Interpreter {
                         _ => None,
                     };
                     if let Some(x) = x {
-                        if let Ok(res) = greeners::Transforms::apply(&[x], other) {
+                        if let Ok(res) = greeners::transforms::Transforms::apply(&[x], other) {
                             return Ok(Value::Float(res[0]));
                         }
                     }
@@ -92,7 +92,7 @@ impl Interpreter {
                         _ => None,
                     };
                     if let (Some(a), Some(b)) = (xa, xb) {
-                        if let Ok(res) = greeners::Transforms::apply2(&[a], &[b], other) {
+                        if let Ok(res) = greeners::transforms::Transforms::apply2(&[a], &[b], other) {
                             return Ok(Value::Float(res[0]));
                         }
                     }

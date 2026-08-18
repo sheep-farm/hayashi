@@ -1,4 +1,5 @@
-use greeners::{Column, DataFrame};
+use greeners::Column;
+use greeners::DataFrame;
 use hayashi_lang::lang::interpreter::value::Value;
 use jupyter_protocol::{Media, MediaType};
 

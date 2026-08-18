@@ -116,12 +116,12 @@ impl Interpreter {
         let y = Array1::from(self.eval_col_expr(&Expr::Var(col_name), &df)?);
 
         let result = match (func, use_t_dist) {
-            ("garch", false) => greeners::GARCH::fit(&y, p, q),
-            ("garch", true) => greeners::GARCH::fit_t(&y, p, q),
-            ("egarch", false) => greeners::EGARCH::fit(&y, p, q),
-            ("egarch", true) => greeners::EGARCH::fit_t(&y, p, q),
-            ("gjrgarch", false) => greeners::GJRGARCH::fit(&y, p, q),
-            ("gjrgarch", true) => greeners::GJRGARCH::fit_t(&y, p, q),
+            ("garch", false) => greeners::garch::GARCH::fit(&y, p, q),
+            ("garch", true) => greeners::garch::GARCH::fit_t(&y, p, q),
+            ("egarch", false) => greeners::garch::EGARCH::fit(&y, p, q),
+            ("egarch", true) => greeners::garch::EGARCH::fit_t(&y, p, q),
+            ("gjrgarch", false) => greeners::garch::GJRGARCH::fit(&y, p, q),
+            ("gjrgarch", true) => greeners::garch::GJRGARCH::fit_t(&y, p, q),
             _ => unreachable!(),
         };
 
@@ -196,7 +196,7 @@ impl Interpreter {
         for (i, &rho) in res.acf.iter().enumerate() {
             let k = i + 1;
             q_accum += nf * (nf + 2.0) * rho * rho / (nf - k as f64);
-            let p_k = greeners::chi2_pvalue(q_accum, k as f64);
+            let p_k = greeners::distributions::chi2_pvalue(q_accum, k as f64);
             display.push_str(&format!(
                 "{:<6} {:>10.4} {:>10.4} {:>8.4} {:>3}\n",
                 k,
@@ -1518,7 +1518,7 @@ impl Interpreter {
     }
     pub(super) fn diagnostics_garch(
         &mut self,
-        m: &greeners::GarchResult,
+        m: &greeners::garch::GarchResult,
         thick: &str,
         thin: &str,
     ) -> Result<HashMap<String, Value>> {
@@ -1622,7 +1622,7 @@ impl Interpreter {
     }
     pub(super) fn diagnostics_arima(
         &mut self,
-        m: &greeners::ArimaResult,
+        m: &greeners::arima::ArimaResult,
         thick: &str,
         thin: &str,
     ) -> Result<HashMap<String, Value>> {
@@ -2364,7 +2364,7 @@ impl Interpreter {
             Some(Value::Float(f)) => vec![*f as usize],
             _ => vec![7, 365],
         };
-        let result = greeners::MSTL::fit(&series, &periods)
+        let result = greeners::mstl::MSTL::fit(&series, &periods)
             .map_err(|e| self.rt_err(format!("mstl: {e}")))?;
         Ok(Value::MstlResult(Rc::new(result)))
     }
@@ -2395,7 +2395,7 @@ impl Interpreter {
             _ => 0.5,
         };
 
-        let (z, p) = greeners::ProportionTests::proportions_ztest_1samp(count, n, mu)
+        let (z, p) = greeners::proportion::ProportionTests::proportions_ztest_1samp(count, n, mu)
             .map_err(|e| self.rt_err(format!("proptest: {e}")))?;
         let p_hat = count as f64 / n as f64;
         let sep = "─".repeat(56);
@@ -2470,7 +2470,7 @@ impl Interpreter {
         let c2 = to_usize(self.eval_expr(&args[2])?)?;
         let n2 = to_usize(self.eval_expr(&args[3])?)?;
 
-        let (z, p) = greeners::ProportionTests::proportions_ztest_2samp(c1, n1, c2, n2)
+        let (z, p) = greeners::proportion::ProportionTests::proportions_ztest_2samp(c1, n1, c2, n2)
             .map_err(|e| self.rt_err(format!("proptest2: {e}")))?;
         let p1 = c1 as f64 / n1 as f64;
         let p2 = c2 as f64 / n2 as f64;
@@ -2549,7 +2549,7 @@ impl Interpreter {
             _ => 0.05,
         };
 
-        let (lo, hi) = greeners::ProportionTests::proportion_confint(count, n, alpha)
+        let (lo, hi) = greeners::proportion::ProportionTests::proportion_confint(count, n, alpha)
             .map_err(|e| self.rt_err(format!("propci: {e}")))?;
         let p_hat = count as f64 / n as f64;
         let pct = (1.0 - alpha) * 100.0;
@@ -2608,7 +2608,7 @@ impl Interpreter {
         let d = to_usize(self.eval_expr(&args[3])?)?;
 
         let table = [[a, b], [c, d]];
-        let (chi2, p) = greeners::ProportionTests::chi2_contingency(&table)
+        let (chi2, p) = greeners::proportion::ProportionTests::chi2_contingency(&table)
             .map_err(|e| self.rt_err(format!("chisq2x2: {e}")))?;
 
         let sep = "─".repeat(56);
@@ -2708,16 +2708,16 @@ impl Interpreter {
         };
         let method = match opt_map.get("method") {
             Some(Value::Str(s)) => match s.to_lowercase().as_str() {
-                "bonferroni" => greeners::MultiTestMethod::Bonferroni,
-                "sidak" => greeners::MultiTestMethod::Sidak,
+                "bonferroni" => greeners::multipletests::MultiTestMethod::Bonferroni,
+                "sidak" => greeners::multipletests::MultiTestMethod::Sidak,
                 "holm" | "holm_bonferroni" | "holmbonferroni" => {
-                    greeners::MultiTestMethod::HolmBonferroni
+                    greeners::multipletests::MultiTestMethod::HolmBonferroni
                 }
                 "bh" | "benjamini_hochberg" | "fdr_bh" => {
-                    greeners::MultiTestMethod::BenjaminiHochberg
+                    greeners::multipletests::MultiTestMethod::BenjaminiHochberg
                 }
                 "by" | "benjamini_yekutieli" | "fdr_by" => {
-                    greeners::MultiTestMethod::BenjaminiYekutieli
+                    greeners::multipletests::MultiTestMethod::BenjaminiYekutieli
                 }
                 other => {
                     return Err(HayashiError::Runtime(format!(
@@ -2725,11 +2725,11 @@ impl Interpreter {
                     )))
                 }
             },
-            _ => greeners::MultiTestMethod::Bonferroni,
+            _ => greeners::multipletests::MultiTestMethod::Bonferroni,
         };
 
         let method_name = format!("{:?}", method);
-        let (rejects, pvals_adj) = greeners::MultipleTests::multipletests(&pvals, alpha, method)
+        let (rejects, pvals_adj) = greeners::multipletests::MultipleTests::multipletests(&pvals, alpha, method)
             .map_err(|e| self.rt_err(format!("multipletests: {e}")))?;
 
         let sep = "─".repeat(64);
@@ -2828,15 +2828,15 @@ impl Interpreter {
 
         let level = match opt_map.get("level") {
         Some(Value::Str(s)) => match s.to_lowercase().as_str() {
-            "local_level" | "ll"            => greeners::UCLevel::LocalLevel,
-            "local_linear" | "local_linear_trend" | "llt" => greeners::UCLevel::LocalLinearTrend,
-            "smooth_trend" | "st"           => greeners::UCLevel::SmoothTrend,
-            "random_walk" | "rw"            => greeners::UCLevel::RandomWalk,
+            "local_level" | "ll"            => greeners::unobserved_components::UCLevel::LocalLevel,
+            "local_linear" | "local_linear_trend" | "llt" => greeners::unobserved_components::UCLevel::LocalLinearTrend,
+            "smooth_trend" | "st"           => greeners::unobserved_components::UCLevel::SmoothTrend,
+            "random_walk" | "rw"            => greeners::unobserved_components::UCLevel::RandomWalk,
             other => return Err(HayashiError::Runtime(format!(
                 "ucm: level='{other}' unknown — use: local_level, local_linear, smooth_trend, random_walk"
             ))),
         },
-        _ => greeners::UCLevel::LocalLinearTrend,
+        _ => greeners::unobserved_components::UCLevel::LocalLinearTrend,
     };
 
         let period = match opt_map.get("period") {
@@ -2847,19 +2847,19 @@ impl Interpreter {
 
         let seasonal = match opt_map.get("seasonal") {
             Some(Value::Str(s)) => match s.to_lowercase().as_str() {
-                "none" => greeners::UCSeasonal::None,
-                "deterministic" => greeners::UCSeasonal::Deterministic(period),
-                "stochastic" => greeners::UCSeasonal::Stochastic(period),
+                "none" => greeners::unobserved_components::UCSeasonal::None,
+                "deterministic" => greeners::unobserved_components::UCSeasonal::Deterministic(period),
+                "stochastic" => greeners::unobserved_components::UCSeasonal::Stochastic(period),
                 other => {
                     return Err(HayashiError::Runtime(format!(
                         "ucm: seasonal='{other}' unknown — use: none, deterministic, stochastic"
                     )))
                 }
             },
-            _ => greeners::UCSeasonal::None,
+            _ => greeners::unobserved_components::UCSeasonal::None,
         };
 
-        let result = greeners::UnobservedComponents::fit(&y, level, seasonal)
+        let result = greeners::unobserved_components::UnobservedComponents::fit(&y, level, seasonal)
             .map_err(|e| self.rt_err(format!("ucm: {e}")))?;
         Ok(Value::UCResult(Rc::new(result)))
     }
@@ -3144,7 +3144,7 @@ impl Interpreter {
             Some(Value::Float(v)) => *v as usize,
             _ => 1,
         };
-        let result = greeners::MarkovAutoregression::fit(&y, k, p)
+        let result = greeners::markov_autoreg::MarkovAutoregression::fit(&y, k, p)
             .map_err(|e| self.rt_err(format!("msauto: {e}")))?;
         Ok(Value::MSARResult(Rc::new(result)))
     }
@@ -3486,7 +3486,7 @@ impl Interpreter {
                 data[[i, j]] = v;
             }
         }
-        let result = greeners::DynamicFactor::fit(&data, k_factors, factor_order)
+        let result = greeners::dynamic_factor::DynamicFactor::fit(&data, k_factors, factor_order)
             .map_err(|e| self.rt_err(format!("dfm: {e}")))?;
         Ok(Value::DFMResult(DFMModel {
             result: Rc::new(result),
@@ -3920,10 +3920,10 @@ impl Interpreter {
         let data = get_col_f64(&df, &var_name)?;
         let slice = data.as_slice().unwrap();
 
-        let skew = greeners::MomentHelpers::skewness(slice);
-        let kurt = greeners::MomentHelpers::kurtosis(slice);
-        let (jb, jb_p) = greeners::MomentHelpers::jarque_bera(slice);
-        let (k2, k2_p) = greeners::MomentHelpers::dagostino(slice);
+        let skew = greeners::moment_helpers::MomentHelpers::skewness(slice);
+        let kurt = greeners::moment_helpers::MomentHelpers::kurtosis(slice);
+        let (jb, jb_p) = greeners::moment_helpers::MomentHelpers::jarque_bera(slice);
+        let (k2, k2_p) = greeners::moment_helpers::MomentHelpers::dagostino(slice);
         let n = data.len();
         let sep = "─".repeat(66);
         let mut display = String::new();

@@ -62,7 +62,7 @@ pub fn pca_children(m: &PcaModel) -> Vec<(String, Value)> {
     vars
 }
 
-pub fn pca_fit_dict(r: &greeners::PCAResult) -> Value {
+pub fn pca_fit_dict(r: &greeners::multivariate::PCAResult) -> Value {
     fit_dict(&[
         ("n_obs", Value::Int(r.n_obs as i64)),
         ("n_components", Value::Int(r.n_components as i64)),
@@ -93,14 +93,14 @@ pub fn factor_children(m: &FactorModel) -> Vec<(String, Value)> {
     vars
 }
 
-pub fn factor_fit_dict(r: &greeners::FactorResult) -> Value {
+pub fn factor_fit_dict(r: &greeners::multivariate::FactorResult) -> Value {
     fit_dict(&[
         ("n_obs", Value::Int(r.n_obs as i64)),
         ("n_factors", Value::Int(r.n_factors as i64)),
     ])
 }
 
-pub fn mice_children(r: &greeners::MICEResult) -> Vec<(String, Value)> {
+pub fn mice_children(r: &greeners::imputation::MICEResult) -> Vec<(String, Value)> {
     let mut vars = Vec::new();
     let mut imputations = Vec::new();
     for (i, ds) in r.datasets.iter().enumerate() {
@@ -123,7 +123,7 @@ pub fn mice_children(r: &greeners::MICEResult) -> Vec<(String, Value)> {
     vars
 }
 
-pub fn mice_fit_dict(r: &greeners::MICEResult) -> Value {
+pub fn mice_fit_dict(r: &greeners::imputation::MICEResult) -> Value {
     fit_dict(&[
         ("n_imputations", Value::Int(r.n_imputations as i64)),
         ("n_iter", Value::Int(r.n_iter as i64)),
@@ -132,7 +132,7 @@ pub fn mice_fit_dict(r: &greeners::MICEResult) -> Value {
     ])
 }
 
-pub fn gam_children(r: &greeners::GamResult) -> Vec<(String, Value)> {
+pub fn gam_children(r: &greeners::glmgam::GamResult) -> Vec<(String, Value)> {
     let mut vars = Vec::new();
     let names = r.variable_names.clone().unwrap_or_default();
     let coef = coef_dataframe(
@@ -149,7 +149,7 @@ pub fn gam_children(r: &greeners::GamResult) -> Vec<(String, Value)> {
     vars
 }
 
-pub fn gam_fit_dict(r: &greeners::GamResult) -> Value {
+pub fn gam_fit_dict(r: &greeners::glmgam::GamResult) -> Value {
     fit_dict(&[
         ("n_linear", Value::Int(r.n_linear as i64)),
         ("n_smooth", Value::Int(r.n_smooth as i64)),
@@ -162,7 +162,7 @@ pub fn gam_fit_dict(r: &greeners::GamResult) -> Value {
     ])
 }
 
-pub fn kmeans_children(r: &greeners::KmeansResult) -> Vec<(String, Value)> {
+pub fn kmeans_children(r: &greeners::kmeans::KmeansResult) -> Vec<(String, Value)> {
     let mut vars = Vec::new();
     let labels: Vec<Value> = r.labels.iter().map(|&l| Value::Int(l as i64)).collect();
     vars.push((
@@ -186,7 +186,7 @@ pub fn kmeans_children(r: &greeners::KmeansResult) -> Vec<(String, Value)> {
     vars
 }
 
-pub fn kmeans_fit_dict(r: &greeners::KmeansResult) -> Value {
+pub fn kmeans_fit_dict(r: &greeners::kmeans::KmeansResult) -> Value {
     let pct = if r.total_ss > 1e-15 {
         r.between_ss / r.total_ss * 100.0
     } else {
@@ -204,7 +204,7 @@ pub fn kmeans_fit_dict(r: &greeners::KmeansResult) -> Value {
     ])
 }
 
-pub fn dbscan_children(r: &greeners::DbscanResult) -> Vec<(String, Value)> {
+pub fn dbscan_children(r: &greeners::dbscan::DbscanResult) -> Vec<(String, Value)> {
     let mut vars = Vec::new();
     let labels: Vec<Value> = r.labels.iter().map(|&l| Value::Int(l)).collect();
     vars.push((
@@ -224,7 +224,7 @@ pub fn dbscan_children(r: &greeners::DbscanResult) -> Vec<(String, Value)> {
     vars
 }
 
-pub fn dbscan_fit_dict(r: &greeners::DbscanResult) -> Value {
+pub fn dbscan_fit_dict(r: &greeners::dbscan::DbscanResult) -> Value {
     fit_dict(&[
         ("n_obs", Value::Int(r.n_obs as i64)),
         ("n_features", Value::Int(r.n_features as i64)),
@@ -236,7 +236,7 @@ pub fn dbscan_fit_dict(r: &greeners::DbscanResult) -> Value {
     ])
 }
 
-pub fn isotonic_children(r: &greeners::IsotonicResult) -> Vec<(String, Value)> {
+pub fn isotonic_children(r: &greeners::isotonic::IsotonicResult) -> Vec<(String, Value)> {
     vec![
         ("x".into(), array1_to_series("x", &r.x)),
         ("y".into(), array1_to_series("y", &r.y)),
@@ -248,7 +248,7 @@ pub fn isotonic_children(r: &greeners::IsotonicResult) -> Vec<(String, Value)> {
     ]
 }
 
-pub fn isotonic_fit_dict(r: &greeners::IsotonicResult) -> Value {
+pub fn isotonic_fit_dict(r: &greeners::isotonic::IsotonicResult) -> Value {
     fit_dict(&[
         ("n_obs", Value::Int(r.n_obs as i64)),
         ("n_blocks", Value::Int(r.n_blocks as i64)),
@@ -258,7 +258,7 @@ pub fn isotonic_fit_dict(r: &greeners::IsotonicResult) -> Value {
     ])
 }
 
-pub fn kde_children(r: &greeners::KDEResult) -> Vec<(String, Value)> {
+pub fn kde_children(r: &greeners::nonparametric::KDEResult) -> Vec<(String, Value)> {
     vec![
         ("support".into(), array1_to_series("support", &r.support)),
         ("density".into(), array1_to_series("density", &r.density)),
@@ -266,7 +266,7 @@ pub fn kde_children(r: &greeners::KDEResult) -> Vec<(String, Value)> {
     ]
 }
 
-pub fn kde_fit_dict(r: &greeners::KDEResult) -> Value {
+pub fn kde_fit_dict(r: &greeners::nonparametric::KDEResult) -> Value {
     let support_min = r.support.iter().cloned().fold(f64::INFINITY, f64::min);
     let support_max = r.support.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
     let (peak_idx, peak_density) = r
@@ -288,7 +288,7 @@ pub fn kde_fit_dict(r: &greeners::KDEResult) -> Value {
     ])
 }
 
-pub fn bart_children(r: &greeners::BartResult) -> Vec<(String, Value)> {
+pub fn bart_children(r: &greeners::bart::BartResult) -> Vec<(String, Value)> {
     let mut vars = Vec::new();
     vars.push(("fitted".into(), array1_to_series("fitted", &r.fitted)));
 
@@ -321,7 +321,7 @@ pub fn bart_children(r: &greeners::BartResult) -> Vec<(String, Value)> {
     vars
 }
 
-pub fn bart_fit_dict(r: &greeners::BartResult) -> Value {
+pub fn bart_fit_dict(r: &greeners::bart::BartResult) -> Value {
     fit_dict(&[
         ("n_obs", Value::Int(r.n_obs as i64)),
         ("n_features", Value::Int(r.n_features as i64)),
@@ -335,7 +335,7 @@ pub fn bart_fit_dict(r: &greeners::BartResult) -> Value {
     ])
 }
 
-pub fn gp_children(r: &greeners::GpResult) -> Vec<(String, Value)> {
+pub fn gp_children(r: &greeners::gp::GpResult) -> Vec<(String, Value)> {
     vec![
         ("fitted".into(), array1_to_series("fitted", &r.fitted)),
         (
@@ -346,7 +346,7 @@ pub fn gp_children(r: &greeners::GpResult) -> Vec<(String, Value)> {
     ]
 }
 
-pub fn gp_fit_dict(r: &greeners::GpResult) -> Value {
+pub fn gp_fit_dict(r: &greeners::gp::GpResult) -> Value {
     fit_dict(&[
         ("n_obs", Value::Int(r.n_obs as i64)),
         ("n_features", Value::Int(r.n_features as i64)),
@@ -359,7 +359,7 @@ pub fn gp_fit_dict(r: &greeners::GpResult) -> Value {
     ])
 }
 
-pub fn gmm_clustering_children(r: &greeners::GmmClusteringResult) -> Vec<(String, Value)> {
+pub fn gmm_clustering_children(r: &greeners::gmm_clustering::GmmResult) -> Vec<(String, Value)> {
     let mut vars = Vec::new();
     let labels: Vec<Value> = r.labels.iter().map(|&l| Value::Int(l as i64)).collect();
     vars.push((
@@ -383,7 +383,7 @@ pub fn gmm_clustering_children(r: &greeners::GmmClusteringResult) -> Vec<(String
     vars
 }
 
-pub fn gmm_clustering_fit_dict(r: &greeners::GmmClusteringResult) -> Value {
+pub fn gmm_clustering_fit_dict(r: &greeners::gmm_clustering::GmmResult) -> Value {
     fit_dict(&[
         ("n_obs", Value::Int(r.n_obs as i64)),
         ("n_features", Value::Int(r.n_features as i64)),
@@ -396,7 +396,7 @@ pub fn gmm_clustering_fit_dict(r: &greeners::GmmClusteringResult) -> Value {
     ])
 }
 
-pub fn hierarchical_children(r: &greeners::HierarchicalResult) -> Vec<(String, Value)> {
+pub fn hierarchical_children(r: &greeners::hierarchical::HierarchicalResult) -> Vec<(String, Value)> {
     let mut columns: IndexMap<String, greeners::Column> = IndexMap::new();
     let cluster_a: Vec<i64> = r.merges.iter().map(|m| m.cluster_a as i64).collect();
     let cluster_b: Vec<i64> = r.merges.iter().map(|m| m.cluster_b as i64).collect();
@@ -443,7 +443,7 @@ pub fn hierarchical_children(r: &greeners::HierarchicalResult) -> Vec<(String, V
     vars
 }
 
-pub fn hierarchical_fit_dict(r: &greeners::HierarchicalResult) -> Value {
+pub fn hierarchical_fit_dict(r: &greeners::hierarchical::HierarchicalResult) -> Value {
     fit_dict(&[
         ("n_obs", Value::Int(r.n_obs as i64)),
         ("n_features", Value::Int(r.n_features as i64)),
@@ -454,7 +454,7 @@ pub fn hierarchical_fit_dict(r: &greeners::HierarchicalResult) -> Value {
     ])
 }
 
-pub fn spectral_children(r: &greeners::SpectralResult) -> Vec<(String, Value)> {
+pub fn spectral_children(r: &greeners::spectral::SpectralResult) -> Vec<(String, Value)> {
     let mut vars = Vec::new();
     let labels: Vec<Value> = r.labels.iter().map(|&l| Value::Int(l as i64)).collect();
     vars.push((
@@ -481,7 +481,7 @@ pub fn spectral_children(r: &greeners::SpectralResult) -> Vec<(String, Value)> {
     vars
 }
 
-pub fn spectral_fit_dict(r: &greeners::SpectralResult) -> Value {
+pub fn spectral_fit_dict(r: &greeners::spectral::SpectralResult) -> Value {
     fit_dict(&[
         ("n_obs", Value::Int(r.n_obs as i64)),
         ("n_features", Value::Int(r.n_features as i64)),

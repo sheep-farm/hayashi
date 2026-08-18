@@ -1855,7 +1855,7 @@ impl Interpreter {
         let sd = (vals.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n - 1.0)).sqrt();
         let se = sd / n.sqrt();
         let alpha = 1.0 - level;
-        let t_crit = greeners::t_quantile(1.0 - alpha / 2.0, n - 1.0);
+        let t_crit = greeners::distributions::t_quantile(1.0 - alpha / 2.0, n - 1.0);
         let lo = mean - t_crit * se;
         let hi = mean + t_crit * se;
         println!("\n  Variable: {var}   Obs: {}", vals.len());
