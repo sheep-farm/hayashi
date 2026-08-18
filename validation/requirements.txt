@@ -1275,6 +1275,9 @@ typing-extensions==4.16.0 \
     #   minikanren
     #   pymc
     #   shap
+tzdata==2026.3 \
+    --hash=sha256:dc096730c87af6cab1b171c9d532be840741ff5d459015e7f6947bd7d7e54931
+    # via pandas
 umap-learn==0.5.12 \
     --hash=sha256:6aff02ecac5f2aad9f3c65ee518d7ae93e1a985ae38721fdcffceee4232c33c7 \
     --hash=sha256:f2a85d2a2adcb52b541bed9b27a23ca169b56bb1b23283abeebfb8dfb8a42fe5
