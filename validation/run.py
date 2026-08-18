@@ -44,6 +44,8 @@ def run_command(cmd: list[str], cwd: Path | None = None, quiet: bool = False) ->
         cwd=cwd or ROOT_DIR,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=False,
     )
 
