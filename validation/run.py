@@ -62,7 +62,7 @@ def python_executable() -> str:
 
 def parse_hayashi_csv(path: Path) -> dict[str, dict[str, float]]:
     """Parse the CSV produced by Hayashi OLS export from a file."""
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         return parse_hayashi_csv_from_string(f.read())
 
 
@@ -1370,27 +1370,27 @@ def run_case(case: dict[str, Any], quiet: bool = False) -> tuple[str, list[str],
             hayashi_txt = hayashi_dir / "output.txt"
             if not hayashi_txt.exists():
                 return "blocked", [f"Hayashi output not found: {hayashi_txt}"], ref_report
-            hayashi = normalise_intercept(parse_hayashi_margins(hayashi_txt.read_text()))
+            hayashi = normalise_intercept(parse_hayashi_margins(hayashi_txt.read_text(encoding="utf-8")))
         elif output_format == "txt":
             hayashi_txt = hayashi_dir / "output.txt"
             if not hayashi_txt.exists():
                 return "blocked", [f"Hayashi output not found: {hayashi_txt}"], ref_report
             if family == "kalman":
-                hayashi = parse_hayashi_local_level(hayashi_txt.read_text())
+                hayashi = parse_hayashi_local_level(hayashi_txt.read_text(encoding="utf-8"))
             else:
-                hayashi = normalise_intercept(parse_hayashi_txt_table(hayashi_txt.read_text()))
+                hayashi = normalise_intercept(parse_hayashi_txt_table(hayashi_txt.read_text(encoding="utf-8")))
         elif output_format == "json":
             hayashi_json = hayashi_dir / "output.json"
             if not hayashi_json.exists():
                 return "blocked", [f"Hayashi output not found: {hayashi_json}"], ref_report
-            hayashi = parse_reference_json(hayashi_json.read_text())
+            hayashi = parse_reference_json(hayashi_json.read_text(encoding="utf-8"))
             if hayashi is None:
                 return "blocked", [f"Could not parse Hayashi output.json"], ref_report
         elif output_format == "keyvalue":
             hayashi_txt = hayashi_dir / "output.txt"
             if not hayashi_txt.exists():
                 return "blocked", [f"Hayashi output not found: {hayashi_txt}"], ref_report
-            hayashi = parse_hayashi_key_value(hayashi_txt.read_text())
+            hayashi = parse_hayashi_key_value(hayashi_txt.read_text(encoding="utf-8"))
         else:
             hayashi_csv = hayashi_dir / "output.csv"
             if not hayashi_csv.exists():
@@ -1492,7 +1492,7 @@ def render_matrix_md(cases: list[dict[str, Any]]) -> str:
 
 
 def update_matrix_md(cases: list[dict[str, Any]]) -> None:
-    MATRIX_MD.write_text(render_matrix_md(cases))
+    MATRIX_MD.write_text(render_matrix_md(cases), encoding="utf-8")
 
 
 def _case_matrix_metadata(case: dict[str, Any]) -> tuple[str, str, str, str, str]:
@@ -1601,7 +1601,7 @@ def check_metadata(
 
     if not MATRIX_MD.exists():
         findings.append("validation/MATRIX.md is missing")
-    elif not matrix_md_metadata_matches(cases, MATRIX_MD.read_text()):
+    elif not matrix_md_metadata_matches(cases, MATRIX_MD.read_text(encoding="utf-8")):
         findings.append("validation/MATRIX.md is stale; regenerate it with validation/run.py")
 
     return findings
@@ -1657,7 +1657,7 @@ def load_cases() -> tuple[dict[str, Any], list[dict[str, Any]], set[str], set[st
     if not MATRIX_YML.exists():
         raise FileNotFoundError(f"{MATRIX_YML} not found")
 
-    with open(MATRIX_YML) as f:
+    with open(MATRIX_YML, encoding="utf-8") as f:
         matrix = yaml.safe_load(f) or {}
 
     registry = matrix.get("cases", [])
@@ -1667,7 +1667,7 @@ def load_cases() -> tuple[dict[str, Any], list[dict[str, Any]], set[str], set[st
     discovered: list[dict[str, Any]] = []
     for case_yml in sorted(VALIDATION_DIR.glob("cases/*/case.yml")):
         case_id = case_yml.parent.name
-        with open(case_yml) as f:
+        with open(case_yml, encoding="utf-8") as f:
             case = yaml.safe_load(f) or {}
         case["id"] = case_id
         case["_manifest_status"] = case.get("status", "not-started")
@@ -1799,7 +1799,7 @@ def write_matrix(matrix: dict[str, Any], cases: list[dict[str, Any]]) -> None:
         }
         for case in cases
     ]
-    with open(MATRIX_YML, "w") as f:
+    with open(MATRIX_YML, "w", encoding="utf-8") as f:
         yaml.dump(matrix, f, sort_keys=False, allow_unicode=True)
 
     # Regenerate MATRIX.md.
