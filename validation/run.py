@@ -41,6 +41,9 @@ def _is_number(token: str) -> bool:
 def run_command(cmd: list[str], cwd: Path | None = None, quiet: bool = False) -> subprocess.CompletedProcess[str]:
     if not quiet:
         log(f"  $ {' '.join(cmd)}")
+    env = os.environ.copy()
+    env["PYTHONIOENCODING"] = "utf-8"
+    env["R_CLI"] = "en_US.UTF-8"  # RStudio/Posit UTF-8 hint
     return subprocess.run(
         cmd,
         cwd=cwd or ROOT_DIR,
@@ -49,6 +52,7 @@ def run_command(cmd: list[str], cwd: Path | None = None, quiet: bool = False) ->
         encoding="utf-8",
         errors="replace",
         check=False,
+        env=env,
     )
 
 
