@@ -396,7 +396,9 @@ pub fn gmm_clustering_fit_dict(r: &greeners::gmm_clustering::GmmResult) -> Value
     ])
 }
 
-pub fn hierarchical_children(r: &greeners::hierarchical::HierarchicalResult) -> Vec<(String, Value)> {
+pub fn hierarchical_children(
+    r: &greeners::hierarchical::HierarchicalResult,
+) -> Vec<(String, Value)> {
     let mut columns: IndexMap<String, greeners::Column> = IndexMap::new();
     let cluster_a: Vec<i64> = r.merges.iter().map(|m| m.cluster_a as i64).collect();
     let cluster_b: Vec<i64> = r.merges.iter().map(|m| m.cluster_b as i64).collect();

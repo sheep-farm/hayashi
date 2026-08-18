@@ -205,8 +205,9 @@ impl Interpreter {
                 .to_vec()
         };
 
-        let result = greeners::setar::SETAR::fit(&ndarray::Array1::from_vec(y_vec), ar_order, delay)
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let result =
+            greeners::setar::SETAR::fit(&ndarray::Array1::from_vec(y_vec), ar_order, delay)
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let names = model_expansion::ar_coef_names(result.ar_order);
         let summary = format!(
@@ -734,8 +735,9 @@ impl Interpreter {
             }
         }
 
-        let result = greeners::quantile_var::QuantileVAR::fit(&y_mat, lags, tau, n_boot, Some(all_cols))
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let result =
+            greeners::quantile_var::QuantileVAR::fit(&y_mat, lags, tau, n_boot, Some(all_cols))
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let var_names = &result.var_names;
         let param_names = model_expansion::var_param_names(result.n_vars, result.lags, var_names);
@@ -1294,8 +1296,9 @@ impl Interpreter {
             }
         }
 
-        let result = greeners::bvar::BVAR::fit(&y_mat, lags, lambda1, lambda2, lambda3, Some(all_cols))
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let result =
+            greeners::bvar::BVAR::fit(&y_mat, lags, lambda1, lambda2, lambda3, Some(all_cols))
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let var_names = &result.var_names;
         let param_names = model_expansion::var_param_names(result.n_vars, result.lags, var_names);

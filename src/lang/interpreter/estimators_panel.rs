@@ -2218,8 +2218,9 @@ impl Interpreter {
             .formula_var_names(&g_endog)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        let result = greeners::panel::FE2SLS::fit(&y_vec, &x_mat, &z_mat, &entity_ids, Some(var_names))
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let result =
+            greeners::panel::FE2SLS::fit(&y_vec, &x_mat, &z_mat, &entity_ids, Some(var_names))
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         Ok(Value::FE2SLSResult(Rc::new(result)))
     }
@@ -2244,8 +2245,9 @@ impl Interpreter {
         let var_names = df
             .formula_var_names(&g_formula)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        let result = greeners::panel::PCSE::fit(&y_vec, &x_mat, &entity_ids, &time_ids, Some(var_names))
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let result =
+            greeners::panel::PCSE::fit(&y_vec, &x_mat, &entity_ids, &time_ids, Some(var_names))
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         Ok(Value::PcseResult(Rc::new(result)))
     }
 
@@ -2764,9 +2766,10 @@ impl Interpreter {
             re_vcov[(idx, idx)] = re.std_errors[*j].powi(2);
         }
 
-        let result =
-            greeners::panel_robust::RobustHausman::compare_arrays(&fe_beta, &re_beta, &fe_vcov, &re_vcov, None)
-                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let result = greeners::panel_robust::RobustHausman::compare_arrays(
+            &fe_beta, &re_beta, &fe_vcov, &re_vcov, None,
+        )
+        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         Ok(diag(format!("{result}")))
     }
@@ -2867,8 +2870,9 @@ impl Interpreter {
             names
         };
 
-        let result = greeners::panel_robust::RobustFTest::test(&beta, &vcov, &indices, Some(&names_ref), n)
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let result =
+            greeners::panel_robust::RobustFTest::test(&beta, &vcov, &indices, Some(&names_ref), n)
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         Ok(diag(format!("{result}")))
     }

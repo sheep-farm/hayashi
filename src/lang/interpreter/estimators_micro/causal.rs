@@ -486,9 +486,16 @@ impl Interpreter {
             _ => 5,
         };
         let cov = resolve_cov_full(opt_map, &df)?;
-        let result =
-            greeners::event_study::EventStudy::fit(&y, &event_time, &x_controls, reference, min_t, max_t, cov)
-                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let result = greeners::event_study::EventStudy::fit(
+            &y,
+            &event_time,
+            &x_controls,
+            reference,
+            min_t,
+            max_t,
+            cov,
+        )
+        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let event_names: Vec<String> = result
             .event_times
@@ -600,8 +607,9 @@ impl Interpreter {
             _ => 2,
         };
 
-        let result = greeners::double_ml::DoubleML::fit_plr(&y_vec, &d_vec, &x_mat, n_folds, poly_degree)
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let result =
+            greeners::double_ml::DoubleML::fit_plr(&y_vec, &d_vec, &x_mat, n_folds, poly_degree)
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let theta_names = vec!["theta".to_string()];
         let theta_params = ndarray::Array1::from(vec![result.theta]);
@@ -1189,8 +1197,9 @@ impl Interpreter {
             }
         }
 
-        let result = greeners::bayesian_sc::BayesianSC::fit(&y_arr, &y_controls, treatment_period, prior)
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let result =
+            greeners::bayesian_sc::BayesianSC::fit(&y_arr, &y_controls, treatment_period, prior)
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let tau_names = vec!["tau".to_string()];
         let tau_params = ndarray::Array1::from(vec![result.tau]);

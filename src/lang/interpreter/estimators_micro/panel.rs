@@ -46,8 +46,14 @@ impl Interpreter {
         };
 
         let var_names = g_formula.independents.clone();
-        let result = greeners::panel_tobit::PanelTobit::fit(&y_vec, &x_mat, &panel_ids, censor, Some(var_names))
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let result = greeners::panel_tobit::PanelTobit::fit(
+            &y_vec,
+            &x_mat,
+            &panel_ids,
+            censor,
+            Some(var_names),
+        )
+        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let names = result.variable_names.clone().unwrap_or_default();
         let summary = format!(
@@ -478,8 +484,9 @@ impl Interpreter {
             }
         };
 
-        let result = greeners::pstr::PSTR::fit(&y_arr, &x_arr, &q_arr, &entity_ids, Some(var_names))
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let result =
+            greeners::pstr::PSTR::fit(&y_arr, &x_arr, &q_arr, &entity_ids, Some(var_names))
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let summary = format!(
             "PSTR(k={}, n={}), gamma={:.4}, c={:.4}",

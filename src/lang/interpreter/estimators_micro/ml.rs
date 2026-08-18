@@ -34,9 +34,14 @@ impl Interpreter {
         }
         let var_names = g_formula.independents.clone();
 
-        let result =
-            greeners::random_forest::RandomForest::fit(&y_arr, &x_arr, n_trees, max_depth, Some(var_names))
-                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let result = greeners::random_forest::RandomForest::fit(
+            &y_arr,
+            &x_arr,
+            n_trees,
+            max_depth,
+            Some(var_names),
+        )
+        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let summary = format!(
             "RandomForest(trees={}, depth={}), n={}, R2={:.4}",
@@ -195,8 +200,9 @@ impl Interpreter {
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         let var_names = g_formula.independents.clone();
 
-        let result = greeners::mlp::MLP::fit(&y_arr, &x_arr, n_hidden, lr, n_epochs, Some(var_names))
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let result =
+            greeners::mlp::MLP::fit(&y_arr, &x_arr, n_hidden, lr, n_epochs, Some(var_names))
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let summary = format!(
             "MLP(hidden={}, epochs={}), n={}, R2={:.4}",
@@ -632,9 +638,15 @@ impl Interpreter {
             }
         }
 
-        let result =
-            greeners::causal_forest::CausalForest::fit(&y_arr, &t_vec, &x_mat, n_trees, max_depth, Some(x_vars))
-                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let result = greeners::causal_forest::CausalForest::fit(
+            &y_arr,
+            &t_vec,
+            &x_mat,
+            n_trees,
+            max_depth,
+            Some(x_vars),
+        )
+        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let summary = format!(
             "CausalForest(ate={:.4}, se={:.4}), n={}",
@@ -755,8 +767,9 @@ impl Interpreter {
             }
         }
 
-        let result = greeners::grf::GRF::fit(&y_arr, &t_vec, &x_mat, n_trees, max_depth, Some(x_vars))
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let result =
+            greeners::grf::GRF::fit(&y_arr, &t_vec, &x_mat, n_trees, max_depth, Some(x_vars))
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let summary = format!(
             "GRF(ate={:.4}, se={:.4}), n={}",
@@ -962,8 +975,10 @@ impl Interpreter {
             .ok_or_else(|| HayashiError::Runtime(format!("{func}: '{y_var}' must be numeric")))?;
         let y_arr = ndarray::Array1::from_vec(y_vals.to_vec());
 
-        let result = greeners::transformer::Transformer::fit(&y_arr, d_model, seq_len, lr, n_epochs, n_forecast)
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let result = greeners::transformer::Transformer::fit(
+            &y_arr, d_model, seq_len, lr, n_epochs, n_forecast,
+        )
+        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let summary = format!(
             "Transformer(d_model={}, seqlen={}, epochs={}), n={}, R2={:.4}",
@@ -1071,8 +1086,9 @@ impl Interpreter {
             }
         }
 
-        let result = greeners::dr_learner::DRLearner::fit(&y_arr, &t_vec, &x_mat, n_folds, Some(x_vars))
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let result =
+            greeners::dr_learner::DRLearner::fit(&y_arr, &t_vec, &x_mat, n_folds, Some(x_vars))
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let summary = format!(
             "DRLearner(ate={:.4}, se={:.4}), n={}",
@@ -1927,9 +1943,15 @@ impl Interpreter {
             _ => None,
         };
 
-        let result =
-            greeners::reg_path::RegPath::fit(&y_arr, &x_arr, &reg_type, alpha, n_lam, Some(var_names))
-                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let result = greeners::reg_path::RegPath::fit(
+            &y_arr,
+            &x_arr,
+            &reg_type,
+            alpha,
+            n_lam,
+            Some(var_names),
+        )
+        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let summary = format!(
             "RegPath({}), alpha={:.2}, n={}",
@@ -2161,8 +2183,9 @@ impl Interpreter {
             }
         }
 
-        let result = greeners::hierarchical::HierarchicalClustering::fit(&x_mat, linkage, cut_height)
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let result =
+            greeners::hierarchical::HierarchicalClustering::fit(&x_mat, linkage, cut_height)
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         Ok(Value::HierarchicalResult(Rc::new(result)))
     }

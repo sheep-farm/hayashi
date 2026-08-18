@@ -82,9 +82,21 @@ impl Interpreter {
 
         let var_names = g_formula.independents.clone();
         let result = if func == "spatial_panel_sar" {
-            greeners::spatial_panel::SpatialPanel::fit_sar(&y_vec, &x_mat, &w_mat, &entity_ids, Some(var_names))
+            greeners::spatial_panel::SpatialPanel::fit_sar(
+                &y_vec,
+                &x_mat,
+                &w_mat,
+                &entity_ids,
+                Some(var_names),
+            )
         } else {
-            greeners::spatial_panel::SpatialPanel::fit_sem(&y_vec, &x_mat, &w_mat, &entity_ids, Some(var_names))
+            greeners::spatial_panel::SpatialPanel::fit_sem(
+                &y_vec,
+                &x_mat,
+                &w_mat,
+                &entity_ids,
+                Some(var_names),
+            )
         }
         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
@@ -220,9 +232,14 @@ impl Interpreter {
             }
         };
 
-        let result =
-            greeners::spatial_durbin::SpatialDurbin::fit(&y_arr, &x_arr, &w_mat, &entity_ids, Some(var_names))
-                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let result = greeners::spatial_durbin::SpatialDurbin::fit(
+            &y_arr,
+            &x_arr,
+            &w_mat,
+            &entity_ids,
+            Some(var_names),
+        )
+        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let result_names = result.variable_names.clone();
         let summary = format!(
@@ -357,9 +374,14 @@ impl Interpreter {
             }
         };
 
-        let result =
-            greeners::spatial_durbin_error::SpatialDurbinError::fit(&y_arr, &x_arr, &w_mat, &entity_ids, Some(var_names))
-                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let result = greeners::spatial_durbin_error::SpatialDurbinError::fit(
+            &y_arr,
+            &x_arr,
+            &w_mat,
+            &entity_ids,
+            Some(var_names),
+        )
+        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let result_names = result.variable_names.clone();
         let summary = format!(

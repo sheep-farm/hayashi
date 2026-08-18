@@ -831,10 +831,9 @@ impl Interpreter {
                             ))
                         }
                     };
-                    return Ok(Some(ColResult::Float(greeners::transforms::Transforms::regexm_vec(
-                        &str_col.to_vec(),
-                        &pattern,
-                    ))));
+                    return Ok(Some(ColResult::Float(
+                        greeners::transforms::Transforms::regexm_vec(&str_col.to_vec(), &pattern),
+                    )));
                 }
             }
         }
@@ -1190,17 +1189,21 @@ impl Interpreter {
         match func {
             "rank" => {
                 let vals = self.eval_col_expr(&args[0], df)?;
-                Ok(Some(ColResult::Float(greeners::transforms::Transforms::rank(&vals))))
+                Ok(Some(ColResult::Float(
+                    greeners::transforms::Transforms::rank(&vals),
+                )))
             }
             "cumsum" => {
                 let vals = self.eval_col_expr(&args[0], df)?;
-                Ok(Some(ColResult::Float(greeners::transforms::Transforms::cumsum(&vals))))
+                Ok(Some(ColResult::Float(
+                    greeners::transforms::Transforms::cumsum(&vals),
+                )))
             }
             "std" | "standardize" | "zscore" => {
                 let vals = self.eval_col_expr(&args[0], df)?;
-                Ok(Some(ColResult::Float(greeners::transforms::Transforms::standardize(
-                    &vals,
-                ))))
+                Ok(Some(ColResult::Float(
+                    greeners::transforms::Transforms::standardize(&vals),
+                )))
             }
             "iqr" => {
                 let vals = self.eval_col_expr(&args[0], df)?;
@@ -1240,7 +1243,9 @@ impl Interpreter {
         match func {
             "group" => {
                 let strs = col_to_strings(df, &col_name)?;
-                Ok(Some(ColResult::Float(greeners::transforms::Transforms::group(&strs))))
+                Ok(Some(ColResult::Float(
+                    greeners::transforms::Transforms::group(&strs),
+                )))
             }
             "date" => {
                 let strs = col_to_strings(df, &col_name)?;
@@ -1719,11 +1724,9 @@ impl Interpreter {
                 let strs = self.eval_str_col(&args[0], df)?;
                 let pattern = self.eval_str_scalar(&args[1], "regexr: pattern")?;
                 let replacement = self.eval_str_scalar(&args[2], "regexr: replacement")?;
-                Ok(Some(ColResult::String(greeners::transforms::Transforms::regexr_vec(
-                    &strs,
-                    &pattern,
-                    &replacement,
-                ))))
+                Ok(Some(ColResult::String(
+                    greeners::transforms::Transforms::regexr_vec(&strs, &pattern, &replacement),
+                )))
             }
             "regexra" => {
                 if args.len() != 3 {
@@ -1736,7 +1739,9 @@ impl Interpreter {
                 let replacement = self.eval_str_scalar(&args[2], "regexra: replacement")?;
                 Ok(Some(ColResult::String(
                     strs.iter()
-                        .map(|s| greeners::transforms::Transforms::regexra(s, &pattern, &replacement))
+                        .map(|s| {
+                            greeners::transforms::Transforms::regexra(s, &pattern, &replacement)
+                        })
                         .collect(),
                 )))
             }
@@ -1748,9 +1753,9 @@ impl Interpreter {
                 }
                 let strs = self.eval_str_col(&args[0], df)?;
                 let pattern = self.eval_str_scalar(&args[1], "regexs: pattern")?;
-                Ok(Some(ColResult::String(greeners::transforms::Transforms::regexs_vec(
-                    &strs, &pattern,
-                ))))
+                Ok(Some(ColResult::String(
+                    greeners::transforms::Transforms::regexs_vec(&strs, &pattern),
+                )))
             }
             _ => Ok(None),
         }

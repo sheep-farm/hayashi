@@ -754,7 +754,11 @@ impl Interpreter {
         }
     }
 
-    fn predict_poisson_vals(&self, r: &greeners::poisson::PoissonResult, kind: &str) -> Result<Vec<f64>> {
+    fn predict_poisson_vals(
+        &self,
+        r: &greeners::poisson::PoissonResult,
+        kind: &str,
+    ) -> Result<Vec<f64>> {
         match kind {
             "count" | "mu" | "fitted" => Ok(r.fitted_values().to_vec()),
             "xb" => Ok(r.x_data().dot(&r.params).to_vec()),
@@ -764,7 +768,11 @@ impl Interpreter {
         }
     }
 
-    fn predict_negbin_vals(&self, r: &greeners::negbin::NegBinResult, kind: &str) -> Result<Vec<f64>> {
+    fn predict_negbin_vals(
+        &self,
+        r: &greeners::negbin::NegBinResult,
+        kind: &str,
+    ) -> Result<Vec<f64>> {
         match kind {
             "count" | "mu" | "fitted" => Ok(r.fitted_values().to_vec()),
             "xb" => Ok(r.x_data().dot(&r.params).to_vec()),
@@ -1028,7 +1036,11 @@ impl Interpreter {
         }
     }
 
-    fn predict_rolling_vals(&self, r: &greeners::rolling::RollingResult, kind: &str) -> Result<Vec<f64>> {
+    fn predict_rolling_vals(
+        &self,
+        r: &greeners::rolling::RollingResult,
+        kind: &str,
+    ) -> Result<Vec<f64>> {
         match kind {
             "residuals" | "resid" | "e" => Ok(r.residuals.to_vec()),
             k => Err(HayashiError::Runtime(format!(
@@ -1077,7 +1089,11 @@ impl Interpreter {
         }
     }
 
-    fn predict_lowess_vals(&self, r: &greeners::nonparametric::LowessResult, kind: &str) -> Result<Vec<f64>> {
+    fn predict_lowess_vals(
+        &self,
+        r: &greeners::nonparametric::LowessResult,
+        kind: &str,
+    ) -> Result<Vec<f64>> {
         match kind {
             "smoothed" | "yhat" | "fitted" => Ok(r.smoothed.to_vec()),
             "residuals" | "resid" | "e" => Ok(r.residuals.to_vec()),
@@ -1150,7 +1166,11 @@ impl Interpreter {
         }
     }
 
-    fn predict_ucm_vals(&self, r: &greeners::unobserved_components::UCResult, kind: &str) -> Result<Vec<f64>> {
+    fn predict_ucm_vals(
+        &self,
+        r: &greeners::unobserved_components::UCResult,
+        kind: &str,
+    ) -> Result<Vec<f64>> {
         match kind {
             "level" => Ok(r.level.to_vec()),
             "trend" => Ok(r
@@ -1191,7 +1211,11 @@ impl Interpreter {
         }
     }
 
-    fn predict_msar_vals(&self, r: &greeners::markov_autoreg::MarkovAutoregResult, kind: &str) -> Result<Vec<f64>> {
+    fn predict_msar_vals(
+        &self,
+        r: &greeners::markov_autoreg::MarkovAutoregResult,
+        kind: &str,
+    ) -> Result<Vec<f64>> {
         match kind {
             "regime" | "state" => Ok(r.predict_regime().iter().map(|&s| (s + 1) as f64).collect()),
             s if s.starts_with("regime") && s.len() > 6 => {

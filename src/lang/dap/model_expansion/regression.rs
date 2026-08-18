@@ -252,7 +252,9 @@ pub fn ordered_fit_dict(r: &greeners::ordered::OrderedResult) -> Value {
     ])
 }
 
-pub fn zero_inflated_children(r: &greeners::zero_inflated::ZeroInflatedResult) -> Vec<(String, Value)> {
+pub fn zero_inflated_children(
+    r: &greeners::zero_inflated::ZeroInflatedResult,
+) -> Vec<(String, Value)> {
     let mut vars = Vec::new();
     let count_names = r.count_var_names.clone().unwrap_or_default();
     let inflate_names = r.inflate_var_names.clone().unwrap_or_default();

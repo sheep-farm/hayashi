@@ -1436,7 +1436,9 @@ fn model_view_from_mixed(r: &std::rc::Rc<greeners::mixed::MixedResult>) -> Model
     }
 }
 
-fn model_view_from_zero_inflated(r: &std::rc::Rc<greeners::zero_inflated::ZeroInflatedResult>) -> ModelView {
+fn model_view_from_zero_inflated(
+    r: &std::rc::Rc<greeners::zero_inflated::ZeroInflatedResult>,
+) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
     fit.insert("log_likelihood".into(), Value::Float(r.log_likelihood));
@@ -1601,7 +1603,9 @@ fn model_view_from_rd(r: &std::rc::Rc<greeners::rd::RdResult>) -> ModelView {
     }
 }
 
-fn model_view_from_recursive_ls(r: &std::rc::Rc<greeners::rolling::RecursiveLSResult>) -> ModelView {
+fn model_view_from_recursive_ls(
+    r: &std::rc::Rc<greeners::rolling::RecursiveLSResult>,
+) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
 
@@ -1623,7 +1627,9 @@ fn model_view_from_recursive_ls(r: &std::rc::Rc<greeners::rolling::RecursiveLSRe
     }
 }
 
-fn model_view_from_conditional(r: &std::rc::Rc<greeners::conditional::ConditionalResult>) -> ModelView {
+fn model_view_from_conditional(
+    r: &std::rc::Rc<greeners::conditional::ConditionalResult>,
+) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
     fit.insert("n_groups".into(), Value::Int(r.n_groups as i64));
@@ -1727,7 +1733,9 @@ fn model_view_from_ets(r: &std::rc::Rc<greeners::ets::ETSResult>) -> ModelView {
     }
 }
 
-fn model_view_from_markov_switching(r: &std::rc::Rc<greeners::markov::MarkovSwitchingResult>) -> ModelView {
+fn model_view_from_markov_switching(
+    r: &std::rc::Rc<greeners::markov::MarkovSwitchingResult>,
+) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
     fit.insert("n_regimes".into(), Value::Int(r.n_regimes as i64));
@@ -1767,7 +1775,9 @@ fn model_view_from_markov_switching(r: &std::rc::Rc<greeners::markov::MarkovSwit
     }
 }
 
-fn model_view_from_markov_autoreg(r: &std::rc::Rc<greeners::markov_autoreg::MarkovAutoregResult>) -> ModelView {
+fn model_view_from_markov_autoreg(
+    r: &std::rc::Rc<greeners::markov_autoreg::MarkovAutoregResult>,
+) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
     fit.insert("n_regimes".into(), Value::Int(r.k_regimes as i64));

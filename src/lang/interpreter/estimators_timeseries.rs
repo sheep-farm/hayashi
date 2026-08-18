@@ -2729,8 +2729,9 @@ impl Interpreter {
         };
 
         let method_name = format!("{:?}", method);
-        let (rejects, pvals_adj) = greeners::multipletests::MultipleTests::multipletests(&pvals, alpha, method)
-            .map_err(|e| self.rt_err(format!("multipletests: {e}")))?;
+        let (rejects, pvals_adj) =
+            greeners::multipletests::MultipleTests::multipletests(&pvals, alpha, method)
+                .map_err(|e| self.rt_err(format!("multipletests: {e}")))?;
 
         let sep = "─".repeat(64);
         let mut display = String::new();
@@ -2848,7 +2849,9 @@ impl Interpreter {
         let seasonal = match opt_map.get("seasonal") {
             Some(Value::Str(s)) => match s.to_lowercase().as_str() {
                 "none" => greeners::unobserved_components::UCSeasonal::None,
-                "deterministic" => greeners::unobserved_components::UCSeasonal::Deterministic(period),
+                "deterministic" => {
+                    greeners::unobserved_components::UCSeasonal::Deterministic(period)
+                }
                 "stochastic" => greeners::unobserved_components::UCSeasonal::Stochastic(period),
                 other => {
                     return Err(HayashiError::Runtime(format!(
@@ -2859,8 +2862,9 @@ impl Interpreter {
             _ => greeners::unobserved_components::UCSeasonal::None,
         };
 
-        let result = greeners::unobserved_components::UnobservedComponents::fit(&y, level, seasonal)
-            .map_err(|e| self.rt_err(format!("ucm: {e}")))?;
+        let result =
+            greeners::unobserved_components::UnobservedComponents::fit(&y, level, seasonal)
+                .map_err(|e| self.rt_err(format!("ucm: {e}")))?;
         Ok(Value::UCResult(Rc::new(result)))
     }
 

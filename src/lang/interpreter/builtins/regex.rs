@@ -24,7 +24,9 @@ impl Interpreter {
                         )
                     }
                 };
-                Ok(Value::Bool(greeners::transforms::Transforms::regexm(&s, &pat)))
+                Ok(Value::Bool(greeners::transforms::Transforms::regexm(
+                    &s, &pat,
+                )))
             }
             "regexr" => {
                 if args.len() < 3 {
@@ -52,7 +54,9 @@ impl Interpreter {
                         )
                     }
                 };
-                Ok(Value::Str(greeners::transforms::Transforms::regexr(&s, &pat, &rep)))
+                Ok(Value::Str(greeners::transforms::Transforms::regexr(
+                    &s, &pat, &rep,
+                )))
             }
             "regexra" => {
                 if args.len() < 3 {
@@ -80,7 +84,9 @@ impl Interpreter {
                         )
                     }
                 };
-                Ok(Value::Str(greeners::transforms::Transforms::regexra(&s, &pat, &rep)))
+                Ok(Value::Str(greeners::transforms::Transforms::regexra(
+                    &s, &pat, &rep,
+                )))
             }
             "regexs" => {
                 if args.len() < 2 {
