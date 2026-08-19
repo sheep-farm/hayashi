@@ -192,6 +192,7 @@ impl DebugState {
     }
 }
 
+#[cfg(feature = "greeners-causal")]
 fn rd_kernel_opt(opt: Option<&Value>) -> std::result::Result<greeners::rd::RdKernel, String> {
     match opt {
         None => Ok(greeners::rd::RdKernel::Triangular),

@@ -2559,7 +2559,10 @@ impl Interpreter {
             }
         }
 
+        #[cfg(feature = "greeners-ols")]
         let (_clean, keep_idx, omit_idx) = greeners::OLS::detect_collinearity(&mat, 1e-10);
+        #[cfg(not(feature = "greeners-ols"))]
+        let (keep_idx, omit_idx): (Vec<usize>, Vec<usize>) = ((0..k).collect(), Vec::new());
 
         if omit_idx.is_empty() {
             println!(
