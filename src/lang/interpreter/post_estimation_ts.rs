@@ -72,6 +72,7 @@ impl Interpreter {
 
                 match model {
                     // ── Logit / Probit ────────────────────────────────────────
+                    #[cfg(feature = "greeners-glm")]
                     Value::BinaryResult(bm) => {
                         let mut x_use = bm.x.clone();
                         for (var, val) in &at_vals {
@@ -197,6 +198,7 @@ impl Interpreter {
                     }
 
                     // ── Poisson / NegBin ──────────────────────────────────────
+                    #[cfg(feature = "greeners-glm")]
                     Value::PoissonResult(r) => {
                         let x = r.x_data();
                         let fb: Vec<String> =
@@ -244,6 +246,7 @@ impl Interpreter {
                         println!("n = {}", ame_result.n_obs);
                         println!("{sep2}\n");
                     }
+                    #[cfg(feature = "greeners-glm")]
                     Value::NegBinResult(r) => {
                         let x = r.x_data();
                         let fb: Vec<String> =
@@ -297,6 +300,7 @@ impl Interpreter {
                     // ── Ordered Logit / Probit ────────────────────────────────
                     // AME_k(Y=j) = (1/n) Σ_i [f(κ_{j-1} - X_iβ) - f(κ_j - X_iβ)] * β_k
                     // (com κ_0 = -∞ → f(κ_0 - ·) = 0;  κ_J = +∞ → f(κ_J - ·) = 0)
+                    #[cfg(feature = "greeners-glm")]
                     Value::OrderedResult(r) => {
                         let x = r.x_data();
                         let n = x.nrows();
@@ -405,6 +409,7 @@ impl Interpreter {
                 };
 
                 match model {
+                    #[cfg(feature = "greeners-glm")]
                     Value::BinaryResult(bm) => {
                         let vcov = Self::binary_mle_vcov(&bm.kind, &bm.result.params, &bm.y, &bm.x);
                         let ame = if bm.kind == "logit" {
@@ -910,6 +915,7 @@ impl Interpreter {
             // ── forecast ─────────────────────────────────────────────────────
             // forecast(model, steps=8)
             // forecast(model, steps=8, alpha=0.05)
+            #[cfg(feature = "greeners-timeseries")]
             "forecast" | "fcast" | "predict_h" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
@@ -918,6 +924,7 @@ impl Interpreter {
                 }
 
                 let model = match self.eval_expr(&args[0])? {
+                    #[cfg(feature = "greeners-timeseries")]
                     Value::ArimaResult(m) => m,
                     _ => {
                         return Err(HayashiError::Type(
