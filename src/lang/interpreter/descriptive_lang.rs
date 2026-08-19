@@ -186,7 +186,16 @@ impl Interpreter {
             "summarize" => self.summarize(func, args, opts, opt_map),
             "eststo" | "est_store" => self.eststo(func, args, opts, opt_map),
             "estclear" => self.estclear(func, args, opts, opt_map),
-            #[cfg(all(feature = "greeners-bayesian", feature = "greeners-causal", feature = "greeners-glm", feature = "greeners-imputation", feature = "greeners-ols", feature = "greeners-panel", feature = "greeners-survival", feature = "greeners-timeseries"))]
+            #[cfg(all(
+                feature = "greeners-bayesian",
+                feature = "greeners-causal",
+                feature = "greeners-glm",
+                feature = "greeners-imputation",
+                feature = "greeners-ols",
+                feature = "greeners-panel",
+                feature = "greeners-survival",
+                feature = "greeners-timeseries"
+            ))]
             "esttab" => self.esttab(func, args, opts, opt_map),
             _ => return Ok(None),
         };
@@ -1756,7 +1765,16 @@ impl Interpreter {
         Ok(Value::Int(n as i64))
     }
 
-    #[cfg(all(feature = "greeners-bayesian", feature = "greeners-causal", feature = "greeners-glm", feature = "greeners-imputation", feature = "greeners-ols", feature = "greeners-panel", feature = "greeners-survival", feature = "greeners-timeseries"))]
+    #[cfg(all(
+        feature = "greeners-bayesian",
+        feature = "greeners-causal",
+        feature = "greeners-glm",
+        feature = "greeners-imputation",
+        feature = "greeners-ols",
+        feature = "greeners-panel",
+        feature = "greeners-survival",
+        feature = "greeners-timeseries"
+    ))]
     pub(super) fn esttab(
         &mut self,
         _func: &str,

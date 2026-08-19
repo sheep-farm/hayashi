@@ -60,7 +60,11 @@ impl Interpreter {
             "rolling" | "rols" => self.eval_rolling(args, opts, opt_map),
             #[cfg(feature = "greeners-ols")]
             "recursive" | "recols" => self.eval_recursive(args, opts),
-            #[cfg(all(feature = "greeners-bayesian", feature = "greeners-glm", feature = "greeners-ols"))]
+            #[cfg(all(
+                feature = "greeners-bayesian",
+                feature = "greeners-glm",
+                feature = "greeners-ols"
+            ))]
             "ic" | "fitstat" | "estat" => self.ic(func, args, opts, opt_map),
             #[cfg(feature = "greeners-diagnostics")]
             "akaike_weights" | "aic_weights" => self.akaike_weights(func, args, opts, opt_map),
@@ -1004,7 +1008,11 @@ impl Interpreter {
         }))
     }
 
-    #[cfg(all(feature = "greeners-bayesian", feature = "greeners-glm", feature = "greeners-ols"))]
+    #[cfg(all(
+        feature = "greeners-bayesian",
+        feature = "greeners-glm",
+        feature = "greeners-ols"
+    ))]
     pub(super) fn ic(
         &mut self,
         _func: &str,

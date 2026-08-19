@@ -1,6 +1,15 @@
 use super::super::*;
 impl Interpreter {
-    #[cfg(all(feature = "greeners-bayesian", feature = "greeners-causal", feature = "greeners-glm", feature = "greeners-imputation", feature = "greeners-ols", feature = "greeners-panel", feature = "greeners-survival", feature = "greeners-timeseries"))]
+    #[cfg(all(
+        feature = "greeners-bayesian",
+        feature = "greeners-causal",
+        feature = "greeners-glm",
+        feature = "greeners-imputation",
+        feature = "greeners-ols",
+        feature = "greeners-panel",
+        feature = "greeners-survival",
+        feature = "greeners-timeseries"
+    ))]
     pub(super) fn tidy(
         &mut self,
         func: &str,
