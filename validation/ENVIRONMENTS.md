@@ -7,9 +7,8 @@ package versions, and the resolved versions are recorded in the validation
 artefact.
 
 This document covers the R/Python package environments. The numerical engine
-(Greeners) is pinned separately: the validation workflow checks out Greeners
-`v1.6.2` at revision `ada1c6c828e04565d1acff3974d105ede6b937bc` (see
-`scripts/checkout-greeners.sh`).
+(Greeners) is pinned in `Cargo.lock` and consumed from crates.io; the validation
+workflow no longer checks out Greeners from source.
 
 ## Python
 

@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed
+
+- Bumped `greeners` dependency from path/local to `2.0.0` on crates.io.
+- Removed `scripts/checkout-greeners.sh` and the Greeners checkout steps from
+  CI workflows; Greeners is now resolved from `Cargo.lock`.
+
 ## [0.2.10] — 2026-08-13
 
 ### Changed

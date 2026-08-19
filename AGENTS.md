@@ -214,8 +214,9 @@ Public surface:
 
 - `ci.yml`: validation metadata check, `cargo deny` advisories,
   `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test` on
-  Ubuntu/macOS/Windows. All jobs clone `../Greeners` from `develop`.
-- `validation.yml`: full empirical validation on Ubuntu with R + Python.
+  Ubuntu/macOS/Windows. Greeners is consumed from crates.io via `Cargo.lock`.
+- `validation.yml`: full empirical validation on Ubuntu/macOS/Windows with
+  R + Python.
 - `nightly.yml`: builds `dev` and publishes a `nightly` GitHub release.
 - `release.yml`: builds and publishes on `v*` tags.
 - `docs.yml`: builds and deploys mdBook to GitHub Pages on `master`.
@@ -236,7 +237,7 @@ Public surface:
   - `bugfix/rnormal-normal-draws` — `rnormal` standard-normal fix.
   - `bugfix/sqlite-identifier-quoting` — SQLite quoting hardening.
   - `tests/golden-ols-se` — OLS golden tests.
-  - `patch/202601` — dependency patch for `greeners 1.4.7`.
+
 
 Workflow: PRs target `dev`; `master` is release-only.
 
@@ -258,12 +259,8 @@ Workflow: PRs target `dev`; `master` is release-only.
 
 ## 8. Design decisions, not fragilities
 
-<!-- - **Greeners path dependency**: using a local `../Greeners` path in
-  `Cargo.toml` is a dev-only setup. Greeners could physically live inside
-  Hayashi, but that would violate separation of concerns: Hayashi is the
-  language/CLI layer, Greeners is the numerical engine. The CI clones
-  Greeners to `../Greeners` from `develop` so the same responsibility
-  split is preserved in automated builds. -->
+- **Greeners dependency**: Hayashi consumes `greeners` from crates.io
+  (`greeners = "2.0.0"`). The exact version is pinned in `Cargo.lock`.
 - **`parallel for` does not capture `Rc` model results**: this is
   intentional. Each iteration is an independent, self-contained sandbox
   whose state must die at the end of the block. Preventing `Rc`-backed

@@ -8,7 +8,6 @@ on:
       - "src/**"
       - "Cargo.toml"
       - "Cargo.lock"
-      - "scripts/checkout-greeners.sh"
       - ".github/workflows/validation.yml"
   push:
     branches: [dev, master]
@@ -17,7 +16,6 @@ on:
       - "src/**"
       - "Cargo.toml"
       - "Cargo.lock"
-      - "scripts/checkout-greeners.sh"
       - ".github/workflows/validation.yml"
   workflow_dispatch:
 
@@ -30,9 +28,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Checkout Greeners dependency
-        run: bash scripts/checkout-greeners.sh
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
