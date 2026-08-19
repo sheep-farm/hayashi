@@ -1899,6 +1899,7 @@ impl Interpreter {
                         n,
                     ));
                 }
+                #[cfg(feature = "greeners-ols")]
                 Value::IvResult(r) => {
                     models.push(esttab_extract_std(
                         "IV/2SLS",
@@ -1909,6 +1910,7 @@ impl Interpreter {
                         r.n_obs,
                     ));
                 }
+                #[cfg(feature = "greeners-glm")]
                 Value::PoissonResult(r) => {
                     models.push(esttab_extract_std(
                         "Poisson",
@@ -1919,6 +1921,7 @@ impl Interpreter {
                         r.n_obs,
                     ));
                 }
+                #[cfg(feature = "greeners-glm")]
                 Value::NegBinResult(r) => {
                     models.push(esttab_extract_std(
                         "NegBin",
@@ -1929,6 +1932,7 @@ impl Interpreter {
                         r.n_obs,
                     ));
                 }
+                #[cfg(feature = "greeners-glm")]
                 Value::OrderedResult(r) => {
                     let mut info = esttab_extract_std(
                         &r.model_name,
@@ -1949,6 +1953,7 @@ impl Interpreter {
                     }
                     models.push(info);
                 }
+                #[cfg(feature = "greeners-ols")]
                 Value::TobitResult(r) => {
                     let mut info = esttab_extract_std(
                         "Tobit",
@@ -1961,6 +1966,7 @@ impl Interpreter {
                     info.coefs.push(("_sigma".into(), r.sigma, None, None));
                     models.push(info);
                 }
+                #[cfg(feature = "greeners-ols")]
                 Value::HeckmanResult(r) => {
                     let mut info = esttab_extract_std(
                         "Heckman",
@@ -1995,6 +2001,7 @@ impl Interpreter {
                         r.n_obs,
                     ));
                 }
+                #[cfg(feature = "greeners-panel")]
                 Value::ReResult(r) => {
                     models.push(esttab_extract_std(
                         "RE",
@@ -2005,6 +2012,7 @@ impl Interpreter {
                         0,
                     ));
                 }
+                #[cfg(feature = "greeners-panel")]
                 Value::AbResult(r) => {
                     models.push(esttab_extract_std(
                         "AB-GMM",
@@ -2015,6 +2023,7 @@ impl Interpreter {
                         r.n_obs,
                     ));
                 }
+                #[cfg(feature = "greeners-ols")]
                 Value::GmmResult(r) => {
                     let names: Option<Vec<String>> =
                         Some((0..r.params.len()).map(|i| format!("x{i}")).collect());
@@ -2027,6 +2036,7 @@ impl Interpreter {
                         r.n_obs,
                     ));
                 }
+                #[cfg(feature = "greeners-panel")]
                 Value::SysGmmResult(r) => {
                     models.push(esttab_extract_std(
                         "SysGMM",
@@ -2037,6 +2047,7 @@ impl Interpreter {
                         r.n_obs_fd,
                     ));
                 }
+                #[cfg(feature = "greeners-panel")]
                 Value::PcseResult(r) => {
                     models.push(esttab_extract_std(
                         "PCSE",
@@ -2047,6 +2058,7 @@ impl Interpreter {
                         r.n_obs,
                     ));
                 }
+                #[cfg(feature = "greeners-panel")]
                 Value::PanelGlsResult(r) => {
                     let label = match r.panels {
                         greeners::panel::GlsPanels::Hetero => "XTGLS-H",
@@ -2071,6 +2083,7 @@ impl Interpreter {
                         r.n_obs,
                     ));
                 }
+                #[cfg(feature = "greeners-ols")]
                 Value::QuantileResult(r) => {
                     let label = format!("QReg(τ={:.2})", r.tau);
                     models.push(esttab_extract_std(
@@ -2082,6 +2095,7 @@ impl Interpreter {
                         0,
                     ));
                 }
+                #[cfg(feature = "greeners-survival")]
                 Value::CoxResult(r) => {
                     models.push(esttab_extract_std(
                         "CoxPH",
@@ -2092,6 +2106,7 @@ impl Interpreter {
                         r.n_obs,
                     ));
                 }
+                #[cfg(feature = "greeners-ols")]
                 Value::RlmResult(r) => {
                     models.push(esttab_extract_std(
                         "RLM",
@@ -2102,6 +2117,7 @@ impl Interpreter {
                         r.n_obs,
                     ));
                 }
+                #[cfg(feature = "greeners-glm")]
                 Value::GeeResult(r) => {
                     // GEE uses robust SE (sandwich) by default
                     models.push(esttab_extract_std(
@@ -2113,6 +2129,7 @@ impl Interpreter {
                         r.n_obs,
                     ));
                 }
+                #[cfg(feature = "greeners-glm")]
                 Value::BetaResult(r) => {
                     models.push(esttab_extract_std(
                         "BetaReg",
@@ -2123,6 +2140,7 @@ impl Interpreter {
                         r.n_obs,
                     ));
                 }
+                #[cfg(feature = "greeners-glm")]
                 Value::GlmResult(r) => {
                     let family_name = format!("GLM({:?})", r.family);
                     models.push(esttab_extract_std(
@@ -2145,6 +2163,7 @@ impl Interpreter {
                     "esttab() does not support PCA/Factor — use print() to see loadings and explained variance".into()
                 ));
                 }
+                #[cfg(feature = "greeners-glm")]
                 Value::ConditionalResult(r) => {
                     models.push(esttab_extract_std(
                         &r.model_name,
@@ -2155,11 +2174,13 @@ impl Interpreter {
                         r.n_obs,
                     ));
                 }
+                #[cfg(feature = "greeners-timeseries")]
                 Value::MarkovResult(_) => {
                     return Err(HayashiError::Runtime(
                     "esttab() does not support Markov Switching — use print() to see regime parameters".into()
                 ));
                 }
+                #[cfg(feature = "greeners-ols")]
                 Value::GlsarResult(r) => {
                     models.push(esttab_extract_std(
                         "GLSAR",
@@ -2170,6 +2191,7 @@ impl Interpreter {
                         r.n_obs,
                     ));
                 }
+                #[cfg(feature = "greeners-bayesian")]
                 Value::MixedResult(r) => {
                     // esttab only displays fixed effects of MixedLM
                     models.push(esttab_extract_std(
@@ -2181,92 +2203,109 @@ impl Interpreter {
                         r.n_obs,
                     ));
                 }
+                #[cfg(feature = "greeners-glm")]
                 Value::ZeroInflatedResult(_) => {
                     return Err(HayashiError::Runtime(
                         "esttab() does not support zip/zinb (two equations) — use print()".into(),
                     ));
                 }
+                #[cfg(feature = "greeners-ols")]
                 Value::SurResult(_) => {
                     return Err(HayashiError::Runtime(
                         "esttab() does not support sur (multiple equations) — use print()".into(),
                     ));
                 }
+                #[cfg(feature = "greeners-ols")]
                 Value::RollingResult(_) | Value::RecursiveLSResult(_) => {
                     return Err(HayashiError::Runtime(
                     "esttab() does not support rolling/recursive — coefficients vary over time; use print()".into()
                 ));
                 }
+                #[cfg(feature = "greeners-glm")]
                 Value::MNLogitResult(_) => {
                     return Err(HayashiError::Runtime(
                         "esttab() does not support mlogit (multiple equations) — use print()"
                             .into(),
                     ));
                 }
+                #[cfg(feature = "greeners-causal")]
                 Value::DidResult(_) | Value::KMResult(_) => {
                     return Err(HayashiError::Runtime(
                         "esttab() does not support did/km — result has its own format; use print()"
                             .into(),
                     ));
                 }
+                #[cfg(feature = "greeners-causal")]
                 Value::RdResult(_) | Value::SynthResult(_) | Value::PsmResult(_) => {
                     return Err(HayashiError::Runtime(
                     "esttab() does not support causal estimators (rd, psm, synth) — use print()".into()
                 ));
                 }
+                #[cfg(feature = "greeners-timeseries")]
                 Value::VarmaResult(_) => {
                     return Err(HayashiError::Runtime(
                         "esttab() does not support VARMA (matrix coefficients) — use print()"
                             .into(),
                     ));
                 }
+                #[cfg(feature = "greeners-timeseries")]
                 Value::DecompResult(_) | Value::MstlResult(_) => {
                     return Err(HayashiError::Runtime(
                         "esttab() does not support seasonal decomposition — use print()".into(),
                     ));
                 }
+                #[cfg(feature = "greeners-timeseries")]
                 Value::UCResult(_) => {
                     return Err(HayashiError::Runtime(
                         "esttab() does not support UCM (variance parameters, not β) — use print()"
                             .into(),
                     ));
                 }
+                #[cfg(feature = "greeners-glm")]
                 Value::GamResult(_) => {
                     return Err(HayashiError::Runtime(
                     "esttab() does not support GAM (smooth terms do not have a standard β table) — use print()".into()
                 ));
                 }
+                #[cfg(feature = "greeners-imputation")]
                 Value::MiceResult(_) => {
                     return Err(HayashiError::Runtime(
                     "esttab() does not support MICE (multiple datasets) — estimate model in each dataset and use Rubin's rules".into()
                 ));
                 }
+                #[cfg(feature = "greeners-timeseries")]
                 Value::MSARResult(_) => {
                     return Err(HayashiError::Runtime(
                         "esttab() does not support Markov-AR (regime parameters) — use print()"
                             .into(),
                     ));
                 }
+                #[cfg(feature = "greeners-timeseries")]
                 Value::SVarResult(_) => {
                     return Err(HayashiError::Runtime(
                         "esttab() does not support SVAR (structural A/B matrices) — use print()"
                             .into(),
                     ));
                 }
+                #[cfg(feature = "greeners-ols")]
                 Value::ThreeSLSResult(_) => {
                     return Err(HayashiError::Runtime(
                         "esttab() does not support 3SLS (multiple equations) — use print()".into(),
                     ));
                 }
+                #[cfg(feature = "greeners-timeseries")]
                 Value::DFMResult(_) => {
                     return Err(HayashiError::Runtime(
                         "esttab() does not support DFM (fatores latentes) — use print()".into(),
                     ));
                 }
+                #[cfg(feature = "greeners-timeseries")]
                 Value::EtsResult(_) => {
                     return Err(HayashiError::Runtime(
                         "esttab() does not support ETS (smoothing parameters) — use print()".into(),
                     ));
                 }
+                #[cfg(feature = "greeners-panel")]
                 Value::ThresholdResult(_) => {
                     return Err(HayashiError::Runtime(
                         "esttab() does not support panel threshold (two regimes) — use print()"

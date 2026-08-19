@@ -2,6 +2,7 @@ use super::super::*;
 use crate::lang::dap::model_expansion;
 
 impl Interpreter {
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn sfa_production(
         &mut self,
         func: &str,
@@ -91,6 +92,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-bayesian")]
     pub(super) fn bayes_sfa_production(
         &mut self,
         func: &str,
@@ -190,6 +192,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-bayesian")]
     pub(super) fn bayes_lm(
         &mut self,
         _func: &str,

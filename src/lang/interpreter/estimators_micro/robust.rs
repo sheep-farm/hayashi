@@ -39,6 +39,7 @@ impl Interpreter {
         Ok(Value::RlmResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-glm")]
     pub(super) fn gee(
         &mut self,
         _func: &str,
