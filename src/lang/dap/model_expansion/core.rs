@@ -76,6 +76,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             fitted_values: None,
             x: Some(&m.x),
         }),
+        #[cfg(feature = "greeners-ols")]
         Value::IvResult(r) => regression_children(RegressionCtx {
             names: r.variable_names.clone().unwrap_or_default(),
             params: &r.params,
@@ -89,6 +90,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             fitted_values: None,
             x: None,
         }),
+        #[cfg(feature = "greeners-panel")]
         Value::PanelResult(r) => regression_children(RegressionCtx {
             names: r.variable_names.clone().unwrap_or_default(),
             params: &r.params,
@@ -102,6 +104,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             fitted_values: None,
             x: None,
         }),
+        #[cfg(feature = "greeners-panel")]
         Value::ReResult(r) => regression_children(RegressionCtx {
             names: r.variable_names.clone().unwrap_or_default(),
             params: &r.params,
@@ -115,6 +118,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             fitted_values: None,
             x: None,
         }),
+        #[cfg(feature = "greeners-glm")]
         Value::BinaryResult(m) => regression_children(RegressionCtx {
             names: m.coef_names.clone(),
             params: &m.result.params,
@@ -128,6 +132,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             fitted_values: None,
             x: None,
         }),
+        #[cfg(feature = "greeners-ols")]
         Value::QuantileResult(r) => regression_children(RegressionCtx {
             names: r.variable_names.clone().unwrap_or_default(),
             params: &r.params,
@@ -141,6 +146,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             fitted_values: None,
             x: None,
         }),
+        #[cfg(feature = "greeners-ols")]
         Value::TobitResult(r) => regression_children(RegressionCtx {
             names: r.variable_names.clone().unwrap_or_default(),
             params: &r.params,
@@ -154,6 +160,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             fitted_values: None,
             x: None,
         }),
+        #[cfg(feature = "greeners-glm")]
         Value::PoissonResult(r) => regression_children(RegressionCtx {
             names: r.variable_names.clone().unwrap_or_default(),
             params: &r.params,
@@ -167,6 +174,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             fitted_values: None,
             x: None,
         }),
+        #[cfg(feature = "greeners-glm")]
         Value::NegBinResult(r) => regression_children(RegressionCtx {
             names: r.variable_names.clone().unwrap_or_default(),
             params: &r.params,
@@ -180,6 +188,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             fitted_values: None,
             x: None,
         }),
+        #[cfg(feature = "greeners-glm")]
         Value::GlmResult(r) => regression_children(RegressionCtx {
             names: r.variable_names.clone().unwrap_or_default(),
             params: &r.params,
@@ -193,6 +202,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             fitted_values: None,
             x: None,
         }),
+        #[cfg(feature = "greeners-ols")]
         Value::RlmResult(r) => regression_children(RegressionCtx {
             names: r.variable_names.clone().unwrap_or_default(),
             params: &r.params,
@@ -206,6 +216,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             fitted_values: None,
             x: None,
         }),
+        #[cfg(feature = "greeners-glm")]
         Value::BetaResult(r) => regression_children(RegressionCtx {
             names: r.variable_names.clone().unwrap_or_default(),
             params: &r.params,
@@ -219,6 +230,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             fitted_values: None,
             x: None,
         }),
+        #[cfg(feature = "greeners-ols")]
         Value::GmmResult(r) => regression_children(RegressionCtx {
             names: (0..r.params.len()).map(|i| format!("x{i}")).collect(),
             params: &r.params,
@@ -232,6 +244,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             fitted_values: None,
             x: None,
         }),
+        #[cfg(feature = "greeners-panel")]
         Value::AbResult(r) => regression_children(RegressionCtx {
             names: r.variable_names.clone().unwrap_or_default(),
             params: &r.params,
@@ -245,6 +258,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             fitted_values: None,
             x: None,
         }),
+        #[cfg(feature = "greeners-panel")]
         Value::SysGmmResult(r) => regression_children(RegressionCtx {
             names: r.variable_names.clone().unwrap_or_default(),
             params: &r.params,
@@ -258,6 +272,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             fitted_values: None,
             x: None,
         }),
+        #[cfg(feature = "greeners-panel")]
         Value::PcseResult(r) => regression_children(RegressionCtx {
             names: r.variable_names.clone().unwrap_or_default(),
             params: &r.params,
@@ -271,6 +286,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             fitted_values: None,
             x: None,
         }),
+        #[cfg(feature = "greeners-panel")]
         Value::PanelGlsResult(r) => regression_children(RegressionCtx {
             names: r.variable_names.clone().unwrap_or_default(),
             params: &r.params,
@@ -284,6 +300,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             fitted_values: None,
             x: None,
         }),
+        #[cfg(feature = "greeners-panel")]
         Value::FE2SLSResult(r) => regression_children(RegressionCtx {
             names: r.variable_names.clone().unwrap_or_default(),
             params: &r.params,
@@ -297,6 +314,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             fitted_values: None,
             x: None,
         }),
+        #[cfg(feature = "greeners-glm")]
         Value::OrderedResult(r) => regression_children(RegressionCtx {
             names: r.variable_names.clone().unwrap_or_default(),
             params: &r.params,
@@ -310,8 +328,11 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             fitted_values: None,
             x: None,
         }),
+        #[cfg(feature = "greeners-glm")]
         Value::ZeroInflatedResult(r) => zero_inflated_children(r),
+        #[cfg(feature = "greeners-bayesian")]
         Value::MixedResult(r) => mixed_children(r),
+        #[cfg(feature = "greeners-ols")]
         Value::GlsarResult(r) => regression_children(RegressionCtx {
             names: (0..r.params.len()).map(|i| format!("x{i}")).collect(),
             params: &r.params,
@@ -325,52 +346,92 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
             fitted_values: None,
             x: None,
         }),
+        #[cfg(feature = "greeners-ols")]
         Value::SurResult(m) => sur_children(m),
+        #[cfg(feature = "greeners-ols")]
         Value::ThreeSLSResult(m) => three_sls_children(m),
+        #[cfg(feature = "greeners-glm")]
         Value::MNLogitResult(r) => mnlogit_children(r),
+        #[cfg(feature = "greeners-timeseries")]
         Value::ArimaResult(r) => arima_children(r),
+        #[cfg(feature = "greeners-timeseries")]
         Value::GarchResult(r) => garch_children(r),
+        #[cfg(feature = "greeners-timeseries")]
         Value::EtsResult(r) => ets_children(r),
+        #[cfg(feature = "greeners-timeseries")]
         Value::MstlResult(r) => mstl_children(r),
+        #[cfg(feature = "greeners-timeseries")]
         Value::UCResult(r) => uc_children(r),
+        #[cfg(feature = "greeners-timeseries")]
         Value::LocalLevelResult(r) => local_level_children(r),
+        #[cfg(feature = "greeners-timeseries")]
         Value::AutoRegResult(r) => autoreg_children(r),
+        #[cfg(feature = "greeners-timeseries")]
         Value::ArdlResult(r) => ardl_children(r),
+        #[cfg(feature = "greeners-panel")]
         Value::ThresholdResult(r) => threshold_children(r),
+        #[cfg(feature = "greeners-timeseries")]
         Value::VarResult(r) => var_children(r),
+        #[cfg(feature = "greeners-timeseries")]
         Value::VecmResult(r) => vecm_children(r),
+        #[cfg(feature = "greeners-timeseries")]
         Value::VarmaResult(r) => varma_children(r),
+        #[cfg(feature = "greeners-timeseries")]
         Value::SVarResult(r) => svar_children(r),
+        #[cfg(feature = "greeners-timeseries")]
         Value::MSARResult(r) => msar_children(r),
+        #[cfg(feature = "greeners-timeseries")]
         Value::DFMResult(r) => dfm_children(r),
+        #[cfg(feature = "greeners-timeseries")]
         Value::MarkovResult(r) => markov_children(r),
+        #[cfg(feature = "greeners-causal")]
         Value::RdResult(r) => rd_children(r),
+        #[cfg(feature = "greeners-causal")]
         Value::SynthResult(r) => synth_children(r),
+        #[cfg(feature = "greeners-causal")]
         Value::PsmResult(r) => psm_children(r),
+        #[cfg(feature = "greeners-causal")]
         Value::DidResult(r) => did_children(r),
+        #[cfg(feature = "greeners-survival")]
         Value::KMResult(r) => km_children(r),
+        #[cfg(feature = "greeners-survival")]
         Value::CoxResult(r) => cox_children(r),
+        #[cfg(feature = "greeners-ols")]
         Value::HeckmanResult(r) => heckman_children(r),
+        #[cfg(feature = "greeners-glm")]
         Value::GeeResult(r) => gee_children(r),
         Value::LowessResult(r) => lowess_children(r),
+        #[cfg(feature = "greeners-ols")]
         Value::PenalizedResult(m) => penalized_children(m),
         Value::PcaResult(m) => pca_children(m),
         Value::FactorResult(m) => factor_children(m),
+        #[cfg(feature = "greeners-imputation")]
         Value::MiceResult(r) => mice_children(r),
+        #[cfg(feature = "greeners-glm")]
         Value::GamResult(r) => gam_children(r),
+        #[cfg(feature = "greeners-glm")]
         Value::ConditionalResult(r) => conditional_children(r),
+        #[cfg(feature = "greeners-ols")]
         Value::RollingResult(r) => rolling_children(r),
+        #[cfg(feature = "greeners-ols")]
         Value::RecursiveLSResult(r) => recursive_ls_children(r),
+        #[cfg(feature = "greeners-timeseries")]
         Value::DecompResult(r) => decomp_children(r),
         Value::DiagResult(r) => diag_children(r),
+        #[cfg(feature = "greeners-ml")]
         Value::KmeansResult(r) => kmeans_children(r),
+        #[cfg(feature = "greeners-ml")]
         Value::DbscanResult(r) => dbscan_children(r),
         Value::IsotonicResult(r) => isotonic_children(r),
         Value::KdeResult(r) => kde_children(r),
+        #[cfg(feature = "greeners-ml")]
         Value::BartResult(r) => bart_children(r),
+        #[cfg(feature = "greeners-ml")]
         Value::GpResult(r) => gp_children(r),
         Value::GmmClusteringResult(r) => gmm_clustering_children(r),
+        #[cfg(feature = "greeners-ml")]
         Value::HierarchicalResult(r) => hierarchical_children(r),
+        #[cfg(feature = "greeners-timeseries")]
         Value::SpectralResult(r) => spectral_children(r),
         Value::ModelResult { fields, .. } => {
             fields.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
@@ -446,6 +507,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
                 "OlsResult",
             )
         }
+        #[cfg(feature = "greeners-ols")]
         Value::IvResult(r) => (
             format!(
                 "IV(k={}, n={}), R2={:.4}",
@@ -455,6 +517,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "IvResult",
         ),
+        #[cfg(feature = "greeners-panel")]
         Value::PanelResult(r) => (
             format!(
                 "Panel(k={}, n={}, N={}), R2={:.4}",
@@ -465,6 +528,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "PanelResult",
         ),
+        #[cfg(feature = "greeners-panel")]
         Value::ReResult(r) => (
             format!(
                 "RE(k={}, N={}), R2={:.4}",
@@ -477,6 +541,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "ReResult",
         ),
+        #[cfg(feature = "greeners-glm")]
         Value::BinaryResult(m) => (
             format!(
                 "{}(k={}), pseudoR2={:.4}",
@@ -486,6 +551,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "BinaryResult",
         ),
+        #[cfg(feature = "greeners-ols")]
         Value::QuantileResult(r) => (
             format!(
                 "Quantile(tau={:.2}, k={}), R2={:.4}",
@@ -495,6 +561,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "QuantileResult",
         ),
+        #[cfg(feature = "greeners-ols")]
         Value::TobitResult(r) => (
             format!(
                 "Tobit(k={}, n={}), sigma={:.4}",
@@ -504,6 +571,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "TobitResult",
         ),
+        #[cfg(feature = "greeners-glm")]
         Value::PoissonResult(r) => (
             format!(
                 "Poisson(k={}, n={}), pseudoR2={:.4}",
@@ -513,6 +581,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "PoissonResult",
         ),
+        #[cfg(feature = "greeners-glm")]
         Value::NegBinResult(r) => (
             format!(
                 "NegBin(k={}, n={}), alpha={:.4}",
@@ -522,6 +591,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "NegBinResult",
         ),
+        #[cfg(feature = "greeners-glm")]
         Value::GlmResult(r) => (
             format!(
                 "GLM(k={}, n={}), pseudoR2={:.4}",
@@ -531,6 +601,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "GlmResult",
         ),
+        #[cfg(feature = "greeners-ols")]
         Value::RlmResult(r) => (
             format!(
                 "RLM(k={}, n={}), scale={:.4}",
@@ -540,6 +611,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "RlmResult",
         ),
+        #[cfg(feature = "greeners-glm")]
         Value::BetaResult(r) => (
             format!(
                 "Beta(k={}, n={}), phi={:.4}",
@@ -549,6 +621,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "BetaResult",
         ),
+        #[cfg(feature = "greeners-ols")]
         Value::GmmResult(r) => (
             format!(
                 "GMM(k={}, n={}), J={:.4}",
@@ -558,6 +631,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "GmmResult",
         ),
+        #[cfg(feature = "greeners-panel")]
         Value::AbResult(r) => (
             format!(
                 "ArellanoBond(k={}, n={}), m1_p={:.4}",
@@ -567,6 +641,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "AbResult",
         ),
+        #[cfg(feature = "greeners-panel")]
         Value::SysGmmResult(r) => (
             format!(
                 "SysGMM(k={}, n={}), Sargan={:.4}",
@@ -576,6 +651,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "SysGmmResult",
         ),
+        #[cfg(feature = "greeners-panel")]
         Value::PcseResult(r) => (
             format!(
                 "PCSE(k={}, n={}), R2={:.4}",
@@ -585,6 +661,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "PcseResult",
         ),
+        #[cfg(feature = "greeners-panel")]
         Value::PanelGlsResult(r) => (
             format!(
                 "PanelGLS(k={}, n={}), R2={:.4}",
@@ -594,6 +671,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "PanelGlsResult",
         ),
+        #[cfg(feature = "greeners-panel")]
         Value::FE2SLSResult(r) => (
             format!(
                 "FE2SLS(k={}, n={}), R2={:.4}",
@@ -603,6 +681,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "FE2SLSResult",
         ),
+        #[cfg(feature = "greeners-glm")]
         Value::OrderedResult(r) => (
             format!(
                 "Ordered(k={}, n={}), pseudoR2={:.4}",
@@ -612,6 +691,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "OrderedResult",
         ),
+        #[cfg(feature = "greeners-glm")]
         Value::ZeroInflatedResult(r) => (
             format!(
                 "ZeroInflated(count={}, inflate={}, n={}), logLik={:.4}",
@@ -622,6 +702,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "ZeroInflatedResult",
         ),
+        #[cfg(feature = "greeners-bayesian")]
         Value::MixedResult(r) => (
             format!(
                 "Mixed(fixed={}, n={}, groups={}), logLik={:.4}",
@@ -632,6 +713,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "MixedResult",
         ),
+        #[cfg(feature = "greeners-ols")]
         Value::GlsarResult(r) => (
             format!(
                 "GLSAR(k={}, n={}), R2={:.4}",
@@ -641,6 +723,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "GlsarResult",
         ),
+        #[cfg(feature = "greeners-ols")]
         Value::SurResult(m) => (
             format!(
                 "SUR(eqs={}), sysR2={:.4}",
@@ -649,10 +732,12 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "SurResult",
         ),
+        #[cfg(feature = "greeners-ols")]
         Value::ThreeSLSResult(m) => (
             format!("3SLS(eqs={})", m.result.equations.len()),
             "ThreeSLSResult",
         ),
+        #[cfg(feature = "greeners-glm")]
         Value::MNLogitResult(r) => (
             format!(
                 "MNLogit(k={}, n={}), pseudoR2={:.4}",
@@ -662,6 +747,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "MNLogitResult",
         ),
+        #[cfg(feature = "greeners-timeseries")]
         Value::ArimaResult(r) => (
             format!(
                 "ARIMA(p={},d={},q={}), n={}, logLik={:.4}",
@@ -669,6 +755,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "ArimaResult",
         ),
+        #[cfg(feature = "greeners-timeseries")]
         Value::GarchResult(r) => (
             format!(
                 "GARCH(p={},q={}), n={}, logLik={:.4}",
@@ -676,6 +763,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "GarchResult",
         ),
+        #[cfg(feature = "greeners-timeseries")]
         Value::EtsResult(r) => (
             format!(
                 "ETS({},{}), n={}, sse={:.4}",
@@ -683,10 +771,12 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "EtsResult",
         ),
+        #[cfg(feature = "greeners-timeseries")]
         Value::MstlResult(r) => (
             format!("MSTL(periods={:?}), n={}", r.periods, r.n_obs),
             "MstlResult",
         ),
+        #[cfg(feature = "greeners-timeseries")]
         Value::UCResult(r) => (
             format!(
                 "UC(level={:?}, seasonal={:?}), n={}, logLik={:.4}",
@@ -694,6 +784,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "UCResult",
         ),
+        #[cfg(feature = "greeners-timeseries")]
         Value::LocalLevelResult(r) => (
             format!(
                 "LocalLevel(n={}, sigma_obs={:.4}, sigma_state={:.4})",
@@ -701,6 +792,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "LocalLevelResult",
         ),
+        #[cfg(feature = "greeners-timeseries")]
         Value::AutoRegResult(r) => (
             format!(
                 "AutoReg(lags={}), n={}, R2={:.4}",
@@ -708,6 +800,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "AutoRegResult",
         ),
+        #[cfg(feature = "greeners-timeseries")]
         Value::ArdlResult(r) => (
             format!(
                 "ARDL(y_lags={}, x_lags={}), n={}, R2={:.4}",
@@ -715,6 +808,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "ArdlResult",
         ),
+        #[cfg(feature = "greeners-panel")]
         Value::ThresholdResult(r) => (
             format!(
                 "PanelThreshold(gamma={:.4}), R2={:.4}",
@@ -722,6 +816,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "ThresholdResult",
         ),
+        #[cfg(feature = "greeners-timeseries")]
         Value::VarResult(r) => (
             format!(
                 "VAR(lags={}, k={}), n={}, AIC={:.4}",
@@ -729,10 +824,12 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "VarResult",
         ),
+        #[cfg(feature = "greeners-timeseries")]
         Value::VecmResult(r) => (
             format!("VECM(rank={}, lags={}), n={}", r.rank, r.lags, r.n_obs),
             "VecmResult",
         ),
+        #[cfg(feature = "greeners-timeseries")]
         Value::VarmaResult(r) => (
             format!(
                 "VARMA({},{}), k={}, n={}",
@@ -740,6 +837,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "VarmaResult",
         ),
+        #[cfg(feature = "greeners-timeseries")]
         Value::SVarResult(r) => (
             format!(
                 "SVAR(k={}, lags={}), id={}",
@@ -747,6 +845,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "SVarResult",
         ),
+        #[cfg(feature = "greeners-timeseries")]
         Value::MSARResult(r) => (
             format!(
                 "MSAR(ar={}, regimes={}), n={}",
@@ -754,6 +853,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "MSARResult",
         ),
+        #[cfg(feature = "greeners-timeseries")]
         Value::DFMResult(m) => (
             format!(
                 "DFM(factors={}, series={}), n={}",
@@ -761,6 +861,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "DFMResult",
         ),
+        #[cfg(feature = "greeners-timeseries")]
         Value::MarkovResult(r) => (
             format!(
                 "MarkovSwitching(ar={}, regimes={}), n={}",
@@ -768,6 +869,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "MarkovResult",
         ),
+        #[cfg(feature = "greeners-causal")]
         Value::RdResult(r) => (
             format!(
                 "RD(tau={:.4}, bw={:.4}), n={}",
@@ -775,6 +877,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "RdResult",
         ),
+        #[cfg(feature = "greeners-causal")]
         Value::SynthResult(r) => (
             format!(
                 "Synth(unit={}, donors={}), T_pre={}, T_post={}",
@@ -782,6 +885,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "SynthResult",
         ),
+        #[cfg(feature = "greeners-causal")]
         Value::PsmResult(r) => (
             format!(
                 "PSM(ATT={:.4}), n_treat={}, n_matched={}",
@@ -789,6 +893,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "PsmResult",
         ),
+        #[cfg(feature = "greeners-causal")]
         Value::DidResult(r) => (
             format!(
                 "DiD(ATT={:.4}), n={}, R2={:.4}",
@@ -796,6 +901,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "DidResult",
         ),
+        #[cfg(feature = "greeners-survival")]
         Value::KMResult(r) => (
             format!(
                 "KM(n={}, events={}), median={:.4}",
@@ -803,6 +909,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "KMResult",
         ),
+        #[cfg(feature = "greeners-survival")]
         Value::CoxResult(r) => (
             format!(
                 "Cox(k={}, events={}), C={:.4}",
@@ -812,6 +919,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "CoxResult",
         ),
+        #[cfg(feature = "greeners-ols")]
         Value::HeckmanResult(r) => (
             format!(
                 "Heckman(n={}, selected={}), rho={:.4}",
@@ -819,6 +927,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "HeckmanResult",
         ),
+        #[cfg(feature = "greeners-glm")]
         Value::GeeResult(r) => (
             format!(
                 "GEE(k={}, groups={}), QIC={:.4}",
@@ -832,6 +941,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             format!("Lowess(n={}, frac={:.4})", r.n_obs, r.frac),
             "LowessResult",
         ),
+        #[cfg(feature = "greeners-ols")]
         Value::PenalizedResult(m) => (
             format!(
                 "{}(n={}, alpha={:.4}), R2={:.4}",
@@ -856,6 +966,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "FactorResult",
         ),
+        #[cfg(feature = "greeners-imputation")]
         Value::MiceResult(r) => (
             format!(
                 "MICE(n={}, vars={}, m={})",
@@ -863,6 +974,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "MiceResult",
         ),
+        #[cfg(feature = "greeners-glm")]
         Value::GamResult(r) => (
             format!(
                 "GAM(n={}, linear={}, smooth={}), GCV={:.4}",
@@ -870,10 +982,12 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "GamResult",
         ),
+        #[cfg(feature = "greeners-glm")]
         Value::ConditionalResult(r) => (
             format!("{}(n={}, groups={})", r.model_name, r.n_obs, r.n_groups),
             "ConditionalResult",
         ),
+        #[cfg(feature = "greeners-ols")]
         Value::RollingResult(r) => (
             format!(
                 "RollingOLS(n={}, window={}), k={}",
@@ -883,10 +997,12 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "RollingResult",
         ),
+        #[cfg(feature = "greeners-ols")]
         Value::RecursiveLSResult(r) => (
             format!("RecursiveLS(n={}, k={})", r.n_obs, r.params_history.ncols()),
             "RecursiveLSResult",
         ),
+        #[cfg(feature = "greeners-timeseries")]
         Value::DecompResult(r) => (
             format!("Decomp({}), n={}", r.model, r.observed.len()),
             "DecompResult",
@@ -895,6 +1011,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             format!("Diagnostic({} fields)", r.fields.len()),
             "DiagResult",
         ),
+        #[cfg(feature = "greeners-ml")]
         Value::KmeansResult(r) => (
             format!(
                 "KMeans(k={}, n={}), inertia={:.4}",
@@ -902,6 +1019,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "KmeansResult",
         ),
+        #[cfg(feature = "greeners-ml")]
         Value::DbscanResult(r) => (
             format!(
                 "DBSCAN(clusters={}, noise={}), n={}",
@@ -925,6 +1043,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "KdeResult",
         ),
+        #[cfg(feature = "greeners-ml")]
         Value::BartResult(r) => (
             format!(
                 "BART(trees={}, depth={}), n={}, R2={:.4}",
@@ -932,6 +1051,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "BartResult",
         ),
+        #[cfg(feature = "greeners-ml")]
         Value::GpResult(r) => (
             format!(
                 "GP(n={}, l={:.4}, sigma_f={:.4}), R2={:.4}",
@@ -949,6 +1069,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "GmmClusteringResult",
         ),
+        #[cfg(feature = "greeners-ml")]
         Value::HierarchicalResult(r) => (
             format!(
                 "HClust(k={}, n={}), linkage={:?}",
@@ -956,6 +1077,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             ),
             "HierarchicalResult",
         ),
+        #[cfg(feature = "greeners-timeseries")]
         Value::SpectralResult(r) => (
             format!(
                 "Spectral(k={}, n={}), inertia={:.4}",

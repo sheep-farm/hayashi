@@ -29,6 +29,7 @@ pub struct PenalizedModel {
     pub kind: String,
 }
 
+#[cfg(feature = "greeners-ols")]
 impl std::fmt::Display for PenalizedModel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let title = match self.kind.as_str() {
@@ -73,6 +74,7 @@ pub struct BinaryModel {
     pub coef_names: Vec<String>, // coefficient names for margins
 }
 
+#[cfg(feature = "greeners-glm")]
 impl std::fmt::Display for BinaryModel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.result)
@@ -88,6 +90,7 @@ pub struct SurModel {
     pub eq_var_names: Vec<Vec<String>>, // names per equation
 }
 
+#[cfg(feature = "greeners-ols")]
 impl std::fmt::Display for SurModel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let r = &self.result;
@@ -225,6 +228,7 @@ pub struct DFMModel {
     pub var_names: Vec<String>,
 }
 
+#[cfg(feature = "greeners-timeseries")]
 impl std::fmt::Display for DFMModel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.result)
@@ -240,6 +244,7 @@ pub struct ThreeSLSModel {
     pub eq_var_names: Vec<Vec<String>>,
 }
 
+#[cfg(feature = "greeners-ols")]
 impl std::fmt::Display for ThreeSLSModel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.result)

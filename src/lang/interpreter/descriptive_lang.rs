@@ -2073,6 +2073,7 @@ impl Interpreter {
                         r.n_obs,
                     ));
                 }
+                #[cfg(feature = "greeners-panel")]
                 Value::FE2SLSResult(r) => {
                     models.push(esttab_extract_std(
                         "FE-IV",
@@ -2229,7 +2230,14 @@ impl Interpreter {
                     ));
                 }
                 #[cfg(feature = "greeners-causal")]
-                Value::DidResult(_) | Value::KMResult(_) => {
+                Value::DidResult(_) => {
+                    return Err(HayashiError::Runtime(
+                        "esttab() does not support did/km — result has its own format; use print()"
+                            .into(),
+                    ));
+                }
+                #[cfg(feature = "greeners-survival")]
+                Value::KMResult(_) => {
                     return Err(HayashiError::Runtime(
                         "esttab() does not support did/km — result has its own format; use print()"
                             .into(),

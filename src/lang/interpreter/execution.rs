@@ -708,37 +708,51 @@ impl Interpreter {
                 "Factor Analysis",
                 "scores not available via FA — use pca() for scores; FA is for loadings analysis",
             ),
+            #[cfg(feature = "greeners-timeseries")]
             (Value::MarkovResult(r), k) => self.predict_markov_vals(r, k),
+            #[cfg(feature = "greeners-glm")]
             (Value::ConditionalResult(_), _) => Self::unsupported_predict(
                 "clogit/cpoisson",
                 "fixed effects absorbed — unconditional prediction not available; use β̂ coefficients for odds ratios or marginal effects",
             ),
+            #[cfg(feature = "greeners-timeseries")]
             (Value::VarmaResult(_), _) => Self::unsupported_predict(
                 "varma",
                 "multivariate prediction not supported as a column — use print() for diagnostics",
             ),
+            #[cfg(feature = "greeners-timeseries")]
             (Value::UCResult(r), k) => self.predict_ucm_vals(r, k),
+            #[cfg(feature = "greeners-glm")]
             (Value::GamResult(_), _) => Self::unsupported_predict(
                 "gam",
                 "fitted values are not stored — use gam() with df=dataset and compute Xβ̂ manually",
             ),
+            #[cfg(feature = "greeners-imputation")]
             (Value::MiceResult(_), _) => Self::unsupported_predict(
                 "mice",
                 "MICE returns multiple datasets; access via model pooling",
             ),
+            #[cfg(feature = "greeners-timeseries")]
             (Value::SVarResult(_), _) => Self::unsupported_predict(
                 "svar",
                 "no fitted values — use sirf() and sfevd() for impulse-response analysis",
             ),
+            #[cfg(feature = "greeners-ols")]
             (Value::ThreeSLSResult(_), _) => Self::unsupported_predict(
                 "3sls",
                 "multiple equations — use print() to see coefficients per equation",
             ),
+            #[cfg(feature = "greeners-timeseries")]
             (Value::DFMResult(m), k) => self.predict_dfm_vals(m, k),
+            #[cfg(feature = "greeners-timeseries")]
             (Value::MSARResult(r), k) => self.predict_msar_vals(r, k),
+            #[cfg(feature = "greeners-timeseries")]
             (Value::DecompResult(r), k) => self.predict_decomp_vals(r, k),
+            #[cfg(feature = "greeners-timeseries")]
             (Value::MstlResult(r), k) => self.predict_mstl_vals(r, k),
+            #[cfg(feature = "greeners-timeseries")]
             (Value::EtsResult(r), k) => self.predict_ets_vals(r, k),
+            #[cfg(feature = "greeners-panel")]
             (Value::ThresholdResult(_), k) => Err(HayashiError::Runtime(format!(
                 "predict pthresh: kind '{k}' — use print() to see thresholds and coefficients"
             ))),

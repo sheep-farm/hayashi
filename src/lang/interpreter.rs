@@ -803,7 +803,9 @@ impl Interpreter {
             Value::UserFn(_) => "Function",
             Value::Error(_) => "Error",
             Value::OlsResult(_) => "OlsResult",
+            #[cfg(feature = "greeners-ols")]
             Value::IvResult(_) => "IvResult",
+            #[cfg(feature = "greeners-ols")]
             Value::PenalizedResult(_) => "PenalizedResult",
             _ => "Object",
         }

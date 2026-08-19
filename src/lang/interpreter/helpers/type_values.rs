@@ -45,12 +45,19 @@ pub(in crate::lang::interpreter) fn value_as_bool(v: &Value) -> bool {
 pub(in crate::lang::interpreter) fn extract_params(v: &Value) -> Option<Vec<f64>> {
     match v {
         Value::OlsResult(m) => Some(m.result.params.to_vec()),
+        #[cfg(feature = "greeners-glm")]
         Value::BinaryResult(m) => Some(m.result.params.to_vec()),
+        #[cfg(feature = "greeners-ols")]
         Value::PenalizedResult(m) => Some(m.params.to_vec()),
+        #[cfg(feature = "greeners-glm")]
         Value::PoissonResult(r) => Some(r.params.to_vec()),
+        #[cfg(feature = "greeners-glm")]
         Value::NegBinResult(r) => Some(r.params.to_vec()),
+        #[cfg(feature = "greeners-ols")]
         Value::QuantileResult(r) => Some(r.params.to_vec()),
+        #[cfg(feature = "greeners-panel")]
         Value::PanelResult(r) => Some(r.params.to_vec()),
+        #[cfg(feature = "greeners-ols")]
         Value::TobitResult(r) => Some(r.params.to_vec()),
         _ => None,
     }
@@ -60,12 +67,19 @@ pub(in crate::lang::interpreter) fn extract_params(v: &Value) -> Option<Vec<f64>
 pub(in crate::lang::interpreter) fn extract_se(v: &Value) -> Option<Vec<f64>> {
     match v {
         Value::OlsResult(m) => Some(m.result.std_errors.to_vec()),
+        #[cfg(feature = "greeners-glm")]
         Value::BinaryResult(m) => Some(m.result.std_errors.to_vec()),
+        #[cfg(feature = "greeners-ols")]
         Value::PenalizedResult(m) => Some(m.std_errors.to_vec()),
+        #[cfg(feature = "greeners-glm")]
         Value::PoissonResult(r) => Some(r.std_errors.to_vec()),
+        #[cfg(feature = "greeners-glm")]
         Value::NegBinResult(r) => Some(r.std_errors.to_vec()),
+        #[cfg(feature = "greeners-ols")]
         Value::QuantileResult(r) => Some(r.std_errors.to_vec()),
+        #[cfg(feature = "greeners-panel")]
         Value::PanelResult(r) => Some(r.std_errors.to_vec()),
+        #[cfg(feature = "greeners-ols")]
         Value::TobitResult(r) => Some(r.std_errors.to_vec()),
         _ => None,
     }
@@ -75,12 +89,19 @@ pub(in crate::lang::interpreter) fn extract_se(v: &Value) -> Option<Vec<f64>> {
 pub(in crate::lang::interpreter) fn extract_var_names(v: &Value) -> Vec<String> {
     match v {
         Value::OlsResult(m) => m.result.variable_names.clone().unwrap_or_default(),
+        #[cfg(feature = "greeners-glm")]
         Value::BinaryResult(m) => m.coef_names.clone(),
+        #[cfg(feature = "greeners-ols")]
         Value::PenalizedResult(m) => m.variable_names.clone(),
+        #[cfg(feature = "greeners-glm")]
         Value::PoissonResult(r) => r.variable_names.clone().unwrap_or_default(),
+        #[cfg(feature = "greeners-glm")]
         Value::NegBinResult(r) => r.variable_names.clone().unwrap_or_default(),
+        #[cfg(feature = "greeners-ols")]
         Value::QuantileResult(r) => r.variable_names.clone().unwrap_or_default(),
+        #[cfg(feature = "greeners-panel")]
         Value::PanelResult(r) => r.variable_names.clone().unwrap_or_default(),
+        #[cfg(feature = "greeners-ols")]
         Value::TobitResult(r) => r.variable_names.clone().unwrap_or_default(),
         _ => vec![],
     }

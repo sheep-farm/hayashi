@@ -3,6 +3,7 @@ use super::*;
 use crate::lang::dap::model_expansion;
 use std::sync::Arc;
 
+#[cfg(feature = "greeners-timeseries")]
 mod timeseries_models;
 
 /// margins, VECM/VAR/IRF/FEVD, ARIMA/SARIMA/AutoReg/ARDL/Kalman/forecast,
@@ -565,22 +566,28 @@ impl Interpreter {
             }
 
             // ── vecm ─────────────────────────────────────────────────────────
+            #[cfg(feature = "greeners-timeseries")]
             "vecm" => self.eval_vecm(args, opt_map),
 
             // ── var ──────────────────────────────────────────────────────────
+            #[cfg(feature = "greeners-timeseries")]
             "var" => self.eval_var(args, opt_map),
 
             // ── irf ──────────────────────────────────────────────────────────
+            #[cfg(feature = "greeners-timeseries")]
             "irf" => self.eval_irf(args, opt_map),
 
             // ── fevd ─────────────────────────────────────────────────────────
+            #[cfg(feature = "greeners-timeseries")]
             "fevd" => self.eval_fevd(args, opt_map),
 
             // ── arima / sarima ───────────────────────────────────────────────
+            #[cfg(feature = "greeners-timeseries")]
             "arima" | "sarima" => self.eval_arima(func, args, opt_map),
 
             // ── autoreg ──────────────────────────────────────────────────────
             // autoreg(df, y, lags=p, trend="c")
+            #[cfg(feature = "greeners-timeseries")]
             "autoreg" | "ar" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
@@ -632,6 +639,7 @@ impl Interpreter {
 
             // ── ardl ─────────────────────────────────────────────────────────
             // ardl(y ~ x1 + x2, df, lags=p, xlags=q)
+            #[cfg(feature = "greeners-timeseries")]
             "ardl" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
@@ -702,6 +710,7 @@ impl Interpreter {
             //                               nu_t = nu_{t-1} + zeta_t
             //
             // Adiciona colunas {var}_filtered e {var}_smoothed ao DataFrame.
+            #[cfg(feature = "greeners-timeseries")]
             "kalman" | "kfilter" | "ssm" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(

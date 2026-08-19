@@ -110,6 +110,7 @@ impl Interpreter {
             return Err(HayashiError::Runtime("irf() requires a VAR model".into()));
         }
         let model = match self.eval_expr(&args[0])? {
+            #[cfg(feature = "greeners-timeseries")]
             Value::VarResult(m) => m,
             _ => return Err(HayashiError::Type("irf() requires a VAR model".into())),
         };
@@ -184,6 +185,7 @@ impl Interpreter {
             return Err(HayashiError::Runtime("fevd() requires a VAR model".into()));
         }
         let model = match self.eval_expr(&args[0])? {
+            #[cfg(feature = "greeners-timeseries")]
             Value::VarResult(m) => m,
             _ => return Err(HayashiError::Type("fevd() requires a VAR model".into())),
         };

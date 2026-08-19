@@ -46,6 +46,7 @@ impl Interpreter {
                                 &r.conf_upper,
                             );
                         }
+                        #[cfg(feature = "greeners-ols")]
                         Value::RollingResult(r) => {
                             let dates = r.dates.clone();
                             let n = r.n_obs;
@@ -82,6 +83,7 @@ impl Interpreter {
                                 map.insert(name, Value::List(Arc::new(vals)));
                             }
                         }
+                        #[cfg(feature = "greeners-ols")]
                         Value::IvResult(r) => {
                             map = self.build_tidy_simple(
                                 r.variable_names.clone().unwrap_or_default(),
@@ -91,6 +93,7 @@ impl Interpreter {
                                 &r.p_values,
                             );
                         }
+                        #[cfg(feature = "greeners-glm")]
                         Value::BinaryResult(m) => {
                             let r = &m.result;
                             map = self.build_tidy_simple(
@@ -101,6 +104,7 @@ impl Interpreter {
                                 &r.p_values,
                             );
                         }
+                        #[cfg(feature = "greeners-panel")]
                         Value::PanelResult(r) => {
                             map = self.build_tidy_simple(
                                 r.variable_names.clone().unwrap_or_default(),
@@ -110,6 +114,7 @@ impl Interpreter {
                                 &r.p_values,
                             );
                         }
+                        #[cfg(feature = "greeners-panel")]
                         Value::ReResult(r) => {
                             map = self.build_tidy_simple(
                                 r.variable_names.clone().unwrap_or_default(),
@@ -119,6 +124,7 @@ impl Interpreter {
                                 &r.p_values,
                             );
                         }
+                        #[cfg(feature = "greeners-ols")]
                         Value::GmmResult(r) => {
                             let names: Vec<String> =
                                 (0..r.params.len()).map(|i| format!("x{i}")).collect();
@@ -130,6 +136,7 @@ impl Interpreter {
                                 &r.p_values,
                             );
                         }
+                        #[cfg(feature = "greeners-glm")]
                         Value::PoissonResult(r) => {
                             map = self.build_tidy_simple(
                                 r.variable_names.clone().unwrap_or_default(),
@@ -139,6 +146,7 @@ impl Interpreter {
                                 &r.p_values,
                             );
                         }
+                        #[cfg(feature = "greeners-glm")]
                         Value::NegBinResult(r) => {
                             map = self.build_tidy_simple(
                                 r.variable_names.clone().unwrap_or_default(),
@@ -148,6 +156,7 @@ impl Interpreter {
                                 &r.p_values,
                             );
                         }
+                        #[cfg(feature = "greeners-glm")]
                         Value::GlmResult(r) => {
                             map = self.build_tidy_simple(
                                 r.variable_names.clone().unwrap_or_default(),
@@ -157,6 +166,7 @@ impl Interpreter {
                                 &r.p_values,
                             );
                         }
+                        #[cfg(feature = "greeners-ols")]
                         Value::QuantileResult(r) => {
                             map = self.build_tidy_simple(
                                 r.variable_names.clone().unwrap_or_default(),
@@ -166,6 +176,7 @@ impl Interpreter {
                                 &r.p_values,
                             );
                         }
+                        #[cfg(feature = "greeners-ols")]
                         Value::TobitResult(r) => {
                             map = self.build_tidy_simple(
                                 r.variable_names.clone().unwrap_or_default(),
@@ -175,6 +186,7 @@ impl Interpreter {
                                 &r.p_values,
                             );
                         }
+                        #[cfg(feature = "greeners-ols")]
                         Value::HeckmanResult(r) => {
                             map = self.build_tidy_simple(
                                 r.variable_names.clone().unwrap_or_default(),
@@ -184,6 +196,7 @@ impl Interpreter {
                                 &r.p_values,
                             );
                         }
+                        #[cfg(feature = "greeners-glm")]
                         Value::OrderedResult(r) => {
                             map = self.build_tidy_simple(
                                 r.variable_names.clone().unwrap_or_default(),
@@ -193,6 +206,7 @@ impl Interpreter {
                                 &r.p_values,
                             );
                         }
+                        #[cfg(feature = "greeners-panel")]
                         Value::AbResult(r) => {
                             map = self.build_tidy_simple(
                                 r.variable_names.clone().unwrap_or_default(),
@@ -202,6 +216,7 @@ impl Interpreter {
                                 &r.p_values,
                             );
                         }
+                        #[cfg(feature = "greeners-ols")]
                         Value::PenalizedResult(m) => {
                             map = self.build_tidy_simple(
                                 m.variable_names.clone(),
@@ -211,6 +226,7 @@ impl Interpreter {
                                 &ndarray::Array1::from_vec(vec![0.0; m.params.len()]),
                             );
                         }
+                        #[cfg(feature = "greeners-ols")]
                         Value::RlmResult(r) => {
                             map = self.build_tidy_simple(
                                 r.variable_names.clone().unwrap_or_default(),
@@ -220,6 +236,7 @@ impl Interpreter {
                                 &r.p_values,
                             );
                         }
+                        #[cfg(feature = "greeners-glm")]
                         Value::BetaResult(r) => {
                             map = self.build_tidy_simple(
                                 r.variable_names.clone().unwrap_or_default(),
@@ -229,6 +246,7 @@ impl Interpreter {
                                 &r.p_values,
                             );
                         }
+                        #[cfg(feature = "greeners-glm")]
                         Value::GeeResult(r) => {
                             map = self.build_tidy_simple(
                                 r.variable_names.clone().unwrap_or_default(),
@@ -238,6 +256,7 @@ impl Interpreter {
                                 &r.p_values,
                             );
                         }
+                        #[cfg(feature = "greeners-timeseries")]
                         Value::ArimaResult(r) => {
                             // ARIMA has ar_params, ma_params, intercept — concatenate
                             let mut all_params = r.ar_params.to_vec();
@@ -273,6 +292,7 @@ impl Interpreter {
                                 .collect();
                             map = self.build_tidy_simple(names, &params, &se, &tv, &pv);
                         }
+                        #[cfg(feature = "greeners-timeseries")]
                         Value::GarchResult(r) => {
                             map = self.build_tidy_simple(
                                 r.variable_names.clone(),
@@ -282,6 +302,7 @@ impl Interpreter {
                                 &r.p_values,
                             );
                         }
+                        #[cfg(feature = "greeners-timeseries")]
                         Value::VarResult(r) => {
                             // VAR: params is (1+k*p) x k matrix — flatten column by column
                             let k = r.n_vars;
@@ -314,6 +335,7 @@ impl Interpreter {
                             let pv = ndarray::Array1::<f64>::zeros(n_coef);
                             map = self.build_tidy_simple(names, &params, &ses, &tv, &pv);
                         }
+                        #[cfg(feature = "greeners-timeseries")]
                         Value::VecmResult(r) => {
                             // VECM: alpha (r x k), beta (r x k), gamma (k*(p-1) x k)
                             let k = r.n_vars;
@@ -370,6 +392,7 @@ impl Interpreter {
                             let pv = ndarray::Array1::<f64>::zeros(n_total);
                             map = self.build_tidy_simple(names, &params, &ses, &tv, &pv);
                         }
+                        #[cfg(feature = "greeners-panel")]
                         Value::SysGmmResult(r) => {
                             map = self.build_tidy_simple(
                                 r.variable_names.clone().unwrap_or_default(),
@@ -379,6 +402,7 @@ impl Interpreter {
                                 &r.p_values,
                             );
                         }
+                        #[cfg(feature = "greeners-panel")]
                         Value::FE2SLSResult(r) => {
                             map = self.build_tidy_simple(
                                 r.variable_names.clone().unwrap_or_default(),
@@ -388,6 +412,7 @@ impl Interpreter {
                                 &r.p_values,
                             );
                         }
+                        #[cfg(feature = "greeners-panel")]
                         Value::PcseResult(r) => {
                             map = self.build_tidy_simple(
                                 r.variable_names.clone().unwrap_or_default(),
@@ -397,6 +422,7 @@ impl Interpreter {
                                 &r.p_values,
                             );
                         }
+                        #[cfg(feature = "greeners-panel")]
                         Value::PanelGlsResult(r) => {
                             map = self.build_tidy_simple(
                                 r.variable_names.clone().unwrap_or_default(),
@@ -406,6 +432,7 @@ impl Interpreter {
                                 &r.p_values,
                             );
                         }
+                        #[cfg(feature = "greeners-ols")]
                         Value::GlsarResult(r) => {
                             map = self.build_tidy_simple(
                                 r.variable_names.clone().unwrap_or_default(),
@@ -415,6 +442,7 @@ impl Interpreter {
                                 &r.p_values,
                             );
                         }
+                        #[cfg(feature = "greeners-ols")]
                         Value::RecursiveLSResult(r) => {
                             let names: Vec<String> =
                                 (0..r.params.len()).map(|i| format!("beta{}", i)).collect();
@@ -423,6 +451,7 @@ impl Interpreter {
                             let pv = ndarray::Array1::<f64>::zeros(r.params.len());
                             map = self.build_tidy_simple(names, &r.params, &se, &tv, &pv);
                         }
+                        #[cfg(feature = "greeners-survival")]
                         Value::CoxResult(r) => {
                             map = self.build_tidy_simple(
                                 r.variable_names.clone().unwrap_or_default(),
@@ -432,6 +461,7 @@ impl Interpreter {
                                 &r.p_values,
                             );
                         }
+                        #[cfg(feature = "greeners-glm")]
                         Value::ConditionalResult(r) => {
                             map = self.build_tidy_simple(
                                 r.variable_names.clone().unwrap_or_default(),
@@ -441,6 +471,7 @@ impl Interpreter {
                                 &r.p_values,
                             );
                         }
+                        #[cfg(feature = "greeners-glm")]
                         Value::GamResult(r) => {
                             map = self.build_tidy_simple(
                                 r.variable_names.clone().unwrap_or_default(),
@@ -450,6 +481,7 @@ impl Interpreter {
                                 &r.p_values,
                             );
                         }
+                        #[cfg(feature = "greeners-bayesian")]
                         Value::MixedResult(r) => {
                             map = self.build_tidy_simple(
                                 r.variable_names.clone().unwrap_or_default(),
@@ -459,6 +491,7 @@ impl Interpreter {
                                 &r.p_values,
                             );
                         }
+                        #[cfg(feature = "greeners-glm")]
                         Value::ZeroInflatedResult(r) => {
                             // Combine count and inflate params
                             let nc = r.count_params.len();
@@ -495,6 +528,7 @@ impl Interpreter {
                             }
                             map = self.build_tidy_simple(names, &params, &ses, &tv, &pv);
                         }
+                        #[cfg(feature = "greeners-timeseries")]
                         Value::AutoRegResult(r) => {
                             map = self.build_tidy_simple(
                                 r.param_names.clone(),
@@ -504,6 +538,7 @@ impl Interpreter {
                                 &r.p_values,
                             );
                         }
+                        #[cfg(feature = "greeners-timeseries")]
                         Value::ArdlResult(r) => {
                             map = self.build_tidy_simple(
                                 r.param_names.clone(),
@@ -513,6 +548,7 @@ impl Interpreter {
                                 &r.p_values,
                             );
                         }
+                        #[cfg(feature = "greeners-causal")]
                         Value::DidResult(r) => {
                             map = self.build_tidy_simple(
                                 r.variable_names.clone(),
@@ -522,6 +558,7 @@ impl Interpreter {
                                 &r.p_values,
                             );
                         }
+                        #[cfg(feature = "greeners-panel")]
                         Value::ThresholdResult(r) => {
                             // Combine regime1 and regime2 params
                             let n1 = r.params_regime1.len();
@@ -544,6 +581,7 @@ impl Interpreter {
                             let pv = ndarray::Array1::<f64>::zeros(n);
                             map = self.build_tidy_simple(names, &params, &se, &tv, &pv);
                         }
+                        #[cfg(feature = "greeners-causal")]
                         Value::RdResult(r) => {
                             let mut var = vec!["tau".to_string()];
                             let mut coef = vec![r.tau];
@@ -571,6 +609,7 @@ impl Interpreter {
                             let cu = ndarray::Array1::from_vec(cu);
                             map = self.build_tidy_coef_map(var, &params, &se, &t, &p, &cl, &cu);
                         }
+                        #[cfg(feature = "greeners-causal")]
                         Value::SynthResult(r) => {
                             let mut var = Vec::new();
                             let mut coef = Vec::new();
@@ -586,6 +625,7 @@ impl Interpreter {
                             let names: Vec<String> = var.clone();
                             map = self.build_tidy_simple(names, &params, &se, &t, &p);
                         }
+                        #[cfg(feature = "greeners-causal")]
                         Value::PsmResult(r) => {
                             let mut cov = Vec::new();
                             let mut mt = Vec::new();
@@ -608,6 +648,7 @@ impl Interpreter {
                             map.insert("smd_before".into(), Value::List(Arc::new(smdb)));
                             map.insert("smd_after".into(), Value::List(Arc::new(smda)));
                         }
+                        #[cfg(feature = "greeners-glm")]
                         Value::MNLogitResult(r) => {
                             let k = r.params.nrows();
                             let j = r.params.ncols();
@@ -668,6 +709,7 @@ impl Interpreter {
                             map.insert("conf_low".into(), Value::List(Arc::new(nan_col.clone())));
                             map.insert("conf_high".into(), Value::List(Arc::new(nan_col)));
                         }
+                        #[cfg(feature = "greeners-survival")]
                         Value::KMResult(r) => {
                             let n = r.times.len();
                             let mut time = Vec::new();
@@ -688,6 +730,7 @@ impl Interpreter {
                             map.insert("conf_low".into(), Value::List(Arc::new(cl)));
                             map.insert("conf_high".into(), Value::List(Arc::new(cu)));
                         }
+                        #[cfg(feature = "greeners-ols")]
                         Value::SurResult(m) => {
                             let r = &m.result;
                             let mut eq_vec = Vec::new();
@@ -738,6 +781,7 @@ impl Interpreter {
                             map.insert("conf_low".into(), Value::List(Arc::new(nan_col.clone())));
                             map.insert("conf_high".into(), Value::List(Arc::new(nan_col)));
                         }
+                        #[cfg(feature = "greeners-ols")]
                         Value::ThreeSLSResult(m) => {
                             let r = &m.result;
                             let mut eq_vec = Vec::new();
@@ -788,6 +832,7 @@ impl Interpreter {
                             map.insert("conf_low".into(), Value::List(Arc::new(nan_col.clone())));
                             map.insert("conf_high".into(), Value::List(Arc::new(nan_col)));
                         }
+                        #[cfg(feature = "greeners-timeseries")]
                         Value::SVarResult(r) => {
                             let mut matrix = Vec::new();
                             let mut row = Vec::new();
@@ -828,6 +873,7 @@ impl Interpreter {
                             map.insert("conf_low".into(), Value::List(Arc::new(nan_col.clone())));
                             map.insert("conf_high".into(), Value::List(Arc::new(nan_col)));
                         }
+                        #[cfg(feature = "greeners-timeseries")]
                         Value::VarmaResult(r) => {
                             let mut type_vec = Vec::new();
                             let mut lag_vec = Vec::new();
@@ -890,6 +936,7 @@ impl Interpreter {
                             map.insert("conf_low".into(), Value::List(Arc::new(nan_col.clone())));
                             map.insert("conf_high".into(), Value::List(Arc::new(nan_col)));
                         }
+                        #[cfg(feature = "greeners-timeseries")]
                         Value::MarkovResult(r) => {
                             let mut regime = Vec::new();
                             let mut parameter = Vec::new();
@@ -916,6 +963,7 @@ impl Interpreter {
                             map.insert("conf_low".into(), Value::List(Arc::new(nan_col.clone())));
                             map.insert("conf_high".into(), Value::List(Arc::new(nan_col)));
                         }
+                        #[cfg(feature = "greeners-timeseries")]
                         Value::MSARResult(r) => {
                             let mut regime = Vec::new();
                             let mut parameter = Vec::new();
@@ -991,6 +1039,7 @@ impl Interpreter {
                             map.insert("conf_low".into(), Value::List(Arc::new(nan_col.clone())));
                             map.insert("conf_high".into(), Value::List(Arc::new(nan_col)));
                         }
+                        #[cfg(feature = "greeners-timeseries")]
                         Value::DFMResult(m) => {
                             let r = &m.result;
                             let mut var = Vec::new();
@@ -1013,11 +1062,29 @@ impl Interpreter {
                             map.insert("conf_low".into(), Value::List(Arc::new(nan_col.clone())));
                             map.insert("conf_high".into(), Value::List(Arc::new(nan_col)));
                         }
-                        Value::DecompResult(_)
-                        | Value::MstlResult(_)
-                        | Value::UCResult(_)
-                        | Value::MiceResult(_)
-                        | Value::LowessResult(_) => {
+                        #[cfg(feature = "greeners-timeseries")]
+                        Value::DecompResult(_) | Value::MstlResult(_) | Value::UCResult(_) => {
+                            // No coefficient-like parameters; return empty tidy table
+                            map.insert("variable".into(), Value::List(Arc::new(Vec::new())));
+                            map.insert("coef".into(), Value::List(Arc::new(Vec::new())));
+                            map.insert("std_err".into(), Value::List(Arc::new(Vec::new())));
+                            map.insert("t".into(), Value::List(Arc::new(Vec::new())));
+                            map.insert("p_value".into(), Value::List(Arc::new(Vec::new())));
+                            map.insert("conf_low".into(), Value::List(Arc::new(Vec::new())));
+                            map.insert("conf_high".into(), Value::List(Arc::new(Vec::new())));
+                        }
+                        #[cfg(feature = "greeners-imputation")]
+                        Value::MiceResult(_) => {
+                            // No coefficient-like parameters; return empty tidy table
+                            map.insert("variable".into(), Value::List(Arc::new(Vec::new())));
+                            map.insert("coef".into(), Value::List(Arc::new(Vec::new())));
+                            map.insert("std_err".into(), Value::List(Arc::new(Vec::new())));
+                            map.insert("t".into(), Value::List(Arc::new(Vec::new())));
+                            map.insert("p_value".into(), Value::List(Arc::new(Vec::new())));
+                            map.insert("conf_low".into(), Value::List(Arc::new(Vec::new())));
+                            map.insert("conf_high".into(), Value::List(Arc::new(Vec::new())));
+                        }
+                        Value::LowessResult(_) => {
                             // No coefficient-like parameters; return empty tidy table
                             map.insert("variable".into(), Value::List(Arc::new(Vec::new())));
                             map.insert("coef".into(), Value::List(Arc::new(Vec::new())));

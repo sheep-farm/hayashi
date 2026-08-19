@@ -42,13 +42,15 @@ impl Interpreter {
             "ols" => self.ols(func, args, opts, opt_map),
             #[cfg(feature = "greeners-ols")]
             "iv" => self.iv(func, args, opts, opt_map),
-            #[cfg(feature = "greeners-ols")]
+            #[cfg(feature = "greeners-diagnostics")]
             "weak_iv" => self.weak_iv(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-diagnostics")]
             "estat_overid" | "sargan" | "overid" | "sargan_test" => {
                 self.estat_overid(func, args, opts, opt_map)
             }
             #[cfg(feature = "greeners-ols")]
             "estat_endog" | "endog_test" | "dwh" => self.estat_endog(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-diagnostics")]
             "estat_classification" | "classification" => {
                 self.estat_classification(func, args, opts, opt_map)
             }
@@ -62,9 +64,9 @@ impl Interpreter {
             "logit" => self.logit(func, args, opts, opt_map),
             #[cfg(feature = "greeners-glm")]
             "probit" => self.probit(func, args, opts, opt_map),
-            #[cfg(feature = "greeners-ols")]
+            #[cfg(feature = "greeners-glm")]
             "heckman" | "heckit" => self.heckman(func, args, opts, opt_map),
-            #[cfg(feature = "greeners-ols")]
+            #[cfg(feature = "greeners-glm")]
             "tobit" => self.tobit(func, args, opts, opt_map),
             #[cfg(feature = "greeners-causal")]
             "rd" => self.rd(func, args, opts, opt_map),
@@ -88,13 +90,14 @@ impl Interpreter {
             "did" => self.did(func, args, opts, opt_map),
             #[cfg(feature = "greeners-causal")]
             "lpdid" => self.lpdid(func, args, opts, opt_map),
-            #[cfg(feature = "greeners-ols")]
+            #[cfg(feature = "greeners-causal")]
             "eventstudy" | "event_study" | "es" => self.eventstudy(func, args, opts, opt_map),
             "nls_exp" | "nls_power" | "nls_logistic" | "nls_cobb_douglas" | "nls_ces" => {
                 self.nls_exp(func, args, opts, opt_map)
             }
             #[cfg(feature = "greeners-causal")]
             "double_ml" | "dml" => self.double_ml(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-timeseries")]
             "sfa_production" | "sfa_cost" | "frontier" => {
                 self.sfa_production(func, args, opts, opt_map)
             }
@@ -102,9 +105,11 @@ impl Interpreter {
             "panel_tobit" => self.panel_tobit(func, args, opts, opt_map),
             #[cfg(feature = "greeners-panel")]
             "panel_heckman" => self.panel_heckman(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-spatial")]
             "spatial_panel_sar" | "spatial_panel_sem" => {
                 self.spatial_panel_sar(func, args, opts, opt_map)
             }
+            #[cfg(feature = "greeners-bayesian")]
             "bayes_sfa_production" | "bayes_sfa_cost" | "bayes_frontier" => {
                 self.bayes_sfa_production(func, args, opts, opt_map)
             }
@@ -136,11 +141,13 @@ impl Interpreter {
             "pstr" => self.pstr(func, args, opts, opt_map),
             #[cfg(feature = "greeners-timeseries")]
             "modwt" => self.modwt(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-timeseries")]
             "copula" => self.copula(func, args, opts, opt_map),
             #[cfg(feature = "greeners-timeseries")]
             "nardl" => self.nardl(func, args, opts, opt_map),
             #[cfg(feature = "greeners-panel")]
             "pvar" | "panel_var" => self.pvar(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-panel")]
             "fcoef" | "functional_coef" => self.fcoef(func, args, opts, opt_map),
             #[cfg(feature = "greeners-timeseries")]
             "dcc_garch" | "dcc" => self.dcc_garch(func, args, opts, opt_map),
@@ -198,6 +205,7 @@ impl Interpreter {
             "orf" | "orthogonal_forest" => self.orf(func, args, opts, opt_map),
             #[cfg(feature = "greeners-ml")]
             "spectral" | "spectral_clustering" => self.spectral(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-ml")]
             "isotonic" | "isotonic_reg" => self.isotonic(func, args, opts, opt_map),
             #[cfg(feature = "greeners-causal")]
             "causal_impact" | "causalimpact" => self.causal_impact(func, args, opts, opt_map),
@@ -209,6 +217,7 @@ impl Interpreter {
             "bayes_lm" | "bayesian_lm" => self.bayes_lm(func, args, opts, opt_map),
             #[cfg(feature = "greeners-ml")]
             "dbscan" | "dbscan_clust" => self.dbscan(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-ml")]
             "gmm_clust" | "gmm_clustering" => self.gmm_clust(func, args, opts, opt_map),
             #[cfg(feature = "greeners-ols")]
             "reg_path" | "regpath" => self.reg_path(func, args, opts, opt_map),
@@ -220,6 +229,7 @@ impl Interpreter {
             "tsne" | "t_sne" => self.tsne(func, args, opts, opt_map),
             #[cfg(feature = "greeners-ml")]
             "umap" => self.umap(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-ml")]
             "biplot" | "pca_biplot" => self.biplot(func, args, opts, opt_map),
             #[cfg(feature = "greeners-spatial")]
             "spatial_sar" | "spatial_sem" => self.spatial_sar(func, args, opts, opt_map),
@@ -233,6 +243,7 @@ impl Interpreter {
             "rlm" => self.rlm(func, args, opts, opt_map),
             #[cfg(feature = "greeners-glm")]
             "gee" => self.gee(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-panel")]
             "xtlogit" | "xtprobit" | "xtpoisson" | "xtgee" => {
                 self.xtlogit(func, args, opts, opt_map)
             }
@@ -253,9 +264,13 @@ impl Interpreter {
             "glm" => self.glm(func, args, opts, opt_map),
             #[cfg(feature = "greeners-diagnostics")]
             "influence" => self.influence(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-ml")]
             "lowess" => self.lowess(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-ml")]
             "kde" => self.kde(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-ml")]
             "pca" | "princomp" => self.pca(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-ml")]
             "factor" => self.factor(func, args, opts, opt_map),
             "manova" => self.manova(func, args, opts, opt_map),
             _ => return Ok(None),
