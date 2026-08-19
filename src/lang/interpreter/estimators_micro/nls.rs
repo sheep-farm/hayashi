@@ -59,10 +59,10 @@ impl Interpreter {
 
         #[allow(clippy::type_complexity)]
         let (predict_fn, param_names): (&dyn Fn(&[f64], &[f64]) -> f64, Vec<String>) = match func {
-            "nls_exp" => (&greeners::predict_exp, vec!["a".into(), "b".into()]),
-            "nls_power" => (&greeners::predict_power, vec!["a".into(), "b".into()]),
+            "nls_exp" => (&greeners::nls::predict_exp, vec!["a".into(), "b".into()]),
+            "nls_power" => (&greeners::nls::predict_power, vec!["a".into(), "b".into()]),
             "nls_logistic" => (
-                &greeners::predict_logistic,
+                &greeners::nls::predict_logistic,
                 vec!["a".into(), "b".into(), "c".into()],
             ),
             "nls_cobb_douglas" => {
@@ -70,10 +70,10 @@ impl Interpreter {
                 for i in 0..n_x {
                     names.push(format!("b{i}"));
                 }
-                (&greeners::predict_cobb_douglas, names)
+                (&greeners::nls::predict_cobb_douglas, names)
             }
             "nls_ces" => (
-                &greeners::predict_ces,
+                &greeners::nls::predict_ces,
                 vec!["a".into(), "b1".into(), "rho".into()],
             ),
             _ => unreachable!(),
@@ -87,7 +87,7 @@ impl Interpreter {
             )));
         }
 
-        let result = greeners::NLS::fit_with_names(
+        let result = greeners::nls::NLS::fit_with_names(
             &y_vec,
             &x_mat,
             predict_fn,

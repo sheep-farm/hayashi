@@ -71,7 +71,7 @@ impl Interpreter {
         };
         let kernel = rd_kernel_opt(opt_map.get("kernel")).map_err(HayashiError::Runtime)?;
 
-        let result = greeners::RD::fit(
+        let result = greeners::rd::RD::fit(
             &y,
             &x,
             cutoff,
@@ -162,7 +162,7 @@ impl Interpreter {
         };
         let kernel = rd_kernel_opt(opt_map.get("kernel")).map_err(HayashiError::Runtime)?;
 
-        let result = greeners::RD::fit_fuzzy(
+        let result = greeners::rd::RD::fit_fuzzy(
             &y,
             &d,
             &x,
@@ -267,7 +267,7 @@ impl Interpreter {
             _ => return Err(HayashiError::Runtime("psm: boot must be integer".into())),
         };
 
-        let result = greeners::PSM::fit(
+        let result = greeners::psm::PSM::fit(
             &y,
             &d,
             &x,
@@ -361,7 +361,7 @@ impl Interpreter {
             _ => return Err(HayashiError::Runtime("synth(): covs must be a list".into())),
         };
 
-        let result = greeners::SyntheticControl::fit(
+        let result = greeners::synth::SyntheticControl::fit(
             &outcome_col,
             &treated_unit,
             t0,
@@ -486,9 +486,16 @@ impl Interpreter {
             _ => 5,
         };
         let cov = resolve_cov_full(opt_map, &df)?;
-        let result =
-            greeners::EventStudy::fit(&y, &event_time, &x_controls, reference, min_t, max_t, cov)
-                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let result = greeners::event_study::EventStudy::fit(
+            &y,
+            &event_time,
+            &x_controls,
+            reference,
+            min_t,
+            max_t,
+            cov,
+        )
+        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let event_names: Vec<String> = result
             .event_times
@@ -600,8 +607,9 @@ impl Interpreter {
             _ => 2,
         };
 
-        let result = greeners::DoubleML::fit_plr(&y_vec, &d_vec, &x_mat, n_folds, poly_degree)
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let result =
+            greeners::double_ml::DoubleML::fit_plr(&y_vec, &d_vec, &x_mat, n_folds, poly_degree)
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let theta_names = vec!["theta".to_string()];
         let theta_params = ndarray::Array1::from(vec![result.theta]);
@@ -815,7 +823,7 @@ impl Interpreter {
             }
         }
 
-        let result = greeners::SyntheticDiD::fit(&y_mat, &treated_vec, treatment_period)
+        let result = greeners::synth_did::SyntheticDiD::fit(&y_mat, &treated_vec, treatment_period)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let att_names = vec!["ATT".to_string()];
@@ -939,7 +947,7 @@ impl Interpreter {
             )));
         };
 
-        let result = greeners::CUPED::fit(&y_arr, &x_arr, &treated_vec)
+        let result = greeners::cuped::CUPED::fit(&y_arr, &x_arr, &treated_vec)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let effect_names = vec!["treatment".to_string()];
@@ -1063,7 +1071,7 @@ impl Interpreter {
             }
         }
 
-        let result = greeners::DMLCrossfit::fit(&y_arr, &d_arr, &x_mat, n_folds)
+        let result = greeners::dml_crossfit::DML::fit(&y_arr, &d_arr, &x_mat, n_folds)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let theta_names = vec!["theta".to_string()];
@@ -1189,8 +1197,9 @@ impl Interpreter {
             }
         }
 
-        let result = greeners::BayesianSC::fit(&y_arr, &y_controls, treatment_period, prior)
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let result =
+            greeners::bayesian_sc::BayesianSC::fit(&y_arr, &y_controls, treatment_period, prior)
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let tau_names = vec!["tau".to_string()];
         let tau_params = ndarray::Array1::from(vec![result.tau]);
@@ -1335,7 +1344,7 @@ impl Interpreter {
             }
         }
 
-        let result = greeners::CausalImpact::fit(
+        let result = greeners::causal_impact::CausalImpact::fit(
             &y_arr,
             &controls_mat,
             treatment_period,
@@ -1502,7 +1511,7 @@ impl Interpreter {
         // -----------------------------------------------------------------
         // Configure the estimator
         // -----------------------------------------------------------------
-        let mut estimator = greeners::LpDid::new();
+        let mut estimator = greeners::lp_did::LpDid::new();
 
         if let Some(Value::Str(s)) = opt_map.get("estimand") {
             estimator = estimator.with_target_estimand(s);

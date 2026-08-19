@@ -5,14 +5,25 @@ use crate::lang::error::{HayashiError, Result};
 use crate::lang::lexer::Lexer;
 use crate::lang::parser::{parse_formula_text, Parser};
 use greeners::diagnostics::Diagnostics;
+use greeners::distributions::chi2_pvalue;
+use greeners::distributions::f_pvalue;
+use greeners::distributions::logistic;
+use greeners::distributions::norm_pdf;
+use greeners::distributions::t_pvalue_two;
+use greeners::distributions::t_quantile;
 use greeners::linalg::UPLO;
 use greeners::linalg::{LinalgEigh as _, LinalgInverse as _};
 use greeners::specification_tests::SpecificationTests;
-use greeners::{chi2_pvalue, f_pvalue, logistic, norm_pdf, t_pvalue_two, t_quantile};
-use greeners::{
-    BinaryDiagnostics, CovarianceType, DataFrame, FixedEffects, Formula as GFormula, Logit, Probit,
-    RandomEffects, IV, OLS,
-};
+use greeners::BinaryDiagnostics;
+use greeners::CovarianceType;
+use greeners::DataFrame;
+use greeners::FixedEffects;
+use greeners::Formula as GFormula;
+use greeners::Logit;
+use greeners::Probit;
+use greeners::RandomEffects;
+use greeners::IV;
+use greeners::OLS;
 use ndarray::{Array1, Array2, Axis};
 use serde_json::{json, Value as JsonValue};
 use statrs::distribution::{ContinuousCDF, Normal};
@@ -169,13 +180,13 @@ impl DebugState {
     }
 }
 
-fn rd_kernel_opt(opt: Option<&Value>) -> std::result::Result<greeners::RdKernel, String> {
+fn rd_kernel_opt(opt: Option<&Value>) -> std::result::Result<greeners::rd::RdKernel, String> {
     match opt {
-        None => Ok(greeners::RdKernel::Triangular),
+        None => Ok(greeners::rd::RdKernel::Triangular),
         Some(Value::Str(s)) => match s.as_str() {
-            "triangular" | "tri" => Ok(greeners::RdKernel::Triangular),
-            "uniform" | "uni" => Ok(greeners::RdKernel::Uniform),
-            "epanechnikov" | "epa" => Ok(greeners::RdKernel::Epanechnikov),
+            "triangular" | "tri" => Ok(greeners::rd::RdKernel::Triangular),
+            "uniform" | "uni" => Ok(greeners::rd::RdKernel::Uniform),
+            "epanechnikov" | "epa" => Ok(greeners::rd::RdKernel::Epanechnikov),
             other => Err(format!(
                 "kernel '{other}' unknown (triangular|uniform|epanechnikov)"
             )),

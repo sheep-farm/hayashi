@@ -1856,7 +1856,7 @@ impl Interpreter {
             }
             match val {
                 Value::OlsResult(m) => {
-                    use greeners::ExportableResult;
+                    use greeners::export::ExportableResult;
                     let coefs = esttab_parse_csv(&m.result.to_csv());
                     let n = m.residuals.len();
                     let cov_label = match &m.result.cov_type {

@@ -46,8 +46,14 @@ impl Interpreter {
         };
 
         let var_names = g_formula.independents.clone();
-        let result = greeners::PanelTobit::fit(&y_vec, &x_mat, &panel_ids, censor, Some(var_names))
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let result = greeners::panel_tobit::PanelTobit::fit(
+            &y_vec,
+            &x_mat,
+            &panel_ids,
+            censor,
+            Some(var_names),
+        )
+        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let names = result.variable_names.clone().unwrap_or_default();
         let summary = format!(
@@ -176,7 +182,7 @@ impl Interpreter {
 
         let sel_names = sel_g_formula.independents.clone();
         let out_names = g_formula.independents.clone();
-        let result = greeners::PanelHeckman::fit(
+        let result = greeners::panel_heckman::PanelHeckman::fit(
             &z_vec,
             &y_vec,
             &w_mat,
@@ -313,7 +319,7 @@ impl Interpreter {
             }
         };
 
-        let result = greeners::PanelQuantile::fit(
+        let result = greeners::panel_quantile::PanelQuantile::fit(
             &ndarray::Array1::from_vec(y_vec),
             &x_arr,
             &entity_ids,
@@ -376,7 +382,7 @@ impl Interpreter {
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         let var_names = g_formula.independents.clone();
 
-        let result = greeners::FMOLS::fit(&y_arr, &x_arr, Some(var_names))
+        let result = greeners::fmols::FMOLS::fit(&y_arr, &x_arr, Some(var_names))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let summary = format!(
@@ -478,8 +484,9 @@ impl Interpreter {
             }
         };
 
-        let result = greeners::PSTR::fit(&y_arr, &x_arr, &q_arr, &entity_ids, Some(var_names))
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let result =
+            greeners::pstr::PSTR::fit(&y_arr, &x_arr, &q_arr, &entity_ids, Some(var_names))
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let summary = format!(
             "PSTR(k={}, n={}), gamma={:.4}, c={:.4}",
@@ -588,7 +595,7 @@ impl Interpreter {
             }
         };
 
-        let result = greeners::PanelVAR::fit(&y_mat, &entity_ids, lags, Some(all_cols))
+        let result = greeners::panel_var::PanelVAR::fit(&y_mat, &entity_ids, lags, Some(all_cols))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let lag_names =
@@ -672,7 +679,7 @@ impl Interpreter {
         })?;
         let z_arr = ndarray::Array1::from_vec(z_vals.to_vec());
 
-        let result = greeners::FunctionalCoef::fit(
+        let result = greeners::functional_coef::FunctionalCoef::fit(
             &y_arr,
             &x_arr,
             &z_arr,
@@ -837,7 +844,7 @@ impl Interpreter {
             }
         }
 
-        let result = greeners::MFVAR::fit(
+        let result = greeners::mfvar::MFVAR::fit(
             &y_low,
             &y_high,
             agg_ratio,
@@ -999,7 +1006,7 @@ impl Interpreter {
             }
         };
 
-        let result = greeners::FAPanel::fit(
+        let result = greeners::fa_panel::FAPanel::fit(
             &y_arr,
             &x_arr,
             &aux_mat,

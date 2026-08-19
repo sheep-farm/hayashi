@@ -2117,7 +2117,7 @@ impl Interpreter {
             .formula_var_names(&g_formula)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        let result = greeners::SystemGmm::fit(
+        let result = greeners::dynamic_panel::SystemGmm::fit(
             &y_vec,
             &x_mat,
             &entity_ids,
@@ -2218,8 +2218,9 @@ impl Interpreter {
             .formula_var_names(&g_endog)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        let result = greeners::FE2SLS::fit(&y_vec, &x_mat, &z_mat, &entity_ids, Some(var_names))
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let result =
+            greeners::panel::FE2SLS::fit(&y_vec, &x_mat, &z_mat, &entity_ids, Some(var_names))
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         Ok(Value::FE2SLSResult(Rc::new(result)))
     }
@@ -2244,8 +2245,9 @@ impl Interpreter {
         let var_names = df
             .formula_var_names(&g_formula)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        let result = greeners::PCSE::fit(&y_vec, &x_mat, &entity_ids, &time_ids, Some(var_names))
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let result =
+            greeners::panel::PCSE::fit(&y_vec, &x_mat, &entity_ids, &time_ids, Some(var_names))
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         Ok(Value::PcseResult(Rc::new(result)))
     }
 
@@ -2259,11 +2261,11 @@ impl Interpreter {
         let (formula_ast, df, df_name, id_col) = self.extract_panel_args(args, opt_map)?;
         let time_col = self.get_time_col(&df_name, opt_map)?;
         let panels_opt = match opt_map.get("panels") {
-            Some(Value::Str(s)) if s == "corr" => greeners::GlsPanels::Correlated,
+            Some(Value::Str(s)) if s == "corr" => greeners::panel::GlsPanels::Correlated,
             Some(Value::Str(s)) if s == "hetero" || s == "heteroscedastic" => {
-                greeners::GlsPanels::Hetero
+                greeners::panel::GlsPanels::Hetero
             }
-            None => greeners::GlsPanels::Hetero,
+            None => greeners::panel::GlsPanels::Hetero,
             _ => {
                 return Err(HayashiError::Runtime(
                     "xtgls(): panels must be \"hetero\" or \"corr\"".into(),
@@ -2281,7 +2283,7 @@ impl Interpreter {
         let var_names = df
             .formula_var_names(&g_formula)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        let result = greeners::PanelGLS::fit(
+        let result = greeners::panel::PanelGLS::fit(
             &y_vec,
             &x_mat,
             &entity_ids,
@@ -2651,7 +2653,7 @@ impl Interpreter {
             return Ok(diag(out));
         }
 
-        let p = greeners::chi2_pvalue(chi2, df as f64);
+        let p = greeners::distributions::chi2_pvalue(chi2, df as f64);
 
         let sig = if p < 0.01 {
             "***"
@@ -2764,9 +2766,10 @@ impl Interpreter {
             re_vcov[(idx, idx)] = re.std_errors[*j].powi(2);
         }
 
-        let result =
-            greeners::RobustHausman::compare_arrays(&fe_beta, &re_beta, &fe_vcov, &re_vcov, None)
-                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let result = greeners::panel_robust::RobustHausman::compare_arrays(
+            &fe_beta, &re_beta, &fe_vcov, &re_vcov, None,
+        )
+        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         Ok(diag(format!("{result}")))
     }
@@ -2867,8 +2870,9 @@ impl Interpreter {
             names
         };
 
-        let result = greeners::RobustFTest::test(&beta, &vcov, &indices, Some(&names_ref), n)
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let result =
+            greeners::panel_robust::RobustFTest::test(&beta, &vcov, &indices, Some(&names_ref), n)
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         Ok(diag(format!("{result}")))
     }

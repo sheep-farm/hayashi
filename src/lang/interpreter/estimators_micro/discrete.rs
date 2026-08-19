@@ -110,7 +110,7 @@ impl Interpreter {
         let y_vec = y_vec_raw.mapv(|v| if v.is_finite() { v } else { 0.0 });
         let x_out = x_out.mapv(|v| if v.is_finite() { v } else { 0.0 });
 
-        let result = greeners::Heckman::fit(
+        let result = greeners::heckman::Heckman::fit(
             &y_vec,
             &x_out,
             &z_vec,
@@ -144,7 +144,7 @@ impl Interpreter {
             None => 0.0,
             _ => return Err(HayashiError::Runtime("tobit(): ll must be numeric".into())),
         };
-        let result = greeners::Tobit::fit(&y_vec, &x_mat, ll_limit, Some(var_names))
+        let result = greeners::tobit::Tobit::fit(&y_vec, &x_mat, ll_limit, Some(var_names))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         Ok(Value::TobitResult(Rc::new(result)))
     }

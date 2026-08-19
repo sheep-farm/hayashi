@@ -1,6 +1,6 @@
 use super::*;
 
-pub fn arima_children(r: &greeners::ArimaResult) -> Vec<(String, Value)> {
+pub fn arima_children(r: &greeners::arima::ArimaResult) -> Vec<(String, Value)> {
     let mut params = vec![r.intercept];
     params.extend(r.ar_params.iter());
     params.extend(r.ma_params.iter());
@@ -26,7 +26,7 @@ pub fn arima_children(r: &greeners::ArimaResult) -> Vec<(String, Value)> {
     })
 }
 
-pub fn arima_fit_dict(r: &greeners::ArimaResult) -> Value {
+pub fn arima_fit_dict(r: &greeners::arima::ArimaResult) -> Value {
     let mut entries = vec![
         ("sigma2", Value::Float(r.sigma2)),
         ("aic", Value::Float(r.aic)),
@@ -49,7 +49,7 @@ pub fn arima_fit_dict(r: &greeners::ArimaResult) -> Value {
     fit_dict(&entries)
 }
 
-pub fn garch_children(r: &greeners::GarchResult) -> Vec<(String, Value)> {
+pub fn garch_children(r: &greeners::garch::GarchResult) -> Vec<(String, Value)> {
     let mut vars = regression_children(RegressionCtx {
         names: r.variable_names.clone(),
         params: &r.params,
@@ -74,7 +74,7 @@ pub fn garch_children(r: &greeners::GarchResult) -> Vec<(String, Value)> {
     vars
 }
 
-pub fn garch_fit_dict(r: &greeners::GarchResult) -> Value {
+pub fn garch_fit_dict(r: &greeners::garch::GarchResult) -> Value {
     fit_dict(&[
         ("log_lik", Value::Float(r.log_likelihood)),
         ("aic", Value::Float(r.aic)),
@@ -89,7 +89,7 @@ pub fn garch_fit_dict(r: &greeners::GarchResult) -> Value {
     ])
 }
 
-pub fn ets_children(r: &greeners::ETSResult) -> Vec<(String, Value)> {
+pub fn ets_children(r: &greeners::ets::ETSResult) -> Vec<(String, Value)> {
     let mut vars = Vec::new();
     vars.push(("level".into(), array1_to_series("level", &r.level)));
     if !r.trend.is_empty() {
@@ -114,7 +114,7 @@ pub fn ets_children(r: &greeners::ETSResult) -> Vec<(String, Value)> {
     vars
 }
 
-pub fn ets_fit_dict(r: &greeners::ETSResult) -> Value {
+pub fn ets_fit_dict(r: &greeners::ets::ETSResult) -> Value {
     let mut entries = vec![
         ("alpha", Value::Float(r.alpha)),
         ("sse", Value::Float(r.sse)),
@@ -142,7 +142,7 @@ pub fn ets_fit_dict(r: &greeners::ETSResult) -> Value {
     fit_dict(&entries)
 }
 
-pub fn mstl_children(r: &greeners::MSTLResult) -> Vec<(String, Value)> {
+pub fn mstl_children(r: &greeners::mstl::MSTLResult) -> Vec<(String, Value)> {
     let mut vars = Vec::new();
     vars.push(("trend".into(), array1_to_series("trend", &r.trend)));
     for (i, s) in r.seasonal.iter().enumerate() {
@@ -161,7 +161,7 @@ pub fn mstl_children(r: &greeners::MSTLResult) -> Vec<(String, Value)> {
     vars
 }
 
-pub fn mstl_fit_dict(r: &greeners::MSTLResult) -> Value {
+pub fn mstl_fit_dict(r: &greeners::mstl::MSTLResult) -> Value {
     fit_dict(&[
         ("n_obs", Value::Int(r.n_obs as i64)),
         (
@@ -173,7 +173,7 @@ pub fn mstl_fit_dict(r: &greeners::MSTLResult) -> Value {
     ])
 }
 
-pub fn uc_children(r: &greeners::UCResult) -> Vec<(String, Value)> {
+pub fn uc_children(r: &greeners::unobserved_components::UCResult) -> Vec<(String, Value)> {
     let mut vars = Vec::new();
     let n = r.params.len();
     let params = if n > 0 {
@@ -217,7 +217,7 @@ pub fn uc_children(r: &greeners::UCResult) -> Vec<(String, Value)> {
     vars
 }
 
-pub fn uc_fit_dict(r: &greeners::UCResult) -> Value {
+pub fn uc_fit_dict(r: &greeners::unobserved_components::UCResult) -> Value {
     fit_dict(&[
         ("log_lik", Value::Float(r.log_likelihood)),
         ("aic", Value::Float(r.aic)),
@@ -231,7 +231,7 @@ pub fn uc_fit_dict(r: &greeners::UCResult) -> Value {
     ])
 }
 
-pub fn local_level_children(r: &greeners::LocalLevelResult) -> Vec<(String, Value)> {
+pub fn local_level_children(r: &greeners::statespace::LocalLevelResult) -> Vec<(String, Value)> {
     let mut vars = Vec::new();
     let filtered: Vec<f64> = r
         .filtered_states
@@ -259,7 +259,7 @@ pub fn local_level_children(r: &greeners::LocalLevelResult) -> Vec<(String, Valu
     vars
 }
 
-pub fn local_level_fit_dict(r: &greeners::LocalLevelResult) -> Value {
+pub fn local_level_fit_dict(r: &greeners::statespace::LocalLevelResult) -> Value {
     fit_dict(&[
         ("sigma_obs", Value::Float(r.sigma_obs)),
         ("sigma_state", Value::Float(r.sigma_state)),
@@ -268,7 +268,7 @@ pub fn local_level_fit_dict(r: &greeners::LocalLevelResult) -> Value {
     ])
 }
 
-pub fn autoreg_children(r: &greeners::AutoRegResult) -> Vec<(String, Value)> {
+pub fn autoreg_children(r: &greeners::autoreg::AutoRegResult) -> Vec<(String, Value)> {
     regression_children(RegressionCtx {
         names: r.param_names.clone(),
         params: &r.params,
@@ -284,7 +284,7 @@ pub fn autoreg_children(r: &greeners::AutoRegResult) -> Vec<(String, Value)> {
     })
 }
 
-pub fn autoreg_fit_dict(r: &greeners::AutoRegResult) -> Value {
+pub fn autoreg_fit_dict(r: &greeners::autoreg::AutoRegResult) -> Value {
     fit_dict(&[
         ("r2", Value::Float(r.r_squared)),
         ("adj_r2", Value::Float(r.adj_r_squared)),
@@ -296,7 +296,7 @@ pub fn autoreg_fit_dict(r: &greeners::AutoRegResult) -> Value {
     ])
 }
 
-pub fn ardl_children(r: &greeners::ARDLResult) -> Vec<(String, Value)> {
+pub fn ardl_children(r: &greeners::autoreg::ARDLResult) -> Vec<(String, Value)> {
     regression_children(RegressionCtx {
         names: r.param_names.clone(),
         params: &r.params,
@@ -312,7 +312,7 @@ pub fn ardl_children(r: &greeners::ARDLResult) -> Vec<(String, Value)> {
     })
 }
 
-pub fn ardl_fit_dict(r: &greeners::ARDLResult) -> Value {
+pub fn ardl_fit_dict(r: &greeners::autoreg::ARDLResult) -> Value {
     fit_dict(&[
         ("r2", Value::Float(r.r_squared)),
         ("adj_r2", Value::Float(r.adj_r_squared)),
@@ -596,7 +596,7 @@ pub fn dfm_children(m: &DFMModel) -> Vec<(String, Value)> {
     vars
 }
 
-pub fn dfm_fit_dict(r: &greeners::DynamicFactorResult) -> Value {
+pub fn dfm_fit_dict(r: &greeners::dynamic_factor::DynamicFactorResult) -> Value {
     fit_dict(&[
         ("log_lik", Value::Float(r.log_likelihood)),
         ("aic", Value::Float(r.aic)),
@@ -649,7 +649,7 @@ pub fn markov_fit_dict(r: &greeners::markov::MarkovSwitchingResult) -> Value {
     ])
 }
 
-pub fn rolling_children(r: &greeners::RollingResult) -> Vec<(String, Value)> {
+pub fn rolling_children(r: &greeners::rolling::RollingResult) -> Vec<(String, Value)> {
     let mut vars = Vec::new();
     let k = r.params_history.ncols();
     let param_names = r
@@ -672,14 +672,14 @@ pub fn rolling_children(r: &greeners::RollingResult) -> Vec<(String, Value)> {
     vars
 }
 
-pub fn rolling_fit_dict(r: &greeners::RollingResult) -> Value {
+pub fn rolling_fit_dict(r: &greeners::rolling::RollingResult) -> Value {
     fit_dict(&[
         ("window", Value::Int(r.window as i64)),
         ("n_obs", Value::Int(r.n_obs as i64)),
     ])
 }
 
-pub fn recursive_ls_children(r: &greeners::RecursiveLSResult) -> Vec<(String, Value)> {
+pub fn recursive_ls_children(r: &greeners::rolling::RecursiveLSResult) -> Vec<(String, Value)> {
     let mut vars = Vec::new();
     let k = r.params_history.ncols();
     let param_names: Vec<String> = (0..k).map(|i| format!("beta{i}")).collect();
@@ -701,11 +701,11 @@ pub fn recursive_ls_children(r: &greeners::RecursiveLSResult) -> Vec<(String, Va
     vars
 }
 
-pub fn recursive_ls_fit_dict(r: &greeners::RecursiveLSResult) -> Value {
+pub fn recursive_ls_fit_dict(r: &greeners::rolling::RecursiveLSResult) -> Value {
     fit_dict(&[("n_obs", Value::Int(r.n_obs as i64))])
 }
 
-pub fn decomp_children(r: &greeners::DecompositionResult) -> Vec<(String, Value)> {
+pub fn decomp_children(r: &greeners::decomposition::DecompositionResult) -> Vec<(String, Value)> {
     vec![
         ("observed".into(), array1_to_series("observed", &r.observed)),
         ("trend".into(), array1_to_series("trend", &r.trend)),
@@ -715,6 +715,6 @@ pub fn decomp_children(r: &greeners::DecompositionResult) -> Vec<(String, Value)
     ]
 }
 
-pub fn decomp_fit_dict(r: &greeners::DecompositionResult) -> Value {
+pub fn decomp_fit_dict(r: &greeners::decomposition::DecompositionResult) -> Value {
     fit_dict(&[("model", Value::Str(r.model.clone()))])
 }

@@ -754,7 +754,11 @@ impl Interpreter {
         }
     }
 
-    fn predict_poisson_vals(&self, r: &greeners::PoissonResult, kind: &str) -> Result<Vec<f64>> {
+    fn predict_poisson_vals(
+        &self,
+        r: &greeners::poisson::PoissonResult,
+        kind: &str,
+    ) -> Result<Vec<f64>> {
         match kind {
             "count" | "mu" | "fitted" => Ok(r.fitted_values().to_vec()),
             "xb" => Ok(r.x_data().dot(&r.params).to_vec()),
@@ -764,7 +768,11 @@ impl Interpreter {
         }
     }
 
-    fn predict_negbin_vals(&self, r: &greeners::NegBinResult, kind: &str) -> Result<Vec<f64>> {
+    fn predict_negbin_vals(
+        &self,
+        r: &greeners::negbin::NegBinResult,
+        kind: &str,
+    ) -> Result<Vec<f64>> {
         match kind {
             "count" | "mu" | "fitted" => Ok(r.fitted_values().to_vec()),
             "xb" => Ok(r.x_data().dot(&r.params).to_vec()),
@@ -776,7 +784,7 @@ impl Interpreter {
 
     fn predict_ordered_vals(
         &self,
-        r: &greeners::OrderedResult,
+        r: &greeners::ordered::OrderedResult,
         kind: &str,
         df: &DataFrame,
     ) -> Result<Vec<f64>> {
@@ -867,7 +875,7 @@ impl Interpreter {
 
     fn predict_tobit_vals(
         &self,
-        r: &greeners::TobitResult,
+        r: &greeners::tobit::TobitResult,
         kind: &str,
         df: &DataFrame,
     ) -> Result<Vec<f64>> {
@@ -881,7 +889,7 @@ impl Interpreter {
 
     fn predict_heckman_vals(
         &self,
-        r: &greeners::HeckmanResult,
+        r: &greeners::heckman::HeckmanResult,
         kind: &str,
         df: &DataFrame,
     ) -> Result<Vec<f64>> {
@@ -895,7 +903,7 @@ impl Interpreter {
 
     fn predict_cox_vals(
         &self,
-        r: &greeners::CoxResult,
+        r: &greeners::survival::CoxResult,
         kind: &str,
         df: &DataFrame,
     ) -> Result<Vec<f64>> {
@@ -912,7 +920,7 @@ impl Interpreter {
 
     fn predict_quantile_vals(
         &self,
-        r: &greeners::QuantileResult,
+        r: &greeners::quantile::QuantileResult,
         kind: &str,
         df: &DataFrame,
     ) -> Result<Vec<f64>> {
@@ -926,7 +934,7 @@ impl Interpreter {
 
     fn predict_rlm_vals(
         &self,
-        r: &greeners::RlmResult,
+        r: &greeners::rlm::RlmResult,
         kind: &str,
         df: &DataFrame,
     ) -> Result<Vec<f64>> {
@@ -940,7 +948,7 @@ impl Interpreter {
 
     fn predict_gee_vals(
         &self,
-        r: &greeners::GeeResult,
+        r: &greeners::gee::GeeResult,
         kind: &str,
         df: &DataFrame,
     ) -> Result<Vec<f64>> {
@@ -954,7 +962,7 @@ impl Interpreter {
 
     fn predict_beta_vals(
         &self,
-        r: &greeners::BetaResult,
+        r: &greeners::beta_model::BetaResult,
         kind: &str,
         df: &DataFrame,
     ) -> Result<Vec<f64>> {
@@ -973,7 +981,7 @@ impl Interpreter {
 
     fn predict_glsar_vals(
         &self,
-        r: &greeners::GlsarResult,
+        r: &greeners::glsar::GlsarResult,
         kind: &str,
         df: &DataFrame,
         varname: &str,
@@ -997,7 +1005,7 @@ impl Interpreter {
 
     fn predict_mixedlm_vals(
         &self,
-        r: &greeners::MixedResult,
+        r: &greeners::mixed::MixedResult,
         kind: &str,
         df: &DataFrame,
     ) -> Result<Vec<f64>> {
@@ -1011,7 +1019,7 @@ impl Interpreter {
 
     fn predict_zero_inflated_vals(
         &self,
-        r: &greeners::ZeroInflatedResult,
+        r: &greeners::zero_inflated::ZeroInflatedResult,
         kind: &str,
         df: &DataFrame,
     ) -> Result<Vec<f64>> {
@@ -1028,7 +1036,11 @@ impl Interpreter {
         }
     }
 
-    fn predict_rolling_vals(&self, r: &greeners::RollingResult, kind: &str) -> Result<Vec<f64>> {
+    fn predict_rolling_vals(
+        &self,
+        r: &greeners::rolling::RollingResult,
+        kind: &str,
+    ) -> Result<Vec<f64>> {
         match kind {
             "residuals" | "resid" | "e" => Ok(r.residuals.to_vec()),
             k => Err(HayashiError::Runtime(format!(
@@ -1039,7 +1051,7 @@ impl Interpreter {
 
     fn predict_recursive_ls_vals(
         &self,
-        r: &greeners::RecursiveLSResult,
+        r: &greeners::rolling::RecursiveLSResult,
         kind: &str,
     ) -> Result<Vec<f64>> {
         match kind {
@@ -1054,7 +1066,7 @@ impl Interpreter {
 
     fn predict_glm_vals(
         &self,
-        r: &greeners::GlmResult,
+        r: &greeners::glm::GlmResult,
         kind: &str,
         df: &DataFrame,
     ) -> Result<Vec<f64>> {
@@ -1077,7 +1089,11 @@ impl Interpreter {
         }
     }
 
-    fn predict_lowess_vals(&self, r: &greeners::LowessResult, kind: &str) -> Result<Vec<f64>> {
+    fn predict_lowess_vals(
+        &self,
+        r: &greeners::nonparametric::LowessResult,
+        kind: &str,
+    ) -> Result<Vec<f64>> {
         match kind {
             "smoothed" | "yhat" | "fitted" => Ok(r.smoothed.to_vec()),
             "residuals" | "resid" | "e" => Ok(r.residuals.to_vec()),
@@ -1112,7 +1128,7 @@ impl Interpreter {
 
     fn predict_markov_vals(
         &self,
-        r: &greeners::MarkovSwitchingResult,
+        r: &greeners::markov::MarkovSwitchingResult,
         kind: &str,
     ) -> Result<Vec<f64>> {
         match kind {
@@ -1150,7 +1166,11 @@ impl Interpreter {
         }
     }
 
-    fn predict_ucm_vals(&self, r: &greeners::UCResult, kind: &str) -> Result<Vec<f64>> {
+    fn predict_ucm_vals(
+        &self,
+        r: &greeners::unobserved_components::UCResult,
+        kind: &str,
+    ) -> Result<Vec<f64>> {
         match kind {
             "level" => Ok(r.level.to_vec()),
             "trend" => Ok(r
@@ -1191,7 +1211,11 @@ impl Interpreter {
         }
     }
 
-    fn predict_msar_vals(&self, r: &greeners::MarkovAutoregResult, kind: &str) -> Result<Vec<f64>> {
+    fn predict_msar_vals(
+        &self,
+        r: &greeners::markov_autoreg::MarkovAutoregResult,
+        kind: &str,
+    ) -> Result<Vec<f64>> {
         match kind {
             "regime" | "state" => Ok(r.predict_regime().iter().map(|&s| (s + 1) as f64).collect()),
             s if s.starts_with("regime") && s.len() > 6 => {
@@ -1216,7 +1240,7 @@ impl Interpreter {
 
     fn predict_decomp_vals(
         &self,
-        r: &greeners::DecompositionResult,
+        r: &greeners::decomposition::DecompositionResult,
         kind: &str,
     ) -> Result<Vec<f64>> {
         match kind {
@@ -1230,7 +1254,7 @@ impl Interpreter {
         }
     }
 
-    fn predict_mstl_vals(&self, r: &greeners::MSTLResult, kind: &str) -> Result<Vec<f64>> {
+    fn predict_mstl_vals(&self, r: &greeners::mstl::MSTLResult, kind: &str) -> Result<Vec<f64>> {
         match kind {
             "trend" => Ok(r.trend.to_vec()),
             "resid" | "residual" | "e" => Ok(r.resid.to_vec()),
@@ -1258,7 +1282,7 @@ impl Interpreter {
         }
     }
 
-    fn predict_ets_vals(&self, r: &greeners::ETSResult, kind: &str) -> Result<Vec<f64>> {
+    fn predict_ets_vals(&self, r: &greeners::ets::ETSResult, kind: &str) -> Result<Vec<f64>> {
         match kind {
             "fitted" | "yhat" | "xb" => Ok(r.fitted_values.to_vec()),
             "residuals" | "resid" | "e" => Ok(r.residuals.to_vec()),
@@ -1373,7 +1397,7 @@ impl Interpreter {
             }
         };
 
-        use greeners::ExportableResult;
+        use greeners::export::ExportableResult;
 
         let ext = path_str.rsplit('.').next().unwrap_or("").to_lowercase();
         let fmt_lower = fmt_str.to_lowercase();

@@ -915,7 +915,7 @@ fn model_view_from_random_effects(
     }
 }
 
-fn model_view_from_quantile(r: &std::rc::Rc<greeners::QuantileResult>) -> ModelView {
+fn model_view_from_quantile(r: &std::rc::Rc<greeners::quantile::QuantileResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("tau".into(), Value::Float(r.tau));
     fit.insert("r_squared".into(), Value::Float(r.r_squared));
@@ -943,7 +943,7 @@ fn model_view_from_quantile(r: &std::rc::Rc<greeners::QuantileResult>) -> ModelV
     }
 }
 
-fn model_view_from_tobit(r: &std::rc::Rc<greeners::TobitResult>) -> ModelView {
+fn model_view_from_tobit(r: &std::rc::Rc<greeners::tobit::TobitResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
     fit.insert("log_likelihood".into(), Value::Float(r.log_likelihood));
@@ -971,7 +971,7 @@ fn model_view_from_tobit(r: &std::rc::Rc<greeners::TobitResult>) -> ModelView {
     }
 }
 
-fn model_view_from_poisson(r: &std::rc::Rc<greeners::PoissonResult>) -> ModelView {
+fn model_view_from_poisson(r: &std::rc::Rc<greeners::poisson::PoissonResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
     fit.insert("log_likelihood".into(), Value::Float(r.log_likelihood));
@@ -1003,7 +1003,7 @@ fn model_view_from_poisson(r: &std::rc::Rc<greeners::PoissonResult>) -> ModelVie
     }
 }
 
-fn model_view_from_negbin(r: &std::rc::Rc<greeners::NegBinResult>) -> ModelView {
+fn model_view_from_negbin(r: &std::rc::Rc<greeners::negbin::NegBinResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
     fit.insert("log_likelihood".into(), Value::Float(r.log_likelihood));
@@ -1035,7 +1035,7 @@ fn model_view_from_negbin(r: &std::rc::Rc<greeners::NegBinResult>) -> ModelView 
     }
 }
 
-fn model_view_from_glm(r: &std::rc::Rc<greeners::GlmResult>) -> ModelView {
+fn model_view_from_glm(r: &std::rc::Rc<greeners::glm::GlmResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
     fit.insert("log_likelihood".into(), Value::Float(r.log_likelihood));
@@ -1068,7 +1068,7 @@ fn model_view_from_glm(r: &std::rc::Rc<greeners::GlmResult>) -> ModelView {
     }
 }
 
-fn model_view_from_rlm(r: &std::rc::Rc<greeners::RlmResult>) -> ModelView {
+fn model_view_from_rlm(r: &std::rc::Rc<greeners::rlm::RlmResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
     fit.insert("scale".into(), Value::Float(r.scale));
@@ -1092,7 +1092,7 @@ fn model_view_from_rlm(r: &std::rc::Rc<greeners::RlmResult>) -> ModelView {
     }
 }
 
-fn model_view_from_beta(r: &std::rc::Rc<greeners::BetaResult>) -> ModelView {
+fn model_view_from_beta(r: &std::rc::Rc<greeners::beta_model::BetaResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
     fit.insert("log_likelihood".into(), Value::Float(r.log_likelihood));
@@ -1124,7 +1124,7 @@ fn model_view_from_beta(r: &std::rc::Rc<greeners::BetaResult>) -> ModelView {
     }
 }
 
-fn model_view_from_gmm(r: &std::rc::Rc<greeners::GmmResult>) -> ModelView {
+fn model_view_from_gmm(r: &std::rc::Rc<greeners::gmm::GmmResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
     fit.insert("j_stat".into(), Value::Float(r.j_stat));
@@ -1154,7 +1154,7 @@ fn model_view_from_gmm(r: &std::rc::Rc<greeners::GmmResult>) -> ModelView {
     }
 }
 
-fn model_view_from_garch(r: &std::rc::Rc<greeners::GarchResult>) -> ModelView {
+fn model_view_from_garch(r: &std::rc::Rc<greeners::garch::GarchResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
     fit.insert("log_likelihood".into(), Value::Float(r.log_likelihood));
@@ -1191,7 +1191,7 @@ fn model_view_from_garch(r: &std::rc::Rc<greeners::GarchResult>) -> ModelView {
     }
 }
 
-fn model_view_from_autoreg(r: &std::rc::Rc<greeners::AutoRegResult>) -> ModelView {
+fn model_view_from_autoreg(r: &std::rc::Rc<greeners::autoreg::AutoRegResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
     fit.insert("r2".into(), Value::Float(r.r_squared));
@@ -1221,7 +1221,7 @@ fn model_view_from_autoreg(r: &std::rc::Rc<greeners::AutoRegResult>) -> ModelVie
     }
 }
 
-fn model_view_from_ardl(r: &std::rc::Rc<greeners::ARDLResult>) -> ModelView {
+fn model_view_from_ardl(r: &std::rc::Rc<greeners::autoreg::ARDLResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
     fit.insert("r2".into(), Value::Float(r.r_squared));
@@ -1252,7 +1252,7 @@ fn model_view_from_ardl(r: &std::rc::Rc<greeners::ARDLResult>) -> ModelView {
     }
 }
 
-fn model_view_from_glsar(r: &std::rc::Rc<greeners::GlsarResult>) -> ModelView {
+fn model_view_from_glsar(r: &std::rc::Rc<greeners::glsar::GlsarResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
     fit.insert("df_resid".into(), Value::Int(r.df_resid as i64));
@@ -1285,7 +1285,7 @@ fn model_view_from_glsar(r: &std::rc::Rc<greeners::GlsarResult>) -> ModelView {
     }
 }
 
-fn model_view_from_ordered(r: &std::rc::Rc<greeners::OrderedResult>) -> ModelView {
+fn model_view_from_ordered(r: &std::rc::Rc<greeners::ordered::OrderedResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
     fit.insert("log_likelihood".into(), Value::Float(r.log_likelihood));
@@ -1327,7 +1327,7 @@ fn model_view_from_ordered(r: &std::rc::Rc<greeners::OrderedResult>) -> ModelVie
     }
 }
 
-fn model_view_from_cox(r: &std::rc::Rc<greeners::CoxResult>) -> ModelView {
+fn model_view_from_cox(r: &std::rc::Rc<greeners::survival::CoxResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
     fit.insert("n_events".into(), Value::Int(r.n_events as i64));
@@ -1358,7 +1358,7 @@ fn model_view_from_cox(r: &std::rc::Rc<greeners::CoxResult>) -> ModelView {
     }
 }
 
-fn model_view_from_gee(r: &std::rc::Rc<greeners::GeeResult>) -> ModelView {
+fn model_view_from_gee(r: &std::rc::Rc<greeners::gee::GeeResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
     fit.insert("n_groups".into(), Value::Int(r.n_groups as i64));
@@ -1388,7 +1388,7 @@ fn model_view_from_gee(r: &std::rc::Rc<greeners::GeeResult>) -> ModelView {
     }
 }
 
-fn model_view_from_mixed(r: &std::rc::Rc<greeners::MixedResult>) -> ModelView {
+fn model_view_from_mixed(r: &std::rc::Rc<greeners::mixed::MixedResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
     fit.insert("n_groups".into(), Value::Int(r.n_groups as i64));
@@ -1436,7 +1436,9 @@ fn model_view_from_mixed(r: &std::rc::Rc<greeners::MixedResult>) -> ModelView {
     }
 }
 
-fn model_view_from_zero_inflated(r: &std::rc::Rc<greeners::ZeroInflatedResult>) -> ModelView {
+fn model_view_from_zero_inflated(
+    r: &std::rc::Rc<greeners::zero_inflated::ZeroInflatedResult>,
+) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
     fit.insert("log_likelihood".into(), Value::Float(r.log_likelihood));
@@ -1523,7 +1525,7 @@ fn model_view_from_threshold(r: &std::rc::Rc<greeners::threshold::ThresholdResul
     }
 }
 
-fn model_view_from_did(r: &std::rc::Rc<greeners::DidResult>) -> ModelView {
+fn model_view_from_did(r: &std::rc::Rc<greeners::did::DidResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
     fit.insert("r2".into(), Value::Float(r.r_squared));
@@ -1557,7 +1559,7 @@ fn model_view_from_did(r: &std::rc::Rc<greeners::DidResult>) -> ModelView {
     }
 }
 
-fn model_view_from_rd(r: &std::rc::Rc<greeners::RdResult>) -> ModelView {
+fn model_view_from_rd(r: &std::rc::Rc<greeners::rd::RdResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_left".into(), Value::Int(r.n_left as i64));
     fit.insert("n_right".into(), Value::Int(r.n_right as i64));
@@ -1601,7 +1603,9 @@ fn model_view_from_rd(r: &std::rc::Rc<greeners::RdResult>) -> ModelView {
     }
 }
 
-fn model_view_from_recursive_ls(r: &std::rc::Rc<greeners::RecursiveLSResult>) -> ModelView {
+fn model_view_from_recursive_ls(
+    r: &std::rc::Rc<greeners::rolling::RecursiveLSResult>,
+) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
 
@@ -1623,7 +1627,9 @@ fn model_view_from_recursive_ls(r: &std::rc::Rc<greeners::RecursiveLSResult>) ->
     }
 }
 
-fn model_view_from_conditional(r: &std::rc::Rc<greeners::ConditionalResult>) -> ModelView {
+fn model_view_from_conditional(
+    r: &std::rc::Rc<greeners::conditional::ConditionalResult>,
+) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
     fit.insert("n_groups".into(), Value::Int(r.n_groups as i64));
@@ -1656,7 +1662,7 @@ fn model_view_from_conditional(r: &std::rc::Rc<greeners::ConditionalResult>) -> 
     }
 }
 
-fn model_view_from_gam(r: &std::rc::Rc<greeners::GamResult>) -> ModelView {
+fn model_view_from_gam(r: &std::rc::Rc<greeners::glmgam::GamResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
     fit.insert("n_linear".into(), Value::Int(r.n_linear as i64));
@@ -1688,7 +1694,7 @@ fn model_view_from_gam(r: &std::rc::Rc<greeners::GamResult>) -> ModelView {
     }
 }
 
-fn model_view_from_ets(r: &std::rc::Rc<greeners::ETSResult>) -> ModelView {
+fn model_view_from_ets(r: &std::rc::Rc<greeners::ets::ETSResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
     fit.insert("sse".into(), Value::Float(r.sse));
@@ -1727,7 +1733,9 @@ fn model_view_from_ets(r: &std::rc::Rc<greeners::ETSResult>) -> ModelView {
     }
 }
 
-fn model_view_from_markov_switching(r: &std::rc::Rc<greeners::MarkovSwitchingResult>) -> ModelView {
+fn model_view_from_markov_switching(
+    r: &std::rc::Rc<greeners::markov::MarkovSwitchingResult>,
+) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
     fit.insert("n_regimes".into(), Value::Int(r.n_regimes as i64));
@@ -1767,7 +1775,9 @@ fn model_view_from_markov_switching(r: &std::rc::Rc<greeners::MarkovSwitchingRes
     }
 }
 
-fn model_view_from_markov_autoreg(r: &std::rc::Rc<greeners::MarkovAutoregResult>) -> ModelView {
+fn model_view_from_markov_autoreg(
+    r: &std::rc::Rc<greeners::markov_autoreg::MarkovAutoregResult>,
+) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
     fit.insert("n_regimes".into(), Value::Int(r.k_regimes as i64));
@@ -1865,7 +1875,7 @@ fn model_view_from_var(r: &std::rc::Rc<greeners::var::VarResult>) -> ModelView {
     }
 }
 
-fn model_view_from_svar(r: &std::rc::Rc<greeners::SVarResult>) -> ModelView {
+fn model_view_from_svar(r: &std::rc::Rc<greeners::svar::SVarResult>) -> ModelView {
     let mut fit = HashMap::new();
     let vr = &r.var_result;
     fit.insert("n_obs".into(), Value::Int(vr.n_obs as i64));
@@ -2042,7 +2052,7 @@ fn model_view_from_vecm(r: &std::rc::Rc<greeners::vecm::VecmResult>) -> ModelVie
     }
 }
 
-fn model_view_from_ab(r: &std::rc::Rc<greeners::ArellanoBondResult>) -> ModelView {
+fn model_view_from_ab(r: &std::rc::Rc<greeners::dynamic_panel::ArellanoBondResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
     fit.insert("n_entities".into(), Value::Int(r.n_entities as i64));
@@ -2073,7 +2083,7 @@ fn model_view_from_ab(r: &std::rc::Rc<greeners::ArellanoBondResult>) -> ModelVie
     }
 }
 
-fn model_view_from_sys_gmm(r: &std::rc::Rc<greeners::SystemGmmResult>) -> ModelView {
+fn model_view_from_sys_gmm(r: &std::rc::Rc<greeners::dynamic_panel::SystemGmmResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs_fd".into(), Value::Int(r.n_obs_fd as i64));
     fit.insert("n_obs_lev".into(), Value::Int(r.n_obs_lev as i64));
@@ -2105,7 +2115,7 @@ fn model_view_from_sys_gmm(r: &std::rc::Rc<greeners::SystemGmmResult>) -> ModelV
     }
 }
 
-fn model_view_from_pcse(r: &std::rc::Rc<greeners::PcseResult>) -> ModelView {
+fn model_view_from_pcse(r: &std::rc::Rc<greeners::panel::PcseResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
     fit.insert("n_entities".into(), Value::Int(r.n_entities as i64));
@@ -2138,7 +2148,7 @@ fn model_view_from_pcse(r: &std::rc::Rc<greeners::PcseResult>) -> ModelView {
     }
 }
 
-fn model_view_from_panel_gls(r: &std::rc::Rc<greeners::PanelGlsResult>) -> ModelView {
+fn model_view_from_panel_gls(r: &std::rc::Rc<greeners::panel::PanelGlsResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
     fit.insert("n_entities".into(), Value::Int(r.n_entities as i64));
@@ -2174,7 +2184,7 @@ fn model_view_from_panel_gls(r: &std::rc::Rc<greeners::PanelGlsResult>) -> Model
     }
 }
 
-fn model_view_from_rolling(r: &std::rc::Rc<greeners::RollingResult>) -> ModelView {
+fn model_view_from_rolling(r: &std::rc::Rc<greeners::rolling::RollingResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
     fit.insert("window".into(), Value::Int(r.window as i64));

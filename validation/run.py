@@ -9,10 +9,12 @@ import argparse
 import json
 import math
 import os
+import re
 import shutil
 import subprocess
 import sys
-from pathlib import Path
+import tempfile
+from pathlib import Path, PureWindowsPath
 from typing import Any
 
 import yaml
@@ -44,6 +46,8 @@ def run_command(cmd: list[str], cwd: Path | None = None, quiet: bool = False) ->
         cwd=cwd or ROOT_DIR,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=False,
     )
 
@@ -62,7 +66,7 @@ def python_executable() -> str:
 
 def parse_hayashi_csv(path: Path) -> dict[str, dict[str, float]]:
     """Parse the CSV produced by Hayashi OLS export from a file."""
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         return parse_hayashi_csv_from_string(f.read())
 
 
@@ -546,7 +550,7 @@ def parse_hayashi_pcse(text: str) -> dict[str, dict[str, float]]:
     lines = text.splitlines()
     start_idx = -1
     for i, line in enumerate(lines):
-        if re.search(r"Variável\s+coef\s+PCSE", line):
+        if re.search(r"(Vari[aá]vel|Variable)\s+coef\s+PCSE", line, re.IGNORECASE):
             start_idx = i
             break
     if start_idx == -1:
@@ -1153,6 +1157,60 @@ def compare_against_references(
     return failures, failures_by_reference
 
 
+def _windows_path_for_hayashi(p: Path) -> str:
+    """Return a Windows-friendly absolute path string that Hayashi can load."""
+    # Use forward slashes; the Hayashi loader normalises them on Windows.
+    return str(p.resolve()).replace("\\", "/")
+
+
+def _prepare_windows_hayashi_script(
+    src: Path,
+    output_path: Path,
+) -> Path:
+    """Rewrite a Hayashi script so it can run on Windows.
+
+    Converts relative 'load' paths to absolute paths and replaces '/dev/stdout'
+    in 'export' calls with a concrete output file, because Windows has no
+    /dev/stdout special file.
+    """
+    text = src.read_text(encoding="utf-8")
+
+    # Make every quoted path that looks like a repository-relative file path
+    # absolute. This fixes 'load "validation/cases/.../data/...csv"' and any
+    # similar quoted strings.
+    def _absolutise_load_path(match: re.Match) -> str:
+        raw = match.group(1)
+        # Only rewrite plain relative paths that start inside the repo.
+        if raw.startswith("/") or re.search(r"^[a-zA-Z]:", raw):
+            return match.group(0)
+        repo_relative = Path(raw)
+        if repo_relative.is_absolute():
+            return match.group(0)
+        absolute = _windows_path_for_hayashi(ROOT_DIR / repo_relative)
+        return f'"{absolute}"'
+
+    text = re.sub(r'"(validation/cases/[^"]+)"', _absolutise_load_path, text)
+
+    # Replace export(..., "<fmt>", "/dev/stdout") with export(..., "<fmt>", "<out_path>").
+    text = re.sub(
+        r'(export\([^)]+,\s*"[^"]+",\s*)"/dev/stdout"',
+        lambda m: f'{m.group(1)}"{_windows_path_for_hayashi(output_path)}"',
+        text,
+    )
+
+    tmp = tempfile.NamedTemporaryFile(
+        mode="w",
+        suffix=".hay",
+        prefix=f"{src.stem}_",
+        dir=src.parent,
+        encoding="utf-8",
+        delete=False,
+    )
+    tmp.write(text)
+    tmp.close()
+    return Path(tmp.name)
+
+
 def run_case(case: dict[str, Any], quiet: bool = False) -> tuple[str, list[str], dict[str, dict]]:
     """Run a single validation case.
 
@@ -1277,10 +1335,32 @@ def run_case(case: dict[str, Any], quiet: bool = False) -> tuple[str, list[str],
         return "blocked", ["No reference implementation could run."], ref_report
 
     # Run Hayashi script using the binary selected earlier.
-    hay_script = str(VALIDATION_DIR / case.get("hayashi_script", f"cases/{case_id}/hayashi/run.hay"))
-    hay_res = run_command([hay_exe, hay_script], quiet=quiet)
+    hay_script = VALIDATION_DIR / case.get("hayashi_script", f"cases/{case_id}/hayashi/run.hay")
+    output_format = case.get("output_format", "csv")
+    family = case.get("estimator_family", "")
+
+    # Select the output file path Hayashi would write when not using stdout.
+    output_ext = {
+        "csv": "csv",
+        "json": "json",
+        "txt": "txt",
+        "margins": "txt",
+        "keyvalue": "txt",
+    }.get(output_format, output_format)
+    hay_output_path = hayashi_dir / f"output.{output_ext}"
+    hay_output_path.unlink(missing_ok=True)
+
+    if sys.platform == "win32":
+        hay_script = _prepare_windows_hayashi_script(hay_script, hay_output_path)
+
+    hay_res = run_command([hay_exe, str(hay_script)], quiet=quiet)
     if hay_res.returncode != 0:
         return "blocked", [f"Hayashi script failed:\n{hay_res.stderr}"], ref_report
+
+    # On Windows Hayashi cannot write to /dev/stdout; the rewritten script
+    # writes to a file and we read it back.
+    if sys.platform == "win32" and hay_output_path.exists():
+        hay_res.stdout = hay_output_path.read_text(encoding="utf-8", errors="replace")
 
     # ── Parse every declared reference output ────────────────────────
     reference_outputs: dict[str, dict[str, Any]] = {}
@@ -1370,27 +1450,27 @@ def run_case(case: dict[str, Any], quiet: bool = False) -> tuple[str, list[str],
             hayashi_txt = hayashi_dir / "output.txt"
             if not hayashi_txt.exists():
                 return "blocked", [f"Hayashi output not found: {hayashi_txt}"], ref_report
-            hayashi = normalise_intercept(parse_hayashi_margins(hayashi_txt.read_text()))
+            hayashi = normalise_intercept(parse_hayashi_margins(hayashi_txt.read_text(encoding="utf-8")))
         elif output_format == "txt":
             hayashi_txt = hayashi_dir / "output.txt"
             if not hayashi_txt.exists():
                 return "blocked", [f"Hayashi output not found: {hayashi_txt}"], ref_report
             if family == "kalman":
-                hayashi = parse_hayashi_local_level(hayashi_txt.read_text())
+                hayashi = parse_hayashi_local_level(hayashi_txt.read_text(encoding="utf-8"))
             else:
-                hayashi = normalise_intercept(parse_hayashi_txt_table(hayashi_txt.read_text()))
+                hayashi = normalise_intercept(parse_hayashi_txt_table(hayashi_txt.read_text(encoding="utf-8")))
         elif output_format == "json":
             hayashi_json = hayashi_dir / "output.json"
             if not hayashi_json.exists():
                 return "blocked", [f"Hayashi output not found: {hayashi_json}"], ref_report
-            hayashi = parse_reference_json(hayashi_json.read_text())
+            hayashi = parse_reference_json(hayashi_json.read_text(encoding="utf-8"))
             if hayashi is None:
                 return "blocked", [f"Could not parse Hayashi output.json"], ref_report
         elif output_format == "keyvalue":
             hayashi_txt = hayashi_dir / "output.txt"
             if not hayashi_txt.exists():
                 return "blocked", [f"Hayashi output not found: {hayashi_txt}"], ref_report
-            hayashi = parse_hayashi_key_value(hayashi_txt.read_text())
+            hayashi = parse_hayashi_key_value(hayashi_txt.read_text(encoding="utf-8"))
         else:
             hayashi_csv = hayashi_dir / "output.csv"
             if not hayashi_csv.exists():
@@ -1492,7 +1572,7 @@ def render_matrix_md(cases: list[dict[str, Any]]) -> str:
 
 
 def update_matrix_md(cases: list[dict[str, Any]]) -> None:
-    MATRIX_MD.write_text(render_matrix_md(cases))
+    MATRIX_MD.write_text(render_matrix_md(cases), encoding="utf-8")
 
 
 def _case_matrix_metadata(case: dict[str, Any]) -> tuple[str, str, str, str, str]:
@@ -1601,7 +1681,7 @@ def check_metadata(
 
     if not MATRIX_MD.exists():
         findings.append("validation/MATRIX.md is missing")
-    elif not matrix_md_metadata_matches(cases, MATRIX_MD.read_text()):
+    elif not matrix_md_metadata_matches(cases, MATRIX_MD.read_text(encoding="utf-8")):
         findings.append("validation/MATRIX.md is stale; regenerate it with validation/run.py")
 
     return findings
@@ -1657,7 +1737,7 @@ def load_cases() -> tuple[dict[str, Any], list[dict[str, Any]], set[str], set[st
     if not MATRIX_YML.exists():
         raise FileNotFoundError(f"{MATRIX_YML} not found")
 
-    with open(MATRIX_YML) as f:
+    with open(MATRIX_YML, encoding="utf-8") as f:
         matrix = yaml.safe_load(f) or {}
 
     registry = matrix.get("cases", [])
@@ -1667,7 +1747,7 @@ def load_cases() -> tuple[dict[str, Any], list[dict[str, Any]], set[str], set[st
     discovered: list[dict[str, Any]] = []
     for case_yml in sorted(VALIDATION_DIR.glob("cases/*/case.yml")):
         case_id = case_yml.parent.name
-        with open(case_yml) as f:
+        with open(case_yml, encoding="utf-8") as f:
             case = yaml.safe_load(f) or {}
         case["id"] = case_id
         case["_manifest_status"] = case.get("status", "not-started")
@@ -1799,7 +1879,7 @@ def write_matrix(matrix: dict[str, Any], cases: list[dict[str, Any]]) -> None:
         }
         for case in cases
     ]
-    with open(MATRIX_YML, "w") as f:
+    with open(MATRIX_YML, "w", encoding="utf-8") as f:
         yaml.dump(matrix, f, sort_keys=False, allow_unicode=True)
 
     # Regenerate MATRIX.md.

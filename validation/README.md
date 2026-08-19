@@ -92,6 +92,34 @@ estimator manually in base R/Python because no suitable packaged reference is
 available; each case's `README.md` documents the exact packages and
 implementation choices.
 
+## Cross-platform CI policy
+
+The validation workflow runs on Ubuntu, macOS and Windows.
+
+- **Ubuntu is the precision reference.** Both R and Python references run
+  reliably, and a `pass` on Ubuntu means Hayashi agrees with both references
+  within the declared tolerances. This is the strongest evidence of numerical
+  correctness.
+
+- **macOS and Windows are treated as compatibility smoke tests.** The runner
+  uses `--allow-partial` on these platforms because the reference environments
+  are more fragile:
+  - **macOS**: the R `renv` snapshot sometimes fails to restore or compile
+    native packages (e.g. `plm`, `wooldridge` dependencies), causing the R
+    reference to halt without output. When the Python reference runs and
+    Hayashi matches it, the case is recorded as `partial`.
+  - **Windows**: the reference scripts and the Hayashi scripts use Unix-only
+    idioms (`/dev/stdout`, repository-relative forward-slash paths, and UTF-8
+    console output such as `Δvalue`). The runner rewrites `run.hay` on the fly
+    to use concrete output files and absolute paths, and it forces UTF-8 I/O
+    decoding. Any remaining `partial` results on Windows are due to reference
+    scripts that fail for environment reasons (e.g. `UnicodeEncodeError` on
+    `cp1252` consoles) rather than numerical disagreement.
+
+A `partial` result on macOS or Windows still means Hayashi matched every
+available reference on that platform; it does not indicate a precision problem
+in Hayashi.
+
 ## Directory layout
 
 ```text

@@ -967,7 +967,7 @@ impl Interpreter {
             num / (dx * dy).sqrt()
         };
         let t_stat = rho * ((nf - 2.0) / (1.0 - rho * rho).max(1e-15)).sqrt();
-        let p_val = greeners::t_pvalue_two(t_stat.abs(), nf - 2.0);
+        let p_val = greeners::distributions::t_pvalue_two(t_stat.abs(), nf - 2.0);
         let mut display = String::new();
         display.push_str(&format!("\n  Spearman ρ({v1}, {v2})\n"));
         display.push_str(&format!(
@@ -1256,7 +1256,7 @@ impl Interpreter {
             .sum();
         let h = 12.0 / (nf * (nf + 1.0)) * h_num;
         let df_kw = (k - 1) as f64;
-        let p_val = greeners::chi2_pvalue(h, (k - 1) as f64);
+        let p_val = greeners::distributions::chi2_pvalue(h, (k - 1) as f64);
         let mut display = String::new();
         display.push_str("\n  Kruskal-Wallis H\n");
         display.push_str(&format!("  {var_name} by {by_name}  ({k} groups, N={n})\n"));

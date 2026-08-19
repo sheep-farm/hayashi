@@ -127,7 +127,7 @@ impl std::fmt::Display for SurModel {
 // ── PCA wrapper (adds variable names to PCAResult) ───────────────────────────
 #[derive(Clone)]
 pub struct PcaModel {
-    pub result: Rc<greeners::PCAResult>,
+    pub result: Rc<greeners::multivariate::PCAResult>,
     pub var_names: Vec<String>,
 }
 
@@ -179,7 +179,7 @@ impl std::fmt::Display for PcaModel {
 // ── Factor Analysis wrapper ───────────────────────────────────────────────────
 #[derive(Clone)]
 pub struct FactorModel {
-    pub result: Rc<greeners::FactorResult>,
+    pub result: Rc<greeners::multivariate::FactorResult>,
     pub var_names: Vec<String>,
 }
 
@@ -216,7 +216,7 @@ impl std::fmt::Display for FactorModel {
 // ── DFM wrapper ───────────────────────────────────────────────────────────────
 #[derive(Clone)]
 pub struct DFMModel {
-    pub result: Rc<greeners::DynamicFactorResult>,
+    pub result: Rc<greeners::dynamic_factor::DynamicFactorResult>,
     #[allow(dead_code)]
     pub var_names: Vec<String>,
 }

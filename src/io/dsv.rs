@@ -1,6 +1,8 @@
 use crate::lang::error::{HayashiError, Result};
 use crate::lang::predicate::{RowAccess, RowPredicate};
-use greeners::{ColumnType, DataFrame, TypeInferenceConfig};
+use greeners::ColumnType;
+use greeners::DataFrame;
+use greeners::TypeInferenceConfig;
 
 /// Linha de um CSV/TSV para avaliação do `where`.
 struct DsvRow<'a> {

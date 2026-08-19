@@ -46,7 +46,7 @@ impl Interpreter {
 
         let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
 
-        let result = greeners::FamaMacBeth::fit(&g_formula, &df, &time_col, nw_lags)
+        let result = greeners::fama_macbeth::FamaMacBeth::fit(&g_formula, &df, &time_col, nw_lags)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let summary = format!(

@@ -83,7 +83,13 @@ jobs:
         run: echo "${{ github.workspace }}/target/release" >> "$GITHUB_PATH"
 
       - name: Run validation programme
-        run: python validation/run.py
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            python validation/run.py
+          else
+            python validation/run.py --allow-partial
+          fi
 
       - name: Upload validation report
         if: always()
