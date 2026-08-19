@@ -4,6 +4,7 @@ use crate::lang::dap::protocol::*;
 use crate::lang::error::{HayashiError, Result};
 use crate::lang::lexer::Lexer;
 use crate::lang::parser::{parse_formula_text, Parser};
+#[cfg(feature = "greeners-diagnostics")]
 use greeners::diagnostics::Diagnostics;
 use greeners::distributions::chi2_pvalue;
 use greeners::distributions::f_pvalue;
@@ -13,15 +14,22 @@ use greeners::distributions::t_pvalue_two;
 use greeners::distributions::t_quantile;
 use greeners::linalg::UPLO;
 use greeners::linalg::{LinalgEigh as _, LinalgInverse as _};
+#[cfg(feature = "greeners-diagnostics")]
 use greeners::specification_tests::SpecificationTests;
+#[cfg(feature = "greeners-diagnostics")]
 use greeners::BinaryDiagnostics;
 use greeners::CovarianceType;
 use greeners::DataFrame;
+#[cfg(feature = "greeners-panel")]
 use greeners::FixedEffects;
 use greeners::Formula as GFormula;
+#[cfg(feature = "greeners-glm")]
 use greeners::Logit;
+#[cfg(feature = "greeners-glm")]
 use greeners::Probit;
+#[cfg(feature = "greeners-panel")]
 use greeners::RandomEffects;
+#[cfg(feature = "greeners-ols")]
 use greeners::IV;
 use greeners::OLS;
 use ndarray::{Array1, Array2, Axis};
@@ -88,9 +96,13 @@ use self::helpers::*;
 
 pub use builtins::BUILTIN_NAMES;
 pub use env::Env;
-pub use models::{
-    BinaryModel, DFMModel, OlsModel, PcaModel, PenalizedModel, SurModel, ThreeSLSModel,
-};
+#[cfg(feature = "greeners-glm")]
+pub use models::BinaryModel;
+#[cfg(feature = "greeners-timeseries")]
+pub use models::DFMModel;
+pub use models::{OlsModel, PcaModel};
+#[cfg(feature = "greeners-ols")]
+pub use models::{PenalizedModel, SurModel, ThreeSLSModel};
 pub use value::{DiagResult, ErrorValue, SendValue, Series, UserFn, Value};
 
 fn t_critical_95(df: f64) -> f64 {
@@ -180,6 +192,7 @@ impl DebugState {
     }
 }
 
+#[cfg(feature = "greeners-causal")]
 fn rd_kernel_opt(opt: Option<&Value>) -> std::result::Result<greeners::rd::RdKernel, String> {
     match opt {
         None => Ok(greeners::rd::RdKernel::Triangular),
@@ -790,7 +803,9 @@ impl Interpreter {
             Value::UserFn(_) => "Function",
             Value::Error(_) => "Error",
             Value::OlsResult(_) => "OlsResult",
+            #[cfg(feature = "greeners-ols")]
             Value::IvResult(_) => "IvResult",
+            #[cfg(feature = "greeners-ols")]
             Value::PenalizedResult(_) => "PenalizedResult",
             _ => "Object",
         }

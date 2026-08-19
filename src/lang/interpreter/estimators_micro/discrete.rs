@@ -2,6 +2,7 @@ use super::super::helpers::*;
 use super::super::*;
 
 impl Interpreter {
+    #[cfg(feature = "greeners-glm")]
     pub(super) fn logit(
         &mut self,
         _func: &str,
@@ -27,6 +28,7 @@ impl Interpreter {
         }))
     }
 
+    #[cfg(feature = "greeners-glm")]
     pub(super) fn probit(
         &mut self,
         _func: &str,
@@ -52,6 +54,7 @@ impl Interpreter {
         }))
     }
 
+    #[cfg(all(feature = "greeners-glm", feature = "greeners-ols"))]
     pub(super) fn heckman(
         &mut self,
         _func: &str,
@@ -123,6 +126,7 @@ impl Interpreter {
         Ok(Value::HeckmanResult(Rc::new(result)))
     }
 
+    #[cfg(all(feature = "greeners-glm", feature = "greeners-ols"))]
     pub(super) fn tobit(
         &mut self,
         _func: &str,
@@ -149,6 +153,7 @@ impl Interpreter {
         Ok(Value::TobitResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-glm")]
     pub(super) fn poisson(
         &mut self,
         _func: &str,
@@ -170,6 +175,7 @@ impl Interpreter {
         Ok(Value::PoissonResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-glm")]
     pub(super) fn nbreg(
         &mut self,
         _func: &str,
@@ -191,6 +197,7 @@ impl Interpreter {
         Ok(Value::NegBinResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-glm")]
     pub(super) fn ologit(
         &mut self,
         _func: &str,
@@ -205,6 +212,7 @@ impl Interpreter {
         Ok(Value::OrderedResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-glm")]
     pub(super) fn oprobit(
         &mut self,
         _func: &str,
@@ -219,6 +227,7 @@ impl Interpreter {
         Ok(Value::OrderedResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-glm")]
     pub(super) fn mlogit(
         &mut self,
         _func: &str,
@@ -239,6 +248,7 @@ impl Interpreter {
         Ok(Value::MNLogitResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-glm")]
     pub(super) fn xtlogit(
         &mut self,
         func: &str,
@@ -325,6 +335,7 @@ impl Interpreter {
         Ok(Value::GeeResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-glm")]
     pub(super) fn zip(
         &mut self,
         func: &str,

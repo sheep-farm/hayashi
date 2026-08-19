@@ -3,6 +3,7 @@ use super::*;
 use crate::lang::dap::model_expansion;
 use std::sync::Arc;
 
+#[cfg(feature = "greeners-timeseries")]
 mod timeseries_models;
 
 /// margins, VECM/VAR/IRF/FEVD, ARIMA/SARIMA/AutoReg/ARDL/Kalman/forecast,
@@ -72,6 +73,7 @@ impl Interpreter {
 
                 match model {
                     // ── Logit / Probit ────────────────────────────────────────
+                    #[cfg(feature = "greeners-glm")]
                     Value::BinaryResult(bm) => {
                         let mut x_use = bm.x.clone();
                         for (var, val) in &at_vals {
@@ -197,6 +199,7 @@ impl Interpreter {
                     }
 
                     // ── Poisson / NegBin ──────────────────────────────────────
+                    #[cfg(feature = "greeners-glm")]
                     Value::PoissonResult(r) => {
                         let x = r.x_data();
                         let fb: Vec<String> =
@@ -244,6 +247,7 @@ impl Interpreter {
                         println!("n = {}", ame_result.n_obs);
                         println!("{sep2}\n");
                     }
+                    #[cfg(feature = "greeners-glm")]
                     Value::NegBinResult(r) => {
                         let x = r.x_data();
                         let fb: Vec<String> =
@@ -297,6 +301,7 @@ impl Interpreter {
                     // ── Ordered Logit / Probit ────────────────────────────────
                     // AME_k(Y=j) = (1/n) Σ_i [f(κ_{j-1} - X_iβ) - f(κ_j - X_iβ)] * β_k
                     // (com κ_0 = -∞ → f(κ_0 - ·) = 0;  κ_J = +∞ → f(κ_J - ·) = 0)
+                    #[cfg(feature = "greeners-glm")]
                     Value::OrderedResult(r) => {
                         let x = r.x_data();
                         let n = x.nrows();
@@ -405,6 +410,7 @@ impl Interpreter {
                 };
 
                 match model {
+                    #[cfg(feature = "greeners-glm")]
                     Value::BinaryResult(bm) => {
                         let vcov = Self::binary_mle_vcov(&bm.kind, &bm.result.params, &bm.y, &bm.x);
                         let ame = if bm.kind == "logit" {
@@ -560,22 +566,28 @@ impl Interpreter {
             }
 
             // ── vecm ─────────────────────────────────────────────────────────
+            #[cfg(feature = "greeners-timeseries")]
             "vecm" => self.eval_vecm(args, opt_map),
 
             // ── var ──────────────────────────────────────────────────────────
+            #[cfg(feature = "greeners-timeseries")]
             "var" => self.eval_var(args, opt_map),
 
             // ── irf ──────────────────────────────────────────────────────────
+            #[cfg(feature = "greeners-timeseries")]
             "irf" => self.eval_irf(args, opt_map),
 
             // ── fevd ─────────────────────────────────────────────────────────
+            #[cfg(feature = "greeners-timeseries")]
             "fevd" => self.eval_fevd(args, opt_map),
 
             // ── arima / sarima ───────────────────────────────────────────────
+            #[cfg(feature = "greeners-timeseries")]
             "arima" | "sarima" => self.eval_arima(func, args, opt_map),
 
             // ── autoreg ──────────────────────────────────────────────────────
             // autoreg(df, y, lags=p, trend="c")
+            #[cfg(feature = "greeners-timeseries")]
             "autoreg" | "ar" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
@@ -627,6 +639,7 @@ impl Interpreter {
 
             // ── ardl ─────────────────────────────────────────────────────────
             // ardl(y ~ x1 + x2, df, lags=p, xlags=q)
+            #[cfg(feature = "greeners-timeseries")]
             "ardl" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
@@ -697,6 +710,7 @@ impl Interpreter {
             //                               nu_t = nu_{t-1} + zeta_t
             //
             // Adiciona colunas {var}_filtered e {var}_smoothed ao DataFrame.
+            #[cfg(feature = "greeners-timeseries")]
             "kalman" | "kfilter" | "ssm" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
@@ -910,6 +924,7 @@ impl Interpreter {
             // ── forecast ─────────────────────────────────────────────────────
             // forecast(model, steps=8)
             // forecast(model, steps=8, alpha=0.05)
+            #[cfg(feature = "greeners-timeseries")]
             "forecast" | "fcast" | "predict_h" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
@@ -918,6 +933,7 @@ impl Interpreter {
                 }
 
                 let model = match self.eval_expr(&args[0])? {
+                    #[cfg(feature = "greeners-timeseries")]
                     Value::ArimaResult(m) => m,
                     _ => {
                         return Err(HayashiError::Type(

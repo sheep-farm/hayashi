@@ -67,6 +67,7 @@ impl Interpreter {
             "decode" | "tostring" => self.decode(func, args, opts, opt_map),
             "rename" => self.rename(func, args, opts, opt_map),
             "drop" => self.drop(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-ols")]
             "drop_collinear" => self.drop_collinear(func, args, opts, opt_map),
             "mutate" | "generate" => self.mutate(func, args, opts, opt_map),
             "keep" | "select" => self.keep(func, args, opts, opt_map),
@@ -2496,6 +2497,7 @@ impl Interpreter {
         Ok(Value::DataFrame(Arc::new(new_df)))
     }
 
+    #[cfg(feature = "greeners-ols")]
     pub(super) fn drop_collinear(
         &mut self,
         _func: &str,
@@ -2559,7 +2561,10 @@ impl Interpreter {
             }
         }
 
+        #[cfg(feature = "greeners-ols")]
         let (_clean, keep_idx, omit_idx) = greeners::OLS::detect_collinearity(&mat, 1e-10);
+        #[cfg(not(feature = "greeners-ols"))]
+        let (keep_idx, omit_idx): (Vec<usize>, Vec<usize>) = ((0..k).collect(), Vec::new());
 
         if omit_idx.is_empty() {
             println!(

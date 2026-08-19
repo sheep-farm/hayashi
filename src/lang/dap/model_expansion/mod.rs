@@ -1,6 +1,8 @@
-use crate::lang::interpreter::models::{
-    DFMModel, FactorModel, PcaModel, PenalizedModel, SurModel, ThreeSLSModel,
-};
+#[cfg(feature = "greeners-timeseries")]
+use crate::lang::interpreter::models::DFMModel;
+use crate::lang::interpreter::models::{FactorModel, PcaModel};
+#[cfg(feature = "greeners-ols")]
+use crate::lang::interpreter::models::{PenalizedModel, SurModel, ThreeSLSModel};
 use crate::lang::interpreter::{Series, Value};
 use indexmap::IndexMap;
 use ndarray::Array1;

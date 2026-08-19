@@ -3,6 +3,7 @@ use super::super::*;
 use crate::lang::dap::model_expansion;
 
 impl Interpreter {
+    #[cfg(feature = "greeners-ols")]
     pub(super) fn ols(
         &mut self,
         _func: &str,
@@ -59,6 +60,7 @@ impl Interpreter {
         }))
     }
 
+    #[cfg(feature = "greeners-ols")]
     pub(super) fn iv(
         &mut self,
         _func: &str,
@@ -108,6 +110,7 @@ impl Interpreter {
         Ok(Value::IvResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-ols")]
     pub(super) fn qreg(
         &mut self,
         _func: &str,
@@ -141,6 +144,7 @@ impl Interpreter {
         Ok(Value::QuantileResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-ols")]
     pub(super) fn wls(
         &mut self,
         _func: &str,

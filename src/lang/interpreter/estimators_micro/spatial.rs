@@ -2,6 +2,7 @@ use super::super::*;
 use crate::lang::dap::model_expansion;
 
 impl Interpreter {
+    #[cfg(feature = "greeners-spatial")]
     pub(super) fn spatial_panel_sar(
         &mut self,
         func: &str,
@@ -151,6 +152,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-spatial")]
     pub(super) fn spatial_durbin(
         &mut self,
         func: &str,
@@ -294,6 +296,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-spatial")]
     pub(super) fn spatial_durbin_error(
         &mut self,
         func: &str,
@@ -436,6 +439,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-spatial")]
     pub(super) fn spatial_sar(
         &mut self,
         func: &str,

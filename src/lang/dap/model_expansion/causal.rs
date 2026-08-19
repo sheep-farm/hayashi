@@ -1,5 +1,6 @@
 use super::*;
 
+#[cfg(feature = "greeners-causal")]
 pub fn rd_children(r: &greeners::rd::RdResult) -> Vec<(String, Value)> {
     let mut vars = Vec::new();
     let mut map = HashMap::new();
@@ -23,7 +24,7 @@ pub fn rd_children(r: &greeners::rd::RdResult) -> Vec<(String, Value)> {
     vars.push(("fit".into(), Value::Dict(Arc::new(map))));
     vars
 }
-
+#[cfg(feature = "greeners-causal")]
 pub fn synth_children(r: &greeners::synth::SynthResult) -> Vec<(String, Value)> {
     let mut vars = Vec::new();
     let mut weights = HashMap::new();
@@ -58,7 +59,7 @@ pub fn synth_children(r: &greeners::synth::SynthResult) -> Vec<(String, Value)> 
     vars.push(("fit".into(), synth_fit_dict(r)));
     vars
 }
-
+#[cfg(feature = "greeners-causal")]
 pub fn synth_fit_dict(r: &greeners::synth::SynthResult) -> Value {
     let mut entries = vec![
         ("treated_unit".into(), Value::Str(r.treated_unit.clone())),
@@ -74,7 +75,7 @@ pub fn synth_fit_dict(r: &greeners::synth::SynthResult) -> Value {
     }
     Value::Dict(Arc::new(HashMap::from_iter(entries)))
 }
-
+#[cfg(feature = "greeners-causal")]
 pub fn psm_children(r: &greeners::psm::PsmResult) -> Vec<(String, Value)> {
     let mut vars = Vec::new();
     let mut map = HashMap::new();
@@ -149,7 +150,7 @@ pub fn psm_children(r: &greeners::psm::PsmResult) -> Vec<(String, Value)> {
     vars.push(("balance".into(), balance_df));
     vars
 }
-
+#[cfg(feature = "greeners-causal")]
 pub fn did_children(r: &greeners::did::DidResult) -> Vec<(String, Value)> {
     regression_children(RegressionCtx {
         names: r.variable_names.clone(),
@@ -165,7 +166,7 @@ pub fn did_children(r: &greeners::did::DidResult) -> Vec<(String, Value)> {
         x: None,
     })
 }
-
+#[cfg(feature = "greeners-causal")]
 pub fn did_fit_dict(r: &greeners::did::DidResult) -> Value {
     fit_dict(&[
         ("att", Value::Float(r.att)),
@@ -181,7 +182,7 @@ pub fn did_fit_dict(r: &greeners::did::DidResult) -> Value {
         ("cov_type", Value::Str(format!("{:?}", r.cov_type))),
     ])
 }
-
+#[cfg(feature = "greeners-survival")]
 pub fn km_children(r: &greeners::survival::KMResult) -> Vec<(String, Value)> {
     let mut vars = Vec::new();
     let n = r.times.len();
@@ -204,7 +205,7 @@ pub fn km_children(r: &greeners::survival::KMResult) -> Vec<(String, Value)> {
     vars.push(("fit".into(), km_fit_dict(r)));
     vars
 }
-
+#[cfg(feature = "greeners-survival")]
 pub fn km_fit_dict(r: &greeners::survival::KMResult) -> Value {
     fit_dict(&[
         ("median_survival", Value::Float(r.median_survival)),
@@ -212,7 +213,7 @@ pub fn km_fit_dict(r: &greeners::survival::KMResult) -> Value {
         ("n_events", Value::Int(r.n_events as i64)),
     ])
 }
-
+#[cfg(feature = "greeners-survival")]
 pub fn cox_children(r: &greeners::survival::CoxResult) -> Vec<(String, Value)> {
     let mut vars = regression_children(RegressionCtx {
         names: r.variable_names.clone().unwrap_or_default(),
@@ -233,7 +234,7 @@ pub fn cox_children(r: &greeners::survival::CoxResult) -> Vec<(String, Value)> {
     ));
     vars
 }
-
+#[cfg(feature = "greeners-survival")]
 pub fn cox_fit_dict(r: &greeners::survival::CoxResult) -> Value {
     fit_dict(&[
         ("log_lik", Value::Float(r.log_likelihood)),
@@ -244,7 +245,7 @@ pub fn cox_fit_dict(r: &greeners::survival::CoxResult) -> Value {
         ("converged", Value::Bool(r.converged)),
     ])
 }
-
+#[cfg(feature = "greeners-ols")]
 pub fn heckman_children(r: &greeners::heckman::HeckmanResult) -> Vec<(String, Value)> {
     let mut vars = Vec::new();
     let outcome_names = r.variable_names.clone().unwrap_or_default();
@@ -273,7 +274,7 @@ pub fn heckman_children(r: &greeners::heckman::HeckmanResult) -> Vec<(String, Va
     vars.push(("fit".into(), heckman_fit_dict(r)));
     vars
 }
-
+#[cfg(feature = "greeners-ols")]
 pub fn heckman_fit_dict(r: &greeners::heckman::HeckmanResult) -> Value {
     fit_dict(&[
         ("delta", Value::Float(r.delta)),

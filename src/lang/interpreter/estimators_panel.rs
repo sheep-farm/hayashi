@@ -26,48 +26,94 @@ impl Interpreter {
             "bootse" => {
                 return self.eval_call("bootstrap", args, opts).map(Some);
             }
+            #[cfg(feature = "greeners-timeseries")]
             "markov" | "msar" | "markovswitching" => self.markov(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-glm")]
             "clogit" | "xtlogit_fe" => self.clogit(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-glm")]
             "cpoisson" | "xtpoisson_fe" | "ppml" => self.cpoisson(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-glm")]
             "cmnlogit" | "cmlogit" | "conditional_mlogit" => {
                 self.cmnlogit(func, args, opts, opt_map)
             }
+            #[cfg(feature = "greeners-diagnostics")]
             "gqtest" => self.gqtest(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-diagnostics")]
             "bphet" | "hettest" => self.bphet(func, args, opts, opt_map),
+            #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-ols"))]
             "bptest" | "xttest0" | "xtbp" => self.bptest(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-diagnostics")]
             "wooldridge" | "xtserial" | "wooldridge_serial" | "xtwooldridge" => {
                 self.wooldridge(func, args, opts, opt_map)
             }
+            #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-ols"))]
             "pesaran" | "xtcd" => self.eval_pesaran(args, opt_map),
+            #[cfg(feature = "greeners-diagnostics")]
             "mundlak" => self.eval_mundlak(args, opt_map),
+            #[cfg(feature = "greeners-diagnostics")]
             "abtest" | "abar" | "abond" | "xtabond_test" | "arellano_bond" => {
                 self.abtest(func, args, opts, opt_map)
             }
+            #[cfg(feature = "greeners-ols")]
             "sur" | "sureg" => self.sur(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-ols")]
             "rolling" | "rols" => self.eval_rolling(args, opts, opt_map),
+            #[cfg(feature = "greeners-ols")]
             "recursive" | "recols" => self.eval_recursive(args, opts),
+            #[cfg(all(
+                feature = "greeners-bayesian",
+                feature = "greeners-glm",
+                feature = "greeners-ols"
+            ))]
             "ic" | "fitstat" | "estat" => self.ic(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-diagnostics")]
             "akaike_weights" | "aic_weights" => self.akaike_weights(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-diagnostics")]
             "lrtest" | "lr_test" => self.lrtest(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-panel")]
             "fe" => self.fe(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-panel")]
             "be" => self.be(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-panel")]
             "re" => self.re(func, args, opts, opt_map),
+            #[cfg(all(
+                feature = "greeners-diagnostics",
+                feature = "greeners-ols",
+                feature = "greeners-panel"
+            ))]
+            #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-ols"))]
             "ftest_fe" => self.ftest_fe(func, args, opts, opt_map),
+            #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-ols"))]
             "pesaran_cd" | "cd_test" => self.pesaran_cd(func, args, opts, opt_map),
+            #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-ols"))]
             "bplm" => self.bplm(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-diagnostics")]
             "chamberlain" => self.chamberlain(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-diagnostics")]
             "mundlak_OLD_REMOVED" => self.mundlak_OLD_REMOVED(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-panel")]
             "ab" => self.ab(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-ols")]
             "gmm" => self.gmm(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-panel")]
             "sysgmm" => self.sysgmm(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-panel")]
             "feiv" => self.feiv(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-panel")]
             "pcse" => self.pcse(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-panel")]
             "xtgls" => self.xtgls(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-diagnostics")]
             "ab_test" => self.ab_test(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-diagnostics")]
             "wooldridge_OLD_REMOVED" => self.wooldridge_OLD_REMOVED(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-panel")]
             "hausman" => self.hausman(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-panel")]
             "hausman_robust" | "hausman_r" => self.hausman_robust(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-panel")]
             "ftest_robust" | "f_robust" => self.ftest_robust(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-diagnostics")]
             "test" => self.test(func, args, opts, opt_map),
             _ => return Ok(None),
         };
@@ -451,6 +497,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn markov(
         &mut self,
         _func: &str,
@@ -493,6 +540,7 @@ impl Interpreter {
         Ok(Value::MarkovResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-glm")]
     pub(super) fn clogit(
         &mut self,
         _func: &str,
@@ -538,6 +586,7 @@ impl Interpreter {
         Ok(Value::ConditionalResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-glm")]
     pub(super) fn cpoisson(
         &mut self,
         _func: &str,
@@ -583,6 +632,7 @@ impl Interpreter {
         Ok(Value::ConditionalResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-glm")]
     pub(super) fn cmnlogit(
         &mut self,
         _func: &str,
@@ -642,6 +692,7 @@ impl Interpreter {
         Ok(Value::ConditionalResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn gqtest(
         &mut self,
         _func: &str,
@@ -714,6 +765,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn bphet(
         &mut self,
         _func: &str,
@@ -779,6 +831,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-ols"))]
     pub(super) fn bptest(
         &mut self,
         _func: &str,
@@ -881,6 +934,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn wooldridge(
         &mut self,
         _func: &str,
@@ -891,6 +945,7 @@ impl Interpreter {
         self.eval_wooldridge(args, opt_map)
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn abtest(
         &mut self,
         _func: &str,
@@ -901,6 +956,7 @@ impl Interpreter {
         self.eval_abtest(args, opt_map)
     }
 
+    #[cfg(feature = "greeners-ols")]
     pub(super) fn sur(
         &mut self,
         _func: &str,
@@ -952,6 +1008,11 @@ impl Interpreter {
         }))
     }
 
+    #[cfg(all(
+        feature = "greeners-bayesian",
+        feature = "greeners-glm",
+        feature = "greeners-ols"
+    ))]
     pub(super) fn ic(
         &mut self,
         _func: &str,
@@ -985,23 +1046,31 @@ impl Interpreter {
                     m.result.params.len(),
                     m.result.n_obs,
                 ),
+                #[cfg(feature = "greeners-glm")]
                 Value::BinaryResult(b) => {
                     (b.result.log_likelihood, b.result.params.len(), b.x.nrows())
                 }
+                #[cfg(feature = "greeners-glm")]
                 Value::PoissonResult(r) => (r.log_likelihood, r.params.len(), r.n_obs),
+                #[cfg(feature = "greeners-glm")]
                 Value::NegBinResult(r) => (r.log_likelihood, r.params.len(), r.n_obs),
+                #[cfg(feature = "greeners-glm")]
                 Value::OrderedResult(r) => (
                     r.log_likelihood,
                     r.params.len() + r.thresholds.len(),
                     r.n_obs,
                 ),
+                #[cfg(feature = "greeners-ols")]
                 Value::TobitResult(r) => (r.log_likelihood, r.params.len(), r.n_obs),
+                #[cfg(feature = "greeners-bayesian")]
                 Value::MixedResult(r) => (r.log_likelihood, r.fixed_effects.len(), r.n_obs),
+                #[cfg(feature = "greeners-glm")]
                 Value::ZeroInflatedResult(r) => (
                     r.log_likelihood,
                     r.count_params.len() + r.inflate_params.len(),
                     r.n_obs,
                 ),
+                #[cfg(feature = "greeners-ols")]
                 Value::RollingResult(_) | Value::RecursiveLSResult(_) => {
                     return Err(HayashiError::Runtime(format!(
                         "ic(): '{label}' has no log-likelihood — use print() for diagnostics"
@@ -1149,6 +1218,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn akaike_weights(
         &mut self,
         _func: &str,
@@ -1169,12 +1239,19 @@ impl Interpreter {
             let val = self.eval_expr(arg)?;
             let ll = match &val {
                 Value::OlsResult(m) => m.result.log_likelihood,
+                #[cfg(feature = "greeners-glm")]
                 Value::BinaryResult(b) => b.result.log_likelihood,
+                #[cfg(feature = "greeners-glm")]
                 Value::PoissonResult(r) => r.log_likelihood,
+                #[cfg(feature = "greeners-glm")]
                 Value::NegBinResult(r) => r.log_likelihood,
+                #[cfg(feature = "greeners-glm")]
                 Value::OrderedResult(r) => r.log_likelihood,
+                #[cfg(feature = "greeners-ols")]
                 Value::TobitResult(r) => r.log_likelihood,
+                #[cfg(feature = "greeners-bayesian")]
                 Value::MixedResult(r) => r.log_likelihood,
+                #[cfg(feature = "greeners-glm")]
                 Value::ZeroInflatedResult(r) => r.log_likelihood,
                 _ => {
                     return Err(
@@ -1184,12 +1261,19 @@ impl Interpreter {
             };
             let k = match &val {
                 Value::OlsResult(m) => m.result.params.len(),
+                #[cfg(feature = "greeners-glm")]
                 Value::BinaryResult(b) => b.result.params.len(),
+                #[cfg(feature = "greeners-glm")]
                 Value::PoissonResult(r) => r.params.len(),
+                #[cfg(feature = "greeners-glm")]
                 Value::NegBinResult(r) => r.params.len(),
+                #[cfg(feature = "greeners-glm")]
                 Value::OrderedResult(r) => r.params.len() + r.thresholds.len(),
+                #[cfg(feature = "greeners-ols")]
                 Value::TobitResult(r) => r.params.len(),
+                #[cfg(feature = "greeners-bayesian")]
                 Value::MixedResult(r) => r.fixed_effects.len(),
+                #[cfg(feature = "greeners-glm")]
                 Value::ZeroInflatedResult(r) => r.count_params.len() + r.inflate_params.len(),
                 _ => 0,
             };
@@ -1221,6 +1305,7 @@ impl Interpreter {
         Ok(Value::Dict(Arc::new(out)))
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn lrtest(
         &mut self,
         _func: &str,
@@ -1239,21 +1324,31 @@ impl Interpreter {
         let extract = |v: &Value| -> Result<(f64, usize)> {
             Ok(match v {
             Value::OlsResult(m) => (m.result.log_likelihood, m.result.params.len()),
-            Value::BinaryResult(b) => (b.result.log_likelihood, b.result.params.len()),
-            Value::PoissonResult(r) => (r.log_likelihood, r.params.len()),
-            Value::NegBinResult(r) => (r.log_likelihood, r.params.len()),
-            Value::OrderedResult(r) => {
+                        #[cfg(feature = "greeners-glm")]
+Value::BinaryResult(b) => (b.result.log_likelihood, b.result.params.len()),
+                        #[cfg(feature = "greeners-glm")]
+Value::PoissonResult(r) => (r.log_likelihood, r.params.len()),
+                        #[cfg(feature = "greeners-glm")]
+Value::NegBinResult(r) => (r.log_likelihood, r.params.len()),
+                        #[cfg(feature = "greeners-glm")]
+Value::OrderedResult(r) => {
                 (r.log_likelihood, r.params.len() + r.thresholds.len())
             }
-            Value::TobitResult(r) => (r.log_likelihood, r.params.len()),
-            Value::MixedResult(r) => (r.log_likelihood, r.fixed_effects.len()),
-            Value::ZeroInflatedResult(r) => (
+                        #[cfg(feature = "greeners-ols")]
+Value::TobitResult(r) => (r.log_likelihood, r.params.len()),
+                        #[cfg(feature = "greeners-bayesian")]
+Value::MixedResult(r) => (r.log_likelihood, r.fixed_effects.len()),
+                        #[cfg(feature = "greeners-glm")]
+Value::ZeroInflatedResult(r) => (
                 r.log_likelihood,
                 r.count_params.len() + r.inflate_params.len(),
             ),
-            Value::GlmResult(r) => (r.log_likelihood, r.params.len()),
-            Value::GarchResult(r) => (r.log_likelihood, r.params.len()),
-            Value::ArimaResult(r) => {
+                        #[cfg(feature = "greeners-glm")]
+Value::GlmResult(r) => (r.log_likelihood, r.params.len()),
+                        #[cfg(feature = "greeners-timeseries")]
+Value::GarchResult(r) => (r.log_likelihood, r.params.len()),
+                        #[cfg(feature = "greeners-timeseries")]
+Value::ArimaResult(r) => {
                 (r.log_likelihood, r.ar_params.len() + r.ma_params.len() + 1)
             }
             _ => {
@@ -1281,6 +1376,7 @@ impl Interpreter {
         Ok(Value::Dict(Arc::new(map)))
     }
 
+    #[cfg(feature = "greeners-panel")]
     pub(super) fn fe(
         &mut self,
         _func: &str,
@@ -1319,6 +1415,7 @@ impl Interpreter {
         Ok(Value::PanelResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-panel")]
     pub(super) fn re(
         &mut self,
         _func: &str,
@@ -1348,6 +1445,7 @@ impl Interpreter {
         Ok(Value::ReResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-panel")]
     pub(super) fn be(
         &mut self,
         _func: &str,
@@ -1376,6 +1474,12 @@ impl Interpreter {
         Ok(Value::BetweenResult(Rc::new(result)))
     }
 
+    #[cfg(all(
+        feature = "greeners-diagnostics",
+        feature = "greeners-ols",
+        feature = "greeners-panel"
+    ))]
+    #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-ols"))]
     pub(super) fn ftest_fe(
         &mut self,
         _func: &str,
@@ -1476,6 +1580,7 @@ impl Interpreter {
         Ok(diag_with(out, fields))
     }
 
+    #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-ols"))]
     pub(super) fn pesaran_cd(
         &mut self,
         _func: &str,
@@ -1566,6 +1671,7 @@ impl Interpreter {
         Ok(diag_with(out, fields))
     }
 
+    #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-ols"))]
     pub(super) fn bplm(
         &mut self,
         _func: &str,
@@ -1661,6 +1767,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn chamberlain(
         &mut self,
         _func: &str,
@@ -1770,6 +1877,7 @@ impl Interpreter {
     }
 
     #[allow(non_snake_case)]
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn mundlak_OLD_REMOVED(
         &mut self,
         _func: &str,
@@ -1911,6 +2019,7 @@ impl Interpreter {
         Ok(diag_with(out, fields))
     }
 
+    #[cfg(feature = "greeners-panel")]
     pub(super) fn ab(
         &mut self,
         _func: &str,
@@ -1983,6 +2092,7 @@ impl Interpreter {
         Ok(Value::AbResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-ols")]
     pub(super) fn gmm(
         &mut self,
         _func: &str,
@@ -2055,6 +2165,7 @@ impl Interpreter {
         Ok(Value::GmmResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-panel")]
     pub(super) fn sysgmm(
         &mut self,
         _func: &str,
@@ -2131,6 +2242,7 @@ impl Interpreter {
         Ok(Value::SysGmmResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-panel")]
     pub(super) fn feiv(
         &mut self,
         _func: &str,
@@ -2225,6 +2337,7 @@ impl Interpreter {
         Ok(Value::FE2SLSResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-panel")]
     pub(super) fn pcse(
         &mut self,
         _func: &str,
@@ -2251,6 +2364,7 @@ impl Interpreter {
         Ok(Value::PcseResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-panel")]
     pub(super) fn xtgls(
         &mut self,
         _func: &str,
@@ -2295,6 +2409,7 @@ impl Interpreter {
         Ok(Value::PanelGlsResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn ab_test(
         &mut self,
         _func: &str,
@@ -2443,6 +2558,7 @@ impl Interpreter {
     }
 
     #[allow(non_snake_case)]
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn wooldridge_OLD_REMOVED(
         &mut self,
         _func: &str,
@@ -2546,6 +2662,7 @@ impl Interpreter {
         Ok(diag_with(out, fields))
     }
 
+    #[cfg(feature = "greeners-panel")]
     pub(super) fn hausman(
         &mut self,
         _func: &str,
@@ -2558,6 +2675,7 @@ impl Interpreter {
         }
 
         let fe = match self.eval_expr(&args[0])? {
+            #[cfg(feature = "greeners-panel")]
             Value::PanelResult(r) => r,
             _ => {
                 return Err(HayashiError::Type(
@@ -2566,6 +2684,7 @@ impl Interpreter {
             }
         };
         let re = match self.eval_expr(&args[1])? {
+            #[cfg(feature = "greeners-panel")]
             Value::ReResult(r) => r,
             _ => {
                 return Err(HayashiError::Type(
@@ -2697,6 +2816,7 @@ impl Interpreter {
         Ok(diag_with(out, fields))
     }
 
+    #[cfg(feature = "greeners-panel")]
     pub(super) fn hausman_robust(
         &mut self,
         _func: &str,
@@ -2711,6 +2831,7 @@ impl Interpreter {
         }
 
         let fe = match self.eval_expr(&args[0])? {
+            #[cfg(feature = "greeners-panel")]
             Value::PanelResult(r) => r,
             _ => {
                 return Err(HayashiError::Type(
@@ -2719,6 +2840,7 @@ impl Interpreter {
             }
         };
         let re = match self.eval_expr(&args[1])? {
+            #[cfg(feature = "greeners-panel")]
             Value::ReResult(r) => r,
             _ => {
                 return Err(HayashiError::Type(
@@ -2774,6 +2896,7 @@ impl Interpreter {
         Ok(diag(format!("{result}")))
     }
 
+    #[cfg(feature = "greeners-panel")]
     pub(super) fn ftest_robust(
         &mut self,
         _func: &str,
@@ -2804,6 +2927,7 @@ impl Interpreter {
                     m.result.variable_names.clone().unwrap_or_default(),
                 )
             }
+            #[cfg(feature = "greeners-panel")]
             Value::PanelResult(m) => {
                 let p = m.params.len();
                 let mut vcov = ndarray::Array2::<f64>::zeros((p, p));
@@ -2817,6 +2941,7 @@ impl Interpreter {
                     m.variable_names.clone().unwrap_or_default(),
                 )
             }
+            #[cfg(feature = "greeners-panel")]
             Value::ReResult(m) => {
                 let p = m.params.len();
                 let mut vcov = ndarray::Array2::<f64>::zeros((p, p));
@@ -2877,6 +3002,7 @@ impl Interpreter {
         Ok(diag(format!("{result}")))
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn test(
         &mut self,
         _func: &str,

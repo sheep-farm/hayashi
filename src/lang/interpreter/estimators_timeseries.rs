@@ -15,50 +15,87 @@ impl Interpreter {
         opt_map: &HashMap<String, Value>,
     ) -> Result<Option<Value>> {
         let result: Result<Value> = match func {
+            #[cfg(feature = "greeners-timeseries")]
             "garch" | "egarch" | "gjrgarch" => self.garch(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-diagnostics")]
             "ljungbox" | "ljung_box" | "portmanteau" => self.ljungbox(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-diagnostics")]
             "leverage" => self.leverage(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-diagnostics")]
             "cooks" => self.cooks(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-diagnostics")]
             "vif" => self.vif(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-diagnostics")]
             "condnum" => self.condnum(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-diagnostics")]
             "durbinwatson" | "dw" => self.durbinwatson(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-diagnostics")]
             "white" => self.white(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-diagnostics")]
             "reset" => self.reset(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-diagnostics")]
             "jb" => self.jb(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-diagnostics")]
             "bgodfrey" => self.bgodfrey(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-diagnostics")]
             "bgtest" | "bg" | "breusch_godfrey" => {
                 return self.eval_call("bgodfrey", args, opts).map(Some);
             }
+            #[cfg(feature = "greeners-diagnostics")]
             "archtest" | "arch_test" | "engle_arch" => self.archtest(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-timeseries")]
             "acf" => self.acf(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-timeseries")]
             "pacf" => self.pacf(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-diagnostics")]
             "cusumtest" | "cusum_test" => self.cusumtest(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-timeseries")]
             "forecast_vol" => self.forecast_vol(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-diagnostics")]
             "diagnostics" => self.diagnostics(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-timeseries")]
             "varma" | "varmax" => self.varma(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-timeseries")]
             "decompose" | "seasonal_decompose" => self.decompose(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-timeseries")]
             "stl" => self.stl(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-timeseries")]
             "mstl" => self.mstl(func, args, opts, opt_map),
             "proptest" | "prtest" => self.proptest(func, args, opts, opt_map),
             "proptest2" | "prtest2" => self.proptest2(func, args, opts, opt_map),
             "propci" => self.propci(func, args, opts, opt_map),
             "chisq2x2" | "chi2_2x2" => self.chisq2x2(func, args, opts, opt_map),
             "multipletests" | "multtest" => self.multipletests(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-timeseries")]
             "ucm" | "uc" | "structural_ts" => self.ucm(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-glm")]
             "gam" | "gamfit" => self.gam(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-imputation")]
             "mice" | "mi" | "multiple_imputation" => self.mice(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-timeseries")]
             "msauto" | "markov_ar" | "ms_ar" | "hamilton" => self.msauto(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-timeseries")]
             "svar" | "svec" => self.svar(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-timeseries")]
             "sirf" | "svar_irf" => self.sirf(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-timeseries")]
             "sfevd" | "svar_fevd" => self.sfevd(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-ols")]
             "threesl" | "three_sls" | "3sls" | "reg3" => self.threesl(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-timeseries")]
             "dfm" | "dynamic_factor" => self.dfm(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-diagnostics")]
             "adtest" | "anderson_darling" => self.adtest(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-diagnostics")]
             "lilliefors" | "lillie" => self.lilliefors(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-diagnostics")]
             "omnibus" | "dagostino" => self.omnibus(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-diagnostics")]
             "swilk" | "shapiro_wilk" | "shapiro" => self.swilk(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-diagnostics")]
             "sfrancia" | "shapiro_francia" => self.sfrancia(func, args, opts, opt_map),
             "sktest" => self.sktest(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-diagnostics")]
             "harveycollier" | "harvey_collier" | "hctest" => {
                 self.harveycollier(func, args, opts, opt_map)
             }
@@ -67,6 +104,7 @@ impl Interpreter {
         result.map(Some)
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn garch(
         &mut self,
         func: &str,
@@ -130,6 +168,7 @@ impl Interpreter {
         )))
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn ljungbox(
         &mut self,
         _func: &str,
@@ -156,8 +195,10 @@ impl Interpreter {
                 Array1::from(self.eval_col_expr(&Expr::Var(col_name), &df)?)
             }
             // GARCH standardized residuals
+            #[cfg(feature = "greeners-timeseries")]
             Value::GarchResult(m) => m.standardized_residuals.clone(),
             // ARIMA residuals
+            #[cfg(feature = "greeners-timeseries")]
             Value::ArimaResult(m) => Array1::from_vec(m.residuals().to_vec()),
             // OLS residuals
             Value::OlsResult(m) => m.residuals.clone(),
@@ -242,6 +283,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn leverage(
         &mut self,
         _func: &str,
@@ -343,6 +385,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn cooks(
         &mut self,
         _func: &str,
@@ -442,6 +485,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn vif(
         &mut self,
         _func: &str,
@@ -508,6 +552,7 @@ impl Interpreter {
         Ok(Value::DataFrame(Arc::new(df)))
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn condnum(
         &mut self,
         _func: &str,
@@ -567,6 +612,7 @@ impl Interpreter {
         Ok(Value::Dict(Arc::new(map)))
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn durbinwatson(
         &mut self,
         _func: &str,
@@ -615,6 +661,7 @@ impl Interpreter {
         Ok(Value::Dict(Arc::new(map)))
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn white(
         &mut self,
         _func: &str,
@@ -674,6 +721,7 @@ impl Interpreter {
         Ok(Value::Dict(Arc::new(map)))
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn reset(
         &mut self,
         _func: &str,
@@ -745,6 +793,7 @@ impl Interpreter {
         Ok(Value::Dict(Arc::new(map)))
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn jb(
         &mut self,
         _func: &str,
@@ -771,7 +820,9 @@ impl Interpreter {
                 Array1::from(self.eval_col_expr(&Expr::Var(col_name), &df)?)
             }
             Value::OlsResult(m) => m.residuals.clone(),
+            #[cfg(feature = "greeners-timeseries")]
             Value::ArimaResult(m) => Array1::from_vec(m.residuals().to_vec()),
+            #[cfg(feature = "greeners-timeseries")]
             Value::GarchResult(m) => m.standardized_residuals.clone(),
             _ => {
                 return Err(HayashiError::Type(
@@ -816,6 +867,7 @@ impl Interpreter {
         Ok(Value::Dict(Arc::new(map)))
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn bgodfrey(
         &mut self,
         _func: &str,
@@ -884,6 +936,7 @@ impl Interpreter {
         Ok(Value::Dict(Arc::new(map)))
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn archtest(
         &mut self,
         _func: &str,
@@ -913,6 +966,7 @@ impl Interpreter {
             // GARCH residuals: archtest(model, lags=5)
             // uses standardized residuals z_t = ε_t/√h_t — under H₀ of
             // correct specification, z_t² should have no autocorrelation
+            #[cfg(feature = "greeners-timeseries")]
             Value::GarchResult(m) => m.standardized_residuals.clone(),
             _ => {
                 return Err(HayashiError::Type(
@@ -993,6 +1047,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn acf(
         &mut self,
         _func: &str,
@@ -1016,7 +1071,9 @@ impl Interpreter {
                 Array1::from(self.eval_col_expr(&Expr::Var(col_name), &df)?)
             }
             Value::OlsResult(m) => m.residuals.clone(),
+            #[cfg(feature = "greeners-timeseries")]
             Value::GarchResult(m) => m.standardized_residuals.clone(),
+            #[cfg(feature = "greeners-timeseries")]
             Value::ArimaResult(m) => Array1::from_vec(m.residuals().to_vec()),
             _ => {
                 return Err(HayashiError::Type(
@@ -1035,6 +1092,7 @@ impl Interpreter {
         Ok(Value::List(Arc::new(list)))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn pacf(
         &mut self,
         _func: &str,
@@ -1058,7 +1116,9 @@ impl Interpreter {
                 Array1::from(self.eval_col_expr(&Expr::Var(col_name), &df)?)
             }
             Value::OlsResult(m) => m.residuals.clone(),
+            #[cfg(feature = "greeners-timeseries")]
             Value::GarchResult(m) => m.standardized_residuals.clone(),
+            #[cfg(feature = "greeners-timeseries")]
             Value::ArimaResult(m) => Array1::from_vec(m.residuals().to_vec()),
             _ => {
                 return Err(HayashiError::Type(
@@ -1077,6 +1137,7 @@ impl Interpreter {
         Ok(Value::List(Arc::new(list)))
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn cusumtest(
         &mut self,
         _func: &str,
@@ -1134,6 +1195,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn forecast_vol(
         &mut self,
         _func: &str,
@@ -1148,6 +1210,7 @@ impl Interpreter {
         }
 
         let model = match self.eval_expr(&args[0])? {
+            #[cfg(feature = "greeners-timeseries")]
             Value::GarchResult(m) => m,
             _ => {
                 return Err(HayashiError::Type(
@@ -1242,6 +1305,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn diagnostics(
         &mut self,
         _func: &str,
@@ -1259,13 +1323,21 @@ impl Interpreter {
         let thin = "─".repeat(62);
 
         let diagnostics = match self.eval_expr(&args[0])? {
+            #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-ols"))]
             Value::OlsResult(ref ols) => self.diagnostics_ols(ols, &thick, &thin)?,
+            #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-timeseries"))]
             Value::GarchResult(ref m) => self.diagnostics_garch(m, &thick, &thin)?,
+            #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-timeseries"))]
             Value::ArimaResult(ref m) => self.diagnostics_arima(m, &thick, &thin)?,
+            #[cfg(feature = "greeners-timeseries")]
             Value::VarResult(ref m) => self.diagnostics_var(m, &thick, &thin)?,
+            #[cfg(feature = "greeners-timeseries")]
             Value::VecmResult(ref m) => self.diagnostics_vecm(m, &thick, &thin)?,
+            #[cfg(feature = "greeners-ols")]
             Value::IvResult(ref iv) => self.diagnostics_iv(iv, &thick, &thin)?,
+            #[cfg(feature = "greeners-panel")]
             Value::PanelResult(ref fe) => self.diagnostics_panel(fe, &thick, &thin)?,
+            #[cfg(feature = "greeners-panel")]
             Value::ReResult(ref re) => self.diagnostics_re(re, &thick, &thin)?,
             _ => {
                 return Err(HayashiError::Type(
@@ -1277,6 +1349,7 @@ impl Interpreter {
         Ok(Value::Dict(Arc::new(diagnostics)))
     }
 
+    #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-ols"))]
     pub(super) fn diagnostics_ols(
         &mut self,
         ols: &super::models::OlsModel,
@@ -1313,6 +1386,7 @@ impl Interpreter {
         Ok(diagnostics)
     }
 
+    #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-ols"))]
     fn ols_jarque_bera(&self, ols: &super::models::OlsModel) -> Result<Value> {
         println!("\n── Residual Normality (Jarque-Bera)");
         match greeners::Diagnostics::jarque_bera(&ols.residuals) {
@@ -1336,6 +1410,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-ols"))]
     fn ols_durbin_watson(&self, ols: &super::models::OlsModel) -> Value {
         let dw = greeners::Diagnostics::durbin_watson(&ols.residuals);
         let dw_label = if dw < 1.5 {
@@ -1353,6 +1428,7 @@ impl Interpreter {
         Value::Dict(Arc::new(dw_map))
     }
 
+    #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-ols"))]
     fn ols_breusch_godfrey(&self, ols: &super::models::OlsModel) -> Result<Value> {
         println!("\n── Serial Autocorrelation (Breusch-Godfrey, lags=4)");
         match greeners::SpecificationTests::breusch_godfrey_test(&ols.residuals, &ols.x, 4) {
@@ -1377,6 +1453,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-ols"))]
     fn ols_white(&self, ols: &super::models::OlsModel) -> Result<Value> {
         println!("\n── Heteroskedasticity (White)");
         match greeners::SpecificationTests::white_test(&ols.residuals, &ols.x) {
@@ -1401,6 +1478,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-ols"))]
     fn ols_reset(&self, ols: &super::models::OlsModel) -> Result<Value> {
         println!("\n── Functional Specification (RESET, power=3)");
         let fitted = ols.result.fitted_values(&ols.x);
@@ -1429,6 +1507,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-ols"))]
     fn ols_vif(&self, ols: &super::models::OlsModel) -> Result<Option<Value>> {
         println!("\n── Multicollinearity (VIF)");
         let names = ols.result.variable_names.as_deref().unwrap_or(&[]);
@@ -1472,6 +1551,7 @@ impl Interpreter {
         Ok(Some(Value::DataFrame(Arc::new(vif_df))))
     }
 
+    #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-ols"))]
     fn ols_cooks(&self, ols: &super::models::OlsModel) -> Result<Option<Value>> {
         let n = ols.residuals.len();
         let mse = ols.result.sigma * ols.result.sigma;
@@ -1516,6 +1596,7 @@ impl Interpreter {
         let cook_df = self.dict_to_dataframe(&cook_columns)?;
         Ok(Some(Value::DataFrame(Arc::new(cook_df))))
     }
+    #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-timeseries"))]
     pub(super) fn diagnostics_garch(
         &mut self,
         m: &greeners::garch::GarchResult,
@@ -1551,6 +1632,7 @@ impl Interpreter {
         Ok(diagnostics)
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     fn garch_ljung_box(&self, std_res: &ndarray::Array1<f64>) -> Result<Value> {
         println!("\n── Autocorrelation in Standardized Residuals (Ljung-Box, lags=10)");
         match greeners::Diagnostics::ljung_box(std_res, 10) {
@@ -1574,6 +1656,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     fn garch_arch_test(&self, std_res: &ndarray::Array1<f64>) -> Result<Value> {
         println!("\n── ARCH Residual Effects (Engle LM, lags=5)");
         match greeners::Diagnostics::arch_test(std_res, 5) {
@@ -1598,6 +1681,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     fn garch_jarque_bera(&self, std_res: &ndarray::Array1<f64>) -> Result<Value> {
         println!("\n── Standardized Residual Normality (Jarque-Bera)");
         match greeners::Diagnostics::jarque_bera(std_res) {
@@ -1620,6 +1704,7 @@ impl Interpreter {
             }
         }
     }
+    #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-timeseries"))]
     pub(super) fn diagnostics_arima(
         &mut self,
         m: &greeners::arima::ArimaResult,
@@ -1643,6 +1728,7 @@ impl Interpreter {
         Ok(diagnostics)
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     fn arima_ljung_box(&self, resid: &ndarray::Array1<f64>) -> Result<Value> {
         println!("\n── Autocorrelation in Residuals (Ljung-Box, lags=10)");
         match greeners::Diagnostics::ljung_box(resid, 10) {
@@ -1666,6 +1752,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     fn arima_jarque_bera(&self, resid: &ndarray::Array1<f64>) -> Result<Value> {
         println!("\n── Residual Normality (Jarque-Bera)");
         match greeners::Diagnostics::jarque_bera(resid) {
@@ -1688,6 +1775,7 @@ impl Interpreter {
             }
         }
     }
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn diagnostics_var(
         &mut self,
         m: &greeners::var::VarResult,
@@ -1761,6 +1849,7 @@ impl Interpreter {
         println!("{thick}\n");
         Ok(diagnostics)
     }
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn diagnostics_vecm(
         &mut self,
         m: &greeners::vecm::VecmResult,
@@ -1792,6 +1881,7 @@ impl Interpreter {
         Ok(diagnostics)
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     fn vecm_johansen(&self, m: &greeners::vecm::VecmResult) -> Result<Value> {
         let k = m.n_vars;
         let n = m.n_obs as f64;
@@ -1844,6 +1934,7 @@ impl Interpreter {
         Ok(Value::DataFrame(Arc::new(joh_df)))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     fn vecm_alpha(&self, m: &greeners::vecm::VecmResult) -> Result<Value> {
         let k = m.n_vars;
         let r = m.rank;
@@ -1875,6 +1966,7 @@ impl Interpreter {
         Ok(Value::DataFrame(Arc::new(alpha_df)))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     fn vecm_beta(&self, m: &greeners::vecm::VecmResult) -> Result<Value> {
         let k = m.n_vars;
         let r = m.rank;
@@ -1901,6 +1993,7 @@ impl Interpreter {
         let beta_df = self.dict_to_dataframe(&beta_columns)?;
         Ok(Value::DataFrame(Arc::new(beta_df)))
     }
+    #[cfg(feature = "greeners-ols")]
     pub(super) fn diagnostics_iv(
         &mut self,
         iv: &greeners::iv::IvResult,
@@ -1946,6 +2039,7 @@ impl Interpreter {
         Ok(diagnostics)
     }
 
+    #[cfg(feature = "greeners-ols")]
     fn iv_coefficients(&self, iv: &greeners::iv::IvResult) -> Result<Option<Value>> {
         let k = iv.params.len();
         let names = iv.variable_names.as_deref().unwrap_or(&[]);
@@ -1974,6 +2068,7 @@ impl Interpreter {
         Ok(Some(Value::DataFrame(Arc::new(iv_df))))
     }
 
+    #[cfg(feature = "greeners-panel")]
     pub(super) fn diagnostics_panel(
         &mut self,
         fe: &greeners::panel::PanelResult,
@@ -2021,6 +2116,7 @@ impl Interpreter {
         Ok(diagnostics)
     }
 
+    #[cfg(feature = "greeners-panel")]
     fn fe_coefficients(&self, fe: &greeners::panel::PanelResult) -> Result<Option<Value>> {
         let k = fe.params.len();
         let names = fe.variable_names.as_deref().unwrap_or(&[]);
@@ -2058,6 +2154,7 @@ impl Interpreter {
         Ok(Some(Value::DataFrame(Arc::new(fe_df))))
     }
 
+    #[cfg(feature = "greeners-panel")]
     pub(super) fn diagnostics_re(
         &mut self,
         re: &greeners::panel::RandomEffectsResult,
@@ -2126,6 +2223,7 @@ impl Interpreter {
         Ok(diagnostics)
     }
 
+    #[cfg(feature = "greeners-panel")]
     fn re_coefficients(&self, re: &greeners::panel::RandomEffectsResult) -> Result<Option<Value>> {
         let k = re.params.len();
         println!("\n── Coefficient Significance");
@@ -2167,6 +2265,7 @@ impl Interpreter {
         Ok(Some(Value::DataFrame(Arc::new(re_df))))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn varma(
         &mut self,
         _func: &str,
@@ -2216,6 +2315,7 @@ impl Interpreter {
         Ok(Value::VarmaResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn decompose(
         &mut self,
         _func: &str,
@@ -2263,6 +2363,7 @@ impl Interpreter {
         Ok(Value::DecompResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn stl(
         &mut self,
         _func: &str,
@@ -2316,6 +2417,7 @@ impl Interpreter {
         Ok(Value::DecompResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn mstl(
         &mut self,
         _func: &str,
@@ -2793,6 +2895,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn ucm(
         &mut self,
         _func: &str,
@@ -2868,6 +2971,7 @@ impl Interpreter {
         Ok(Value::UCResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-glm")]
     pub(super) fn gam(
         &mut self,
         _func: &str,
@@ -2988,6 +3092,7 @@ impl Interpreter {
         Ok((x_smooth_ref, alpha_pen_used))
     }
 
+    #[cfg(feature = "greeners-glm")]
     fn parse_gam_family_link(
         &self,
         opt_map: &HashMap<String, Value>,
@@ -3038,6 +3143,7 @@ impl Interpreter {
         Ok((family, link))
     }
 
+    #[cfg(feature = "greeners-imputation")]
     pub(super) fn mice(
         &mut self,
         _func: &str,
@@ -3107,6 +3213,7 @@ impl Interpreter {
         Ok(Value::MiceResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn msauto(
         &mut self,
         _func: &str,
@@ -3153,6 +3260,7 @@ impl Interpreter {
         Ok(Value::MSARResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn svar(
         &mut self,
         _func: &str,
@@ -3212,6 +3320,7 @@ impl Interpreter {
         Ok(Value::SVarResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn sirf(
         &mut self,
         _func: &str,
@@ -3223,6 +3332,7 @@ impl Interpreter {
             return Err(HayashiError::Runtime("sirf(model, steps=10)".into()));
         }
         let model = match self.eval_expr(&args[0])? {
+            #[cfg(feature = "greeners-timeseries")]
             Value::SVarResult(m) => m,
             _ => return Err(HayashiError::Type("sirf() requires an SVAR model".into())),
         };
@@ -3282,6 +3392,7 @@ impl Interpreter {
         Ok(Value::DataFrame(Arc::new(df)))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn sfevd(
         &mut self,
         _func: &str,
@@ -3293,6 +3404,7 @@ impl Interpreter {
             return Err(HayashiError::Runtime("sfevd(model, steps=10)".into()));
         }
         let model = match self.eval_expr(&args[0])? {
+            #[cfg(feature = "greeners-timeseries")]
             Value::SVarResult(m) => m,
             _ => return Err(HayashiError::Type("sfevd() requires an SVAR model".into())),
         };
@@ -3352,6 +3464,7 @@ impl Interpreter {
         Ok(Value::DataFrame(Arc::new(df)))
     }
 
+    #[cfg(feature = "greeners-ols")]
     pub(super) fn threesl(
         &mut self,
         _func: &str,
@@ -3438,6 +3551,7 @@ impl Interpreter {
         }))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn dfm(
         &mut self,
         _func: &str,
@@ -3498,6 +3612,7 @@ impl Interpreter {
         }))
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn adtest(
         &mut self,
         _func: &str,
@@ -3581,6 +3696,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn lilliefors(
         &mut self,
         _func: &str,
@@ -3659,6 +3775,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn omnibus(
         &mut self,
         _func: &str,
@@ -3725,6 +3842,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn swilk(
         &mut self,
         _func: &str,
@@ -3808,6 +3926,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn sfrancia(
         &mut self,
         _func: &str,
@@ -4007,6 +4126,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn harveycollier(
         &mut self,
         _func: &str,

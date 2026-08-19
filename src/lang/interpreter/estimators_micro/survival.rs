@@ -2,6 +2,7 @@ use super::super::helpers::*;
 use super::super::*;
 
 impl Interpreter {
+    #[cfg(feature = "greeners-survival")]
     pub(super) fn km(
         &mut self,
         _func: &str,
@@ -46,6 +47,7 @@ impl Interpreter {
         Ok(Value::KMResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-survival")]
     pub(super) fn cox(
         &mut self,
         _func: &str,

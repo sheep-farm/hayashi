@@ -1,5 +1,6 @@
 use super::*;
 
+#[cfg(feature = "greeners-ols")]
 pub fn penalized_children(m: &PenalizedModel) -> Vec<(String, Value)> {
     let mut vars = Vec::new();
     let zeros: Array1<f64> = Array1::zeros(m.params.len());
@@ -16,7 +17,7 @@ pub fn penalized_children(m: &PenalizedModel) -> Vec<(String, Value)> {
     vars.push(("fit".into(), penalized_fit_dict(m)));
     vars
 }
-
+#[cfg(feature = "greeners-ols")]
 pub fn penalized_fit_dict(m: &PenalizedModel) -> Value {
     let mut entries = vec![
         ("kind", Value::Str(m.kind.clone())),
@@ -99,7 +100,7 @@ pub fn factor_fit_dict(r: &greeners::multivariate::FactorResult) -> Value {
         ("n_factors", Value::Int(r.n_factors as i64)),
     ])
 }
-
+#[cfg(feature = "greeners-imputation")]
 pub fn mice_children(r: &greeners::imputation::MICEResult) -> Vec<(String, Value)> {
     let mut vars = Vec::new();
     let mut imputations = Vec::new();
@@ -122,7 +123,7 @@ pub fn mice_children(r: &greeners::imputation::MICEResult) -> Vec<(String, Value
     vars.push(("fit".into(), mice_fit_dict(r)));
     vars
 }
-
+#[cfg(feature = "greeners-imputation")]
 pub fn mice_fit_dict(r: &greeners::imputation::MICEResult) -> Value {
     fit_dict(&[
         ("n_imputations", Value::Int(r.n_imputations as i64)),
@@ -131,7 +132,7 @@ pub fn mice_fit_dict(r: &greeners::imputation::MICEResult) -> Value {
         ("n_vars", Value::Int(r.n_vars as i64)),
     ])
 }
-
+#[cfg(feature = "greeners-glm")]
 pub fn gam_children(r: &greeners::glmgam::GamResult) -> Vec<(String, Value)> {
     let mut vars = Vec::new();
     let names = r.variable_names.clone().unwrap_or_default();
@@ -148,7 +149,7 @@ pub fn gam_children(r: &greeners::glmgam::GamResult) -> Vec<(String, Value)> {
     vars.push(("fit".into(), gam_fit_dict(r)));
     vars
 }
-
+#[cfg(feature = "greeners-glm")]
 pub fn gam_fit_dict(r: &greeners::glmgam::GamResult) -> Value {
     fit_dict(&[
         ("n_linear", Value::Int(r.n_linear as i64)),
@@ -161,7 +162,7 @@ pub fn gam_fit_dict(r: &greeners::glmgam::GamResult) -> Value {
         ("converged", Value::Bool(r.converged)),
     ])
 }
-
+#[cfg(feature = "greeners-ml")]
 pub fn kmeans_children(r: &greeners::kmeans::KmeansResult) -> Vec<(String, Value)> {
     let mut vars = Vec::new();
     let labels: Vec<Value> = r.labels.iter().map(|&l| Value::Int(l as i64)).collect();
@@ -185,7 +186,7 @@ pub fn kmeans_children(r: &greeners::kmeans::KmeansResult) -> Vec<(String, Value
     vars.push(("fit".into(), kmeans_fit_dict(r)));
     vars
 }
-
+#[cfg(feature = "greeners-ml")]
 pub fn kmeans_fit_dict(r: &greeners::kmeans::KmeansResult) -> Value {
     let pct = if r.total_ss > 1e-15 {
         r.between_ss / r.total_ss * 100.0
@@ -203,7 +204,7 @@ pub fn kmeans_fit_dict(r: &greeners::kmeans::KmeansResult) -> Value {
         ("pct_explained", Value::Float(pct)),
     ])
 }
-
+#[cfg(feature = "greeners-ml")]
 pub fn dbscan_children(r: &greeners::dbscan::DbscanResult) -> Vec<(String, Value)> {
     let mut vars = Vec::new();
     let labels: Vec<Value> = r.labels.iter().map(|&l| Value::Int(l)).collect();
@@ -223,7 +224,7 @@ pub fn dbscan_children(r: &greeners::dbscan::DbscanResult) -> Vec<(String, Value
     vars.push(("fit".into(), dbscan_fit_dict(r)));
     vars
 }
-
+#[cfg(feature = "greeners-ml")]
 pub fn dbscan_fit_dict(r: &greeners::dbscan::DbscanResult) -> Value {
     fit_dict(&[
         ("n_obs", Value::Int(r.n_obs as i64)),
@@ -287,7 +288,7 @@ pub fn kde_fit_dict(r: &greeners::nonparametric::KDEResult) -> Value {
         ("peak_x", Value::Float(peak_x)),
     ])
 }
-
+#[cfg(feature = "greeners-ml")]
 pub fn bart_children(r: &greeners::bart::BartResult) -> Vec<(String, Value)> {
     let mut vars = Vec::new();
     vars.push(("fitted".into(), array1_to_series("fitted", &r.fitted)));
@@ -320,7 +321,7 @@ pub fn bart_children(r: &greeners::bart::BartResult) -> Vec<(String, Value)> {
     vars.push(("fit".into(), bart_fit_dict(r)));
     vars
 }
-
+#[cfg(feature = "greeners-ml")]
 pub fn bart_fit_dict(r: &greeners::bart::BartResult) -> Value {
     fit_dict(&[
         ("n_obs", Value::Int(r.n_obs as i64)),
@@ -334,7 +335,7 @@ pub fn bart_fit_dict(r: &greeners::bart::BartResult) -> Value {
         ("mse", Value::Float(r.mse)),
     ])
 }
-
+#[cfg(feature = "greeners-ml")]
 pub fn gp_children(r: &greeners::gp::GpResult) -> Vec<(String, Value)> {
     vec![
         ("fitted".into(), array1_to_series("fitted", &r.fitted)),
@@ -345,7 +346,7 @@ pub fn gp_children(r: &greeners::gp::GpResult) -> Vec<(String, Value)> {
         ("fit".into(), gp_fit_dict(r)),
     ]
 }
-
+#[cfg(feature = "greeners-ml")]
 pub fn gp_fit_dict(r: &greeners::gp::GpResult) -> Value {
     fit_dict(&[
         ("n_obs", Value::Int(r.n_obs as i64)),
@@ -395,7 +396,7 @@ pub fn gmm_clustering_fit_dict(r: &greeners::gmm_clustering::GmmResult) -> Value
         ("bic", Value::Float(r.bic)),
     ])
 }
-
+#[cfg(feature = "greeners-ml")]
 pub fn hierarchical_children(
     r: &greeners::hierarchical::HierarchicalResult,
 ) -> Vec<(String, Value)> {
@@ -444,7 +445,7 @@ pub fn hierarchical_children(
     vars.push(("fit".into(), hierarchical_fit_dict(r)));
     vars
 }
-
+#[cfg(feature = "greeners-ml")]
 pub fn hierarchical_fit_dict(r: &greeners::hierarchical::HierarchicalResult) -> Value {
     fit_dict(&[
         ("n_obs", Value::Int(r.n_obs as i64)),
@@ -455,7 +456,7 @@ pub fn hierarchical_fit_dict(r: &greeners::hierarchical::HierarchicalResult) -> 
         ("cophenetic_corr", Value::Float(r.cophenetic_corr)),
     ])
 }
-
+#[cfg(feature = "greeners-timeseries")]
 pub fn spectral_children(r: &greeners::spectral::SpectralResult) -> Vec<(String, Value)> {
     let mut vars = Vec::new();
     let labels: Vec<Value> = r.labels.iter().map(|&l| Value::Int(l as i64)).collect();
@@ -482,7 +483,7 @@ pub fn spectral_children(r: &greeners::spectral::SpectralResult) -> Vec<(String,
     vars.push(("fit".into(), spectral_fit_dict(r)));
     vars
 }
-
+#[cfg(feature = "greeners-timeseries")]
 pub fn spectral_fit_dict(r: &greeners::spectral::SpectralResult) -> Value {
     fit_dict(&[
         ("n_obs", Value::Int(r.n_obs as i64)),

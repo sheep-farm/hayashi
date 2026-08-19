@@ -546,6 +546,7 @@ impl Interpreter {
         formula_str
     }
 
+    #[cfg(feature = "greeners-ols")]
     pub(super) fn eval_field(
         &mut self,
         obj: &Expr,
@@ -561,9 +562,13 @@ impl Interpreter {
                 Err(_) => model_expansion::value_field(&val, field)
                     .ok_or_else(|| self.rt_err(format!("unknown method or field '{field}'"))),
             },
+            #[cfg(feature = "greeners-ols")]
             (Value::IvResult(r), "summary") => Ok(Value::Str(format!("{r}"))),
+            #[cfg(feature = "greeners-glm")]
             (Value::BinaryResult(m), "summary") => Ok(Value::Str(format!("{m}"))),
+            #[cfg(feature = "greeners-panel")]
             (Value::PanelResult(r), "summary") => Ok(Value::Str(format!("{r}"))),
+            #[cfg(feature = "greeners-panel")]
             (Value::ReResult(r), "summary") => Ok(Value::Str(format!("{r}"))),
             _ => {
                 if let Some(v) = model_expansion::value_field(&val, field) {

@@ -4,6 +4,7 @@ use indexmap::IndexMap;
 
 impl Interpreter {
     /// `wooldridge` / `xtserial` — Wooldridge serial correlation test.
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn eval_wooldridge(
         &mut self,
         args: &[Expr],
@@ -102,6 +103,7 @@ impl Interpreter {
     }
 
     /// `pesaran` / `xtcd` — Pesaran cross-sectional dependence test.
+    #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-ols"))]
     pub(super) fn eval_pesaran(
         &mut self,
         args: &[Expr],
@@ -193,6 +195,7 @@ impl Interpreter {
     }
 
     /// `mundlak` — RE vs FE adequacy test.
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn eval_mundlak(
         &mut self,
         args: &[Expr],
@@ -321,6 +324,7 @@ impl Interpreter {
     }
 
     /// `abtest` / `arellano_bond` — Arellano-Bond m1/m2 tests.
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn eval_abtest(
         &mut self,
         args: &[Expr],

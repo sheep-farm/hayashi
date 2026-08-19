@@ -3,6 +3,7 @@ use crate::lang::ast::{Expr as AstExpr, RhsTerm};
 use crate::lang::dap::model_expansion;
 
 impl Interpreter {
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn midas(
         &mut self,
         _func: &str,
@@ -118,6 +119,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn tvp(
         &mut self,
         _func: &str,
@@ -172,6 +174,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn setar(
         &mut self,
         _func: &str,
@@ -262,6 +265,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn msvar(
         &mut self,
         func: &str,
@@ -365,6 +369,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(all(feature = "greeners-bayesian", feature = "greeners-timeseries"))]
     pub(super) fn favar(
         &mut self,
         func: &str,
@@ -509,6 +514,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn johansen_break(
         &mut self,
         func: &str,
@@ -620,6 +626,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn tvp_var(
         &mut self,
         func: &str,
@@ -692,6 +699,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn qvar(
         &mut self,
         func: &str,
@@ -784,6 +792,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn modwt(
         &mut self,
         func: &str,
@@ -873,6 +882,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn copula(
         &mut self,
         func: &str,
@@ -958,6 +968,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn nardl(
         &mut self,
         func: &str,
@@ -1048,6 +1059,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn dcc_garch(
         &mut self,
         _func: &str,
@@ -1116,6 +1128,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn tvar(
         &mut self,
         func: &str,
@@ -1248,6 +1261,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(all(feature = "greeners-bayesian", feature = "greeners-timeseries"))]
     pub(super) fn bvar(
         &mut self,
         func: &str,
@@ -1349,6 +1363,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn tvcopula(
         &mut self,
         func: &str,
@@ -1435,6 +1450,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn sv(
         &mut self,
         func: &str,
@@ -1519,6 +1535,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn hawkes(
         &mut self,
         func: &str,
