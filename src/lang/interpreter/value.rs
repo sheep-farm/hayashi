@@ -609,6 +609,7 @@ impl std::fmt::Display for Value {
             Value::OlsResult(m) => write!(f, "{m}"),
             #[cfg(feature = "greeners-ols")]
             Value::IvResult(r) => write!(f, "{r}"),
+            #[cfg(feature = "greeners-glm")]
             Value::BinaryResult(m) => write!(f, "{m}"),
             #[cfg(feature = "greeners-panel")]
             Value::PanelResult(r) => write!(f, "{r}"),
