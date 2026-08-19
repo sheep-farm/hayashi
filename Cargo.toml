@@ -33,7 +33,8 @@ path = "src/bin/hay-kernel/main.rs"
 required-features = ["native"]
 
 [dependencies]
-greeners = "2.0.0"
+# Greeners econometrics facade (local conditional re-export crate)
+greeners = { path = "crates/greeners", default-features = false }
 ndarray = "0.17"
 chrono = "0.4"
 statrs = "0.18"
@@ -82,7 +83,26 @@ js-sys = { version = "0.3", optional = true }
 indexmap = { version = "2", features = ["serde"] }
 
 [features]
-default = ["plotters", "wasm", "native"]
+default = ["plotters", "wasm", "native", "full"]
+
+# Greeners sub-crate toggles, forwarded to the local greeners facade.
+greeners-ols = ["greeners/ols"]
+greeners-glm = ["greeners/glm"]
+greeners-panel = ["greeners/panel"]
+greeners-timeseries = ["greeners/timeseries"]
+greeners-bayesian = ["greeners/bayesian"]
+greeners-causal = ["greeners/causal"]
+greeners-ml = ["greeners/ml"]
+greeners-spatial = ["greeners/spatial"]
+greeners-survival = ["greeners/survival"]
+greeners-imputation = ["greeners/imputation"]
+greeners-diagnostics = ["greeners/diagnostics"]
+full = [
+    "greeners-ols", "greeners-glm", "greeners-panel", "greeners-timeseries",
+    "greeners-bayesian", "greeners-causal", "greeners-ml", "greeners-spatial",
+    "greeners-survival", "greeners-imputation", "greeners-diagnostics",
+]
+minimal = ["greeners-ols"]
 odbc = ["dep:odbc-api"]
 plotters = ["dep:plotters"]
 wasm = ["dep:wasmi"]

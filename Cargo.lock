@@ -1459,14 +1459,7 @@ dependencies = [
 [[package]]
 name = "greeners"
 version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e15664176baa939b2abe3a38772d7a0b7ead36544b55a12af9b9d5d075d45c6"
 dependencies = [
- "argmin",
- "argmin-math",
- "chrono",
- "csv",
- "faer",
  "greeners-bayesian",
  "greeners-causal",
  "greeners-core",
@@ -1479,17 +1472,6 @@ dependencies = [
  "greeners-spatial",
  "greeners-survival",
  "greeners-timeseries",
- "indexmap",
- "ndarray",
- "num-complex",
- "rand 0.8.6",
- "rand_distr",
- "rayon",
- "regex",
- "serde",
- "serde_json",
- "statrs",
- "thiserror 1.0.69",
 ]
 
 [[package]]
