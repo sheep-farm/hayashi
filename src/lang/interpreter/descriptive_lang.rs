@@ -1881,6 +1881,7 @@ impl Interpreter {
                         ll: Some(m.result.log_likelihood),
                     });
                 }
+                #[cfg(feature = "greeners-glm")]
                 Value::BinaryResult(bm) => {
                     let label = if bm.kind == "logit" {
                         "Logit"
@@ -1983,6 +1984,7 @@ impl Interpreter {
                         .push(("_lambda".into(), r.delta, Some(r.delta_se), Some(dp)));
                     models.push(info);
                 }
+                #[cfg(feature = "greeners-panel")]
                 Value::PanelResult(r) => {
                     models.push(esttab_extract_std(
                         "FE",
