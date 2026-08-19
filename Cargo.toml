@@ -33,7 +33,7 @@ path = "src/bin/hay-kernel/main.rs"
 required-features = ["native"]
 
 [dependencies]
-greeners = { path = "../Greeners/crates/greeners" }
+greeners = "2.0.0"
 ndarray = "0.17"
 chrono = "0.4"
 statrs = "0.18"

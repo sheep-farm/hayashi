@@ -1458,7 +1458,9 @@ dependencies = [
 
 [[package]]
 name = "greeners"
-version = "2.0.0-proposal.1"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e15664176baa939b2abe3a38772d7a0b7ead36544b55a12af9b9d5d075d45c6"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1492,7 +1494,9 @@ dependencies = [
 
 [[package]]
 name = "greeners-bayesian"
-version = "2.0.0-proposal.1"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c75ae1cd55149cf746d383070b5d661ee02df025c769a0ad6b28e926fcc8dc4"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1515,7 +1519,9 @@ dependencies = [
 
 [[package]]
 name = "greeners-causal"
-version = "2.0.0-proposal.1"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "faf1927c188bb9615acf8c6457dfc51c0a3cb6d1c3a677329d76ca81ffd504de"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1539,7 +1545,9 @@ dependencies = [
 
 [[package]]
 name = "greeners-core"
-version = "2.0.0-proposal.1"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "332f2c813d68f35c9091f426bf0df69839be3551a3751c85617392694c417df7"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1561,7 +1569,9 @@ dependencies = [
 
 [[package]]
 name = "greeners-diagnostics"
-version = "2.0.0-proposal.1"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "31685c9104e3136f472d4eec3a70f55a219b3c2f663dbe9481f61bb14c83e674"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1586,7 +1596,9 @@ dependencies = [
 
 [[package]]
 name = "greeners-glm"
-version = "2.0.0-proposal.1"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f86e82f949b5ee00a7127ac52f622515d1ac2aae9e716605ace0d1bc9bc3ada3"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1610,7 +1622,9 @@ dependencies = [
 
 [[package]]
 name = "greeners-imputation"
-version = "2.0.0-proposal.1"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "766e9d87faa3fc2e7e112786abb3ea4cebd0a03dc347e095685424164b62cba5"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1634,7 +1648,9 @@ dependencies = [
 
 [[package]]
 name = "greeners-ml"
-version = "2.0.0-proposal.1"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ccc1b78557bb0bf213f8ee16567cbc31ae6c57a3c92064babbd09797f1467560"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1657,7 +1673,9 @@ dependencies = [
 
 [[package]]
 name = "greeners-ols"
-version = "2.0.0-proposal.1"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d04d092739a9a61d5d3df1e7ff0ffca44e77347f8f0e8661740e9d47dee58120"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1680,7 +1698,9 @@ dependencies = [
 
 [[package]]
 name = "greeners-panel"
-version = "2.0.0-proposal.1"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea18c1808d1387ecfab6fae6aa02f574c9443da2f9f4b7386cddc8c80ae8c4fa"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1704,7 +1724,9 @@ dependencies = [
 
 [[package]]
 name = "greeners-spatial"
-version = "2.0.0-proposal.1"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3018740be0b0edfdb582a2f5fe1000da3ec14280d288c6f3ce6786ad82c43a66"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1727,7 +1749,9 @@ dependencies = [
 
 [[package]]
 name = "greeners-survival"
-version = "2.0.0-proposal.1"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "19ef7db8fed60beb9c3cd9df96824e2c2ba79803085b5770c9e94c2b14312f04"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1750,7 +1774,9 @@ dependencies = [
 
 [[package]]
 name = "greeners-timeseries"
-version = "2.0.0-proposal.1"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "98d0dd587c1dc858606988c1dfebde22942a1d525fb2e6bcead5be736fe5a202"
 dependencies = [
  "argmin",
  "argmin-math",
