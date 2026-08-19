@@ -1,4 +1,8 @@
-use super::interpreter::models::{BinaryModel, OlsModel, PenalizedModel};
+use super::interpreter::models::OlsModel;
+#[cfg(feature = "greeners-glm")]
+use super::interpreter::models::BinaryModel;
+#[cfg(feature = "greeners-ols")]
+use super::interpreter::models::PenalizedModel;
 use super::interpreter::Value;
 use arrow::array::{
     make_array, Array, ArrayRef, BooleanArray, Float64Array, Int64Array, StringArray,
@@ -708,6 +712,7 @@ fn ols_model_to_json(m: &OlsModel) -> serde_json::Value {
 }
 
 /// Serialize a BinaryModel (logit/probit) to JSON dict for plugin consumption.
+#[cfg(feature = "greeners-glm")]
 fn binary_model_to_json(m: &BinaryModel) -> serde_json::Value {
     let r = &m.result;
     let mut map = serde_json::Map::new();
@@ -722,7 +727,7 @@ fn binary_model_to_json(m: &BinaryModel) -> serde_json::Value {
     serde_json::Value::Object(map)
 }
 
-/// Serialize a PenalizedModel (ridge/lasso/elasticnet) to JSON dict.
+#[cfg(feature = "greeners-ols")]
 fn penalized_model_to_json(m: &PenalizedModel) -> serde_json::Value {
     let mut map = serde_json::Map::new();
     map.insert("__model_type__".into(), serde_json::json!(m.kind.as_str()));

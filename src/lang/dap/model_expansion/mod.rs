@@ -13,13 +13,9 @@ mod core;
 pub use core::*;
 mod regression;
 pub use regression::*;
-#[cfg(feature = "greeners-timeseries")]
 mod timeseries;
-#[cfg(feature = "greeners-timeseries")]
 pub use timeseries::*;
-#[cfg(feature = "greeners-causal")]
 mod causal;
-#[cfg(feature = "greeners-causal")]
 pub use causal::*;
 mod misc;
 pub use misc::*;

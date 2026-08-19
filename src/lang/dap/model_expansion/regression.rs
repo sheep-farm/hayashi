@@ -18,6 +18,7 @@ pub fn ols_fit_dict(r: &greeners::OlsResult) -> Value {
     ])
 }
 
+#[cfg(feature = "greeners-ols")]
 pub fn iv_fit_dict(r: &greeners::iv::IvResult) -> Value {
     fit_dict(&[
         ("r2", Value::Float(r.r_squared)),
@@ -28,7 +29,7 @@ pub fn iv_fit_dict(r: &greeners::iv::IvResult) -> Value {
         ("inference", Value::Str(format!("{:?}", r.inference_type))),
     ])
 }
-
+#[cfg(feature = "greeners-panel")]
 pub fn panel_fit_dict(r: &greeners::panel::PanelResult) -> Value {
     fit_dict(&[
         ("r2", Value::Float(r.r_squared)),
@@ -39,7 +40,7 @@ pub fn panel_fit_dict(r: &greeners::panel::PanelResult) -> Value {
         ("inference", Value::Str(format!("{:?}", r.inference_type))),
     ])
 }
-
+#[cfg(feature = "greeners-panel")]
 pub fn re_fit_dict(r: &greeners::panel::RandomEffectsResult) -> Value {
     fit_dict(&[
         ("r2_overall", Value::Float(r.r_squared_overall)),
@@ -49,7 +50,7 @@ pub fn re_fit_dict(r: &greeners::panel::RandomEffectsResult) -> Value {
         ("inference", Value::Str(format!("{:?}", r.inference_type))),
     ])
 }
-
+#[cfg(feature = "greeners-glm")]
 pub fn binary_fit_dict(r: &greeners::discrete::BinaryModelResult) -> Value {
     fit_dict(&[
         ("model_name", Value::Str(r.model_name.clone())),
@@ -59,7 +60,7 @@ pub fn binary_fit_dict(r: &greeners::discrete::BinaryModelResult) -> Value {
         ("inference", Value::Str(format!("{:?}", r.inference_type))),
     ])
 }
-
+#[cfg(feature = "greeners-ols")]
 pub fn quantile_fit_dict(r: &greeners::quantile::QuantileResult) -> Value {
     fit_dict(&[
         ("tau", Value::Float(r.tau)),
@@ -67,7 +68,7 @@ pub fn quantile_fit_dict(r: &greeners::quantile::QuantileResult) -> Value {
         ("iterations", Value::Int(r.iterations as i64)),
     ])
 }
-
+#[cfg(feature = "greeners-ols")]
 pub fn tobit_fit_dict(r: &greeners::tobit::TobitResult) -> Value {
     fit_dict(&[
         ("sigma", Value::Float(r.sigma)),
@@ -78,7 +79,7 @@ pub fn tobit_fit_dict(r: &greeners::tobit::TobitResult) -> Value {
         ("iterations", Value::Int(r.iterations as i64)),
     ])
 }
-
+#[cfg(feature = "greeners-glm")]
 pub fn poisson_fit_dict(r: &greeners::poisson::PoissonResult) -> Value {
     fit_dict(&[
         ("log_lik", Value::Float(r.log_likelihood)),
@@ -96,7 +97,7 @@ pub fn poisson_fit_dict(r: &greeners::poisson::PoissonResult) -> Value {
         ("inference", Value::Str(format!("{:?}", r.inference_type))),
     ])
 }
-
+#[cfg(feature = "greeners-glm")]
 pub fn negbin_fit_dict(r: &greeners::negbin::NegBinResult) -> Value {
     fit_dict(&[
         ("log_lik", Value::Float(r.log_likelihood)),
@@ -115,7 +116,7 @@ pub fn negbin_fit_dict(r: &greeners::negbin::NegBinResult) -> Value {
         ("inference", Value::Str(format!("{:?}", r.inference_type))),
     ])
 }
-
+#[cfg(feature = "greeners-glm")]
 pub fn glm_fit_dict(r: &greeners::glm::GlmResult) -> Value {
     fit_dict(&[
         ("log_lik", Value::Float(r.log_likelihood)),
@@ -134,7 +135,7 @@ pub fn glm_fit_dict(r: &greeners::glm::GlmResult) -> Value {
         ("family", Value::Str(format!("{:?}", r.family))),
     ])
 }
-
+#[cfg(feature = "greeners-ols")]
 pub fn rlm_fit_dict(r: &greeners::rlm::RlmResult) -> Value {
     fit_dict(&[
         ("scale", Value::Float(r.scale)),
@@ -143,7 +144,7 @@ pub fn rlm_fit_dict(r: &greeners::rlm::RlmResult) -> Value {
         ("converged", Value::Bool(r.converged)),
     ])
 }
-
+#[cfg(feature = "greeners-glm")]
 pub fn beta_fit_dict(r: &greeners::beta_model::BetaResult) -> Value {
     fit_dict(&[
         ("precision_param", Value::Float(r.precision_param)),
@@ -156,7 +157,7 @@ pub fn beta_fit_dict(r: &greeners::beta_model::BetaResult) -> Value {
         ("converged", Value::Bool(r.converged)),
     ])
 }
-
+#[cfg(feature = "greeners-ols")]
 pub fn gmm_fit_dict(r: &greeners::gmm::GmmResult) -> Value {
     fit_dict(&[
         ("j_stat", Value::Float(r.j_stat)),
@@ -166,7 +167,7 @@ pub fn gmm_fit_dict(r: &greeners::gmm::GmmResult) -> Value {
         ("df_overid", Value::Int(r.df_overid as i64)),
     ])
 }
-
+#[cfg(feature = "greeners-panel")]
 pub fn ab_fit_dict(r: &greeners::dynamic_panel::ArellanoBondResult) -> Value {
     fit_dict(&[
         ("sargan_stat", Value::Float(r.sargan_stat)),
@@ -184,7 +185,7 @@ pub fn ab_fit_dict(r: &greeners::dynamic_panel::ArellanoBondResult) -> Value {
         ("m2_pval", Value::Float(r.m2_pval)),
     ])
 }
-
+#[cfg(feature = "greeners-panel")]
 pub fn sysgmm_fit_dict(r: &greeners::dynamic_panel::SystemGmmResult) -> Value {
     fit_dict(&[
         ("sargan_stat", Value::Float(r.sargan_stat)),
@@ -202,7 +203,7 @@ pub fn sysgmm_fit_dict(r: &greeners::dynamic_panel::SystemGmmResult) -> Value {
         ("m2_pval", Value::Float(r.m2_pval)),
     ])
 }
-
+#[cfg(feature = "greeners-panel")]
 pub fn pcse_fit_dict(r: &greeners::panel::PcseResult) -> Value {
     fit_dict(&[
         ("r2", Value::Float(r.r_squared)),
@@ -213,7 +214,7 @@ pub fn pcse_fit_dict(r: &greeners::panel::PcseResult) -> Value {
         ("sigma", Value::Float(r.sigma)),
     ])
 }
-
+#[cfg(feature = "greeners-panel")]
 pub fn panel_gls_fit_dict(r: &greeners::panel::PanelGlsResult) -> Value {
     fit_dict(&[
         ("r2", Value::Float(r.r_squared)),
@@ -225,7 +226,7 @@ pub fn panel_gls_fit_dict(r: &greeners::panel::PanelGlsResult) -> Value {
         ("panels", Value::Str(format!("{:?}", r.panels))),
     ])
 }
-
+#[cfg(feature = "greeners-panel")]
 pub fn fe2sls_fit_dict(r: &greeners::panel::PanelIvResult) -> Value {
     fit_dict(&[
         ("r2", Value::Float(r.r_squared)),
@@ -236,7 +237,7 @@ pub fn fe2sls_fit_dict(r: &greeners::panel::PanelIvResult) -> Value {
         ("inference", Value::Str(format!("{:?}", r.inference_type))),
     ])
 }
-
+#[cfg(feature = "greeners-glm")]
 pub fn ordered_fit_dict(r: &greeners::ordered::OrderedResult) -> Value {
     fit_dict(&[
         ("model_name", Value::Str(r.model_name.clone())),
@@ -251,7 +252,7 @@ pub fn ordered_fit_dict(r: &greeners::ordered::OrderedResult) -> Value {
         ("inference", Value::Str(format!("{:?}", r.inference_type))),
     ])
 }
-
+#[cfg(feature = "greeners-glm")]
 pub fn zero_inflated_children(
     r: &greeners::zero_inflated::ZeroInflatedResult,
 ) -> Vec<(String, Value)> {
@@ -284,7 +285,7 @@ pub fn zero_inflated_children(
     vars.push(("fit".into(), zero_inflated_fit_dict(r)));
     vars
 }
-
+#[cfg(feature = "greeners-glm")]
 pub fn zero_inflated_fit_dict(r: &greeners::zero_inflated::ZeroInflatedResult) -> Value {
     let mut entries: Vec<(&str, Value)> = vec![
         ("model_name", Value::Str(r.model_name.clone())),
@@ -301,7 +302,7 @@ pub fn zero_inflated_fit_dict(r: &greeners::zero_inflated::ZeroInflatedResult) -
     }
     fit_dict(&entries)
 }
-
+#[cfg(feature = "greeners-bayesian")]
 pub fn mixed_children(r: &greeners::mixed::MixedResult) -> Vec<(String, Value)> {
     let mut vars = Vec::new();
     let names = r.variable_names.clone().unwrap_or_default();
@@ -332,7 +333,7 @@ pub fn mixed_children(r: &greeners::mixed::MixedResult) -> Vec<(String, Value)> 
     vars.push(("fit".into(), mixed_fit_dict(r)));
     vars
 }
-
+#[cfg(feature = "greeners-bayesian")]
 pub fn mixed_fit_dict(r: &greeners::mixed::MixedResult) -> Value {
     fit_dict(&[
         ("log_lik", Value::Float(r.log_likelihood)),
@@ -345,7 +346,7 @@ pub fn mixed_fit_dict(r: &greeners::mixed::MixedResult) -> Value {
         ("converged", Value::Bool(r.converged)),
     ])
 }
-
+#[cfg(feature = "greeners-ols")]
 pub fn glsar_fit_dict(r: &greeners::glsar::GlsarResult) -> Value {
     fit_dict(&[
         ("r2", Value::Float(r.r_squared)),
@@ -353,7 +354,7 @@ pub fn glsar_fit_dict(r: &greeners::glsar::GlsarResult) -> Value {
         ("df_resid", Value::Int(r.df_resid as i64)),
     ])
 }
-
+#[cfg(feature = "greeners-ols")]
 pub fn sur_children(m: &SurModel) -> Vec<(String, Value)> {
     let r = &m.result;
     let mut vars = Vec::new();
@@ -387,7 +388,7 @@ pub fn sur_children(m: &SurModel) -> Vec<(String, Value)> {
     }
     vars
 }
-
+#[cfg(feature = "greeners-ols")]
 pub fn three_sls_children(m: &ThreeSLSModel) -> Vec<(String, Value)> {
     let r = &m.result;
     let mut vars = Vec::new();
@@ -419,7 +420,7 @@ pub fn three_sls_children(m: &ThreeSLSModel) -> Vec<(String, Value)> {
     }
     vars
 }
-
+#[cfg(feature = "greeners-glm")]
 pub fn mnlogit_children(r: &greeners::mnlogit::MNLogitResult) -> Vec<(String, Value)> {
     let mut vars = Vec::new();
     let names = r.variable_names.clone().unwrap_or_default();
@@ -436,7 +437,7 @@ pub fn mnlogit_children(r: &greeners::mnlogit::MNLogitResult) -> Vec<(String, Va
     vars.push(("fit".into(), mnlogit_fit_dict(r)));
     vars
 }
-
+#[cfg(feature = "greeners-glm")]
 pub fn mnlogit_fit_dict(r: &greeners::mnlogit::MNLogitResult) -> Value {
     fit_dict(&[
         ("log_lik", Value::Float(r.log_likelihood)),
@@ -449,7 +450,7 @@ pub fn mnlogit_fit_dict(r: &greeners::mnlogit::MNLogitResult) -> Value {
         ("converged", Value::Bool(r.converged)),
     ])
 }
-
+#[cfg(feature = "greeners-glm")]
 pub fn gee_children(r: &greeners::gee::GeeResult) -> Vec<(String, Value)> {
     let mut vars = Vec::new();
     let names = r.variable_names.clone().unwrap_or_default();
@@ -472,7 +473,7 @@ pub fn gee_children(r: &greeners::gee::GeeResult) -> Vec<(String, Value)> {
     vars.push(("fit".into(), gee_fit_dict(r)));
     vars
 }
-
+#[cfg(feature = "greeners-glm")]
 pub fn gee_fit_dict(r: &greeners::gee::GeeResult) -> Value {
     fit_dict(&[
         ("scale", Value::Float(r.scale)),
@@ -483,7 +484,7 @@ pub fn gee_fit_dict(r: &greeners::gee::GeeResult) -> Value {
         ("converged", Value::Bool(r.converged)),
     ])
 }
-
+#[cfg(feature = "greeners-glm")]
 pub fn conditional_children(r: &greeners::conditional::ConditionalResult) -> Vec<(String, Value)> {
     let mut vars = Vec::new();
     let names = r.variable_names.clone().unwrap_or_default();
@@ -500,7 +501,7 @@ pub fn conditional_children(r: &greeners::conditional::ConditionalResult) -> Vec
     vars.push(("fit".into(), conditional_fit_dict(r)));
     vars
 }
-
+#[cfg(feature = "greeners-glm")]
 pub fn conditional_fit_dict(r: &greeners::conditional::ConditionalResult) -> Value {
     fit_dict(&[
         ("model_name", Value::Str(r.model_name.clone())),
