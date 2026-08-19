@@ -17,6 +17,7 @@ impl std::fmt::Display for OlsModel {
 }
 
 #[derive(Clone)]
+#[cfg(feature = "greeners-ols")]
 pub struct PenalizedModel {
     pub params: Array1<f64>,
     pub std_errors: Array1<f64>,
@@ -63,6 +64,7 @@ impl std::fmt::Display for PenalizedModel {
 }
 
 #[derive(Clone)]
+#[cfg(feature = "greeners-glm")]
 pub struct BinaryModel {
     pub result: Rc<greeners::discrete::BinaryModelResult>,
     pub y: Array1<f64>,
@@ -80,6 +82,7 @@ impl std::fmt::Display for BinaryModel {
 // ── SUR wrapper (preserves variable names per equation) ─────────────────────
 
 #[derive(Clone)]
+#[cfg(feature = "greeners-ols")]
 pub struct SurModel {
     pub result: Rc<greeners::sur::SurResult>,
     pub eq_var_names: Vec<Vec<String>>, // names per equation
@@ -215,6 +218,7 @@ impl std::fmt::Display for FactorModel {
 
 // ── DFM wrapper ───────────────────────────────────────────────────────────────
 #[derive(Clone)]
+#[cfg(feature = "greeners-timeseries")]
 pub struct DFMModel {
     pub result: Rc<greeners::dynamic_factor::DynamicFactorResult>,
     #[allow(dead_code)]
@@ -229,6 +233,7 @@ impl std::fmt::Display for DFMModel {
 
 // ── 3SLS wrapper ──────────────────────────────────────────────────────────────
 #[derive(Clone)]
+#[cfg(feature = "greeners-ols")]
 pub struct ThreeSLSModel {
     pub result: Rc<greeners::three_sls::ThreeSLSResult>,
     #[allow(dead_code)]
