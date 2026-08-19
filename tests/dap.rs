@@ -1,3 +1,4 @@
+use serde_json::json;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
@@ -120,17 +121,20 @@ fn dap_breakpoint_and_variables() {
     session.send("initialize", "");
     session.send(
         "setBreakpoints",
-        &format!(
-            "{{\"source\":{{\"path\":\"{}\"}},\"breakpoints\":[{{\"line\":3}}]}}",
-            _tmp.display()
-        ),
+        &json!({
+            "source": {"path": _tmp.to_string_lossy()},
+            "breakpoints": [{"line": 3}]
+        })
+        .to_string(),
     );
     session.send(
         "launch",
-        &format!(
-            "{{\"request\":\"launch\",\"name\":\"test\",\"program\":\"{}\"}}",
-            _tmp.display()
-        ),
+        &json!({
+            "request": "launch",
+            "name": "test",
+            "program": _tmp.to_string_lossy()
+        })
+        .to_string(),
     );
     session.send("configurationDone", "");
 
@@ -162,10 +166,12 @@ fn dap_runs_to_completion_without_breakpoints() {
     session.send("initialize", "");
     session.send(
         "launch",
-        &format!(
-            "{{\"request\":\"launch\",\"name\":\"test\",\"program\":\"{}\"}}",
-            _tmp.display()
-        ),
+        &json!({
+            "request": "launch",
+            "name": "test",
+            "program": _tmp.to_string_lossy()
+        })
+        .to_string(),
     );
     session.send("configurationDone", "");
 
@@ -181,17 +187,20 @@ fn dap_breakpoint_inside_expression_block() {
     session.send("initialize", "");
     session.send(
         "setBreakpoints",
-        &format!(
-            "{{\"source\":{{\"path\":\"{}\"}},\"breakpoints\":[{{\"line\":3}}]}}",
-            _tmp.display()
-        ),
+        &json!({
+            "source": {"path": _tmp.to_string_lossy()},
+            "breakpoints": [{"line": 3}]
+        })
+        .to_string(),
     );
     session.send(
         "launch",
-        &format!(
-            "{{\"request\":\"launch\",\"name\":\"test\",\"program\":\"{}\"}}",
-            _tmp.display()
-        ),
+        &json!({
+            "request": "launch",
+            "name": "test",
+            "program": _tmp.to_string_lossy()
+        })
+        .to_string(),
     );
     session.send("configurationDone", "");
 
@@ -217,17 +226,20 @@ fn dap_function_call_variables() {
     session.send("initialize", "");
     session.send(
         "setBreakpoints",
-        &format!(
-            "{{\"source\":{{\"path\":\"{}\"}},\"breakpoints\":[{{\"line\":2}}]}}",
-            _tmp.display()
-        ),
+        &json!({
+            "source": {"path": _tmp.to_string_lossy()},
+            "breakpoints": [{"line": 2}]
+        })
+        .to_string(),
     );
     session.send(
         "launch",
-        &format!(
-            "{{\"request\":\"launch\",\"name\":\"test\",\"program\":\"{}\"}}",
-            _tmp.display()
-        ),
+        &json!({
+            "request": "launch",
+            "name": "test",
+            "program": _tmp.to_string_lossy()
+        })
+        .to_string(),
     );
     session.send("configurationDone", "");
 
@@ -274,17 +286,20 @@ fn dap_print_output_event() {
     session.send("initialize", "");
     session.send(
         "setBreakpoints",
-        &format!(
-            "{{\"source\":{{\"path\":\"{}\"}},\"breakpoints\":[{{\"line\":2}}]}}",
-            _tmp.display()
-        ),
+        &json!({
+            "source": {"path": _tmp.to_string_lossy()},
+            "breakpoints": [{"line": 2}]
+        })
+        .to_string(),
     );
     session.send(
         "launch",
-        &format!(
-            "{{\"request\":\"launch\",\"name\":\"test\",\"program\":\"{}\"}}",
-            _tmp.display()
-        ),
+        &json!({
+            "request": "launch",
+            "name": "test",
+            "program": _tmp.to_string_lossy()
+        })
+        .to_string(),
     );
     session.send("configurationDone", "");
 
