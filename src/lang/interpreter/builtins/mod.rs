@@ -575,6 +575,7 @@ impl Interpreter {
                 self.aggregations_list(func, args, opts, _opt_map)
             }
             "date" | "datetime" => self.datetime(func, args, opts, _opt_map),
+            #[cfg(all(feature = "greeners-bayesian", feature = "greeners-causal", feature = "greeners-glm", feature = "greeners-imputation", feature = "greeners-ols", feature = "greeners-panel", feature = "greeners-survival", feature = "greeners-timeseries"))]
             "glance" => self.glance(func, args, opts, _opt_map),
             "len" | "keys" | "values" | "has_key" | "dict_merge" | "dmerge" | "dict_set"
             | "dset" | "dict_remove" | "dremove" | "dataframe" => {
@@ -593,6 +594,7 @@ impl Interpreter {
             | "starts_with" | "ends_with" | "substr" | "split" | "str_replace" => {
                 self.string_functions(func, args, opts, _opt_map)
             }
+            #[cfg(all(feature = "greeners-bayesian", feature = "greeners-causal", feature = "greeners-glm", feature = "greeners-imputation", feature = "greeners-ols", feature = "greeners-panel", feature = "greeners-survival", feature = "greeners-timeseries"))]
             "tidy" => self.tidy(func, args, opts, _opt_map),
             "int" | "float" | "str" | "string" | "bool" | "is_nil" | "is_int" | "is_float"
             | "is_bool" | "is_str" | "is_string" | "is_list" | "is_dict" | "is_df"

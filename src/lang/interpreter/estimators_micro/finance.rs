@@ -4,6 +4,7 @@ use crate::lang::dap::model_expansion;
 
 impl Interpreter {
     #[cfg(feature = "greeners-diagnostics")]
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn fmb(
         &mut self,
         _func: &str,

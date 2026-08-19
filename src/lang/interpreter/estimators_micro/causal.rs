@@ -3,6 +3,7 @@ use super::super::*;
 use crate::lang::dap::model_expansion;
 
 impl Interpreter {
+    #[cfg(feature = "greeners-causal")]
     pub(super) fn rd(
         &mut self,
         _func: &str,
@@ -84,6 +85,7 @@ impl Interpreter {
         Ok(Value::RdResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-causal")]
     pub(super) fn fuzzy_rd(
         &mut self,
         _func: &str,
@@ -176,6 +178,7 @@ impl Interpreter {
         Ok(Value::RdResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-causal")]
     pub(super) fn psm(
         &mut self,
         _func: &str,
@@ -281,6 +284,7 @@ impl Interpreter {
         Ok(Value::PsmResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-causal")]
     pub(super) fn synth(
         &mut self,
         _func: &str,
@@ -374,6 +378,7 @@ impl Interpreter {
         Ok(Value::SynthResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-causal")]
     pub(super) fn did(
         &mut self,
         _func: &str,
@@ -415,6 +420,7 @@ impl Interpreter {
         Ok(Value::DidResult(Rc::new(result)))
     }
 
+    #[cfg(all(feature = "greeners-causal", feature = "greeners-ols"))]
     pub(super) fn eventstudy(
         &mut self,
         _func: &str,
@@ -563,6 +569,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-causal")]
     pub(super) fn double_ml(
         &mut self,
         _func: &str,
@@ -659,6 +666,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-causal")]
     pub(super) fn synthdid(
         &mut self,
         func: &str,
@@ -888,6 +896,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-causal")]
     pub(super) fn cuped(
         &mut self,
         func: &str,
@@ -1006,6 +1015,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-causal")]
     pub(super) fn dml_crossfit(
         &mut self,
         func: &str,
@@ -1117,6 +1127,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(all(feature = "greeners-bayesian", feature = "greeners-causal"))]
     pub(super) fn bsc(
         &mut self,
         func: &str,
@@ -1266,6 +1277,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-causal")]
     pub(super) fn causal_impact(
         &mut self,
         func: &str,
@@ -1428,6 +1440,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-causal")]
     pub(super) fn lpdid(
         &mut self,
         _func: &str,
@@ -1435,6 +1448,7 @@ impl Interpreter {
         _opts: &[Opt],
         opt_map: &HashMap<String, Value>,
     ) -> Result<Value> {
+        #[cfg(feature = "greeners-causal")]
         fn to_usize(v: &Value, name: &str) -> Result<usize> {
             match v {
                 Value::Int(i) if *i >= 0 => Ok(*i as usize),

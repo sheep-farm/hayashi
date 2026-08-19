@@ -1,6 +1,6 @@
-use super::interpreter::models::OlsModel;
 #[cfg(feature = "greeners-glm")]
 use super::interpreter::models::BinaryModel;
+use super::interpreter::models::OlsModel;
 #[cfg(feature = "greeners-ols")]
 use super::interpreter::models::PenalizedModel;
 use super::interpreter::Value;

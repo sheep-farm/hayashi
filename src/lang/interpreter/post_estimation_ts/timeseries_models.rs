@@ -2,6 +2,7 @@ use super::*;
 
 impl Interpreter {
     /// `vecm(df, y1, y2, ..., lags=2, rank=1)` — Vector Error Correction.
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn eval_vecm(
         &mut self,
         args: &[Expr],
@@ -55,6 +56,7 @@ impl Interpreter {
     }
 
     /// `var(df, y1, y2, ..., lags=2)` — Vetor Auto-regressivo.
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn eval_var(
         &mut self,
         args: &[Expr],
@@ -101,6 +103,7 @@ impl Interpreter {
     }
 
     /// `irf(model, steps=10)` — Impulse Response Function.
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn eval_irf(
         &mut self,
         args: &[Expr],
@@ -176,6 +179,7 @@ impl Interpreter {
     }
 
     /// `fevd(model, steps=10)` — Forecast Error Variance Decomposition.
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn eval_fevd(
         &mut self,
         args: &[Expr],
@@ -255,6 +259,7 @@ impl Interpreter {
     }
 
     /// `arima` / `sarima(df, varname, p=1, d=1, q=1, ...)`.
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn eval_arima(
         &mut self,
         func: &str,

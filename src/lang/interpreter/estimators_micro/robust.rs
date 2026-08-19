@@ -3,6 +3,7 @@ use super::super::*;
 
 impl Interpreter {
     #[cfg(feature = "greeners-ols")]
+    #[cfg(feature = "greeners-ols")]
     pub(super) fn rlm(
         &mut self,
         _func: &str,
@@ -40,6 +41,7 @@ impl Interpreter {
         Ok(Value::RlmResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-glm")]
     #[cfg(feature = "greeners-glm")]
     pub(super) fn gee(
         &mut self,
@@ -129,6 +131,7 @@ impl Interpreter {
     }
 
     #[cfg(feature = "greeners-bayesian")]
+    #[cfg(feature = "greeners-bayesian")]
     pub(super) fn mixed(
         &mut self,
         _func: &str,
@@ -207,6 +210,7 @@ impl Interpreter {
     }
 
     #[cfg(feature = "greeners-ols")]
+    #[cfg(feature = "greeners-ols")]
     pub(super) fn glsar(
         &mut self,
         _func: &str,
@@ -238,6 +242,7 @@ impl Interpreter {
         Ok(Value::GlsarResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-glm")]
     #[cfg(feature = "greeners-glm")]
     pub(super) fn betareg(
         &mut self,
@@ -273,6 +278,7 @@ impl Interpreter {
         Ok(Value::BetaResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-glm")]
     #[cfg(feature = "greeners-glm")]
     pub(super) fn glm(
         &mut self,

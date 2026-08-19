@@ -546,6 +546,7 @@ impl Interpreter {
         formula_str
     }
 
+    #[cfg(feature = "greeners-ols")]
     pub(super) fn eval_field(
         &mut self,
         obj: &Expr,

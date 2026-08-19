@@ -2,6 +2,7 @@ use super::super::*;
 use crate::lang::dap::model_expansion;
 
 impl Interpreter {
+    #[cfg(feature = "greeners-panel")]
     pub(super) fn panel_tobit(
         &mut self,
         _func: &str,
@@ -97,6 +98,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-panel")]
     pub(super) fn panel_heckman(
         &mut self,
         _func: &str,
@@ -255,6 +257,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-panel")]
     pub(super) fn panel_qreg(
         &mut self,
         func: &str,
@@ -367,6 +370,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(all(feature = "greeners-ols", feature = "greeners-panel"))]
     pub(super) fn fmols(
         &mut self,
         _func: &str,
@@ -426,6 +430,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-panel")]
     pub(super) fn pstr(
         &mut self,
         func: &str,
@@ -539,6 +544,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-panel")]
     pub(super) fn pvar(
         &mut self,
         func: &str,
@@ -642,6 +648,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-panel")]
     pub(super) fn fcoef(
         &mut self,
         func: &str,
@@ -730,6 +737,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(all(feature = "greeners-bayesian", feature = "greeners-panel"))]
     pub(super) fn mfvar(
         &mut self,
         func: &str,
@@ -913,6 +921,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-panel")]
     pub(super) fn fapanel(
         &mut self,
         func: &str,

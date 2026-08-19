@@ -4,6 +4,7 @@ use super::super::*;
 use crate::lang::dap::model_expansion;
 
 impl Interpreter {
+    #[cfg(feature = "greeners-ml")]
     pub(super) fn rf(
         &mut self,
         _func: &str,
@@ -84,6 +85,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-ml")]
     pub(super) fn gbm(
         &mut self,
         _func: &str,
@@ -169,6 +171,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-ml")]
     pub(super) fn mlp(
         &mut self,
         _func: &str,
@@ -247,6 +250,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-ml")]
     pub(super) fn qrf(
         &mut self,
         func: &str,
@@ -344,6 +348,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-ml")]
     pub(super) fn xgboost(
         &mut self,
         _func: &str,
@@ -456,6 +461,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(all(feature = "greeners-ml", feature = "greeners-timeseries"))]
     pub(super) fn lstm(
         &mut self,
         func: &str,
@@ -563,6 +569,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(all(feature = "greeners-causal", feature = "greeners-ml"))]
     pub(super) fn causalforest(
         &mut self,
         func: &str,
@@ -692,6 +699,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-ml")]
     pub(super) fn grf(
         &mut self,
         func: &str,
@@ -822,6 +830,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(all(feature = "greeners-causal", feature = "greeners-ml"))]
     pub(super) fn conformal(
         &mut self,
         _func: &str,
@@ -908,6 +917,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-ml")]
     pub(super) fn transformer(
         &mut self,
         func: &str,
@@ -1016,6 +1026,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(all(feature = "greeners-causal", feature = "greeners-ml"))]
     pub(super) fn dr_learner(
         &mut self,
         func: &str,
@@ -1137,6 +1148,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-ml")]
     pub(super) fn bart(
         &mut self,
         _func: &str,
@@ -1187,6 +1199,7 @@ impl Interpreter {
         Ok(Value::BartResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-ml")]
     pub(super) fn gp(
         &mut self,
         _func: &str,
@@ -1208,6 +1221,7 @@ impl Interpreter {
         Ok(Value::GpResult(Rc::new(result)))
     }
 
+    #[cfg(all(feature = "greeners-causal", feature = "greeners-ml"))]
     pub(super) fn tmle(
         &mut self,
         func: &str,
@@ -1330,6 +1344,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-ml")]
     pub(super) fn orf(
         &mut self,
         func: &str,
@@ -1482,6 +1497,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(all(feature = "greeners-ml", feature = "greeners-timeseries"))]
     pub(super) fn spectral(
         &mut self,
         func: &str,
@@ -1550,6 +1566,7 @@ impl Interpreter {
         Ok(Value::SpectralResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-ml")]
     pub(super) fn isotonic(
         &mut self,
         func: &str,
@@ -1591,6 +1608,7 @@ impl Interpreter {
         Ok(Value::IsotonicResult(Rc::new(result)))
     }
 
+    #[cfg(all(feature = "greeners-imputation", feature = "greeners-ml"))]
     pub(super) fn mice_chained(
         &mut self,
         func: &str,
@@ -1705,6 +1723,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-ml")]
     pub(super) fn kmeans(
         &mut self,
         func: &str,
@@ -1768,6 +1787,7 @@ impl Interpreter {
         Ok(Value::KmeansResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-ml")]
     pub(super) fn dbscan(
         &mut self,
         func: &str,
@@ -1840,6 +1860,7 @@ impl Interpreter {
         Ok(Value::DbscanResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-ml")]
     pub(super) fn gmm_clust(
         &mut self,
         func: &str,
@@ -1913,6 +1934,7 @@ impl Interpreter {
         Ok(Value::GmmClusteringResult(Rc::new(result)))
     }
 
+    #[cfg(all(feature = "greeners-ml", feature = "greeners-ols"))]
     pub(super) fn reg_path(
         &mut self,
         _func: &str,
@@ -2008,6 +2030,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-ml")]
     pub(super) fn qrf_inf(
         &mut self,
         _func: &str,
@@ -2120,6 +2143,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-ml")]
     pub(super) fn hclust(
         &mut self,
         func: &str,
@@ -2190,6 +2214,7 @@ impl Interpreter {
         Ok(Value::HierarchicalResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-ml")]
     pub(super) fn tsne(
         &mut self,
         func: &str,
@@ -2291,6 +2316,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-ml")]
     pub(super) fn umap(
         &mut self,
         func: &str,
@@ -2387,6 +2413,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-ml")]
     pub(super) fn biplot(
         &mut self,
         func: &str,
@@ -2501,6 +2528,7 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-ml")]
     pub(super) fn lowess(
         &mut self,
         _func: &str,
@@ -2560,6 +2588,7 @@ impl Interpreter {
         Ok(Value::LowessResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-ml")]
     pub(super) fn kde(
         &mut self,
         _func: &str,
@@ -2618,6 +2647,7 @@ impl Interpreter {
         Ok(Value::KdeResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-ml")]
     pub(super) fn pca(
         &mut self,
         _func: &str,
@@ -2661,6 +2691,7 @@ impl Interpreter {
         }))
     }
 
+    #[cfg(feature = "greeners-ml")]
     pub(super) fn factor(
         &mut self,
         _func: &str,

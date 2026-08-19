@@ -3,6 +3,7 @@ use super::super::*;
 use crate::lang::dap::model_expansion;
 
 impl Interpreter {
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn weak_iv(
         &mut self,
         _func: &str,
@@ -293,6 +294,7 @@ impl Interpreter {
         Ok(diag_with(out, fields))
     }
 
+    #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-ols"))]
     pub(super) fn estat_overid(
         &mut self,
         _func: &str,
@@ -364,6 +366,7 @@ impl Interpreter {
         Ok(Value::Dict(Arc::new(map)))
     }
 
+    #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-ols"))]
     pub(super) fn estat_endog(
         &mut self,
         _func: &str,
@@ -470,6 +473,7 @@ impl Interpreter {
         Ok(Value::Dict(Arc::new(map)))
     }
 
+    #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-glm"))]
     pub(super) fn estat_classification(
         &mut self,
         _func: &str,
@@ -482,6 +486,7 @@ impl Interpreter {
         }
         let v = self.eval_expr(&args[0])?;
         let model = match &v {
+            #[cfg(feature = "greeners-glm")]
             Value::BinaryResult(m) => m.clone(),
             _ => {
                 return Err(
@@ -514,6 +519,7 @@ impl Interpreter {
         Ok(Value::Dict(Arc::new(map)))
     }
 
+    #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-glm"))]
     pub(super) fn lroc(
         &mut self,
         _func: &str,
@@ -526,6 +532,7 @@ impl Interpreter {
         }
         let v = self.eval_expr(&args[0])?;
         let model = match &v {
+            #[cfg(feature = "greeners-glm")]
             Value::BinaryResult(m) => m.clone(),
             _ => return Err(self.rt_err("lroc: argument must be a logit/probit model")),
         };
@@ -554,6 +561,7 @@ impl Interpreter {
         Ok(Value::Dict(Arc::new(map)))
     }
 
+    #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-glm"))]
     pub(super) fn estat_gof(
         &mut self,
         _func: &str,
@@ -566,6 +574,7 @@ impl Interpreter {
         }
         let v = self.eval_expr(&args[0])?;
         let model = match &v {
+            #[cfg(feature = "greeners-glm")]
             Value::BinaryResult(m) => m.clone(),
             _ => return Err(self.rt_err("estat_gof: argument must be a logit/probit model")),
         };
@@ -598,6 +607,7 @@ impl Interpreter {
         Ok(Value::Dict(Arc::new(map)))
     }
 
+    #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-glm"))]
     pub(super) fn linktest(
         &mut self,
         _func: &str,
@@ -610,6 +620,7 @@ impl Interpreter {
         }
         let v = self.eval_expr(&args[0])?;
         let model = match &v {
+            #[cfg(feature = "greeners-glm")]
             Value::BinaryResult(m) => m.clone(),
             _ => return Err(self.rt_err("linktest: argument must be a logit/probit model")),
         };
@@ -639,6 +650,7 @@ impl Interpreter {
         Ok(Value::Dict(Arc::new(map)))
     }
 
+    #[cfg(feature = "greeners-diagnostics")]
     pub(super) fn influence(
         &mut self,
         _func: &str,

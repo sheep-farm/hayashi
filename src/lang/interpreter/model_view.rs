@@ -1,8 +1,8 @@
-use super::models::{FactorModel, OlsModel, PcaModel};
 #[cfg(feature = "greeners-glm")]
 use super::models::BinaryModel;
 #[cfg(feature = "greeners-timeseries")]
 use super::models::DFMModel;
+use super::models::{FactorModel, OlsModel, PcaModel};
 #[cfg(feature = "greeners-ols")]
 use super::models::{PenalizedModel, SurModel, ThreeSLSModel};
 use super::{Series, Value};

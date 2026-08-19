@@ -42,9 +42,11 @@ impl Interpreter {
         opt_map: &HashMap<String, Value>,
     ) -> Result<Option<Value>> {
         let result: Result<Value> = match func {
+            #[cfg(feature = "greeners-timeseries")]
             "ets" | "ses" | "hwes" | "holtwinters" | "exponential_smoothing" => {
                 self.ets(func, args, opts, opt_map)
             }
+            #[cfg(feature = "greeners-panel")]
             "pthresh" | "xtthresh" | "panel_threshold" | "threshold" => {
                 self.pthresh(func, args, opts, opt_map)
             }
@@ -61,20 +63,33 @@ impl Interpreter {
                 self.signrank(func, args, opts, opt_map)
             }
             "bitest" | "signtest" | "binom_test" => self.bitest(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-timeseries")]
             "hpfilter" | "hp_filter" | "hprescott" => self.hpfilter(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-timeseries")]
             "bkfilter" | "bk_filter" | "baxter_king" => self.bkfilter(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-timeseries")]
             "cffilter" | "cf_filter" | "christiano_fitzgerald" => {
                 self.cffilter(func, args, opts, opt_map)
             }
+            #[cfg(feature = "greeners-ols")]
             "ridge" | "ridge_reg" => self.ridge(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-ols")]
             "lasso" | "lasso_reg" => self.lasso(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-ols")]
             "elasticnet" | "elastic_net" | "enet" => self.elasticnet(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-timeseries")]
             "adf" | "dickey_fuller" | "augmented_df" => self.adf(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-timeseries")]
             "kpss" => self.kpss(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-timeseries")]
             "pp" | "phillips_perron" => self.pp(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-timeseries")]
             "za" | "zivot_andrews" | "zivot" => self.za(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-timeseries")]
             "granger" | "granger_causality" => self.granger(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-timeseries")]
             "engle_granger" | "coint" | "egtest" => self.engle_granger(func, args, opts, opt_map),
+            #[cfg(feature = "greeners-timeseries")]
             "johansen" | "johansen_trace" | "vecrank" => self.johansen(func, args, opts, opt_map),
             "xtset" => self.xtset(func, args, opts, opt_map),
             _ => return Ok(None),
@@ -82,6 +97,8 @@ impl Interpreter {
         result.map(Some)
     }
 
+    #[cfg(feature = "greeners-timeseries")]
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn ets(
         &mut self,
         func: &str,
@@ -164,6 +181,8 @@ impl Interpreter {
         Ok(Value::EtsResult(Rc::new(result)))
     }
 
+    #[cfg(feature = "greeners-panel")]
+    #[cfg(feature = "greeners-panel")]
     pub(super) fn pthresh(
         &mut self,
         _func: &str,
@@ -1585,6 +1604,8 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn hpfilter(
         &mut self,
         _func: &str,
@@ -1661,6 +1682,8 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn bkfilter(
         &mut self,
         _func: &str,
@@ -1741,6 +1764,8 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn cffilter(
         &mut self,
         _func: &str,
@@ -1817,6 +1842,8 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-ols")]
+    #[cfg(feature = "greeners-ols")]
     pub(super) fn ridge(
         &mut self,
         _func: &str,
@@ -1903,6 +1930,8 @@ impl Interpreter {
         }))
     }
 
+    #[cfg(feature = "greeners-ols")]
+    #[cfg(feature = "greeners-ols")]
     pub(super) fn lasso(
         &mut self,
         _func: &str,
@@ -2069,6 +2098,8 @@ impl Interpreter {
         }))
     }
 
+    #[cfg(feature = "greeners-ols")]
+    #[cfg(feature = "greeners-ols")]
     pub(super) fn elasticnet(
         &mut self,
         _func: &str,
@@ -2238,6 +2269,8 @@ impl Interpreter {
         }))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn adf(
         &mut self,
         _func: &str,
@@ -2332,6 +2365,8 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn kpss(
         &mut self,
         _func: &str,
@@ -2424,6 +2459,8 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn pp(
         &mut self,
         _func: &str,
@@ -2511,6 +2548,8 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn za(
         &mut self,
         _func: &str,
@@ -2593,6 +2632,8 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn granger(
         &mut self,
         _func: &str,
@@ -2681,6 +2722,8 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn engle_granger(
         &mut self,
         _func: &str,
@@ -2779,6 +2822,8 @@ impl Interpreter {
         ))
     }
 
+    #[cfg(feature = "greeners-timeseries")]
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn johansen(
         &mut self,
         _func: &str,

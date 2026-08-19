@@ -4,6 +4,8 @@ use crate::lang::dap::protocol::*;
 use crate::lang::error::{HayashiError, Result};
 use crate::lang::lexer::Lexer;
 use crate::lang::parser::{parse_formula_text, Parser};
+#[cfg(feature = "greeners-diagnostics")]
+use greeners::diagnostics::Diagnostics;
 use greeners::distributions::chi2_pvalue;
 use greeners::distributions::f_pvalue;
 use greeners::distributions::logistic;
@@ -12,17 +14,15 @@ use greeners::distributions::t_pvalue_two;
 use greeners::distributions::t_quantile;
 use greeners::linalg::UPLO;
 use greeners::linalg::{LinalgEigh as _, LinalgInverse as _};
-use greeners::CovarianceType;
-use greeners::DataFrame;
-use greeners::Formula as GFormula;
-#[cfg(feature = "greeners-diagnostics")]
-use greeners::diagnostics::Diagnostics;
 #[cfg(feature = "greeners-diagnostics")]
 use greeners::specification_tests::SpecificationTests;
 #[cfg(feature = "greeners-diagnostics")]
 use greeners::BinaryDiagnostics;
+use greeners::CovarianceType;
+use greeners::DataFrame;
 #[cfg(feature = "greeners-panel")]
 use greeners::FixedEffects;
+use greeners::Formula as GFormula;
 #[cfg(feature = "greeners-glm")]
 use greeners::Logit;
 #[cfg(feature = "greeners-glm")]
@@ -96,11 +96,11 @@ use self::helpers::*;
 
 pub use builtins::BUILTIN_NAMES;
 pub use env::Env;
-pub use models::{OlsModel, PcaModel};
 #[cfg(feature = "greeners-glm")]
 pub use models::BinaryModel;
 #[cfg(feature = "greeners-timeseries")]
 pub use models::DFMModel;
+pub use models::{OlsModel, PcaModel};
 #[cfg(feature = "greeners-ols")]
 pub use models::{PenalizedModel, SurModel, ThreeSLSModel};
 pub use value::{DiagResult, ErrorValue, SendValue, Series, UserFn, Value};

@@ -3,6 +3,7 @@ use super::super::*;
 use crate::lang::dap::model_expansion;
 
 impl Interpreter {
+    #[cfg(feature = "greeners-ols")]
     pub(super) fn nls_exp(
         &mut self,
         func: &str,

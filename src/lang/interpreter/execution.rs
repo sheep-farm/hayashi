@@ -83,6 +83,7 @@ impl Interpreter {
 
             Stmt::Load { path, alias, opts } => self.exec_load(path, alias, opts)?,
 
+            #[cfg(feature = "greeners-ols")]
             Stmt::Predict {
                 df,
                 varname,
@@ -627,6 +628,7 @@ impl Interpreter {
 
     // ── predict ──────────────────────────────────────────────────────────────
 
+    #[cfg(feature = "greeners-ols")]
     fn predict_model_values(
         &self,
         model_val: &Value,
@@ -1360,6 +1362,7 @@ impl Interpreter {
         Err(HayashiError::Runtime(format!("predict {model}: {detail}")))
     }
 
+    #[cfg(feature = "greeners-ols")]
     fn exec_predict(&mut self, df: &str, varname: &str, model: &Expr, kind: &Expr) -> Result<()> {
         let mut df_val = match self.env.get(df) {
             Some(Value::DataFrame(d)) => d.clone(),
