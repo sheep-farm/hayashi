@@ -765,6 +765,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(feature = "greeners-glm")]
     fn predict_binary_vals(&self, m: &BinaryModel, kind: &str) -> Result<Vec<f64>> {
         match kind {
             "pr" | "xb" | "fitted" => Ok(m.result.predict_proba(&m.x).to_vec()),
@@ -774,6 +775,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(feature = "greeners-glm")]
     fn predict_poisson_vals(
         &self,
         r: &greeners::poisson::PoissonResult,
@@ -788,6 +790,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(feature = "greeners-glm")]
     fn predict_negbin_vals(
         &self,
         r: &greeners::negbin::NegBinResult,
@@ -802,6 +805,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(feature = "greeners-glm")]
     fn predict_ordered_vals(
         &self,
         r: &greeners::ordered::OrderedResult,
@@ -851,6 +855,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(feature = "greeners-ols")]
     fn predict_iv_vals(
         &self,
         r: &greeners::iv::IvResult,
@@ -865,6 +870,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(feature = "greeners-panel")]
     fn predict_panel_vals(
         &self,
         r: &greeners::panel::PanelResult,
@@ -879,6 +885,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(feature = "greeners-panel")]
     fn predict_re_vals(
         &self,
         r: &greeners::panel::RandomEffectsResult,
@@ -893,6 +900,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(feature = "greeners-ols")]
     fn predict_tobit_vals(
         &self,
         r: &greeners::tobit::TobitResult,
@@ -907,6 +915,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(feature = "greeners-ols")]
     fn predict_heckman_vals(
         &self,
         r: &greeners::heckman::HeckmanResult,
@@ -921,6 +930,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(feature = "greeners-survival")]
     fn predict_cox_vals(
         &self,
         r: &greeners::survival::CoxResult,
@@ -938,6 +948,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(feature = "greeners-ols")]
     fn predict_quantile_vals(
         &self,
         r: &greeners::quantile::QuantileResult,
@@ -952,6 +963,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(feature = "greeners-ols")]
     fn predict_rlm_vals(
         &self,
         r: &greeners::rlm::RlmResult,
@@ -966,6 +978,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(feature = "greeners-glm")]
     fn predict_gee_vals(
         &self,
         r: &greeners::gee::GeeResult,
@@ -980,6 +993,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(feature = "greeners-glm")]
     fn predict_beta_vals(
         &self,
         r: &greeners::beta_model::BetaResult,
@@ -999,6 +1013,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(feature = "greeners-ols")]
     fn predict_glsar_vals(
         &self,
         r: &greeners::glsar::GlsarResult,
@@ -1023,6 +1038,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(feature = "greeners-bayesian")]
     fn predict_mixedlm_vals(
         &self,
         r: &greeners::mixed::MixedResult,
@@ -1037,6 +1053,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(feature = "greeners-glm")]
     fn predict_zero_inflated_vals(
         &self,
         r: &greeners::zero_inflated::ZeroInflatedResult,
@@ -1056,6 +1073,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(feature = "greeners-ols")]
     fn predict_rolling_vals(
         &self,
         r: &greeners::rolling::RollingResult,
@@ -1069,6 +1087,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(feature = "greeners-ols")]
     fn predict_recursive_ls_vals(
         &self,
         r: &greeners::rolling::RecursiveLSResult,
@@ -1084,6 +1103,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(feature = "greeners-glm")]
     fn predict_glm_vals(
         &self,
         r: &greeners::glm::GlmResult,
@@ -1146,6 +1166,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     fn predict_markov_vals(
         &self,
         r: &greeners::markov::MarkovSwitchingResult,
@@ -1186,6 +1207,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     fn predict_ucm_vals(
         &self,
         r: &greeners::unobserved_components::UCResult,
@@ -1210,6 +1232,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     fn predict_dfm_vals(&self, m: &DFMModel, kind: &str) -> Result<Vec<f64>> {
         if let Some(rest) = kind.strip_prefix('f') {
             let idx = rest
@@ -1231,6 +1254,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     fn predict_msar_vals(
         &self,
         r: &greeners::markov_autoreg::MarkovAutoregResult,
@@ -1258,6 +1282,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     fn predict_decomp_vals(
         &self,
         r: &greeners::decomposition::DecompositionResult,
@@ -1274,6 +1299,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     fn predict_mstl_vals(&self, r: &greeners::mstl::MSTLResult, kind: &str) -> Result<Vec<f64>> {
         match kind {
             "trend" => Ok(r.trend.to_vec()),
@@ -1302,6 +1328,7 @@ impl Interpreter {
         }
     }
 
+    #[cfg(feature = "greeners-timeseries")]
     fn predict_ets_vals(&self, r: &greeners::ets::ETSResult, kind: &str) -> Result<Vec<f64>> {
         match kind {
             "fitted" | "yhat" | "xb" => Ok(r.fitted_values.to_vec()),
