@@ -1,6 +1,10 @@
-use super::models::{
-    BinaryModel, DFMModel, FactorModel, OlsModel, PcaModel, PenalizedModel, SurModel, ThreeSLSModel,
-};
+use super::models::{FactorModel, OlsModel, PcaModel};
+#[cfg(feature = "greeners-glm")]
+use super::models::BinaryModel;
+#[cfg(feature = "greeners-timeseries")]
+use super::models::DFMModel;
+#[cfg(feature = "greeners-ols")]
+use super::models::{PenalizedModel, SurModel, ThreeSLSModel};
 use super::{Series, Value};
 use indexmap::IndexMap;
 use ndarray::{Array1, Array2};
