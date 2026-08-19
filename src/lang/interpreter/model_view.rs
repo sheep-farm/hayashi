@@ -269,50 +269,93 @@ impl Value {
     pub fn to_model_view(&self) -> Option<ModelView> {
         match self {
             Value::OlsResult(m) => Some(model_view_from_ols(m)),
+            #[cfg(feature = "greeners-glm")]
             Value::BinaryResult(m) => Some(model_view_from_binary(m)),
+            #[cfg(feature = "greeners-ols")]
             Value::SurResult(m) => Some(model_view_from_sur(m)),
             Value::PcaResult(m) => Some(model_view_from_pca(m)),
             Value::FactorResult(m) => Some(model_view_from_factor(m)),
+            #[cfg(feature = "greeners-timeseries")]
             Value::DFMResult(m) => Some(model_view_from_dfm(m)),
+            #[cfg(feature = "greeners-ols")]
             Value::ThreeSLSResult(m) => Some(model_view_from_three_sls(m)),
+            #[cfg(feature = "greeners-ols")]
             Value::PenalizedResult(m) => Some(model_view_from_penalized(m)),
+            #[cfg(feature = "greeners-ols")]
             Value::IvResult(r) => Some(model_view_from_iv(r)),
+            #[cfg(feature = "greeners-panel")]
             Value::PanelResult(r) => Some(model_view_from_panel(r)),
+            #[cfg(feature = "greeners-panel")]
             Value::ReResult(r) => Some(model_view_from_random_effects(r)),
+            #[cfg(feature = "greeners-ols")]
             Value::QuantileResult(r) => Some(model_view_from_quantile(r)),
+            #[cfg(feature = "greeners-ols")]
             Value::TobitResult(r) => Some(model_view_from_tobit(r)),
+            #[cfg(feature = "greeners-glm")]
             Value::PoissonResult(r) => Some(model_view_from_poisson(r)),
+            #[cfg(feature = "greeners-glm")]
             Value::NegBinResult(r) => Some(model_view_from_negbin(r)),
+            #[cfg(feature = "greeners-glm")]
             Value::GlmResult(r) => Some(model_view_from_glm(r)),
+            #[cfg(feature = "greeners-ols")]
             Value::RlmResult(r) => Some(model_view_from_rlm(r)),
+            #[cfg(feature = "greeners-glm")]
             Value::BetaResult(r) => Some(model_view_from_beta(r)),
+            #[cfg(feature = "greeners-ols")]
             Value::GmmResult(r) => Some(model_view_from_gmm(r)),
+            #[cfg(feature = "greeners-timeseries")]
             Value::GarchResult(r) => Some(model_view_from_garch(r)),
+            #[cfg(feature = "greeners-timeseries")]
             Value::AutoRegResult(r) => Some(model_view_from_autoreg(r)),
+            #[cfg(feature = "greeners-timeseries")]
             Value::ArdlResult(r) => Some(model_view_from_ardl(r)),
+            #[cfg(feature = "greeners-ols")]
             Value::GlsarResult(r) => Some(model_view_from_glsar(r)),
+            #[cfg(feature = "greeners-glm")]
             Value::OrderedResult(r) => Some(model_view_from_ordered(r)),
+            #[cfg(feature = "greeners-survival")]
             Value::CoxResult(r) => Some(model_view_from_cox(r)),
+            #[cfg(feature = "greeners-glm")]
             Value::GeeResult(r) => Some(model_view_from_gee(r)),
+            #[cfg(feature = "greeners-bayesian")]
             Value::MixedResult(r) => Some(model_view_from_mixed(r)),
+            #[cfg(feature = "greeners-glm")]
             Value::ZeroInflatedResult(r) => Some(model_view_from_zero_inflated(r)),
+            #[cfg(feature = "greeners-panel")]
             Value::ThresholdResult(r) => Some(model_view_from_threshold(r)),
+            #[cfg(feature = "greeners-causal")]
             Value::DidResult(r) => Some(model_view_from_did(r)),
+            #[cfg(feature = "greeners-causal")]
             Value::RdResult(r) => Some(model_view_from_rd(r)),
+            #[cfg(feature = "greeners-ols")]
             Value::RecursiveLSResult(r) => Some(model_view_from_recursive_ls(r)),
+            #[cfg(feature = "greeners-glm")]
             Value::ConditionalResult(r) => Some(model_view_from_conditional(r)),
+            #[cfg(feature = "greeners-glm")]
             Value::GamResult(r) => Some(model_view_from_gam(r)),
+            #[cfg(feature = "greeners-timeseries")]
             Value::EtsResult(r) => Some(model_view_from_ets(r)),
+            #[cfg(feature = "greeners-timeseries")]
             Value::MarkovResult(r) => Some(model_view_from_markov_switching(r)),
+            #[cfg(feature = "greeners-timeseries")]
             Value::MSARResult(r) => Some(model_view_from_markov_autoreg(r)),
+            #[cfg(feature = "greeners-timeseries")]
             Value::VarResult(r) => Some(model_view_from_var(r)),
+            #[cfg(feature = "greeners-timeseries")]
             Value::VecmResult(r) => Some(model_view_from_vecm(r)),
+            #[cfg(feature = "greeners-timeseries")]
             Value::SVarResult(r) => Some(model_view_from_svar(r)),
+            #[cfg(feature = "greeners-timeseries")]
             Value::VarmaResult(r) => Some(model_view_from_varma(r)),
+            #[cfg(feature = "greeners-panel")]
             Value::AbResult(r) => Some(model_view_from_ab(r)),
+            #[cfg(feature = "greeners-panel")]
             Value::SysGmmResult(r) => Some(model_view_from_sys_gmm(r)),
+            #[cfg(feature = "greeners-panel")]
             Value::PcseResult(r) => Some(model_view_from_pcse(r)),
+            #[cfg(feature = "greeners-panel")]
             Value::PanelGlsResult(r) => Some(model_view_from_panel_gls(r)),
+            #[cfg(feature = "greeners-ols")]
             Value::RollingResult(r) => Some(model_view_from_rolling(r)),
             Value::ModelResult {
                 display,
@@ -435,6 +478,7 @@ fn model_view_from_ols(m: &OlsModel) -> ModelView {
     }
 }
 
+#[cfg(feature = "greeners-glm")]
 fn model_view_from_binary(m: &BinaryModel) -> ModelView {
     let r = &m.result;
     let mut fit = HashMap::new();
@@ -508,6 +552,7 @@ fn flatten_equations(
     )
 }
 
+#[cfg(feature = "greeners-ols")]
 fn model_view_from_sur(m: &SurModel) -> ModelView {
     let r = &m.result;
     let n_obs = r.equations.first().map(|eq| eq.params.len()).unwrap_or(0);
@@ -653,6 +698,7 @@ fn model_view_from_factor(m: &FactorModel) -> ModelView {
     }
 }
 
+#[cfg(feature = "greeners-timeseries")]
 fn model_view_from_dfm(m: &DFMModel) -> ModelView {
     let r = &m.result;
     let mut fit = HashMap::new();
@@ -737,6 +783,7 @@ fn flatten_three_sls_equations(
     )
 }
 
+#[cfg(feature = "greeners-ols")]
 fn model_view_from_three_sls(m: &ThreeSLSModel) -> ModelView {
     let r = &m.result;
     let n_obs = r.equations.first().map(|eq| eq.params.len()).unwrap_or(0);
@@ -781,6 +828,7 @@ fn model_view_from_three_sls(m: &ThreeSLSModel) -> ModelView {
     }
 }
 
+#[cfg(feature = "greeners-ols")]
 fn model_view_from_penalized(m: &PenalizedModel) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(m.n_obs as i64));
@@ -824,6 +872,7 @@ fn model_view_from_penalized(m: &PenalizedModel) -> ModelView {
 
 // ── Rc<GreenersResult> converters ───────────────────────────────────────────
 
+#[cfg(feature = "greeners-ols")]
 fn model_view_from_iv(r: &std::rc::Rc<greeners::iv::IvResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
@@ -854,6 +903,7 @@ fn model_view_from_iv(r: &std::rc::Rc<greeners::iv::IvResult>) -> ModelView {
     }
 }
 
+#[cfg(feature = "greeners-panel")]
 fn model_view_from_panel(r: &std::rc::Rc<greeners::panel::PanelResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
@@ -885,6 +935,7 @@ fn model_view_from_panel(r: &std::rc::Rc<greeners::panel::PanelResult>) -> Model
     }
 }
 
+#[cfg(feature = "greeners-panel")]
 fn model_view_from_random_effects(
     r: &std::rc::Rc<greeners::panel::RandomEffectsResult>,
 ) -> ModelView {
@@ -919,6 +970,7 @@ fn model_view_from_random_effects(
     }
 }
 
+#[cfg(feature = "greeners-ols")]
 fn model_view_from_quantile(r: &std::rc::Rc<greeners::quantile::QuantileResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("tau".into(), Value::Float(r.tau));
@@ -947,6 +999,7 @@ fn model_view_from_quantile(r: &std::rc::Rc<greeners::quantile::QuantileResult>)
     }
 }
 
+#[cfg(feature = "greeners-ols")]
 fn model_view_from_tobit(r: &std::rc::Rc<greeners::tobit::TobitResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
@@ -975,6 +1028,7 @@ fn model_view_from_tobit(r: &std::rc::Rc<greeners::tobit::TobitResult>) -> Model
     }
 }
 
+#[cfg(feature = "greeners-glm")]
 fn model_view_from_poisson(r: &std::rc::Rc<greeners::poisson::PoissonResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
@@ -1007,6 +1061,7 @@ fn model_view_from_poisson(r: &std::rc::Rc<greeners::poisson::PoissonResult>) ->
     }
 }
 
+#[cfg(feature = "greeners-glm")]
 fn model_view_from_negbin(r: &std::rc::Rc<greeners::negbin::NegBinResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
@@ -1039,6 +1094,7 @@ fn model_view_from_negbin(r: &std::rc::Rc<greeners::negbin::NegBinResult>) -> Mo
     }
 }
 
+#[cfg(feature = "greeners-glm")]
 fn model_view_from_glm(r: &std::rc::Rc<greeners::glm::GlmResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
@@ -1072,6 +1128,7 @@ fn model_view_from_glm(r: &std::rc::Rc<greeners::glm::GlmResult>) -> ModelView {
     }
 }
 
+#[cfg(feature = "greeners-ols")]
 fn model_view_from_rlm(r: &std::rc::Rc<greeners::rlm::RlmResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
@@ -1096,6 +1153,7 @@ fn model_view_from_rlm(r: &std::rc::Rc<greeners::rlm::RlmResult>) -> ModelView {
     }
 }
 
+#[cfg(feature = "greeners-glm")]
 fn model_view_from_beta(r: &std::rc::Rc<greeners::beta_model::BetaResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
@@ -1128,6 +1186,7 @@ fn model_view_from_beta(r: &std::rc::Rc<greeners::beta_model::BetaResult>) -> Mo
     }
 }
 
+#[cfg(feature = "greeners-ols")]
 fn model_view_from_gmm(r: &std::rc::Rc<greeners::gmm::GmmResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
@@ -1158,6 +1217,7 @@ fn model_view_from_gmm(r: &std::rc::Rc<greeners::gmm::GmmResult>) -> ModelView {
     }
 }
 
+#[cfg(feature = "greeners-timeseries")]
 fn model_view_from_garch(r: &std::rc::Rc<greeners::garch::GarchResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
@@ -1195,6 +1255,7 @@ fn model_view_from_garch(r: &std::rc::Rc<greeners::garch::GarchResult>) -> Model
     }
 }
 
+#[cfg(feature = "greeners-timeseries")]
 fn model_view_from_autoreg(r: &std::rc::Rc<greeners::autoreg::AutoRegResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
@@ -1225,6 +1286,7 @@ fn model_view_from_autoreg(r: &std::rc::Rc<greeners::autoreg::AutoRegResult>) ->
     }
 }
 
+#[cfg(feature = "greeners-timeseries")]
 fn model_view_from_ardl(r: &std::rc::Rc<greeners::autoreg::ARDLResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
@@ -1256,6 +1318,7 @@ fn model_view_from_ardl(r: &std::rc::Rc<greeners::autoreg::ARDLResult>) -> Model
     }
 }
 
+#[cfg(feature = "greeners-ols")]
 fn model_view_from_glsar(r: &std::rc::Rc<greeners::glsar::GlsarResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
@@ -1289,6 +1352,7 @@ fn model_view_from_glsar(r: &std::rc::Rc<greeners::glsar::GlsarResult>) -> Model
     }
 }
 
+#[cfg(feature = "greeners-glm")]
 fn model_view_from_ordered(r: &std::rc::Rc<greeners::ordered::OrderedResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
@@ -1331,6 +1395,7 @@ fn model_view_from_ordered(r: &std::rc::Rc<greeners::ordered::OrderedResult>) ->
     }
 }
 
+#[cfg(feature = "greeners-survival")]
 fn model_view_from_cox(r: &std::rc::Rc<greeners::survival::CoxResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
@@ -1362,6 +1427,7 @@ fn model_view_from_cox(r: &std::rc::Rc<greeners::survival::CoxResult>) -> ModelV
     }
 }
 
+#[cfg(feature = "greeners-glm")]
 fn model_view_from_gee(r: &std::rc::Rc<greeners::gee::GeeResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
@@ -1392,6 +1458,7 @@ fn model_view_from_gee(r: &std::rc::Rc<greeners::gee::GeeResult>) -> ModelView {
     }
 }
 
+#[cfg(feature = "greeners-bayesian")]
 fn model_view_from_mixed(r: &std::rc::Rc<greeners::mixed::MixedResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
@@ -1440,6 +1507,7 @@ fn model_view_from_mixed(r: &std::rc::Rc<greeners::mixed::MixedResult>) -> Model
     }
 }
 
+#[cfg(feature = "greeners-glm")]
 fn model_view_from_zero_inflated(
     r: &std::rc::Rc<greeners::zero_inflated::ZeroInflatedResult>,
 ) -> ModelView {
@@ -1492,6 +1560,7 @@ fn model_view_from_zero_inflated(
     }
 }
 
+#[cfg(feature = "greeners-panel")]
 fn model_view_from_threshold(r: &std::rc::Rc<greeners::threshold::ThresholdResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_search".into(), Value::Int(r.n_search as i64));
@@ -1529,6 +1598,7 @@ fn model_view_from_threshold(r: &std::rc::Rc<greeners::threshold::ThresholdResul
     }
 }
 
+#[cfg(feature = "greeners-causal")]
 fn model_view_from_did(r: &std::rc::Rc<greeners::did::DidResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
@@ -1563,6 +1633,7 @@ fn model_view_from_did(r: &std::rc::Rc<greeners::did::DidResult>) -> ModelView {
     }
 }
 
+#[cfg(feature = "greeners-causal")]
 fn model_view_from_rd(r: &std::rc::Rc<greeners::rd::RdResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_left".into(), Value::Int(r.n_left as i64));
@@ -1607,6 +1678,7 @@ fn model_view_from_rd(r: &std::rc::Rc<greeners::rd::RdResult>) -> ModelView {
     }
 }
 
+#[cfg(feature = "greeners-ols")]
 fn model_view_from_recursive_ls(
     r: &std::rc::Rc<greeners::rolling::RecursiveLSResult>,
 ) -> ModelView {
@@ -1631,6 +1703,7 @@ fn model_view_from_recursive_ls(
     }
 }
 
+#[cfg(feature = "greeners-glm")]
 fn model_view_from_conditional(
     r: &std::rc::Rc<greeners::conditional::ConditionalResult>,
 ) -> ModelView {
@@ -1666,6 +1739,7 @@ fn model_view_from_conditional(
     }
 }
 
+#[cfg(feature = "greeners-glm")]
 fn model_view_from_gam(r: &std::rc::Rc<greeners::glmgam::GamResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
@@ -1698,6 +1772,7 @@ fn model_view_from_gam(r: &std::rc::Rc<greeners::glmgam::GamResult>) -> ModelVie
     }
 }
 
+#[cfg(feature = "greeners-timeseries")]
 fn model_view_from_ets(r: &std::rc::Rc<greeners::ets::ETSResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
@@ -1737,6 +1812,7 @@ fn model_view_from_ets(r: &std::rc::Rc<greeners::ets::ETSResult>) -> ModelView {
     }
 }
 
+#[cfg(feature = "greeners-timeseries")]
 fn model_view_from_markov_switching(
     r: &std::rc::Rc<greeners::markov::MarkovSwitchingResult>,
 ) -> ModelView {
@@ -1779,6 +1855,7 @@ fn model_view_from_markov_switching(
     }
 }
 
+#[cfg(feature = "greeners-timeseries")]
 fn model_view_from_markov_autoreg(
     r: &std::rc::Rc<greeners::markov_autoreg::MarkovAutoregResult>,
 ) -> ModelView {
@@ -1850,6 +1927,7 @@ fn flatten_var_params(r: &greeners::var::VarResult) -> (Vec<String>, Array1<f64>
     (names, params, ses)
 }
 
+#[cfg(feature = "greeners-timeseries")]
 fn model_view_from_var(r: &std::rc::Rc<greeners::var::VarResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
@@ -1879,6 +1957,7 @@ fn model_view_from_var(r: &std::rc::Rc<greeners::var::VarResult>) -> ModelView {
     }
 }
 
+#[cfg(feature = "greeners-timeseries")]
 fn model_view_from_svar(r: &std::rc::Rc<greeners::svar::SVarResult>) -> ModelView {
     let mut fit = HashMap::new();
     let vr = &r.var_result;
@@ -1918,6 +1997,7 @@ fn model_view_from_svar(r: &std::rc::Rc<greeners::svar::SVarResult>) -> ModelVie
     }
 }
 
+#[cfg(feature = "greeners-timeseries")]
 fn model_view_from_varma(r: &std::rc::Rc<greeners::varma::VarmaResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
@@ -1970,6 +2050,7 @@ fn model_view_from_varma(r: &std::rc::Rc<greeners::varma::VarmaResult>) -> Model
     }
 }
 
+#[cfg(feature = "greeners-timeseries")]
 fn model_view_from_vecm(r: &std::rc::Rc<greeners::vecm::VecmResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
@@ -2056,6 +2137,7 @@ fn model_view_from_vecm(r: &std::rc::Rc<greeners::vecm::VecmResult>) -> ModelVie
     }
 }
 
+#[cfg(feature = "greeners-panel")]
 fn model_view_from_ab(r: &std::rc::Rc<greeners::dynamic_panel::ArellanoBondResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
@@ -2087,6 +2169,7 @@ fn model_view_from_ab(r: &std::rc::Rc<greeners::dynamic_panel::ArellanoBondResul
     }
 }
 
+#[cfg(feature = "greeners-panel")]
 fn model_view_from_sys_gmm(r: &std::rc::Rc<greeners::dynamic_panel::SystemGmmResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs_fd".into(), Value::Int(r.n_obs_fd as i64));
@@ -2119,6 +2202,7 @@ fn model_view_from_sys_gmm(r: &std::rc::Rc<greeners::dynamic_panel::SystemGmmRes
     }
 }
 
+#[cfg(feature = "greeners-panel")]
 fn model_view_from_pcse(r: &std::rc::Rc<greeners::panel::PcseResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
@@ -2152,6 +2236,7 @@ fn model_view_from_pcse(r: &std::rc::Rc<greeners::panel::PcseResult>) -> ModelVi
     }
 }
 
+#[cfg(feature = "greeners-panel")]
 fn model_view_from_panel_gls(r: &std::rc::Rc<greeners::panel::PanelGlsResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
@@ -2188,6 +2273,7 @@ fn model_view_from_panel_gls(r: &std::rc::Rc<greeners::panel::PanelGlsResult>) -
     }
 }
 
+#[cfg(feature = "greeners-ols")]
 fn model_view_from_rolling(r: &std::rc::Rc<greeners::rolling::RollingResult>) -> ModelView {
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
