@@ -227,20 +227,37 @@ The validation programme covers four dimensions:
 ## Estimators not covered by validation
 
 Not every command in Hayashi is a validation case. The programme focuses on
-core empirical estimators and intentionally excludes some command categories:
+core empirical estimators and intentionally excludes some command categories.
+For a machine-readable list of all cases and their status, see `matrix.yml`
+and the generated `MATRIX.md`. For the most up-to-date list of implemented
+estimators that are not yet numerically validated, see `KNOWN_GAPS.md`.
 
-- **Diagnostic/test commands without a dedicated case** (e.g., `adf`, `kpss`,
-  `engle_granger`, `johansen`, `bgodfrey`, `archtest`, `hausman`) — validated
-  indirectly through the estimators that use them. Diagnostics with a case,
-  such as `granger`, `ljungbox`, `white`, and `reset`, are listed in the matrix.
+- **Diagnostic/test commands without a dedicated case** (e.g., `ab_test`,
+  `adf`, `adtest`, `archtest`, `bgodfrey`, `bitest`, `bkfilter`, `bphet`,
+  `bptest`, `chisq2x2`, `condnum`, `cooks`, `cusumtest`, `durbinwatson`,
+  `engle_granger`, `gqtest`, `hausman`, `hpfilter`, `jb`, `johansen`, `kpss`,
+  `kruskal`, `leverage`, `lilliefors`, `linktest`, `ljungbox`, `lroc`, `lrtest`,
+  `multipletests`, `omnibus`, `pacf`, `pesaran_cd`, `pp`, `proptest`,
+  `proptest2`, `propci`, `ranksum`, `reset`, `sfevd`, `sfrancia`, `sirf`,
+  `sktest`, `spearman`, `swilk`, `test`, `testparm`, `vif`, `weak_iv`, `white`,
+  `za`) — validated indirectly through the estimators that use them.
+  Diagnostics with a case, such as `granger`, `ljungbox`, `white`, and
+  `reset`, are listed in the matrix.
 - **Utility/data manipulation commands** (e.g., `generate`, `filter`,
   `summarize`, `load`, `export`) — covered by `cargo test`, not by empirical
   validation.
 - **Visualization commands** (e.g., `plot`, `scatter`, `histogram`) — not part
   of numerical validation.
-- **Niche or hard-to-reference estimators** (e.g., `portfolio_sort`,
-  `double_sort`, dynamic factor, GAM, multiple imputation) —
+- **Niche or hard-to-reference estimators without a validation case** —
   require specialised datasets or lack canonical open-source reference
-  implementations.
-- **Estimators with output format limitations** (e.g., `svar`, `svec`) —
-  require changes to the Greeners export format before they can be parsed.
+  implementations. Examples include `bplm`, `cancorr`, `cffilter`,
+  `chamberlain`, `cmnlogit`, `decompose`, `gam`, `markov`, `mice`, `msauto`,
+  `mstl`, `pthresh`, `stl`, `ucm`, `bayes_sfa_production`, `bsc`, `bvar`,
+  `fapanel`, `fcoef`, `fmols`, `lstm`, `mfvar`, `spatial_durbin_error`,
+  `spatial_panel_sar`, `spatial_panel_sem`, `spectral`, `transformer`,
+  `tvcopula`, `tvp_var`, and `johansen_break`.
+- **Estimators with `not-supported` validation placeholders** — some of the
+  estimators above have a directory under `validation/cases/` whose
+  `case.yml` is marked `not-supported` (the `run.hay` is a placeholder)
+  because no stable R/Python reference is available. They are not numerically
+  validated, but they are implemented and callable.

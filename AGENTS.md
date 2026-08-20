@@ -90,13 +90,16 @@ sessions.
 
 ## 1. Architecture overview
 
-Hayashi is a Rust interpreter split into two crates:
+Hayashi is a Rust interpreter split into two crates in this repo:
 
-- **Hayashi** (`hayashi-lang`, this repo): lexer, parser, interpreter, CLI,
+- **Hayashi** (`hayashi-lang`): lexer, parser, interpreter, CLI,
   REPL, DAP server, I/O loaders, Jupyter kernel, documentation, examples,
   validation programme, benchmarks, and books.
-- **Greeners** (`../Greeners`, MIT): the numerical engine — DataFrame,
-  linear algebra, and estimator implementations.
+- **Greeners** (`crates/greeners`): a local conditional re-export facade that
+  aggregates the published `greeners-*` sub-crates from crates.io
+  (`greeners-core`, `greeners-ols`, etc.). It keeps the numerical engine
+  modular and lets the `hayashi-lang` build toggle estimator families with
+  Cargo features.
 
 Public surface:
 - `src/lib.rs` exposes `Interpreter` and `run_source`. It also provides
@@ -153,6 +156,10 @@ Public surface:
 
 ## 3. Greeners integration
 
+- `crates/greeners` is a local feature-gated facade that re-exports the
+  `greeners-*` sub-crates from crates.io. `Cargo.toml` depends on
+  `greeners = { path = "crates/greeners", default-features = false }` and
+  forwards feature flags (`greeners-ols`, `greeners-glm`, etc.) to the facade.
 - `src/lang/interpreter.rs` has `materialize_formula()` (lines ~1292–1441).
   It turns a Hayashi `Formula` into a Greeners `GFormula` by:
   1. Evaluating complex RHS terms (`log(K)`, `I(x^2)`) and inserting them
@@ -197,24 +204,28 @@ Public surface:
 
 ## 5. Tests and validation
 
-- `tests/smoke.rs` (12 968 lines, ~776 unit tests) covers margins, parser,
+- `tests/smoke.rs` (14 229 lines, 776 tests) covers margins, parser,
   scoping, expressions, data manipulation, estimation, post-estimation,
   and finance examples.
-- `tests/dap.rs` has 5 tests, all `#[ignore]` because they need an
-  interactive DAP client.
+- `tests/dap.rs` has 5 tests, all active and passing (no `#[ignore]`).
 - `tests/numerical_golden.rs` checks OLS coefficients and SEs against
   statsmodels with `1e-8` tolerance.
+- `tests/error_messages_english.rs` guards the English error-style policy.
 - `validation/` runs Hayashi scripts against R/Python/Stata reference
   implementations. `validation/run.py` orchestrates discovery, execution,
   parsing, and tolerance-based comparison; `validation/matrix.yml` is the
   registry; `validation/MATRIX.md` is the human-readable dashboard.
-- Current validation: 226 cases, 200 `pass`, 14 `not-supported`, 1 `blocked`.
+- Validation metadata: `python validation/run.py --check` currently
+  discovers 229 cases and `validation/matrix.yml` reports 214 `pass`,
+  15 `not-supported`, 0 `blocked`.
 
 ### 5.1 CI
 
-- `ci.yml`: validation metadata check, `cargo deny` advisories,
+- `ci.yml`: validation metadata check, `cargo deny check advisories`,
   `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test` on
-  Ubuntu/macOS/Windows. Greeners is consumed from crates.io via `Cargo.lock`.
+  Ubuntu/macOS/Windows. Greeners sub-crates are consumed from crates.io and
+  re-exported by the local `crates/greeners` facade; versions are pinned in
+  `Cargo.lock`.
 - `validation.yml`: full empirical validation on Ubuntu/macOS/Windows with
   R + Python.
 - `nightly.yml`: builds `dev` and publishes a `nightly` GitHub release.
@@ -223,8 +234,8 @@ Public surface:
 
 ## 6. Branches and releases
 
-- `dev`: active development. Current HEAD: `8617e1f` (Jupyter kernel +
-  MIME plot rendering).
+- `dev`: active development. Current HEAD: `9155724` (PoC: modular
+  greeners build (#147)).
 - `master`: stable releases. Current HEAD: `36d04b4` (site rebuild for
   0.2.9). Tags include `v0.2.0` through `v0.2.9` and `nightly`.
 - `gh-pages`: published site.
@@ -246,8 +257,8 @@ Workflow: PRs target `dev`; `master` is release-only.
 1. **Model wrapper inconsistency**: some estimators use dedicated
    wrappers, others use `Rc<GreenersResult>` or `ModelResult`. Uniform
    access to residuals / predict requires knowing which variant is which.
-2. **DAP tests ignored**: the DAP server is only tested manually; the
-   automated tests are disabled.
+2. **DAP tests active**: all 5 DAP tests run and pass with
+   `cargo test --test dap` (no `#[ignore]`).
 3. **`fe()` `cluster=` support**: `cluster=` and `cluster2=` are supported
    via `resolve_cov_full()`. Validation case `panel_fe_cluster_wagepan`
    confirms the feature.
@@ -259,8 +270,9 @@ Workflow: PRs target `dev`; `master` is release-only.
 
 ## 8. Design decisions, not fragilities
 
-- **Greeners dependency**: Hayashi consumes `greeners` from crates.io
-  (`greeners = "2.0.0"`). The exact version is pinned in `Cargo.lock`.
+- **Greeners dependency**: Hayashi consumes the published `greeners-*`
+  sub-crates from crates.io through a local `crates/greeners` feature-gated
+  re-export facade. The exact versions are pinned in `Cargo.lock`.
 - **`parallel for` does not capture `Rc` model results**: this is
   intentional. Each iteration is an independent, self-contained sandbox
   whose state must die at the end of the block. Preventing `Rc`-backed
