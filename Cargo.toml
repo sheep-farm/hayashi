@@ -62,14 +62,11 @@ odbc-api = { version = "28", optional = true }
 libloading = { version = "0.8", optional = true }
 wasmi = { version = "0.31", optional = true }
 
-# Jupyter kernel support
-jupyter-protocol = "2"
-jupyter-zmq-client = { version = "1", features = ["tokio-runtime"] }
-tokio = { version = "1.36", features = ["macros", "rt-multi-thread"] }
 anyhow = "1"
-uuid = { version = "1", features = ["v4"] }
-gag = "1"
-zeromq = "0.6"
+
+# Transitive dependency needed for argmin on wasm32. Enables
+# web_sys performance.now() as Instant source on the wasm target.
+instant = { version = "0.1", features = ["wasm-bindgen"] }
 
 # Enable getrandom js backend for wasm
 getrandom = { version = "0.2", features = ["js"] }
@@ -118,6 +115,15 @@ native = ["network", "dta", "sqlite", "repl"]
 wasm-bindings = ["dep:wasm-bindgen", "dep:js-sys"]
 # Minimal feature for the headless hay-run binary (no REPL/DAP).
 script = []
+
+# Jupyter kernel support — not available on wasm32-unknown-unknown.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+jupyter-protocol = "2"
+jupyter-zmq-client = { version = "1", features = ["tokio-runtime"] }
+tokio = { version = "1.36", features = ["macros", "rt-multi-thread"] }
+uuid = { version = "1", features = ["v4"] }
+gag = "1"
+zeromq = "0.6"
 
 [profile.release]
 opt-level = 3
