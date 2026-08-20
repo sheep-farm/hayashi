@@ -169,6 +169,17 @@ print("done")</code></pre>
                 <tr><td><code class="language-hay">did(y ~ treat + post, df)</code></td><td>Difference-in-differences</td></tr>
                 <tr><td><code class="language-hay">gmm(y ~ x1, df, instruments=z1)</code></td><td>Generalized method of moments</td></tr>
                 <tr><td><code class="language-hay">rolling(y ~ x1 + x2, df, window=30)</code></td><td>Rolling OLS with optional <code class="language-hay">date=date_col</code></td></tr>
+                <tr><td><code class="language-hay">spatial_sar(y ~ x, df, w=W)</code></td><td>Spatial autoregressive model</td></tr>
+                <tr><td><code class="language-hay">spatial_sem(y ~ x, df, w=W)</code></td><td>Spatial error model</td></tr>
+                <tr><td><code class="language-hay">xtlogit(y ~ x, df, id="firm")</code></td><td>Panel logit via GEE</td></tr>
+                <tr><td><code class="language-hay">xtprobit(y ~ x, df, id="firm")</code></td><td>Panel probit via GEE</td></tr>
+                <tr><td><code class="language-hay">xtpoisson(y ~ x, df, id="firm")</code></td><td>Panel Poisson via GEE</td></tr>
+                <tr><td><code class="language-hay">nls_exp(y ~ x, df, start=[...])</code></td><td>Nonlinear least squares (exponential)</td></tr>
+                <tr><td><code class="language-hay">sfa_production(y ~ x1 + x2, df)</code></td><td>Stochastic production frontier</td></tr>
+                <tr><td><code class="language-hay">eventstudy(y ~ event_time, df)</code></td><td>Dynamic event-study / DiD</td></tr>
+                <tr><td><code class="language-hay">double_ml(y ~ d + x, df)</code></td><td>Double/debiased machine learning</td></tr>
+                <tr><td><code class="language-hay">modwt(df, "y", scales=4)</code></td><td>Maximal overlap discrete wavelet transform</td></tr>
+                <tr><td colspan="2"><em>... and 90+ additional estimators, including <code>copula</code>, <code>nardl</code>, <code>pvar</code>, <code>qvar</code>, <code>setar</code>, <code>tvp_var</code>, <code>did</code>, <code>synthdid</code>, <code>midas</code>, <code>favar</code>, <code>msvar</code>, <code>bvar</code>, <code>mfvar</code>, <code>tvcopula</code>, <code>sv</code>, <code>fapanel</code>, <code>hawkes</code>, <code>qrf</code>, <code>gbm</code>, <code>mlp</code>, and <code>rf</code>.</em></td></tr>
               </tbody>
             </table>
 
