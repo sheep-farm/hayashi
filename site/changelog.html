@@ -207,41 +207,56 @@
         <div class="release" id="unreleased">
           <div class="release-version">Unreleased <span class="badge-dev">dev</span></div>
           <div class="release-date">In development</div>
+          <p style="color: var(--text-muted);">No unreleased changes at this time.</p>
+        </div>
 
-          <div class="release-section">
-            <h3 class="added">Added</h3>
-            <ul>
-              <li><strong>Safe modes for <code>hay dist-update</code></strong>: <code>--help</code> and <code>--check</code> subcommands, argument validation with unit tests.</li>
-              <li><strong>English-only user-facing output</strong>: all error messages and printed strings translated to English. Mathematical notation preserved.</li>
-              <li><strong>Interpreter decomposition</strong>: <code>interpreter.rs</code> split into focused submodules (execution, eval_expr, dispatch, helpers, value, models). Reduced from ~4,800 to ~680 lines.</li>
-              <li><strong><code>for</code> loop index/value binding</strong>: <code>for i, v in list</code> and <code>for k, v in dict</code>.</li>
-              <li><strong><code>try/catch/finally</code></strong>: <code>finally</code> block runs regardless of try outcome.</li>
-              <li><strong><code>hay install</code> with version</strong>: install specific release tags.</li>
-              <li><strong><code>hay list</code> shows versions</strong> from plugin metadata.</li>
-              <li><strong><code>match</code> as contextual keyword</strong>: works as identifier and match expression.</li>
-              <li><strong><code>list_files()</code> builtin</strong>: <code>list_files(dir)</code> and <code>list_files(dir, pattern)</code>.</li>
-              <li><strong><code>++</code> and <code>--</code> operators</strong>: increment and decrement with desugaring to <code>x = x + 1</code>.</li>
-            </ul>
-          </div>
+        <!-- 0.2.10 -->
+        <div class="release" id="0.2.10">
+          <div class="release-version"><a href="https://github.com/sheep-farm/hayashi/releases/tag/v0.2.10" target="_blank" rel="noopener">0.2.10</a></div>
+          <div class="release-date">2026-08-20</div>
 
           <div class="release-section">
             <h3 class="changed">Changed</h3>
             <ul>
-              <li><strong><code>quietly(expr)</code> deprecated</strong>: use <code>quietly on</code> / <code>quietly off</code> instead.</li>
-              <li><strong>Validation runner exit semantics</strong>: non-zero exit on blocked cases unless <code>--allow-blocked</code>.</li>
-              <li><strong><code>data_source</code> field</strong> added to validation cases.</li>
+              <li><strong>Greeners 2.0.0</strong>: the numerical facade now ships as the published <code>greeners = "2.0.0"</code> crate on crates.io. The local <code>crates/greeners</code> checkout and associated CI steps were removed.</li>
+              <li><strong>Greeners 2.0.0 fixes</strong> carried into Hayashi: MLP (Adam optimizer), NARDL lag handling, PSTR grid search, SAR/SEM log-likelihood, spatial Durbin overflow, NLS CES normalisation, panel Tobit variable names, and GEE sandwich standard errors.</li>
+            </ul>
+          </div>
+
+          <div class="release-section">
+            <h3 class="internal">Validation</h3>
+            <ul>
+              <li><strong>234 cases</strong> across <strong>115 implemented estimators</strong>: <strong>219 pass</strong>, <strong>15 not-supported</strong>, <strong>0 fail / 0 blocked</strong>.</li>
+              <li>New validated cases include <code>decompose</code>, <code>ucm</code>, <code>cancorr</code>, <code>bplm</code>, <code>chamberlain</code>, <code>nls_*</code>, <code>copula</code>, <code>spatial_sar</code>, <code>spatial_sem</code>, <code>xtlogit</code>, <code>xtprobit</code>, <code>xtpoisson</code>, <code>modwt</code>, <code>did</code>, <code>qreg</code>, <code>synthdid</code>, and more.</li>
+            </ul>
+          </div>
+
+          <div class="release-section">
+            <h3 class="added">Added</h3>
+            <ul>
+              <li><strong>VS Code debugger: structured model expansion</strong> — model results expand in the Variables panel with <code>coefficients</code> (DataFrame), <code>fit</code> (Dict), and per-parameter Series for OLS, IV/2SLS, panel, binary, count, <code>tobit</code>, <code>ordered</code>, <code>mnlogit</code>, <code>zip</code>/<code>zinb</code>, <code>glm</code>, <code>rlm</code>, <code>qreg</code>, <code>gmm</code>, <code>ab</code>, <code>sysgmm</code>, <code>glsar</code>, <code>mixed</code>, <code>sur</code>, and <code>3sls</code>.</li>
+              <li><strong>New estimators</strong>: <code>xtlogit</code>, <code>xtprobit</code>, <code>xtpoisson</code> (panel GEE), <code>spatial_sar</code>, <code>spatial_sem</code>, <code>spatial_panel_sar</code>, <code>spatial_panel_sem</code>, <code>spatial_durbin</code>, <code>spatial_durbin_error</code>, <code>nls_exp</code>, <code>nls_power</code>, <code>nls_logistic</code>, <code>nls_cobb_douglas</code>, <code>nls_ces</code>, <code>sfa_production</code>, <code>sfa_cost</code>, <code>panel_tobit</code>, <code>panel_heckman</code>, <code>panel_qreg</code>, <code>eventstudy</code>, <code>double_ml</code>, <code>copula</code>, <code>nardl</code>, <code>pvar</code>, <code>qvar</code>, <code>setar</code>, <code>tvp_var</code>, <code>modwt</code>, <code>did</code>, <code>synthdid</code>, <code>midas</code>, <code>tvp</code>, <code>favar</code>, <code>msvar</code>, <code>bvar</code>, <code>mfvar</code>, <code>tvcopula</code>, <code>sv</code>, <code>fapanel</code>, <code>hawkes</code>, <code>qrf</code>, <code>gbm</code>, <code>mlp</code>, <code>rf</code>, <code>synth_smoking</code>, and more.</li>
+              <li><strong>New diagnostics and post-estimation</strong>: <code>acf()</code>/<code>pacf()</code> (autocorrelation values), <code>cusumtest(model)</code>, <code>akaike_weights(m1, m2, ...)</code>, <code>lrtest(m_restricted, m_unrestricted)</code>, <code>estat_overid</code>, <code>estat_endog</code>, <code>estat_classification</code>, <code>lroc(model)</code> (with ASCII ROC plot), <code>estat_gof</code>, <code>linktest</code>, <code>marginsplot</code>, and <code>estat_roc</code> aliases.</li>
+              <li><strong>Language and runtime</strong>: <code>for i, v in list</code> and <code>for k, v in dict</code>, <code>try/catch/finally</code> with <code>finally</code> always running, <code>match</code> as contextual keyword, <code>list_files()</code> builtin, <code>++</code>/<code>--</code> operators, <code>quietly on</code>/<code>quietly off</code>, and <code>hay install user/repo@version</code> / <code>hay list</code> with plugin versions.</li>
             </ul>
           </div>
 
           <div class="release-section">
             <h3 class="fixed">Fixed</h3>
             <ul>
-              <li><strong>CSV export column order</strong>: <code>to_csv</code> no longer sorts columns alphabetically. Insertion order preserved via <code>IndexMap</code>.</li>
-              <li><strong><code>append()</code> losing string columns</strong>: <code>get_string()</code> now handles <code>Categorical</code> columns. Previously, <code>append()</code> produced empty strings for columns with repeated values (dates, tickers, sectors).</li>
-              <li><strong>Plugin resolution on Windows</strong>: <code>HOME</code> falls back to <code>USERPROFILE</code>. Searches executable directory. <code>HAYASHI_PATH</code> uses <code>;</code> separator on Windows.</li>
-              <li><strong>Validation workflow</strong>: repaired <code>validation.yml</code>, added Greeners checkout.</li>
-              <li><strong>Clippy warnings</strong>: fixed <code>empty_line_after_doc_comments</code>, <code>too_many_arguments</code>, <code>needless_range_loop</code>.</li>
+              <li><strong>CSV export column order</strong>: <code>to_csv</code> preserves insertion order via <code>IndexMap</code>.</li>
+              <li><strong><code>append()</code> string columns</strong>: <code>get_string()</code> handles <code>Categorical</code> columns, fixing empty strings for repeated values.</li>
+              <li><strong>Plugin resolution on Windows</strong>: <code>HOME</code> falls back to <code>USERPROFILE</code>, searches executable directory, and uses <code>;</code> separator for <code>HAYASHI_PATH</code>.</li>
             </ul>
+          </div>
+
+          <div class="release-section">
+            <h3>Downloads</h3>
+            <div class="download-links">
+              <a href="https://github.com/sheep-farm/hayashi/releases/download/v0.2.10/hay-v0.2.10-x86_64-unknown-linux-gnu.tar.gz" target="_blank" rel="noopener">Linux x86_64</a>
+              <a href="https://github.com/sheep-farm/hayashi/releases/download/v0.2.10/hay-v0.2.10-aarch64-apple-darwin.tar.gz" target="_blank" rel="noopener">macOS ARM64</a>
+              <a href="https://github.com/sheep-farm/hayashi/releases/download/v0.2.10/hay-v0.2.10-x86_64-pc-windows-msvc.zip" target="_blank" rel="noopener">Windows x86_64</a>
+            </div>
           </div>
         </div>
 
