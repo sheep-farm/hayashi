@@ -5,8 +5,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
-### Changed
-
 ## [0.2.10] — 2026-08-20
 
 ### Changed
