@@ -112,6 +112,12 @@ cases:
   notes: Centiles 10, 25, 50, 75, 90 for the wage variable.
   dimension: numerical
   status: pass
+- id: chamberlain_wagepan
+  notes: 'Chamberlain test on lwage ~ union + married. The Python reference builds
+    the unrestricted model y_it = const + X_it beta + sum_s X_i,s Pi_s and tests H0:
+    all Pi_s = 0 with an F-test, matching the Hayashi/Greeners formulation.'
+  dimension: numerical
+  status: pass
 - id: ci_wooldridge_wage1
   notes: 95% confidence interval for the wage mean.
   dimension: numerical

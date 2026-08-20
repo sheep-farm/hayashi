@@ -24,6 +24,7 @@
 | causal_impact | simulated_causal_impact | R, Python | pass | — | Bayesian structural time series for counterfactual inference (Brodersen 2015). Uses simulated data with known treatment effect. |
 | causalforest | simulated | R, Python | pass | — | Simulated data y = 1 + 2*x1 - x2 + 0.5*treated + N(0,1). Hayashi causalforest() reports the average treatment effect. R reference uses grf::causal_forest; Python uses econml.grf.CausalForest. |
 | descriptive | wooldridge::wage1 | R, Python | pass | — | Centiles 10, 25, 50, 75, 90 for the wage variable. |
+| chamberlain | wooldridge::wagepan | Python | pass | — | Chamberlain test on lwage ~ union + married. The Python reference builds the unrestricted model y_it = const + X_it beta + sum_s X_i,s Pi_s and tests H0: all Pi_s = 0 with an F-test, matching the Hayashi/Greeners formulation. |
 | descriptive | wooldridge::wage1 | R, Python | pass | — | 95% confidence interval for the wage mean. |
 | clogit | simulated | R, Python | pass | — | Simulated matched groups with group fixed effects and a single endogenous regressor. R reference is survival::clogit; groups without within-group variation are dropped at generation time. |
 | cloglog | wooldridge::affairs | R, Python | pass | — | Complementary log-log GLM on Wooldridge affairs. A sign error in the Greeners cloglog derivative caused IRLS divergence; the derivative is now positive and the model converges to the same estimates as R glm and statsmodels. |
