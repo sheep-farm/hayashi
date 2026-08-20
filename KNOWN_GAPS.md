@@ -4,8 +4,8 @@ This document tracks estimator families that are implemented and exposed to user
 
 ## Status of the validation programme
 
-- As of this update, `validation/matrix.yml` contains 229 cases.
-- 214 cases currently `pass`; 15 remain `not-supported` because a stable
+- As of this update, `validation/matrix.yml` contains 230 cases.
+- 217 cases currently `pass`; 15 remain `not-supported` because a stable
   comparable reference is unavailable.
 - The cases compare Hayashi output against R and/or Python reference implementations (statsmodels, linearmodels, wooldridge, etc.) with family-specific tolerances.
 
@@ -14,25 +14,25 @@ This document tracks estimator families that are implemented and exposed to user
 These commands exist in the interpreter dispatch and are listed in user-facing docs, but have no corresponding case under `validation/cases/` (no numerical validation against a reference implementation):
 
 - `bplm` — (`src/lang/interpreter/estimators_panel.rs`)
-- `cancorr` — canonical correlation (`src/lang/interpreter/estimators_misc.rs`)
 - `cffilter` / `cf_filter` / `christiano_fitzgerald` — Christiano-Fitzgerald band-pass filter (`src/lang/interpreter/estimators_misc.rs`)
 - `chamberlain` — Chamberlain panel estimator (`src/lang/interpreter/estimators_panel.rs`)
 - `cmnlogit` / `cmlogit` / `conditional_mlogit` — conditional multinomial logit (`src/lang/interpreter/estimators_panel.rs`)
-- `decompose` — seasonal decomposition (`src/lang/interpreter/estimators_timeseries.rs`)
 - `gam` / `gamfit` — generalized additive model (`src/lang/interpreter/estimators_timeseries.rs`)
 - `markov` / `msar` / `markovswitching` — Markov-switching model (`src/lang/interpreter/estimators_panel.rs`)
 - `mice` / `mi` / `multiple_imputation` — MICE imputation, simple/one-shot variant (`src/lang/interpreter/estimators_timeseries.rs`; the `mice_chained` variant is validated)
 - `mstl` / `stl` — seasonal-trend decomposition (`src/lang/interpreter/estimators_timeseries.rs`)
 - `msauto` / `markov_ar` / `ms_ar` / `hamilton` — Markov-switching autoregression (`src/lang/interpreter/estimators_timeseries.rs`)
 - `pthresh` / `xtthresh` / `panel_threshold` / `threshold` — panel threshold regression (`src/lang/interpreter/estimators_misc.rs`)
-- `ucm` / `uc` / `structural_ts` — unobserved components model (`src/lang/interpreter/estimators_timeseries.rs`)
 
-The following estimators were previously in this list but are now covered by validation cases (`be_simulated`, `feiv_simulated`, `clogit_simulated`, `cpoisson_simulated`, `varma_simulated`, `threesl_simulated`, `svec_simulated`):
+The following estimators were previously in this list but are now covered by validation cases (`be_simulated`, `feiv_simulated`, `clogit_simulated`, `cpoisson_simulated`, `varma_simulated`, `threesl_simulated`, `svec_simulated`, `decompose_simulated`, `ucm_simulated`, `cancorr_simulated`):
 
 - `be` — between estimator (`src/lang/interpreter/estimators_panel.rs`)
-- `feiv` — fixed-effects IV (`src/lang/interpreter/estimators_panel.rs`)
+- `cancorr` — canonical correlation (`src/lang/interpreter/estimators_misc.rs`)
 - `clogit` — conditional logit (`src/lang/interpreter/estimators_panel.rs`)
 - `cpoisson` — conditional Poisson / PPML (`src/lang/interpreter/estimators_panel.rs`)
+- `decompose` — seasonal decomposition (`src/lang/interpreter/estimators_timeseries.rs`)
+- `feiv` — fixed-effects IV (`src/lang/interpreter/estimators_panel.rs`)
+- `ucm` / `uc` / `structural_ts` — unobserved components model (`src/lang/interpreter/estimators_timeseries.rs`)
 - `varma` / `varmax` — vector ARMA (`src/lang/interpreter/estimators_timeseries.rs`)
 - `three_sls` / `threesl` / `3sls` / `reg3` — three-stage least squares (`src/lang/interpreter/estimators_timeseries.rs`)
 

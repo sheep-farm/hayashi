@@ -85,6 +85,12 @@ cases:
     for a deterministic CI reference.
   dimension: numerical
   status: not-supported
+- id: cancorr_simulated
+  notes: Simulated dataset with two X and two Y variables. Compares the two canonical
+    correlations and Wilks' lambda. The reference uses the generalised-eigenvalue
+    formulation.
+  dimension: numerical
+  status: pass
 - id: causal_impact_simulated
   notes: Bayesian structural time series for counterfactual inference (Brodersen 2015).
     Uses simulated data with known treatment effect.
@@ -170,6 +176,12 @@ cases:
 - id: dcc_garch_nyse
   notes: DCC-GARCH (Dynamic Conditional Correlation GARCH) on NYSE returns. Uses simplified
     DCC-GARCH(1,1) model.
+  dimension: numerical
+  status: pass
+- id: decompose_simulated
+  notes: Simulated monthly series (trend + sinusoidal seasonal + noise). Compares
+    selected non-boundary observations of trend, seasonal, and residual components
+    from classical additive decomposition against statsmodels.seasonal_decompose.
   dimension: numerical
   status: pass
 - id: dfm_simulated
@@ -1074,6 +1086,12 @@ cases:
   notes: No stable PyMC or R TVP reference implementation in the venv.
   dimension: numerical
   status: not-supported
+- id: ucm_simulated
+  notes: Simulated monthly series with local-linear trend and deterministic seasonal
+    (period=12). Compares the estimated irregular variance and the first/last smoothed
+    level state.
+  dimension: numerical
+  status: pass
 - id: umap_simulated
   notes: UMAP embedding of three 3D blobs; cluster quality measured via K-Means inertia.
   dimension: numerical
