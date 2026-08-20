@@ -18,7 +18,7 @@ report.
 
 | Tool | Version |
 |---|---|
-| Hayashi | 0.2.10-dev |
+| Hayashi | 0.2.10 |
 | Python | 3.14.6 |
 | R | 4.6.1 |
 | statsmodels | 0.14.6 |
