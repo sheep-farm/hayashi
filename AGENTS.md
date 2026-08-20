@@ -95,11 +95,11 @@ Hayashi is a Rust interpreter split into two crates in this repo:
 - **Hayashi** (`hayashi-lang`): lexer, parser, interpreter, CLI,
   REPL, DAP server, I/O loaders, Jupyter kernel, documentation, examples,
   validation programme, benchmarks, and books.
-- **Greeners** (`crates/greeners`): a local conditional re-export facade that
-  aggregates the published `greeners-*` sub-crates from crates.io
-  (`greeners-core`, `greeners-ols`, etc.). It keeps the numerical engine
-  modular and lets the `hayashi-lang` build toggle estimator families with
-  Cargo features.
+- **Greeners** (`greeners = "2.0.0"` on crates.io): the published facade
+  aggregates the `greeners-*` sub-crates (`greeners-core`, `greeners-ols`,
+  etc.). Hayashi's own Cargo features still gate estimator dispatch modules
+  in `src/lang/interpreter`, but every sub-crate is now resolved through the
+  registry version pinned in `Cargo.lock`.
 
 Public surface:
 - `src/lib.rs` exposes `Interpreter` and `run_source`. It also provides
@@ -216,16 +216,15 @@ Public surface:
   parsing, and tolerance-based comparison; `validation/matrix.yml` is the
   registry; `validation/MATRIX.md` is the human-readable dashboard.
 - Validation metadata: `python validation/run.py --check` currently
-  discovers 229 cases and `validation/matrix.yml` reports 214 `pass`,
-  15 `not-supported`, 0 `blocked`.
+  discovers 234 cases and `validation/matrix.yml` reports 219 `pass`,
+  15 `not-supported`, 0 `blocked`, 0 `fail`.
 
 ### 5.1 CI
 
 - `ci.yml`: validation metadata check, `cargo deny check advisories`,
   `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test` on
-  Ubuntu/macOS/Windows. Greeners sub-crates are consumed from crates.io and
-  re-exported by the local `crates/greeners` facade; versions are pinned in
-  `Cargo.lock`.
+  Ubuntu/macOS/Windows. Greeners is consumed as the published `greeners`
+  facade crate from crates.io; versions are pinned in `Cargo.lock`.
 - `validation.yml`: full empirical validation on Ubuntu/macOS/Windows with
   R + Python.
 - `nightly.yml`: builds `dev` and publishes a `nightly` GitHub release.
@@ -234,8 +233,8 @@ Public surface:
 
 ## 6. Branches and releases
 
-- `dev`: active development. Current HEAD: `9155724` (PoC: modular
-  greeners build (#147)).
+- `dev`: active development. Current HEAD: `52bf02f` (Switch greeners
+  dependency to crates.io 2.0.0).
 - `master`: stable releases. Current HEAD: `36d04b4` (site rebuild for
   0.2.9). Tags include `v0.2.0` through `v0.2.9` and `nightly`.
 - `gh-pages`: published site.
