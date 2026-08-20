@@ -1,0 +1,15 @@
+load "validation/cases/decompose_simulated/data/data.csv" as df
+
+let m = decompose(df, y, period=12, model="additive")
+
+let first = 6
+let last = 113
+
+let out = dataframe({
+  "variable": ["trend_first", "trend_last", "seasonal_first", "seasonal_last", "resid_first", "resid_last"],
+  "coef": [m.trend[first], m.trend[last], m.seasonal[first], m.seasonal[last], m.residual[first], m.residual[last]],
+  "std_err": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+})
+
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")
