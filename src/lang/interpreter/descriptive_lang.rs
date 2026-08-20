@@ -1,5 +1,157 @@
 use super::helpers::*;
 use super::*;
+use crate::lang::dap::model_expansion;
+use std::sync::Arc;
+
+struct CodebookEntry {
+    name: String,
+    type_name: &'static str,
+    obs: i64,
+    missing: i64,
+    unique: i64,
+    mean: f64,
+    sd: f64,
+    min: f64,
+    p25: f64,
+    p50: f64,
+    p75: f64,
+    max: f64,
+    trues: i64,
+    falses: i64,
+    values: String,
+}
+
+type CoefRow = (String, f64, Option<f64>, Option<f64>);
+
+struct ModelInfo {
+    label: String,
+    coefs: Vec<CoefRow>,
+    n: usize,
+    r2: Option<f64>,
+    adj_r2: Option<f64>,
+    #[allow(dead_code)]
+    ll: Option<f64>,
+}
+
+fn esttab_stars(p: Option<f64>) -> &'static str {
+    match p {
+        Some(p) if p < 0.01 => "***",
+        Some(p) if p < 0.05 => "**",
+        Some(p) if p < 0.10 => "*",
+        _ => "",
+    }
+}
+
+fn esttab_parse_csv(csv: &str) -> Vec<CoefRow> {
+    let mut rows = Vec::new();
+    let mut first = true;
+    for line in csv.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        if first {
+            first = false;
+            continue;
+        } // header
+        let f: Vec<&str> = line.splitn(6, ',').collect();
+        if f.len() >= 5 {
+            let raw = f[0].trim().trim_matches('"');
+            let name = if raw == "const" {
+                "_cons".to_string()
+            } else {
+                raw.to_string()
+            };
+            let coef = f[1].trim().parse::<f64>().unwrap_or(f64::NAN);
+            let se = f[2].trim().parse::<f64>().unwrap_or(f64::NAN);
+            let p = f[4].trim().parse::<f64>().unwrap_or(1.0);
+            rows.push((name, coef, Some(se), Some(p)));
+        }
+    }
+    rows
+}
+
+fn esttab_extract_std(
+    label: &str,
+    vnames: &Option<Vec<String>>,
+    params: &ndarray::Array1<f64>,
+    se: &ndarray::Array1<f64>,
+    pv: &ndarray::Array1<f64>,
+    n: usize,
+) -> ModelInfo {
+    let k = params.len();
+    let fb: Vec<String> = (0..k).map(|i| format!("x{i}")).collect();
+    let nm = vnames.as_ref().unwrap_or(&fb);
+    let coefs: Vec<CoefRow> = nm
+        .iter()
+        .zip(params.iter())
+        .zip(se.iter())
+        .zip(pv.iter())
+        .map(|(((n, &c), &s), &p)| (n.clone(), c, Some(s), Some(p)))
+        .collect();
+    ModelInfo {
+        label: label.to_string(),
+        coefs,
+        n,
+        r2: None,
+        adj_r2: None,
+        ll: None,
+    }
+}
+
+fn fit_float(fit: &std::collections::HashMap<String, Value>, keys: &[&str]) -> Option<f64> {
+    for k in keys {
+        if let Some(Value::Float(v)) = fit.get(*k) {
+            return Some(*v);
+        }
+    }
+    None
+}
+
+fn model_view_to_model_info(mv: &crate::lang::interpreter::model_view::ModelView) -> ModelInfo {
+    let coefs = mv.to_coef_rows();
+    let n = mv.n_obs().unwrap_or(0);
+    let r2 = mv
+        .r_squared()
+        .or_else(|| fit_float(&mv.fit, &["r2", "r_squared", "r_squared_overall"]));
+    let adj_r2 = fit_float(&mv.fit, &["adj_r2", "adj_r_squared"]);
+    let ll = fit_float(&mv.fit, &["log_lik", "log_likelihood"]);
+    ModelInfo {
+        label: mv.type_name.clone(),
+        coefs,
+        n,
+        r2,
+        adj_r2,
+        ll,
+    }
+}
+
+fn codebook_numeric_stats(vals: &[f64]) -> (f64, f64, f64, f64, f64, f64, f64, usize) {
+    let n = vals.len();
+    let mean = vals.iter().sum::<f64>() / n as f64;
+    let var = vals.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n as f64 - 1.0).max(1.0);
+    let sd = var.sqrt();
+    let min = vals.iter().cloned().fold(f64::INFINITY, f64::min);
+    let max = vals.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    let mut sorted = vals.to_vec();
+    sorted.sort_by(nan_last_cmp);
+    let pctile = |p: f64| -> f64 {
+        let idx = (p * (n - 1) as f64).round() as usize;
+        sorted[idx.min(n - 1)]
+    };
+    let mut unique = sorted.clone();
+    unique.dedup();
+    (
+        mean,
+        sd,
+        min,
+        pctile(0.25),
+        pctile(0.50),
+        pctile(0.75),
+        max,
+        unique.len(),
+    )
+}
 
 /// set_seed, timer, quietly, capture, assert, preserve/restore, source, help,
 /// describe, codebook, format, duplicates, label, correlate, summarize,
@@ -9,1798 +161,2476 @@ impl Interpreter {
         &mut self,
         func: &str,
         args: &[Expr],
-        _opts: &[Opt],
+        opts: &[Opt],
         opt_map: &HashMap<String, Value>,
     ) -> Result<Option<Value>> {
         let result: Result<Value> = match func {
-            // ── set_seed: reproducibility ────────────────────────────────
-            "set_seed" | "seed" | "setseed" => {
-                if args.is_empty() {
-                    return Err(HayashiError::Runtime("set_seed(N) — sets RNG seed".into()));
-                }
-                let s = match self.eval_expr(&args[0])? {
-                    Value::Int(v) => v as u64,
-                    Value::Float(v) => v as u64,
-                    _ => return Err(HayashiError::Type("seed must be integer".into())),
-                };
-                self.rng_seed = Some(s);
-                use rand::SeedableRng;
-                self.rng = rand::rngs::StdRng::seed_from_u64(s);
-                println!("set seed {s}");
-                Ok(Value::Nil)
-            }
-
-            // ── timer: measures execution time ─────────────────────────────
-            "timer" | "time" | "bench" => {
-                if args.is_empty() {
-                    return Err(HayashiError::Runtime(
-                        "timer(expr) — measures evaluation time".into(),
-                    ));
-                }
-                let start = std::time::Instant::now();
-                let result = self.eval_expr(&args[0])?;
-                let elapsed = start.elapsed();
-                println!("  elapsed: {:.4}s", elapsed.as_secs_f64());
-                Ok(result)
-            }
-
-            // ── quietly: evaluates expression, suppresses output ──────────────────
-            "quietly" | "quiet" => {
-                if args.is_empty() {
-                    return Err(HayashiError::Runtime(
-                        "quietly(expr) — evaluates without printing".into(),
-                    ));
-                }
-                self.eval_expr(&args[0])?;
-                Ok(Value::Nil)
-            }
-
-            // ── capture: evaluates expression, ignores errors ───────────────────
-            "capture" | "cap" => {
-                if args.is_empty() {
-                    return Err(HayashiError::Runtime(
-                        "capture(expr) — evaluates ignoring errors".into(),
-                    ));
-                }
-                match self.eval_expr(&args[0]) {
-                    Ok(v) => Ok(v),
-                    Err(e) => {
-                        eprintln!("(captured: {e})");
-                        Ok(Value::Nil)
-                    }
-                }
-            }
-
-            // ── assert: error if condition is false ──────────────────────────
-            "assert" => {
-                if args.is_empty() {
-                    return Err(HayashiError::Runtime(
-                        "assert(cond [, msg]) — error if condition is false".into(),
-                    ));
-                }
-                let val = self.eval_expr(&args[0])?;
-                if !value_as_bool(&val) {
-                    let msg = if args.len() >= 2 {
-                        match self.eval_expr(&args[1])? {
-                            Value::Str(s) => s,
-                            _ => "assertion failed".into(),
-                        }
-                    } else {
-                        "assertion failed".into()
-                    };
-                    return Err(HayashiError::Runtime(msg));
-                }
-                Ok(Value::Nil)
-            }
-
-            // ── preserve/restore: save and restore variable state ───
-            "preserve" => {
-                if args.is_empty() {
-                    return Err(HayashiError::Runtime(
-                        "preserve(df) — saves a copy of the DataFrame".into(),
-                    ));
-                }
-                let name = match &args[0] {
-                    Expr::Var(n) => n.clone(),
-                    _ => {
-                        return Err(HayashiError::Type(
-                            "preserve() requires a variable name".into(),
-                        ))
-                    }
-                };
-                let val = self
-                    .env
-                    .get(&name)
-                    .ok_or_else(|| self.rt_err(format!("'{name}' not found")))?
-                    .clone();
-                self.preserved.insert(name.clone(), val);
-                println!("preserve {name}");
-                Ok(Value::Nil)
-            }
-
-            "restore" => {
-                if args.is_empty() {
-                    return Err(HayashiError::Runtime(
-                        "restore(df) — restaura DataFrame salvo".into(),
-                    ));
-                }
-                let name = match &args[0] {
-                    Expr::Var(n) => n.clone(),
-                    _ => {
-                        return Err(HayashiError::Type(
-                            "restore() requires a variable name".into(),
-                        ))
-                    }
-                };
-                let val = self
-                    .preserved
-                    .remove(&name)
-                    .ok_or_else(|| self.rt_err(format!("'{name}' was not preserved")))?;
-                self.env.set(&name, val)?;
-                println!("restore {name}");
-                Ok(Value::Nil)
-            }
-
-            // ── source/do: executa script .hay no ambiente atual ─────────────
-            "source" | "do" | "run" | "include" => {
-                if args.is_empty() {
-                    return Err(self.rt_err("source(\"script.hay\")"));
-                }
-                let path = match self.eval_expr(&args[0])? {
-                    Value::Str(s) => s,
-                    _ => return Err(HayashiError::Type("source() requires a string path".into())),
-                };
-                let src = std::fs::read_to_string(&path)
-                    .map_err(|e| self.rt_err(format!("cannot read '{path}': {e}")))?;
-                println!("source {path}");
-                crate::lang::run_source(&src, self)?;
-                Ok(Value::Nil)
-            }
-
-            "import" | "require" => {
-                if args.is_empty() {
-                    return Err(self.rt_err("import(\"module_or_url\")"));
-                }
-                let module = match self.eval_expr(&args[0])? {
-                    Value::Str(s) => s,
-                    _ => return Err(HayashiError::Type("import() requires a string".into())),
-                };
-
-                if self.imported.contains(&module) {
-                    return Ok(Some(Value::Nil));
-                }
-
-                let resolved = {
-                    #[cfg(feature = "native")]
-                    {
-                        if crate::io::fetch::is_url(&module) {
-                            let tmp = crate::io::fetch::download_to_temp(&module)?;
-                            tmp.to_string_lossy().to_string()
-                        } else {
-                            self.resolve_import(&module)?
-                        }
-                    }
-                    #[cfg(not(feature = "native"))]
-                    {
-                        self.resolve_import(&module)?
-                    }
-                };
-
-                let alias = match opt_map.get("as") {
-                    Some(Value::Str(s)) => Some(s.clone()),
-                    _ => None,
-                };
-                let only: Option<Vec<String>> = match opt_map.get("only") {
-                    Some(Value::List(lst)) => Some(
-                        lst.iter()
-                            .filter_map(|v| match v {
-                                Value::Str(s) => Some(s.clone()),
-                                _ => None,
-                            })
-                            .collect(),
-                    ),
-                    _ => None,
-                };
-
-                let ns = alias.clone().unwrap_or_else(|| {
-                    let base = module
-                        .trim_end_matches(".hay")
-                        .trim_end_matches(".wasm")
-                        .trim_end_matches(".so")
-                        .trim_end_matches(".dll")
-                        .trim_end_matches(".dylib");
-                    base.rsplit('/').next().unwrap_or(&module).to_string()
-                });
-
-                let is_wasm = resolved.ends_with(".wasm");
-                let is_native = resolved.ends_with(".so")
-                    || resolved.ends_with(".dll")
-                    || resolved.ends_with(".dylib");
-
-                if is_wasm {
-                    #[cfg(not(feature = "wasm"))]
-                    return Err(self.rt_err("import: WASM plugins require 'wasm' feature"));
-                    #[cfg(feature = "wasm")]
-                    {
-                        use crate::lang::plugin::WasmPlugin;
-                        let plugin = WasmPlugin::new(&resolved, &ns).map_err(|e| {
-                            self.rt_err(format!("import: failed to load WASM plugin: {e}"))
-                        })?;
-                        self.plugins.insert(ns.clone(), Box::new(plugin));
-                        self.imported.insert(module.clone());
-                        return Ok(Some(Value::Nil));
-                    }
-                } else if is_native {
-                    #[cfg(not(feature = "native"))]
-                    return Err(self.rt_err("import: native plugins require 'native' feature"));
-                    #[cfg(feature = "native")]
-                    {
-                        use crate::lang::plugin::RustNativePlugin;
-                        let plugin = RustNativePlugin::new(&resolved, &ns).map_err(|e| {
-                            self.rt_err(format!("import: failed to load native plugin: {e}"))
-                        })?;
-                        self.plugins.insert(ns.clone(), Box::new(plugin));
-                        self.imported.insert(module.clone());
-                        return Ok(Some(Value::Nil));
-                    }
-                }
-
-                // Default script plugin (.hay) loading
-                let src = std::fs::read_to_string(&resolved)
-                    .map_err(|e| self.rt_err(format!("import: cannot read '{resolved}': {e}")))?;
-
-                self.imported.insert(module.clone());
-
-                let before: std::collections::HashSet<String> =
-                    self.env.var_names().into_iter().collect();
-
-                crate::lang::run_source(&src, self)?;
-
-                let new_names: Vec<String> = self
-                    .env
-                    .var_names()
-                    .into_iter()
-                    .filter(|n| !before.contains(n))
-                    .collect();
-
-                if let Some(ref allowed) = only {
-                    for name in &new_names {
-                        if !allowed.contains(name) {
-                            self.env.remove(name);
-                        }
-                    }
-                } else {
-                    for name in &new_names {
-                        if let Some(val) = self.env.get(name).cloned() {
-                            let qualified = format!("{ns}::{name}");
-                            self.env.declare(&qualified, val).ok();
-                            self.env.remove(name);
-                        }
-                    }
-                }
-
-                Ok(Value::Nil)
-            }
-
-            "plugin_path" => {
-                if args.is_empty() {
-                    if self.plugin_paths.is_empty() {
-                        println!("plugin_path: (none)");
-                    } else {
-                        for p in &self.plugin_paths {
-                            println!("  {p}");
-                        }
-                    }
-                    return Ok(Some(Value::Nil));
-                }
-                for arg in args {
-                    let path = match self.eval_expr(arg)? {
-                        Value::Str(s) => s,
-                        other => {
-                            return Err(
-                                self.type_err(format!("plugin_path: expected string, got {other}"))
-                            )
-                        }
-                    };
-                    if !self.plugin_paths.contains(&path) {
-                        self.plugin_paths.push(path);
-                    }
-                }
-                Ok(Value::Nil)
-            }
-
-            // ── help: sistema de ajuda inline ──────────────────────────────
-            "help" => {
-                let topic = if args.is_empty() {
-                    String::new()
-                } else {
-                    match &args[0] {
-                        Expr::Var(n) | Expr::Str(n) => n.clone(),
-                        _ => String::new(),
-                    }
-                };
-                if topic == "about" {
-                    println!("{}", crate::lang::help::help_about());
-                } else if topic == "license" {
-                    println!("{}", crate::lang::help::help_license());
-                } else {
-                    match crate::lang::help::help_text(&topic) {
-                        Some(h) => println!("{h}"),
-                        None => {
-                            if let Some(Value::UserFn(uf)) = self.env.get(&topic) {
-                                if let Some(doc) = &uf.doc {
-                                    println!("fn {}({})\n{}", topic, uf.params.join(", "), doc);
-                                } else {
-                                    println!(
-                                        "fn {}({})\n  (no docstring)",
-                                        topic,
-                                        uf.params.join(", ")
-                                    );
-                                }
-                            } else {
-                                println!(
-                                    "help: '{}' not documented. Type help() for full list.",
-                                    topic
-                                );
-                            }
-                        }
-                    }
-                }
-                Ok(Value::Nil)
-            }
-
-            // ── describe ─────────────────────────────────────────────────────
-            "describe" => {
-                if args.len() != 1 {
-                    return Err(HayashiError::Runtime("describe() takes 1 argument".into()));
-                }
-                let df_name = match &args[0] {
-                    Expr::Var(n) => Some(n.clone()),
-                    _ => None,
-                };
-                match self.eval_expr(&args[0])? {
-                    Value::DataFrame(df) => {
-                        println!("{}", df);
-                        // mostrar labels se existirem
-                        if let Some(ref name) = df_name {
-                            if let Some(var_labels) = self.labels.get(name) {
-                                if !var_labels.is_empty() {
-                                    println!("\n  Labels:");
-                                    let mut sorted: Vec<_> = var_labels.iter().collect();
-                                    sorted.sort_by_key(|(k, _)| (*k).clone());
-                                    for (var, lbl) in sorted {
-                                        println!("    {:<20} {}", var, lbl);
-                                    }
-                                }
-                            }
-                        }
-                        Ok(Value::Nil)
-                    }
-                    _ => Err(HayashiError::Type("describe() requires a DataFrame".into())),
-                }
-            }
-
-            // ── codebook ─────────────────────────────────────────────────────
-            "codebook" => {
-                if args.is_empty() {
-                    return Err(HayashiError::Runtime(
-                        "codebook(df [, var1, var2, ...])".into(),
-                    ));
-                }
-                let df = match self.eval_expr(&args[0])? {
-                    Value::DataFrame(df) => df,
-                    other => return Err(self.type_mismatch("DataFrame", &other)),
-                };
-
-                let requested: Vec<String> = if args.len() > 1 {
-                    self.resolve_var_list(&args[1..], &df)?
-                } else {
-                    let mut names = df.column_names();
-                    names.sort();
-                    names
-                };
-
-                let sep = "─".repeat(76);
-                println!("\n{:═^76}", " Codebook ");
-
-                for name in &requested {
-                    use greeners::Column;
-                    let col = df
-                        .get_column(name)
-                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-
-                    println!("\n{sep}");
-                    match col {
-                        Column::Float(arr) => {
-                            let total = arr.len();
-                            let vals: Vec<f64> =
-                                arr.iter().copied().filter(|x| x.is_finite()).collect();
-                            let missing = total - vals.len();
-                            let n = vals.len();
-                            println!(
-                                "  {:<20} type: float    obs: {}    missing: {}",
-                                name, total, missing
-                            );
-                            if n > 0 {
-                                let mean = vals.iter().sum::<f64>() / n as f64;
-                                let var = vals.iter().map(|x| (x - mean).powi(2)).sum::<f64>()
-                                    / (n as f64 - 1.0).max(1.0);
-                                let sd = var.sqrt();
-                                let min = vals.iter().cloned().fold(f64::INFINITY, f64::min);
-                                let max = vals.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-                                let mut sorted = vals.clone();
-                                sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
-                                let pctile = |p: f64| -> f64 {
-                                    let idx = (p * (n - 1) as f64).round() as usize;
-                                    sorted[idx.min(n - 1)]
-                                };
-                                let mut unique = sorted.clone();
-                                unique.dedup();
-                                println!(
-                                    "  unique: {}    mean: {:.4}    sd: {:.4}",
-                                    unique.len(),
-                                    mean,
-                                    sd
-                                );
-                                println!(
-                                    "  min: {:.4}    p25: {:.4}    p50: {:.4}    p75: {:.4}    max: {:.4}",
-                                    min,
-                                    pctile(0.25),
-                                    pctile(0.50),
-                                    pctile(0.75),
-                                    max
-                                );
-                            }
-                        }
-                        Column::Int(arr) => {
-                            let total = arr.len();
-                            let vals: Vec<f64> = arr.iter().map(|&x| x as f64).collect();
-                            let n = vals.len();
-                            println!("  {:<20} type: int      obs: {}    missing: 0", name, total);
-                            if n > 0 {
-                                let mean = vals.iter().sum::<f64>() / n as f64;
-                                let var = vals.iter().map(|x| (x - mean).powi(2)).sum::<f64>()
-                                    / (n as f64 - 1.0).max(1.0);
-                                let sd = var.sqrt();
-                                let min = vals.iter().cloned().fold(f64::INFINITY, f64::min);
-                                let max = vals.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-                                let mut sorted = vals.clone();
-                                sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
-                                let mut unique = sorted.clone();
-                                unique.dedup();
-                                println!(
-                                    "  unique: {}    mean: {:.4}    sd: {:.4}",
-                                    unique.len(),
-                                    mean,
-                                    sd
-                                );
-                                println!("  min: {:.0}    max: {:.0}", min, max);
-                            }
-                        }
-                        Column::String(arr) => {
-                            let total = arr.len();
-                            let non_empty = arr.iter().filter(|s: &&String| !s.is_empty()).count();
-                            let missing = total - non_empty;
-                            let mut unique: Vec<&str> =
-                                arr.iter().map(|s: &String| s.as_str()).collect();
-                            unique.sort();
-                            unique.dedup();
-                            println!(
-                                "  {:<20} type: string   obs: {}    missing: {}",
-                                name, total, missing
-                            );
-                            println!("  unique: {}", unique.len());
-                            if unique.len() <= 10 {
-                                let examples: Vec<&str> = unique.iter().take(10).copied().collect();
-                                println!("  values: {}", examples.join(", "));
-                            } else {
-                                let first5: Vec<&str> = unique.iter().take(5).copied().collect();
-                                println!(
-                                    "  values: {}, ... ({} more)",
-                                    first5.join(", "),
-                                    unique.len() - 5
-                                );
-                            }
-                        }
-                        Column::Bool(arr) => {
-                            let total = arr.len();
-                            let trues = arr.iter().filter(|&&b| b).count();
-                            let falses = total - trues;
-                            println!("  {:<20} type: bool     obs: {}    missing: 0", name, total);
-                            println!("  true: {}    false: {}", trues, falses);
-                        }
-                        _ => {
-                            println!("  {:<20} type: other", name);
-                        }
-                    }
-                }
-                println!("\n{sep}");
-                println!();
-                Ok(Value::Nil)
-            }
-
-            // ── format: formats numeric value ──────────────────────────────
-            "format" | "fmt" => {
-                if args.len() < 2 {
-                    return Err(HayashiError::Runtime(
-                        "format(value, fmt_str) — e.g. format(3.14, \"%.2f\")".into(),
-                    ));
-                }
-                let val = match self.eval_expr(&args[0])? {
-                    Value::Float(f) => f,
-                    Value::Int(i) => i as f64,
-                    other => {
-                        return Err(HayashiError::Type(format!(
-                            "format(): first argument must be numeric, not {other}"
-                        )))
-                    }
-                };
-                let fmt_s = match self.eval_expr(&args[1])? {
-                    Value::Str(s) => s,
-                    _ => {
-                        return Err(HayashiError::Type(
-                            "format(): second argument must be string (e.g. \"%.2f\")".into(),
-                        ))
-                    }
-                };
-                // parse "%.Nf" → N decimal places
-                let decimals: usize = if fmt_s.starts_with("%.") && fmt_s.ends_with('f') {
-                    fmt_s[2..fmt_s.len() - 1].parse().unwrap_or(4)
-                } else if fmt_s.starts_with('%') && fmt_s.ends_with('f') {
-                    // "%f" without specifying decimals
-                    6
-                } else {
-                    return Err(HayashiError::Runtime(format!(
-                        "format(): format string '{fmt_s}' not recognized (use \"%.Nf\")"
-                    )));
-                };
-                Ok(Value::Str(format!("{:.prec$}", val, prec = decimals)))
-            }
-
-            // ── duplicates: report/drop/tag duplicates ────────────────
-            "duplicates" => {
-                if args.len() < 2 {
-                    return Err(HayashiError::Runtime(
-                        "duplicates(df, var [, action=report|drop|tag])".into(),
-                    ));
-                }
-                let df_name = match &args[0] {
-                    Expr::Var(n) => n.clone(),
-                    _ => {
-                        return Err(HayashiError::Type(
-                            "duplicates(): first argument must be variable name".into(),
-                        ))
-                    }
-                };
-                let df = match self.env.get(&df_name) {
-                    Some(Value::DataFrame(d)) => d.clone(),
-                    _ => {
-                        return Err(HayashiError::Runtime(format!(
-                            "'{df_name}' is not a DataFrame"
-                        )))
-                    }
-                };
-                let var_name = match &args[1] {
-                    Expr::Var(n) | Expr::Str(n) => n.clone(),
-                    _ => {
-                        return Err(HayashiError::Type(
-                            "duplicates(): second argument must be column name".into(),
-                        ))
-                    }
-                };
-                let action = match opt_map.get("action") {
-                    Some(Value::Str(s)) => s.clone(),
-                    None => "report".into(),
-                    _ => "report".into(),
-                };
-
-                let col = get_col_f64(&df, &var_name)?;
-                let n = col.len();
-
-                // count occurrences of each value
-                let mut counts: HashMap<i64, usize> = HashMap::new();
-                for &v in col.iter() {
-                    let key = v.to_bits() as i64;
-                    *counts.entry(key).or_insert(0) += 1;
-                }
-
-                let n_dup: usize = counts.values().filter(|&&c| c > 1).map(|c| c - 1).sum();
-                let n_unique = counts.len();
-
-                match action.as_str() {
-                    "report" => {
-                        println!("duplicates report: {var_name}");
-                        println!("  observations:    {n}");
-                        println!("  unique values: {n_unique}");
-                        println!("  duplicates:    {n_dup}");
-                        Ok(Value::Int(n_dup as i64))
-                    }
-                    "drop" => {
-                        let mut seen: std::collections::HashSet<i64> =
-                            std::collections::HashSet::new();
-                        let keep: Vec<usize> = (0..n)
-                            .filter(|&i| {
-                                let key = col[i].to_bits() as i64;
-                                seen.insert(key)
-                            })
-                            .collect();
-                        let new_df = df
-                            .iloc(Some(&keep), None)
-                            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                        println!(
-                            "duplicates drop: {n_dup} obs removed, {} remaining",
-                            new_df.n_rows()
-                        );
-                        self.env.set(&df_name, Value::DataFrame(Rc::new(new_df)))?;
-                        Ok(Value::Nil)
-                    }
-                    "tag" => {
-                        let dup_col: Vec<f64> = (0..n)
-                            .map(|i| {
-                                let key = col[i].to_bits() as i64;
-                                *counts.get(&key).unwrap_or(&1) as f64
-                            })
-                            .collect();
-                        let mut df_mut = df.clone();
-                        let arr = ndarray::Array1::from(dup_col);
-                        Rc::make_mut(&mut df_mut)
-                            .insert("_dup".to_string(), arr)
-                            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                        println!("duplicates tag: _dup column generated ({n_dup} duplicates)");
-                        self.env.set(&df_name, Value::DataFrame(df_mut))?;
-                        Ok(Value::Nil)
-                    }
-                    other => Err(HayashiError::Runtime(format!(
-                        "duplicates(): action '{other}' unknown (report|drop|tag)"
-                    ))),
-                }
-            }
-
-            // ── label: stores variable labels ─────────────────────────
-            "label" => {
-                if args.len() < 3 {
-                    return Err(HayashiError::Runtime(
-                        "label(df, var, \"description\")".into(),
-                    ));
-                }
-                let df_name = match &args[0] {
-                    Expr::Var(n) => n.clone(),
-                    _ => {
-                        return Err(HayashiError::Type(
-                            "label(): first argument must be DataFrame name".into(),
-                        ))
-                    }
-                };
-                let var_name = match &args[1] {
-                    Expr::Var(n) | Expr::Str(n) => n.clone(),
-                    _ => {
-                        return Err(HayashiError::Type(
-                            "label(): second argument must be variable name".into(),
-                        ))
-                    }
-                };
-                let description = match self.eval_expr(&args[2])? {
-                    Value::Str(s) => s,
-                    _ => {
-                        return Err(HayashiError::Type(
-                            "label(): third argument must be string".into(),
-                        ))
-                    }
-                };
-                self.labels
-                    .entry(df_name.clone())
-                    .or_default()
-                    .insert(var_name.clone(), description.clone());
-                println!("label {df_name}.{var_name} = \"{description}\"");
-                Ok(Value::Nil)
-            }
-
-            // ── correlate ────────────────────────────────────────────────────
-            "correlate" | "corr" | "pwcorr" => {
-                if args.is_empty() {
-                    return Err(HayashiError::Runtime(
-                        "correlate() requires a DataFrame as first argument".into(),
-                    ));
-                }
-                let df = match self.eval_expr(&args[0])? {
-                    Value::DataFrame(df) => df,
-                    other => return Err(self.type_mismatch("DataFrame", &other)),
-                };
-
-                // requested variables or all numeric
-                let names: Vec<String> = if args.len() > 1 {
-                    self.resolve_var_list(&args[1..], &df)?
-                } else {
-                    use greeners::Column;
-                    let mut ns: Vec<String> = df
-                        .column_names()
-                        .into_iter()
-                        .filter(|n| {
-                            matches!(df.get_column(n), Ok(Column::Float(_)) | Ok(Column::Int(_)))
-                        })
-                        .collect();
-                    ns.sort();
-                    ns
-                };
-
-                if names.len() < 2 {
-                    return Err(HayashiError::Runtime(
-                        "correlate() needs at least 2 numeric variables".into(),
-                    ));
-                }
-
-                let refs: Vec<&str> = names.iter().map(String::as_str).collect();
-                let sub = df
-                    .select(&refs)
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                let mat = sub
-                    .corr()
-                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-
-                // corr() sorts columns alphabetically — synchronize with the matrix
-                let mut sorted_names = names.clone();
-                sorted_names.sort();
-
-                let col_w = 10usize;
-                let row_label_w = 16usize;
-                let trunc = |s: &str, w: usize| {
-                    if s.len() > w {
-                        s[..w].to_string()
-                    } else {
-                        s.to_string()
-                    }
-                };
-
-                // header
-                print!("{:>width$} |", "", width = row_label_w);
-                for name in &sorted_names {
-                    print!(" {:>width$}", trunc(name, col_w), width = col_w);
-                }
-                println!();
-                println!(
-                    "{}-+{}",
-                    "-".repeat(row_label_w),
-                    "-".repeat((col_w + 1) * sorted_names.len())
-                );
-
-                // p-value: t = r*sqrt(n-2)/sqrt(1-r²), df=n-2
-                let show_stars =
-                    func == "pwcorr" || matches!(opt_map.get("star"), Some(Value::Bool(true)));
-                let n_obs = df.n_rows() as f64;
-                let corr_pval = |r: f64| -> f64 {
-                    if n_obs <= 2.0 || (1.0 - r * r) <= 0.0 {
-                        return 1.0;
-                    }
-                    let t = r * (n_obs - 2.0).sqrt() / (1.0 - r * r).sqrt();
-                    t_pvalue_two(t, n_obs - 2.0)
-                };
-                let star = |p: f64| -> &str {
-                    if p < 0.01 {
-                        "***"
-                    } else if p < 0.05 {
-                        "**"
-                    } else if p < 0.10 {
-                        "*"
-                    } else {
-                        ""
-                    }
-                };
-
-                for (i, row_name) in sorted_names.iter().enumerate() {
-                    print!(
-                        "{:>width$} |",
-                        trunc(row_name, row_label_w),
-                        width = row_label_w
-                    );
-                    for j in 0..=i {
-                        let r = mat[[i, j]];
-                        if show_stars && i != j {
-                            let s = star(corr_pval(r));
-                            print!(" {:>7.4}{:<3}", r, s);
-                        } else {
-                            print!(" {:>10.4}", r);
-                        }
-                    }
-                    println!();
-                }
-                if show_stars {
-                    println!("* p<0.10  ** p<0.05  *** p<0.01");
-                }
-                println!();
-                Ok(Value::Nil)
-            }
-
-            // ── summarize ────────────────────────────────────────────────────
-            "summarize" => {
-                if args.is_empty() {
-                    return Err(HayashiError::Runtime(
-                        "summarize() requires a DataFrame as first argument".into(),
-                    ));
-                }
-                let df = match self.eval_expr(&args[0])? {
-                    Value::DataFrame(df) => df,
-                    other => return Err(self.type_mismatch("DataFrame", &other)),
-                };
-
-                let requested: Vec<String> = if args.len() > 1 {
-                    self.resolve_var_list(&args[1..], &df)?
-                } else {
-                    let mut names = df.column_names();
-                    names.sort();
-                    names
-                };
-
-                let detail = matches!(opt_map.get("detail"), Some(Value::Bool(true)))
-                    || matches!(opt_map.get("d"), Some(Value::Bool(true)));
-                let quiet = self.capturing;
-
-                if !quiet {
-                    println!(
-                        "\n{:<16} {:>9}  {:>7}  {:>12} {:>12} {:>12} {:>12}",
-                        "Variable", "Obs", "Missing", "Mean", "Std. Dev.", "Min", "Max"
-                    );
-                    println!("{}", "-".repeat(91));
-                }
-
-                let mut result_dicts: Vec<(String, HashMap<String, Value>)> = Vec::new();
-
-                for name in &requested {
-                    use greeners::Column;
-                    let col = df
-                        .get_column(name)
-                        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-
-                    let (n_total, n_missing, vals): (usize, usize, Vec<f64>) = match col {
-                        Column::Float(arr) => {
-                            let total = arr.len();
-                            let vals: Vec<f64> =
-                                arr.iter().copied().filter(|x| x.is_finite()).collect();
-                            let missing = total - vals.len();
-                            (total, missing, vals)
-                        }
-                        Column::Int(arr) => {
-                            let vals: Vec<f64> = arr.iter().map(|&x| x as f64).collect();
-                            (vals.len(), 0, vals)
-                        }
-                        _ => {
-                            if !quiet {
-                                println!("{:<16} {:>9}  {:>7}", name, "(non-numeric)", "");
-                            }
-                            continue;
-                        }
-                    };
-
-                    let n = vals.len();
-                    if n == 0 {
-                        if !quiet {
-                            println!("{:<16} {:>9}  {:>7}  (all missing)", name, 0, n_total);
-                        }
-                        continue;
-                    }
-
-                    let mean = vals.iter().sum::<f64>() / n as f64;
-                    let variance = vals.iter().map(|x| (x - mean).powi(2)).sum::<f64>()
-                        / (n as f64 - 1.0).max(1.0);
-                    let sd = variance.sqrt();
-                    let min = vals.iter().cloned().fold(f64::INFINITY, f64::min);
-                    let max = vals.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-
-                    if !quiet {
-                        let miss_str = if n_missing > 0 {
-                            format!("{}", n_missing)
-                        } else {
-                            String::new()
-                        };
-                        println!(
-                            "{:<16} {:>9}  {:>7}  {:>12.4} {:>12.4} {:>12.4} {:>12.4}",
-                            name, n, miss_str, mean, sd, min, max
-                        );
-                    }
-
-                    let mut d = HashMap::new();
-                    d.insert("N".into(), Value::Int(n as i64));
-                    d.insert("missing".into(), Value::Int(n_missing as i64));
-                    d.insert("mean".into(), Value::Float(mean));
-                    d.insert("sd".into(), Value::Float(sd));
-                    d.insert("min".into(), Value::Float(min));
-                    d.insert("max".into(), Value::Float(max));
-                    d.insert("variance".into(), Value::Float(variance));
-
-                    if detail {
-                        let mut sorted = vals.clone();
-                        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
-                        let pctile = |p: f64| -> f64 {
-                            let idx = (p * (n - 1) as f64).round() as usize;
-                            sorted[idx.min(n - 1)]
-                        };
-                        let p1 = pctile(0.01);
-                        let p5 = pctile(0.05);
-                        let p10 = pctile(0.10);
-                        let p25 = pctile(0.25);
-                        let p50 = pctile(0.50);
-                        let p75 = pctile(0.75);
-                        let p90 = pctile(0.90);
-                        let p95 = pctile(0.95);
-                        let p99 = pctile(0.99);
-                        let skew = if n > 2 {
-                            let m3 = vals.iter().map(|x| ((x - mean) / sd).powi(3)).sum::<f64>();
-                            m3 * n as f64 / ((n - 1) as f64 * (n - 2) as f64)
-                        } else {
-                            f64::NAN
-                        };
-                        let kurt = if n > 3 {
-                            let m4 = vals.iter().map(|x| ((x - mean) / sd).powi(4)).sum::<f64>()
-                                / n as f64;
-                            m4
-                        } else {
-                            f64::NAN
-                        };
-                        if !quiet {
-                            println!("         Percentiles:");
-                            println!("          1%  {:>10.4}       Skewness  {:>10.4}", p1, skew);
-                            println!("          5%  {:>10.4}       Kurtosis  {:>10.4}", p5, kurt);
-                            println!("         10%  {:>10.4}", p10);
-                            println!(
-                                "         25%  {:>10.4}       Variance  {:>10.4}",
-                                p25, variance
-                            );
-                            println!("         50%  {:>10.4}", p50);
-                            println!("         75%  {:>10.4}", p75);
-                            println!("         90%  {:>10.4}", p90);
-                            println!("         95%  {:>10.4}", p95);
-                            println!("         99%  {:>10.4}", p99);
-                        }
-                        d.insert("p1".into(), Value::Float(p1));
-                        d.insert("p5".into(), Value::Float(p5));
-                        d.insert("p10".into(), Value::Float(p10));
-                        d.insert("p25".into(), Value::Float(p25));
-                        d.insert("p50".into(), Value::Float(p50));
-                        d.insert("p75".into(), Value::Float(p75));
-                        d.insert("p90".into(), Value::Float(p90));
-                        d.insert("p95".into(), Value::Float(p95));
-                        d.insert("p99".into(), Value::Float(p99));
-                        d.insert("skewness".into(), Value::Float(skew));
-                        d.insert("kurtosis".into(), Value::Float(kurt));
-                    }
-                    result_dicts.push((name.clone(), d));
-                }
-                if !quiet {
-                    println!();
-                }
-
-                if quiet {
-                    if result_dicts.len() == 1 {
-                        let (_, d) = result_dicts.into_iter().next().unwrap();
-                        Ok(Value::Dict(Rc::new(d)))
-                    } else {
-                        let mut outer = HashMap::new();
-                        for (name, d) in result_dicts {
-                            outer.insert(name, Value::Dict(Rc::new(d)));
-                        }
-                        Ok(Value::Dict(Rc::new(outer)))
-                    }
-                } else {
-                    Ok(Value::Nil)
-                }
-            }
-
-            // ── esttab ───────────────────────────────────────────────────────
-            // ── eststo: acumula modelo para esttab posterior ──────────────
-            "eststo" | "est_store" => {
-                if args.is_empty() {
-                    return Err(HayashiError::Runtime("eststo(model)".into()));
-                }
-                let val = self.eval_expr(&args[0])?;
-                let n = self.stored_models.len() + 1;
-                self.stored_models.push(val);
-                println!(
-                    "eststo: modelo {n} armazenado ({} total)",
-                    self.stored_models.len()
-                );
-                Ok(Value::Nil)
-            }
-
-            "estclear" => {
-                let n = self.stored_models.len();
-                self.stored_models.clear();
-                println!("estclear: {n} modelos removidos");
-                Ok(Value::Nil)
-            }
-
-            "esttab" => {
-                // sem args → usa modelos acumulados via eststo
-                let use_stored = args.is_empty();
-                if use_stored && self.stored_models.is_empty() {
-                    return Err(HayashiError::Runtime(
-                        "esttab() requires models — pass as args or use eststo() first".into(),
-                    ));
-                }
-
-                let fmt = match opt_map.get("fmt") {
-                    Some(Value::Str(s)) => s.clone(),
-                    None => "txt".to_string(),
-                    _ => return Err(HayashiError::Type("fmt= must be a string".into())),
-                };
-                let out_path = match opt_map.get("path") {
-                    Some(Value::Str(s)) => Some(s.clone()),
-                    None => None,
-                    _ => return Err(HayashiError::Type("path= must be a string".into())),
-                };
-
-                // (variable_name, coef, se_opt, pval_opt)
-                type CoefRow = (String, f64, Option<f64>, Option<f64>);
-                // (label, coefs, n_obs, fit_stats)
-                struct ModelInfo {
-                    label: String,
-                    coefs: Vec<CoefRow>,
-                    n: usize,
-                    r2: Option<f64>,
-                    adj_r2: Option<f64>,
-                    #[allow(dead_code)]
-                    ll: Option<f64>,
-                }
-
-                // parseia CSV do OlsResult: variable,coef,se,t,p
-                let parse_csv = |csv: &str| -> Vec<CoefRow> {
-                    let mut rows = Vec::new();
-                    let mut first = true;
-                    for line in csv.lines() {
-                        let line = line.trim();
-                        if line.is_empty() {
-                            continue;
-                        }
-                        if first {
-                            first = false;
-                            continue;
-                        } // header
-                        let f: Vec<&str> = line.splitn(6, ',').collect();
-                        if f.len() >= 5 {
-                            let raw = f[0].trim().trim_matches('"');
-                            let name = if raw == "const" {
-                                "_cons".to_string()
-                            } else {
-                                raw.to_string()
-                            };
-                            let coef = f[1].trim().parse::<f64>().unwrap_or(f64::NAN);
-                            let se = f[2].trim().parse::<f64>().unwrap_or(f64::NAN);
-                            let p = f[4].trim().parse::<f64>().unwrap_or(1.0);
-                            rows.push((name, coef, Some(se), Some(p)));
-                        }
-                    }
-                    rows
-                };
-
-                let stars = |p: Option<f64>| match p {
-                    Some(p) if p < 0.01 => "***",
-                    Some(p) if p < 0.05 => "**",
-                    Some(p) if p < 0.10 => "*",
-                    _ => "",
-                };
-
-                let extract_std = |label: &str,
-                                   vnames: &Option<Vec<String>>,
-                                   params: &ndarray::Array1<f64>,
-                                   se: &ndarray::Array1<f64>,
-                                   pv: &ndarray::Array1<f64>,
-                                   n: usize|
-                 -> ModelInfo {
-                    let k = params.len();
-                    let fb: Vec<String> = (0..k).map(|i| format!("x{i}")).collect();
-                    let nm = vnames.as_ref().unwrap_or(&fb);
-                    let coefs: Vec<CoefRow> = nm
-                        .iter()
-                        .zip(params.iter())
-                        .zip(se.iter())
-                        .zip(pv.iter())
-                        .map(|(((n, &c), &s), &p)| (n.clone(), c, Some(s), Some(p)))
-                        .collect();
-                    ModelInfo {
-                        label: label.to_string(),
-                        coefs,
-                        n,
-                        r2: None,
-                        adj_r2: None,
-                        ll: None,
-                    }
-                };
-
-                let mut models: Vec<ModelInfo> = Vec::new();
-                let model_vals: Vec<Value> = if use_stored {
-                    self.stored_models.clone()
-                } else {
-                    let mut vals = Vec::new();
-                    for a in args {
-                        let v = self.eval_expr(a)?;
-                        if let Value::List(items) = v {
-                            vals.extend(items.iter().cloned());
-                        } else {
-                            vals.push(v);
-                        }
-                    }
-                    vals
-                };
-                for val in model_vals {
-                    match val {
-                        Value::OlsResult(m) => {
-                            use greeners::ExportableResult;
-                            let coefs = parse_csv(&m.result.to_csv());
-                            let n = m.residuals.len();
-                            let cov_label = match &m.result.cov_type {
-                                CovarianceType::NonRobust => "",
-                                CovarianceType::HC1 => " (robust)",
-                                CovarianceType::HC2 => " (HC2)",
-                                CovarianceType::HC3 => " (HC3)",
-                                CovarianceType::HC4 => " (HC4)",
-                                CovarianceType::NeweyWest(l) => {
-                                    let _ = l;
-                                    " (NW)"
-                                }
-                                CovarianceType::Clustered(_) => " (cluster)",
-                                CovarianceType::ClusteredTwoWay(_, _) => " (2w-cluster)",
-                            };
-                            models.push(ModelInfo {
-                                label: format!("OLS{cov_label}"),
-                                coefs,
-                                n,
-                                r2: Some(m.result.r_squared),
-                                adj_r2: Some(m.result.adj_r_squared),
-                                ll: Some(m.result.log_likelihood),
-                            });
-                        }
-                        Value::BinaryResult(bm) => {
-                            let label = if bm.kind == "logit" {
-                                "Logit"
-                            } else {
-                                "Probit"
-                            }
-                            .to_string();
-                            let n = bm.x.nrows();
-                            models.push(extract_std(
-                                &label,
-                                &bm.result.variable_names,
-                                &bm.result.params,
-                                &bm.result.std_errors,
-                                &bm.result.p_values,
-                                n,
-                            ));
-                        }
-                        Value::IvResult(r) => {
-                            models.push(extract_std(
-                                "IV/2SLS",
-                                &r.variable_names,
-                                &r.params,
-                                &r.std_errors,
-                                &r.p_values,
-                                r.n_obs,
-                            ));
-                        }
-                        Value::PoissonResult(r) => {
-                            models.push(extract_std(
-                                "Poisson",
-                                &r.variable_names,
-                                &r.params,
-                                &r.std_errors,
-                                &r.p_values,
-                                r.n_obs,
-                            ));
-                        }
-                        Value::NegBinResult(r) => {
-                            models.push(extract_std(
-                                "NegBin",
-                                &r.variable_names,
-                                &r.params,
-                                &r.std_errors,
-                                &r.p_values,
-                                r.n_obs,
-                            ));
-                        }
-                        Value::OrderedResult(r) => {
-                            let mut info = extract_std(
-                                &r.model_name,
-                                &r.variable_names,
-                                &r.params,
-                                &r.std_errors,
-                                &r.p_values,
-                                r.n_obs,
-                            );
-                            for (i, (&thr, &thr_se)) in r
-                                .thresholds
-                                .iter()
-                                .zip(r.threshold_std_errors.iter())
-                                .enumerate()
-                            {
-                                info.coefs.push((
-                                    format!("_cut{}", i + 1),
-                                    thr,
-                                    Some(thr_se),
-                                    None,
-                                ));
-                            }
-                            models.push(info);
-                        }
-                        Value::TobitResult(r) => {
-                            let mut info = extract_std(
-                                "Tobit",
-                                &r.variable_names,
-                                &r.params,
-                                &r.std_errors,
-                                &r.p_values,
-                                r.n_obs,
-                            );
-                            info.coefs.push(("_sigma".into(), r.sigma, None, None));
-                            models.push(info);
-                        }
-                        Value::HeckmanResult(r) => {
-                            let mut info = extract_std(
-                                "Heckman",
-                                &r.variable_names,
-                                &r.params,
-                                &r.std_errors,
-                                &r.p_values,
-                                r.n_obs,
-                            );
-                            let dz = if r.delta_se > 0.0 {
-                                r.delta / r.delta_se
-                            } else {
-                                f64::NAN
-                            };
-                            let dp = if dz.is_finite() {
-                                t_pvalue_two(dz, r.n_selected as f64)
-                            } else {
-                                f64::NAN
-                            };
-                            info.coefs.push((
-                                "_lambda".into(),
-                                r.delta,
-                                Some(r.delta_se),
-                                Some(dp),
-                            ));
-                            models.push(info);
-                        }
-                        Value::PanelResult(r) => {
-                            models.push(extract_std(
-                                "FE",
-                                &r.variable_names,
-                                &r.params,
-                                &r.std_errors,
-                                &r.p_values,
-                                r.n_obs,
-                            ));
-                        }
-                        Value::ReResult(r) => {
-                            models.push(extract_std(
-                                "RE",
-                                &r.variable_names,
-                                &r.params,
-                                &r.std_errors,
-                                &r.p_values,
-                                0,
-                            ));
-                        }
-                        Value::AbResult(r) => {
-                            models.push(extract_std(
-                                "AB-GMM",
-                                &r.variable_names,
-                                &r.params,
-                                &r.std_errors,
-                                &r.p_values,
-                                r.n_obs,
-                            ));
-                        }
-                        Value::GmmResult(r) => {
-                            let names: Option<Vec<String>> =
-                                Some((0..r.params.len()).map(|i| format!("x{i}")).collect());
-                            models.push(extract_std(
-                                "GMM",
-                                &names,
-                                &r.params,
-                                &r.std_errors,
-                                &r.p_values,
-                                r.n_obs,
-                            ));
-                        }
-                        Value::SysGmmResult(r) => {
-                            models.push(extract_std(
-                                "SysGMM",
-                                &r.variable_names,
-                                &r.params,
-                                &r.std_errors,
-                                &r.p_values,
-                                r.n_obs_fd,
-                            ));
-                        }
-                        Value::PcseResult(r) => {
-                            models.push(extract_std(
-                                "PCSE",
-                                &r.variable_names,
-                                &r.params,
-                                &r.std_errors,
-                                &r.p_values,
-                                r.n_obs,
-                            ));
-                        }
-                        Value::PanelGlsResult(r) => {
-                            let label = match r.panels {
-                                greeners::panel::GlsPanels::Hetero => "XTGLS-H",
-                                greeners::panel::GlsPanels::Correlated => "XTGLS-C",
-                            };
-                            models.push(extract_std(
-                                label,
-                                &r.variable_names,
-                                &r.params,
-                                &r.std_errors,
-                                &r.p_values,
-                                r.n_obs,
-                            ));
-                        }
-                        Value::FE2SLSResult(r) => {
-                            models.push(extract_std(
-                                "FE-IV",
-                                &r.variable_names,
-                                &r.params,
-                                &r.std_errors,
-                                &r.p_values,
-                                r.n_obs,
-                            ));
-                        }
-                        Value::QuantileResult(r) => {
-                            let label = format!("QReg(τ={:.2})", r.tau);
-                            models.push(extract_std(
-                                &label,
-                                &r.variable_names,
-                                &r.params,
-                                &r.std_errors,
-                                &r.p_values,
-                                0,
-                            ));
-                        }
-                        Value::CoxResult(r) => {
-                            models.push(extract_std(
-                                "CoxPH",
-                                &r.variable_names,
-                                &r.params,
-                                &r.std_errors,
-                                &r.p_values,
-                                r.n_obs,
-                            ));
-                        }
-                        Value::RlmResult(r) => {
-                            models.push(extract_std(
-                                "RLM",
-                                &r.variable_names,
-                                &r.params,
-                                &r.std_errors,
-                                &r.p_values,
-                                r.n_obs,
-                            ));
-                        }
-                        Value::GeeResult(r) => {
-                            // GEE uses robust SE (sandwich) by default
-                            models.push(extract_std(
-                                "GEE",
-                                &r.variable_names,
-                                &r.params,
-                                &r.robust_se,
-                                &r.p_values,
-                                r.n_obs,
-                            ));
-                        }
-                        Value::BetaResult(r) => {
-                            models.push(extract_std(
-                                "BetaReg",
-                                &r.variable_names,
-                                &r.params,
-                                &r.std_errors,
-                                &r.p_values,
-                                r.n_obs,
-                            ));
-                        }
-                        Value::GlmResult(r) => {
-                            let family_name = format!("GLM({:?})", r.family);
-                            models.push(extract_std(
-                                &family_name,
-                                &r.variable_names,
-                                &r.params,
-                                &r.std_errors,
-                                &r.p_values,
-                                r.n_obs,
-                            ));
-                        }
-                        Value::LowessResult(_) => {
-                            return Err(HayashiError::Runtime(
-                                "esttab() does not support lowess — use predict to extract smoothed values".into()
-                            ));
-                        }
-                        Value::PcaResult(_) | Value::FactorResult(_) => {
-                            return Err(HayashiError::Runtime(
-                                "esttab() does not support PCA/Factor — use print() to see loadings and explained variance".into()
-                            ));
-                        }
-                        Value::ConditionalResult(r) => {
-                            models.push(extract_std(
-                                &r.model_name,
-                                &r.variable_names,
-                                &r.params,
-                                &r.std_errors,
-                                &r.p_values,
-                                r.n_obs,
-                            ));
-                        }
-                        Value::MarkovResult(_) => {
-                            return Err(HayashiError::Runtime(
-                                "esttab() does not support Markov Switching — use print() to see regime parameters".into()
-                            ));
-                        }
-                        Value::GlsarResult(r) => {
-                            models.push(extract_std(
-                                "GLSAR",
-                                &r.variable_names,
-                                &r.params,
-                                &r.std_errors,
-                                &r.p_values,
-                                r.n_obs,
-                            ));
-                        }
-                        Value::MixedResult(r) => {
-                            // esttab only displays fixed effects of MixedLM
-                            models.push(extract_std(
-                                "MixedLM",
-                                &r.variable_names,
-                                &r.fixed_effects,
-                                &r.fixed_se,
-                                &r.p_values,
-                                r.n_obs,
-                            ));
-                        }
-                        Value::ZeroInflatedResult(_) => {
-                            return Err(HayashiError::Runtime(
-                                "esttab() does not support zip/zinb (two equations) — use print()"
-                                    .into(),
-                            ));
-                        }
-                        Value::SurResult(_) => {
-                            return Err(HayashiError::Runtime(
-                                "esttab() does not support sur (multiple equations) — use print()"
-                                    .into(),
-                            ));
-                        }
-                        Value::RollingResult(_) | Value::RecursiveLSResult(_) => {
-                            return Err(HayashiError::Runtime(
-                                "esttab() does not support rolling/recursive — coefficients vary over time; use print()".into()
-                            ));
-                        }
-                        Value::MNLogitResult(_) => {
-                            return Err(HayashiError::Runtime(
-                                "esttab() does not support mlogit (multiple equations) — use print()"
-                                    .into(),
-                            ));
-                        }
-                        Value::DidResult(_) | Value::KMResult(_) => {
-                            return Err(HayashiError::Runtime(
-                                "esttab() does not support did/km — result has its own format; use print()".into()
-                            ));
-                        }
-                        Value::RdResult(_) | Value::SynthResult(_) | Value::PsmResult(_) => {
-                            return Err(HayashiError::Runtime(
-                                "esttab() does not support causal estimators (rd, psm, synth) — use print()".into()
-                            ));
-                        }
-                        Value::VarmaResult(_) => {
-                            return Err(HayashiError::Runtime(
-                                "esttab() does not support VARMA (matrix coefficients) — use print()".into()
-                            ));
-                        }
-                        Value::DecompResult(_) | Value::MstlResult(_) => {
-                            return Err(HayashiError::Runtime(
-                                "esttab() does not support seasonal decomposition — use print()"
-                                    .into(),
-                            ));
-                        }
-                        Value::UCResult(_) => {
-                            return Err(HayashiError::Runtime(
-                                "esttab() does not support UCM (variance parameters, not β) — use print()".into()
-                            ));
-                        }
-                        Value::GamResult(_) => {
-                            return Err(HayashiError::Runtime(
-                                "esttab() does not support GAM (smooth terms do not have a standard β table) — use print()".into()
-                            ));
-                        }
-                        Value::MiceResult(_) => {
-                            return Err(HayashiError::Runtime(
-                                "esttab() does not support MICE (multiple datasets) — estimate model in each dataset and use Rubin's rules".into()
-                            ));
-                        }
-                        Value::MSARResult(_) => {
-                            return Err(HayashiError::Runtime(
-                                "esttab() does not support Markov-AR (regime parameters) — use print()".into()
-                            ));
-                        }
-                        Value::SVarResult(_) => {
-                            return Err(HayashiError::Runtime(
-                                "esttab() does not support SVAR (structural A/B matrices) — use print()".into()
-                            ));
-                        }
-                        Value::ThreeSLSResult(_) => {
-                            return Err(HayashiError::Runtime(
-                                "esttab() does not support 3SLS (multiple equations) — use print()"
-                                    .into(),
-                            ));
-                        }
-                        Value::DFMResult(_) => {
-                            return Err(HayashiError::Runtime(
-                                "esttab() does not support DFM (fatores latentes) — use print()"
-                                    .into(),
-                            ));
-                        }
-                        Value::EtsResult(_) => {
-                            return Err(HayashiError::Runtime(
-                                "esttab() does not support ETS (smoothing parameters) — use print()".into()
-                            ));
-                        }
-                        Value::ThresholdResult(_) => {
-                            return Err(HayashiError::Runtime(
-                                "esttab() does not support panel threshold (two regimes) — use print()".into()
-                            ));
-                        }
-                        _ => {
-                            return Err(HayashiError::Type(
-                                "esttab(): model type not supported — use print()".into(),
-                            ))
-                        }
-                    }
-                }
-
-                // union of variable names in order of first occurrence
-                let mut all_vars: Vec<String> = Vec::new();
-                let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
-                for mi in &models {
-                    let coefs = &mi.coefs;
-                    for (nm, _, _, _) in coefs {
-                        if seen.insert(nm.clone()) {
-                            all_vars.push(nm.clone());
-                        }
-                    }
-                }
-
-                let n_models = models.len();
-                let col_w = 16usize;
-                let label_w = all_vars.iter().map(|s| s.len()).max().unwrap_or(8).max(12) + 2;
-                let total_w = label_w + n_models * (col_w + 1);
-
-                // build content (txt or latex)
-                let mut buf = String::new();
-
-                if fmt == "latex" || fmt == "tex" {
-                    buf.push_str("\\begin{tabular}{l");
-                    for _ in 0..n_models {
-                        buf.push('r');
-                    }
-                    buf.push_str("}\n\\hline\\hline\n");
-                    // header
-                    buf.push_str(" &");
-                    for (i, mi) in models.iter().enumerate() {
-                        let label = &mi.label;
-                        buf.push_str(&format!(" ({}) {}", i + 1, label));
-                        if i + 1 < n_models {
-                            buf.push('&');
-                        }
-                    }
-                    buf.push_str(" \\\\\n\\hline\n");
-
-                    for var in &all_vars {
-                        if var == "_cons" {
-                            continue;
-                        } // _cons vai no final
-                        buf.push_str(&var.to_string());
-                        for mi in &models {
-                            let coefs = &mi.coefs;
-                            let row = coefs.iter().find(|(nm, _, _, _)| nm == var);
-                            match row {
-                                Some((_, c, _, p)) => {
-                                    buf.push_str(&format!(" & {:.4}{}", c, stars(*p)))
-                                }
-                                None => buf.push_str(" &"),
-                            }
-                        }
-                        buf.push_str(" \\\\\n");
-                        // SE linha
-                        let has_se = models.iter().any(|mi| {
-                            mi.coefs
-                                .iter()
-                                .find(|(nm, _, _, _)| nm == var)
-                                .and_then(|(_, _, se, _)| *se)
-                                .is_some()
-                        });
-                        if has_se {
-                            buf.push(' ');
-                            for mi in &models {
-                                let coefs = &mi.coefs;
-                                let row = coefs.iter().find(|(nm, _, _, _)| nm == var);
-                                match row.and_then(|(_, _, se, _)| *se) {
-                                    Some(se) => buf.push_str(&format!(" & ({:.4})", se)),
-                                    None => buf.push_str(" &"),
-                                }
-                            }
-                            buf.push_str(" \\\\\n");
-                        }
-                    }
-                    // _cons at the end
-                    if all_vars.iter().any(|v| v == "_cons") {
-                        buf.push_str("Constant");
-                        for mi in &models {
-                            let coefs = &mi.coefs;
-                            let row = coefs.iter().find(|(nm, _, _, _)| nm == "_cons");
-                            match row {
-                                Some((_, c, _, p)) => {
-                                    buf.push_str(&format!(" & {:.4}{}", c, stars(*p)))
-                                }
-                                None => buf.push_str(" &"),
-                            }
-                        }
-                        buf.push_str(" \\\\\n");
-                        let has_se = models.iter().any(|mi| {
-                            mi.coefs
-                                .iter()
-                                .find(|(nm, _, _, _)| nm == "_cons")
-                                .and_then(|(_, _, se, _)| *se)
-                                .is_some()
-                        });
-                        if has_se {
-                            buf.push(' ');
-                            for mi in &models {
-                                let coefs = &mi.coefs;
-                                let row = coefs.iter().find(|(nm, _, _, _)| nm == "_cons");
-                                match row.and_then(|(_, _, se, _)| *se) {
-                                    Some(se) => buf.push_str(&format!(" & ({:.4})", se)),
-                                    None => buf.push_str(" &"),
-                                }
-                            }
-                            buf.push_str(" \\\\\n");
-                        }
-                    }
-                    buf.push_str("\\hline\nN");
-                    for mi in &models {
-                        buf.push_str(&format!(" & {}", mi.n));
-                    }
-                    buf.push_str(" \\\\\n");
-                    if models.iter().any(|mi| mi.r2.is_some()) {
-                        buf.push_str("$R^2$");
-                        for mi in &models {
-                            match mi.r2 {
-                                Some(v) => buf.push_str(&format!(" & {:.4}", v)),
-                                None => buf.push_str(" &"),
-                            }
-                        }
-                        buf.push_str(" \\\\\n");
-                    }
-                    if models.iter().any(|mi| mi.adj_r2.is_some()) {
-                        buf.push_str("Adj. $R^2$");
-                        for mi in &models {
-                            match mi.adj_r2 {
-                                Some(v) => buf.push_str(&format!(" & {:.4}", v)),
-                                None => buf.push_str(" &"),
-                            }
-                        }
-                        buf.push_str(" \\\\\n");
-                    }
-                    buf.push_str("\\hline\\hline\n\\end{tabular}\n");
-                    buf.push_str("\\footnotesize{* p$<$0.10, ** p$<$0.05, *** p$<$0.01}\n");
-                } else {
-                    // ── ASCII txt ─────────────────────────────────────────────
-                    let sep = "─".repeat(total_w);
-
-                    // header: numbering
-                    let mut line = format!("{:<lw$}", "", lw = label_w);
-                    for i in 0..n_models {
-                        line.push_str(&format!(" {:>cw$}", format!("({})", i + 1), cw = col_w));
-                    }
-                    buf.push_str(&format!("{line}\n"));
-
-                    // header: labels
-                    let mut line = format!("{:<lw$}", "", lw = label_w);
-                    for mi in &models {
-                        line.push_str(&format!(" {:>cw$}", mi.label, cw = col_w));
-                    }
-                    buf.push_str(&format!("{line}\n"));
-                    buf.push_str(&format!("{sep}\n"));
-
-                    let print_var = |var: &str, buf: &mut String| {
-                        // linha de coeficientes
-                        let display_name = if var == "_cons" { "Constant" } else { var };
-                        let mut line = format!("{:<lw$}", display_name, lw = label_w);
-                        for mi in &models {
-                            let coefs = &mi.coefs;
-                            let row = coefs.iter().find(|(nm, _, _, _)| nm == var);
-                            match row {
-                                Some((_, c, _, p)) => {
-                                    let s = stars(*p);
-                                    let cell = format!("{:.4}{}", c, s);
-                                    line.push_str(&format!(" {:>cw$}", cell, cw = col_w));
-                                }
-                                None => line.push_str(&format!(" {:>cw$}", "", cw = col_w)),
-                            }
-                        }
-                        buf.push_str(&format!("{line}\n"));
-
-                        // standard error row
-                        let has_se = models.iter().any(|mi| {
-                            mi.coefs
-                                .iter()
-                                .find(|(nm, _, _, _)| nm == var)
-                                .and_then(|(_, _, se, _)| *se)
-                                .is_some()
-                        });
-                        if has_se {
-                            let mut line = format!("{:<lw$}", "", lw = label_w);
-                            for mi in &models {
-                                let coefs = &mi.coefs;
-                                let row = coefs.iter().find(|(nm, _, _, _)| nm == var);
-                                match row.and_then(|(_, _, se, _)| *se) {
-                                    Some(se) => line.push_str(&format!(
-                                        " {:>cw$}",
-                                        format!("({:.4})", se),
-                                        cw = col_w
-                                    )),
-                                    None => line.push_str(&format!(" {:>cw$}", "", cw = col_w)),
-                                }
-                            }
-                            buf.push_str(&format!("{line}\n"));
-                        }
-                    };
-
-                    for var in &all_vars {
-                        if var == "_cons" {
-                            continue;
-                        }
-                        print_var(var, &mut buf);
-                    }
-                    if all_vars.iter().any(|v| v == "_cons") {
-                        print_var("_cons", &mut buf);
-                    }
-
-                    buf.push_str(&format!("{sep}\n"));
-                    let mut line = format!("{:<lw$}", "N", lw = label_w);
-                    for mi in &models {
-                        line.push_str(&format!(" {:>cw$}", mi.n, cw = col_w));
-                    }
-                    buf.push_str(&format!("{line}\n"));
-                    if models.iter().any(|mi| mi.r2.is_some()) {
-                        let mut line = format!("{:<lw$}", "R²", lw = label_w);
-                        for mi in &models {
-                            match mi.r2 {
-                                Some(v) => line.push_str(&format!(" {:>cw$.4}", v, cw = col_w)),
-                                None => line.push_str(&format!(" {:>cw$}", "", cw = col_w)),
-                            }
-                        }
-                        buf.push_str(&format!("{line}\n"));
-                    }
-                    if models.iter().any(|mi| mi.adj_r2.is_some()) {
-                        let mut line = format!("{:<lw$}", "Adj. R²", lw = label_w);
-                        for mi in &models {
-                            match mi.adj_r2 {
-                                Some(v) => line.push_str(&format!(" {:>cw$.4}", v, cw = col_w)),
-                                None => line.push_str(&format!(" {:>cw$}", "", cw = col_w)),
-                            }
-                        }
-                        buf.push_str(&format!("{line}\n"));
-                    }
-                    buf.push_str(&format!("{sep}\n"));
-                    buf.push_str("* p<0.10  ** p<0.05  *** p<0.01\n");
-                }
-
-                if let Some(path) = out_path {
-                    std::fs::write(&path, &buf).map_err(|e| HayashiError::Io(e.to_string()))?;
-                    println!("Exported table → '{path}'");
-                } else {
-                    print!("\n{buf}");
-                }
-
-                Ok(Value::Nil)
-            }
-
+            "set_seed" | "seed" | "setseed" => self.set_seed(func, args, opts, opt_map),
+            "timer" | "time" | "bench" => self.timer(func, args, opts, opt_map),
+            "quietly" | "quiet" => self.quietly(func, args, opts, opt_map),
+            "capture" | "cap" => self.capture(func, args, opts, opt_map),
+            "assert" => self.assert(func, args, opts, opt_map),
+            "preserve" => self.preserve(func, args, opts, opt_map),
+            "restore" => self.restore(func, args, opts, opt_map),
+            "source" | "do" | "run" | "include" => self.source(func, args, opts, opt_map),
+            "import" | "require" => self.import(func, args, opts, opt_map),
+            "install" => self.install(func, args, opts, opt_map),
+            "plugin_path" => self.plugin_path(func, args, opts, opt_map),
+            "help" => self.help(func, args, opts, opt_map),
+            "describe" => self.describe(func, args, opts, opt_map),
+            "codebook" => self.codebook(func, args, opts, opt_map),
+            "format" | "fmt" => self.format(func, args, opts, opt_map),
+            "duplicates" => self.duplicates(func, args, opts, opt_map),
+            "label" => self.label(func, args, opts, opt_map),
+            "correlate" | "corr" | "pwcorr" => self.correlate(func, args, opts, opt_map),
+            "summarize" => self.summarize(func, args, opts, opt_map),
+            "eststo" | "est_store" => self.eststo(func, args, opts, opt_map),
+            "estclear" => self.estclear(func, args, opts, opt_map),
+            #[cfg(all(
+                feature = "greeners-bayesian",
+                feature = "greeners-causal",
+                feature = "greeners-glm",
+                feature = "greeners-imputation",
+                feature = "greeners-ols",
+                feature = "greeners-panel",
+                feature = "greeners-survival",
+                feature = "greeners-timeseries"
+            ))]
+            "esttab" => self.esttab(func, args, opts, opt_map),
             _ => return Ok(None),
         };
         result.map(Some)
+    }
+
+    pub(super) fn set_seed(
+        &mut self,
+        _func: &str,
+        args: &[Expr],
+        _opts: &[Opt],
+        _opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        if args.is_empty() {
+            return Err(HayashiError::Runtime("set_seed(N) — sets RNG seed".into()));
+        }
+        let s = match self.eval_expr(&args[0])? {
+            Value::Int(v) => v as u64,
+            Value::Float(v) => v as u64,
+            _ => return Err(HayashiError::Type("seed must be integer".into())),
+        };
+        self.rng_seed = Some(s);
+        use rand::SeedableRng;
+        self.rng = rand::rngs::StdRng::seed_from_u64(s);
+        let display = format!("set seed {s}");
+        let summary = format!("RNG seed set to {s}");
+        let fields = vec![("seed".to_string(), Value::Int(s as i64))];
+        Ok(model_expansion::model_result(
+            display, summary, "set_seed", fields,
+        ))
+    }
+
+    pub(super) fn timer(
+        &mut self,
+        _func: &str,
+        args: &[Expr],
+        _opts: &[Opt],
+        opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        if args.is_empty() {
+            return Err(HayashiError::Runtime(
+                "timer(expr [, digits=N]) — measures evaluation time".into(),
+            ));
+        }
+        let digits: usize = match opt_map.get("digits") {
+            Some(Value::Int(n)) if *n >= 0 => *n as usize,
+            Some(Value::Float(n)) if *n >= 0.0 => *n as usize,
+            _ => 4,
+        };
+        let start = std::time::Instant::now();
+        let result = self.eval_expr(&args[0])?;
+        let elapsed = start.elapsed();
+        println!("  elapsed: {:.1$}s", elapsed.as_secs_f64(), digits);
+        Ok(result)
+    }
+
+    pub(super) fn quietly(
+        &mut self,
+        _func: &str,
+        args: &[Expr],
+        _opts: &[Opt],
+        _opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        if args.is_empty() {
+            return Err(HayashiError::Runtime(
+                "quietly(expr) — evaluates without printing".into(),
+            ));
+        }
+        let _ = self.eval_expr(&args[0])?;
+        let display = String::new();
+        let summary = "expression evaluated quietly";
+        let fields = vec![("quiet".to_string(), Value::Bool(true))];
+        Ok(model_expansion::model_result(
+            display, summary, "quietly", fields,
+        ))
+    }
+
+    pub(super) fn capture(
+        &mut self,
+        _func: &str,
+        args: &[Expr],
+        _opts: &[Opt],
+        _opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        if args.is_empty() {
+            return Err(HayashiError::Runtime(
+                "capture(expr) — evaluates ignoring errors".into(),
+            ));
+        }
+        match self.eval_expr(&args[0]) {
+            Ok(v) => Ok(v),
+            Err(e) => {
+                let display = String::new();
+                let summary = format!("captured error: {e}");
+                let fields = vec![
+                    ("error".to_string(), Value::Str(e.to_string())),
+                    ("captured".to_string(), Value::Bool(true)),
+                ];
+                Ok(model_expansion::model_result(
+                    display, summary, "capture", fields,
+                ))
+            }
+        }
+    }
+
+    pub(super) fn assert(
+        &mut self,
+        _func: &str,
+        args: &[Expr],
+        _opts: &[Opt],
+        _opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        if args.is_empty() {
+            return Err(HayashiError::Runtime(
+                "assert(cond [, msg]) — error if condition is false".into(),
+            ));
+        }
+        let val = self.eval_expr(&args[0])?;
+        if !value_as_bool(&val) {
+            let msg = if args.len() >= 2 {
+                match self.eval_expr(&args[1])? {
+                    Value::Str(s) => s,
+                    _ => "assertion failed".into(),
+                }
+            } else {
+                "assertion failed".into()
+            };
+            return Err(HayashiError::Runtime(msg));
+        }
+        let display = "assertion passed".to_string();
+        let summary = "assertion passed";
+        let fields = vec![("passed".to_string(), Value::Bool(true))];
+        Ok(model_expansion::model_result(
+            display, summary, "assert", fields,
+        ))
+    }
+
+    pub(super) fn preserve(
+        &mut self,
+        _func: &str,
+        args: &[Expr],
+        _opts: &[Opt],
+        _opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        if args.is_empty() {
+            return Err(HayashiError::Runtime(
+                "preserve(df) — saves a copy of the DataFrame".into(),
+            ));
+        }
+        let name = match &args[0] {
+            Expr::Var(n) => n.clone(),
+            _ => {
+                return Err(HayashiError::Type(
+                    "preserve() requires a variable name".into(),
+                ))
+            }
+        };
+        let val = self
+            .env
+            .get(&name)
+            .ok_or_else(|| self.rt_err(format!("'{name}' not found")))?
+            .clone();
+        self.preserved.insert(name.clone(), val);
+        let display = format!("preserve {name}");
+        let summary = format!("preserved variable '{name}'");
+        let fields = vec![
+            ("name".to_string(), Value::Str(name.clone())),
+            ("preserved".to_string(), Value::Bool(true)),
+        ];
+        Ok(model_expansion::model_result(
+            display, summary, "preserve", fields,
+        ))
+    }
+
+    pub(super) fn restore(
+        &mut self,
+        _func: &str,
+        args: &[Expr],
+        _opts: &[Opt],
+        _opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        if args.is_empty() {
+            return Err(HayashiError::Runtime(
+                "restore(df) — restaura DataFrame salvo".into(),
+            ));
+        }
+        let name = match &args[0] {
+            Expr::Var(n) => n.clone(),
+            _ => {
+                return Err(HayashiError::Type(
+                    "restore() requires a variable name".into(),
+                ))
+            }
+        };
+        let val = self
+            .preserved
+            .remove(&name)
+            .ok_or_else(|| self.rt_err(format!("'{name}' was not preserved")))?;
+        self.env.set(&name, val)?;
+        let display = format!("restore {name}");
+        let summary = format!("restored variable '{name}'");
+        let fields = vec![
+            ("name".to_string(), Value::Str(name.clone())),
+            ("restored".to_string(), Value::Bool(true)),
+        ];
+        Ok(model_expansion::model_result(
+            display, summary, "restore", fields,
+        ))
+    }
+
+    pub(super) fn source(
+        &mut self,
+        _func: &str,
+        args: &[Expr],
+        _opts: &[Opt],
+        _opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        if args.is_empty() {
+            return Err(self.rt_err("source(\"script.hay\")"));
+        }
+        let path = match self.eval_expr(&args[0])? {
+            Value::Str(s) => s,
+            _ => return Err(HayashiError::Type("source() requires a string path".into())),
+        };
+        let src = std::fs::read_to_string(&path)
+            .map_err(|e| self.rt_err(format!("cannot read '{path}': {e}")))?;
+        let display = format!("source {path}");
+        let summary = format!("sourced script '{path}'");
+        crate::lang::run_source_with_path(&src, self, Some(std::path::Path::new(&path)))?;
+        let fields = vec![
+            ("path".to_string(), Value::Str(path.clone())),
+            ("sourced".to_string(), Value::Bool(true)),
+        ];
+        Ok(model_expansion::model_result(
+            display, summary, "source", fields,
+        ))
+    }
+
+    pub(super) fn import(
+        &mut self,
+        _func: &str,
+        args: &[Expr],
+        _opts: &[Opt],
+        opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        if args.is_empty() {
+            return Err(self.rt_err("import(\"module_or_url\")"));
+        }
+        let module = match self.eval_expr(&args[0])? {
+            Value::Str(s) => s,
+            _ => return Err(HayashiError::Type("import() requires a string".into())),
+        };
+
+        if self.imported.contains(&module) {
+            let display = format!("import {module} (already imported)");
+            let summary = format!("{module} already imported");
+            let fields = vec![
+                ("module".to_string(), Value::Str(module.clone())),
+                ("status".to_string(), Value::Str("already_imported".into())),
+            ];
+            return Ok(model_expansion::model_result(
+                display, summary, "import", fields,
+            ));
+        }
+
+        let resolved = {
+            #[cfg(feature = "network")]
+            {
+                if crate::io::fetch::is_url(&module) {
+                    let tmp = crate::io::fetch::download_to_temp(&module)?;
+                    tmp.to_string_lossy().to_string()
+                } else {
+                    self.resolve_import(&module)?
+                }
+            }
+            #[cfg(not(feature = "network"))]
+            {
+                self.resolve_import(&module)?
+            }
+        };
+
+        let alias = match opt_map.get("as") {
+            Some(Value::Str(s)) => Some(s.clone()),
+            _ => None,
+        };
+        let only: Option<Vec<String>> = match opt_map.get("only") {
+            Some(Value::List(lst)) => Some(
+                lst.iter()
+                    .filter_map(|v| match v {
+                        Value::Str(s) => Some(s.clone()),
+                        _ => None,
+                    })
+                    .collect(),
+            ),
+            _ => None,
+        };
+
+        let ns = alias.clone().unwrap_or_else(|| {
+            let base = module
+                .trim_end_matches(".hay")
+                .trim_end_matches(".wasm")
+                .trim_end_matches(".so")
+                .trim_end_matches(".dll")
+                .trim_end_matches(".dylib");
+            base.rsplit('/').next().unwrap_or(&module).to_string()
+        });
+
+        let is_wasm = resolved.ends_with(".wasm");
+        let is_native =
+            resolved.ends_with(".so") || resolved.ends_with(".dll") || resolved.ends_with(".dylib");
+
+        if is_wasm {
+            #[cfg(not(feature = "wasm"))]
+            return Err(self.rt_err("import: WASM plugins require 'wasm' feature"));
+            #[cfg(feature = "wasm")]
+            {
+                use crate::lang::plugin::WasmPlugin;
+                let plugin = WasmPlugin::new(&resolved, &ns)
+                    .map_err(|e| self.rt_err(format!("import: failed to load WASM plugin: {e}")))?;
+                self.plugins.insert(ns.clone(), Box::new(plugin));
+                self.imported.insert(module.clone());
+                let display = format!("import {module} (WASM plugin)");
+                let summary = format!("loaded WASM plugin '{ns}' from {resolved}");
+                let fields = vec![
+                    ("module".to_string(), Value::Str(module.clone())),
+                    ("namespace".to_string(), Value::Str(ns.clone())),
+                    ("resolved".to_string(), Value::Str(resolved.clone())),
+                    ("plugin_type".to_string(), Value::Str("wasm".into())),
+                    ("status".to_string(), Value::Str("loaded".into())),
+                ];
+                return Ok(model_expansion::model_result(
+                    display, summary, "import", fields,
+                ));
+            }
+        } else if is_native {
+            #[cfg(not(feature = "network"))]
+            return Err(self.rt_err("import: native plugins require 'network' feature"));
+            #[cfg(feature = "network")]
+            {
+                use crate::lang::plugin::RustNativePlugin;
+                let plugin = RustNativePlugin::new(&resolved, &ns).map_err(|e| {
+                    self.rt_err(format!("import: failed to load native plugin: {e}"))
+                })?;
+                self.plugins.insert(ns.clone(), Box::new(plugin));
+                self.imported.insert(module.clone());
+                let display = format!("import {module} (native plugin)");
+                let summary = format!("loaded native plugin '{ns}' from {resolved}");
+                let fields = vec![
+                    ("module".to_string(), Value::Str(module.clone())),
+                    ("namespace".to_string(), Value::Str(ns.clone())),
+                    ("resolved".to_string(), Value::Str(resolved.clone())),
+                    ("plugin_type".to_string(), Value::Str("native".into())),
+                    ("status".to_string(), Value::Str("loaded".into())),
+                ];
+                return Ok(model_expansion::model_result(
+                    display, summary, "import", fields,
+                ));
+            }
+        }
+
+        // Default script plugin (.hay) loading
+        let src = std::fs::read_to_string(&resolved)
+            .map_err(|e| self.rt_err(format!("import: cannot read '{resolved}': {e}")))?;
+
+        self.imported.insert(module.clone());
+
+        let before: std::collections::HashSet<String> = self.env.var_names().into_iter().collect();
+
+        crate::lang::run_source_with_path(&src, self, Some(std::path::Path::new(&resolved)))?;
+
+        let new_names: Vec<String> = self
+            .env
+            .var_names()
+            .into_iter()
+            .filter(|n| !before.contains(n))
+            .collect();
+
+        if let Some(ref allowed) = only {
+            for name in &new_names {
+                if !allowed.contains(name) {
+                    self.env.remove(name);
+                }
+            }
+        } else {
+            for name in &new_names {
+                if let Some(val) = self.env.get(name).cloned() {
+                    let qualified = format!("{ns}::{name}");
+                    self.env.declare(&qualified, val).ok();
+                    self.env.remove(name);
+                }
+            }
+        }
+
+        let new_names_val = Value::List(Arc::new(
+            new_names.iter().map(|n| Value::Str(n.clone())).collect(),
+        ));
+        let display = format!("import {module}");
+        let summary = format!(
+            "loaded script '{module}' as namespace '{ns}' with {} new names",
+            new_names.len()
+        );
+        let fields = vec![
+            ("module".to_string(), Value::Str(module.clone())),
+            ("namespace".to_string(), Value::Str(ns.clone())),
+            ("resolved".to_string(), Value::Str(resolved.clone())),
+            ("new_names".to_string(), new_names_val),
+            ("status".to_string(), Value::Str("loaded".into())),
+        ];
+        Ok(model_expansion::model_result(
+            display, summary, "import", fields,
+        ))
+    }
+
+    pub(super) fn install(
+        &mut self,
+        _func: &str,
+        args: &[Expr],
+        _opts: &[Opt],
+        opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        if args.is_empty() {
+            return Err(self.rt_err("install(\"user/repo\")"));
+        }
+        let spec = match self.eval_expr(&args[0])? {
+            Value::Str(s) => s,
+            _ => return Err(HayashiError::Type("install() requires a string".into())),
+        };
+
+        let version = if args.len() >= 2 {
+            match self.eval_expr(&args[1])? {
+                Value::Str(s) => Some(s),
+                _ => {
+                    return Err(HayashiError::Type(
+                        "install(): version must be a string".into(),
+                    ))
+                }
+            }
+        } else if let Some(Value::Str(s)) = opt_map.get("version") {
+            Some(s.clone())
+        } else {
+            None
+        };
+
+        let force = if args.len() >= 3 {
+            match self.eval_expr(&args[2])? {
+                Value::Bool(b) => b,
+                Value::Int(i) => i != 0,
+                Value::Float(f) => f != 0.0,
+                _ => {
+                    return Err(HayashiError::Type(
+                        "install(): force must be boolean or numeric".into(),
+                    ))
+                }
+            }
+        } else {
+            opt_map.get("force").map(value_as_bool).unwrap_or(false)
+        };
+
+        // Silence unused-variable warnings when the `network` feature is off.
+        #[cfg(not(feature = "network"))]
+        let _ = (&spec, &version, force);
+
+        #[cfg(feature = "network")]
+        {
+            crate::io::packages::install(&spec, version.as_deref(), force)?;
+            let display = format!("install {spec}");
+            let summary = format!("installed plugin '{spec}'");
+            let fields = vec![
+                ("spec".to_string(), Value::Str(spec.clone())),
+                (
+                    "version".to_string(),
+                    version
+                        .as_ref()
+                        .map(|v| Value::Str(v.clone()))
+                        .unwrap_or(Value::Nil),
+                ),
+                ("force".to_string(), Value::Bool(force)),
+                ("installed".to_string(), Value::Bool(true)),
+            ];
+            Ok(model_expansion::model_result(
+                display, summary, "install", fields,
+            ))
+        }
+        #[cfg(not(feature = "network"))]
+        {
+            Err(HayashiError::Runtime(
+                "install() requires the 'network' feature".into(),
+            ))
+        }
+    }
+
+    pub(super) fn plugin_path(
+        &mut self,
+        _func: &str,
+        args: &[Expr],
+        _opts: &[Opt],
+        _opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        if args.is_empty() {
+            let mut display = String::new();
+            if self.plugin_paths.is_empty() {
+                display.push_str("plugin_path: (none)\n");
+            } else {
+                for p in &self.plugin_paths {
+                    display.push_str(&format!("  {p}\n"));
+                }
+            }
+            let paths_val = Value::List(Arc::new(
+                self.plugin_paths
+                    .iter()
+                    .map(|p| Value::Str(p.clone()))
+                    .collect(),
+            ));
+            let summary = "plugin paths";
+            let fields = vec![("paths".to_string(), paths_val)];
+            return Ok(model_expansion::model_result(
+                display,
+                summary,
+                "plugin_path",
+                fields,
+            ));
+        }
+        let mut added: Vec<String> = Vec::new();
+        for arg in args {
+            let path = match self.eval_expr(arg)? {
+                Value::Str(s) => s,
+                other => {
+                    return Err(self.type_err(format!("plugin_path: expected string, got {other}")))
+                }
+            };
+            if !self.plugin_paths.contains(&path) {
+                self.plugin_paths.push(path.clone());
+            }
+            added.push(path);
+        }
+        let display = format!("plugin_path: added {}", added.join(", "));
+        let summary = display.clone();
+        let paths_val = Value::List(Arc::new(
+            self.plugin_paths
+                .iter()
+                .map(|p| Value::Str(p.clone()))
+                .collect(),
+        ));
+        let fields = vec![
+            ("added".to_string(), Value::Str(added.join(", "))),
+            ("paths".to_string(), paths_val),
+        ];
+        Ok(model_expansion::model_result(
+            display,
+            summary,
+            "plugin_path",
+            fields,
+        ))
+    }
+
+    pub(super) fn help(
+        &mut self,
+        _func: &str,
+        args: &[Expr],
+        _opts: &[Opt],
+        _opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        let topic = if args.is_empty() {
+            String::new()
+        } else {
+            match &args[0] {
+                Expr::Var(n) | Expr::Str(n) => n.clone(),
+                _ => String::new(),
+            }
+        };
+        let mut display = String::new();
+        let mut found = false;
+        if topic == "about" {
+            display.push_str(&crate::lang::help::help_about());
+            found = true;
+        } else if topic == "license" {
+            display.push_str(&crate::lang::help::help_license());
+            found = true;
+        } else {
+            match crate::lang::help::help_text(&topic) {
+                Some(h) => {
+                    display.push_str(&h);
+                    found = true;
+                }
+                None => {
+                    if let Some(Value::UserFn(uf)) = self.env.get(&topic) {
+                        if let Some(doc) = &uf.doc {
+                            display.push_str(&format!(
+                                "fn {}({})\n{}",
+                                topic,
+                                uf.params.join(", "),
+                                doc
+                            ));
+                        } else {
+                            display.push_str(&format!(
+                                "fn {}({})\n  (no docstring)",
+                                topic,
+                                uf.params.join(", ")
+                            ));
+                        }
+                        found = true;
+                    } else {
+                        display.push_str(&format!(
+                            "help: '{}' not documented. Type help() for full list.",
+                            topic
+                        ));
+                    }
+                }
+            }
+        }
+        let summary = if found {
+            format!("help topic '{topic}'")
+        } else {
+            format!("help topic '{topic}' not found")
+        };
+        let fields = vec![
+            ("topic".to_string(), Value::Str(topic.clone())),
+            ("found".to_string(), Value::Bool(found)),
+        ];
+        Ok(model_expansion::model_result(
+            display, summary, "help", fields,
+        ))
+    }
+
+    pub(super) fn describe(
+        &mut self,
+        _func: &str,
+        args: &[Expr],
+        _opts: &[Opt],
+        _opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        if args.len() != 1 {
+            return Err(HayashiError::Runtime("describe() takes 1 argument".into()));
+        }
+        let df_name = match &args[0] {
+            Expr::Var(n) => Some(n.clone()),
+            _ => None,
+        };
+        match self.eval_expr(&args[0])? {
+            Value::DataFrame(df) => {
+                println!("{}", df);
+                // mostrar labels se existirem
+                if let Some(ref name) = df_name {
+                    if let Some(var_labels) = self.labels.get(name) {
+                        if !var_labels.is_empty() {
+                            println!("\n  Labels:");
+                            let mut sorted: Vec<_> = var_labels.iter().collect();
+                            sorted.sort_by_key(|(k, _)| (*k).clone());
+                            for (var, lbl) in sorted {
+                                println!("    {:<20} {}", var, lbl);
+                            }
+                        }
+                    }
+                }
+                // Return Nil to avoid the DataFrame being auto-printed a second time.
+                Ok(Value::Nil)
+            }
+            _ => Err(HayashiError::Type("describe() requires a DataFrame".into())),
+        }
+    }
+
+    pub(super) fn codebook(
+        &mut self,
+        _func: &str,
+        args: &[Expr],
+        _opts: &[Opt],
+        _opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        if args.is_empty() {
+            return Err(HayashiError::Runtime(
+                "codebook(df [, var1, var2, ...])".into(),
+            ));
+        }
+        let df = match self.eval_expr(&args[0])? {
+            Value::DataFrame(df) => df,
+            other => return Err(self.type_mismatch("DataFrame", &other)),
+        };
+
+        let requested: Vec<String> = if args.len() > 1 {
+            self.resolve_var_list(&args[1..], &df)?
+        } else {
+            let mut names = df.column_names();
+            names.sort();
+            names
+        };
+
+        let sep = "─".repeat(76);
+        println!("\n{:═^76}", " Codebook ");
+
+        let mut rows: Vec<CodebookEntry> = Vec::new();
+        for name in &requested {
+            use greeners::Column;
+            let col = df
+                .get_column(name)
+                .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+            println!("\n{sep}");
+            rows.push(match col {
+                Column::Float(arr) => self.codebook_float(name, arr),
+                Column::Int(arr) => self.codebook_int(name, arr),
+                Column::String(arr) => self.codebook_string(name, arr),
+                Column::Bool(arr) => self.codebook_bool(name, arr),
+                _ => Self::codebook_other(name),
+            });
+        }
+        println!("\n{sep}");
+        println!();
+
+        let mut columns = HashMap::new();
+        columns.insert(
+            "variable".into(),
+            Value::List(Arc::new(
+                rows.iter().map(|r| Value::Str(r.name.clone())).collect(),
+            )),
+        );
+        columns.insert(
+            "type".into(),
+            Value::List(Arc::new(
+                rows.iter()
+                    .map(|r| Value::Str(r.type_name.into()))
+                    .collect(),
+            )),
+        );
+        columns.insert(
+            "obs".into(),
+            Value::List(Arc::new(rows.iter().map(|r| Value::Int(r.obs)).collect())),
+        );
+        columns.insert(
+            "missing".into(),
+            Value::List(Arc::new(
+                rows.iter().map(|r| Value::Int(r.missing)).collect(),
+            )),
+        );
+        columns.insert(
+            "unique".into(),
+            Value::List(Arc::new(
+                rows.iter().map(|r| Value::Int(r.unique)).collect(),
+            )),
+        );
+        columns.insert(
+            "mean".into(),
+            Value::List(Arc::new(
+                rows.iter().map(|r| Value::Float(r.mean)).collect(),
+            )),
+        );
+        columns.insert(
+            "sd".into(),
+            Value::List(Arc::new(rows.iter().map(|r| Value::Float(r.sd)).collect())),
+        );
+        columns.insert(
+            "min".into(),
+            Value::List(Arc::new(rows.iter().map(|r| Value::Float(r.min)).collect())),
+        );
+        columns.insert(
+            "p25".into(),
+            Value::List(Arc::new(rows.iter().map(|r| Value::Float(r.p25)).collect())),
+        );
+        columns.insert(
+            "p50".into(),
+            Value::List(Arc::new(rows.iter().map(|r| Value::Float(r.p50)).collect())),
+        );
+        columns.insert(
+            "p75".into(),
+            Value::List(Arc::new(rows.iter().map(|r| Value::Float(r.p75)).collect())),
+        );
+        columns.insert(
+            "max".into(),
+            Value::List(Arc::new(rows.iter().map(|r| Value::Float(r.max)).collect())),
+        );
+        columns.insert(
+            "true".into(),
+            Value::List(Arc::new(rows.iter().map(|r| Value::Int(r.trues)).collect())),
+        );
+        columns.insert(
+            "false".into(),
+            Value::List(Arc::new(
+                rows.iter().map(|r| Value::Int(r.falses)).collect(),
+            )),
+        );
+        columns.insert(
+            "values".into(),
+            Value::List(Arc::new(
+                rows.iter().map(|r| Value::Str(r.values.clone())).collect(),
+            )),
+        );
+        let cb_df = self.dict_to_dataframe(&columns)?;
+        Ok(Value::DataFrame(Arc::new(cb_df)))
+    }
+
+    fn codebook_float(&self, name: &str, arr: &ndarray::Array1<f64>) -> CodebookEntry {
+        let total = arr.len();
+        let vals: Vec<f64> = arr.iter().copied().filter(|x| x.is_finite()).collect();
+        let missing = total - vals.len();
+        println!(
+            "  {:<20} type: float    obs: {}    missing: {}",
+            name, total, missing
+        );
+        if vals.is_empty() {
+            return CodebookEntry {
+                name: name.to_string(),
+                type_name: "float",
+                obs: total as i64,
+                missing: missing as i64,
+                unique: 0,
+                mean: f64::NAN,
+                sd: f64::NAN,
+                min: f64::NAN,
+                p25: f64::NAN,
+                p50: f64::NAN,
+                p75: f64::NAN,
+                max: f64::NAN,
+                trues: 0,
+                falses: 0,
+                values: String::new(),
+            };
+        }
+        let (mean, sd, min, p25, p50, p75, max, unique) = codebook_numeric_stats(&vals);
+        println!("  unique: {}    mean: {:.4}    sd: {:.4}", unique, mean, sd);
+        println!(
+            "  min: {:.4}    p25: {:.4}    p50: {:.4}    p75: {:.4}    max: {:.4}",
+            min, p25, p50, p75, max
+        );
+        CodebookEntry {
+            name: name.to_string(),
+            type_name: "float",
+            obs: total as i64,
+            missing: missing as i64,
+            unique: unique as i64,
+            mean,
+            sd,
+            min,
+            p25,
+            p50,
+            p75,
+            max,
+            trues: 0,
+            falses: 0,
+            values: String::new(),
+        }
+    }
+
+    fn codebook_int(&self, name: &str, arr: &ndarray::Array1<i64>) -> CodebookEntry {
+        let total = arr.len();
+        let vals: Vec<f64> = arr.iter().map(|&x| x as f64).collect();
+        println!("  {:<20} type: int      obs: {}    missing: 0", name, total);
+        if vals.is_empty() {
+            return CodebookEntry {
+                name: name.to_string(),
+                type_name: "int",
+                obs: total as i64,
+                missing: 0,
+                unique: 0,
+                mean: f64::NAN,
+                sd: f64::NAN,
+                min: f64::NAN,
+                p25: f64::NAN,
+                p50: f64::NAN,
+                p75: f64::NAN,
+                max: f64::NAN,
+                trues: 0,
+                falses: 0,
+                values: String::new(),
+            };
+        }
+        let (mean, sd, min, _, _, _, max, unique) = codebook_numeric_stats(&vals);
+        println!("  unique: {}    mean: {:.4}    sd: {:.4}", unique, mean, sd);
+        println!("  min: {:.0}    max: {:.0}", min, max);
+        CodebookEntry {
+            name: name.to_string(),
+            type_name: "int",
+            obs: total as i64,
+            missing: 0,
+            unique: unique as i64,
+            mean,
+            sd,
+            min,
+            p25: f64::NAN,
+            p50: f64::NAN,
+            p75: f64::NAN,
+            max,
+            trues: 0,
+            falses: 0,
+            values: String::new(),
+        }
+    }
+
+    fn codebook_string(&self, name: &str, arr: &ndarray::Array1<String>) -> CodebookEntry {
+        let total = arr.len();
+        let non_empty = arr.iter().filter(|s: &&String| !s.is_empty()).count();
+        let missing = total - non_empty;
+        let mut unique: Vec<&str> = arr.iter().map(|s: &String| s.as_str()).collect();
+        unique.sort();
+        unique.dedup();
+        println!(
+            "  {:<20} type: string   obs: {}    missing: {}",
+            name, total, missing
+        );
+        println!("  unique: {}", unique.len());
+        let values = if unique.len() <= 10 {
+            let examples: Vec<&str> = unique.iter().take(10).copied().collect();
+            println!("  values: {}", examples.join(", "));
+            examples.join(", ")
+        } else {
+            let first5: Vec<&str> = unique.iter().take(5).copied().collect();
+            println!(
+                "  values: {}, ... ({} more)",
+                first5.join(", "),
+                unique.len() - 5
+            );
+            format!("{}, ... ({} more)", first5.join(", "), unique.len() - 5)
+        };
+        CodebookEntry {
+            name: name.to_string(),
+            type_name: "string",
+            obs: total as i64,
+            missing: missing as i64,
+            unique: unique.len() as i64,
+            mean: f64::NAN,
+            sd: f64::NAN,
+            min: f64::NAN,
+            p25: f64::NAN,
+            p50: f64::NAN,
+            p75: f64::NAN,
+            max: f64::NAN,
+            trues: 0,
+            falses: 0,
+            values,
+        }
+    }
+
+    fn codebook_bool(&self, name: &str, arr: &ndarray::Array1<bool>) -> CodebookEntry {
+        let total = arr.len();
+        let trues = arr.iter().filter(|&&b| b).count();
+        let falses = total - trues;
+        println!("  {:<20} type: bool     obs: {}    missing: 0", name, total);
+        println!("  true: {}    false: {}", trues, falses);
+        CodebookEntry {
+            name: name.to_string(),
+            type_name: "bool",
+            obs: total as i64,
+            missing: 0,
+            unique: 2,
+            mean: f64::NAN,
+            sd: f64::NAN,
+            min: f64::NAN,
+            p25: f64::NAN,
+            p50: f64::NAN,
+            p75: f64::NAN,
+            max: f64::NAN,
+            trues: trues as i64,
+            falses: falses as i64,
+            values: String::new(),
+        }
+    }
+
+    fn codebook_other(name: &str) -> CodebookEntry {
+        println!("  {:<20} type: other", name);
+        CodebookEntry {
+            name: name.to_string(),
+            type_name: "other",
+            obs: 0,
+            missing: 0,
+            unique: 0,
+            mean: f64::NAN,
+            sd: f64::NAN,
+            min: f64::NAN,
+            p25: f64::NAN,
+            p50: f64::NAN,
+            p75: f64::NAN,
+            max: f64::NAN,
+            trues: 0,
+            falses: 0,
+            values: String::new(),
+        }
+    }
+
+    pub(super) fn format(
+        &mut self,
+        _func: &str,
+        args: &[Expr],
+        _opts: &[Opt],
+        _opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        if args.len() < 2 {
+            return Err(HayashiError::Runtime(
+                "format(value, fmt_str) — e.g. format(3.14, \"%.2f\")".into(),
+            ));
+        }
+        let val = match self.eval_expr(&args[0])? {
+            Value::Float(f) => f,
+            Value::Int(i) => i as f64,
+            other => {
+                return Err(HayashiError::Type(format!(
+                    "format(): first argument must be numeric, not {other}"
+                )))
+            }
+        };
+        let fmt_s = match self.eval_expr(&args[1])? {
+            Value::Str(s) => s,
+            _ => {
+                return Err(HayashiError::Type(
+                    "format(): second argument must be string (e.g. \"%.2f\")".into(),
+                ))
+            }
+        };
+        // parse "%.Nf" → N decimal places
+        let decimals: usize = if fmt_s.starts_with("%.") && fmt_s.ends_with('f') {
+            fmt_s[2..fmt_s.len() - 1].parse().unwrap_or(4)
+        } else if fmt_s.starts_with('%') && fmt_s.ends_with('f') {
+            // "%f" without specifying decimals
+            6
+        } else {
+            return Err(HayashiError::Runtime(format!(
+                "format(): format string '{fmt_s}' not recognized (use \"%.Nf\")"
+            )));
+        };
+        Ok(Value::Str(format!("{:.prec$}", val, prec = decimals)))
+    }
+
+    pub(super) fn duplicates(
+        &mut self,
+        _func: &str,
+        args: &[Expr],
+        _opts: &[Opt],
+        opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        if args.len() < 2 {
+            return Err(HayashiError::Runtime(
+                "duplicates(df, var [, action=report|drop|tag])".into(),
+            ));
+        }
+        let df_name = match &args[0] {
+            Expr::Var(n) => n.clone(),
+            _ => {
+                return Err(HayashiError::Type(
+                    "duplicates(): first argument must be variable name".into(),
+                ))
+            }
+        };
+        let df = match self.env.get(&df_name) {
+            Some(Value::DataFrame(d)) => d.clone(),
+            _ => {
+                return Err(HayashiError::Runtime(format!(
+                    "'{df_name}' is not a DataFrame"
+                )))
+            }
+        };
+        let var_name = match &args[1] {
+            Expr::Var(n) | Expr::Str(n) => n.clone(),
+            _ => {
+                return Err(HayashiError::Type(
+                    "duplicates(): second argument must be column name".into(),
+                ))
+            }
+        };
+        let action = match opt_map.get("action") {
+            Some(Value::Str(s)) => s.clone(),
+            None => "report".into(),
+            _ => "report".into(),
+        };
+
+        let col = get_col_f64(&df, &var_name)?;
+        let n = col.len();
+
+        // count occurrences of each value
+        let mut counts: HashMap<i64, usize> = HashMap::new();
+        for &v in col.iter() {
+            let key = v.to_bits() as i64;
+            *counts.entry(key).or_insert(0) += 1;
+        }
+
+        let n_dup: usize = counts.values().filter(|&&c| c > 1).map(|c| c - 1).sum();
+        let n_unique = counts.len();
+
+        match action.as_str() {
+            "report" => {
+                let mut display = String::new();
+                display.push_str(&format!("duplicates report: {var_name}\n"));
+                display.push_str(&format!("  observations:    {n}\n"));
+                display.push_str(&format!("  unique values: {n_unique}\n"));
+                display.push_str(&format!("  duplicates:    {n_dup}\n"));
+                let summary = format!("duplicates report for {var_name}: {n_dup} duplicates");
+                let fields = vec![
+                    ("action".to_string(), Value::Str("report".into())),
+                    ("df".to_string(), Value::Str(df_name.clone())),
+                    ("variable".to_string(), Value::Str(var_name.clone())),
+                    ("observations".to_string(), Value::Int(n as i64)),
+                    ("unique".to_string(), Value::Int(n_unique as i64)),
+                    ("duplicates".to_string(), Value::Int(n_dup as i64)),
+                ];
+                Ok(model_expansion::model_result(
+                    display,
+                    summary,
+                    "duplicates",
+                    fields,
+                ))
+            }
+            "drop" => {
+                let mut seen: std::collections::HashSet<i64> = std::collections::HashSet::new();
+                let keep: Vec<usize> = (0..n)
+                    .filter(|&i| {
+                        let key = col[i].to_bits() as i64;
+                        seen.insert(key)
+                    })
+                    .collect();
+                let new_df = df
+                    .iloc(Some(&keep), None)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let remaining = new_df.n_rows();
+                let mut display = String::new();
+                display.push_str(&format!(
+                    "duplicates drop: {n_dup} obs removed, {remaining} remaining\n"
+                ));
+                self.env.set(&df_name, Value::DataFrame(Arc::new(new_df)))?;
+                let summary = format!("dropped {n_dup} duplicate observations from {df_name}");
+                let fields = vec![
+                    ("action".to_string(), Value::Str("drop".into())),
+                    ("df".to_string(), Value::Str(df_name.clone())),
+                    ("variable".to_string(), Value::Str(var_name.clone())),
+                    ("removed".to_string(), Value::Int(n_dup as i64)),
+                    ("remaining".to_string(), Value::Int(remaining as i64)),
+                ];
+                Ok(model_expansion::model_result(
+                    display,
+                    summary,
+                    "duplicates",
+                    fields,
+                ))
+            }
+            "tag" => {
+                let dup_col: Vec<f64> = (0..n)
+                    .map(|i| {
+                        let key = col[i].to_bits() as i64;
+                        *counts.get(&key).unwrap_or(&1) as f64
+                    })
+                    .collect();
+                let mut df_mut = df.clone();
+                let arr = ndarray::Array1::from(dup_col);
+                Arc::make_mut(&mut df_mut)
+                    .insert("_dup".to_string(), arr)
+                    .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+                let mut display = String::new();
+                display.push_str(&format!(
+                    "duplicates tag: _dup column generated ({n_dup} duplicates)\n"
+                ));
+                self.env.set(&df_name, Value::DataFrame(df_mut))?;
+                let summary = format!("tagged {n_dup} duplicates in {df_name}.{var_name}");
+                let fields = vec![
+                    ("action".to_string(), Value::Str("tag".into())),
+                    ("df".to_string(), Value::Str(df_name.clone())),
+                    ("variable".to_string(), Value::Str(var_name.clone())),
+                    ("column".to_string(), Value::Str("_dup".into())),
+                    ("duplicates".to_string(), Value::Int(n_dup as i64)),
+                ];
+                Ok(model_expansion::model_result(
+                    display,
+                    summary,
+                    "duplicates",
+                    fields,
+                ))
+            }
+            other => Err(HayashiError::Runtime(format!(
+                "duplicates(): action '{other}' unknown (report|drop|tag)"
+            ))),
+        }
+    }
+
+    pub(super) fn label(
+        &mut self,
+        _func: &str,
+        args: &[Expr],
+        _opts: &[Opt],
+        _opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        if args.len() < 3 {
+            return Err(HayashiError::Runtime(
+                "label(df, var, \"description\")".into(),
+            ));
+        }
+        let df_name = match &args[0] {
+            Expr::Var(n) => n.clone(),
+            _ => {
+                return Err(HayashiError::Type(
+                    "label(): first argument must be DataFrame name".into(),
+                ))
+            }
+        };
+        let var_name = match &args[1] {
+            Expr::Var(n) | Expr::Str(n) => n.clone(),
+            _ => {
+                return Err(HayashiError::Type(
+                    "label(): second argument must be variable name".into(),
+                ))
+            }
+        };
+        let description = match self.eval_expr(&args[2])? {
+            Value::Str(s) => s,
+            _ => {
+                return Err(HayashiError::Type(
+                    "label(): third argument must be string".into(),
+                ))
+            }
+        };
+        self.labels
+            .entry(df_name.clone())
+            .or_default()
+            .insert(var_name.clone(), description.clone());
+        let display = format!("label {df_name}.{var_name} = \"{description}\"");
+        let summary = format!("set label for {df_name}.{var_name}");
+        let fields = vec![
+            ("df".to_string(), Value::Str(df_name.clone())),
+            ("variable".to_string(), Value::Str(var_name.clone())),
+            ("label".to_string(), Value::Str(description.clone())),
+        ];
+        Ok(model_expansion::model_result(
+            display, summary, "label", fields,
+        ))
+    }
+
+    pub(super) fn correlate(
+        &mut self,
+        func: &str,
+        args: &[Expr],
+        _opts: &[Opt],
+        opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        if args.is_empty() {
+            return Err(HayashiError::Runtime(
+                "correlate() requires a DataFrame as first argument".into(),
+            ));
+        }
+        let df = match self.eval_expr(&args[0])? {
+            Value::DataFrame(df) => df,
+            other => return Err(self.type_mismatch("DataFrame", &other)),
+        };
+
+        // requested variables or all numeric
+        let names: Vec<String> = if args.len() > 1 {
+            self.resolve_var_list(&args[1..], &df)?
+        } else {
+            use greeners::Column;
+            let mut ns: Vec<String> = df
+                .column_names()
+                .into_iter()
+                .filter(|n| matches!(df.get_column(n), Ok(Column::Float(_)) | Ok(Column::Int(_))))
+                .collect();
+            ns.sort();
+            ns
+        };
+
+        if names.len() < 2 {
+            return Err(HayashiError::Runtime(
+                "correlate() needs at least 2 numeric variables".into(),
+            ));
+        }
+
+        let mut sorted_names = names.clone();
+        sorted_names.sort();
+        let refs: Vec<&str> = sorted_names.iter().map(String::as_str).collect();
+        let sub = df
+            .select(&refs)
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let mat = sub
+            .corr()
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+        let col_w = 10usize;
+        let row_label_w = 16usize;
+        let trunc = |s: &str, w: usize| {
+            if s.len() > w {
+                s[..w].to_string()
+            } else {
+                s.to_string()
+            }
+        };
+
+        // header
+        print!("{:>width$} |", "", width = row_label_w);
+        for name in &sorted_names {
+            print!(" {:>width$}", trunc(name, col_w), width = col_w);
+        }
+        println!();
+        println!(
+            "{}-+{}",
+            "-".repeat(row_label_w),
+            "-".repeat((col_w + 1) * sorted_names.len())
+        );
+
+        // p-value: t = r*sqrt(n-2)/sqrt(1-r²), df=n-2
+        let show_stars = func == "pwcorr" || matches!(opt_map.get("star"), Some(Value::Bool(true)));
+        let n_obs = df.n_rows() as f64;
+        let corr_pval = |r: f64| -> f64 {
+            if n_obs <= 2.0 || (1.0 - r * r) <= 0.0 {
+                return 1.0;
+            }
+            let t = r * (n_obs - 2.0).sqrt() / (1.0 - r * r).sqrt();
+            t_pvalue_two(t, n_obs - 2.0)
+        };
+        let star = |p: f64| -> &str {
+            if p < 0.01 {
+                "***"
+            } else if p < 0.05 {
+                "**"
+            } else if p < 0.10 {
+                "*"
+            } else {
+                ""
+            }
+        };
+
+        let mut var1 = Vec::new();
+        let mut var2 = Vec::new();
+        let mut r_vec = Vec::new();
+        let mut p_vec = Vec::new();
+        for (i, row_name) in sorted_names.iter().enumerate() {
+            print!(
+                "{:>width$} |",
+                trunc(row_name, row_label_w),
+                width = row_label_w
+            );
+            for j in 0..=i {
+                let r = mat[[i, j]];
+                if i >= j {
+                    var1.push(Value::Str(sorted_names[i].clone()));
+                    var2.push(Value::Str(sorted_names[j].clone()));
+                    r_vec.push(Value::Float(r));
+                    let p = if i == j { 0.0 } else { corr_pval(r) };
+                    p_vec.push(Value::Float(p));
+                }
+                if show_stars && i != j {
+                    let s = star(corr_pval(r));
+                    print!(" {:>7.4}{:<3}", r, s);
+                } else {
+                    print!(" {:>10.4}", r);
+                }
+            }
+            println!();
+        }
+        if show_stars {
+            println!("* p<0.10  ** p<0.05  *** p<0.01");
+        }
+        println!();
+
+        let mut columns = HashMap::new();
+        columns.insert("var1".into(), Value::List(Arc::new(var1)));
+        columns.insert("var2".into(), Value::List(Arc::new(var2)));
+        columns.insert("r".into(), Value::List(Arc::new(r_vec)));
+        columns.insert("p".into(), Value::List(Arc::new(p_vec)));
+        let df = self.dict_to_dataframe(&columns)?;
+        Ok(Value::DataFrame(Arc::new(df)))
+    }
+
+    pub(super) fn summarize(
+        &mut self,
+        _func: &str,
+        args: &[Expr],
+        _opts: &[Opt],
+        opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        if args.is_empty() {
+            return Err(HayashiError::Runtime(
+                "summarize() requires a DataFrame as first argument".into(),
+            ));
+        }
+        let df = match self.eval_expr(&args[0])? {
+            Value::DataFrame(df) => df,
+            other => return Err(self.type_mismatch("DataFrame", &other)),
+        };
+
+        let requested: Vec<String> = if args.len() > 1 {
+            self.resolve_var_list(&args[1..], &df)?
+        } else {
+            let mut names = df.column_names();
+            names.sort();
+            names
+        };
+
+        let detail = matches!(opt_map.get("detail"), Some(Value::Bool(true)))
+            || matches!(opt_map.get("d"), Some(Value::Bool(true)));
+        let quiet = self.capturing;
+
+        if !quiet {
+            println!(
+                "\n{:<16} {:>9}  {:>7}  {:>12} {:>12} {:>12} {:>12}",
+                "Variable", "Obs", "Missing", "Mean", "Std. Dev.", "Min", "Max"
+            );
+            println!("{}", "-".repeat(91));
+        }
+
+        let mut result_dicts: Vec<(String, HashMap<String, Value>)> = Vec::new();
+
+        for name in &requested {
+            if let Some(d) = self.summarize_variable(name, &df, detail, quiet)? {
+                result_dicts.push((name.clone(), d));
+            }
+        }
+        if !quiet {
+            println!();
+        }
+
+        if result_dicts.len() == 1 {
+            let (_, d) = result_dicts.into_iter().next().unwrap();
+            Ok(Value::Dict(Arc::new(d)))
+        } else {
+            let mut outer = HashMap::new();
+            for (name, d) in result_dicts {
+                outer.insert(name, Value::Dict(Arc::new(d)));
+            }
+            Ok(Value::Dict(Arc::new(outer)))
+        }
+    }
+
+    fn summarize_variable(
+        &self,
+        name: &str,
+        df: &greeners::DataFrame,
+        detail: bool,
+        quiet: bool,
+    ) -> Result<Option<HashMap<String, Value>>> {
+        use greeners::Column;
+        let col = df
+            .get_column(name)
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+
+        let (n_total, n_missing, vals): (usize, usize, Vec<f64>) = match col {
+            Column::Float(arr) => {
+                let total = arr.len();
+                let vals: Vec<f64> = arr.iter().copied().filter(|x| x.is_finite()).collect();
+                let missing = total - vals.len();
+                (total, missing, vals)
+            }
+            Column::Int(arr) => {
+                let vals: Vec<f64> = arr.iter().map(|&x| x as f64).collect();
+                (vals.len(), 0, vals)
+            }
+            _ => {
+                if !quiet {
+                    println!("{:<16} {:>9}  {:>7}", name, "(non-numeric)", "");
+                }
+                return Ok(None);
+            }
+        };
+
+        let n = vals.len();
+        if n == 0 {
+            if !quiet {
+                println!("{:<16} {:>9}  {:>7}  (all missing)", name, 0, n_total);
+            }
+            return Ok(None);
+        }
+
+        let mean = vals.iter().sum::<f64>() / n as f64;
+        let variance =
+            vals.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n as f64 - 1.0).max(1.0);
+        let sd = variance.sqrt();
+        let min = vals.iter().cloned().fold(f64::INFINITY, f64::min);
+        let max = vals.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+
+        if !quiet {
+            let miss_str = if n_missing > 0 {
+                format!("{}", n_missing)
+            } else {
+                String::new()
+            };
+            println!(
+                "{:<16} {:>9}  {:>7}  {:>12.4} {:>12.4} {:>12.4} {:>12.4}",
+                name, n, miss_str, mean, sd, min, max
+            );
+        }
+
+        let mut d = HashMap::new();
+        d.insert("N".into(), Value::Int(n as i64));
+        d.insert("missing".into(), Value::Int(n_missing as i64));
+        d.insert("mean".into(), Value::Float(mean));
+        d.insert("sd".into(), Value::Float(sd));
+        d.insert("min".into(), Value::Float(min));
+        d.insert("max".into(), Value::Float(max));
+        d.insert("variance".into(), Value::Float(variance));
+
+        if detail {
+            let mut sorted = vals.clone();
+            sorted.sort_by(nan_last_cmp);
+            let pctile = |p: f64| -> f64 {
+                let idx = (p * (n - 1) as f64).round() as usize;
+                sorted[idx.min(n - 1)]
+            };
+            let p1 = pctile(0.01);
+            let p5 = pctile(0.05);
+            let p10 = pctile(0.10);
+            let p25 = pctile(0.25);
+            let p50 = pctile(0.50);
+            let p75 = pctile(0.75);
+            let p90 = pctile(0.90);
+            let p95 = pctile(0.95);
+            let p99 = pctile(0.99);
+            let skew = if n > 2 {
+                let m3 = vals.iter().map(|x| ((x - mean) / sd).powi(3)).sum::<f64>();
+                m3 * n as f64 / ((n - 1) as f64 * (n - 2) as f64)
+            } else {
+                f64::NAN
+            };
+            let kurt = if n > 3 {
+                let m4 = vals.iter().map(|x| ((x - mean) / sd).powi(4)).sum::<f64>() / n as f64;
+                m4
+            } else {
+                f64::NAN
+            };
+            if !quiet {
+                println!("         Percentiles:");
+                println!("          1%  {:>10.4}       Skewness  {:>10.4}", p1, skew);
+                println!("          5%  {:>10.4}       Kurtosis  {:>10.4}", p5, kurt);
+                println!("         10%  {:>10.4}", p10);
+                println!(
+                    "         25%  {:>10.4}       Variance  {:>10.4}",
+                    p25, variance
+                );
+                println!("         50%  {:>10.4}", p50);
+                println!("         75%  {:>10.4}", p75);
+                println!("         90%  {:>10.4}", p90);
+                println!("         95%  {:>10.4}", p95);
+                println!("         99%  {:>10.4}", p99);
+            }
+            d.insert("p1".into(), Value::Float(p1));
+            d.insert("p5".into(), Value::Float(p5));
+            d.insert("p10".into(), Value::Float(p10));
+            d.insert("p25".into(), Value::Float(p25));
+            d.insert("p50".into(), Value::Float(p50));
+            d.insert("p75".into(), Value::Float(p75));
+            d.insert("p90".into(), Value::Float(p90));
+            d.insert("p95".into(), Value::Float(p95));
+            d.insert("p99".into(), Value::Float(p99));
+            d.insert("skewness".into(), Value::Float(skew));
+            d.insert("kurtosis".into(), Value::Float(kurt));
+        }
+        Ok(Some(d))
+    }
+
+    pub(super) fn eststo(
+        &mut self,
+        _func: &str,
+        args: &[Expr],
+        _opts: &[Opt],
+        _opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        if args.is_empty() {
+            return Err(HayashiError::Runtime("eststo(model)".into()));
+        }
+        let val = self.eval_expr(&args[0])?;
+        let n = self.stored_models.len() + 1;
+        self.stored_models.push(val);
+        println!(
+            "eststo: model {n} stored ({} total)",
+            self.stored_models.len()
+        );
+        Ok(Value::Int(n as i64))
+    }
+
+    pub(super) fn estclear(
+        &mut self,
+        _func: &str,
+        _args: &[Expr],
+        _opts: &[Opt],
+        _opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        let n = self.stored_models.len();
+        self.stored_models.clear();
+        println!("estclear: {n} models removed");
+        Ok(Value::Int(n as i64))
+    }
+
+    #[cfg(all(
+        feature = "greeners-bayesian",
+        feature = "greeners-causal",
+        feature = "greeners-glm",
+        feature = "greeners-imputation",
+        feature = "greeners-ols",
+        feature = "greeners-panel",
+        feature = "greeners-survival",
+        feature = "greeners-timeseries"
+    ))]
+    pub(super) fn esttab(
+        &mut self,
+        _func: &str,
+        args: &[Expr],
+        _opts: &[Opt],
+        opt_map: &HashMap<String, Value>,
+    ) -> Result<Value> {
+        // sem args → usa modelos acumulados via eststo
+        let use_stored = args.is_empty();
+        if use_stored && self.stored_models.is_empty() {
+            return Err(HayashiError::Runtime(
+                "esttab() requires models — pass as args or use eststo() first".into(),
+            ));
+        }
+
+        let fmt = match opt_map.get("fmt") {
+            Some(Value::Str(s)) => s.clone(),
+            None => "txt".to_string(),
+            _ => return Err(HayashiError::Type("fmt= must be a string".into())),
+        };
+        let out_path = match opt_map.get("path") {
+            Some(Value::Str(s)) => Some(s.clone()),
+            None => None,
+            _ => return Err(HayashiError::Type("path= must be a string".into())),
+        };
+
+        // helpers: esttab_parse_csv, esttab_stars, esttab_extract_std
+
+        let mut models: Vec<ModelInfo> = Vec::new();
+        let model_vals: Vec<Value> = if use_stored {
+            self.stored_models.clone()
+        } else {
+            let mut vals = Vec::new();
+            for a in args {
+                let v = self.eval_expr(a)?;
+                if let Value::List(items) = v {
+                    vals.extend(items.iter().cloned());
+                } else {
+                    vals.push(v);
+                }
+            }
+            vals
+        };
+        for val in model_vals {
+            // Use the canonical ModelView for any single-equation regression-like
+            // estimator.  Models with special esttab formatting (OLS covariance
+            // labels, thresholds, lambdas, multi-equation systems, or non-β
+            // results) fall through to the explicit match arms below.
+            if let Some(mv) = val.to_model_view() {
+                let skip = matches!(
+                    mv.type_name.as_str(),
+                    "OlsResult"
+                        | "BinaryResult"
+                        | "OrderedResult"
+                        | "TobitResult"
+                        | "HeckmanResult"
+                        | "PanelGlsResult"
+                        | "ZeroInflatedResult"
+                        | "SurResult"
+                        | "RollingResult"
+                        | "RecursiveLSResult"
+                        | "MNLogitResult"
+                        | "DidResult"
+                        | "KMResult"
+                        | "RdResult"
+                        | "SynthResult"
+                        | "PsmResult"
+                        | "VarmaResult"
+                        | "DecompResult"
+                        | "MstlResult"
+                        | "UCResult"
+                        | "GamResult"
+                        | "MiceResult"
+                        | "MSARResult"
+                        | "SVarResult"
+                        | "ThreeSLSResult"
+                        | "DFMResult"
+                        | "EtsResult"
+                        | "ThresholdResult"
+                        | "VarResult"
+                        | "VecmResult"
+                        | "PcaResult"
+                        | "FactorResult"
+                        | "GmmClusteringResult"
+                        | "HierarchicalResult"
+                        | "SpectralResult"
+                        | "KmeansResult"
+                        | "DbscanResult"
+                        | "IsotonicResult"
+                        | "KdeResult"
+                        | "BartResult"
+                        | "GpResult"
+                        | "LowessResult"
+                );
+                if !skip && !mv.to_coef_rows().is_empty() {
+                    models.push(model_view_to_model_info(&mv));
+                    continue;
+                }
+            }
+            match val {
+                Value::OlsResult(m) => {
+                    use greeners::export::ExportableResult;
+                    let coefs = esttab_parse_csv(&m.result.to_csv());
+                    let n = m.residuals.len();
+                    let cov_label = match &m.result.cov_type {
+                        CovarianceType::NonRobust => "",
+                        CovarianceType::HC1 => " (robust)",
+                        CovarianceType::HC2 => " (HC2)",
+                        CovarianceType::HC3 => " (HC3)",
+                        CovarianceType::HC4 => " (HC4)",
+                        CovarianceType::NeweyWest(l) => {
+                            let _ = l;
+                            " (NW)"
+                        }
+                        CovarianceType::Clustered(_) => " (cluster)",
+                        CovarianceType::ClusteredTwoWay(_, _) => " (2w-cluster)",
+                    };
+                    models.push(ModelInfo {
+                        label: format!("OLS{cov_label}"),
+                        coefs,
+                        n,
+                        r2: Some(m.result.r_squared),
+                        adj_r2: Some(m.result.adj_r_squared),
+                        ll: Some(m.result.log_likelihood),
+                    });
+                }
+                #[cfg(feature = "greeners-glm")]
+                Value::BinaryResult(bm) => {
+                    let label = if bm.kind == "logit" {
+                        "Logit"
+                    } else {
+                        "Probit"
+                    }
+                    .to_string();
+                    let n = bm.x.nrows();
+                    models.push(esttab_extract_std(
+                        &label,
+                        &bm.result.variable_names,
+                        &bm.result.params,
+                        &bm.result.std_errors,
+                        &bm.result.p_values,
+                        n,
+                    ));
+                }
+                #[cfg(feature = "greeners-ols")]
+                Value::IvResult(r) => {
+                    models.push(esttab_extract_std(
+                        "IV/2SLS",
+                        &r.variable_names,
+                        &r.params,
+                        &r.std_errors,
+                        &r.p_values,
+                        r.n_obs,
+                    ));
+                }
+                #[cfg(feature = "greeners-glm")]
+                Value::PoissonResult(r) => {
+                    models.push(esttab_extract_std(
+                        "Poisson",
+                        &r.variable_names,
+                        &r.params,
+                        &r.std_errors,
+                        &r.p_values,
+                        r.n_obs,
+                    ));
+                }
+                #[cfg(feature = "greeners-glm")]
+                Value::NegBinResult(r) => {
+                    models.push(esttab_extract_std(
+                        "NegBin",
+                        &r.variable_names,
+                        &r.params,
+                        &r.std_errors,
+                        &r.p_values,
+                        r.n_obs,
+                    ));
+                }
+                #[cfg(feature = "greeners-glm")]
+                Value::OrderedResult(r) => {
+                    let mut info = esttab_extract_std(
+                        &r.model_name,
+                        &r.variable_names,
+                        &r.params,
+                        &r.std_errors,
+                        &r.p_values,
+                        r.n_obs,
+                    );
+                    for (i, (&thr, &thr_se)) in r
+                        .thresholds
+                        .iter()
+                        .zip(r.threshold_std_errors.iter())
+                        .enumerate()
+                    {
+                        info.coefs
+                            .push((format!("_cut{}", i + 1), thr, Some(thr_se), None));
+                    }
+                    models.push(info);
+                }
+                #[cfg(feature = "greeners-ols")]
+                Value::TobitResult(r) => {
+                    let mut info = esttab_extract_std(
+                        "Tobit",
+                        &r.variable_names,
+                        &r.params,
+                        &r.std_errors,
+                        &r.p_values,
+                        r.n_obs,
+                    );
+                    info.coefs.push(("_sigma".into(), r.sigma, None, None));
+                    models.push(info);
+                }
+                #[cfg(feature = "greeners-ols")]
+                Value::HeckmanResult(r) => {
+                    let mut info = esttab_extract_std(
+                        "Heckman",
+                        &r.variable_names,
+                        &r.params,
+                        &r.std_errors,
+                        &r.p_values,
+                        r.n_obs,
+                    );
+                    let dz = if r.delta_se > 0.0 {
+                        r.delta / r.delta_se
+                    } else {
+                        f64::NAN
+                    };
+                    let dp = if dz.is_finite() {
+                        t_pvalue_two(dz, r.n_selected as f64)
+                    } else {
+                        f64::NAN
+                    };
+                    info.coefs
+                        .push(("_lambda".into(), r.delta, Some(r.delta_se), Some(dp)));
+                    models.push(info);
+                }
+                #[cfg(feature = "greeners-panel")]
+                Value::PanelResult(r) => {
+                    models.push(esttab_extract_std(
+                        "FE",
+                        &r.variable_names,
+                        &r.params,
+                        &r.std_errors,
+                        &r.p_values,
+                        r.n_obs,
+                    ));
+                }
+                #[cfg(feature = "greeners-panel")]
+                Value::ReResult(r) => {
+                    models.push(esttab_extract_std(
+                        "RE",
+                        &r.variable_names,
+                        &r.params,
+                        &r.std_errors,
+                        &r.p_values,
+                        0,
+                    ));
+                }
+                #[cfg(feature = "greeners-panel")]
+                Value::AbResult(r) => {
+                    models.push(esttab_extract_std(
+                        "AB-GMM",
+                        &r.variable_names,
+                        &r.params,
+                        &r.std_errors,
+                        &r.p_values,
+                        r.n_obs,
+                    ));
+                }
+                #[cfg(feature = "greeners-ols")]
+                Value::GmmResult(r) => {
+                    let names: Option<Vec<String>> =
+                        Some((0..r.params.len()).map(|i| format!("x{i}")).collect());
+                    models.push(esttab_extract_std(
+                        "GMM",
+                        &names,
+                        &r.params,
+                        &r.std_errors,
+                        &r.p_values,
+                        r.n_obs,
+                    ));
+                }
+                #[cfg(feature = "greeners-panel")]
+                Value::SysGmmResult(r) => {
+                    models.push(esttab_extract_std(
+                        "SysGMM",
+                        &r.variable_names,
+                        &r.params,
+                        &r.std_errors,
+                        &r.p_values,
+                        r.n_obs_fd,
+                    ));
+                }
+                #[cfg(feature = "greeners-panel")]
+                Value::PcseResult(r) => {
+                    models.push(esttab_extract_std(
+                        "PCSE",
+                        &r.variable_names,
+                        &r.params,
+                        &r.std_errors,
+                        &r.p_values,
+                        r.n_obs,
+                    ));
+                }
+                #[cfg(feature = "greeners-panel")]
+                Value::PanelGlsResult(r) => {
+                    let label = match r.panels {
+                        greeners::panel::GlsPanels::Hetero => "XTGLS-H",
+                        greeners::panel::GlsPanels::Correlated => "XTGLS-C",
+                    };
+                    models.push(esttab_extract_std(
+                        label,
+                        &r.variable_names,
+                        &r.params,
+                        &r.std_errors,
+                        &r.p_values,
+                        r.n_obs,
+                    ));
+                }
+                #[cfg(feature = "greeners-panel")]
+                Value::FE2SLSResult(r) => {
+                    models.push(esttab_extract_std(
+                        "FE-IV",
+                        &r.variable_names,
+                        &r.params,
+                        &r.std_errors,
+                        &r.p_values,
+                        r.n_obs,
+                    ));
+                }
+                #[cfg(feature = "greeners-ols")]
+                Value::QuantileResult(r) => {
+                    let label = format!("QReg(τ={:.2})", r.tau);
+                    models.push(esttab_extract_std(
+                        &label,
+                        &r.variable_names,
+                        &r.params,
+                        &r.std_errors,
+                        &r.p_values,
+                        0,
+                    ));
+                }
+                #[cfg(feature = "greeners-survival")]
+                Value::CoxResult(r) => {
+                    models.push(esttab_extract_std(
+                        "CoxPH",
+                        &r.variable_names,
+                        &r.params,
+                        &r.std_errors,
+                        &r.p_values,
+                        r.n_obs,
+                    ));
+                }
+                #[cfg(feature = "greeners-ols")]
+                Value::RlmResult(r) => {
+                    models.push(esttab_extract_std(
+                        "RLM",
+                        &r.variable_names,
+                        &r.params,
+                        &r.std_errors,
+                        &r.p_values,
+                        r.n_obs,
+                    ));
+                }
+                #[cfg(feature = "greeners-glm")]
+                Value::GeeResult(r) => {
+                    // GEE uses robust SE (sandwich) by default
+                    models.push(esttab_extract_std(
+                        "GEE",
+                        &r.variable_names,
+                        &r.params,
+                        &r.robust_se,
+                        &r.p_values,
+                        r.n_obs,
+                    ));
+                }
+                #[cfg(feature = "greeners-glm")]
+                Value::BetaResult(r) => {
+                    models.push(esttab_extract_std(
+                        "BetaReg",
+                        &r.variable_names,
+                        &r.params,
+                        &r.std_errors,
+                        &r.p_values,
+                        r.n_obs,
+                    ));
+                }
+                #[cfg(feature = "greeners-glm")]
+                Value::GlmResult(r) => {
+                    let family_name = format!("GLM({:?})", r.family);
+                    models.push(esttab_extract_std(
+                        &family_name,
+                        &r.variable_names,
+                        &r.params,
+                        &r.std_errors,
+                        &r.p_values,
+                        r.n_obs,
+                    ));
+                }
+                Value::LowessResult(_) => {
+                    return Err(HayashiError::Runtime(
+                        "esttab() does not support lowess — use predict to extract smoothed values"
+                            .into(),
+                    ));
+                }
+                Value::PcaResult(_) | Value::FactorResult(_) => {
+                    return Err(HayashiError::Runtime(
+                    "esttab() does not support PCA/Factor — use print() to see loadings and explained variance".into()
+                ));
+                }
+                #[cfg(feature = "greeners-glm")]
+                Value::ConditionalResult(r) => {
+                    models.push(esttab_extract_std(
+                        &r.model_name,
+                        &r.variable_names,
+                        &r.params,
+                        &r.std_errors,
+                        &r.p_values,
+                        r.n_obs,
+                    ));
+                }
+                #[cfg(feature = "greeners-timeseries")]
+                Value::MarkovResult(_) => {
+                    return Err(HayashiError::Runtime(
+                    "esttab() does not support Markov Switching — use print() to see regime parameters".into()
+                ));
+                }
+                #[cfg(feature = "greeners-ols")]
+                Value::GlsarResult(r) => {
+                    models.push(esttab_extract_std(
+                        "GLSAR",
+                        &r.variable_names,
+                        &r.params,
+                        &r.std_errors,
+                        &r.p_values,
+                        r.n_obs,
+                    ));
+                }
+                #[cfg(feature = "greeners-bayesian")]
+                Value::MixedResult(r) => {
+                    // esttab only displays fixed effects of MixedLM
+                    models.push(esttab_extract_std(
+                        "MixedLM",
+                        &r.variable_names,
+                        &r.fixed_effects,
+                        &r.fixed_se,
+                        &r.p_values,
+                        r.n_obs,
+                    ));
+                }
+                #[cfg(feature = "greeners-glm")]
+                Value::ZeroInflatedResult(_) => {
+                    return Err(HayashiError::Runtime(
+                        "esttab() does not support zip/zinb (two equations) — use print()".into(),
+                    ));
+                }
+                #[cfg(feature = "greeners-ols")]
+                Value::SurResult(_) => {
+                    return Err(HayashiError::Runtime(
+                        "esttab() does not support sur (multiple equations) — use print()".into(),
+                    ));
+                }
+                #[cfg(feature = "greeners-ols")]
+                Value::RollingResult(_) | Value::RecursiveLSResult(_) => {
+                    return Err(HayashiError::Runtime(
+                    "esttab() does not support rolling/recursive — coefficients vary over time; use print()".into()
+                ));
+                }
+                #[cfg(feature = "greeners-glm")]
+                Value::MNLogitResult(_) => {
+                    return Err(HayashiError::Runtime(
+                        "esttab() does not support mlogit (multiple equations) — use print()"
+                            .into(),
+                    ));
+                }
+                #[cfg(feature = "greeners-causal")]
+                Value::DidResult(_) => {
+                    return Err(HayashiError::Runtime(
+                        "esttab() does not support did/km — result has its own format; use print()"
+                            .into(),
+                    ));
+                }
+                #[cfg(feature = "greeners-survival")]
+                Value::KMResult(_) => {
+                    return Err(HayashiError::Runtime(
+                        "esttab() does not support did/km — result has its own format; use print()"
+                            .into(),
+                    ));
+                }
+                #[cfg(feature = "greeners-causal")]
+                Value::RdResult(_) | Value::SynthResult(_) | Value::PsmResult(_) => {
+                    return Err(HayashiError::Runtime(
+                    "esttab() does not support causal estimators (rd, psm, synth) — use print()".into()
+                ));
+                }
+                #[cfg(feature = "greeners-timeseries")]
+                Value::VarmaResult(_) => {
+                    return Err(HayashiError::Runtime(
+                        "esttab() does not support VARMA (matrix coefficients) — use print()"
+                            .into(),
+                    ));
+                }
+                #[cfg(feature = "greeners-timeseries")]
+                Value::DecompResult(_) | Value::MstlResult(_) => {
+                    return Err(HayashiError::Runtime(
+                        "esttab() does not support seasonal decomposition — use print()".into(),
+                    ));
+                }
+                #[cfg(feature = "greeners-timeseries")]
+                Value::UCResult(_) => {
+                    return Err(HayashiError::Runtime(
+                        "esttab() does not support UCM (variance parameters, not β) — use print()"
+                            .into(),
+                    ));
+                }
+                #[cfg(feature = "greeners-glm")]
+                Value::GamResult(_) => {
+                    return Err(HayashiError::Runtime(
+                    "esttab() does not support GAM (smooth terms do not have a standard β table) — use print()".into()
+                ));
+                }
+                #[cfg(feature = "greeners-imputation")]
+                Value::MiceResult(_) => {
+                    return Err(HayashiError::Runtime(
+                    "esttab() does not support MICE (multiple datasets) — estimate model in each dataset and use Rubin's rules".into()
+                ));
+                }
+                #[cfg(feature = "greeners-timeseries")]
+                Value::MSARResult(_) => {
+                    return Err(HayashiError::Runtime(
+                        "esttab() does not support Markov-AR (regime parameters) — use print()"
+                            .into(),
+                    ));
+                }
+                #[cfg(feature = "greeners-timeseries")]
+                Value::SVarResult(_) => {
+                    return Err(HayashiError::Runtime(
+                        "esttab() does not support SVAR (structural A/B matrices) — use print()"
+                            .into(),
+                    ));
+                }
+                #[cfg(feature = "greeners-ols")]
+                Value::ThreeSLSResult(_) => {
+                    return Err(HayashiError::Runtime(
+                        "esttab() does not support 3SLS (multiple equations) — use print()".into(),
+                    ));
+                }
+                #[cfg(feature = "greeners-timeseries")]
+                Value::DFMResult(_) => {
+                    return Err(HayashiError::Runtime(
+                        "esttab() does not support DFM (fatores latentes) — use print()".into(),
+                    ));
+                }
+                #[cfg(feature = "greeners-timeseries")]
+                Value::EtsResult(_) => {
+                    return Err(HayashiError::Runtime(
+                        "esttab() does not support ETS (smoothing parameters) — use print()".into(),
+                    ));
+                }
+                #[cfg(feature = "greeners-panel")]
+                Value::ThresholdResult(_) => {
+                    return Err(HayashiError::Runtime(
+                        "esttab() does not support panel threshold (two regimes) — use print()"
+                            .into(),
+                    ));
+                }
+                _ => {
+                    return Err(HayashiError::Type(
+                        "esttab(): model type not supported — use print()".into(),
+                    ))
+                }
+            }
+        }
+
+        // union of variable names in order of first occurrence
+        let mut all_vars: Vec<String> = Vec::new();
+        let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+        for mi in &models {
+            let coefs = &mi.coefs;
+            for (nm, _, _, _) in coefs {
+                if seen.insert(nm.clone()) {
+                    all_vars.push(nm.clone());
+                }
+            }
+        }
+
+        // Build long-format table for return value
+        let mut tab_var: Vec<Value> = Vec::new();
+        let mut tab_model: Vec<Value> = Vec::new();
+        let mut tab_coef: Vec<Value> = Vec::new();
+        let mut tab_se: Vec<Value> = Vec::new();
+        let mut tab_p: Vec<Value> = Vec::new();
+        let mut tab_n: Vec<Value> = Vec::new();
+        let mut tab_r2: Vec<Value> = Vec::new();
+        let mut tab_adj_r2: Vec<Value> = Vec::new();
+        for (m_idx, mi) in models.iter().enumerate() {
+            let model_label = format!("({}) {}", m_idx + 1, mi.label);
+            for var in &all_vars {
+                let row = mi.coefs.iter().find(|(nm, _, _, _)| nm == var);
+                let (c, se, p) = match row {
+                    Some((_, c, se, p)) => (*c, *se, *p),
+                    None => (f64::NAN, None, None),
+                };
+                tab_var.push(Value::Str(var.clone()));
+                tab_model.push(Value::Str(model_label.clone()));
+                tab_coef.push(Value::Float(c));
+                tab_se.push(Value::Float(se.unwrap_or(f64::NAN)));
+                tab_p.push(Value::Float(p.unwrap_or(f64::NAN)));
+                tab_n.push(Value::Int(mi.n as i64));
+                tab_r2.push(Value::Float(mi.r2.unwrap_or(f64::NAN)));
+                tab_adj_r2.push(Value::Float(mi.adj_r2.unwrap_or(f64::NAN)));
+            }
+        }
+
+        let n_models = models.len();
+        let col_w = 16usize;
+        let label_w = all_vars.iter().map(|s| s.len()).max().unwrap_or(8).max(12) + 2;
+        let total_w = label_w + n_models * (col_w + 1);
+
+        // build content (txt or latex)
+        let mut buf = String::new();
+
+        if fmt == "latex" || fmt == "tex" {
+            buf.push_str("\\begin{tabular}{l");
+            for _ in 0..n_models {
+                buf.push('r');
+            }
+            buf.push_str("}\n\\hline\\hline\n");
+            // header
+            buf.push_str(" &");
+            for (i, mi) in models.iter().enumerate() {
+                let label = &mi.label;
+                buf.push_str(&format!(" ({}) {}", i + 1, label));
+                if i + 1 < n_models {
+                    buf.push('&');
+                }
+            }
+            buf.push_str(" \\\\\n\\hline\n");
+
+            for var in &all_vars {
+                if var == "_cons" {
+                    continue;
+                } // _cons vai no final
+                buf.push_str(&var.to_string());
+                for mi in &models {
+                    let coefs = &mi.coefs;
+                    let row = coefs.iter().find(|(nm, _, _, _)| nm == var);
+                    match row {
+                        Some((_, c, _, p)) => {
+                            buf.push_str(&format!(" & {:.4}{}", c, esttab_stars(*p)))
+                        }
+                        None => buf.push_str(" &"),
+                    }
+                }
+                buf.push_str(" \\\\\n");
+                // SE linha
+                let has_se = models.iter().any(|mi| {
+                    mi.coefs
+                        .iter()
+                        .find(|(nm, _, _, _)| nm == var)
+                        .and_then(|(_, _, se, _)| *se)
+                        .is_some()
+                });
+                if has_se {
+                    buf.push(' ');
+                    for mi in &models {
+                        let coefs = &mi.coefs;
+                        let row = coefs.iter().find(|(nm, _, _, _)| nm == var);
+                        match row.and_then(|(_, _, se, _)| *se) {
+                            Some(se) => buf.push_str(&format!(" & ({:.4})", se)),
+                            None => buf.push_str(" &"),
+                        }
+                    }
+                    buf.push_str(" \\\\\n");
+                }
+            }
+            // _cons at the end
+            if all_vars.iter().any(|v| v == "_cons") {
+                buf.push_str("Constant");
+                for mi in &models {
+                    let coefs = &mi.coefs;
+                    let row = coefs.iter().find(|(nm, _, _, _)| nm == "_cons");
+                    match row {
+                        Some((_, c, _, p)) => {
+                            buf.push_str(&format!(" & {:.4}{}", c, esttab_stars(*p)))
+                        }
+                        None => buf.push_str(" &"),
+                    }
+                }
+                buf.push_str(" \\\\\n");
+                let has_se = models.iter().any(|mi| {
+                    mi.coefs
+                        .iter()
+                        .find(|(nm, _, _, _)| nm == "_cons")
+                        .and_then(|(_, _, se, _)| *se)
+                        .is_some()
+                });
+                if has_se {
+                    buf.push(' ');
+                    for mi in &models {
+                        let coefs = &mi.coefs;
+                        let row = coefs.iter().find(|(nm, _, _, _)| nm == "_cons");
+                        match row.and_then(|(_, _, se, _)| *se) {
+                            Some(se) => buf.push_str(&format!(" & ({:.4})", se)),
+                            None => buf.push_str(" &"),
+                        }
+                    }
+                    buf.push_str(" \\\\\n");
+                }
+            }
+            buf.push_str("\\hline\nN");
+            for mi in &models {
+                buf.push_str(&format!(" & {}", mi.n));
+            }
+            buf.push_str(" \\\\\n");
+            if models.iter().any(|mi| mi.r2.is_some()) {
+                buf.push_str("$R^2$");
+                for mi in &models {
+                    match mi.r2 {
+                        Some(v) => buf.push_str(&format!(" & {:.4}", v)),
+                        None => buf.push_str(" &"),
+                    }
+                }
+                buf.push_str(" \\\\\n");
+            }
+            if models.iter().any(|mi| mi.adj_r2.is_some()) {
+                buf.push_str("Adj. $R^2$");
+                for mi in &models {
+                    match mi.adj_r2 {
+                        Some(v) => buf.push_str(&format!(" & {:.4}", v)),
+                        None => buf.push_str(" &"),
+                    }
+                }
+                buf.push_str(" \\\\\n");
+            }
+            buf.push_str("\\hline\\hline\n\\end{tabular}\n");
+            buf.push_str("\\footnotesize{* p$<$0.10, ** p$<$0.05, *** p$<$0.01}\n");
+        } else {
+            // ── ASCII txt ─────────────────────────────────────────────
+            let sep = "─".repeat(total_w);
+
+            // header: numbering
+            let mut line = format!("{:<lw$}", "", lw = label_w);
+            for i in 0..n_models {
+                line.push_str(&format!(" {:>cw$}", format!("({})", i + 1), cw = col_w));
+            }
+            buf.push_str(&format!("{line}\n"));
+
+            // header: labels
+            let mut line = format!("{:<lw$}", "", lw = label_w);
+            for mi in &models {
+                line.push_str(&format!(" {:>cw$}", mi.label, cw = col_w));
+            }
+            buf.push_str(&format!("{line}\n"));
+            buf.push_str(&format!("{sep}\n"));
+
+            let print_var = |var: &str, buf: &mut String| {
+                // linha de coeficientes
+                let display_name = if var == "_cons" { "Constant" } else { var };
+                let mut line = format!("{:<lw$}", display_name, lw = label_w);
+                for mi in &models {
+                    let coefs = &mi.coefs;
+                    let row = coefs.iter().find(|(nm, _, _, _)| nm == var);
+                    match row {
+                        Some((_, c, _, p)) => {
+                            let s = esttab_stars(*p);
+                            let cell = format!("{:.4}{}", c, s);
+                            line.push_str(&format!(" {:>cw$}", cell, cw = col_w));
+                        }
+                        None => line.push_str(&format!(" {:>cw$}", "", cw = col_w)),
+                    }
+                }
+                buf.push_str(&format!("{line}\n"));
+
+                // standard error row
+                let has_se = models.iter().any(|mi| {
+                    mi.coefs
+                        .iter()
+                        .find(|(nm, _, _, _)| nm == var)
+                        .and_then(|(_, _, se, _)| *se)
+                        .is_some()
+                });
+                if has_se {
+                    let mut line = format!("{:<lw$}", "", lw = label_w);
+                    for mi in &models {
+                        let coefs = &mi.coefs;
+                        let row = coefs.iter().find(|(nm, _, _, _)| nm == var);
+                        match row.and_then(|(_, _, se, _)| *se) {
+                            Some(se) => line.push_str(&format!(
+                                " {:>cw$}",
+                                format!("({:.4})", se),
+                                cw = col_w
+                            )),
+                            None => line.push_str(&format!(" {:>cw$}", "", cw = col_w)),
+                        }
+                    }
+                    buf.push_str(&format!("{line}\n"));
+                }
+            };
+
+            for var in &all_vars {
+                if var == "_cons" {
+                    continue;
+                }
+                print_var(var, &mut buf);
+            }
+            if all_vars.iter().any(|v| v == "_cons") {
+                print_var("_cons", &mut buf);
+            }
+
+            buf.push_str(&format!("{sep}\n"));
+            let mut line = format!("{:<lw$}", "N", lw = label_w);
+            for mi in &models {
+                line.push_str(&format!(" {:>cw$}", mi.n, cw = col_w));
+            }
+            buf.push_str(&format!("{line}\n"));
+            if models.iter().any(|mi| mi.r2.is_some()) {
+                let mut line = format!("{:<lw$}", "R²", lw = label_w);
+                for mi in &models {
+                    match mi.r2 {
+                        Some(v) => line.push_str(&format!(" {:>cw$.4}", v, cw = col_w)),
+                        None => line.push_str(&format!(" {:>cw$}", "", cw = col_w)),
+                    }
+                }
+                buf.push_str(&format!("{line}\n"));
+            }
+            if models.iter().any(|mi| mi.adj_r2.is_some()) {
+                let mut line = format!("{:<lw$}", "Adj. R²", lw = label_w);
+                for mi in &models {
+                    match mi.adj_r2 {
+                        Some(v) => line.push_str(&format!(" {:>cw$.4}", v, cw = col_w)),
+                        None => line.push_str(&format!(" {:>cw$}", "", cw = col_w)),
+                    }
+                }
+                buf.push_str(&format!("{line}\n"));
+            }
+            buf.push_str(&format!("{sep}\n"));
+            buf.push_str("* p<0.10  ** p<0.05  *** p<0.01\n");
+        }
+
+        if let Some(path) = out_path {
+            std::fs::write(&path, &buf).map_err(|e| HayashiError::Io(e.to_string()))?;
+            println!("Exported table → '{path}'");
+        } else {
+            print!("\n{buf}");
+        }
+
+        let mut columns = HashMap::new();
+        columns.insert("variable".into(), Value::List(Arc::new(tab_var)));
+        columns.insert("model".into(), Value::List(Arc::new(tab_model)));
+        columns.insert("coef".into(), Value::List(Arc::new(tab_coef)));
+        columns.insert("se".into(), Value::List(Arc::new(tab_se)));
+        columns.insert("p".into(), Value::List(Arc::new(tab_p)));
+        columns.insert("n".into(), Value::List(Arc::new(tab_n)));
+        columns.insert("r2".into(), Value::List(Arc::new(tab_r2)));
+        columns.insert("adj_r2".into(), Value::List(Arc::new(tab_adj_r2)));
+        let df = self.dict_to_dataframe(&columns)?;
+        Ok(Value::DataFrame(Arc::new(df)))
     }
 }

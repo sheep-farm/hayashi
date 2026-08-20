@@ -1,0 +1,110 @@
+\chapter{Spatial Econometrics}
+
+\section{Why spatial?}
+
+When observations are located in space or connected by a network,
+disturbances or outcomes can spill over from one unit to its
+neighbours. Ignoring this dependence produces biased standard errors,
+coefficient bias, and misleading inference.
+
+\section{The spatial weights matrix}
+
+Every spatial model in \hayashi{} requires a row-standardized weights
+matrix $W$. If the data are sorted by unit, $W_{ij}$ is the weight that
+unit $j$ receives when predicting the outcome of unit $i$.
+
+\begin{lstlisting}[caption={Spatial weights matrix}]
+// 3 regions with mutual neighbours
+let W = [[0, 0.5, 0.5],
+         [0.5, 0, 0.5],
+         [0.5, 0.5, 0]]
+\end{lstlisting}
+
+For larger grids, generate $W$ from the DataFrame or load it from a file.
+
+\section{Spatial SAR}
+
+The Spatial Autoregressive model is
+
+\[
+y = \rho W y + X\beta + \varepsilon
+\]
+
+where $\rho$ is the spatial autoregressive parameter. Estimation uses
+concentrated maximum likelihood: for each value in a grid of $\rho$,
+transform the dependent variable and run OLS; then select the $\rho$
+that maximises the concentrated log-likelihood.
+
+\begin{lstlisting}[caption={Spatial SAR}]
+let n = 100
+let W = makeweights(df, "region", type="rook")  // or list of lists
+generate df x1 = rnormal(n)
+generate df y = 0.5*x1 + rnormal(n)
+generate df wy = spatial_lag(W, y)
+generate df y = y + 0.3*wy
+
+let m_sar = spatial_sar(y ~ x1, df, w=W)
+print(m_sar)
+\end{lstlisting}
+
+The output reports $\rho$, $\beta$, their standard errors, and a
+likelihood-ratio test for $\rho = 0$.
+
+\section{Spatial SEM}
+
+The Spatial Error Model is
+
+\[
+y = X\beta + u, \qquad u = \lambda W u + \varepsilon
+\]
+
+Errors are spatially correlated, but the outcome itself is not directly
+influenced by neighbours' outcomes.
+
+\begin{lstlisting}[caption={Spatial SEM}]
+let m_sem = spatial_sem(y ~ x1, df, w=W)
+print(m_sem)
+\end{lstlisting}
+
+\section{Spatial Durbin and panel extensions}
+
+The Spatial Durbin model adds spatially lagged regressors:
+
+\[
+y = \rho W y + X\beta + W X \theta + \varepsilon
+\]
+
+It nests SAR ($\theta = 0$) and the spatial lag model ($\rho = 0$).
+
+\begin{lstlisting}[caption={Spatial Durbin}]
+let m_sdm = spatial_durbin(y ~ x1, df, w=W)
+print(m_sdm)
+\end{lstlisting}
+
+For panel data with fixed effects, use the panel variants:
+
+\begin{lstlisting}[caption={Spatial panel SAR}]
+let m_panelsar = spatial_panel_sar(y ~ x1, df, w=W, id="region")
+print(m_panelsar)
+\end{lstlisting}
+
+\section{Interpreting direct and indirect effects}
+
+In a Spatial Durbin model the coefficient on $x$ is not the total effect.
+The total effect on unit $i$ includes the direct impact $\beta$ plus the
+indirect impact that travels through the network via $\theta$ and $\rho$.
+
+\hayashi{} reports direct, indirect, and total effects in the \texttt{m\_sdm}
+summary when available.
+
+\section{Practical notes}
+
+\begin{itemize}
+\item Always check that $W$ is row-standardised; non-standardised $W$
+      distorts the interpretation of $\rho$ and $\lambda$.
+\item Larger samples are needed for spatial MLE than for OLS.
+\item Cross-section spatial models assume a stable network. Panel spatial
+      models add fixed effects but still require a time-invariant $W$.
+\item The \texttt{spatial\_durbin\_error} model combines spatially lagged
+      regressors with a spatial error term.
+\end{itemize}

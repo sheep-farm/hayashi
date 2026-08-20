@@ -1,6 +1,6 @@
 [package]
 name = "hayashi-lang"
-version = "0.2.10-dev"
+version = "0.2.10"
 authors = ["Flávio de Vasconcellos Corrêa <flavio.vcorrea@ufpel.edu.br>"]
 edition = "2021"
 description = "An interpreted language for applied econometrics — Stata-like syntax, modern features, zero cost"
@@ -22,19 +22,32 @@ name = "hay"
 path = "src/main.rs"
 required-features = ["native"]
 
+[[bin]]
+name = "hay-run"
+path = "src/bin/hay-run.rs"
+required-features = ["script", "network"]
+
+[[bin]]
+name = "hay-kernel"
+path = "src/bin/hay-kernel/main.rs"
+required-features = ["native"]
+
 [dependencies]
-greeners = { path = "../Greeners" }
+# Greeners econometrics facade (crates.io)
+greeners = { version = "2.0.0", default-features = false }
 ndarray = "0.17"
 chrono = "0.4"
 statrs = "0.18"
+radsort = "0.1.1"
 thiserror = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 csv = "1"
 rand = "0.8"
+rand_distr = "0.4"
 plotters = { version = "0.3", default-features = false, features = ["svg_backend", "line_series"], optional = true }
 calamine = "0.35"
-parquet = { version = "59", default-features = false, features = ["arrow", "snap"] }
+parquet = { version = "59", default-features = false, features = ["arrow", "snap", "zstd"] }
 arrow = { version = "59", default-features = false, features = ["csv", "json", "ffi"] }
 rust_xlsxwriter = "0.95"
 
@@ -49,6 +62,12 @@ odbc-api = { version = "28", optional = true }
 libloading = { version = "0.8", optional = true }
 wasmi = { version = "0.31", optional = true }
 
+anyhow = "1"
+
+# Transitive dependency needed for argmin on wasm32. Enables
+# web_sys performance.now() as Instant source on the wasm target.
+instant = { version = "0.1", features = ["wasm-bindgen"] }
+
 # Enable getrandom js backend for wasm
 getrandom = { version = "0.2", features = ["js"] }
 
@@ -61,12 +80,50 @@ js-sys = { version = "0.3", optional = true }
 indexmap = { version = "2", features = ["serde"] }
 
 [features]
-default = ["plotters", "wasm", "native"]
+default = ["plotters", "wasm", "native", "full"]
+
+# Greeners sub-crate toggles. `greeners = "2.0.0"` is now the published facade
+# and always includes every sub-crate, so these features only gate Hayashi's
+# conditional compilation of estimator modules.
+greeners-ols = []
+greeners-glm = []
+greeners-panel = []
+greeners-timeseries = []
+greeners-bayesian = []
+greeners-causal = []
+greeners-ml = []
+greeners-spatial = []
+greeners-survival = []
+greeners-imputation = []
+greeners-diagnostics = []
+full = [
+    "greeners-ols", "greeners-glm", "greeners-panel", "greeners-timeseries",
+    "greeners-bayesian", "greeners-causal", "greeners-ml", "greeners-spatial",
+    "greeners-survival", "greeners-imputation", "greeners-diagnostics",
+]
+minimal = ["greeners-ols"]
 odbc = ["dep:odbc-api"]
 plotters = ["dep:plotters"]
 wasm = ["dep:wasmi"]
-native = ["dep:rustyline", "dep:dta", "dep:ureq", "dep:url", "dep:tempfile", "dep:rusqlite", "dep:libloading"]
+# Headless network/install support (URL loading, package install, native plugins).
+network = ["dep:ureq", "dep:url", "dep:tempfile", "dep:libloading"]
+dta = ["dep:dta"]
+sqlite = ["dep:rusqlite"]
+repl = ["dep:rustyline"]
+# Full native CLI (network + database formats + REPL).
+native = ["network", "dta", "sqlite", "repl"]
 wasm-bindings = ["dep:wasm-bindgen", "dep:js-sys"]
+# Minimal feature for the headless hay-run binary (no REPL/DAP).
+script = []
+
+# Jupyter kernel support — not available on wasm32-unknown-unknown.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+jupyter-protocol = "2"
+jupyter-zmq-client = { version = "1", features = ["tokio-runtime"] }
+tokio = { version = "1.36", features = ["macros", "rt-multi-thread"] }
+uuid = { version = "1", features = ["v4"] }
+gag = "1"
+zeromq = "0.6"
 
 [profile.release]
 opt-level = 3

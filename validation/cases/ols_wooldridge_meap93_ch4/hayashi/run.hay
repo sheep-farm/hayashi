@@ -1,0 +1,8 @@
+// Wooldridge (Introductory Econometrics, 7e), Chapter 4, Examples 4.2 and 4.10.
+// math pass rate equation with log salary, staff and enrollment: math10 ~ ltotcomp + lstaff + lenroll.
+
+load "validation/cases/ols_wooldridge_meap93_ch4/data/meap93.csv" as df
+
+let m = ols(math10 ~ ltotcomp + lstaff + lenroll, df)
+
+export(m, "csv", "/dev/stdout")

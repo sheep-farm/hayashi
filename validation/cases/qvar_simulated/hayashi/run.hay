@@ -1,0 +1,17 @@
+load "validation/cases/qvar_simulated/data/data.csv" as df
+let m = qvar(y1 ~ y2, df, lags=1, tau=0.5, boot=0)
+let eqs = ["y1", "y2"]
+let params = ["const", "L1.y1", "L1.y2"]
+let vars = []
+let coefs = []
+let ses = []
+for i in 0..2 {
+  for j in 0..3 {
+    push(vars, eqs[i] + "_" + params[j])
+    push(coefs, m.coeffs[params[j]][i])
+    push(ses, 0.0 / 0.0)
+  }
+}
+let out = dataframe({"variable": vars, "coef": coefs, "std_err": ses})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

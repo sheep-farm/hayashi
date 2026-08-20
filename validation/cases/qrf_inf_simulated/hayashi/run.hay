@@ -1,0 +1,10 @@
+load "validation/cases/qrf_inf_simulated/data/data.csv" as df
+let m = qrf_inf(y ~ x1 + x2, df, q="0.75", boot=50, trees=50, depth=5)
+let nan = 0.0/0.0
+let out = dataframe({
+  "variable": ["r_squared"],
+  "coef": [m.fit.oob_r_squared],
+  "std_err": [nan]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

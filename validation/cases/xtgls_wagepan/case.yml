@@ -1,0 +1,36 @@
+id: xtgls_wagepan
+title: Panel feasible GLS on Wooldridge wagepan
+estimator_family: xtgls
+status: pass
+dimension: numerical
+
+dataset:
+  name: wooldridge::wagepan
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-3
+    standard_errors: 1e-2
+
+output_format: txt
+
+hayashi_script: cases/xtgls_wagepan/hayashi/run.hay
+reference_scripts:
+  R: cases/xtgls_wagepan/reference/run.R
+  Python: cases/xtgls_wagepan/reference/run.py
+
+notes: Panel feasible GLS with panel-level heteroskedasticity (Parks/Kmenta, Stata xtgls panels(heteroskedastic)). R and Python references implement the same two-step FGLS procedure used by Hayashi/Greeners.
+
+result:
+  summary: "Hayashi matches the Python reference to machine precision."
+  known_differences: []
+  issues_opened: []

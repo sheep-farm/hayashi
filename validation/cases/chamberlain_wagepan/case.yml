@@ -1,0 +1,30 @@
+id: chamberlain_wagepan
+title: Chamberlain test for period-specific correlation with individual effects on Wooldridge wagepan
+estimator_family: chamberlain
+status: pass
+dimension: numerical
+
+dataset:
+  name: wooldridge::wagepan
+  source: R package wooldridge / Python wooldridge package
+  licence: n/a
+
+references:
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+  tolerances:
+    coefficients: 1e-12
+
+hayashi_script: cases/chamberlain_wagepan/hayashi/run.hay
+reference_scripts:
+  Python: cases/chamberlain_wagepan/reference/run.py
+
+notes: "Chamberlain test on lwage ~ union + married. The Python reference builds the unrestricted model y_it = const + X_it beta + sum_s X_i,s Pi_s and tests H0: all Pi_s = 0 with an F-test, matching the Hayashi/Greeners formulation."
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []

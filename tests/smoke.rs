@@ -57,6 +57,126 @@ fn assert_err_contains(name: &str, src: &str, needle: &str) {
     );
 }
 
+fn parse_coefficient_rows(out: &str) -> Vec<(String, f64)> {
+    let rows: Vec<Vec<String>> = out
+        .lines()
+        .filter(|line| line.contains('│'))
+        .map(|line| {
+            line.split('│')
+                .map(str::trim)
+                .filter(|cell| !cell.is_empty())
+                .map(str::to_string)
+                .collect()
+        })
+        .collect();
+    let header_index = rows
+        .iter()
+        .position(|row| {
+            row.iter().any(|cell| cell == "variable") && row.iter().any(|cell| cell == "coef")
+        })
+        .unwrap_or_else(|| panic!("missing coefficient table header:\n{out}"));
+    let header = &rows[header_index];
+    let variable_index = header.iter().position(|cell| cell == "variable").unwrap();
+    let coefficient_index = header.iter().position(|cell| cell == "coef").unwrap();
+    let header_len = header.len();
+
+    rows.into_iter()
+        .skip(header_index + 1)
+        .filter(|row| row.len() == header_len)
+        .map(|row| {
+            let coefficient = row[coefficient_index]
+                .parse::<f64>()
+                .unwrap_or_else(|_| panic!("invalid coefficient row {row:?}:\n{out}"));
+            (row[variable_index].clone(), coefficient)
+        })
+        .collect()
+}
+
+fn assert_no_intercept_name(name: &str) {
+    assert!(
+        !matches!(name, "_cons" | "const" | "Intercept"),
+        "unexpected intercept coefficient '{name}'"
+    );
+}
+
+fn binary_no_intercept_script(estimator: &str, result: &str) -> String {
+    format!(
+        r#"
+input df
+y x
+0 -3.0
+0 -2.5
+1 -2.0
+0 -1.5
+0 -1.0
+1 -0.5
+0 0.0
+1 0.5
+0 1.0
+1 1.5
+1 2.0
+0 2.5
+1 3.0
+1 3.5
+1 4.0
+1 4.5
+end
+let m = {estimator}(y ~ x - 1, df)
+{result}
+"#
+    )
+}
+
+fn panel_heckman_script(outcome: &str, selection: &str) -> String {
+    format!(
+        r#"
+input df
+id wage educ exper particip kids
+1 10 8 2 1 0
+1 12 8 5 1 1
+1 0 8 8 0 3
+1 15 8 11 1 0
+2 8 6 1 1 1
+2 0 6 4 0 2
+2 11 6 7 1 0
+2 13 6 10 1 1
+3 0 10 3 0 3
+3 18 10 6 1 0
+3 20 10 9 1 1
+3 22 10 12 1 0
+4 9 7 2 1 0
+4 0 7 5 0 3
+4 12 7 8 1 1
+4 14 7 11 1 0
+5 11 9 3 1 0
+5 0 9 6 0 2
+5 16 9 9 1 1
+5 19 9 12 1 0
+end
+panel_heckman({outcome}, df, sel="{selection}", id="id")
+"#
+    )
+}
+
+fn manual_formula_no_intercept_script(call: &str) -> String {
+    format!(
+        r#"
+input df
+y running treated x post etime id time event
+1.0 -3.0 0 0.2 0 -3 1 1 1
+1.5 -2.0 0 0.4 0 -2 1 2 1
+2.0 -1.0 0 0.7 0 -1 1 3 1
+3.0 0.5 1 1.0 1 0 1 4 1
+3.5 1.0 1 1.2 1 1 2 1 1
+4.0 2.0 1 1.5 1 2 2 2 0
+4.5 3.0 1 1.7 1 3 2 3 1
+5.0 4.0 1 2.0 1 4 2 4 1
+end
+{call}
+"#
+    )
+}
+
 #[derive(Debug)]
 struct MarginsRow {
     dydx: f64,
@@ -88,6 +208,139 @@ fn assert_close(label: &str, actual: f64, expected: f64, tol: f64) {
         (actual - expected).abs() <= tol,
         "{label}: expected {expected}, got {actual}"
     );
+}
+
+#[derive(Clone, Copy)]
+struct FeivObservation {
+    id: i64,
+    y: f64,
+    w: f64,
+    x: i64,
+    z: i64,
+}
+
+#[derive(Debug)]
+struct FeivRow {
+    coefficient: f64,
+    standard_error: f64,
+}
+
+fn invert_2x2(matrix: [[f64; 2]; 2]) -> [[f64; 2]; 2] {
+    let determinant = matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0];
+    assert!(
+        determinant.abs() > 1e-12,
+        "FE-IV test oracle encountered a singular matrix"
+    );
+    let scale = 1.0 / determinant;
+    [
+        [matrix[1][1] * scale, -matrix[0][1] * scale],
+        [-matrix[1][0] * scale, matrix[0][0] * scale],
+    ]
+}
+
+fn multiply_2x2(lhs: [[f64; 2]; 2], rhs: [[f64; 2]; 2]) -> [[f64; 2]; 2] {
+    let mut product = [[0.0; 2]; 2];
+    for row in 0..2 {
+        for column in 0..2 {
+            product[row][column] = lhs[row][0] * rhs[0][column] + lhs[row][1] * rhs[1][column];
+        }
+    }
+    product
+}
+
+fn transpose_2x2(matrix: [[f64; 2]; 2]) -> [[f64; 2]; 2] {
+    [[matrix[0][0], matrix[1][0]], [matrix[0][1], matrix[1][1]]]
+}
+
+fn multiply_2x2_vector(matrix: [[f64; 2]; 2], vector: [f64; 2]) -> [f64; 2] {
+    [
+        matrix[0][0] * vector[0] + matrix[0][1] * vector[1],
+        matrix[1][0] * vector[0] + matrix[1][1] * vector[1],
+    ]
+}
+
+fn feiv_expected(observations: &[FeivObservation]) -> ([f64; 2], [f64; 2]) {
+    let mut group_sums = std::collections::BTreeMap::<i64, ([f64; 4], usize)>::new();
+    for observation in observations {
+        let (sums, count) = group_sums.entry(observation.id).or_default();
+        sums[0] += observation.y;
+        sums[1] += observation.w;
+        sums[2] += observation.x as f64;
+        sums[3] += observation.z as f64;
+        *count += 1;
+    }
+
+    let mut demeaned = Vec::with_capacity(observations.len());
+    for observation in observations {
+        let (sums, count) = group_sums
+            .get(&observation.id)
+            .expect("FE-IV test observation must have a group mean");
+        let denominator = *count as f64;
+        demeaned.push((
+            observation.y - sums[0] / denominator,
+            [
+                observation.w - sums[1] / denominator,
+                observation.x as f64 - sums[2] / denominator,
+            ],
+            [
+                observation.z as f64 - sums[3] / denominator,
+                observation.x as f64 - sums[2] / denominator,
+            ],
+        ));
+    }
+
+    let mut z_cross_z = [[0.0; 2]; 2];
+    let mut z_cross_x = [[0.0; 2]; 2];
+    let mut z_cross_y = [0.0; 2];
+    for (y, x, z) in &demeaned {
+        for row in 0..2 {
+            z_cross_y[row] += z[row] * y;
+            for column in 0..2 {
+                z_cross_z[row][column] += z[row] * z[column];
+                z_cross_x[row][column] += z[row] * x[column];
+            }
+        }
+    }
+
+    // Independent scalar implementation of Xhat'X = X'Z(Z'Z)^-1Z'X.
+    let inverse_z_cross_z = invert_2x2(z_cross_z);
+    let x_cross_z = transpose_2x2(z_cross_x);
+    let xhat_cross_x = multiply_2x2(multiply_2x2(x_cross_z, inverse_z_cross_z), z_cross_x);
+    let xhat_cross_y = multiply_2x2_vector(multiply_2x2(x_cross_z, inverse_z_cross_z), z_cross_y);
+    let inverse_xhat_cross_x = invert_2x2(xhat_cross_x);
+    let coefficients = multiply_2x2_vector(inverse_xhat_cross_x, xhat_cross_y);
+
+    let residual_sum_squares = demeaned
+        .iter()
+        .map(|(y, x, _)| {
+            let residual = y - x[0] * coefficients[0] - x[1] * coefficients[1];
+            residual * residual
+        })
+        .sum::<f64>();
+    let residual_df = observations.len() - 2 - (group_sums.len() - 1);
+    let sigma_squared = residual_sum_squares / residual_df as f64;
+    let standard_errors = [
+        (sigma_squared * inverse_xhat_cross_x[0][0]).sqrt(),
+        (sigma_squared * inverse_xhat_cross_x[1][1]).sqrt(),
+    ];
+
+    (coefficients, standard_errors)
+}
+
+fn parse_feiv_row(out: &str, variable: &str) -> FeivRow {
+    let row = out
+        .lines()
+        .find(|line| line.split_whitespace().next() == Some(variable))
+        .unwrap_or_else(|| panic!("missing FE-IV row for {variable}:\n{out}"));
+    let fields: Vec<&str> = row.split_whitespace().collect();
+    assert!(
+        fields.len() >= 3,
+        "FE-IV row for {variable} did not include coefficient and SE:\n{row}\n\n{out}"
+    );
+    FeivRow {
+        coefficient: fields[1].parse().unwrap(),
+        standard_error: fields[2].parse().unwrap(),
+    }
 }
 
 fn assert_margins_row_close(
@@ -230,6 +483,47 @@ fn margins_probit_at_matches_statsmodels_delta_method() {
         "margins(m, at_x2=1)",
         (0.075333, 0.025688, 2.933, 0.0034),
         (-0.009041, 0.144700, -0.062, 0.9502),
+    );
+}
+
+#[test]
+fn no_intercept_logit_preserves_slope_name() {
+    let (ok, out) = run_inline(&binary_no_intercept_script("logit", "tidy(m)"));
+    assert!(ok, "no-intercept logit failed:\n{out}");
+    let rows = parse_coefficient_rows(&out);
+    assert_eq!(rows.len(), 1, "unexpected logit coefficient rows:\n{out}");
+    assert_eq!(rows[0].0, "x", "wrong logit coefficient name:\n{out}");
+    assert!(
+        rows[0].1.is_finite(),
+        "non-finite logit coefficient:\n{out}"
+    );
+}
+
+#[test]
+fn no_intercept_probit_preserves_slope_name() {
+    let (ok, out) = run_inline(&binary_no_intercept_script("probit", "tidy(m)"));
+    assert!(ok, "no-intercept probit failed:\n{out}");
+    let rows = parse_coefficient_rows(&out);
+    assert_eq!(rows.len(), 1, "unexpected probit coefficient rows:\n{out}");
+    assert_eq!(rows[0].0, "x", "wrong probit coefficient name:\n{out}");
+    assert!(
+        rows[0].1.is_finite(),
+        "non-finite probit coefficient:\n{out}"
+    );
+}
+
+#[test]
+fn no_intercept_logit_margins_reports_finite_slope_effect() {
+    let (ok, out) = run_inline(&binary_no_intercept_script("logit", "margins(m)"));
+    assert!(ok, "no-intercept logit margins failed:\n{out}");
+    let row = parse_margins_row(&out, "x");
+    assert!(row.dydx.is_finite(), "non-finite marginal effect:\n{out}");
+    assert!(row.se.is_finite(), "non-finite marginal-effect SE:\n{out}");
+    assert!(row.z.is_finite(), "non-finite marginal-effect z:\n{out}");
+    assert!(row.p.is_finite(), "non-finite marginal-effect p:\n{out}");
+    assert!(
+        row.dydx.abs() > 1e-6,
+        "marginal effect is not meaningfully non-zero:\n{out}"
     );
 }
 
@@ -514,6 +808,34 @@ fn expr_float() {
 }
 
 #[test]
+fn round_with_digits() {
+    assert_ok_contains(
+        "round_digits",
+        r#"
+print(round(3.14159, 2))
+print(round(1234.5678, -2))
+print(round(1.2345, 3))
+"#,
+        "1.235",
+    );
+}
+
+#[test]
+fn expr_scientific_notation() {
+    assert_ok_contains(
+        "scientific",
+        r#"
+print(1e-6)
+print(1.5E+3)
+print(2e3)
+let x = 1e-6 * 2
+print(x)
+"#,
+        "0.000002",
+    );
+}
+
+#[test]
 fn expr_comparison() {
     assert_ok_contains(
         "comparison",
@@ -583,6 +905,44 @@ display mean(df, Y)
 "#,
         "9",
     );
+}
+
+#[test]
+fn generate_substr_on_string_column() {
+    // substr() in generate must produce a String column from a String column.
+    let (ok, out) = run_inline(
+        r#"load "examples/data/sample.json" as df
+generate df city_upper = upper(city)
+generate df city_first3 = substr(city, 0, 3)
+print(df)"#,
+    );
+    assert!(ok, "generate substr/upper failed:\n{out}");
+    assert!(
+        out.contains("city_upper"),
+        "expected city_upper column:\n{out}"
+    );
+    assert!(
+        out.contains("city_first3"),
+        "expected city_first3 column:\n{out}"
+    );
+    assert!(out.contains("SÃO"), "expected uppercased city:\n{out}");
+    assert!(
+        out.contains("São"),
+        "expected original city preserved:\n{out}"
+    );
+}
+
+#[test]
+fn generate_str_literal_broadcast() {
+    // A bare string literal in generate must broadcast to a String column.
+    let (ok, out) = run_inline(
+        r#"load "examples/data/sample.json" as df
+generate df tag = "BR"
+print(df)"#,
+    );
+    assert!(ok, "generate str literal failed:\n{out}");
+    assert!(out.contains("tag"), "expected tag column:\n{out}");
+    assert!(out.contains("BR"), "expected BR value:\n{out}");
 }
 
 #[test]
@@ -808,6 +1168,360 @@ end
 ols("Y ~ X1", df)
 "#,
         "OLS Regression",
+    );
+}
+
+#[test]
+fn formula_no_intercept_literal() {
+    let (ok, out) = run_inline(
+        r#"
+input df
+y x
+3 1
+5 2
+7 3
+9 4
+end
+let m = ols(y ~ x - 1, df)
+print(m.coef)
+"#,
+    );
+    assert!(ok, "literal no-intercept OLS failed:\n{out}");
+    let rows = parse_coefficient_rows(&out);
+    assert_eq!(rows.len(), 1, "unexpected OLS coefficient rows:\n{out}");
+    assert_eq!(rows[0].0, "x", "wrong OLS coefficient name:\n{out}");
+    assert_close("no-intercept OLS coefficient", rows[0].1, 2.33, 0.005);
+}
+
+#[test]
+fn formula_no_intercept_runtime_string() {
+    let (ok, out) = run_inline(
+        r#"
+input df
+y x
+3 1
+5 2
+7 3
+9 4
+end
+let specification = "y ~ 0 + x"
+let m = ols(specification, df)
+print(m.coef)
+"#,
+    );
+    assert!(ok, "runtime no-intercept OLS failed:\n{out}");
+    let rows = parse_coefficient_rows(&out);
+    assert_eq!(rows.len(), 1, "unexpected OLS coefficient rows:\n{out}");
+    assert_eq!(rows[0].0, "x", "wrong OLS coefficient name:\n{out}");
+    assert_close(
+        "runtime no-intercept OLS coefficient",
+        rows[0].1,
+        2.33,
+        0.005,
+    );
+}
+
+#[test]
+fn formula_runtime_multiline_matches_literal_multiline() {
+    let data = r#"
+input df
+y x z
+5 1 1
+7 2 1
+8 1 2
+10 2 2
+11 4 1
+13 2 3
+end
+"#;
+    let literal_source = format!(
+        r#"{data}
+let m = ols(
+    y ~ x +
+        z - 1,
+    df
+)
+print(m.coef)
+"#
+    );
+    let runtime_source = format!(
+        r#"{data}
+let specification = "y ~ x +
+z - 1"
+let m = ols(specification, df)
+print(m.coef)
+"#
+    );
+
+    let (literal_ok, literal_out) = run_inline(&literal_source);
+    assert!(
+        literal_ok,
+        "multiline literal formula failed:\n{literal_out}"
+    );
+    let (runtime_ok, runtime_out) = run_inline(&runtime_source);
+    assert!(
+        runtime_ok,
+        "multiline runtime formula failed:\n{runtime_out}"
+    );
+
+    let literal_rows = parse_coefficient_rows(&literal_out);
+    let runtime_rows = parse_coefficient_rows(&runtime_out);
+    assert_eq!(
+        literal_rows.len(),
+        2,
+        "unexpected literal rows:\n{literal_out}"
+    );
+    assert_eq!(
+        runtime_rows.len(),
+        2,
+        "unexpected runtime rows:\n{runtime_out}"
+    );
+    for ((literal_name, literal_coef), (runtime_name, runtime_coef)) in
+        literal_rows.iter().zip(&runtime_rows)
+    {
+        assert_eq!(runtime_name, literal_name);
+        assert_close(
+            &format!("multiline runtime coefficient '{runtime_name}'"),
+            *runtime_coef,
+            *literal_coef,
+            0.005,
+        );
+    }
+}
+
+#[test]
+fn formula_default_and_intercept_only_models_keep_an_intercept() {
+    let (default_ok, default_out) = run_inline(
+        r#"
+input df
+y x
+3 1
+5 2
+7 3
+9 4
+end
+let m = ols(y ~ x, df)
+print(m.coef)
+"#,
+    );
+    assert!(default_ok, "default-intercept OLS failed:\n{default_out}");
+    assert!(
+        default_out.contains("_cons"),
+        "default intercept missing:\n{default_out}"
+    );
+
+    let (only_ok, only_out) = run_inline(
+        r#"
+input df
+y
+3
+5
+7
+9
+end
+let m = ols(y ~ 1, df)
+print(m.coef)
+"#,
+    );
+    assert!(only_ok, "intercept-only OLS failed:\n{only_out}");
+    assert!(
+        only_out.contains("_cons"),
+        "intercept-only coefficient missing:\n{only_out}"
+    );
+}
+
+#[test]
+fn formula_no_intercept_reaches_iv_structural_and_instrument_matrices() {
+    let (ok, out) = run_inline(
+        r#"
+input df
+y x z
+2 1 1
+3 2 1
+7 3 2
+8 4 3
+end
+let m = iv(y ~ x - 1, ~ z - 1, df)
+tidy(m)
+"#,
+    );
+    assert!(ok, "no-intercept IV failed:\n{out}");
+    let rows = parse_coefficient_rows(&out);
+    assert_eq!(rows.len(), 1, "unexpected IV coefficient rows:\n{out}");
+    assert_eq!(rows[0].0, "x", "wrong IV coefficient name:\n{out}");
+    assert_no_intercept_name(&rows[0].0);
+    assert_close("no-intercept IV coefficient", rows[0].1, 2.05, 0.005);
+    for forbidden in ["_cons", "const", "Intercept"] {
+        assert!(!out.contains(forbidden), "unexpected '{forbidden}':\n{out}");
+    }
+}
+
+#[test]
+fn formula_no_intercept_runtime_instrument_string() {
+    let (ok, out) = run_inline(
+        r#"
+input df
+y x z
+2 1 1
+3 2 1
+7 3 2
+8 4 3
+end
+let instruments = "~ z - 1"
+let m = iv(y ~ x - 1, instruments, df)
+tidy(m)
+"#,
+    );
+    assert!(ok, "runtime no-intercept instrument formula failed:\n{out}");
+    let rows = parse_coefficient_rows(&out);
+    assert_eq!(rows.len(), 1, "unexpected IV coefficient rows:\n{out}");
+    assert_eq!(rows[0].0, "x", "wrong IV coefficient name:\n{out}");
+    assert_no_intercept_name(&rows[0].0);
+    assert_close(
+        "runtime no-intercept IV coefficient",
+        rows[0].1,
+        2.05,
+        0.005,
+    );
+    for forbidden in ["_cons", "const", "Intercept"] {
+        assert!(!out.contains(forbidden), "unexpected '{forbidden}':\n{out}");
+    }
+}
+
+#[test]
+fn formula_no_intercept_weak_iv_without_exogenous_columns() {
+    let (ok, out) = run_inline(
+        r#"
+input df
+y x z
+2.0 1.1 1.0
+3.0 1.8 1.5
+4.5 2.7 2.0
+5.0 3.1 2.7
+6.8 4.2 3.0
+7.1 4.6 3.8
+8.9 5.7 4.1
+9.2 6.0 5.0
+10.8 7.1 5.4
+12.0 7.8 6.2
+end
+weak_iv(y ~ x - 1, ~ z - 1, df)
+"#,
+    );
+    assert!(ok, "no-intercept weak-IV diagnostic failed:\n{out}");
+    let first_stage = out
+        .lines()
+        .find(|line| line.contains("F(1,"))
+        .unwrap_or_else(|| panic!("missing first-stage F line:\n{out}"));
+    let df = first_stage
+        .split("F(1,")
+        .nth(1)
+        .and_then(|tail| tail.split(')').next())
+        .and_then(|value| value.parse::<usize>().ok())
+        .unwrap_or_else(|| panic!("invalid first-stage degrees of freedom:\n{out}"));
+    let f_stat = first_stage
+        .split('=')
+        .nth(1)
+        .and_then(|tail| tail.split_whitespace().next())
+        .and_then(|value| value.parse::<f64>().ok())
+        .unwrap_or_else(|| panic!("invalid first-stage F statistic:\n{out}"));
+    assert_eq!(df, 9, "wrong no-intercept first-stage df:\n{out}");
+    assert!(f_stat.is_finite(), "non-finite first-stage F:\n{out}");
+    assert_close("no-intercept first-stage F", f_stat, 2674.363, 5e-4);
+}
+
+#[test]
+fn manual_rd_rejects_no_intercept_formula() {
+    assert_err_contains(
+        "rd_no_intercept",
+        &manual_formula_no_intercept_script("rd(y ~ running - 1, 0, df)"),
+        "no-intercept formulas are not supported by this estimator",
+    );
+}
+
+#[test]
+fn manual_fuzzy_rd_rejects_no_intercept_formula() {
+    assert_err_contains(
+        "fuzzy_rd_no_intercept",
+        &manual_formula_no_intercept_script("fuzzy_rd(y ~ running - 1, \"treated\", 0, df)"),
+        "no-intercept formulas are not supported by this estimator",
+    );
+}
+
+#[test]
+fn manual_psm_rejects_no_intercept_formula() {
+    assert_err_contains(
+        "psm_no_intercept",
+        &manual_formula_no_intercept_script("psm(y ~ treated + x - 1, df)"),
+        "no-intercept formulas are not supported by this estimator",
+    );
+}
+
+#[test]
+fn manual_did_rejects_no_intercept_formula() {
+    assert_err_contains(
+        "did_no_intercept",
+        &manual_formula_no_intercept_script("did(y ~ treated + post - 1, df)"),
+        "no-intercept formulas are not supported by this estimator",
+    );
+}
+
+#[test]
+fn manual_eventstudy_rejects_no_intercept_formula() {
+    assert_err_contains(
+        "eventstudy_no_intercept",
+        &manual_formula_no_intercept_script("eventstudy(y ~ etime - 1, df)"),
+        "no-intercept formulas are not supported by this estimator",
+    );
+}
+
+#[test]
+fn manual_lpdid_rejects_no_intercept_formula() {
+    assert_err_contains(
+        "lpdid_no_intercept",
+        &manual_formula_no_intercept_script("lpdid(y ~ id + time + treated - 1, df)"),
+        "no-intercept formulas are not supported by this estimator",
+    );
+}
+
+#[test]
+fn manual_cox_rejects_no_intercept_formula() {
+    assert_err_contains(
+        "cox_no_intercept",
+        &manual_formula_no_intercept_script("cox(time ~ x - 1, df, event=\"event\")"),
+        "no-intercept formulas are not supported by this estimator",
+    );
+}
+
+#[test]
+fn weak_iv_rejects_non_positive_residual_degrees_of_freedom() {
+    assert_err_contains(
+        "weak_iv_zero_residual_df",
+        r#"
+input df
+y x z
+1 2 3
+end
+weak_iv(y ~ x - 1, ~ z - 1, df)
+"#,
+        "requires more observations than first-stage regressors",
+    );
+}
+
+#[test]
+fn formula_rejects_unsupported_top_level_subtraction() {
+    assert_err_contains(
+        "formula_subtraction",
+        r#"
+input df
+y x1 x2
+1 1 2
+2 2 3
+3 3 4
+end
+ols(y ~ x1 - x2, df)
+"#,
+        "only '- 1' is supported",
     );
 }
 
@@ -1079,6 +1793,32 @@ let g = glance(m)
 print(g)
 "#,
         "r2",
+    );
+}
+
+#[test]
+fn ols_field_access() {
+    assert_ok_contains(
+        "ols_field_access",
+        r#"
+input df
+Y X
+10 2
+12 3
+8 1
+15 5
+11 2
+14 4
+end
+let m = ols(Y ~ X, df)
+let b = m.params
+let r2 = m.r_squared
+let res = m.residuals
+print(b)
+print(r2)
+print(res)
+"#,
+        "coef",
     );
 }
 
@@ -2296,6 +3036,37 @@ fe(output ~ capital + labor, panel)
 }
 
 #[test]
+fn panel_fe_accepts_explicit_no_intercept_formula() {
+    assert_ok_contains(
+        "panel_fe_no_intercept",
+        r#"
+input panel
+output capital labor firm year
+10.2 5 8 1 2019
+11.0 5 9 1 2020
+12.5 6 9 1 2021
+11.8 5 10 1 2022
+19.3 10 12 2 2019
+20.1 10 13 2 2020
+23.1 12 14 2 2021
+20.7 11 13 2 2022
+14.6 7 10 3 2019
+15.3 7 11 3 2020
+17.9 8 11 3 2021
+15.2 7 12 3 2022
+24.8 13 15 4 2019
+25.5 13 16 4 2020
+27.3 14 16 4 2021
+26.1 14 17 4 2022
+end
+xtset(panel, firm, year)
+fe(output ~ capital + labor - 1, panel)
+"#,
+        "Fixed Effects",
+    );
+}
+
+#[test]
 fn panel_re_basic() {
     assert_ok_contains(
         "panel_re",
@@ -2323,6 +3094,37 @@ xtset(panel, firm, year)
 re(output ~ capital + labor, panel)
 "#,
         "Random Effects",
+    );
+}
+
+#[test]
+fn panel_be_basic() {
+    assert_ok_contains(
+        "panel_be",
+        r#"
+input panel
+output capital labor firm year
+10.2 5 8 1 2019
+11.0 5 9 1 2020
+12.5 6 9 1 2021
+11.8 5 10 1 2022
+19.3 10 12 2 2019
+20.1 10 13 2 2020
+23.1 12 14 2 2021
+20.7 11 13 2 2022
+14.6 7 10 3 2019
+15.3 7 11 3 2020
+17.9 8 11 3 2021
+15.2 7 12 3 2022
+24.8 13 15 4 2019
+25.5 13 16 4 2020
+27.3 14 16 4 2021
+26.1 14 17 4 2022
+end
+xtset(panel, firm, year)
+be(output ~ capital + labor, panel)
+"#,
+        "Between Estimator",
     );
 }
 
@@ -3645,6 +4447,54 @@ list(combined)
     );
 }
 
+#[test]
+fn rbind_list_of_dfs() {
+    assert_ok_contains(
+        "rbind_list",
+        r#"
+input df1
+X Y
+1 10
+2 20
+end
+input df2
+X Y
+3 30
+end
+input df3
+X Y
+4 40
+5 50
+6 60
+end
+let combined = rbind([df1, df2, df3])
+list(combined)
+"#,
+        "6",
+    );
+}
+
+#[test]
+fn rbind_skips_nils() {
+    assert_ok_contains(
+        "rbind_nils",
+        r#"
+input df1
+X Y
+1 10
+2 20
+end
+input df2
+X Y
+3 30
+end
+let combined = rbind([df1, nil, df2, nil])
+list(combined)
+"#,
+        "3",
+    );
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // GENERATE EXTENSIONS — rowmean, rank, cumsum, group, rowsum
 // ══════════════════════════════════════════════════════════════════════════════
@@ -4499,6 +5349,88 @@ assert(variance(df, N) < 1.3, "rnormal variance should be near one")
 }
 
 #[test]
+fn math_random_distributions() {
+    let rows = (1..=512)
+        .map(|i| i.to_string())
+        .collect::<Vec<_>>()
+        .join("\n");
+    let script = format!(
+        r#"
+set_seed(12345)
+input df
+X
+{rows}
+end
+generate df u1 = runiform()
+generate df u2 = runiform(10, 20)
+generate df n1 = rnormal()
+generate df n2 = rnormal(5, 2)
+generate df b = rbernoulli(0.3)
+generate df p = rpoisson(4)
+generate df bn = rbinomial(10, 0.3)
+generate df g = rgamma(2, 1)
+generate df e = rexponential(1)
+generate df w = rweibull(1, 2)
+generate df c = rcauchy(0, 1)
+generate df t = rstudentt(5)
+generate df cs = rchisq(3)
+generate df f = rf(2, 10)
+generate df bt = rbeta(2, 5)
+generate df ln = rlognormal(0, 1)
+generate df sk = rskewnormal(0, 1, 2)
+generate df geo = rgeometric(0.3)
+generate df hyp = rhypergeometric(100, 30, 10)
+generate df zt = rzipf(1000, 3)
+generate df pert = rpert(0, 10, 5)
+generate df tri = rtriangular(0, 10, 5)
+generate df fr = rfrechet(0, 1, 3)
+generate df gum = rgumbel(0, 1)
+generate df ig = rinversegaussian(1, 1)
+generate df nig = rnig(2, 0.5)
+generate df par = rpareto(1, 3)
+generate df z = rzeta(4)
+
+assert(min(df, u2) >= 10, "runiform(10,20) lower bound")
+assert(max(df, u2) < 20, "runiform(10,20) upper bound")
+assert(mean(df, b) > 0.15 && mean(df, b) < 0.45, "rbernoulli mean")
+assert(mean(df, p) > 3 && mean(df, p) < 5, "rpoisson mean")
+assert(mean(df, bn) > 2 && mean(df, bn) < 4, "rbinomial mean")
+assert(min(df, bn) >= 0 && max(df, bn) <= 10, "rbinomial support")
+assert(mean(df, g) > 1.5 && mean(df, g) < 2.5, "rgamma mean")
+assert(mean(df, e) > 0.7 && mean(df, e) < 1.3, "rexponential mean")
+assert(mean(df, w) > 0.7 && mean(df, w) < 1.0, "rweibull mean")
+assert(min(df, c) < max(df, c), "rcauchy range")
+assert(mean(df, t) > -0.3 && mean(df, t) < 0.3, "rstudentt mean")
+assert(mean(df, cs) > 2 && mean(df, cs) < 4, "rchisq mean")
+assert(mean(df, f) > 0.8 && mean(df, f) < 1.8, "rf mean")
+assert(mean(df, bt) > 0.2 && mean(df, bt) < 0.4, "rbeta mean")
+assert(mean(df, ln) > 1.0 && mean(df, ln) < 2.2, "rlognormal mean")
+assert(mean(df, sk) > 0.4 && mean(df, sk) < 1.0, "rskewnormal mean")
+assert(min(df, geo) >= 0, "rgeometric support")
+assert(mean(df, geo) > 2.0 && mean(df, geo) < 2.7, "rgeometric mean")
+assert(min(df, hyp) >= 0 && max(df, hyp) <= 10, "rhypergeometric support")
+assert(mean(df, hyp) > 2.5 && mean(df, hyp) < 3.5, "rhypergeometric mean")
+assert(min(df, zt) >= 1 && max(df, zt) <= 1000, "rzipf support")
+assert(mean(df, zt) > 1.0 && mean(df, zt) < 2.0, "rzipf mean")
+assert(min(df, pert) >= 0 && max(df, pert) <= 10, "rpert support")
+assert(mean(df, pert) > 4 && mean(df, pert) < 6, "rpert mean")
+assert(min(df, tri) >= 0 && max(df, tri) <= 10, "rtriangular support")
+assert(mean(df, tri) > 4.5 && mean(df, tri) < 5.5, "rtriangular mean")
+assert(mean(df, fr) > 1.0 && mean(df, fr) < 1.7, "rfrechet mean")
+assert(mean(df, gum) > 0.3 && mean(df, gum) < 0.9, "rgumbel mean")
+assert(min(df, ig) > 0, "rinversegaussian support")
+assert(mean(df, ig) > 0.7 && mean(df, ig) < 1.3, "rinversegaussian mean")
+assert(mean(df, nig) > 0.1 && mean(df, nig) < 0.4, "rnig mean")
+assert(min(df, par) >= 1, "rpareto support")
+assert(mean(df, par) > 1.0 && mean(df, par) < 2.0, "rpareto mean")
+assert(min(df, z) >= 1, "rzeta support")
+assert(mean(df, z) > 1.0 && mean(df, z) < 1.3, "rzeta mean")
+"#
+    );
+    assert_ok("random_distributions", &script);
+}
+
+#[test]
 fn math_normal_pdf() {
     assert_ok_contains(
         "normal_pdf",
@@ -5313,7 +6245,10 @@ export(df, "csv", "{}")"#,
     );
     let (ok, out) = run_inline(&script);
     assert!(ok, "export csv failed:\n{out}");
-    assert!(out.contains("Exported"), "expected 'Exported':\n{out}");
+    assert!(
+        out.contains("exported to"),
+        "expected 'exported to':\n{out}"
+    );
     let content = std::fs::read_to_string(tmp("hayashi_test_export.csv")).unwrap();
     assert!(content.contains("Soja"), "csv missing data:\n{content}");
 }
@@ -5394,6 +6329,191 @@ display mean(df2, preco)"#,
     let (ok, out) = run_inline(&script);
     assert!(ok, "roundtrip xlsx failed:\n{out}");
     assert!(out.contains("88.4"), "expected mean ~88.4:\n{out}");
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// EXPORT — append mode
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn export_csv_append() {
+    let p = tmp("hayashi_append.csv");
+    let _ = std::fs::remove_file(&p);
+
+    // Primeira exportação (cria arquivo)
+    let script1 = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "csv", "{}", false)"#,
+        p
+    );
+    let (ok, out) = run_inline(&script1);
+    assert!(ok, "first export csv failed:\n{out}");
+    assert!(
+        out.contains("exported to"),
+        "expected 'exported to':\n{out}"
+    );
+
+    // Segunda exportação (append)
+    let script2 = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "csv", "{}", true)"#,
+        p
+    );
+    let (ok, out) = run_inline(&script2);
+    assert!(ok, "append csv failed:\n{out}");
+    assert!(
+        out.contains("appended to"),
+        "expected 'appended to':\n{out}"
+    );
+
+    // Verificar que arquivo tem o dobro de linhas (exceto header)
+    let content = std::fs::read_to_string(&p).unwrap();
+    let lines: Vec<&str> = content.lines().collect();
+    assert!(
+        lines.len() > 10,
+        "csv should have more lines after append:\n{content}"
+    );
+
+    let _ = std::fs::remove_file(&p);
+}
+
+#[test]
+fn export_tsv_append() {
+    let p = tmp("hayashi_append.tsv");
+    let _ = std::fs::remove_file(&p);
+
+    // Primeira exportação
+    let script1 = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "tsv", "{}", false)"#,
+        p
+    );
+    let (ok, out) = run_inline(&script1);
+    assert!(ok, "first export tsv failed:\n{out}");
+
+    // Segunda exportação (append)
+    let script2 = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "tsv", "{}", true)"#,
+        p
+    );
+    let (ok, out) = run_inline(&script2);
+    assert!(ok, "append tsv failed:\n{out}");
+    assert!(
+        out.contains("appended to"),
+        "expected 'appended to':\n{out}"
+    );
+
+    let _ = std::fs::remove_file(&p);
+}
+
+#[test]
+fn export_json_append() {
+    let p = tmp("hayashi_append.json");
+    let _ = std::fs::remove_file(&p);
+
+    // Primeira exportação
+    let script1 = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "json", "{}", false)"#,
+        p
+    );
+    let (ok, out) = run_inline(&script1);
+    assert!(ok, "first export json failed:\n{out}");
+
+    // Segunda exportação (append)
+    let script2 = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "json", "{}", true)"#,
+        p
+    );
+    let (ok, out) = run_inline(&script2);
+    assert!(ok, "append json failed:\n{out}");
+    assert!(
+        out.contains("appended to"),
+        "expected 'appended to':\n{out}"
+    );
+
+    let _ = std::fs::remove_file(&p);
+}
+
+#[test]
+fn export_sqlite_append() {
+    let p = tmp("hayashi_append.db");
+    let _ = std::fs::remove_file(&p);
+
+    // Primeira exportação
+    let script1 = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "sqlite", "{}", false)"#,
+        p
+    );
+    let (ok, out) = run_inline(&script1);
+    assert!(ok, "first export sqlite failed:\n{out}");
+
+    // Segunda exportação (append)
+    let script2 = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "sqlite", "{}", true)"#,
+        p
+    );
+    let (ok, out) = run_inline(&script2);
+    assert!(ok, "append sqlite failed:\n{out}");
+    assert!(
+        out.contains("appended to"),
+        "expected 'appended to':\n{out}"
+    );
+
+    let _ = std::fs::remove_file(&p);
+}
+
+#[test]
+fn export_xlsx_append() {
+    let p = tmp("hayashi_append.xlsx");
+    let _ = std::fs::remove_file(&p);
+
+    // Primeira exportação
+    let script1 = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "xlsx", "{}", false)"#,
+        p
+    );
+    let (ok, out) = run_inline(&script1);
+    assert!(ok, "first export xlsx failed:\n{out}");
+
+    // Segunda exportação (append)
+    let script2 = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "xlsx", "{}", true)"#,
+        p
+    );
+    let (ok, out) = run_inline(&script2);
+    assert!(ok, "append xlsx failed:\n{out}");
+    assert!(
+        out.contains("appended to"),
+        "expected 'appended to':\n{out}"
+    );
+
+    let _ = std::fs::remove_file(&p);
+}
+
+#[test]
+fn export_parquet_append_error() {
+    let p = tmp("hayashi_append.pq");
+    let _ = std::fs::remove_file(&p);
+
+    // Tentar append em parquet deve falhar
+    let script = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "parquet", "{}", true)"#,
+        p
+    );
+    let (ok, out) = run_inline(&script);
+    assert!(!ok, "parquet append should fail:\n{out}");
+    assert!(
+        out.contains("does not support append"),
+        "expected append error:\n{out}"
+    );
 }
 
 #[test]
@@ -5894,6 +7014,16 @@ display double(4)"#,
     );
 }
 
+#[test]
+fn install_rejects_bad_spec() {
+    let (ok, out) = run_inline(r#"install("bad_spec")"#);
+    assert!(!ok, "install bad_spec should fail:\n{out}");
+    assert!(
+        out.contains("expected 'user/repo'"),
+        "expected 'user/repo' error:\n{out}"
+    );
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // F-STRING — string interpolation
 // ══════════════════════════════════════════════════════════════════════════════
@@ -5942,6 +7072,70 @@ fn fstring_escape_braces() {
 #[test]
 fn fstring_scientific() {
     assert_ok_contains("fstr_sci", r#"display f"{0.00123:.2e}""#, "1.23e-3");
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// T-STRINGS — t"..." evaluates the generated source as an expression
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn tstring_basic_var() {
+    assert_ok_contains(
+        "tstr_basic",
+        r#"
+let n = 1
+let x1 = 42
+let y = t"x{n}"
+display y
+"#,
+        "42",
+    );
+}
+
+#[test]
+fn tstring_expr() {
+    assert_ok_contains(
+        "tstr_expr",
+        r#"
+let x1 = 10
+let y = t"x1 * 2 + 5"
+display y
+"#,
+        "25",
+    );
+}
+
+#[test]
+fn tstring_interpolated_expr() {
+    assert_ok_contains(
+        "tstr_interp",
+        r#"
+let a = 3
+let b = 4
+let y = t"{a} + {b}"
+display y
+"#,
+        "7",
+    );
+}
+
+#[test]
+fn tstring_generate_column_name() {
+    assert_ok_contains(
+        "tstr_gen_col",
+        r#"
+input df
+Y X
+1 2
+3 4
+end
+
+let gen_y = "new_col"
+generate df t"{gen_y}" = X * 2
+describe(df)
+"#,
+        "new_col",
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -6151,6 +7345,296 @@ print(df2)"#,
     let (ok, out) = run_inline(&script);
     assert!(ok, "load parquet failed:\n{out}");
     assert!(out.contains("8 rows"), "expected 8 rows:\n{out}");
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LOAD — columns= / where= pushdown
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn load_parquet_columns() {
+    let p = tmp("hayashi_cols.parquet");
+    let script = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "parquet", "{p}")
+load "{p}" as df2, columns=[ano, preco]
+describe(df2)"#,
+    );
+    let (ok, out) = run_inline(&script);
+    assert!(ok, "parquet columns= failed:\n{out}");
+    assert!(out.contains("ano"), "expected 'ano' column:\n{out}");
+    assert!(out.contains("preco"), "expected 'preco' column:\n{out}");
+    assert!(
+        !out.contains("produto"),
+        "expected 'produto' to be excluded:\n{out}"
+    );
+}
+
+#[test]
+fn load_parquet_where_eq() {
+    let p = tmp("hayashi_where.parquet");
+    let script = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "parquet", "{p}")
+load "{p}" as df2, where="produto == \"Soja\""
+display count(df2)"#,
+    );
+    let (ok, out) = run_inline(&script);
+    assert!(ok, "parquet where= failed:\n{out}");
+    assert!(out.contains("4"), "expected 4 rows for Soja:\n{out}");
+}
+
+#[test]
+fn load_parquet_columns_where_combined() {
+    let p = tmp("hayashi_cw.parquet");
+    let script = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "parquet", "{p}")
+load "{p}" as df2, columns=[ano, preco], where="produto == \"Milho\""
+display count(df2)
+summarize(df2, preco)"#,
+    );
+    let (ok, out) = run_inline(&script);
+    assert!(ok, "parquet columns+where failed:\n{out}");
+    assert!(out.contains("4"), "expected 4 rows for Milho:\n{out}");
+    // mean of Milho preco: (42.10 + 55.80 + 68.30 + 50.50) / 4 = 54.175
+    assert!(
+        out.contains("54.17") || out.contains("54.18"),
+        "expected mean ~54.17:\n{out}"
+    );
+}
+
+#[test]
+fn load_parquet_where_gt() {
+    let p = tmp("hayashi_gt.parquet");
+    let script = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "parquet", "{p}")
+load "{p}" as df2, where="preco > 100"
+display count(df2)"#,
+    );
+    let (ok, out) = run_inline(&script);
+    assert!(ok, "parquet where= > failed:\n{out}");
+    // preco > 100: 130.7, 145.2, 120.0 → 3 rows
+    assert!(
+        out.contains("3"),
+        "expected 3 rows with preco > 100:\n{out}"
+    );
+}
+
+#[test]
+fn load_sqlite_columns() {
+    let (ok, out) = run_inline(
+        r#"load "examples/data/sample.db" as df, table=precos, columns=[ano, preco]
+describe(df)"#,
+    );
+    assert!(ok, "sqlite columns= failed:\n{out}");
+    assert!(out.contains("ano"), "expected 'ano':\n{out}");
+    assert!(out.contains("preco"), "expected 'preco':\n{out}");
+    assert!(
+        !out.contains("produto"),
+        "expected 'produto' excluded:\n{out}"
+    );
+}
+
+#[test]
+fn load_sqlite_where_eq() {
+    let (ok, out) = run_inline(
+        r#"load "examples/data/sample.db" as df, table=precos, where="produto == \"Soja\""
+display count(df)"#,
+    );
+    assert!(ok, "sqlite where= failed:\n{out}");
+    assert!(out.contains("4"), "expected 4 Soja rows:\n{out}");
+}
+
+#[test]
+fn load_sqlite_columns_where() {
+    let (ok, out) = run_inline(
+        r#"load "examples/data/sample.db" as df, table=precos, columns=[preco], where="ano >= 2022"
+display count(df)
+summarize(df, preco)"#,
+    );
+    assert!(ok, "sqlite columns+where failed:\n{out}");
+    // ano >= 2022: 145.20, 68.30, 120.00, 50.50 → 4 rows
+    assert!(out.contains("4"), "expected 4 rows:\n{out}");
+}
+
+#[test]
+fn load_sqlite_where_in_list() {
+    let (ok, out) = run_inline(
+        r#"load "examples/data/sample.db" as df, table=precos, where="ano in [2020, 2023]"
+display count(df)"#,
+    );
+    assert!(ok, "sqlite where in= failed:\n{out}");
+    // 2020 (2) + 2023 (2) = 4
+    assert!(out.contains("4"), "expected 4 rows:\n{out}");
+}
+
+#[test]
+fn load_csv_columns() {
+    let (ok, out) = run_inline(
+        r#"load "examples/data/sample_semicolon.csv" as df, sep=";", columns=[produto, preco]
+describe(df)"#,
+    );
+    assert!(ok, "csv columns= failed:\n{out}");
+    assert!(out.contains("produto"), "expected 'produto':\n{out}");
+    assert!(out.contains("preco"), "expected 'preco':\n{out}");
+    assert!(!out.contains("qtd"), "expected 'qtd' excluded:\n{out}");
+}
+
+#[test]
+fn load_csv_where_gt() {
+    let (ok, out) = run_inline(
+        r#"load "examples/data/sample_semicolon.csv" as df, sep=";", where="preco > 5"
+display count(df)"#,
+    );
+    assert!(ok, "csv where= failed:\n{out}");
+    // preco > 5: Arroz 5.49, Feijão 8.99, Café 14.50 → 3 rows
+    assert!(out.contains("3"), "expected 3 rows with preco > 5:\n{out}");
+}
+
+#[test]
+fn load_csv_columns_where_combined() {
+    let (ok, out) = run_inline(
+        r#"load "examples/data/sample_semicolon.csv" as df, sep=";", columns=[produto], where="preco > 5"
+display count(df)
+list(df, produto)"#,
+    );
+    assert!(ok, "csv columns+where failed:\n{out}");
+    assert!(out.contains("2"), "expected 2 rows:\n{out}");
+    assert!(out.contains("Feij"), "expected Feijão:\n{out}");
+    assert!(out.contains("Caf"), "expected Café:\n{out}");
+}
+
+#[test]
+fn load_tsv_where_string_eq() {
+    let (ok, out) = run_inline(
+        r#"load "examples/data/sample.tsv" as df, where="grade == \"A\""
+display count(df)"#,
+    );
+    assert!(ok, "tsv where= string eq failed:\n{out}");
+    // grade A: Alice, Carol → 2 rows
+    assert!(out.contains("2"), "expected 2 rows with grade A:\n{out}");
+}
+
+#[test]
+fn load_tsv_columns_where_score() {
+    let (ok, out) = run_inline(
+        r#"load "examples/data/sample.tsv" as df, columns=[name, score], where="score > 75"
+display count(df)
+list(df, name)"#,
+    );
+    assert!(ok, "tsv columns+where failed:\n{out}");
+    // score > 75: Alice 85.5, Carol 91.3, Eve 79.2 → 3 rows
+    assert!(out.contains("3"), "expected 3 rows:\n{out}");
+    assert!(out.contains("Alice"), "expected Alice:\n{out}");
+    assert!(out.contains("Carol"), "expected Carol:\n{out}");
+}
+
+#[test]
+fn load_xlsx_columns_where() {
+    let p = tmp("hayashi_xlsx_cols.xlsx");
+    let script = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "xlsx", "{p}")
+load "{p}" as df2, columns=[ano, preco], where="produto == \"Soja\""
+display count(df2)
+summarize(df2, preco)"#,
+    );
+    let (ok, out) = run_inline(&script);
+    assert!(ok, "xlsx columns+where failed:\n{out}");
+    assert!(out.contains("4"), "expected 4 Soja rows:\n{out}");
+    // mean of Soja preco: (95.30 + 130.70 + 145.20 + 120.00) / 4 = 122.80
+    assert!(out.contains("122.8"), "expected mean ~122.80:\n{out}");
+}
+
+#[test]
+fn load_where_and_or() {
+    let p = tmp("hayashi_andor.parquet");
+    let script = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "parquet", "{p}")
+load "{p}" as df2, where="produto == \"Soja\" && ano > 2021"
+display count(df2)"#,
+    );
+    let (ok, out) = run_inline(&script);
+    assert!(ok, "where AND failed:\n{out}");
+    // Soja + ano > 2021: 2022 (145.20), 2023 (120.00) → 2 rows
+    assert!(out.contains("2"), "expected 2 rows:\n{out}");
+}
+
+#[test]
+fn load_where_not() {
+    let p = tmp("hayashi_not.parquet");
+    let script = format!(
+        r#"load "examples/data/sample.db" as df
+export(df, "parquet", "{p}")
+load "{p}" as df2, where="!(produto == \"Soja\")"
+display count(df2)"#,
+    );
+    let (ok, out) = run_inline(&script);
+    assert!(ok, "where NOT failed:\n{out}");
+    // não-Soja = Milho: 4 rows
+    assert!(out.contains("4"), "expected 4 rows (not Soja):\n{out}");
+}
+
+// ── Combinações inválidas / erros ────────────────────────────────────────
+
+#[test]
+fn load_query_with_where_error() {
+    let (ok, out) = run_inline(
+        r#"load "examples/data/sample.db" as df, query="SELECT * FROM precos", where="ano > 2020""#,
+    );
+    assert!(!ok, "should reject query= + where=:\n{out}");
+    assert!(
+        out.contains("cannot be combined"),
+        "expected 'cannot be combined':\n{out}"
+    );
+}
+
+#[test]
+fn load_columns_unknown_error() {
+    let (ok, out) =
+        run_inline(r#"load "examples/data/sample.db" as df, table=precos, columns=[xxx]"#);
+    assert!(!ok, "should reject unknown column:\n{out}");
+    // SQLite rejeita no engine SQL; outros loaders validam antes.
+    assert!(
+        out.contains("not found") || out.contains("unknown") || out.contains("no such column"),
+        "expected 'not found', 'unknown' or 'no such column':\n{out}"
+    );
+}
+
+#[test]
+fn load_where_unknown_column_error() {
+    let (ok, out) =
+        run_inline(r#"load "examples/data/sample.db" as df, table=precos, where="xxx == 1""#);
+    assert!(!ok, "should reject where with unknown column:\n{out}");
+    // Para SQLite, o erro vem do engine SQL; para outras fontes, do loader.
+    assert!(
+        out.contains("unknown column") || out.contains("no such column"),
+        "expected 'unknown column' or 'no such column':\n{out}"
+    );
+}
+
+#[test]
+fn load_json_columns_unsupported_error() {
+    let (ok, out) = run_inline(r#"load "examples/data/sample.json" as df, columns=[pop]"#);
+    assert!(!ok, "should reject columns= on JSON:\n{out}");
+    assert!(
+        out.contains("not yet supported") || out.contains("JSON"),
+        "expected JSON unsupported message:\n{out}"
+    );
+}
+
+#[test]
+fn load_help_lists_new_options() {
+    let (ok, out) = run_inline("help(load)");
+    assert!(ok, "help(load) failed:\n{out}");
+    assert!(
+        out.contains("columns="),
+        "help should mention columns=:\n{out}"
+    );
+    assert!(out.contains("where="), "help should mention where=:\n{out}");
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -8119,6 +9603,97 @@ display len(squares)
     );
 }
 
+#[test]
+fn parallel_for_basic() {
+    // parallel for returns a List of the last expression values
+    assert_ok_contains(
+        "parallel_basic",
+        r#"
+let items = [1, 2, 3, 4, 5, 6]
+parallel for x in items {
+    x * x
+}
+display len(x)
+display x[0]
+display x[5]
+"#,
+        "36",
+    );
+}
+
+#[test]
+fn parallel_for_captures_outer() {
+    // Each thread captures outer variables via Arc clone
+    assert_ok_contains(
+        "parallel_capture",
+        r#"
+let mult = 10
+let items = [1, 2, 3, 4]
+parallel for x in items {
+    x * mult
+}
+display x[3]
+"#,
+        "40",
+    );
+}
+
+#[test]
+fn parallel_for_return() {
+    // Explicit return inside parallel for body
+    assert_ok_contains(
+        "parallel_return",
+        r#"
+let items = [1, 2, 3, 4, 5]
+parallel for x in items {
+    if x > 3 {
+        return x * 100
+    }
+    x
+}
+display x[3]
+display x[4]
+"#,
+        "500",
+    );
+}
+
+#[test]
+fn parallel_for_threads_option() {
+    // Optional threads=N parameter limits worker threads
+    assert_ok_contains(
+        "parallel_threads",
+        r#"
+let items = [1, 2, 3, 4, 5, 6, 7, 8]
+parallel for x in items, threads=2 {
+    x * x
+}
+display len(x)
+display x[0]
+display x[7]
+"#,
+        "64",
+    );
+}
+
+#[test]
+fn parallel_for_expression_form() {
+    // parallel for as expression: let r = parallel for ...
+    assert_ok_contains(
+        "parallel_expr",
+        r#"
+let items = [1, 2, 3, 4, 5]
+let r = parallel for x in items, threads=2 {
+    x * 10
+}
+display len(r)
+display r[0]
+display r[4]
+"#,
+        "50",
+    );
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // MATCH — cases with types and expressions in arms
 // ══════════════════════════════════════════════════════════════════════════════
@@ -9377,5 +10952,3278 @@ fn dict_multiline_in_call() {
 })
 display nrow(df)"#,
         "3",
+    );
+}
+
+#[test]
+fn diag_acf_returns_list() {
+    assert_ok_contains(
+        "acf_list",
+        r#"
+input df
+Y
+1
+2
+3
+4
+5
+6
+7
+8
+end
+let v = acf(df, Y, lags=3)
+display len(v)
+"#,
+        "4",
+    );
+}
+
+#[test]
+fn diag_pacf_returns_list() {
+    assert_ok_contains(
+        "pacf_list",
+        r#"
+input df
+Y
+1
+2
+3
+4
+5
+6
+7
+8
+end
+let v = pacf(df, Y, lags=3)
+display len(v)
+"#,
+        "4",
+    );
+}
+
+#[test]
+fn diag_acf_on_model() {
+    assert_ok_contains(
+        "acf_model",
+        r#"
+input df
+Y X
+10 2
+12 3
+8 1
+15 5
+11 2
+14 4
+9 1
+13 4
+end
+let m = ols(Y ~ X, df)
+let v = acf(m, lags=2)
+display len(v)
+"#,
+        "3",
+    );
+}
+
+#[test]
+fn diag_cusumtest() {
+    assert_ok_contains(
+        "cusum_test",
+        r#"
+input df
+Y X
+10 2
+12 3
+8 1
+15 5
+11 2
+14 4
+9 1
+13 4
+16 5
+17 6
+end
+let m = ols(Y ~ X, df)
+cusumtest(m)
+"#,
+        "CUSUM",
+    );
+}
+
+#[test]
+fn diag_akaike_weights() {
+    assert_ok_contains(
+        "akaike_weights_test",
+        r#"
+input df
+Y X1 X2
+10 2 1
+12 3 2
+8 1 0
+15 5 3
+11 2 1
+14 4 2
+9 1 0
+13 4 3
+end
+let m1 = ols(Y ~ X1, df)
+let m2 = ols(Y ~ X1 + X2, df)
+let w = akaike_weights(m1, m2)
+display has_key(w, "m1")
+"#,
+        "true",
+    );
+}
+
+#[test]
+fn diag_lrtest_ols() {
+    assert_ok_contains(
+        "lrtest_ols",
+        r#"
+input df
+Y X1 X2
+10 2 1
+12 3 2
+8 1 0
+15 5 3
+11 2 1
+14 4 2
+9 1 0
+13 4 3
+end
+let m1 = ols(Y ~ X1, df)
+let m2 = ols(Y ~ X1 + X2, df)
+lrtest(m1, m2)
+"#,
+        "Likelihood-Ratio",
+    );
+}
+
+#[test]
+fn diag_lrtest_rejects_non_nested() {
+    // m1 has MORE params than m2 — should error
+    assert_ok_contains(
+        "lrtest_non_nested",
+        r#"
+input df
+Y X1 X2
+10 2 1
+12 3 2
+8 1 0
+15 5 3
+11 2 1
+14 4 2
+9 1 0
+13 4 3
+end
+let m1 = ols(Y ~ X1 + X2, df)
+let m2 = ols(Y ~ X1, df)
+try {
+    lrtest(m1, m2)
+    display "no error"
+} catch e {
+    display "caught"
+}
+"#,
+        "caught",
+    );
+}
+
+#[test]
+fn iv_sargan_overid() {
+    // Overidentified: 2 instruments (z1, z2) for 1 endogenous (x)
+    // z1 and z2 are valid instruments → should not reject H0
+    assert_ok_contains(
+        "sargan_test",
+        r#"
+input df
+y x z1 z2
+3 2 1 3
+5 3 2 1
+4 4 3 4
+7 5 4 2
+6 6 5 5
+9 7 6 3
+8 8 7 6
+11 9 8 4
+10 10 9 7
+13 11 10 5
+end
+estat_overid(y ~ x, ~ z1 + z2, df)
+"#,
+        "Sargan",
+    );
+}
+
+#[test]
+fn iv_sargan_no_intercept_reports_structured_instrument_count() {
+    assert_ok(
+        "sargan_no_intercept_instrument_count",
+        r#"
+input df
+y x z1 z2
+3 2 1 3
+5 3 2 1
+4 4 3 4
+7 5 4 2
+6 6 5 5
+9 7 6 3
+8 8 7 6
+11 9 8 4
+10 10 9 7
+13 11 10 5
+end
+let d = estat_overid(y ~ x - 1, ~ z1 + z2 - 1, df)
+assert(d.n_instruments == 2, "no-intercept instrument count")
+"#,
+    );
+}
+
+#[test]
+fn gmm_no_intercept_reports_structural_parameter_count() {
+    assert_ok(
+        "gmm_no_intercept_parameter_count",
+        r#"
+input df
+y x z1 z2
+3 2 1 3
+5 3 2 1
+4 4 3 4
+7 5 4 2
+6 6 5 5
+9 7 6 3
+8 8 7 6
+11 9 8 4
+10 10 9 7
+13 11 10 5
+end
+let m = gmm(y ~ x - 1, ~ z1 + z2 - 1, df)
+assert(nrow(m.coefficients) == 1, "no-intercept GMM parameter count")
+"#,
+    );
+}
+
+#[test]
+fn iv_endog_test() {
+    // DWH endogeneity test: x is endogenous (correlated with error via construction)
+    assert_ok_contains(
+        "endog_test",
+        r#"
+input df
+y x z1
+1 2 1
+2 3 2
+3 4 3
+4 5 4
+5 6 5
+6 7 6
+7 8 7
+8 9 8
+9 10 9
+10 11 10
+end
+estat_endog(y ~ x, ~ z1, df)
+"#,
+        "Durbin-Wu-Hausman",
+    );
+}
+
+#[test]
+fn feiv_integer_design_matches_within_2sls() {
+    let x = [[1, 2, 4, 3], [2, 4, 1, 5], [3, 1, 5, 2], [4, 5, 2, 1]];
+    let z = [[2, 5, 1, 4], [5, 1, 4, 2], [1, 4, 2, 5], [4, 2, 5, 1]];
+    let first_stage_shock = [
+        [0.2, -0.3, 0.5, -0.1],
+        [-0.4, 0.3, -0.2, 0.6],
+        [0.1, 0.4, -0.5, 0.2],
+        [0.5, -0.2, 0.3, -0.4],
+    ];
+    let outcome_shock = [
+        [0.3, -0.2, 0.1, -0.4],
+        [-0.1, 0.5, -0.3, 0.2],
+        [0.4, -0.5, 0.2, -0.1],
+        [-0.3, 0.1, 0.5, -0.2],
+    ];
+    let entity_effect = [0.7, -0.5, 1.1, -0.9];
+
+    let mut observations = Vec::new();
+    for entity in 0..4 {
+        for period in 0..4 {
+            let x_value = x[entity][period];
+            let z_value = z[entity][period];
+            let w = 0.8 * z_value as f64
+                + 0.4 * x_value as f64
+                + entity_effect[entity]
+                + first_stage_shock[entity][period];
+            let y = 1.7 * w - 0.6 * x_value as f64
+                + entity_effect[entity]
+                + 0.7 * first_stage_shock[entity][period]
+                + outcome_shock[entity][period];
+            observations.push(FeivObservation {
+                id: entity as i64 + 1,
+                y,
+                w,
+                x: x_value,
+                z: z_value,
+            });
+        }
+    }
+
+    let (expected_coefficients, expected_standard_errors) = feiv_expected(&observations);
+    let mut script = String::from("input df\nid y w x z\n");
+    for observation in &observations {
+        script.push_str(&format!(
+            "{} {:.12} {:.12} {} {}\n",
+            observation.id, observation.y, observation.w, observation.x, observation.z
+        ));
+    }
+    script.push_str("end\nfeiv(y ~ w + x, ~ z + x, df, id=id)\n");
+
+    let (ok, out) = run_inline(&script);
+    assert!(ok, "FE-IV integer design failed:\n{out}");
+    let w_row = parse_feiv_row(&out, "w");
+    let x_row = parse_feiv_row(&out, "x");
+
+    // FE2SLS displays four decimals, whose maximum rounding error is 5e-5.
+    assert_close(
+        "FE-IV w coefficient",
+        w_row.coefficient,
+        expected_coefficients[0],
+        5e-5,
+    );
+    assert_close(
+        "FE-IV x coefficient",
+        x_row.coefficient,
+        expected_coefficients[1],
+        5e-5,
+    );
+    assert_close(
+        "FE-IV w standard error",
+        w_row.standard_error,
+        expected_standard_errors[0],
+        5e-5,
+    );
+    assert_close(
+        "FE-IV x standard error",
+        x_row.standard_error,
+        expected_standard_errors[1],
+        5e-5,
+    );
+
+    for line in out.lines() {
+        let first_field = line.split_whitespace().next().unwrap_or_default();
+        assert!(
+            !matches!(first_field, "Intercept" | "_cons" | "const" | "__term_0"),
+            "FE-IV output contains an intercept-like row:\n{out}"
+        );
+    }
+}
+
+#[test]
+fn logit_classification() {
+    assert_ok_contains(
+        "logit_class",
+        r#"
+input df
+y x1 x2
+0 1.0 2.0
+0 1.5 2.5
+0 2.0 1.0
+0 2.5 3.0
+0 3.0 1.5
+0 1.2 2.8
+0 2.8 1.2
+0 3.2 2.8
+0 1.8 3.2
+0 2.2 2.2
+0 3.5 1.8
+0 1.0 3.0
+0 2.0 2.5
+0 3.0 2.0
+0 1.5 1.5
+0 2.5 1.0
+0 3.8 2.5
+0 1.2 1.8
+0 2.8 3.5
+0 2.0 3.8
+1 4.0 5.0
+1 4.5 4.5
+1 5.0 6.0
+1 5.5 5.5
+1 6.0 4.0
+1 4.2 5.8
+1 5.8 4.2
+1 6.2 5.8
+1 4.8 6.2
+1 5.2 5.2
+1 6.5 4.8
+1 4.0 6.5
+1 5.0 5.0
+1 6.0 4.5
+1 4.5 4.0
+1 5.5 6.5
+1 3.2 4.5
+1 4.8 3.8
+1 5.8 6.0
+1 5.0 4.2
+0 4.5 3.0
+0 3.5 4.0
+0 5.0 2.0
+0 4.2 3.5
+1 2.5 4.5
+1 3.0 5.0
+1 2.0 4.0
+1 3.5 3.5
+0 5.5 3.5
+0 4.8 4.2
+end
+let m = logit(y ~ x1 + x2, df)
+estat_classification(m)
+"#,
+        "Sensitivity",
+    );
+}
+
+#[test]
+fn logit_roc_auc() {
+    assert_ok_contains(
+        "logit_roc",
+        r#"
+input df
+y x1 x2
+0 1.0 2.0
+0 1.5 2.5
+0 2.0 1.0
+0 2.5 3.0
+0 3.0 1.5
+0 1.2 2.8
+0 2.8 1.2
+0 3.2 2.8
+0 1.8 3.2
+0 2.2 2.2
+0 3.5 1.8
+0 1.0 3.0
+0 2.0 2.5
+0 3.0 2.0
+0 1.5 1.5
+0 2.5 1.0
+0 3.8 2.5
+0 1.2 1.8
+0 2.8 3.5
+0 2.0 3.8
+1 4.0 5.0
+1 4.5 4.5
+1 5.0 6.0
+1 5.5 5.5
+1 6.0 4.0
+1 4.2 5.8
+1 5.8 4.2
+1 6.2 5.8
+1 4.8 6.2
+1 5.2 5.2
+1 6.5 4.8
+1 4.0 6.5
+1 5.0 5.0
+1 6.0 4.5
+1 4.5 4.0
+1 5.5 6.5
+1 3.2 4.5
+1 4.8 3.8
+1 5.8 6.0
+1 5.0 4.2
+0 4.5 3.0
+0 3.5 4.0
+0 5.0 2.0
+0 4.2 3.5
+1 2.5 4.5
+1 3.0 5.0
+1 2.0 4.0
+1 3.5 3.5
+0 5.5 3.5
+0 4.8 4.2
+end
+let m = logit(y ~ x1 + x2, df)
+lroc(m)
+"#,
+        "AUC",
+    );
+}
+
+#[test]
+fn logit_hosmer_lemeshow() {
+    assert_ok_contains(
+        "logit_hl",
+        r#"
+input df
+y x1 x2
+0 1.0 2.0
+0 1.5 2.5
+0 2.0 1.0
+0 2.5 3.0
+0 3.0 1.5
+0 1.2 2.8
+0 2.8 1.2
+0 3.2 2.8
+0 1.8 3.2
+0 2.2 2.2
+0 3.5 1.8
+0 1.0 3.0
+0 2.0 2.5
+0 3.0 2.0
+0 1.5 1.5
+0 2.5 1.0
+0 3.8 2.5
+0 1.2 1.8
+0 2.8 3.5
+0 2.0 3.8
+1 4.0 5.0
+1 4.5 4.5
+1 5.0 6.0
+1 5.5 5.5
+1 6.0 4.0
+1 4.2 5.8
+1 5.8 4.2
+1 6.2 5.8
+1 4.8 6.2
+1 5.2 5.2
+1 6.5 4.8
+1 4.0 6.5
+1 5.0 5.0
+1 6.0 4.5
+1 4.5 4.0
+1 5.5 6.5
+1 3.2 4.5
+1 4.8 3.8
+1 5.8 6.0
+1 5.0 4.2
+0 4.5 3.0
+0 3.5 4.0
+0 5.0 2.0
+0 4.2 3.5
+1 2.5 4.5
+1 3.0 5.0
+1 2.0 4.0
+1 3.5 3.5
+0 5.5 3.5
+0 4.8 4.2
+end
+let m = logit(y ~ x1 + x2, df)
+estat_gof(m)
+"#,
+        "Hosmer-Lemeshow",
+    );
+}
+
+#[test]
+fn logit_linktest() {
+    assert_ok_contains(
+        "logit_linktest",
+        r#"
+input df
+y x1 x2
+0 1.0 2.0
+0 1.5 2.5
+0 2.0 1.0
+0 2.5 3.0
+0 3.0 1.5
+0 1.2 2.8
+0 2.8 1.2
+0 3.2 2.8
+0 1.8 3.2
+0 2.2 2.2
+0 3.5 1.8
+0 1.0 3.0
+0 2.0 2.5
+0 3.0 2.0
+0 1.5 1.5
+0 2.5 1.0
+0 3.8 2.5
+0 1.2 1.8
+0 2.8 3.5
+0 2.0 3.8
+1 4.0 5.0
+1 4.5 4.5
+1 5.0 6.0
+1 5.5 5.5
+1 6.0 4.0
+1 4.2 5.8
+1 5.8 4.2
+1 6.2 5.8
+1 4.8 6.2
+1 5.2 5.2
+1 6.5 4.8
+1 4.0 6.5
+1 5.0 5.0
+1 6.0 4.5
+1 4.5 4.0
+1 5.5 6.5
+1 3.2 4.5
+1 4.8 3.8
+1 5.8 6.0
+1 5.0 4.2
+0 4.5 3.0
+0 3.5 4.0
+0 5.0 2.0
+0 4.2 3.5
+1 2.5 4.5
+1 3.0 5.0
+1 2.0 4.0
+1 3.5 3.5
+0 5.5 3.5
+0 4.8 4.2
+end
+let m = logit(y ~ x1 + x2, df)
+linktest(m)
+"#,
+        "Linktest",
+    );
+}
+
+#[test]
+fn xtlogit_panel() {
+    assert_ok_contains(
+        "xtlogit_panel",
+        r#"
+input df
+id y x1 x2
+1 0 1.0 2.0
+1 1 1.5 2.5
+1 0 2.0 3.0
+1 1 2.5 3.5
+2 0 3.0 1.0
+2 0 3.5 1.5
+2 1 4.0 2.0
+2 1 4.5 2.5
+3 1 5.0 4.0
+3 1 5.5 4.5
+3 1 6.0 5.0
+3 1 6.5 5.5
+end
+xtlogit(y ~ x1 + x2, df, id="id")
+"#,
+        "Generalized Estimating",
+    );
+}
+
+#[test]
+fn xtpoisson_panel() {
+    assert_ok_contains(
+        "xtpoisson_panel",
+        r#"
+input df
+id y x1
+1 2 1.0
+1 3 1.5
+1 4 2.0
+2 1 0.5
+2 2 1.0
+2 3 1.5
+3 5 2.0
+3 6 2.5
+3 7 3.0
+end
+xtpoisson(y ~ x1, df, id="id")
+"#,
+        "Generalized Estimating",
+    );
+}
+
+#[test]
+fn eventstudy_basic() {
+    assert_ok_contains(
+        "eventstudy_basic",
+        r#"
+input df
+y etime
+10 -2
+12 -1
+15 0
+18 1
+20 2
+22 3
+8 -2
+10 -1
+14 0
+17 1
+19 2
+21 3
+end
+eventstudy(y ~ etime, df, ref=-1, min=-2, max=3)
+"#,
+        "Event Study",
+    );
+}
+
+#[test]
+fn nls_exponential() {
+    assert_ok_contains(
+        "nls_exp",
+        r#"
+input df
+y x
+2.8 1.0
+7.7 2.0
+20.1 3.0
+55.0 4.0
+148.0 5.0
+403.0 6.0
+end
+nls_exp(y ~ x, df, start=[1.0, 1.0])
+"#,
+        "Nonlinear Least Squares",
+    );
+}
+
+#[test]
+fn nls_cobb_douglas() {
+    assert_ok_contains(
+        "nls_cd",
+        r#"
+input df
+y k l
+10 5 5
+15 8 6
+20 10 8
+25 12 10
+30 15 12
+35 18 14
+40 20 16
+45 22 18
+end
+nls_cobb_douglas(y ~ k + l, df, start=[1.0, 0.5, 0.5])
+"#,
+        "Nonlinear Least Squares",
+    );
+}
+
+#[test]
+fn marginsplot_logit() {
+    assert_ok_contains(
+        "marginsplot",
+        r#"
+input df
+y x1 x2
+0 1.0 2.0
+0 1.5 2.5
+0 2.0 1.0
+0 2.5 3.0
+0 3.0 1.5
+0 1.2 2.8
+0 2.8 1.2
+0 3.2 2.8
+0 1.8 3.2
+0 2.2 2.2
+0 3.5 1.8
+0 1.0 3.0
+0 2.0 2.5
+0 3.0 2.0
+0 1.5 1.5
+0 2.5 1.0
+0 3.8 2.5
+0 1.2 1.8
+0 2.8 3.5
+0 2.0 3.8
+1 4.0 5.0
+1 4.5 4.5
+1 5.0 6.0
+1 5.5 5.5
+1 6.0 4.0
+1 4.2 5.8
+1 5.8 4.2
+1 6.2 5.8
+1 4.8 6.2
+1 5.2 5.2
+1 6.5 4.8
+1 4.0 6.5
+1 5.0 5.0
+1 6.0 4.5
+1 4.5 4.0
+1 5.5 6.5
+1 3.2 4.5
+1 4.8 3.8
+1 5.8 6.0
+1 5.0 4.2
+0 4.5 3.0
+0 3.5 4.0
+0 5.0 2.0
+0 4.2 3.5
+1 2.5 4.5
+1 3.0 5.0
+1 2.0 4.0
+1 3.5 3.5
+0 5.5 3.5
+0 4.8 4.2
+end
+let m = logit(y ~ x1 + x2, df)
+marginsplot(m)
+"#,
+        "Marginal Effects",
+    );
+}
+
+#[test]
+fn spatial_sar_basic() {
+    assert_ok_contains(
+        "spatial_sar",
+        r#"
+input df
+y x
+1.0 1.0
+2.0 2.0
+3.0 3.0
+4.0 4.0
+5.0 5.0
+6.0 6.0
+7.0 7.0
+8.0 8.0
+end
+let W = [[0, 0.5, 0.5, 0, 0, 0, 0, 0],
+         [0.5, 0, 0.5, 0, 0, 0, 0, 0],
+         [0, 0.5, 0, 0.5, 0, 0, 0, 0],
+         [0, 0, 0.5, 0, 0.5, 0, 0, 0],
+         [0, 0, 0, 0.5, 0, 0.5, 0, 0],
+         [0, 0, 0, 0, 0.5, 0, 0.5, 0],
+         [0, 0, 0, 0, 0, 0.5, 0, 0.5],
+         [0, 0, 0, 0, 0, 0, 0.5, 0]]
+spatial_sar(y ~ x, df, w=W)
+"#,
+        "Spatial Autoregressive",
+    );
+}
+
+#[test]
+fn spatial_sem_basic() {
+    assert_ok_contains(
+        "spatial_sem",
+        r#"
+input df
+y x
+1.0 1.0
+2.0 2.0
+3.0 3.0
+4.0 4.0
+5.0 5.0
+6.0 6.0
+7.0 7.0
+8.0 8.0
+end
+let W = [[0, 0.5, 0.5, 0, 0, 0, 0, 0],
+         [0.5, 0, 0.5, 0, 0, 0, 0, 0],
+         [0, 0.5, 0, 0.5, 0, 0, 0, 0],
+         [0, 0, 0.5, 0, 0.5, 0, 0, 0],
+         [0, 0, 0, 0.5, 0, 0.5, 0, 0],
+         [0, 0, 0, 0, 0.5, 0, 0.5, 0],
+         [0, 0, 0, 0, 0, 0.5, 0, 0.5],
+         [0, 0, 0, 0, 0, 0, 0.5, 0]]
+spatial_sem(y ~ x, df, w=W)
+"#,
+        "Spatial Error",
+    );
+}
+
+#[test]
+fn double_ml_basic() {
+    assert_ok_contains(
+        "double_ml",
+        r#"
+input df
+y d x1 x2
+2.5 1 1.0 0.5
+3.0 1 1.5 0.8
+3.5 1 2.0 1.0
+4.0 0 2.5 1.2
+4.5 0 3.0 1.5
+5.0 1 3.5 1.8
+5.5 1 4.0 2.0
+6.0 0 4.5 2.2
+6.5 0 5.0 2.5
+7.0 1 5.5 2.8
+7.5 1 6.0 3.0
+8.0 0 6.5 3.2
+8.5 0 7.0 3.5
+9.0 1 7.5 3.8
+9.5 1 8.0 4.0
+10.0 0 8.5 4.2
+10.5 0 9.0 4.5
+11.0 1 9.5 4.8
+11.5 1 10.0 5.0
+12.0 0 10.5 5.2
+end
+double_ml(y ~ d + x1 + x2, df, folds=5, poly=2)
+"#,
+        "Double/Debiased ML",
+    );
+}
+
+#[test]
+fn sfa_production_basic() {
+    assert_ok_contains(
+        "sfa_prod",
+        r#"
+input df
+y k l
+10 5 5
+12 6 6
+15 8 7
+18 10 8
+20 12 10
+22 13 11
+25 15 12
+28 17 13
+30 18 14
+32 20 15
+35 22 16
+38 24 17
+40 25 18
+42 27 19
+45 28 20
+end
+sfa_production(y ~ k + l, df)
+"#,
+        "Stochastic Production Frontier",
+    );
+}
+
+#[test]
+fn sfa_production_rejects_no_intercept_formula() {
+    assert_err_contains(
+        "sfa_production_no_intercept",
+        r#"
+input df
+y k l
+10 5 5
+12 6 6
+15 8 7
+18 10 8
+20 12 10
+22 13 11
+25 15 12
+28 17 13
+30 18 14
+32 20 15
+35 22 16
+38 24 17
+40 25 18
+42 27 19
+45 28 20
+end
+sfa_production(y ~ k + l - 1, df)
+"#,
+        "no-intercept formulas are not supported by this estimator",
+    );
+}
+
+#[test]
+fn panel_tobit_basic() {
+    assert_ok_contains(
+        "panel_tobit",
+        r#"
+input df
+firm y x
+1 0 1.0
+1 5 2.0
+1 8 3.0
+1 12 4.0
+2 0 0.5
+2 3 1.5
+2 7 2.5
+2 10 3.5
+3 2 1.0
+3 6 2.0
+3 9 3.0
+3 11 4.0
+4 0 0.8
+4 4 1.8
+4 8 2.8
+4 13 3.8
+end
+panel_tobit(y ~ x, df, id="firm", censor=0)
+"#,
+        "Panel Tobit",
+    );
+}
+
+#[test]
+fn panel_heckman_basic() {
+    assert_ok_contains(
+        "panel_heckman",
+        r#"
+input df
+id wage educ exper particip kids
+1 10 8 2 1 0
+1 12 8 5 1 1
+1 0 8 8 0 3
+1 15 8 11 1 0
+2 8 6 1 1 1
+2 0 6 4 0 2
+2 11 6 7 1 0
+2 13 6 10 1 1
+3 0 10 3 0 3
+3 18 10 6 1 0
+3 20 10 9 1 1
+3 22 10 12 1 0
+4 9 7 2 1 0
+4 0 7 5 0 3
+4 12 7 8 1 1
+4 14 7 11 1 0
+5 11 9 3 1 0
+5 0 9 6 0 2
+5 16 9 9 1 1
+5 19 9 12 1 0
+end
+panel_heckman(wage ~ educ + exper, df, sel="particip ~ educ + kids", id="id")
+"#,
+        "Panel Heckman",
+    );
+}
+
+#[test]
+fn heckman_no_intercept_preserves_outcome_and_selection_names() {
+    let (ok, out) = run_inline(
+        r#"
+seed(42)
+input df
+id
+1
+end
+for i in 1..=8 { df = append(df, df) }
+df |> filter(_n <= 200)
+generate df x = rnormal()
+generate df z = rnormal()
+generate df e = rnormal()
+generate df v = rnormal()
+generate df s = (0.5 + 1.5 * z + v) > 0
+generate df y = (1.0 + 2.0 * x + e) * s
+let m = heckman(y ~ x - 1, s ~ z - 1, df)
+print(m)
+tidy(m)
+"#,
+    );
+    assert!(ok, "no-intercept Heckman failed:\n{out}");
+    for forbidden in ["_cons", "const", "Intercept"] {
+        assert!(
+            !out.contains(forbidden),
+            "unexpected Heckman intercept name '{forbidden}':\n{out}"
+        );
+    }
+    assert!(
+        out.lines()
+            .any(|line| line.split_whitespace().next() == Some("x")),
+        "outcome coefficient name 'x' missing:\n{out}"
+    );
+    assert!(
+        out.lines()
+            .any(|line| line.split_whitespace().next() == Some("z")),
+        "selection coefficient name 'z' missing:\n{out}"
+    );
+    let rows = parse_coefficient_rows(&out);
+    assert_eq!(rows.len(), 1, "unexpected Heckman outcome rows:\n{out}");
+    assert_eq!(rows[0].0, "x", "wrong Heckman outcome name:\n{out}");
+    assert!(
+        rows[0].1.is_finite(),
+        "non-finite Heckman outcome coefficient:\n{out}"
+    );
+}
+
+#[test]
+fn panel_heckman_rejects_no_intercept_outcome_formula() {
+    assert_err_contains(
+        "panel_heckman_no_outcome_intercept",
+        &panel_heckman_script("wage ~ educ + exper - 1", "particip ~ educ + kids"),
+        "panel_heckman() does not support no-intercept outcome formulas",
+    );
+}
+
+#[test]
+fn panel_heckman_rejects_no_intercept_selection_formula() {
+    assert_err_contains(
+        "panel_heckman_no_selection_intercept",
+        &panel_heckman_script("wage ~ educ + exper", "particip ~ educ + kids - 1"),
+        "panel_heckman() does not support no-intercept selection formulas",
+    );
+}
+
+#[test]
+fn panel_heckman_rejects_selection_fixed_effects() {
+    assert_err_contains(
+        "panel_heckman_selection_fixed_effects",
+        &panel_heckman_script("wage ~ educ + exper", "particip ~ educ + kids | id"),
+        "panel_heckman() does not support fixed effects in selection formulas",
+    );
+}
+
+#[test]
+fn spatial_panel_sar_basic() {
+    assert_ok_contains(
+        "spatial_panel_sar",
+        r#"
+input df
+entity y x
+1 10 1.0
+1 12 2.0
+1 15 3.0
+2 8 0.8
+2 10 1.8
+2 13 2.8
+3 11 1.2
+3 14 2.2
+3 17 3.2
+4 9 0.9
+4 11 1.9
+4 14 2.9
+end
+let W = [[0, 0.5, 0.3, 0.2],
+         [0.5, 0, 0.3, 0.2],
+         [0.3, 0.3, 0, 0.4],
+         [0.2, 0.2, 0.4, 0]]
+spatial_panel_sar(y ~ x, df, w=W, id="entity")
+"#,
+        "Spatial Panel SAR",
+    );
+}
+
+#[test]
+fn bayes_sfa_basic() {
+    assert_ok_contains(
+        "bayes_sfa",
+        r#"
+input df
+y k l
+10 5 5
+12 6 6
+15 8 7
+18 10 8
+20 12 10
+22 13 11
+25 15 12
+28 17 13
+30 18 14
+32 20 15
+end
+bayes_sfa_production(y ~ k + l, df, burn=200, draws=500)
+"#,
+        "Bayesian Stochastic",
+    );
+}
+
+#[test]
+fn midas_basic() {
+    assert_ok_contains(
+        "midas",
+        r#"
+input df
+gdp ip
+100 30
+102 31
+101 29
+105 33
+108 35
+110 36
+112 38
+115 40
+113 39
+118 42
+120 43
+122 45
+end
+midas(gdp ~ ip, df, freq=1, lags=3, poly=1)
+"#,
+        "MIDAS",
+    );
+}
+
+#[test]
+fn tvp_basic() {
+    assert_ok_contains(
+        "tvp",
+        r#"
+input df
+y x1 x2
+10 1 5
+12 2 6
+15 3 7
+18 4 8
+20 5 9
+22 6 10
+25 7 11
+28 8 12
+30 9 13
+32 10 14
+end
+tvp(y ~ x1 + x2, df)
+"#,
+        "Time-Varying",
+    );
+}
+
+#[test]
+fn setar_basic() {
+    assert_ok_contains(
+        "setar",
+        r#"
+input df
+y
+10
+12
+11
+15
+18
+16
+20
+22
+19
+15
+12
+10
+8
+9
+11
+14
+17
+20
+23
+21
+18
+15
+12
+10
+end
+setar(y ~ 1, df, order=2, delay=1)
+"#,
+        "SETAR",
+    );
+}
+
+#[test]
+fn panel_qreg_basic() {
+    assert_ok_contains(
+        "panel_qreg",
+        r#"
+input df
+firm y x
+1 10 1.0
+1 12 2.0
+1 15 3.0
+1 18 4.0
+2 8 0.5
+2 10 1.5
+2 13 2.5
+2 16 3.5
+3 11 1.0
+3 14 2.0
+3 17 3.0
+3 20 4.0
+4 9 0.8
+4 12 1.8
+4 15 2.8
+4 18 3.8
+end
+panel_qreg(y ~ x, df, id="firm", tau=0.5)
+"#,
+        "Panel Quantile",
+    );
+}
+
+#[test]
+fn msvar_basic() {
+    assert_ok_contains(
+        "msvar",
+        r#"
+input df
+y1 y2
+10 5
+12 6
+15 7
+18 8
+20 9
+22 10
+25 11
+28 12
+30 13
+32 14
+35 15
+38 16
+40 17
+42 18
+45 19
+48 20
+end
+msvar(y1 ~ y2, df, regimes=2, lags=1)
+"#,
+        "MS-VAR",
+    );
+}
+
+#[test]
+fn favar_basic() {
+    assert_ok_contains(
+        "favar",
+        r#"
+input df
+ip cpi emp rate
+100 50 30 2
+102 51 31 2
+101 50 29 2.5
+105 53 33 2.5
+108 55 35 3
+110 56 36 3
+112 58 38 3.5
+115 60 40 3.5
+113 59 39 3
+118 62 42 3.5
+120 63 43 4
+122 65 45 4
+end
+favar(ip ~ cpi + emp, df, observed="rate", factors=1, lags=1)
+"#,
+        "FAVAR",
+    );
+}
+
+#[test]
+fn spatial_durbin_basic() {
+    assert_ok_contains(
+        "spatial_durbin",
+        r#"
+input df
+entity y x
+1 10 1.0
+1 12 2.0
+1 15 3.0
+2 8 0.8
+2 10 1.8
+2 13 2.8
+3 11 1.2
+3 14 2.2
+3 17 3.2
+4 9 0.9
+4 11 1.9
+4 14 2.9
+end
+let W = [[0, 0.5, 0.3, 0.2],
+         [0.5, 0, 0.3, 0.2],
+         [0.3, 0.3, 0, 0.4],
+         [0.2, 0.2, 0.4, 0]]
+spatial_durbin(y ~ x, df, w=W, id="entity")
+"#,
+        "Spatial Durbin",
+    );
+}
+
+#[test]
+fn johansen_break_basic() {
+    assert_ok_contains(
+        "johansen_break",
+        r#"
+input df
+y1 y2
+10 5
+11 5.5
+12 6
+13 6.5
+14 7
+15 7.5
+16 8
+17 8.5
+18 9
+19 9.5
+20 10
+21 10.5
+22 11
+23 11.5
+24 12
+25 12.5
+26 13
+27 13.5
+28 14
+29 14.5
+30 15
+end
+johansen_break(y1 ~ y2, df, lags=1, breaks=[10])
+"#,
+        "Johansen",
+    );
+}
+
+#[test]
+fn tvp_var_basic() {
+    assert_ok_contains(
+        "tvp_var",
+        r#"
+input df
+y1 y2
+10 5
+12 6
+15 7
+18 8
+20 9
+22 10
+25 11
+28 12
+30 13
+32 14
+35 15
+38 16
+40 17
+42 18
+45 19
+48 20
+end
+tvp_var(y1 ~ y2, df, lags=1)
+"#,
+        "TVP-VAR",
+    );
+}
+
+#[test]
+fn spatial_durbin_error_basic() {
+    assert_ok_contains(
+        "spatial_durbin_error",
+        r#"
+input df
+entity y x
+1 10 1.0
+1 12 2.0
+1 15 3.0
+2 8 0.8
+2 10 1.8
+2 13 2.8
+3 11 1.2
+3 14 2.2
+3 17 3.2
+4 9 0.9
+4 11 1.9
+4 14 2.9
+end
+let W = [[0, 0.5, 0.3, 0.2],
+         [0.5, 0, 0.3, 0.2],
+         [0.3, 0.3, 0, 0.4],
+         [0.2, 0.2, 0.4, 0]]
+spatial_durbin_error(y ~ x, df, w=W, id="entity")
+"#,
+        "Spatial Durbin Error",
+    );
+}
+
+#[test]
+fn fmols_basic() {
+    assert_ok_contains(
+        "fmols",
+        r#"
+input df
+y x
+10 5
+11 5.5
+12 6
+13 6.5
+14 7
+15 7.5
+16 8
+17 8.5
+18 9
+19 9.5
+20 10
+21 10.5
+22 11
+23 11.5
+24 12
+25 12.5
+26 13
+27 13.5
+28 14
+29 14.5
+30 15
+end
+fmols(y ~ x, df)
+"#,
+        "FMOLS",
+    );
+}
+
+#[test]
+fn qvar_basic() {
+    assert_ok_contains(
+        "qvar",
+        r#"
+input df
+y1 y2
+10 5
+12 6
+15 7
+18 8
+20 9
+22 10
+25 11
+28 12
+30 13
+32 14
+35 15
+38 16
+40 17
+42 18
+45 19
+48 20
+end
+qvar(y1 ~ y2, df, lags=1, tau=0.5, boot=20)
+"#,
+        "Quantile VAR",
+    );
+}
+
+#[test]
+fn dfm_basic() {
+    assert_ok_contains(
+        "dfm",
+        r#"
+input df
+y1 y2 y3
+10 5 20
+12 6 22
+15 7 25
+18 8 28
+20 9 30
+22 10 32
+25 11 35
+28 12 38
+30 13 40
+32 14 42
+35 15 45
+38 16 48
+40 17 50
+42 18 52
+45 19 55
+48 20 58
+end
+dfm(df, y1, y2, y3, factors=1)
+"#,
+        "Dynamic Factor Model",
+    );
+}
+
+#[test]
+fn pstr_basic() {
+    assert_ok_contains(
+        "pstr",
+        r#"
+input df
+entity y x q
+1 10 1.0 5
+1 12 2.0 6
+1 15 3.0 7
+2 8 0.8 4
+2 10 1.8 5
+2 13 2.8 6
+3 11 1.2 6
+3 14 2.2 7
+3 17 3.2 8
+4 9 0.9 5
+4 11 1.9 6
+4 14 2.9 7
+end
+pstr(y ~ x, df, q="q", id="entity")
+"#,
+        "PSTR",
+    );
+}
+
+#[test]
+fn modwt_basic() {
+    assert_ok_contains(
+        "modwt",
+        r#"
+input df
+y
+10
+12
+15
+18
+20
+22
+25
+28
+30
+32
+35
+38
+40
+42
+45
+48
+end
+modwt(df, y, scales=3)
+"#,
+        "MODWT",
+    );
+}
+
+#[test]
+fn copula_basic() {
+    assert_ok_contains(
+        "copula",
+        r#"
+input df
+y1 y2
+10 5
+12 6
+15 7
+18 8
+20 9
+22 10
+25 11
+28 12
+30 13
+32 14
+35 15
+38 16
+40 17
+42 18
+45 19
+48 20
+end
+copula(y1 ~ y2, df, type="gaussian")
+"#,
+        "Copula",
+    );
+}
+
+#[test]
+fn nardl_basic() {
+    assert_ok_contains(
+        "nardl",
+        r#"
+input df
+y x
+10 5
+12 6
+15 7
+18 8
+20 9
+22 10
+25 11
+28 12
+30 13
+32 14
+35 15
+38 16
+40 17
+42 18
+45 19
+48 20
+end
+nardl(y ~ x, df, lags=1)
+"#,
+        "NARDL",
+    );
+}
+
+#[test]
+fn pvar_basic() {
+    assert_ok_contains(
+        "pvar",
+        r#"
+input df
+entity y1 y2
+1 10 5
+1 12 6
+1 15 7
+1 18 8
+1 20 9
+1 22 10
+2 8 4
+2 10 5
+2 13 6
+2 16 7
+2 18 8
+2 20 9
+3 11 6
+3 14 7
+3 17 8
+3 20 9
+3 23 10
+3 26 11
+end
+pvar(y1 ~ y2, df, id="entity", lags=1)
+"#,
+        "Panel VAR",
+    );
+}
+
+#[test]
+fn fcoef_basic() {
+    assert_ok_contains(
+        "fcoef",
+        r#"
+input df
+y x z
+10 1.0 5
+12 2.0 6
+15 3.0 7
+18 4.0 8
+20 5.0 9
+22 6.0 10
+25 7.0 11
+28 8.0 12
+30 9.0 13
+32 10.0 14
+35 11.0 15
+38 12.0 16
+40 13.0 17
+42 14.0 18
+45 15.0 19
+48 16.0 20
+end
+fcoef(y ~ x, df, z="z", points=10)
+"#,
+        "Functional Coefficient",
+    );
+}
+
+#[test]
+fn fcoef_rejects_no_intercept_formula() {
+    assert_err_contains(
+        "fcoef_no_intercept",
+        r#"
+input df
+y x z
+10 1.0 5
+12 2.0 6
+15 3.0 7
+18 4.0 8
+20 5.0 9
+22 6.0 10
+25 7.0 11
+28 8.0 12
+30 9.0 13
+32 10.0 14
+35 11.0 15
+38 12.0 16
+40 13.0 17
+42 14.0 18
+45 15.0 19
+48 16.0 20
+end
+fcoef(y ~ x - 1, df, z="z", points=10)
+"#,
+        "no-intercept formulas are not supported by this estimator",
+    );
+}
+
+#[test]
+fn dcc_garch_basic() {
+    assert_ok_contains(
+        "dcc_garch",
+        r#"
+input df
+r1 r2
+0.1 0.05
+0.2 0.1
+-0.1 -0.05
+0.15 0.08
+0.3 0.2
+-0.2 -0.1
+0.1 0.05
+0.25 0.15
+-0.15 -0.08
+0.2 0.1
+0.1 0.05
+0.2 0.1
+-0.1 -0.05
+0.15 0.08
+0.3 0.2
+-0.2 -0.1
+0.1 0.05
+0.25 0.15
+-0.15 -0.08
+0.2 0.1
+0.1 0.05
+0.2 0.1
+-0.1 -0.05
+0.15 0.08
+0.3 0.2
+end
+dcc_garch(r1 ~ r2, df)
+"#,
+        "DCC-GARCH",
+    );
+}
+
+#[test]
+fn tvar_basic() {
+    assert_ok_contains(
+        "tvar",
+        r#"
+input df
+y1 y2 q
+10 5 1
+12 6 2
+15 7 3
+18 8 4
+20 9 5
+22 10 6
+25 11 7
+28 12 8
+30 13 9
+32 14 10
+35 15 11
+38 16 12
+40 17 13
+42 18 14
+45 19 15
+48 20 16
+end
+tvar(y1 ~ y2, df, q="q", lags=1, delay=1)
+"#,
+        "Threshold VAR",
+    );
+}
+
+#[test]
+fn bvar_basic() {
+    assert_ok_contains(
+        "bvar",
+        r#"
+input df
+y1 y2
+10 5
+12 6
+15 7
+18 8
+20 9
+22 10
+25 11
+28 12
+30 13
+32 14
+35 15
+38 16
+40 17
+42 18
+45 19
+48 20
+end
+bvar(y1 ~ y2, df, lags=1, lambda1=0.1, lambda2=0.2)
+"#,
+        "Bayesian VAR",
+    );
+}
+
+#[test]
+fn mfvar_basic() {
+    assert_ok_contains(
+        "mfvar",
+        r#"
+input df_q
+gdp
+100
+102
+105
+108
+110
+112
+115
+118
+end
+input df_m
+cpi
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+end
+mfvar(df_q, gdp, df_m, cpi, agg=3, lags=1)
+"#,
+        "Mixed-Frequency VAR",
+    );
+}
+
+#[test]
+fn tvcopula_basic() {
+    assert_ok_contains(
+        "tvcopula",
+        r#"
+input df
+y1 y2
+0.1 0.05
+0.2 0.1
+-0.1 -0.05
+0.15 0.08
+0.3 0.2
+-0.2 -0.1
+0.1 0.05
+0.25 0.15
+-0.15 -0.08
+0.2 0.1
+0.1 0.05
+0.2 0.1
+-0.1 -0.05
+0.15 0.08
+0.3 0.2
+-0.2 -0.1
+0.1 0.05
+0.25 0.15
+-0.15 -0.08
+0.2 0.1
+0.1 0.05
+0.2 0.1
+-0.1 -0.05
+0.15 0.08
+0.3 0.2
+end
+tvcopula(y1 ~ y2, df, type="gaussian")
+"#,
+        "Time-Varying Copula",
+    );
+}
+
+#[test]
+fn sv_basic() {
+    assert_ok_contains(
+        "sv",
+        r#"
+input df
+r
+0.1
+0.2
+-0.1
+0.15
+0.3
+-0.2
+0.1
+0.25
+-0.15
+0.2
+0.1
+0.2
+-0.1
+0.15
+0.3
+-0.2
+0.1
+0.25
+-0.15
+0.2
+0.1
+0.2
+-0.1
+0.15
+0.3
+end
+sv(df, r, iter=20)
+"#,
+        "Stochastic Volatility",
+    );
+}
+
+#[test]
+fn fapanel_basic() {
+    assert_ok_contains(
+        "fapanel",
+        r#"
+input df
+entity period y x
+1 1 10 1.0
+1 2 12 2.0
+1 3 15 3.0
+2 1 8 0.8
+2 2 10 1.8
+2 3 13 2.8
+3 1 11 1.2
+3 2 14 2.2
+3 3 17 3.2
+end
+input aux_df
+f1 f2
+1.0 0.5
+1.5 0.8
+2.0 1.2
+end
+fapanel(y ~ x, df, aux="aux_df", id="entity", period="period", factors=1)
+"#,
+        "Factor-Augmented Panel",
+    );
+}
+
+#[test]
+fn hawkes_basic() {
+    assert_ok_contains(
+        "hawkes",
+        r#"
+input df
+t
+1.0
+2.5
+3.0
+5.0
+5.5
+7.0
+8.0
+10.0
+11.0
+12.5
+13.0
+15.0
+16.0
+17.5
+18.0
+20.0
+end
+hawkes(df, t, T=20)
+"#,
+        "Hawkes Process",
+    );
+}
+
+#[test]
+fn rf_basic() {
+    assert_ok_contains(
+        "rf",
+        r#"
+input df
+y x1 x2
+10 1.0 5
+12 2.0 6
+15 3.0 7
+18 4.0 8
+20 5.0 9
+22 6.0 10
+25 7.0 11
+28 8.0 12
+30 9.0 13
+32 10.0 14
+35 11.0 15
+38 12.0 16
+40 13.0 17
+42 14.0 18
+45 15.0 19
+48 16.0 20
+end
+rf(y ~ x1 + x2, df, trees=10, depth=5)
+"#,
+        "Random Forest",
+    );
+}
+
+#[test]
+fn gbm_basic() {
+    assert_ok_contains(
+        "gbm",
+        r#"
+input df
+y x1 x2
+10 1.0 5
+12 2.0 6
+15 3.0 7
+18 4.0 8
+20 5.0 9
+22 6.0 10
+25 7.0 11
+28 8.0 12
+30 9.0 13
+32 10.0 14
+35 11.0 15
+38 12.0 16
+40 13.0 17
+42 14.0 18
+45 15.0 19
+48 16.0 20
+end
+gbm(y ~ x1 + x2, df, trees=20, lr=0.1, depth=3)
+"#,
+        "Gradient Boosting",
+    );
+}
+
+#[test]
+fn mlp_basic() {
+    assert_ok_contains(
+        "mlp",
+        r#"
+input df
+y x1 x2
+10 1.0 5
+12 2.0 6
+15 3.0 7
+18 4.0 8
+20 5.0 9
+22 6.0 10
+25 7.0 11
+28 8.0 12
+30 9.0 13
+32 10.0 14
+35 11.0 15
+38 12.0 16
+40 13.0 17
+42 14.0 18
+45 15.0 19
+48 16.0 20
+end
+mlp(y ~ x1 + x2, df, hidden=5, lr=0.01, epochs=50)
+"#,
+        "Neural Network",
+    );
+}
+
+#[test]
+fn synthdid_basic() {
+    assert_ok_contains(
+        "synthdid",
+        r#"
+input df
+unit period y treated
+1 1 10 1
+1 2 12 1
+1 3 15 1
+1 4 18 1
+1 5 22 1
+2 1 8 0
+2 2 9 0
+2 3 11 0
+2 4 12 0
+2 5 13 0
+3 1 9 0
+3 2 10 0
+3 3 12 0
+3 4 13 0
+3 5 14 0
+end
+synthdid(df, y, treated, 3, unit="unit", period="period")
+"#,
+        "Synthetic DiD",
+    );
+}
+
+#[test]
+fn cuped_basic() {
+    assert_ok_contains(
+        "cuped",
+        r#"
+input df
+y_pre y_post treated
+8 12 1
+9 13 1
+10 14 1
+7 11 0
+8 12 0
+9 13 0
+11 15 1
+10 14 0
+12 16 1
+8 11 0
+end
+cuped(y_post ~ y_pre, df, treated="treated")
+"#,
+        "CUPED",
+    );
+}
+
+#[test]
+fn qrf_basic() {
+    assert_ok_contains(
+        "qrf",
+        r#"
+input df
+y x1 x2
+10 1.0 5
+12 2.0 6
+15 3.0 7
+18 4.0 8
+20 5.0 9
+22 6.0 10
+25 7.0 11
+28 8.0 12
+30 9.0 13
+32 10.0 14
+35 11.0 15
+38 12.0 16
+40 13.0 17
+42 14.0 18
+45 15.0 19
+48 16.0 20
+end
+qrf(y ~ x1 + x2, df, quantiles="0.1,0.5,0.9", trees=10, depth=5)
+"#,
+        "Quantile Regression Forest",
+    );
+}
+
+#[test]
+fn xgboost_basic() {
+    assert_ok_contains(
+        "xgboost",
+        r#"
+input df
+y x1 x2
+10 1.0 5
+12 2.0 6
+15 3.0 7
+18 4.0 8
+20 5.0 9
+22 6.0 10
+25 7.0 11
+28 8.0 12
+30 9.0 13
+32 10.0 14
+35 11.0 15
+38 12.0 16
+40 13.0 17
+42 14.0 18
+45 15.0 19
+48 16.0 20
+end
+xgboost(y ~ x1 + x2, df, trees=20, lr=0.3, depth=3, lambda=1.0)
+"#,
+        "XGBoost",
+    );
+}
+
+#[test]
+fn dml_crossfit_basic() {
+    assert_ok_contains(
+        "dml_crossfit",
+        r#"
+input df
+y d x1 x2
+10 1 5 2
+12 1 6 3
+15 0 7 4
+18 1 8 5
+20 0 9 6
+22 1 10 7
+25 0 11 8
+28 1 12 9
+30 0 13 10
+32 1 14 11
+35 0 15 12
+38 1 16 13
+40 0 17 14
+42 1 18 15
+45 0 19 16
+48 1 20 17
+50 0 21 18
+52 1 22 19
+55 0 23 20
+58 1 24 21
+end
+dml_crossfit(y ~ d, df, x="x1,x2", folds=4)
+"#,
+        "Double ML",
+    );
+}
+
+#[test]
+fn bsc_basic() {
+    assert_ok_contains(
+        "bsc",
+        r#"
+input df
+y_treated c1 c2
+10 8 9
+12 9 10
+15 11 12
+18 13 14
+22 15 16
+25 17 18
+28 19 20
+30 21 22
+end
+bsc(df, y_treated, "c1,c2", 4, prior=1.0)
+"#,
+        "Bayesian Synthetic Control",
+    );
+}
+
+#[test]
+fn lstm_basic() {
+    assert_ok_contains(
+        "lstm",
+        r#"
+input df
+y
+10
+12
+15
+18
+20
+22
+25
+28
+30
+32
+35
+38
+40
+42
+45
+48
+50
+52
+55
+58
+60
+62
+65
+68
+70
+end
+lstm(df, y, hidden=5, seqlen=5, lr=0.01, epochs=20, forecast=3)
+"#,
+        "LSTM",
+    );
+}
+
+#[test]
+fn causalforest_basic() {
+    assert_ok_contains(
+        "causalforest",
+        r#"
+input df
+y treated x1 x2
+10 1 5 2
+12 1 6 3
+15 0 7 4
+18 1 8 5
+20 0 9 6
+22 1 10 7
+25 0 11 8
+28 1 12 9
+30 0 13 10
+32 1 14 11
+35 0 15 12
+38 1 16 13
+40 0 17 14
+42 1 18 15
+45 0 19 16
+48 1 20 17
+50 0 21 18
+52 1 22 19
+55 0 23 20
+58 1 24 21
+end
+causalforest(y ~ treated, df, x="x1,x2", trees=10, depth=3)
+"#,
+        "Causal Forest",
+    );
+}
+
+#[test]
+fn grf_basic() {
+    assert_ok_contains(
+        "grf",
+        r#"
+input df
+y treated x1 x2
+10 1 5 2
+12 1 6 3
+15 0 7 4
+18 1 8 5
+20 0 9 6
+22 1 10 7
+25 0 11 8
+28 1 12 9
+30 0 13 10
+32 1 14 11
+35 0 15 12
+38 1 16 13
+40 0 17 14
+42 1 18 15
+45 0 19 16
+48 1 20 17
+50 0 21 18
+52 1 22 19
+55 0 23 20
+58 1 24 21
+end
+grf(y ~ treated, df, x="x1,x2", trees=10, depth=3)
+"#,
+        "Generalized Random Forest",
+    );
+}
+
+#[test]
+fn conformal_basic() {
+    assert_ok_contains(
+        "conformal",
+        r#"
+input df
+y x1 x2
+10 1.0 5
+12 2.0 6
+15 3.0 7
+18 4.0 8
+20 5.0 9
+22 6.0 10
+25 7.0 11
+28 8.0 12
+30 9.0 13
+32 10.0 14
+35 11.0 15
+38 12.0 16
+40 13.0 17
+42 14.0 18
+45 15.0 19
+48 16.0 20
+end
+conformal(y ~ x1 + x2, df, alpha=0.1, calib=0.3)
+"#,
+        "Conformal Prediction",
+    );
+}
+
+#[test]
+fn transformer_basic() {
+    assert_ok_contains(
+        "transformer",
+        r#"
+input df
+y
+10
+12
+15
+18
+20
+22
+25
+28
+30
+32
+35
+38
+40
+42
+45
+48
+50
+52
+55
+58
+60
+62
+65
+68
+70
+end
+transformer(df, y, d_model=4, seqlen=5, lr=0.001, epochs=20, forecast=3)
+"#,
+        "Transformer",
+    );
+}
+
+#[test]
+fn dr_learner_basic() {
+    assert_ok_contains(
+        "dr_learner",
+        r#"
+input df
+y treated x1 x2
+10 1 5 2
+12 1 6 3
+15 0 7 4
+18 1 8 5
+20 0 9 6
+22 1 10 7
+25 0 11 8
+28 1 12 9
+30 0 13 10
+32 1 14 11
+35 0 15 12
+38 1 16 13
+40 0 17 14
+42 1 18 15
+45 0 19 16
+48 1 20 17
+50 0 21 18
+52 1 22 19
+55 0 23 20
+58 1 24 21
+60 0 25 22
+62 1 26 23
+65 0 27 24
+68 1 28 25
+70 0 29 26
+72 1 30 27
+75 0 31 28
+78 1 32 29
+80 0 33 30
+82 1 34 31
+85 0 35 32
+88 1 36 33
+end
+dr_learner(y ~ treated, df, x="x1,x2", folds=3)
+"#,
+        "DR-Learner",
+    );
+}
+
+#[test]
+fn bart_basic() {
+    assert_ok_contains(
+        "bart",
+        r#"
+input df
+y x1 x2
+10 1.0 5
+12 2.0 6
+15 3.0 7
+18 4.0 8
+20 5.0 9
+22 6.0 10
+25 7.0 11
+28 8.0 12
+30 9.0 13
+32 10.0 14
+35 11.0 15
+38 12.0 16
+40 13.0 17
+42 14.0 18
+45 15.0 19
+48 16.0 20
+end
+bart(y ~ x1 + x2, df, trees=10, depth=3, iter=20, burnin=5)
+"#,
+        "BART",
+    );
+}
+
+#[test]
+fn gp_basic() {
+    assert_ok_contains(
+        "gp",
+        r#"
+input df
+y x1 x2
+10 1.0 5
+12 2.0 6
+15 3.0 7
+18 4.0 8
+20 5.0 9
+22 6.0 10
+25 7.0 11
+28 8.0 12
+30 9.0 13
+32 10.0 14
+35 11.0 15
+38 12.0 16
+40 13.0 17
+42 14.0 18
+45 15.0 19
+48 16.0 20
+end
+gp(y ~ x1 + x2, df)
+"#,
+        "Gaussian Process",
+    );
+}
+
+#[test]
+fn tmle_basic() {
+    assert_ok_contains(
+        "tmle",
+        r#"
+input df
+y treated w1 w2
+10 1 5 2
+12 1 6 3
+15 0 7 4
+18 1 8 5
+20 0 9 6
+22 1 10 7
+25 0 11 8
+28 1 12 9
+30 0 13 10
+32 1 14 11
+35 0 15 12
+38 1 16 13
+40 0 17 14
+42 1 18 15
+45 0 19 16
+48 1 20 17
+50 0 21 18
+52 1 22 19
+55 0 23 20
+58 1 24 21
+60 0 25 22
+62 1 26 23
+65 0 27 24
+68 1 28 25
+70 0 29 26
+72 1 30 27
+75 0 31 28
+78 1 32 29
+80 0 33 30
+82 1 34 31
+end
+tmle(y ~ treated, df, w="w1,w2")
+"#,
+        "TMLE",
+    );
+}
+
+#[test]
+fn orf_basic() {
+    assert_ok_contains(
+        "orf",
+        r#"
+input df
+y treated x1 w1
+10 1 5 2
+12 1 6 3
+15 0 7 4
+18 1 8 5
+20 0 9 6
+22 1 10 7
+25 0 11 8
+28 1 12 9
+30 0 13 10
+32 1 14 11
+35 0 15 12
+38 1 16 13
+40 0 17 14
+42 1 18 15
+45 0 19 16
+48 1 20 17
+50 0 21 18
+52 1 22 19
+55 0 23 20
+58 1 24 21
+60 0 25 22
+62 1 26 23
+65 0 27 24
+68 1 28 25
+70 0 29 26
+72 1 30 27
+75 0 31 28
+78 1 32 29
+80 0 33 30
+82 1 34 31
+end
+orf(y ~ treated, df, x="x1", w="w1", trees=10, depth=3)
+"#,
+        "Orthogonal Random Forest",
+    );
+}
+
+#[test]
+fn spectral_basic() {
+    assert_ok_contains(
+        "spectral",
+        r#"
+input df
+x1 x2
+1.0 1.0
+1.1 1.1
+0.9 1.0
+1.0 0.9
+5.0 5.0
+5.1 5.1
+4.9 5.0
+5.0 4.9
+10.0 10.0
+10.1 10.1
+9.9 10.0
+10.0 9.9
+end
+spectral(df, x="x1,x2", k=3)
+"#,
+        "Spectral Clustering",
+    );
+}
+
+#[test]
+fn isotonic_basic() {
+    assert_ok_contains(
+        "isotonic",
+        r#"
+input df
+y x
+1 1
+2 2
+3 3
+2 4
+4 5
+5 6
+4 7
+6 8
+7 9
+8 10
+end
+isotonic(y ~ x, df)
+"#,
+        "Isotonic Regression",
+    );
+}
+
+#[test]
+fn causal_impact_basic() {
+    assert_ok_contains(
+        "causal_impact",
+        r#"
+input df
+y c1 c2
+10 5 2
+11 6 3
+12 7 4
+13 8 5
+14 9 6
+15 10 7
+16 11 8
+17 12 9
+18 13 10
+19 14 11
+20 15 12
+21 16 13
+22 17 14
+23 18 15
+24 19 16
+25 20 17
+30 21 18
+35 22 19
+40 23 20
+45 24 21
+end
+causal_impact(df, y, controls="c1,c2", period=15)
+"#,
+        "Causal Impact",
+    );
+}
+
+#[test]
+fn kmeans_basic() {
+    assert_ok_contains(
+        "kmeans",
+        r#"
+input df
+x1 x2
+1.0 1.0
+1.1 1.1
+0.9 1.0
+1.0 0.9
+5.0 5.0
+5.1 5.1
+4.9 5.0
+5.0 4.9
+10.0 10.0
+10.1 10.1
+9.9 10.0
+10.0 9.9
+end
+kmeans(df, x="x1,x2", k=3)
+"#,
+        "K-Means",
+    );
+}
+
+#[test]
+fn bayes_lm_basic() {
+    assert_ok_contains(
+        "bayes_lm",
+        r#"
+input df
+y x1 x2
+10 1.0 5
+12 2.0 6
+15 3.0 7
+18 4.0 8
+20 5.0 9
+22 6.0 10
+25 7.0 11
+28 8.0 12
+30 9.0 13
+32 10.0 14
+35 11.0 15
+38 12.0 16
+end
+bayes_lm(y ~ x1 + x2, df)
+"#,
+        "Bayesian Linear",
+    );
+}
+
+#[test]
+fn bayes_lm_rejects_no_intercept_formula() {
+    assert_err_contains(
+        "bayes_lm_no_intercept",
+        r#"
+input df
+y x1 x2
+10 1.0 5
+12 2.0 6
+15 3.0 7
+18 4.0 8
+20 5.0 9
+22 6.0 10
+25 7.0 11
+28 8.0 12
+30 9.0 13
+32 10.0 14
+35 11.0 15
+38 12.0 16
+end
+bayes_lm(y ~ x1 + x2 - 1, df)
+"#,
+        "no-intercept formulas are not supported by this estimator",
+    );
+}
+
+#[test]
+fn dbscan_basic() {
+    assert_ok_contains(
+        "dbscan",
+        r#"
+input df
+x1 x2
+1.0 1.0
+1.1 1.1
+0.9 1.0
+1.0 0.9
+5.0 5.0
+5.1 5.1
+4.9 5.0
+5.0 4.9
+10.0 10.0
+10.1 10.1
+9.9 10.0
+10.0 9.9
+end
+dbscan(df, x="x1,x2", eps=2.0, minpts=3)
+"#,
+        "DBSCAN",
+    );
+}
+
+#[test]
+fn gmm_clust_basic() {
+    assert_ok_contains(
+        "gmm_clust",
+        r#"
+input df
+x1 x2
+1.0 1.0
+1.1 1.1
+0.9 1.0
+1.0 0.9
+5.0 5.0
+5.1 5.1
+4.9 5.0
+5.0 4.9
+10.0 10.0
+10.1 10.1
+9.9 10.0
+10.0 9.9
+end
+gmm_clust(df, x="x1,x2", k=3, iter=50)
+"#,
+        "Gaussian Mixture",
+    );
+}
+
+#[test]
+fn reg_path_basic() {
+    assert_ok_contains(
+        "reg_path",
+        r#"
+input df
+y x1 x2
+10 1.0 5
+12 2.0 6
+15 3.0 7
+18 4.0 8
+20 5.0 9
+22 6.0 10
+25 7.0 11
+28 8.0 12
+30 9.0 13
+32 10.0 14
+35 11.0 15
+38 12.0 16
+end
+reg_path(y ~ x1 + x2, df, type="lasso", nlambda=20)
+"#,
+        "Regularization Path",
+    );
+}
+
+#[test]
+fn qrf_inf_basic() {
+    assert_ok_contains(
+        "qrf_inf",
+        r#"
+input df
+y x1 x2
+10 1.0 5
+12 2.0 6
+15 3.0 7
+18 4.0 8
+20 5.0 9
+22 6.0 10
+25 7.0 11
+28 8.0 12
+30 9.0 13
+32 10.0 14
+35 11.0 15
+38 12.0 16
+40 13.0 17
+42 14.0 18
+45 15.0 19
+48 16.0 20
+50 17.0 21
+52 18.0 22
+55 19.0 23
+58 20.0 24
+60 21.0 25
+62 22.0 26
+65 23.0 27
+68 24.0 28
+70 25.0 29
+end
+qrf_inf(y ~ x1 + x2, df, q="0.1,0.5,0.9", boot=10, trees=20, depth=5)
+"#,
+        "QRF Inference",
+    );
+}
+
+#[test]
+fn hclust_basic() {
+    assert_ok_contains(
+        "hclust",
+        r#"
+input df
+x1 x2
+1.0 1.0
+1.1 1.1
+0.9 1.0
+1.0 0.9
+5.0 5.0
+5.1 5.1
+4.9 5.0
+5.0 4.9
+10.0 10.0
+10.1 10.1
+9.9 10.0
+10.0 9.9
+end
+hclust(df, x="x1,x2", linkage="ward")
+"#,
+        "Hierarchical",
+    );
+}
+
+#[test]
+fn tsne_basic() {
+    assert_ok_contains(
+        "tsne",
+        r#"
+input df
+x1 x2
+1.0 1.0
+1.1 1.1
+0.9 1.0
+1.0 0.9
+5.0 5.0
+5.1 5.1
+4.9 5.0
+5.0 4.9
+10.0 10.0
+10.1 10.1
+9.9 10.0
+10.0 9.9
+end
+tsne(df, x="x1,x2", perplexity=5, iter=100, lr=100)
+"#,
+        "t-SNE",
+    );
+}
+
+#[test]
+fn umap_basic() {
+    assert_ok_contains(
+        "umap",
+        r#"
+input df
+x1 x2
+1.0 1.0
+1.1 1.1
+0.9 1.0
+1.0 0.9
+5.0 5.0
+5.1 5.1
+4.9 5.0
+5.0 4.9
+10.0 10.0
+10.1 10.1
+9.9 10.0
+10.0 9.9
+end
+umap(df, x="x1,x2", neighbors=5, iter=100)
+"#,
+        "UMAP",
+    );
+}
+
+#[test]
+fn biplot_basic() {
+    assert_ok_contains(
+        "biplot",
+        r#"
+input df
+x1 x2 x3
+1.0 2.0 3.0
+2.0 3.0 4.0
+3.0 4.0 5.0
+4.0 5.0 6.0
+5.0 6.0 7.0
+6.0 7.0 8.0
+7.0 8.0 9.0
+8.0 9.0 10.0
+9.0 10.0 11.0
+10.0 11.0 12.0
+end
+biplot(df, x="x1,x2,x3", type="symmetric")
+"#,
+        "Biplot",
+    );
+}
+
+#[test]
+fn ftest_robust_basic() {
+    assert_ok_contains(
+        "ftest_robust",
+        r#"
+input df
+y x1 x2
+10 1.0 5
+12 2.0 6
+15 3.0 7
+18 4.0 8
+20 5.0 9
+22 6.0 10
+25 7.0 11
+28 8.0 12
+30 9.0 13
+32 10.0 14
+35 11.0 15
+38 12.0 16
+end
+let m = ols(y ~ x1 + x2, df)
+ftest_robust(m)
+"#,
+        "Robust F-Test",
+    );
+}
+
+#[test]
+fn hausman_robust_basic() {
+    assert_ok_contains(
+        "hausman_robust",
+        r#"
+input panel
+output capital labor firm year
+10.2 5 8 1 2019
+11.0 5 9 1 2020
+12.5 6 9 1 2021
+11.8 5 10 1 2022
+19.3 10 12 2 2019
+20.1 10 13 2 2020
+23.1 12 14 2 2021
+20.7 11 13 2 2022
+14.6 7 10 3 2019
+15.3 7 11 3 2020
+17.9 8 11 3 2021
+15.2 7 12 3 2022
+24.8 13 15 4 2019
+25.5 13 16 4 2020
+27.3 14 16 4 2021
+26.1 14 17 4 2022
+end
+xtset(panel, firm, year)
+let mfe = fe(output ~ capital + labor, panel)
+let mre = re(output ~ capital + labor, panel)
+hausman_robust(mfe, mre)
+"#,
+        "Robust Hausman",
+    );
+}
+
+#[test]
+fn tidy_var_basic() {
+    assert_ok_contains(
+        "tidy_var",
+        r#"
+input df
+y1 y2
+1.0 3.0
+1.5 2.8
+2.0 3.2
+2.5 2.9
+3.0 3.5
+3.5 3.1
+4.0 3.8
+4.5 3.3
+5.0 4.0
+5.5 3.6
+6.0 4.2
+6.5 3.7
+end
+let m = var(df, y1, y2, lags=1)
+tidy(m)
+"#,
+        "variable",
+    );
+}
+
+#[test]
+fn glance_var_basic() {
+    assert_ok_contains(
+        "glance_var",
+        r#"
+input df
+y1 y2
+1.0 3.0
+1.5 2.8
+2.0 3.2
+2.5 2.9
+3.0 3.5
+3.5 3.1
+4.0 3.8
+4.5 3.3
+5.0 4.0
+5.5 3.6
+6.0 4.2
+6.5 3.7
+end
+let m = var(df, y1, y2, lags=1)
+glance(m)
+"#,
+        "aic",
+    );
+}
+
+#[test]
+fn tidy_autoreg_basic() {
+    assert_ok_contains(
+        "tidy_autoreg",
+        r#"
+input df
+y
+1.0
+1.5
+2.0
+2.5
+3.0
+3.5
+4.0
+4.5
+5.0
+5.5
+6.0
+6.5
+7.0
+7.5
+8.0
+end
+let m = autoreg(df, "y", lags=2)
+tidy(m)
+"#,
+        "variable",
+    );
+}
+
+#[test]
+fn glance_autoreg_basic() {
+    assert_ok_contains(
+        "glance_autoreg",
+        r#"
+input df
+y
+1.0
+1.5
+2.0
+2.5
+3.0
+3.5
+4.0
+4.5
+5.0
+5.5
+6.0
+6.5
+7.0
+7.5
+8.0
+end
+let m = autoreg(df, "y", lags=2)
+glance(m)
+"#,
+        "aic",
+    );
+}
+
+#[test]
+fn tidy_glsar_basic() {
+    assert_ok_contains(
+        "tidy_glsar",
+        r#"
+input df
+y x1
+10 1.0
+12 2.0
+15 3.0
+18 4.0
+20 5.0
+22 6.0
+25 7.0
+28 8.0
+30 9.0
+32 10.0
+end
+let m = glsar(y ~ x1, df, ar=1)
+tidy(m)
+"#,
+        "variable",
+    );
+}
+
+#[test]
+fn glance_glsar_basic() {
+    assert_ok_contains(
+        "glance_glsar",
+        r#"
+input df
+y x1
+10 1.0
+12 2.0
+15 3.0
+18 4.0
+20 5.0
+22 6.0
+25 7.0
+28 8.0
+30 9.0
+32 10.0
+end
+let m = glsar(y ~ x1, df, ar=1)
+glance(m)
+"#,
+        "r2",
     );
 }

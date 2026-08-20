@@ -1,0 +1,10 @@
+load "validation/cases/dbscan_simulated/data/data.csv" as df
+let m = dbscan(df, x="x1,x2", eps=0.5, minpts=5)
+let nan = 0.0 / 0.0
+let out = dataframe({
+  "variable": ["n_clusters", "n_noise"],
+  "coef": [m.fit.n_clusters, m.fit.n_noise],
+  "std_err": [nan, nan]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

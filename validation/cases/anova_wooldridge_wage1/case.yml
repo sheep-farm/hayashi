@@ -1,0 +1,47 @@
+id: anova_wooldridge_wage1
+title: One-way ANOVA of wage by education in Wooldridge wage1
+estimator_family: descriptive
+status: pass
+dimension: numerical
+dataset:
+  name: wooldridge::wage1
+  source: R package wooldridge / Python wooldridge-python
+  licence: public teaching dataset
+references:
+- R
+- Python
+comparison:
+  quantities:
+  - ss_between
+  - ss_within
+  - ss_total
+  - df_between
+  - df_within
+  - ms_between
+  - ms_within
+  - f_stat
+  - p_value
+  - n_groups
+  - n_obs
+  tolerances:
+    ss_between: 1e-4
+    ss_within: 1e-4
+    ss_total: 1e-4
+    df_between: 0
+    df_within: 0
+    ms_between: 1e-6
+    ms_within: 1e-6
+    f_stat: 1e-6
+    p_value: 1e-6
+    n_groups: 0
+    n_obs: 0
+output_format: json
+hayashi_script: cases/anova_wooldridge_wage1/hayashi/run.hay
+reference_scripts:
+  R: cases/anova_wooldridge_wage1/reference/run.R
+  Python: cases/anova_wooldridge_wage1/reference/run.py
+notes: One-way ANOVA of wage across education groups.
+result:
+  summary: ''
+  known_differences: []
+  issues_opened: []

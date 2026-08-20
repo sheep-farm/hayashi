@@ -1,0 +1,8 @@
+// Wooldridge (Introductory Econometrics, 7e), Chapter 6, Section 6.2.
+// wage equation with a quadratic in experience: wage ~ exper + expersq.
+
+load "validation/cases/ols_wooldridge_wage1_quad_ch6/data/wage1.csv" as df
+
+let m = ols(wage ~ exper + expersq, df)
+
+export(m, "csv", "/dev/stdout")

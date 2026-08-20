@@ -1,0 +1,8 @@
+// Load the Wooldridge wage1 dataset from CSV.
+load "validation/cases/centile_wooldridge_wage1/data/wage1.csv" as df
+
+// Centiles for the wage variable.
+let c = centile(df, wage, centiles=[10, 25, 50, 75, 90])
+
+// Export the result as JSON for automated comparison.
+export(c, "json", "/dev/stdout")

@@ -1,0 +1,11 @@
+load "validation/cases/modwt_simulated/data/data.csv" as df
+let m = modwt(df, y, scales=3)
+let e = m.energy
+let nan = 0.0/0.0
+let out = dataframe({
+  "variable": ["W_1", "W_2", "W_3"],
+  "coef": [e[0], e[1], e[2]],
+  "std_err": [nan, nan, nan]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

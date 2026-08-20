@@ -10,11 +10,13 @@
 - [Installation](./getting-started/installation.md)
 - [First Script](./getting-started/first-script.md)
 - [The REPL](./getting-started/repl.md)
+- [Jupyter Kernel](./getting-started/jupyter.md)
 
 # Data
 
 - [Loading Data](./data/loading.md)
 - [Data Manipulation](./data/manipulation.md)
+- [Random Variates](./data/random.md)
 - [Descriptive Statistics](./data/descriptive.md)
 - [Exporting](./data/exporting.md)
 
@@ -29,6 +31,7 @@
 
 # Post-Estimation
 
+- [Tidy & Glance](./post/tidy-glance.md)
 - [Hypothesis Tests](./post/tests.md)
 - [Comparison Tables](./post/esttab.md)
 - [Margins & Predictions](./post/margins.md)
@@ -43,6 +46,10 @@
 - [Pipe Operator](./language/pipe.md)
 - [Namespaces & Modules](./language/namespaces.md)
 - [Date & Time](./language/datetime.md)
+
+# Debugging
+
+- [Debugging Hayashi Scripts](./debugging.md)
 
 # Reference
 

@@ -1,0 +1,15 @@
+load "validation/cases/msvar_simulated/data/data.csv" as df
+let m = msvar(y1 ~ y2, df, regimes=2, lags=1)
+let ri = m.regime_intercepts
+let tm = m.transition_matrix
+let out = dataframe({
+  "variable": ["mu0_y1", "mu1_y1", "p00", "p01", "p10", "p11"],
+  "coef": [
+    ri["y1"][0], ri["y1"][1],
+    tm["Regime0"][0], tm["Regime1"][0],
+    tm["Regime0"][1], tm["Regime1"][1]
+  ],
+  "std_err": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

@@ -1,0 +1,3 @@
+load "validation/cases/clogit_simulated/data/data.csv" as df
+let m = clogit(y ~ x, df, group="group")
+print(m)

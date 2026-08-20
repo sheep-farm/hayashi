@@ -1,0 +1,21 @@
+id: fapanel_simulated
+title: Factor-augmented panel (not supported for validation)
+estimator_family: fapanel
+status: not-supported
+dimension: numerical
+dataset:
+  name: simulated
+  source: n/a
+  licence: n/a
+references: []
+comparison:
+  quantities: []
+  tolerances: {}
+output_format: csv
+hayashi_script: cases/fapanel_simulated/hayashi/run.hay
+reference_scripts: {}
+notes: "Requires plm + factor combination; no single canonical reference implementation."
+result:
+  summary: "Requires plm + factor combination; no single canonical reference implementation."
+  known_differences: []
+  issues_opened: []

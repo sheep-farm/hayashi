@@ -1,0 +1,15 @@
+library(jsonlite)
+args <- commandArgs(trailingOnly = FALSE)
+script_path <- sub("^--file=", "", args[grep("^--file=", args)][1])
+case_dir <- normalizePath(file.path(dirname(script_path), ".."))
+df <- read.csv(file.path(case_dir, "data", "data.csv"))
+theta <- cov(df$y, df$pre_y) / var(df$pre_y)
+y_adj <- df$y - theta * (df$pre_y - mean(df$pre_y))
+ate <- mean(y_adj[df$treated == 1]) - mean(y_adj[df$treated == 0])
+unadj <- mean(df$y[df$treated == 1]) - mean(df$y[df$treated == 0])
+vr <- 1 - var(y_adj) / var(df$y)
+result <- list(
+  coefficients = list(treatment_effect = ate, unadjusted_effect = unadj, theta = theta, variance_reduction = vr),
+  standard_errors = list(treatment_effect = NA_real_, unadjusted_effect = NA_real_, theta = NA_real_, variance_reduction = NA_real_)
+)
+cat(toJSON(result, pretty = FALSE, digits = 15, auto_unbox = TRUE))

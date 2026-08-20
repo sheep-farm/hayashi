@@ -1,0 +1,4 @@
+load "validation/cases/dw_simulated/data/data.csv" as df
+let m = ols(y ~ x + z, df)
+let r = dw(m)
+export(r, "json", "/dev/stdout")

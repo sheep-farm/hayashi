@@ -1,0 +1,9 @@
+load "validation/cases/manova_simulated/data/data.csv" as df
+let m = manova(df, y1, y2, by="group")
+let out = dataframe({
+  "variable": ["pillai", "wilks", "lh", "roy"],
+  "coef": [m.fit.pillai_trace, m.fit.wilks_lambda, m.fit.hotelling_lawley, m.fit.roys_largest_root],
+  "std_err": [0.0, 0.0, 0.0, 0.0]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

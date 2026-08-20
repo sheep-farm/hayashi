@@ -1,0 +1,58 @@
+\chapter{Espaço de Estados, Suavização Exponencial e Modelos Mistos}
+
+\section{Componentes não observados}
+
+\texttt{ucm} decompõe uma série em tendência, sazonalidade, ciclo e componente
+irregular, cada um com sua própria variância.
+
+\begin{lstlisting}[caption={UCM}]
+let m_ucm = ucm(df, y)
+print(m_ucm)
+\end{lstlisting}
+
+O modelo é útil para dessazonalização e extração de um componente
+latente de ciclo de negócios.
+
+\section{Suavização exponencial}
+
+\texttt{ets} ajusta um modelo Error-Trend-Seasonal; \texttt{hwes} ou \texttt{holtwinters}
+fornece a variante aditiva de Holt-Winters; \texttt{ses} é a suavização
+exponencial simples.
+
+\begin{lstlisting}[caption={Holt-Winters}]
+let m_hw = holtwinters(df, y, trend="add", seasonal="add", period=12)
+print(m_hw)
+\end{lstlisting}
+
+O comando estima os parâmetros de suavização ($\alpha$, $\beta$,
+$\gamma$) e reporta os componentes ajustados de nível, tendência e
+sazonalidade.
+
+\section{Modelos mistos}
+
+\texttt{mixed} ou \texttt{mixedlm} ajusta um modelo linear misto com interceptos
+aleatórios e/ou inclinações aleatórias. Os efeitos fixos são
+interpretados como em \texttt{fe} ou \texttt{re}, enquanto os efeitos aleatórios
+capturam heterogeneidade não observada.
+
+\begin{lstlisting}[caption={Modelo linear misto}]
+let m_mixed = mixed(y ~ x1 + x2, df, id="escola")
+print(m_mixed)
+\end{lstlisting}
+
+A saída reporta coeficientes de efeitos fixos, componentes de variância
+e predições de empirical Bayes para os efeitos aleatórios.
+
+\section{Kalman e séries temporais estruturais}
+
+\texttt{kalman} (Capítulo~54) e \texttt{ucm} são as principais ferramentas de
+espaço de estados. Comandos estruturais adicionais incluem:
+
+\begin{itemize}
+\item \texttt{msauto} / \texttt{markov\_ar} para autorregressões com mudança de Markov
+\item \texttt{structural\_ts} para séries temporais estruturais genéricas
+\end{itemize}
+
+Esses modelos são estimados por máxima verossimilhança ou QMLE. Verifique
+a log-verossimilhança reportada e critérios de informação ao comparar
+especificações.

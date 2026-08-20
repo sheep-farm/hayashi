@@ -1,0 +1,8 @@
+// Wooldridge (Introductory Econometrics, 7e), Chapter 9, Example 9.3.
+// education and parental education/ability equation: educ ~ motheduc + fatheduc + abil.
+
+load "validation/cases/ols_wooldridge_htv_ch9/data/htv.csv" as df
+
+let m = ols(educ ~ motheduc + fatheduc + abil, df)
+
+export(m, "csv", "/dev/stdout")

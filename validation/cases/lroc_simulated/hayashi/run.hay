@@ -1,0 +1,11 @@
+load "validation/cases/lroc_simulated/data/data.csv" as df
+let m = logit(y ~ x, df)
+let r = lroc(m)
+let se = 0.0
+let out = dataframe({
+  "variable": ["auc", "gini"],
+  "coef": [r.auc, r.gini],
+  "std_err": [se, se]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

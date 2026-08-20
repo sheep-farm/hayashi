@@ -1,7 +1,7 @@
 id: ridge_hprice1
 title: Ridge regression on Wooldridge hprice1
 estimator_family: ridge
-status: active
+status: pass
 dimension: numerical
 
 dataset:
@@ -29,6 +29,7 @@ reference_scripts:
 notes: Ridge regression of log house price on log lot size, log square footage, bedrooms and colonial dummy.
 
 result:
-  summary: ""
+  summary: "R and Python references generate/consume the same Wooldridge hprice1 CSV and use the same closed-form ridge convention with a penalised intercept."
   known_differences: []
-  issues_opened: []
+  issues_opened:
+    - 106

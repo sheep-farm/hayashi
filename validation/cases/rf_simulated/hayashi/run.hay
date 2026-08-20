@@ -1,0 +1,10 @@
+load "validation/cases/rf_simulated/data/data.csv" as df
+let m = rf(y ~ x1 + x2, df, trees=50, depth=5)
+let nan = 0.0/0.0
+let out = dataframe({
+  "variable": ["r_squared"],
+  "coef": [m.fit.r_squared],
+  "std_err": [nan]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

@@ -1,0 +1,10 @@
+load "validation/cases/isotonic_simulated/data/data.csv" as df
+let m = isotonic(y ~ x, df)
+let nan = 0.0 / 0.0
+let out = dataframe({
+  "variable": ["step_1", "step_2", "step_3"],
+  "coef": [m.fitted[0], m.fitted[40], m.fitted[80]],
+  "std_err": [nan, nan, nan]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

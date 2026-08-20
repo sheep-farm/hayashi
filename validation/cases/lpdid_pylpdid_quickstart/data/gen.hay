@@ -1,0 +1,33 @@
+// LP-DiD quickstart validation panel.
+// Mirrors the absorbing staggered-adoption DGP in pylpdid/examples/01_quickstart.py.
+// Run with: hay-run validation/cases/lpdid_pylpdid_quickstart/data/gen.hay
+
+seed(0)
+
+let n_units = 200
+let n_periods = 15
+
+// Unit-level random effects and treatment cohorts.
+let units = dataframe(n_units)
+generate units id = _n - 1
+generate units g0 = runiform()
+generate units g = 12.0
+replace units g = 0 if g0 < 0.25
+replace units g = 6 if g0 >= 0.25 && g0 < 0.5
+replace units g = 9 if g0 >= 0.5 && g0 < 0.75
+generate units ufe = rnormal(0, 1)
+
+// Expand to a long panel.
+let n_obs = n_units * n_periods
+let obs = dataframe(n_obs)
+generate obs id = floor((_n - 1) / n_periods)
+generate obs t = 1 + mod(_n - 1, n_periods)
+
+let df = merge(obs, units, key=id, type=left)
+
+generate df d = (g > 0 && t >= g)
+generate df y = ufe + 0.3 * t + 2.0 * d + rnormal(0, 0.5)
+
+let df = keep(df, id, t, g, y)
+
+export(df, "csv", "validation/cases/lpdid_pylpdid_quickstart/data/panel.csv")

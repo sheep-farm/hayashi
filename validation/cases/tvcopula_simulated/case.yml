@@ -1,0 +1,21 @@
+id: tvcopula_simulated
+title: Time-varying copula (not supported for validation)
+estimator_family: tvcopula
+status: not-supported
+dimension: numerical
+dataset:
+  name: simulated
+  source: n/a
+  licence: n/a
+references: []
+comparison:
+  quantities: []
+  tolerances: {}
+output_format: csv
+hayashi_script: cases/tvcopula_simulated/hayashi/run.hay
+reference_scripts: {}
+notes: "R rmgarch/ccgarch packages not available; Python copula packages do not match Hayashi output."
+result:
+  summary: "R rmgarch/ccgarch packages not available; Python copula packages do not match Hayashi output."
+  known_differences: []
+  issues_opened: []

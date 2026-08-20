@@ -1,0 +1,8 @@
+// Wooldridge (Introductory Econometrics, 7e), Chapter 2, Example 2.3.
+// CEO salary and return on equity equation: salary ~ roe.
+
+load "validation/cases/ols_wooldridge_ceosal1_roe_ch2/data/ceosal1.csv" as df
+
+let m = ols(salary ~ roe, df)
+
+export(m, "csv", "/dev/stdout")

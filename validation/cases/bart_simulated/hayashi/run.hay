@@ -1,0 +1,11 @@
+load "validation/cases/bart_simulated/data/data.csv" as df
+# Note: Hayashi uses iter for post-burn draws and burnin for burn-in.
+let m = bart(y ~ x1 + x2, df, trees=20, depth=3, iter=500, burnin=200)
+let nan = 0.0/0.0
+let out = dataframe({
+  "variable": ["mse", "r_squared"],
+  "coef": [m.fit.mse, m.fit.r_squared],
+  "std_err": [nan, nan]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

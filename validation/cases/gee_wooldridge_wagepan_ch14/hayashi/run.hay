@@ -1,0 +1,6 @@
+// Wooldridge (Introductory Econometrics, 7e), Chapter 14, Example 14.4.
+// generalized estimating equations wage equation: lwage ~ union + married + d81 + d82 + d83 + d84 + d85 + d86 + d87.
+
+load "validation/cases/gee_wooldridge_wagepan_ch14/data/wagepan.csv" as df
+
+gee(lwage ~ union + married + d81 + d82 + d83 + d84 + d85 + d86 + d87, df, id="nr", corr="independence")

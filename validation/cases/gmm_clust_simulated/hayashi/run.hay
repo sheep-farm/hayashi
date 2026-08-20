@@ -1,0 +1,10 @@
+load "validation/cases/gmm_clust_simulated/data/data.csv" as df
+let m = gmm_clust(df, x="x1,x2", k=2, iter=200, tol=1e-6)
+let nan = 0.0 / 0.0
+let out = dataframe({
+  "variable": ["mean_x_min", "mean_x_max", "mean_y_min", "mean_y_max"],
+  "coef": [min(m.means["col0"]), max(m.means["col0"]), min(m.means["col1"]), max(m.means["col1"])],
+  "std_err": [nan, nan, nan, nan]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

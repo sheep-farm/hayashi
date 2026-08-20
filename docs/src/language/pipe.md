@@ -60,6 +60,25 @@ display f"{{literal braces}}"       // {literal braces}
 
 Format specifiers: `{x:.Nf}` for N decimal places, `{x:.Ne}` for scientific notation.
 
+## T-strings
+
+Template strings with `t"..."` interpolate values and then **re-evaluate the resulting text as Hayashi source code**. This is useful for dynamic variable names and expressions.
+
+```
+let n = 1
+let x1 = 42
+let y = t"x{n}"                     // y == 42, as if you had written x1
+
+let gen_y = "x1 + x2 + x3"
+generate df y = t"{gen_y}"          // creates column y from x1 + x2 + x3
+
+let col_name = "new_var"
+let suffix = 2
+generate df t"{col_name}_{suffix}" = X * 2
+```
+
+Use `{...}` for interpolation. Escape literal braces with `{{` and `}}`.
+
 ## in operator
 
 Membership test for lists, dicts (key check), and strings (substring).

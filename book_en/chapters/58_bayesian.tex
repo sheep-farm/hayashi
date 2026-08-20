@@ -1,0 +1,81 @@
+\chapter{Bayesian and Frontier Models}
+
+\section{Bayesian linear regression}
+
+\texttt{bayes\_lm} implements conjugate Normal-Inverse-Gamma Bayesian linear
+regression. With a weak prior it recovers OLS posterior means, but it
+also reports posterior standard deviations, credible intervals, and the
+probability that each coefficient is positive.
+
+\begin{lstlisting}[caption={Bayesian linear regression}]
+set_seed(42)
+let n = 200
+generate df x1 = rnormal(n)
+generate df x2 = rnormal(n)
+generate df y = 1 + 2*x1 - 1.5*x2 + rnormal(n, 0, 2)
+
+let m_bayes = bayes_lm(y ~ x1 + x2, df)
+print(m_bayes)
+\end{lstlisting}
+
+The posterior mean of each coefficient is the weighted average of the
+prior mean and the OLS estimate, with more weight on the data as the
+sample grows. The 95\% credible interval is reported for each
+regressor.
+
+\section{Stochastic frontier analysis}
+
+Stochastic frontier models separate statistical noise from technical or
+cost inefficiency. The production frontier is
+
+\[
+y = X\beta + v - u, \qquad u \ge 0
+\]
+
+where $v$ is noise and $u$ is inefficiency. \texttt{sfa\_production} estimates
+$\beta$, $\sigma_v$, $\sigma_u$, and the mean technical efficiency.
+
+\begin{lstlisting}[caption={Stochastic production frontier}]
+let n = 300
+generate df x1 = rnormal(n)
+generate df x2 = rnormal(n)
+generate df v  = rnormal(n, 0, 0.3)
+generate df u  = abs(rnormal(n, 0, 0.5))
+generate df y  = 1 + 0.8*x1 + 0.6*x2 + v - u
+
+let m_sfa = sfa_production(y ~ x1 + x2, df)
+print(m_sfa)
+\end{lstlisting}
+
+For a cost frontier the inefficiency term is added rather than
+subtracted:
+
+\begin{lstlisting}[caption={Stochastic cost frontier}]
+let m_sfac = sfa_cost(y ~ x1 + x2, df)
+print(m_sfac)
+\end{lstlisting}
+
+\section{Bayesian stochastic frontier}
+
+\texttt{bayes\_sfa\_production} and \texttt{bayes\_sfa\_cost} implement a Gibbs sampler
+with weak conjugate priors. They report posterior means, standard
+deviations, and 95\% credible intervals for the regression coefficients
+and variance parameters.
+
+\begin{lstlisting}[caption={Bayesian SFA}]
+let m_bsfa = bayes_sfa_production(y ~ x1 + x2, df, burn=500, draws=1000)
+print(m_bsfa)
+\end{lstlisting}
+
+These are more robust to small samples than maximum-likelihood SFA, but
+convergence must be checked by running the chain with different starting
+values and comparing posteriors.
+
+\section{When to use each}
+
+\begin{itemize}
+\item \textbf{Standard inference with uncertainty:} \texttt{bayes\_lm}
+\item \textbf{Production efficiency:} \texttt{sfa\_production}
+\item \textbf{Cost efficiency:} \texttt{sfa\_cost}
+\item \textbf{Small-sample SFA or full posterior:} \texttt{bayes\_sfa\_production}
+\end{itemize}

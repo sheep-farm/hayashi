@@ -18,6 +18,7 @@
 \texttt{Nil}       & \texttt{nil}                  & Absence of value \\
 \texttt{String}    & \texttt{"text"}               & UTF-8 \\
 \texttt{FString}   & \texttt{f"val: \{x\}"}        & Interpolation \\
+\texttt{TString}   & \texttt{t"x\{n\}"}             & Re-evaluates generated code \\
 \texttt{List}      & \texttt{[1, 2, 3]}            & 0-based index \\
 \texttt{Dict}      & \texttt{\{"a": 1\}}           & String or int key \\
 \texttt{DataFrame} & \texttt{load "f.csv" as df}   & COW, Float columns \\
@@ -61,7 +62,7 @@ Special constant: \texttt{\_n} = row number (1-based).
 \section{Keywords}
 
 \begin{lstlisting}[style=inline, basicstyle=\ttfamily\footnotesize]
-let  const  fn  return  if  else  for  in  while  break  continue
+let  const  fn  return  if  else  for  parallel  in  while  break  continue
 match  try  catch  and  or  not  true  false  nil  quietly
 \end{lstlisting}
 
@@ -98,7 +99,9 @@ match  try  catch  and  or  not  true  false  nil  quietly
 \toprule
 \textbf{Function} & \textbf{Description} \\
 \midrule
-\texttt{load "f" as df}           & Load file (CSV, parquet) \\
+\texttt{dataframe(dict)} / \texttt{dataframe(n)} & Build DataFrame from dict, or pre-dimension an empty one \\
+\texttt{load "f" as df [, opts]}  & Load file (CSV, TSV, JSON, Parquet, DTA, XLSX, SQLite, ODBC) \\
+                                  & \quad \textit{opts}: \texttt{sheet=}, \texttt{table=}, \texttt{query=}, \texttt{sep=}, \texttt{columns=}, \texttt{where=} \\
 \texttt{save df "f"}              & Save file \\
 \texttt{count(df [, cond])}       & Number of rows \\
 \texttt{filter(df, cond)}         & Filter rows \\
@@ -110,6 +113,7 @@ match  try  catch  and  or  not  true  false  nil  quietly
 \texttt{dropna(df [, cols...])}   & Remove NaN \\
 \texttt{ffill(df)}                & Forward-fill NaN in float columns \\
 \texttt{append(df1, df2)}         & Stack vertically \\
+\texttt{rbind(list\_of\_dfs)}     & Concatenate many DFs (skips nil) \\
 \texttt{merge(df1, df2, on=col)}  & Horizontal join \\
 \texttt{group\_by(df, col, agg)}  & Aggregate by group \\
 \texttt{collapse(df, expr, by=c)} & Collapse by group \\
@@ -132,7 +136,7 @@ match  try  catch  and  or  not  true  false  nil  quietly
 \texttt{ensure\_dir(path)}        & Create directory (and parents) \\
 \texttt{write(content, path)}     & Write string to file \\
 \texttt{export(df, "csv", path)}   & Save DataFrame to CSV \\
-\texttt{load "path" as df}        & Load CSV/parquet into DataFrame \\
+\texttt{load "path" as df [, opts]} & Load CSV/TSV/JSON/Parquet/DTA/XLSX/SQLite/ODBC; \texttt{opts}: \texttt{columns=}, \texttt{where=} (pushdown) \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -140,15 +144,40 @@ match  try  catch  and  or  not  true  false  nil  quietly
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Random generators}
 
+Available inside \lstinline{generate df col = expr}. All respect \lstinline{set_seed}.
+
 \begin{center}
 \begin{tabular}{ll}
 \toprule
 \textbf{Function} & \textbf{Distribution} \\
 \midrule
-\texttt{rnormal()}       & $N(0,1)$ — standard normal \\
-\texttt{runiform()}      & $U(0,1)$ — uniform \\
-\texttt{rbernoulli(p)}   & Bernoulli with fixed probability $p$ \\
-\texttt{seed(n)}         & Sets PRNG seed for reproducibility \\
+\texttt{rnormal()} / \texttt{rnormal($\mu$, $\sigma$)} & Normal \\
+\texttt{rlognormal($\mu$, $\sigma$)} & Log-normal \\
+\texttt{rskewnormal(loc, scale, shape)} & Skew-normal \\
+\texttt{rcauchy(loc, scale)} & Cauchy \\
+\texttt{rstudentt(df)} / \texttt{rt(df)} & Student's $t$ \\
+\texttt{rchisq(k)} & Chi-squared \\
+\texttt{rf(d1, d2)} & $F$ distribution \\
+\texttt{rbeta($\alpha$, $\beta$)} & Beta \\
+\texttt{rgamma(shape, scale)} & Gamma \\
+\texttt{rexponential($\lambda$)} & Exponential (rate $\lambda$) \\
+\texttt{rweibull(scale, shape)} & Weibull \\
+\texttt{rpareto(scale, shape)} & Pareto \\
+\texttt{rpert(min, max, mode)} / \texttt{rpert(min, max, mode, shape)} & PERT \\
+\texttt{rtriangular(min, max, mode)} & Triangular \\
+\texttt{rfrechet(location, scale, shape)} & Fr\'{e}chet \\
+\texttt{rgumbel(location, scale)} & Gumbel \\
+\texttt{rinversegaussian(mean, shape)} & Inverse Gaussian \\
+\texttt{rnig($\alpha$, $\beta$)} & Normal-inverse-Gaussian \\
+\texttt{runiform()} / \texttt{runiform(a, b)} & Uniform $[0,1)$ or $[a,b)$ \\
+\midrule
+\texttt{rbernoulli(p)} & Bernoulli (default $p=0.5$) \\
+\texttt{rbinomial(n, p)} & Binomial \\
+\texttt{rpoisson($\lambda$)} & Poisson \\
+\texttt{rgeometric(p)} & Geometric (failures before first success) \\
+\texttt{rhypergeometric(N, K, n)} & Hypergeometric \\
+\texttt{rzeta(a)} & Zeta ($a>1$) \\
+\texttt{rzipf(N, s)} & Zipf \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -349,6 +378,25 @@ Factor analysis   & \texttt{factor(df, v1, v2, ..., n=2, rotation=varimax)} \\
 Canonical corr.   & \texttt{cancorr(df, xvars=["v1","v2"], yvars=["v3","v4"])} \\
 MANOVA            & \texttt{manova(df, y1, y2, by="group")} \\
 KDE               & \texttt{kde(df, var, bwidth=0.5)} \\
+PCA biplot        & \texttt{biplot(df, x="v1,v2,v3", type="symmetric")} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Clustering and dimension reduction}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Method} & \textbf{Syntax} \\
+\midrule
+K-Means           & \texttt{kmeans(df, x="v1,v2", k=3)} \\
+DBSCAN            & \texttt{dbscan(df, x="v1,v2", eps=1.0, minpts=5)} \\
+GMM clustering    & \texttt{gmm\_clust(df, x="v1,v2", k=3)} \\
+Spectral          & \texttt{spectral(df, x="v1,v2", k=3)} \\
+Hierarchical      & \texttt{hclust(df, x="v1,v2", linkage="ward")} \\
+t-SNE             & \texttt{tsne(df, x="v1,v2", perplexity=30)} \\
+UMAP              & \texttt{umap(df, x="v1,v2", neighbors=15)} \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -370,8 +418,85 @@ Normality (SW)      & \texttt{swilk(df, var)} \\
 Normality (SF)      & \texttt{sfrancia(df, var)} \\
 Homoscedasticity    & \texttt{vif(m\_ols)} \\
 Hausman             & \texttt{hausman(m\_fe, m\_re)} \\
+Robust Hausman      & \texttt{hausman\_robust(m\_fe, m\_re)} \\
+Robust F-test       & \texttt{ftest\_robust(m, vars="x1,x2")} \\
 Linear test         & \texttt{test(m, "x1 = x2")} \\
+Joint test          & \texttt{testparm(m, ["x1", "x2"])} \\
 Linear combination  & \texttt{lincom(m, "x1 + x2")} \\
+White               & \texttt{test(m, "white")} \\
+Breusch-Pagan       & \texttt{test(m, "bp")} \\
+Durbin-Watson       & \texttt{test(m, "dw")} \\
+Goldfeld-Quandt     & \texttt{gqtest(m, split=0.2)} \\
+RESET               & \texttt{reset(m)} \\
+CUSUM               & \texttt{cusumtest(m)} \\
+Jarque-Bera         & \texttt{jb(m)} \\
+Ljung-Box           & \texttt{ljungbox(df, var, lags=10)} \\
+ARCH-LM             & \texttt{archtest(df, var, lags=5)} \\
+ACF / PACF          & \texttt{acf(df, var)} \quad \texttt{pacf(df, var)} \\
+BP LM (panel)       & \texttt{bptest(df, formula, id="entity")} \\
+F-test FE           & \texttt{ftest\_fe(df, formula, id="entity")} \\
+Wooldridge          & \texttt{wooldridge(df, formula, id=, time=)} \\
+Pesaran CD          & \texttt{pesaran(df, formula, id=, time=)} \\
+Arellano-Bond       & \texttt{abtest(df, formula, id=, time=)} \\
+Mundlak             & \texttt{mundlak(df, formula, id="entity")} \\
+Akaike weights      & \texttt{akaike\_weights(m1, m2)} \\
+LR test             & \texttt{lrtest(m1, m2)} \\
+1st-stage F (IV)    & \texttt{weak\_iv(endog, instr, df)} \\
+Sargan/J (IV)       & \texttt{estat\_overid(endog, instr, df)} \\
+Endogeneity (IV)    & \texttt{estat\_endog(endog, instr, df)} \\
+Classification (logit) & \texttt{estat\_classification(m)} \\
+ROC/AUC (logit)     & \texttt{lroc(m)} \\
+Hosmer-Lemeshow     & \texttt{estat\_gof(m)} \\
+Linktest            & \texttt{linktest(m)} \\
+Panel logit (GEE)   & \texttt{xtlogit(y \textasciitilde{} x, df, id="g")} \\
+Panel probit (GEE)  & \texttt{xtprobit(y \textasciitilde{} x, df, id="g")} \\
+Panel Poisson (GEE) & \texttt{xtpoisson(y \textasciitilde{} x, df, id="g")} \\
+Event study         & \texttt{eventstudy(y \textasciitilde{} et, df, ref=-1)} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Machine learning and causal ML}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Method} & \textbf{Syntax} \\
+\midrule
+Random forest       & \texttt{rf(y \textasciitilde{} x1 + x2, df, trees=100)} \\
+Gradient boosting   & \texttt{gbm(y \textasciitilde{} x1 + x2, df, trees=100)} \\
+Quantile RF         & \texttt{qrf(y \textasciitilde{} x1 + x2, df, quantiles="0.1,0.5,0.9")} \\
+XGBoost             & \texttt{xgboost(y \textasciitilde{} x1 + x2, df)} \\
+MLP                 & \texttt{mlp(y \textasciitilde{} x1 + x2, df, hidden=10)} \\
+LSTM                & \texttt{lstm(df, y, hidden=10, seqlen=12, forecast=5)} \\
+Transformer         & \texttt{transformer(df, y, d\_model=8, seqlen=12)} \\
+BART                & \texttt{bart(y \textasciitilde{} x1 + x2, df, trees=20)} \\
+Gaussian process    & \texttt{gp(y \textasciitilde{} x1 + x2, df)} \\
+\midrule
+Causal forest       & \texttt{causalforest(y \textasciitilde{} treated, df, x="x1,x2")} \\
+Generalized RF      & \texttt{grf(y \textasciitilde{} treated, df, x="x1,x2")} \\
+DR-Learner          & \texttt{dr\_learner(y \textasciitilde{} treated, df, x="x1,x2")} \\
+TMLE                & \texttt{tmle(y \textasciitilde{} treated, df, w="x1,x2")} \\
+ORF                 & \texttt{orf(y \textasciitilde{} treated, df, x="x1,x2", w="w1")} \\
+Bayesian SC         & \texttt{bsc(df, y, "x1,x2", 5)} \\
+DML cross-fit       & \texttt{dml\_crossfit(y \textasciitilde{} d, df, x="x1,x2")} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Spatial econometrics}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Model} & \textbf{Syntax} \\
+\midrule
+Spatial SAR         & \texttt{spatial\_sar(y \textasciitilde{} x1 + x2, df, w=W)} \\
+Spatial SEM         & \texttt{spatial\_sem(y \textasciitilde{} x1 + x2, df, w=W)} \\
+Spatial Durbin      & \texttt{spatial\_durbin(y \textasciitilde{} x1 + x2, df, w=W)} \\
+Spatial panel SAR   & \texttt{spatial\_panel\_sar(y \textasciitilde{} x, df, w=W, id="e")} \\
+Spatial panel SEM   & \texttt{spatial\_panel\_sem(y \textasciitilde{} x, df, w=W, id="e")} \\
+Spatial Durbin error & \texttt{spatial\_durbin\_error(y \textasciitilde{} x, df, w=W, id="e")} \\
 \bottomrule
 \end{tabular}
 \end{center}

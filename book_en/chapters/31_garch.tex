@@ -1,0 +1,210 @@
+\chapter{GARCH and Conditional Volatility}
+\label{cap:garch}
+% ── index ──────────────────────────────────────────────────────
+\index{GARCH|textbf}
+\index{conditional volatility|textbf}
+\index{conditional heteroskedasticity|textbf}
+\index{ARCH|see{GARCH}}
+\index{garch@\texttt{garch()}|textbf}
+\index{volatility clustering}
+\index{EGARCH}
+\index{GJR-GARCH}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Conditional Heteroskedasticity}
+
+Financial series exhibit a recurring phenomenon: periods of high
+volatility tend to be followed by more volatility, and calm periods
+persist. This \emph{volatility clustering} violates the assumption of
+constant conditional variance in ARMA models — the variance of $\varepsilon_t$
+given the past varies over time.
+
+The GARCH(\textit{p,q}) model (Engle 1982; Bollerslev 1986) captures this
+dynamic explicitly. The GARCH(1,1) specification is:
+
+\[
+  \varepsilon_t \mid \mathcal{F}_{t-1} \sim (0,\, h_t)
+  \qquad
+  h_t = \omega + \alpha_1\,\varepsilon_{t-1}^2 + \beta_1\,h_{t-1}
+\]
+
+\noindent where $h_t$ is the \emph{conditional variance}, $\alpha_1$ captures the
+ARCH effect (reaction to past shock) and $\beta_1$ captures persistence
+(volatility memory).
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Restriction} & \textbf{Condition} & \textbf{Meaning} \\
+\midrule
+Positive variance   & $\omega > 0,\; \alpha_1 \geq 0,\; \beta_1 \geq 0$ & $h_t > 0$ guaranteed \\
+Stationarity        & $\alpha_1 + \beta_1 < 1$                           & variance does not explode \\
+Unconditional variance & $\sigma^2 = \omega/(1-\alpha_1-\beta_1)$       & long-run level \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The case $\alpha_1 + \beta_1 = 1$ is called IGARCH (\emph{integrated}): the
+volatility has a unit root and shocks have a permanent effect.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{ARCH-LM Test}
+
+Before estimating a volatility model, one tests whether ARCH effects are
+present. Engle's (1982) test regresses $\varepsilon_t^2$ on its own lags and
+evaluates joint significance:
+
+\[
+  \varepsilon_t^2 = a_0 + a_1\,\varepsilon_{t-1}^2 + \cdots + a_m\,\varepsilon_{t-m}^2 + u_t
+\]
+
+\[
+  H_0{:}\; a_1 = \cdots = a_m = 0
+  \quad \text{(no ARCH effects)}
+\]
+
+The statistic is $LM = N \cdot R^2_{\text{aux}} \xrightarrow{d} \chi^2(m)$
+under $H_0$.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{DGP Verification}
+
+The DGP generates a true ARCH(1) process ($\beta=0$):
+
+\[
+  h_t = 0{,}3 + 0{,}5\,\varepsilon_{t-1}^2
+  \qquad
+  \varepsilon_t = \sqrt{h_t}\; z_t
+  \qquad
+  z_t \sim (0,1)
+\]
+
+The innovation is generated directly as a standard normal draw:
+$z = \text{rnormal}()$, so $E[z]=0$ and $E[z^2]=1$.
+
+\begin{lstlisting}[caption={ARCH(1) DGP and GARCH estimation}]
+seed(42)
+input df
+id
+1
+end
+for i in 1..=9 { df = append(df, df) }
+df |> filter(_n <= 500)
+generate df z  = rnormal()               // z: E[z]=0, E[z²]=1
+generate df e  = z
+generate df t  = _n
+let n = nrow(df)
+let i = 2
+while i <= n {
+    let le = mean(df, e, if = t == i - 1)
+    let lz = mean(df, z, if = t == i)
+    replace df e = sqrt(0.3 + 0.5 * le * le) * lz if t == i
+    i = i + 1
+}
+
+archtest(df, e, lags=5)      // should reject H₀
+let m = garch(df, e, p=1, q=1)
+display m
+archtest(m, lags=5)          // should not reject (GARCH captured the ARCH)
+\end{lstlisting}
+
+\subsection*{ARCH-LM Test — raw series}
+
+The raw series should reject the no-ARCH null, confirming time-varying
+conditional variance in the simulated process.
+
+\subsection*{GARCH(1,1) Estimation}
+
+The MLE estimator recovers the true DGP ($\omega=0{,}3$, $\alpha=0{,}5$,
+$\beta=0$) up to finite-sample variation. A fitted $\beta$ near zero identifies
+that the process is pure ARCH — with no GARCH persistence component.\footnote{%
+  With $N=500$, finite-sample estimates need not match the DGP parameters
+  exactly; with larger $N$, convergence improves.}
+
+\subsection*{ARCH-LM on standardized residuals}
+
+After fitting the GARCH, the standardized residuals $\hat{z}_t = \varepsilon_t / \sqrt{\hat{h}_t}$
+should be white noise in $z_t^2$:
+
+After fitting the model, the ARCH-LM test on standardised residuals should no
+longer reject if the volatility specification has captured the conditional
+heteroskedasticity.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Variants: EGARCH and GJR-GARCH}
+
+The symmetric GARCH treats positive and negative shocks equally. In
+financial assets, negative shocks tend to increase volatility more
+than positive shocks of the same magnitude (\emph{leverage effect}).
+
+\textbf{EGARCH} (Nelson 1991) models $\ln h_t$:
+\[
+  \ln h_t = \omega + \beta_1 \ln h_{t-1}
+             + \alpha_1 \left|\frac{\varepsilon_{t-1}}{\sqrt{h_{t-1}}}\right|
+             + \gamma_1 \frac{\varepsilon_{t-1}}{\sqrt{h_{t-1}}}
+\]
+The parameter $\gamma_1 < 0$ captures asymmetry (leverage effect).
+
+\textbf{GJR-GARCH} (Glosten-Jagannathan-Runkle 1993) adds an indicator term:
+\[
+  h_t = \omega + \alpha_1 \varepsilon_{t-1}^2
+        + \gamma_1 \varepsilon_{t-1}^2 \mathbf{1}[\varepsilon_{t-1} < 0]
+        + \beta_1 h_{t-1}
+\]
+The coefficient $\gamma_1 > 0$ implies that negative shocks raise volatility more.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Syntax}
+
+\begin{lstlisting}
+garch(df, y, p=1, q=1)
+garch(df, y, p=1, q=1, dist=t)    // Student-t errors
+egarch(df, y, p=1, q=1)
+gjrgarch(df, y, p=1, q=1)
+archtest(df, y, lags=5)            // ARCH-LM on raw series
+archtest(modelo, lags=5)           // ARCH-LM on standardized residuals
+\end{lstlisting}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Parameter} & \textbf{Default} & \textbf{Description} \\
+\midrule
+\texttt{p}    & 1                & ARCH order ($\alpha$) \\
+\texttt{q}    & 1                & GARCH order ($\beta$) \\
+\texttt{dist} & \texttt{normal}  & distribution: \texttt{normal} or \texttt{t} \\
+\texttt{lags} & 5                & lags for ARCH-LM \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{lstlisting}[caption={Typical workflow — asset returns}]
+load "retornos.csv" as df
+
+// 1. Check for volatility clustering
+archtest(df, ret, lags=10)
+
+// 2. Estimate volatility model
+let m_garch  = garch(df, ret, p=1, q=1)
+let m_gjr    = gjrgarch(df, ret, p=1, q=1)
+
+// 3. Check diagnostics
+archtest(m_garch, lags=10)
+
+// 4. Estimated conditional variance
+display m_garch
+\end{lstlisting}
+
+\begin{nota}
+  \hayashi{} estimates GARCH by MLE assuming Gaussian innovations
+  (\lstinline{dist=normal}) or Student-t (\lstinline{dist=t}). For series
+  with very heavy tails (cryptocurrencies, exchange rates in crises), the
+  $t$ distribution generally improves the fit. Compare AIC/BIC across specifications.
+\end{nota}
+
+\section{Empirical validation}
+
+The ARCH(1) DGP in this chapter corresponds to the \texttt{garch\_book}
+validation case in \texttt{validation/cases/}. The case compares \hayashi{}'s
+MLE coefficients with the Python \texttt{arch} reference. Run
+\lstinline{hay validate} to see the current status.

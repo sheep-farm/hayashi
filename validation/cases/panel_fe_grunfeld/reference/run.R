@@ -1,9 +1,10 @@
 # Reference implementation in R for the panel FE Grunfeld case.
 
-library(wooldridge)
+library(plm)
 library(jsonlite)
 
-data(grunfeld)
+data(Grunfeld, package = "plm")
+grunfeld <- Grunfeld
 
 # Ensure the data directory exists.
 data_dir <- "validation/cases/panel_fe_grunfeld/data"
@@ -33,4 +34,4 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 write_json(result, file.path(out_dir, "expected.json"), pretty = TRUE, auto_unbox = TRUE)
 
-cat(toJSON(result, pretty = TRUE, auto_unbox = TRUE))
+cat(toJSON(result, pretty = FALSE, digits = NA, auto_unbox = TRUE))

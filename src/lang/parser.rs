@@ -1,6 +1,35 @@
 use crate::lang::ast::*;
 use crate::lang::error::{HayashiError, Result};
-use crate::lang::lexer::Token;
+use crate::lang::lexer::{Lexer, Token};
+
+/// Parse one complete formula expression from runtime text.
+pub fn parse_formula_text(source: &str) -> Result<Formula> {
+    let mut lexer = Lexer::new(source.trim());
+    let tokens = lexer
+        .tokenize()?
+        .into_iter()
+        .filter(|(token, _)| token != &Token::Newline)
+        .collect();
+    let mut parser = Parser::new(tokens);
+    let expr = parser.parse_expr()?;
+    parser.skip_newlines();
+    if parser.peek() != &Token::Eof {
+        return Err(HayashiError::Parse {
+            line: parser.line(),
+            msg: format!(
+                "unexpected token after formula: {:?}",
+                parser.peek().clone()
+            ),
+        });
+    }
+    match expr {
+        Expr::Formula(formula) => Ok(formula),
+        _ => Err(HayashiError::Parse {
+            line: 1,
+            msg: "expected a formula containing '~'".into(),
+        }),
+    }
+}
 
 pub struct Parser {
     tokens: Vec<(Token, usize)>,
@@ -75,11 +104,10 @@ impl Parser {
                     }
                     braces += 1;
                 }
-                Token::RBrace => {
-                    if braces > 0 {
-                        braces -= 1;
-                    }
+                Token::RBrace if braces > 0 => {
+                    braces -= 1;
                 }
+                Token::RBrace => {}
                 Token::Newline | Token::Eof | Token::Comma
                     if parens == 0 && brackets == 0 && braces == 0 =>
                 {
@@ -173,7 +201,10 @@ impl Parser {
     /// exactly as produced by the lexer.  This runs once per source location;
     /// the resulting `Vec<FStringPart>` is stored in the AST and evaluated
     /// directly at runtime without re-lexing or re-parsing.
-    fn parse_fstring_parts(&mut self, template: &str) -> crate::lang::error::Result<Vec<FStringPart>> {
+    fn parse_fstring_parts(
+        &mut self,
+        template: &str,
+    ) -> crate::lang::error::Result<Vec<FStringPart>> {
         let mut parts: Vec<FStringPart> = Vec::new();
         let mut lit = String::new();
         let mut chars = template.chars().peekable();
@@ -186,44 +217,7 @@ impl Parser {
                     lit.push('{');
                     continue;
                 }
-                // flush accumulated literal
-                if !lit.is_empty() {
-                    parts.push(FStringPart::Lit(std::mem::take(&mut lit)));
-                }
-                // collect expression (and optional format spec) until matching '}'
-                let mut expr_str = String::new();
-                let mut fmt_spec = String::new();
-                let mut in_fmt = false;
-                let mut depth: usize = 1;
-                for c2 in chars.by_ref() {
-                    if c2 == '{' {
-                        depth += 1;
-                    }
-                    if c2 == '}' {
-                        depth -= 1;
-                        if depth == 0 {
-                            break;
-                        }
-                    }
-                    if c2 == ':' && depth == 1 && !in_fmt {
-                        in_fmt = true;
-                        continue;
-                    }
-                    if in_fmt {
-                        fmt_spec.push(c2);
-                    } else {
-                        expr_str.push(c2);
-                    }
-                }
-                // parse the interpolated expression
-                let mut lexer = crate::lang::lexer::Lexer::new(&expr_str);
-                let tokens = lexer.tokenize()?;
-                let mut inner = Parser::new(tokens);
-                let expr = inner.parse_expr()?;
-                parts.push(FStringPart::Interp {
-                    expr: Box::new(expr),
-                    fmt: if fmt_spec.is_empty() { None } else { Some(fmt_spec) },
-                });
+                self.parse_fstring_interp(&mut chars, &mut lit, &mut parts)?;
             } else if c == '}' {
                 if chars.peek() == Some(&'}') {
                     // escaped brace: }} → }
@@ -240,6 +234,140 @@ impl Parser {
         Ok(parts)
     }
 
+    fn parse_fstring_interp<I>(
+        &self,
+        chars: &mut std::iter::Peekable<I>,
+        lit: &mut String,
+        parts: &mut Vec<FStringPart>,
+    ) -> crate::lang::error::Result<()>
+    where
+        I: Iterator<Item = char>,
+    {
+        // flush accumulated literal
+        if !lit.is_empty() {
+            parts.push(FStringPart::Lit(std::mem::take(lit)));
+        }
+        // collect expression (and optional format spec) until matching '}'
+        let mut expr_str = String::new();
+        let mut fmt_spec = String::new();
+        let mut in_fmt = false;
+        let mut depth: usize = 1;
+        for c2 in chars.by_ref() {
+            if c2 == '{' {
+                depth += 1;
+            }
+            if c2 == '}' {
+                depth -= 1;
+                if depth == 0 {
+                    break;
+                }
+            }
+            if c2 == ':' && depth == 1 && !in_fmt {
+                in_fmt = true;
+                continue;
+            }
+            if in_fmt {
+                fmt_spec.push(c2);
+            } else {
+                expr_str.push(c2);
+            }
+        }
+        // parse the interpolated expression
+        let mut lexer = crate::lang::lexer::Lexer::new(&expr_str);
+        let tokens = lexer.tokenize()?;
+        let mut inner = Parser::new(tokens);
+        let expr = inner.parse_expr()?;
+        parts.push(FStringPart::Interp {
+            expr: Box::new(expr),
+            fmt: if fmt_spec.is_empty() {
+                None
+            } else {
+                Some(fmt_spec)
+            },
+        });
+        Ok(())
+    }
+
+    // ── TString (template/eval string) ───────────────────────────────────────
+
+    /// Parse a t-string template into `Vec<TStringPart>` at parse time.
+    ///
+    /// The `template` string is the raw content after the `t"…"` delimiters.
+    /// Each `{expr}` is parsed as a Hayashi expression. At runtime the parts
+    /// are interpolated, concatenated, and the resulting source string is
+    /// re-lexed and re-parsed as a fresh expression.
+    fn parse_template_parts(
+        &mut self,
+        template: &str,
+    ) -> crate::lang::error::Result<Vec<TStringPart>> {
+        let mut parts: Vec<TStringPart> = Vec::new();
+        let mut lit = String::new();
+        let mut chars = template.chars().peekable();
+
+        while let Some(c) = chars.next() {
+            if c == '{' {
+                if chars.peek() == Some(&'{') {
+                    // escaped brace: {{ → {
+                    chars.next();
+                    lit.push('{');
+                    continue;
+                }
+                self.parse_template_interp(&mut chars, &mut lit, &mut parts)?;
+            } else if c == '}' {
+                if chars.peek() == Some(&'}') {
+                    // escaped brace: }} → }
+                    chars.next();
+                }
+                lit.push('}');
+            } else {
+                lit.push(c);
+            }
+        }
+        if !lit.is_empty() {
+            parts.push(TStringPart::Lit(lit));
+        }
+        Ok(parts)
+    }
+
+    fn parse_template_interp<I>(
+        &self,
+        chars: &mut std::iter::Peekable<I>,
+        lit: &mut String,
+        parts: &mut Vec<TStringPart>,
+    ) -> crate::lang::error::Result<()>
+    where
+        I: Iterator<Item = char>,
+    {
+        // flush accumulated literal
+        if !lit.is_empty() {
+            parts.push(TStringPart::Lit(std::mem::take(lit)));
+        }
+        // collect expression until matching '}'
+        let mut expr_str = String::new();
+        let mut depth: usize = 1;
+        for c2 in chars.by_ref() {
+            if c2 == '{' {
+                depth += 1;
+            }
+            if c2 == '}' {
+                depth -= 1;
+                if depth == 0 {
+                    break;
+                }
+            }
+            expr_str.push(c2);
+        }
+        // parse the interpolated expression
+        let mut lexer = crate::lang::lexer::Lexer::new(&expr_str);
+        let tokens = lexer.tokenize()?;
+        let mut inner = Parser::new(tokens);
+        let expr = inner.parse_expr()?;
+        parts.push(TStringPart::Interp {
+            expr: Box::new(expr),
+        });
+        Ok(())
+    }
+
     // ── Formula ──────────────────────────────────────────────────────────────
 
     fn parse_formula(&mut self, lhs: String) -> Result<Formula> {
@@ -248,40 +376,150 @@ impl Parser {
         let mut rhs = Vec::new();
         let mut fe = Vec::new();
         let mut in_fe = false;
+        let mut intercept = true;
+        let mut saw_rhs_item = false;
+        let mut expecting_rhs_item = true;
+        let mut expecting_fe_item = false;
 
         loop {
             match self.peek().clone() {
-                Token::Newline | Token::Eof | Token::RParen | Token::Comma => break,
-                Token::Pipe => {
+                Token::Newline | Token::Eof | Token::RParen | Token::Comma => {
+                    let line = self.line();
+                    if !saw_rhs_item {
+                        return Err(HayashiError::Parse {
+                            line,
+                            msg: "formula RHS requires a term or intercept control".into(),
+                        });
+                    }
+                    if (!in_fe && expecting_rhs_item) || (in_fe && expecting_fe_item) {
+                        return Err(HayashiError::Parse {
+                            line,
+                            msg: if in_fe {
+                                "fixed-effects section requires an identifier".into()
+                            } else {
+                                "formula RHS contains an empty term".into()
+                            },
+                        });
+                    }
+                    break;
+                }
+                Token::Pipe if !in_fe => {
+                    let line = self.line();
+                    if !saw_rhs_item || expecting_rhs_item {
+                        return Err(HayashiError::Parse {
+                            line,
+                            msg: "formula RHS contains an empty term before '|'".into(),
+                        });
+                    }
                     self.advance();
                     in_fe = true;
+                    expecting_fe_item = true;
                 }
                 Token::Plus => {
+                    let line = self.line();
+                    let expecting_item = if in_fe {
+                        expecting_fe_item
+                    } else {
+                        expecting_rhs_item
+                    };
+                    if expecting_item {
+                        return Err(HayashiError::Parse {
+                            line,
+                            msg: if in_fe {
+                                "fixed-effects section contains an empty term".into()
+                            } else {
+                                "formula RHS contains an empty term".into()
+                            },
+                        });
+                    }
                     self.advance();
+                    if in_fe {
+                        expecting_fe_item = true;
+                    } else {
+                        expecting_rhs_item = true;
+                    }
                 }
-                Token::Minus => {
-                    // "-1" remove intercept — o interpreter trata via `fe`/flags
+                Token::Minus if !in_fe => {
+                    let line = self.line();
                     self.advance();
+                    if self.peek() == &Token::Int(1) {
+                        self.advance();
+                        intercept = false;
+                    } else {
+                        return Err(HayashiError::Parse {
+                            line,
+                            msg: "only '- 1' is supported in formulas".into(),
+                        });
+                    }
+                    saw_rhs_item = true;
+                    expecting_rhs_item = false;
+                }
+                Token::Int(0) if !in_fe => {
+                    if !expecting_rhs_item {
+                        return Err(HayashiError::Parse {
+                            line: self.line(),
+                            msg: "expected '+' before intercept control".into(),
+                        });
+                    }
+                    self.advance();
+                    intercept = false;
+                    saw_rhs_item = true;
+                    expecting_rhs_item = false;
+                }
+                Token::Int(1) if !in_fe => {
+                    if !expecting_rhs_item {
+                        return Err(HayashiError::Parse {
+                            line: self.line(),
+                            msg: "expected '+' before intercept control".into(),
+                        });
+                    }
+                    self.advance();
+                    intercept = true;
+                    saw_rhs_item = true;
+                    expecting_rhs_item = false;
                 }
                 _ => {
                     if in_fe {
-                        // Dentro de efeitos fixos aceitamos apenas idents simples
-                        if let Token::Ident(name) = self.peek().clone() {
-                            self.advance();
-                            fe.push(name);
-                        } else {
-                            self.advance();
+                        let line = self.line();
+                        if !expecting_fe_item {
+                            return Err(HayashiError::Parse {
+                                line,
+                                msg: "expected '+' between fixed-effect identifiers".into(),
+                            });
                         }
+                        let Token::Ident(name) = self.peek().clone() else {
+                            return Err(HayashiError::Parse {
+                                line,
+                                msg: "fixed-effects section requires an identifier".into(),
+                            });
+                        };
+                        self.advance();
+                        fe.push(name);
+                        expecting_fe_item = false;
                         continue;
+                    }
+
+                    if !expecting_rhs_item {
+                        return Err(HayashiError::Parse {
+                            line: self.line(),
+                            msg: "expected '+' between formula terms".into(),
+                        });
                     }
 
                     // parse_formula_terms pode retornar 1 ou 3 termos (expansão x1*x2)
                     let terms = self.parse_formula_terms()?;
                     rhs.extend(terms);
+                    saw_rhs_item = true;
+                    expecting_rhs_item = false;
                 }
             }
         }
-        Ok(Formula { lhs, rhs, fe })
+        Ok(Formula {
+            lhs,
+            rhs,
+            fe,
+            intercept,
+        })
     }
 
     /// Parseia um ou mais termos do RHS.
@@ -350,7 +588,11 @@ impl Parser {
             let op = BinOp::Pow;
             self.advance();
             let rhs = self.parse_unary()?;
-            lhs = Expr::BinOp { op, lhs: Box::new(lhs), rhs: Box::new(rhs) };
+            lhs = Expr::BinOp {
+                op,
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
+            };
         }
 
         Ok(lhs)
@@ -629,6 +871,12 @@ impl Parser {
                 let parts = self.parse_fstring_parts(&s)?;
                 Ok(Expr::FString(parts))
             }
+            Token::TemplateLit(s) => {
+                let s = s.clone();
+                self.advance();
+                let parts = self.parse_template_parts(&s)?;
+                Ok(Expr::Template(parts))
+            }
 
             // Grouping: (expr)
             Token::LParen => {
@@ -660,29 +908,7 @@ impl Parser {
             // Dict literal: {"key": value, ...} or expression block: { stmt; ...; expr }
             Token::LBrace => {
                 if self.is_dict_literal() {
-                    self.advance(); // consumes LBrace
-                                    // Increments manually: inside the dict, Newlines are ignored
-                    self.brace_depth += 1;
-                    let mut pairs = Vec::new();
-                    while !matches!(self.peek(), Token::RBrace | Token::Eof) {
-                        self.skip_newlines();
-                        if matches!(self.peek(), Token::RBrace | Token::Eof) {
-                            break;
-                        }
-                        let key = self.parse_expr()?;
-                        self.skip_newlines();
-                        self.expect(&Token::Colon)?;
-                        self.skip_newlines();
-                        let val = self.parse_expr()?;
-                        pairs.push((key, val));
-                        self.skip_newlines();
-                        if self.peek() == &Token::Comma {
-                            self.advance();
-                        }
-                    }
-                    self.brace_depth -= 1; // decrementa antes do RBrace
-                    self.expect(&Token::RBrace)?;
-                    Ok(Expr::Dict(pairs))
+                    self.parse_dict_literal(line)
                 } else {
                     self.parse_block_expr()
                 }
@@ -703,90 +929,34 @@ impl Parser {
                 Ok(Expr::Quietly(Box::new(inner)))
             }
 
+            // parallel for as expression: let r = parallel for x in iter { ... }
+            Token::Parallel => {
+                let line = self.line();
+                let (var, var2, iter, body, threads) = self.parse_parallel_for(line)?;
+                // Store the ForIter as a boxed Expr to break the recursive type
+                // cycle (ForIter contains Expr, Expr now contains ForIter).
+                let iter_expr = match iter {
+                    ForIter::Range(s, e) => Expr::Range(Box::new(s), Box::new(e)),
+                    ForIter::RangeInclusive(s, e) => Expr::RangeInclusive(Box::new(s), Box::new(e)),
+                    ForIter::Items(e) => e,
+                };
+                Ok(Expr::ParallelFor {
+                    var,
+                    var2,
+                    iter: Box::new(iter_expr),
+                    body,
+                    threads: threads.map(Box::new),
+                })
+            }
+
             // Match expression: match expr { pat => result, ... }
             // `match` is a contextual keyword: it starts a match expression only
             // when followed by a scrutinee expression and an opening brace.
             Token::Ident(ref s) if s == "match" && self.is_match_expr() => {
-                self.advance();
-                let scrutinee = self.parse_expr()?;
-                self.expect(&Token::LBrace)?;
-                self.skip_newlines();
-                let mut arms = Vec::new();
-                while !matches!(self.peek(), Token::RBrace | Token::Eof) {
-                    let pattern = self.parse_expr()?;
-                    self.expect(&Token::FatArrow)?;
-                    let result = self.parse_expr()?;
-                    arms.push((pattern, result));
-                    if self.peek() == &Token::Comma {
-                        self.advance();
-                    }
-                    self.skip_newlines();
-                }
-                self.expect(&Token::RBrace)?;
-                Ok(Expr::Match {
-                    expr: Box::new(scrutinee),
-                    arms,
-                })
+                self.parse_match_expr(line)
             }
 
-            Token::Ident(name) => {
-                self.advance();
-
-                if self.peek() == &Token::ColonColon {
-                    self.advance();
-                    let member = self.expect_ident()?;
-                    let qualified = format!("{name}::{member}");
-                    if self.peek() == &Token::LParen {
-                        self.advance();
-                        let (args, opts) = self.parse_call_args()?;
-                        self.expect(&Token::RParen)?;
-                        return Ok(Expr::Call {
-                            func: qualified,
-                            args,
-                            opts,
-                        });
-                    }
-                    return Ok(Expr::Var(qualified));
-                }
-
-                if self.peek() == &Token::Tilde {
-                    let formula = self.parse_formula(name)?;
-                    return Ok(Expr::Formula(formula));
-                }
-
-                if self.peek() == &Token::LParen {
-                    self.advance();
-                    let (args, opts) = self.parse_call_args()?;
-                    self.expect(&Token::RParen)?;
-                    let mut expr = Expr::Call {
-                        func: name,
-                        args,
-                        opts,
-                    };
-
-                    while self.peek() == &Token::Dot {
-                        self.advance();
-                        let field = self.expect_ident()?;
-                        let (fargs, fopts) = if self.peek() == &Token::LParen {
-                            self.advance();
-                            let r = self.parse_call_args()?;
-                            self.expect(&Token::RParen)?;
-                            r
-                        } else {
-                            (vec![], vec![])
-                        };
-                        expr = Expr::Field {
-                            obj: Box::new(expr),
-                            field,
-                            args: fargs,
-                            opts: fopts,
-                        };
-                    }
-                    return Ok(expr);
-                }
-
-                Ok(Expr::Var(name))
-            }
+            Token::Ident(name) => self.parse_ident_primary(name, line),
 
             // Time-series operators: L.price, L2.price, F.gdp, D.wage
             Token::TsLag(n) => {
@@ -884,6 +1054,133 @@ impl Parser {
         }
     }
 
+    fn parse_dict_literal(&mut self, _line: usize) -> Result<Expr> {
+        self.advance(); // consumes LBrace
+                        // Increments manually: inside the dict, Newlines are ignored
+        self.brace_depth += 1;
+        let mut pairs = Vec::new();
+        while !matches!(self.peek(), Token::RBrace | Token::Eof) {
+            self.skip_newlines();
+            if matches!(self.peek(), Token::RBrace | Token::Eof) {
+                break;
+            }
+            let key = self.parse_expr()?;
+            self.skip_newlines();
+            self.expect(&Token::Colon)?;
+            self.skip_newlines();
+            let val = self.parse_expr()?;
+            pairs.push((key, val));
+            self.skip_newlines();
+            if self.peek() == &Token::Comma {
+                self.advance();
+            }
+        }
+        self.brace_depth -= 1; // decrementa antes do RBrace
+        self.expect(&Token::RBrace)?;
+        Ok(Expr::Dict(pairs))
+    }
+
+    fn parse_match_expr(&mut self, _line: usize) -> Result<Expr> {
+        self.advance();
+        let scrutinee = self.parse_expr()?;
+        self.expect(&Token::LBrace)?;
+        self.skip_newlines();
+        let mut arms = Vec::new();
+        while !matches!(self.peek(), Token::RBrace | Token::Eof) {
+            let pattern = self.parse_expr()?;
+            self.expect(&Token::FatArrow)?;
+            let result = self.parse_expr()?;
+            arms.push((pattern, result));
+            if self.peek() == &Token::Comma {
+                self.advance();
+            }
+            self.skip_newlines();
+        }
+        self.expect(&Token::RBrace)?;
+        Ok(Expr::Match {
+            expr: Box::new(scrutinee),
+            arms,
+        })
+    }
+
+    fn parse_ident_primary(&mut self, name: String, _line: usize) -> Result<Expr> {
+        self.advance();
+
+        if self.peek() == &Token::ColonColon {
+            self.advance();
+            let member = self.expect_ident()?;
+            let qualified = format!("{name}::{member}");
+            if self.peek() == &Token::LParen {
+                self.advance();
+                let (args, opts) = self.parse_call_args()?;
+                self.expect(&Token::RParen)?;
+                return Ok(Expr::Call {
+                    func: qualified,
+                    args,
+                    opts,
+                });
+            }
+            return Ok(Expr::Var(qualified));
+        }
+
+        if self.peek() == &Token::Tilde {
+            let formula = self.parse_formula(name)?;
+            return Ok(Expr::Formula(formula));
+        }
+
+        if self.peek() == &Token::LParen {
+            self.advance();
+            let (args, opts) = self.parse_call_args()?;
+            self.expect(&Token::RParen)?;
+            let mut expr = Expr::Call {
+                func: name,
+                args,
+                opts,
+            };
+
+            while self.peek() == &Token::Dot {
+                self.advance();
+                let field = self.expect_ident()?;
+                let (fargs, fopts) = if self.peek() == &Token::LParen {
+                    self.advance();
+                    let r = self.parse_call_args()?;
+                    self.expect(&Token::RParen)?;
+                    r
+                } else {
+                    (vec![], vec![])
+                };
+                expr = Expr::Field {
+                    obj: Box::new(expr),
+                    field,
+                    args: fargs,
+                    opts: fopts,
+                };
+            }
+            return Ok(expr);
+        }
+
+        let mut expr = Expr::Var(name);
+        while self.peek() == &Token::Dot {
+            self.advance();
+            let field = self.expect_ident()?;
+            let (fargs, fopts) = if self.peek() == &Token::LParen {
+                self.advance();
+                let r = self.parse_call_args()?;
+                self.expect(&Token::RParen)?;
+                r
+            } else {
+                (vec![], vec![])
+            };
+            expr = Expr::Field {
+                obj: Box::new(expr),
+                field,
+                args: fargs,
+                opts: fopts,
+            };
+        }
+        Ok(expr)
+    }
+
     fn is_kw_bare_arg(&mut self) -> bool {
         // Keywords that CANNOT be bare identifiers in
         // expressions (help(if), help(for), etc.). Others like count/load/return
@@ -893,6 +1190,7 @@ impl Parser {
             Token::If
                 | Token::Else
                 | Token::For
+                | Token::Parallel
                 | Token::While
                 | Token::Fn
                 | Token::Let
@@ -912,95 +1210,101 @@ impl Parser {
         let mut opts = Vec::new();
 
         while !matches!(self.peek(), Token::RParen | Token::Eof | Token::Newline) {
-            // opt=value or normal expr
-            // Special case: keyword `if` used as option key (e.g. mean(df, y, if=x==1))
-            let is_kw_opt = matches!(
-                self.peek(),
-                Token::If
-                    | Token::Else
-                    | Token::Generate
-                    | Token::For
-                    | Token::In
-                    | Token::Return
-                    | Token::Break
-                    | Token::Continue
-                    | Token::Count
-                    | Token::Replace
-                    | Token::Load
-                    | Token::Export
-                    | Token::Print
-                    | Token::Predict
-            ) && self
-                .tokens
-                .get(self.pos + 1)
-                .map(|(t, _)| t == &Token::Eq)
-                .unwrap_or(false);
-            if is_kw_opt {
-                let kw_name = match self.peek() {
-                    Token::If => "if",
-                    Token::Else => "else",
-                    Token::Generate => "gen",
-                    Token::For => "for",
-                    Token::In => "in",
-                    Token::Return => "return",
-                    Token::Break => "break",
-                    Token::Continue => "continue",
-                    Token::Count => "count",
-                    Token::Replace => "replace",
-                    Token::Load => "load",
-                    Token::Export => "export",
-                    Token::Print => "print",
-                    Token::Predict => "predict",
-                    _ => "?",
-                }
-                .to_string();
-                self.advance(); // keyword
-                self.advance(); // =
-                let val = self.parse_expr()?;
-                opts.push(Opt {
-                    name: kw_name,
-                    value: val,
-                });
-            } else if self.is_kw_bare_arg() {
-                // Keyword used as bare argument (e.g. help(if), help(for))
-                let kw_name = match self.peek() {
-                    Token::If => "if",
-                    Token::Else => "else",
-                    Token::For => "for",
-                    Token::While => "while",
-                    Token::Fn => "fn",
-                    Token::Let => "let",
-                    Token::Tsset => "tsset",
-                    Token::Quietly => "quietly",
-                    _ => "?",
-                }
-                .to_string();
-                self.advance();
-                args.push(Expr::Str(kw_name));
-            } else if let Token::Ident(name) = self.peek().clone() {
-                // lookahead: is it opt=val?
-                if self
-                    .tokens
-                    .get(self.pos + 1)
-                    .map(|(t, _)| t == &Token::Eq)
-                    .unwrap_or(false)
-                {
-                    self.advance(); // name
-                    self.advance(); // =
-                    let val = self.parse_expr()?;
-                    opts.push(Opt { name, value: val });
-                } else {
-                    args.push(self.parse_expr()?);
-                }
-            } else {
-                args.push(self.parse_expr()?);
-            }
-
+            self.parse_call_arg(&mut args, &mut opts)?;
             if self.peek() == &Token::Comma {
                 self.advance();
             }
         }
         Ok((args, opts))
+    }
+
+    fn parse_call_arg(&mut self, args: &mut Vec<Expr>, opts: &mut Vec<Opt>) -> Result<()> {
+        // opt=value or normal expr
+        // Special case: keyword `if` used as option key (e.g. mean(df, y, if=x==1))
+        let is_kw_opt = matches!(
+            self.peek(),
+            Token::If
+                | Token::Else
+                | Token::Generate
+                | Token::For
+                | Token::Parallel
+                | Token::In
+                | Token::Return
+                | Token::Break
+                | Token::Continue
+                | Token::Count
+                | Token::Replace
+                | Token::Load
+                | Token::Export
+                | Token::Print
+                | Token::Predict
+        ) && self
+            .tokens
+            .get(self.pos + 1)
+            .map(|(t, _)| t == &Token::Eq)
+            .unwrap_or(false);
+        if is_kw_opt {
+            let kw_name = match self.peek() {
+                Token::If => "if",
+                Token::Else => "else",
+                Token::Generate => "gen",
+                Token::For => "for",
+                Token::Parallel => "parallel",
+                Token::In => "in",
+                Token::Return => "return",
+                Token::Break => "break",
+                Token::Continue => "continue",
+                Token::Count => "count",
+                Token::Replace => "replace",
+                Token::Load => "load",
+                Token::Export => "export",
+                Token::Print => "print",
+                Token::Predict => "predict",
+                _ => "?",
+            }
+            .to_string();
+            self.advance(); // keyword
+            self.advance(); // =
+            let val = self.parse_expr()?;
+            opts.push(Opt {
+                name: kw_name,
+                value: val,
+            });
+        } else if self.is_kw_bare_arg() {
+            // Keyword used as bare argument (e.g. help(if), help(for))
+            let kw_name = match self.peek() {
+                Token::If => "if",
+                Token::Else => "else",
+                Token::For => "for",
+                Token::While => "while",
+                Token::Fn => "fn",
+                Token::Let => "let",
+                Token::Tsset => "tsset",
+                Token::Quietly => "quietly",
+                _ => "?",
+            }
+            .to_string();
+            self.advance();
+            args.push(Expr::Str(kw_name));
+        } else if let Token::Ident(name) = self.peek().clone() {
+            // lookahead: is it opt=val?
+            if self
+                .tokens
+                .get(self.pos + 1)
+                .map(|(t, _)| t == &Token::Eq)
+                .unwrap_or(false)
+            {
+                self.advance(); // name
+                self.advance(); // =
+                let val = self.parse_expr()?;
+                opts.push(Opt { name, value: val });
+            } else {
+                args.push(self.parse_expr()?);
+            }
+        } else {
+            args.push(self.parse_expr()?);
+        }
+        Ok(())
     }
 
     // ── Bloco { stmt* } ───────────────────────────────────────────────────────
@@ -1070,20 +1374,22 @@ impl Parser {
         self.expect(&Token::LBrace)?;
         self.brace_depth += 1;
         self.skip_newlines();
-        let mut stmts = Vec::new();
+        let mut stmts: Vec<Spanned> = Vec::new();
         while !matches!(self.peek(), Token::RBrace | Token::Eof) {
+            let line = self.line();
             if let Some(s) = self.parse_stmt()? {
-                stmts.push(s);
+                stmts.push((s, line));
             }
             self.skip_newlines();
         }
         self.brace_depth -= 1;
         self.expect(&Token::RBrace)?;
         // If the last statement is an expression, it is the return value of the block.
-        let final_expr = if let Some(Stmt::Expr(e)) = stmts.last() {
+        let final_expr = if let Some((Stmt::Expr(e), line)) = stmts.last() {
             let e = e.clone();
+            let line = *line;
             stmts.pop();
-            Some(Box::new(e))
+            Some(Box::new((e, line)))
         } else {
             None
         };
@@ -1101,6 +1407,59 @@ impl Parser {
         }
     }
 
+    /// Parses `parallel for var [, var2] in iter [, threads=N] { body }`
+    /// and returns the components. Called from both `parse_stmt` (statement
+    /// form) and `parse_primary` (expression form).
+    #[allow(clippy::type_complexity)]
+    fn parse_parallel_for(
+        &mut self,
+        line: usize,
+    ) -> Result<(String, Option<String>, ForIter, Vec<Spanned>, Option<Expr>)> {
+        self.advance(); // consume 'parallel'
+        match self.advance().clone() {
+            Token::For => {}
+            t => {
+                return Err(HayashiError::Parse {
+                    line,
+                    msg: format!("expected 'for' after 'parallel', got {t:?}"),
+                })
+            }
+        }
+        let var = self.expect_ident()?;
+        let var2 = if self.peek() == &Token::Comma {
+            self.advance();
+            Some(self.expect_ident()?)
+        } else {
+            None
+        };
+        match self.advance().clone() {
+            Token::In => {}
+            t => {
+                return Err(HayashiError::Parse {
+                    line,
+                    msg: format!("expected 'in' after for variable, got {t:?}"),
+                })
+            }
+        }
+        let iter = self.parse_for_iter()?;
+        let threads = if self.peek() == &Token::Comma {
+            self.advance();
+            let opt_name = self.expect_ident()?;
+            if opt_name != "threads" {
+                return Err(HayashiError::Parse {
+                    line,
+                    msg: format!("expected 'threads' after ',' in parallel for, got '{opt_name}'"),
+                });
+            }
+            self.expect(&Token::Eq)?;
+            Some(self.parse_expr()?)
+        } else {
+            None
+        };
+        let body = self.parse_block()?;
+        Ok((var, var2, iter, body, threads))
+    }
+
     // ── Statement ────────────────────────────────────────────────────────────
 
     fn parse_stmt(&mut self) -> Result<Option<Stmt>> {
@@ -1110,513 +1469,86 @@ impl Parser {
         match self.peek().clone() {
             Token::Eof => Ok(None),
 
-            Token::Let => {
-                self.advance();
-                let name = self.expect_ident()?;
-                self.expect(&Token::Eq)?;
-                let value = self.parse_expr()?;
-                Ok(Some(Stmt::Let { name, value }))
-            }
+            Token::Let => self.parse_let_stmt(),
 
-            Token::Ident(ref s) if s == "const" => {
-                self.advance();
-                let name = self.expect_ident()?;
-                self.expect(&Token::Eq)?;
-                let value = self.parse_expr()?;
-                Ok(Some(Stmt::Const { name, value }))
-            }
+            Token::Ident(ref s) if s == "const" => self.parse_const_stmt(),
 
-            Token::Load => {
-                self.advance();
-                let path = self.parse_expr()?;
-                // as nome (opcional)
-                let alias = if let Token::Ident(kw) = self.peek().clone() {
-                    if kw == "as" {
-                        self.advance();
-                        self.expect_ident()?
-                    } else {
-                        "df".to_string()
-                    }
-                } else {
-                    "df".to_string()
-                };
-                // options: , key=value, ...
-                let mut opts = Vec::new();
-                while *self.peek() == Token::Comma {
-                    self.advance();
-                    let key = self.expect_ident()?;
-                    self.expect(&Token::Eq)?;
-                    let val = match key.as_str() {
-                        "sheet" | "table" => {
-                            if let Token::Ident(s) = self.peek().clone() {
-                                self.advance();
-                                Expr::Str(s)
-                            } else {
-                                self.parse_expr()?
-                            }
-                        }
-                        _ => self.parse_expr()?,
-                    };
-                    opts.push(Opt {
-                        name: key,
-                        value: val,
-                    });
-                }
-                Ok(Some(Stmt::Load { path, alias, opts }))
-            }
+            Token::Load => self.parse_load_stmt(),
 
-            Token::Print => {
-                self.advance();
-                self.expect(&Token::LParen)?;
-                let mut exprs = Vec::new();
-                let mut opts = Vec::new();
-                if self.peek() != &Token::RParen {
-                    loop {
-                        if let Some(Token::Ident(name)) = self.peek_raw_at(0).cloned() {
-                            if self.peek_raw_at(1) == Some(&Token::Eq) {
-                                self.advance();
-                                self.advance();
-                                let val = self.parse_expr()?;
-                                opts.push(Opt { name, value: val });
-                                if self.peek() == &Token::Comma {
-                                    self.advance();
-                                    continue;
-                                }
-                                break;
-                            }
-                        }
-                        exprs.push(self.parse_expr()?);
-                        if self.peek() == &Token::Comma {
-                            self.advance();
-                        } else {
-                            break;
-                        }
-                    }
-                }
-                self.expect(&Token::RParen)?;
-                Ok(Some(Stmt::Print(exprs, opts)))
-            }
+            Token::Print => self.parse_print_stmt(),
 
-            Token::Export => {
-                self.advance();
-                self.expect(&Token::LParen)?;
-                let value = self.parse_expr()?;
-                self.expect(&Token::Comma)?;
-                let fmt = self.parse_expr()?;
-                self.expect(&Token::Comma)?;
-                let path = self.parse_expr()?;
-                self.expect(&Token::RParen)?;
-                Ok(Some(Stmt::Export { value, fmt, path }))
-            }
+            Token::Export => self.parse_export_stmt(),
 
-            Token::Generate => {
-                if self.peek_raw_at(1) == Some(&Token::LParen) {
-                    // generate(df, col = expr) — function call form
-                    let expr = self.parse_expr()?;
-                    Ok(Some(Stmt::Expr(expr)))
-                } else {
-                    // generate df var = expr — Stata statement form
-                    // var may be an identifier or an f-string (dynamic column name)
-                    self.advance();
-                    let df = self.expect_ident()?;
-                    let varname = match self.peek().clone() {
-                        Token::Ident(n) => {
-                            self.advance();
-                            Expr::Str(n)
-                        }
-                        Token::FStringLit(s) => {
-                            let s = s.clone();
-                            self.advance();
-                            let parts = self.parse_fstring_parts(&s)?;
-                            Expr::FString(parts)
-                        }
-                        _ => {
-                            return Err(HayashiError::Parse {
-                                line: self.line(),
-                                msg: "generate: expected column name (identifier or f-string)"
-                                    .into(),
-                            })
-                        }
-                    };
-                    self.expect(&Token::Eq)?;
-                    let expr = self.parse_expr()?;
-                    Ok(Some(Stmt::Generate { df, varname, expr }))
-                }
-            }
+            Token::Generate => self.parse_generate_stmt(),
 
-            Token::Predict => {
-                self.advance();
-                let df = self.expect_ident()?;
-                let varname = self.expect_ident()?;
-                self.expect(&Token::Eq)?;
-                let model = self.parse_primary()?;
-                let kind = if self.peek() == &Token::Comma {
-                    self.advance();
-                    self.parse_expr()?
-                } else {
-                    Expr::Str("xb".to_string())
-                };
-                Ok(Some(Stmt::Predict {
-                    df,
-                    varname,
-                    model,
-                    kind,
-                }))
-            }
+            Token::Predict => self.parse_predict_stmt(),
 
-            Token::Count => {
-                self.advance();
-                let df = self.expect_ident()?;
-                let cond = if self.peek() == &Token::If {
-                    self.advance();
-                    Some(self.parse_expr()?)
-                } else {
-                    None
-                };
-                Ok(Some(Stmt::Count { df, cond }))
-            }
+            Token::Count => self.parse_count_stmt(),
 
-            Token::Replace => {
-                self.advance();
-                let df = self.expect_ident()?;
-                let varname = self.expect_ident()?;
-                self.expect(&Token::Eq)?;
-                let expr = self.parse_expr()?;
-                // opcional: if cond_expr
-                let cond = if self.peek() == &Token::If {
-                    self.advance();
-                    Some(self.parse_expr()?)
-                } else {
-                    None
-                };
-                Ok(Some(Stmt::Replace {
-                    df,
-                    varname,
-                    expr,
-                    cond,
-                }))
-            }
+            Token::Replace => self.parse_replace_stmt(),
 
-            Token::Tsset => {
-                self.advance();
-                let df = self.expect_ident()?;
-                let t_var = self.expect_ident()?;
-                Ok(Some(Stmt::Tsset { df, t_var }))
-            }
+            Token::Tsset => self.parse_tsset_stmt(),
 
             // ── if cond { ... } [else [if cond] { ... }] ─────────────────────
-            Token::If => {
-                self.advance();
-                let cond = self.parse_expr()?;
-                let then_body = self.parse_block()?;
-                // else [if ...]
-                let else_body = if self.peek() == &Token::Else {
-                    self.advance();
-                    if self.peek() == &Token::If {
-                        let inner_line = self.line();
-                        let inner = self.parse_stmt()?.ok_or_else(|| HayashiError::Parse {
-                            line,
-                            msg: "expected statement after 'else if'".into(),
-                        })?;
-                        Some(vec![(inner, inner_line)])
-                    } else {
-                        Some(self.parse_block()?)
-                    }
-                } else {
-                    None
-                };
-                Ok(Some(Stmt::If {
-                    cond,
-                    then_body,
-                    else_body,
-                }))
-            }
+            Token::If => self.parse_if_stmt(line),
 
             // ── for var in iter { ... } ───────────────────────────────────────
-            // Also supports: for k, v in dict { ... } and for i, v in list { ... }
-            Token::For => {
-                self.advance();
-                let var = self.expect_ident()?;
-                let var2 = if self.peek() == &Token::Comma {
-                    self.advance();
-                    Some(self.expect_ident()?)
-                } else {
-                    None
-                };
-                // expects "in"
-                match self.advance().clone() {
-                    Token::In => {}
-                    t => {
-                        return Err(HayashiError::Parse {
-                            line,
-                            msg: format!("expected 'in' after for variable, got {t:?}"),
-                        })
-                    }
-                }
-                let iter = self.parse_for_iter()?;
-                let body = self.parse_block()?;
-                Ok(Some(Stmt::For {
-                    var,
-                    var2,
-                    iter,
-                    body,
-                }))
-            }
+            Token::For => self.parse_for_stmt(line),
+
+            // ── parallel for var in iter { ... } ─────────────────────────────
+            // Like `for`, but iterations run concurrently.
+            // As a statement: result is stored in the iteration variable.
+            // As an expression (via parse_primary): result is returned.
+            Token::Parallel => self.parse_parallel_for_stmt(line),
 
             // ── fn name(p1, p2) { body } ─────────────────────────────────────
-            Token::Fn => {
-                self.advance();
-                let name = self.expect_ident()?;
-                self.expect(&Token::LParen)?;
-                let mut params = Vec::new();
-                let mut defaults = Vec::new();
-                while !matches!(self.peek(), Token::RParen | Token::Eof) {
-                    let param = self.expect_ident()?;
-                    let default = if self.peek() == &Token::Eq {
-                        self.advance();
-                        Some(self.parse_expr()?)
-                    } else {
-                        None
-                    };
-                    params.push(param);
-                    defaults.push(default);
-                    if self.peek() == &Token::Comma {
-                        self.advance();
-                    }
-                }
-                self.expect(&Token::RParen)?;
-                let (doc, body) = self.parse_block_with_doc()?;
-                Ok(Some(Stmt::Fn {
-                    name,
-                    params,
-                    defaults,
-                    doc,
-                    body,
-                }))
-            }
+            Token::Fn => self.parse_fn_stmt(),
 
             // ── return [expr] ─────────────────────────────────────────────────
-            Token::Return => {
-                self.advance();
-                let expr = if matches!(self.peek(), Token::Newline | Token::RBrace | Token::Eof) {
-                    None
-                } else {
-                    Some(self.parse_expr()?)
-                };
-                Ok(Some(Stmt::Return(expr)))
-            }
+            Token::Return => self.parse_return_stmt(),
 
-            Token::Break => {
-                self.advance();
-                Ok(Some(Stmt::Break))
-            }
-            Token::Continue => {
-                self.advance();
-                Ok(Some(Stmt::Continue))
-            }
+            Token::Break => self.parse_break_stmt(),
+            Token::Continue => self.parse_continue_stmt(),
 
             // ── while cond { ... } ────────────────────────────────────────────
-            Token::While => {
-                self.advance();
-                let cond = self.parse_expr()?;
-                let body = self.parse_block()?;
-                Ok(Some(Stmt::While { cond, body }))
-            }
+            Token::While => self.parse_while_stmt(),
 
             // ── input df \n header_row \n data_rows \n end ────────────────────
-            Token::Ident(ref s) if s == "input" => {
-                self.advance();
-                let alias = self.expect_ident()?;
-                self.skip_newlines();
-
-                // Header: variable names until newline
-                let mut headers: Vec<String> = Vec::new();
-                loop {
-                    match self.peek().clone() {
-                        Token::Newline | Token::Eof => break,
-                        Token::Ident(h) => {
-                            let h = h.clone();
-                            self.advance();
-                            headers.push(h);
-                        }
-                        _ => break,
-                    }
-                }
-                self.skip_newlines();
-
-                // Data lines until "end"
-                let mut rows: Vec<Vec<f64>> = Vec::new();
-                'outer: loop {
-                    self.skip_newlines();
-                    // Detect "end"
-                    if let Token::Ident(ref s) = self.peek().clone() {
-                        if s == "end" {
-                            self.advance();
-                            break 'outer;
-                        }
-                    }
-                    if self.peek() == &Token::Eof {
-                        break;
-                    }
-
-                    let mut row: Vec<f64> = Vec::new();
-                    loop {
-                        match self.peek().clone() {
-                            Token::Newline | Token::Eof => break,
-                            Token::Float(v) => {
-                                self.advance();
-                                row.push(v);
-                            }
-                            Token::Int(v) => {
-                                let v = v as f64;
-                                self.advance();
-                                row.push(v);
-                            }
-                            Token::Minus => {
-                                self.advance();
-                                let v = match self.peek().clone() {
-                                    Token::Float(v) => {
-                                        self.advance();
-                                        -v
-                                    }
-                                    Token::Int(v) => {
-                                        self.advance();
-                                        -(v as f64)
-                                    }
-                                    _ => {
-                                        return Err(HayashiError::Parse {
-                                            line,
-                                            msg: "expected number after '-'".into(),
-                                        })
-                                    }
-                                };
-                                row.push(v);
-                            }
-                            Token::Dot => {
-                                self.advance();
-                                row.push(f64::NAN);
-                            } // . = missing
-                            Token::Ident(ref s) | Token::StringLit(ref s) => {
-                                let s = s.clone();
-                                return Err(HayashiError::Parse {
-                                    line,
-                                    msg: format!(
-                                        "input block only accepts numeric values — \
-                                         '{s}' is not a number. \
-                                         Use '.' for missing, or load for files with text columns."
-                                    ),
-                                });
-                            }
-                            _ => {
-                                // skip unknown tokens until end of line
-                                while !matches!(self.peek(), Token::Newline | Token::Eof) {
-                                    self.advance();
-                                }
-                                break;
-                            }
-                        }
-                    }
-                    if !row.is_empty() {
-                        rows.push(row);
-                    }
-                }
-                Ok(Some(Stmt::Input {
-                    alias,
-                    headers,
-                    rows,
-                }))
-            }
+            Token::Ident(ref s) if s == "input" => self.parse_input_stmt(line),
 
             // ── try { ... } catch e { ... } [finally { ... }] ────────────────
-            Token::Ident(ref s) if s == "try" => {
-                self.advance();
-                let try_body = self.parse_block()?;
-                let catch_kw = match self.peek().clone() {
-                    Token::Ident(s) if s == "catch" => {
-                        self.advance();
-                        true
-                    }
-                    _ => false,
-                };
-                if !catch_kw {
-                    return Err(HayashiError::Parse {
-                        line,
-                        msg: "expected 'catch' after try block".into(),
-                    });
-                }
-                let error_var = self.expect_ident()?;
-                let catch_body = self.parse_block()?;
-                let finally_body = if matches!(self.peek(), Token::Ident(ref s) if s == "finally") {
-                    self.advance();
-                    self.parse_block()?
-                } else {
-                    Vec::new()
-                };
-                Ok(Some(Stmt::TryCatch {
-                    try_body,
-                    error_var,
-                    catch_body,
-                    finally_body,
-                }))
-            }
+            Token::Ident(ref s) if s == "try" => self.parse_try_catch_stmt(line),
 
             // ── display expr (without parentheses) ───────────────────────────────
-            Token::Ident(ref s) if s == "display" || s == "di" => {
-                self.advance();
-                let expr = self.parse_expr()?;
-                Ok(Some(Stmt::Display(expr)))
-            }
+            Token::Ident(ref s) if s == "display" || s == "di" => self.parse_display_stmt(),
 
             // ── scalar name = expr  (alias de let) ───────────────────────────
-            Token::Ident(ref s) if s == "scalar" => {
-                self.advance();
-                let name = self.expect_ident()?;
-                self.expect(&Token::Eq)?;
-                let value = self.parse_expr()?;
-                Ok(Some(Stmt::Let { name, value }))
-            }
+            Token::Ident(ref s) if s == "scalar" => self.parse_scalar_stmt(),
 
             // name = expr (assignment without let — modifies existing variable)
-            Token::Ident(ref name)
+            Token::Ident(name)
                 if self
                     .tokens
                     .get(self.pos + 1)
                     .map(|(t, _)| t == &Token::Eq)
                     .unwrap_or(false) =>
             {
-                let name = name.clone();
-                self.advance(); // ident
-                self.advance(); // =
-                let value = self.parse_expr()?;
-                Ok(Some(Stmt::Assign { name, value }))
+                self.parse_assign_stmt(name)
             }
 
             // increment/decrement: x++  x--
-            Token::Ident(ref name)
+            Token::Ident(name)
                 if self
                     .tokens
                     .get(self.pos + 1)
                     .map(|(t, _)| matches!(t, Token::PlusPlus | Token::MinusMinus))
                     .unwrap_or(false) =>
             {
-                let name = name.clone();
-                self.advance(); // ident
-                let op = match self.peek() {
-                    Token::PlusPlus => BinOp::Add,
-                    Token::MinusMinus => BinOp::Sub,
-                    _ => unreachable!(),
-                };
-                self.advance(); // ++ or --
-                let value = Expr::BinOp {
-                    op,
-                    lhs: Box::new(Expr::Var(name.clone())),
-                    rhs: Box::new(Expr::Int(1)),
-                };
-                Ok(Some(Stmt::Assign { name, value }))
+                self.parse_incdec_stmt(name)
             }
 
             // compound assignment: +=  -=  *=  /=  %=
-            Token::Ident(ref name)
+            Token::Ident(name)
                 if self
                     .tokens
                     .get(self.pos + 1)
@@ -1632,53 +1564,10 @@ impl Parser {
                     })
                     .unwrap_or(false) =>
             {
-                let name = name.clone();
-                self.advance(); // ident
-                let op = match self.peek() {
-                    Token::PlusEq => BinOp::Add,
-                    Token::MinusEq => BinOp::Sub,
-                    Token::StarEq => BinOp::Mul,
-                    Token::SlashEq => BinOp::Div,
-                    Token::PercentEq => BinOp::Mod,
-                    _ => unreachable!(),
-                };
-                self.advance(); // op=
-                let rhs = self.parse_expr()?;
-                let value = Expr::BinOp {
-                    op,
-                    lhs: Box::new(Expr::Var(name.clone())),
-                    rhs: Box::new(rhs),
-                };
-                Ok(Some(Stmt::Assign { name, value }))
+                self.parse_compound_assign_stmt(name)
             }
 
-            Token::Quietly => {
-                if self
-                    .tokens
-                    .get(self.pos + 1)
-                    .map(|(t, _)| t == &Token::LParen)
-                    .unwrap_or(false)
-                {
-                    // Obsolete functional form at statement level: quietly(expr)
-                    let expr = self.parse_expr()?;
-                    return Ok(Some(Stmt::Expr(expr)));
-                }
-                self.advance(); // consumes quietly
-                match self.peek() {
-                    Token::Ident(s) if s == "on" => {
-                        self.advance();
-                        Ok(Some(Stmt::QuietlyOn))
-                    }
-                    Token::Ident(s) if s == "off" => {
-                        self.advance();
-                        Ok(Some(Stmt::QuietlyOff))
-                    }
-                    other => Err(HayashiError::Parse {
-                        line,
-                        msg: format!("expected 'on' or 'off' after quietly, got {other:?}"),
-                    }),
-                }
-            }
+            Token::Quietly => self.parse_quietly_stmt(line),
 
             Token::Ident(_) => {
                 let expr = self.parse_expr()?;
@@ -1695,6 +1584,7 @@ impl Parser {
             | Token::Bool(_)
             | Token::StringLit(_)
             | Token::FStringLit(_)
+            | Token::TemplateLit(_)
             | Token::LBracket
             | Token::LParen
             | Token::Minus
@@ -1711,6 +1601,566 @@ impl Parser {
         }
     }
 
+    fn parse_input_stmt(&mut self, line: usize) -> Result<Option<Stmt>> {
+        self.advance();
+        let alias = self.expect_ident()?;
+        self.skip_newlines();
+
+        // Header: variable names until newline
+        let mut headers: Vec<String> = Vec::new();
+        loop {
+            match self.peek().clone() {
+                Token::Newline | Token::Eof => break,
+                Token::Ident(h) => {
+                    let h = h.clone();
+                    self.advance();
+                    headers.push(h);
+                }
+                _ => break,
+            }
+        }
+        self.skip_newlines();
+
+        // Data lines until "end"
+        let mut rows: Vec<Vec<f64>> = Vec::new();
+        'outer: loop {
+            self.skip_newlines();
+            // Detect "end"
+            if let Token::Ident(ref s) = self.peek().clone() {
+                if s == "end" {
+                    self.advance();
+                    break 'outer;
+                }
+            }
+            if self.peek() == &Token::Eof {
+                break;
+            }
+
+            let mut row: Vec<f64> = Vec::new();
+            loop {
+                match self.peek().clone() {
+                    Token::Newline | Token::Eof => break,
+                    Token::Float(v) => {
+                        self.advance();
+                        row.push(v);
+                    }
+                    Token::Int(v) => {
+                        let v = v as f64;
+                        self.advance();
+                        row.push(v);
+                    }
+                    Token::Minus => {
+                        self.advance();
+                        let v = match self.peek().clone() {
+                            Token::Float(v) => {
+                                self.advance();
+                                -v
+                            }
+                            Token::Int(v) => {
+                                self.advance();
+                                -(v as f64)
+                            }
+                            _ => {
+                                return Err(HayashiError::Parse {
+                                    line,
+                                    msg: "expected number after '-'".into(),
+                                })
+                            }
+                        };
+                        row.push(v);
+                    }
+                    Token::Dot => {
+                        self.advance();
+                        row.push(f64::NAN);
+                    } // . = missing
+                    Token::Ident(ref s) | Token::StringLit(ref s) => {
+                        let s = s.clone();
+                        return Err(HayashiError::Parse {
+                            line,
+                            msg: format!(
+                                "input block only accepts numeric values — \
+                                 '{s}' is not a number. \
+                                 Use '.' for missing, or load for files with text columns."
+                            ),
+                        });
+                    }
+                    _ => {
+                        // skip unknown tokens until end of line
+                        while !matches!(self.peek(), Token::Newline | Token::Eof) {
+                            self.advance();
+                        }
+                        break;
+                    }
+                }
+            }
+            if !row.is_empty() {
+                rows.push(row);
+            }
+        }
+        Ok(Some(Stmt::Input {
+            alias,
+            headers,
+            rows,
+        }))
+    }
+
+    fn parse_try_catch_stmt(&mut self, line: usize) -> Result<Option<Stmt>> {
+        self.advance();
+        let try_body = self.parse_block()?;
+        let catch_kw = match self.peek().clone() {
+            Token::Ident(s) if s == "catch" => {
+                self.advance();
+                true
+            }
+            _ => false,
+        };
+        if !catch_kw {
+            return Err(HayashiError::Parse {
+                line,
+                msg: "expected 'catch' after try block".into(),
+            });
+        }
+        let error_var = self.expect_ident()?;
+        let catch_body = self.parse_block()?;
+        let finally_body = if matches!(self.peek(), Token::Ident(ref s) if s == "finally") {
+            self.advance();
+            self.parse_block()?
+        } else {
+            Vec::new()
+        };
+        Ok(Some(Stmt::TryCatch {
+            try_body,
+            error_var,
+            catch_body,
+            finally_body,
+        }))
+    }
+
+    fn parse_quietly_stmt(&mut self, line: usize) -> Result<Option<Stmt>> {
+        if self
+            .tokens
+            .get(self.pos + 1)
+            .map(|(t, _)| t == &Token::LParen)
+            .unwrap_or(false)
+        {
+            // Obsolete functional form at statement level: quietly(expr)
+            let expr = self.parse_expr()?;
+            return Ok(Some(Stmt::Expr(expr)));
+        }
+        self.advance(); // consumes quietly
+        match self.peek() {
+            Token::Ident(s) if s == "on" => {
+                self.advance();
+                Ok(Some(Stmt::QuietlyOn))
+            }
+            Token::Ident(s) if s == "off" => {
+                self.advance();
+                Ok(Some(Stmt::QuietlyOff))
+            }
+            other => Err(HayashiError::Parse {
+                line,
+                msg: format!("expected 'on' or 'off' after quietly, got {other:?}"),
+            }),
+        }
+    }
+
+    fn parse_assign_stmt(&mut self, name: String) -> Result<Option<Stmt>> {
+        self.advance(); // ident
+        self.advance(); // =
+        let value = self.parse_expr()?;
+        Ok(Some(Stmt::Assign { name, value }))
+    }
+
+    fn parse_incdec_stmt(&mut self, name: String) -> Result<Option<Stmt>> {
+        self.advance(); // ident
+        let op = match self.peek() {
+            Token::PlusPlus => BinOp::Add,
+            Token::MinusMinus => BinOp::Sub,
+            _ => unreachable!(),
+        };
+        self.advance(); // ++ or --
+        let value = Expr::BinOp {
+            op,
+            lhs: Box::new(Expr::Var(name.clone())),
+            rhs: Box::new(Expr::Int(1)),
+        };
+        Ok(Some(Stmt::Assign { name, value }))
+    }
+
+    fn parse_compound_assign_stmt(&mut self, name: String) -> Result<Option<Stmt>> {
+        self.advance(); // ident
+        let op = match self.peek() {
+            Token::PlusEq => BinOp::Add,
+            Token::MinusEq => BinOp::Sub,
+            Token::StarEq => BinOp::Mul,
+            Token::SlashEq => BinOp::Div,
+            Token::PercentEq => BinOp::Mod,
+            _ => unreachable!(),
+        };
+        self.advance(); // op=
+        let rhs = self.parse_expr()?;
+        let value = Expr::BinOp {
+            op,
+            lhs: Box::new(Expr::Var(name.clone())),
+            rhs: Box::new(rhs),
+        };
+        Ok(Some(Stmt::Assign { name, value }))
+    }
+
+    fn parse_fn_stmt(&mut self) -> Result<Option<Stmt>> {
+        self.advance();
+        let name = self.expect_ident()?;
+        self.expect(&Token::LParen)?;
+        let mut params = Vec::new();
+        let mut defaults = Vec::new();
+        while !matches!(self.peek(), Token::RParen | Token::Eof) {
+            let param = self.expect_ident()?;
+            let default = if self.peek() == &Token::Eq {
+                self.advance();
+                Some(self.parse_expr()?)
+            } else {
+                None
+            };
+            params.push(param);
+            defaults.push(default);
+            if self.peek() == &Token::Comma {
+                self.advance();
+            }
+        }
+        self.expect(&Token::RParen)?;
+        let (doc, body) = self.parse_block_with_doc()?;
+        Ok(Some(Stmt::Fn {
+            name,
+            params,
+            defaults,
+            doc,
+            body,
+        }))
+    }
+
+    fn parse_if_stmt(&mut self, line: usize) -> Result<Option<Stmt>> {
+        self.advance();
+        let cond = self.parse_expr()?;
+        let then_body = self.parse_block()?;
+        // else [if ...]
+        let else_body = if self.peek() == &Token::Else {
+            self.advance();
+            if self.peek() == &Token::If {
+                let inner_line = self.line();
+                let inner = self.parse_stmt()?.ok_or_else(|| HayashiError::Parse {
+                    line,
+                    msg: "expected statement after 'else if'".into(),
+                })?;
+                Some(vec![(inner, inner_line)])
+            } else {
+                Some(self.parse_block()?)
+            }
+        } else {
+            None
+        };
+        Ok(Some(Stmt::If {
+            cond,
+            then_body,
+            else_body,
+        }))
+    }
+
+    fn parse_for_stmt(&mut self, line: usize) -> Result<Option<Stmt>> {
+        // Also supports: for k, v in dict { ... } and for i, v in list { ... }
+        self.advance();
+        let var = self.expect_ident()?;
+        let var2 = if self.peek() == &Token::Comma {
+            self.advance();
+            Some(self.expect_ident()?)
+        } else {
+            None
+        };
+        // expects "in"
+        match self.advance().clone() {
+            Token::In => {}
+            t => {
+                return Err(HayashiError::Parse {
+                    line,
+                    msg: format!("expected 'in' after for variable, got {t:?}"),
+                })
+            }
+        }
+        let iter = self.parse_for_iter()?;
+        let body = self.parse_block()?;
+        Ok(Some(Stmt::For {
+            var,
+            var2,
+            iter,
+            body,
+        }))
+    }
+
+    fn parse_replace_stmt(&mut self) -> Result<Option<Stmt>> {
+        self.advance();
+        let df = self.expect_ident()?;
+        let varname = self.expect_ident()?;
+        self.expect(&Token::Eq)?;
+        let expr = self.parse_expr()?;
+        // opcional: if cond_expr
+        let cond = if self.peek() == &Token::If {
+            self.advance();
+            Some(self.parse_expr()?)
+        } else {
+            None
+        };
+        Ok(Some(Stmt::Replace {
+            df,
+            varname,
+            expr,
+            cond,
+        }))
+    }
+
+    fn parse_tsset_stmt(&mut self) -> Result<Option<Stmt>> {
+        self.advance();
+        let df = self.expect_ident()?;
+        let t_var = self.expect_ident()?;
+        Ok(Some(Stmt::Tsset { df, t_var }))
+    }
+
+    fn parse_generate_stmt(&mut self) -> Result<Option<Stmt>> {
+        if self.peek_raw_at(1) == Some(&Token::LParen) {
+            // generate(df, col = expr) — function call form
+            let expr = self.parse_expr()?;
+            Ok(Some(Stmt::Expr(expr)))
+        } else {
+            // generate df var = expr — Stata statement form
+            // var may be an identifier or an f-string (dynamic column name)
+            self.advance();
+            let df = self.expect_ident()?;
+            let varname = match self.peek().clone() {
+                Token::Ident(n) => {
+                    self.advance();
+                    Expr::Str(n)
+                }
+                Token::FStringLit(s) => {
+                    let s = s.clone();
+                    self.advance();
+                    let parts = self.parse_fstring_parts(&s)?;
+                    Expr::FString(parts)
+                }
+                Token::TemplateLit(s) => {
+                    let s = s.clone();
+                    self.advance();
+                    let parts = self.parse_template_parts(&s)?;
+                    Expr::Template(parts)
+                }
+                _ => {
+                    return Err(HayashiError::Parse {
+                        line: self.line(),
+                        msg: "generate: expected column name (identifier, f-string or t-string)"
+                            .into(),
+                    })
+                }
+            };
+            self.expect(&Token::Eq)?;
+            let expr = self.parse_expr()?;
+            Ok(Some(Stmt::Generate { df, varname, expr }))
+        }
+    }
+
+    fn parse_predict_stmt(&mut self) -> Result<Option<Stmt>> {
+        self.advance();
+        let df = self.expect_ident()?;
+        let varname = self.expect_ident()?;
+        self.expect(&Token::Eq)?;
+        let model = self.parse_primary()?;
+        let kind = if self.peek() == &Token::Comma {
+            self.advance();
+            self.parse_expr()?
+        } else {
+            Expr::Str("xb".to_string())
+        };
+        Ok(Some(Stmt::Predict {
+            df,
+            varname,
+            model,
+            kind,
+        }))
+    }
+
+    fn parse_print_stmt(&mut self) -> Result<Option<Stmt>> {
+        self.advance();
+        self.expect(&Token::LParen)?;
+        let mut exprs = Vec::new();
+        let mut opts = Vec::new();
+        if self.peek() != &Token::RParen {
+            loop {
+                if let Some(Token::Ident(name)) = self.peek_raw_at(0).cloned() {
+                    if self.peek_raw_at(1) == Some(&Token::Eq) {
+                        self.advance();
+                        self.advance();
+                        let val = self.parse_expr()?;
+                        opts.push(Opt { name, value: val });
+                        if self.peek() == &Token::Comma {
+                            self.advance();
+                            continue;
+                        }
+                        break;
+                    }
+                }
+                exprs.push(self.parse_expr()?);
+                if self.peek() == &Token::Comma {
+                    self.advance();
+                } else {
+                    break;
+                }
+            }
+        }
+        self.expect(&Token::RParen)?;
+        Ok(Some(Stmt::Print(exprs, opts)))
+    }
+
+    fn parse_load_stmt(&mut self) -> Result<Option<Stmt>> {
+        self.advance();
+        let path = self.parse_expr()?;
+        // as nome (opcional)
+        let alias = if let Token::Ident(kw) = self.peek().clone() {
+            if kw == "as" {
+                self.advance();
+                self.expect_ident()?
+            } else {
+                "df".to_string()
+            }
+        } else {
+            "df".to_string()
+        };
+        // options: , key=value, ...
+        let mut opts = Vec::new();
+        while *self.peek() == Token::Comma {
+            self.advance();
+            let key = self.expect_ident()?;
+            self.expect(&Token::Eq)?;
+            let val = match key.as_str() {
+                "sheet" | "table" => {
+                    if let Token::Ident(s) = self.peek().clone() {
+                        self.advance();
+                        Expr::Str(s)
+                    } else {
+                        self.parse_expr()?
+                    }
+                }
+                _ => self.parse_expr()?,
+            };
+            opts.push(Opt {
+                name: key,
+                value: val,
+            });
+        }
+        Ok(Some(Stmt::Load { path, alias, opts }))
+    }
+
+    fn parse_let_stmt(&mut self) -> Result<Option<Stmt>> {
+        self.advance();
+        let name = self.expect_ident()?;
+        self.expect(&Token::Eq)?;
+        let value = self.parse_expr()?;
+        Ok(Some(Stmt::Let { name, value }))
+    }
+
+    fn parse_const_stmt(&mut self) -> Result<Option<Stmt>> {
+        self.advance();
+        let name = self.expect_ident()?;
+        self.expect(&Token::Eq)?;
+        let value = self.parse_expr()?;
+        Ok(Some(Stmt::Const { name, value }))
+    }
+
+    fn parse_export_stmt(&mut self) -> Result<Option<Stmt>> {
+        self.advance();
+        self.expect(&Token::LParen)?;
+        let value = self.parse_expr()?;
+        self.expect(&Token::Comma)?;
+        let fmt = self.parse_expr()?;
+        self.expect(&Token::Comma)?;
+        let path = self.parse_expr()?;
+
+        // Parâmetro opcional append
+        let append = if self.peek() == &Token::Comma {
+            self.advance();
+            self.parse_expr()?
+        } else {
+            Expr::Bool(false)
+        };
+
+        self.expect(&Token::RParen)?;
+        Ok(Some(Stmt::Export {
+            value,
+            fmt,
+            path,
+            append,
+        }))
+    }
+
+    fn parse_count_stmt(&mut self) -> Result<Option<Stmt>> {
+        self.advance();
+        let df = self.expect_ident()?;
+        let cond = if self.peek() == &Token::If {
+            self.advance();
+            Some(self.parse_expr()?)
+        } else {
+            None
+        };
+        Ok(Some(Stmt::Count { df, cond }))
+    }
+
+    fn parse_return_stmt(&mut self) -> Result<Option<Stmt>> {
+        self.advance();
+        let expr = if matches!(self.peek(), Token::Newline | Token::RBrace | Token::Eof) {
+            None
+        } else {
+            Some(self.parse_expr()?)
+        };
+        Ok(Some(Stmt::Return(expr)))
+    }
+
+    fn parse_break_stmt(&mut self) -> Result<Option<Stmt>> {
+        self.advance();
+        Ok(Some(Stmt::Break))
+    }
+
+    fn parse_continue_stmt(&mut self) -> Result<Option<Stmt>> {
+        self.advance();
+        Ok(Some(Stmt::Continue))
+    }
+
+    fn parse_while_stmt(&mut self) -> Result<Option<Stmt>> {
+        self.advance();
+        let cond = self.parse_expr()?;
+        let body = self.parse_block()?;
+        Ok(Some(Stmt::While { cond, body }))
+    }
+
+    fn parse_parallel_for_stmt(&mut self, line: usize) -> Result<Option<Stmt>> {
+        let (var, var2, iter, body, threads) = self.parse_parallel_for(line)?;
+        Ok(Some(Stmt::ParallelFor {
+            var,
+            var2,
+            iter,
+            body,
+            threads,
+        }))
+    }
+
+    fn parse_display_stmt(&mut self) -> Result<Option<Stmt>> {
+        self.advance();
+        let expr = self.parse_expr()?;
+        Ok(Some(Stmt::Display(expr)))
+    }
+
+    fn parse_scalar_stmt(&mut self) -> Result<Option<Stmt>> {
+        self.advance();
+        let name = self.expect_ident()?;
+        self.expect(&Token::Eq)?;
+        let value = self.parse_expr()?;
+        Ok(Some(Stmt::Let { name, value }))
+    }
+
     pub fn parse_program(&mut self) -> Result<Vec<Spanned>> {
         let mut stmts = Vec::new();
         loop {
@@ -1722,5 +2172,152 @@ impl Parser {
             }
         }
         Ok(stmts)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lang::lexer::Lexer;
+
+    fn parse_formula(source: &str) -> Result<Formula> {
+        let mut lexer = Lexer::new(source);
+        let tokens = lexer.tokenize()?;
+        let mut parser = Parser::new(tokens);
+        match parser.parse_expr()? {
+            Expr::Formula(formula) => Ok(formula),
+            _ => panic!("expected formula expression"),
+        }
+    }
+
+    fn rhs_names(formula: &Formula) -> Vec<String> {
+        formula.rhs.iter().map(RhsTerm::display_name).collect()
+    }
+
+    #[test]
+    fn intercept_controls_do_not_become_rhs_terms() {
+        let default = parse_formula("y ~ x").unwrap();
+        assert!(default.intercept);
+
+        let minus_one = parse_formula("y ~ x - 1").unwrap();
+        assert!(!minus_one.intercept);
+        assert_eq!(rhs_names(&minus_one), ["x"]);
+
+        let zero = parse_formula("y ~ 0 + x").unwrap();
+        assert!(!zero.intercept);
+        assert_eq!(rhs_names(&zero), ["x"]);
+
+        let zero_then_one = parse_formula("y ~ 0 + x + 1").unwrap();
+        assert!(zero_then_one.intercept);
+        assert_eq!(rhs_names(&zero_then_one), ["x"]);
+
+        let explicit_one = parse_formula("y ~ 1 + x").unwrap();
+        assert!(explicit_one.intercept);
+        assert_eq!(rhs_names(&explicit_one), ["x"]);
+
+        let one_then_minus_one = parse_formula("y ~ x + 1 - 1").unwrap();
+        assert!(!one_then_minus_one.intercept);
+        assert_eq!(rhs_names(&one_then_minus_one), ["x"]);
+
+        let intercept_only = parse_formula("y ~ 1").unwrap();
+        assert!(intercept_only.intercept);
+        assert!(intercept_only.rhs.is_empty());
+
+        let instruments = parse_formula("~ z - 1").unwrap();
+        assert!(!instruments.intercept);
+        assert_eq!(rhs_names(&instruments), ["z"]);
+
+        let fixed_effects = parse_formula("y ~ x - 1 | id").unwrap();
+        assert!(!fixed_effects.intercept);
+        assert_eq!(rhs_names(&fixed_effects), ["x"]);
+        assert_eq!(fixed_effects.fe, ["id"]);
+    }
+
+    #[test]
+    fn nested_one_remains_a_formula_expression() {
+        assert_eq!(rhs_names(&parse_formula("y ~ I(1)").unwrap()), ["I(1)"]);
+    }
+
+    #[test]
+    fn unsupported_formula_subtraction_is_rejected() {
+        let err = parse_formula("y ~ x1 - x2").unwrap_err();
+        assert!(
+            err.to_string().contains("only '- 1' is supported"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn runtime_formula_parser_requires_complete_input() {
+        let formula = parse_formula_text("y ~ x - 1\n").unwrap();
+        assert!(!formula.intercept);
+        assert_eq!(rhs_names(&formula), ["x"]);
+
+        let instruments = parse_formula_text("~ z - 1").unwrap();
+        assert!(!instruments.intercept);
+        assert_eq!(rhs_names(&instruments), ["z"]);
+
+        for source in ["y ~ x, z", "y ~ x)"] {
+            let err = parse_formula_text(source).unwrap_err();
+            assert!(
+                err.to_string().contains("unexpected token after formula"),
+                "'{source}' produced unexpected error: {err}"
+            );
+        }
+
+        assert!(
+            parse_formula_text("y ~ x\ny").is_err(),
+            "a second expression without a separator unexpectedly parsed"
+        );
+    }
+
+    #[test]
+    fn runtime_formula_parser_accepts_surrounding_whitespace() {
+        let formula = parse_formula_text(" \n\t y ~ x - 1 \n ").unwrap();
+        assert_eq!(formula.lhs, "y");
+        assert_eq!(rhs_names(&formula), ["x"]);
+        assert!(!formula.intercept);
+    }
+
+    #[test]
+    fn runtime_formula_parser_matches_multiline_literal_in_call() {
+        let mut lexer = Lexer::new("ols(y ~ x +\n z - 1, df)");
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let literal = match parser.parse_expr().unwrap() {
+            Expr::Call { args, .. } => match &args[0] {
+                Expr::Formula(formula) => formula.clone(),
+                other => panic!("expected formula argument, got {other:?}"),
+            },
+            other => panic!("expected estimator call, got {other:?}"),
+        };
+
+        let runtime = parse_formula_text("y ~ x +\n z - 1").unwrap();
+        assert_eq!(runtime.lhs, literal.lhs);
+        assert_eq!(rhs_names(&runtime), rhs_names(&literal));
+        assert_eq!(runtime.fe, literal.fe);
+        assert_eq!(runtime.intercept, literal.intercept);
+        assert_eq!(rhs_names(&runtime), ["x", "z"]);
+        assert!(!runtime.intercept);
+    }
+
+    #[test]
+    fn formula_parser_rejects_empty_terms_and_fixed_effects() {
+        for source in [
+            "y ~",
+            "y ~ + x",
+            "y ~ x +",
+            "y ~ x + + z",
+            "y ~ x - 1 +",
+            "y ~ x |",
+            "y ~ x | + id",
+            "y ~ x | id +",
+            "y ~ x | id + + time",
+        ] {
+            assert!(
+                parse_formula_text(source).is_err(),
+                "malformed formula unexpectedly parsed: {source}"
+            );
+        }
     }
 }

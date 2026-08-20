@@ -33,9 +33,15 @@ synth("y", 1, 11, df, id="unit", time="year")
 
 ## Reference implementation
 
-- **Python:** `scipy.optimize.minimize` (SLSQP) with simplex constraints on
-  donor weights; ATT = mean post-treatment gap.
-- **R:** `optim` (L-BFGS-B) with projection onto the unit simplex.
+- **Python:** `scipy.optimize.minimize` (SLSQP) with exact simplex constraints
+  on donor weights; ATT = mean post-treatment gap.
+- **R:** base-R `constrOptim` with the final donor weight eliminated to enforce
+  the same simplex constraints exactly.
+
+This is the basic outcome-only SCM: donor weights are non-negative, sum to one,
+and minimise pre-treatment outcome error. It does not implement the nested
+predictor-weight optimisation in the R `Synth` package, augmented SCM,
+synthetic DiD, or placebo inference.
 
 ## Compared quantities
 

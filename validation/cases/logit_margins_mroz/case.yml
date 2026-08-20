@@ -1,0 +1,29 @@
+id: logit_margins_mroz
+title: Logit average marginal effects on Wooldridge mroz
+estimator_family: logit
+status: pass
+dimension: numerical
+dataset:
+  name: wooldridge::mroz
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+references:
+- R
+- Python
+comparison:
+  quantities:
+  - marginal_effects
+  - standard_errors
+  tolerances:
+    marginal_effects: 1e-4
+    standard_errors: 1e-4
+output_format: margins
+hayashi_script: cases/logit_margins_mroz/hayashi/run.hay
+reference_scripts:
+  R: cases/logit_margins_mroz/reference/run.R
+  Python: cases/logit_margins_mroz/reference/run.py
+notes: Logit average marginal effects and delta-method standard errors match R/statsmodels within tolerance.
+result:
+  summary: Average marginal effects and delta-method standard errors match R/statsmodels within tolerance.
+  known_differences: []
+  issues_opened: []

@@ -106,9 +106,131 @@ print(result)</code></pre>
         </div>
 
         <h2 class="section-title" style="margin-top: 4rem;">Approved plugins</h2>
-        <p class="section-subtitle">Officially endorsed plugins maintained by the Hayashi team. Each is reviewed for correctness, cross-platform support, and long-term maintenance.</p>
+        <p class="section-subtitle">Officially endorsed plugins maintained by the Hayashi team. They are grouped by what they do. Some are mature; others are young experiments. All are open source.</p>
 
-        <div class="plugin-grid">
+        <section class="plugin-category-section">
+          <header class="category-header">
+            <div class="category-icon" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg>
+            </div>
+            <div class="category-meta">
+              <h3 class="category-title">Data sources</h3>
+              <p class="category-subtitle">Plug Hayashi into external databases, APIs, and curated datasets.</p>
+            </div>
+            <span class="category-count">5 plugins</span>
+          </header>
+          <div class="plugin-grid">
+
+          <article class="plugin-card">
+            <div class="plugin-card-head">
+              <h3>haywooldridge</h3>
+              <span class="plugin-badge native">NATIVE</span>
+              <span class="plugin-category">Data source</span>
+            </div>
+            <p class="desc">Native Wooldridge datasets plugin for Hayashi. Brings the textbook datasets directly into DataFrames for teaching and replication.</p>
+            <div class="plugin-install"><code>$ hay install sheep-farm/haywooldridge</code><button class="install-copy-btn" aria-label="Copy install command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
+            <div class="plugin-card-foot">
+              <a href="https://github.com/sheep-farm/haywooldridge" class="plugin-link" target="_blank" rel="noopener">GitHub &rarr;</a>
+            </div>
+          </article>
+
+          <article class="plugin-card">
+            <div class="plugin-card-head">
+              <h3>hayfred</h3>
+              <span class="plugin-badge native">NATIVE</span>
+              <span class="plugin-category">Data source</span>
+            </div>
+            <p class="desc">FRED (Federal Reserve Economic Data) connector. Fetch GDP, CPI, unemployment, interest rates, and 800+ other US economic time series directly into Hayashi DataFrames.</p>
+            <div class="plugin-fns">
+              <span class="plugin-fn">fetch</span>
+              <span class="plugin-fn">search</span>
+              <span class="plugin-fn">categories</span>
+              <span class="plugin-fn">releases</span>
+            </div>
+            <div class="plugin-install"><code>$ hay install sheep-farm/hayfred</code><button class="install-copy-btn" aria-label="Copy install command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
+            <div class="plugin-card-foot">
+              <span class="plugin-version">v0.1.0</span>
+              <a href="https://github.com/sheep-farm/hayfred" class="plugin-link" target="_blank" rel="noopener">GitHub &rarr;</a>
+            </div>
+          </article>
+
+          <article class="plugin-card">
+            <div class="plugin-card-head">
+              <h3>haybrasil</h3>
+              <span class="plugin-badge native">NATIVE</span>
+              <span class="plugin-category">Data source</span>
+            </div>
+            <p class="desc">Brazilian macroeconomic data plugin with real API integration. Access BCB (Selic, PIB, reserves), IBGE (municipal GDP, IPCA, unemployment), and CVM (company data, financial statements, FIIs) directly from official Brazilian government APIs.</p>
+            <div class="plugin-fns">
+              <span class="plugin-fn">bcb_selic</span>
+              <span class="plugin-fn">bcb_pib</span>
+              <span class="plugin-fn">ibge_inflacao_ipc_a12</span>
+              <span class="plugin-fn">cvm_empresas_cia_aberta</span>
+            </div>
+            <div class="plugin-install"><code>$ hay install sheep-farm/haybrasil</code><button class="install-copy-btn" aria-label="Copy install command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
+            <div class="plugin-card-foot">
+              <span class="plugin-version">v0.2.0</span>
+              <a href="https://github.com/sheep-farm/haybrasil" class="plugin-link" target="_blank" rel="noopener">GitHub &rarr;</a>
+            </div>
+          </article>
+
+          <article class="plugin-card">
+            <div class="plugin-card-head">
+              <h3>haygeobr</h3>
+              <span class="plugin-badge native">NATIVE</span>
+              <span class="plugin-category">Data source</span>
+            </div>
+            <p class="desc">Official Brazilian spatial data from IPEA's geobr project. Download states, municipalities, biomes, regions, census tracts, indigenous lands, conservation units, and more as DataFrames with WKT geometry. 28 datasets available with automatic caching.</p>
+            <div class="plugin-fns">
+              <span class="plugin-fn">read_state</span>
+              <span class="plugin-fn">read_municipality</span>
+              <span class="plugin-fn">read_biomes</span>
+              <span class="plugin-fn">read_country</span>
+              <span class="plugin-fn">read_census_tract</span>
+              <span class="plugin-fn">list_datasets</span>
+            </div>
+            <div class="plugin-install"><code>$ hay install sheep-farm/haygeobr</code><button class="install-copy-btn" aria-label="Copy install command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
+            <div class="plugin-card-foot">
+              <span class="plugin-version">v0.1.6</span>
+              <a href="https://github.com/sheep-farm/haygeobr" class="plugin-link" target="_blank" rel="noopener">GitHub &rarr;</a>
+            </div>
+          </article>
+
+          <article class="plugin-card">
+            <div class="plugin-card-head">
+              <h3>hayahoo</h3>
+              <span class="plugin-badge native">NATIVE</span>
+              <span class="plugin-category">Data source</span>
+            </div>
+            <p class="desc">Yahoo Finance market data connector. Historical OHLCV prices, real-time quotes, ticker search, and instrument metadata. Caches responses and handles rate limits gracefully.</p>
+            <div class="plugin-fns">
+              <span class="plugin-fn">quote</span>
+              <span class="plugin-fn">history</span>
+              <span class="plugin-fn">search</span>
+              <span class="plugin-fn">info</span>
+            </div>
+            <div class="plugin-install"><code>$ hay install sheep-farm/hayahoo</code><button class="install-copy-btn" aria-label="Copy install command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
+            <div class="plugin-card-foot">
+              <span class="plugin-version">v0.1.1</span>
+              <a href="https://github.com/sheep-farm/hayahoo" class="plugin-link" target="_blank" rel="noopener">GitHub &rarr;</a>
+            </div>
+          </article>
+
+          </div>
+        </section>
+
+        <section class="plugin-category-section">
+          <header class="category-header">
+            <div class="category-icon" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            </div>
+            <div class="category-meta">
+              <h3 class="category-title">Visualization &amp; output</h3>
+              <p class="category-subtitle">Turn results into plots, maps, documents, and exportable formats.</p>
+            </div>
+            <span class="category-count">4 plugins</span>
+          </header>
+          <div class="plugin-grid">
 
           <article class="plugin-card">
             <div class="plugin-card-head">
@@ -134,41 +256,52 @@ print(result)</code></pre>
 
           <article class="plugin-card">
             <div class="plugin-card-head">
-              <h3>hayahoo</h3>
+              <h3>haytex</h3>
               <span class="plugin-badge native">NATIVE</span>
-              <span class="plugin-category">Finance</span>
+              <span class="plugin-category">Output</span>
             </div>
-            <p class="desc">Yahoo Finance market data connector. Historical OHLCV prices, real-time quotes, ticker search, and instrument metadata. Caches responses and handles rate limits gracefully.</p>
+            <p class="desc">Export Hayashi estimation results and DataFrames to publication-ready LaTeX. Supports regression tables, summary statistics, and tabular data with customizable formatting, column alignment, and booktabs-style rules.</p>
             <div class="plugin-fns">
-              <span class="plugin-fn">quote</span>
-              <span class="plugin-fn">history</span>
-              <span class="plugin-fn">search</span>
-              <span class="plugin-fn">info</span>
+              <span class="plugin-fn">regression</span>
+              <span class="plugin-fn">summary</span>
+              <span class="plugin-fn">table</span>
             </div>
-            <div class="plugin-install"><code>$ hay install sheep-farm/hayahoo</code><button class="install-copy-btn" aria-label="Copy install command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
+            <div class="plugin-install"><code>$ hay install sheep-farm/haytex</code><button class="install-copy-btn" aria-label="Copy install command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
             <div class="plugin-card-foot">
-              <span class="plugin-version">v0.1.1</span>
-              <a href="https://github.com/sheep-farm/hayahoo" class="plugin-link" target="_blank" rel="noopener">GitHub &rarr;</a>
+              <span class="plugin-version">v0.2.2</span>
+              <a href="https://github.com/sheep-farm/haytex" class="plugin-link" target="_blank" rel="noopener">GitHub &rarr;</a>
             </div>
           </article>
 
           <article class="plugin-card">
             <div class="plugin-card-head">
-              <h3>hayfred</h3>
+              <h3>haygeom</h3>
               <span class="plugin-badge native">NATIVE</span>
-              <span class="plugin-category">Macro data</span>
+              <span class="plugin-category">Visualization</span>
             </div>
-            <p class="desc">FRED (Federal Reserve Economic Data) connector. Fetch GDP, CPI, unemployment, interest rates, and 800+ other US economic time series directly into Hayashi DataFrames.</p>
+            <p class="desc">Geographic mapping plugin for Hayashi. Create maps with multiple layers, automatic projection, and SVG output. Supports WKT geometries (POINT, POLYGON, MULTIPOLYGON) and integrates with haygeobr for Brazilian spatial data.</p>
             <div class="plugin-fns">
-              <span class="plugin-fn">fetch</span>
-              <span class="plugin-fn">search</span>
-              <span class="plugin-fn">categories</span>
-              <span class="plugin-fn">releases</span>
+              <span class="plugin-fn">map</span>
+              <span class="plugin-fn">add_layer</span>
+              <span class="plugin-fn">render</span>
             </div>
-            <div class="plugin-install"><code>$ hay install sheep-farm/hayfred</code><button class="install-copy-btn" aria-label="Copy install command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
+            <div class="plugin-install"><code>$ hay install sheep-farm/haygeom</code><button class="install-copy-btn" aria-label="Copy install command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
             <div class="plugin-card-foot">
-              <span class="plugin-version">v0.1.0</span>
-              <a href="https://github.com/sheep-farm/hayfred" class="plugin-link" target="_blank" rel="noopener">GitHub &rarr;</a>
+              <span class="plugin-version">v0.1.2</span>
+              <a href="https://github.com/sheep-farm/haygeom" class="plugin-link" target="_blank" rel="noopener">GitHub &rarr;</a>
+            </div>
+          </article>
+
+          <article class="plugin-card">
+            <div class="plugin-card-head">
+              <h3>hayexport</h3>
+              <span class="plugin-badge native">NATIVE</span>
+              <span class="plugin-category">Output</span>
+            </div>
+            <p class="desc">Export utilities for Hayashi. Convert DataFrames and estimation results into common formats for interoperability with other tools.</p>
+            <div class="plugin-install"><code>$ hay install sheep-farm/hayexport</code><button class="install-copy-btn" aria-label="Copy install command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
+            <div class="plugin-card-foot">
+              <a href="https://github.com/sheep-farm/hayexport" class="plugin-link" target="_blank" rel="noopener">GitHub &rarr;</a>
             </div>
           </article>
 
@@ -274,6 +407,125 @@ print(result)</code></pre>
           </article>
 
         </div>
+        </section>
+
+        <section class="plugin-category-section">
+          <header class="category-header">
+            <div class="category-icon" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            </div>
+            <div class="category-meta">
+              <h3 class="category-title">Modeling &amp; estimation</h3>
+              <p class="category-subtitle">Estimators, samplers, optimizers, and simulation tools.</p>
+            </div>
+            <span class="category-count">4 plugins</span>
+          </header>
+          <div class="plugin-grid">
+
+          <article class="plugin-card">
+            <div class="plugin-card-head">
+              <h3>haybayes</h3>
+              <span class="plugin-badge native">NATIVE</span>
+              <span class="plugin-category">Estimation</span>
+            </div>
+            <p class="desc">Bayesian econometrics for Hayashi. Metropolis-Hastings and Gibbs samplers, conjugate priors, Bayesian regression, credible intervals, posterior predictive distributions, and model comparison via Bayes factors.</p>
+            <div class="plugin-fns">
+              <span class="plugin-fn">metropolis_hastings</span>
+              <span class="plugin-fn">gibbs_sampler</span>
+              <span class="plugin-fn">bayesian_regression</span>
+              <span class="plugin-fn">credible_interval</span>
+              <span class="plugin-fn">model_comparison</span>
+            </div>
+            <div class="plugin-install"><code>$ hay install sheep-farm/haybayes</code><button class="install-copy-btn" aria-label="Copy install command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
+            <div class="plugin-card-foot">
+              <span class="plugin-version">v0.1.2</span>
+              <a href="https://github.com/sheep-farm/haybayes" class="plugin-link" target="_blank" rel="noopener">GitHub &rarr;</a>
+            </div>
+          </article>
+
+          <article class="plugin-card">
+            <div class="plugin-card-head">
+              <h3>haysim</h3>
+              <span class="plugin-badge native">NATIVE</span>
+              <span class="plugin-category">Simulation</span>
+            </div>
+            <p class="desc">Simulation utilities for Hayashi. Generate synthetic datasets and Monte Carlo experiments for teaching and validation.</p>
+            <div class="plugin-install"><code>$ hay install sheep-farm/haysim</code><button class="install-copy-btn" aria-label="Copy install command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
+            <div class="plugin-card-foot">
+              <a href="https://github.com/sheep-farm/haysim" class="plugin-link" target="_blank" rel="noopener">GitHub &rarr;</a>
+            </div>
+          </article>
+
+          <article class="plugin-card">
+            <div class="plugin-card-head">
+              <h3>hayopt</h3>
+              <span class="plugin-badge native">NATIVE</span>
+              <span class="plugin-category">Optimization</span>
+            </div>
+            <p class="desc">Optimization routines for Hayashi. Numerical solvers for maximum likelihood, minimum distance, and general objective functions.</p>
+            <div class="plugin-install"><code>$ hay install sheep-farm/hayopt</code><button class="install-copy-btn" aria-label="Copy install command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
+            <div class="plugin-card-foot">
+              <a href="https://github.com/sheep-farm/hayopt" class="plugin-link" target="_blank" rel="noopener">GitHub &rarr;</a>
+            </div>
+          </article>
+
+          <article class="plugin-card">
+            <div class="plugin-card-head">
+              <h3>haytime</h3>
+              <span class="plugin-badge native">NATIVE</span>
+              <span class="plugin-category">Time series</span>
+            </div>
+            <p class="desc">Time series utilities for Hayashi. Date indexing, lag/lead operations, rolling windows, and frequency handling.</p>
+            <div class="plugin-install"><code>$ hay install sheep-farm/haytime</code><button class="install-copy-btn" aria-label="Copy install command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
+            <div class="plugin-card-foot">
+              <a href="https://github.com/sheep-farm/haytime" class="plugin-link" target="_blank" rel="noopener">GitHub &rarr;</a>
+            </div>
+          </article>
+
+        </div>
+        </section>
+
+        <section class="plugin-category-section">
+          <header class="category-header">
+            <div class="category-icon" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+            </div>
+            <div class="category-meta">
+              <h3 class="category-title">Utilities &amp; integration</h3>
+              <p class="category-subtitle">Glue code, spatial helpers, and connectors that do not fit the categories above.</p>
+            </div>
+            <span class="category-count">2 plugins</span>
+          </header>
+          <div class="plugin-grid">
+
+          <article class="plugin-card">
+            <div class="plugin-card-head">
+              <h3>hayweb</h3>
+              <span class="plugin-badge native">NATIVE</span>
+              <span class="plugin-category">Utility</span>
+            </div>
+            <p class="desc">Web integration utilities for Hayashi. Helpers for HTTP requests, web scraping, and API clients.</p>
+            <div class="plugin-install"><code>$ hay install sheep-farm/hayweb</code><button class="install-copy-btn" aria-label="Copy install command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
+            <div class="plugin-card-foot">
+              <a href="https://github.com/sheep-farm/hayweb" class="plugin-link" target="_blank" rel="noopener">GitHub &rarr;</a>
+            </div>
+          </article>
+
+          <article class="plugin-card">
+            <div class="plugin-card-head">
+              <h3>hayspatial</h3>
+              <span class="plugin-badge native">NATIVE</span>
+              <span class="plugin-category">Utility</span>
+            </div>
+            <p class="desc">Spatial analysis helpers for Hayashi. Coordinate transformations, spatial joins, and geometry operations.</p>
+            <div class="plugin-install"><code>$ hay install sheep-farm/hayspatial</code><button class="install-copy-btn" aria-label="Copy install command"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
+            <div class="plugin-card-foot">
+              <a href="https://github.com/sheep-farm/hayspatial" class="plugin-link" target="_blank" rel="noopener">GitHub &rarr;</a>
+            </div>
+          </article>
+
+        </div>
+        </section>
 
         <p style="margin-top: 2rem; color: var(--text-muted); font-size: 0.9rem;">
           Want your plugin listed here? Open an issue on the
@@ -282,23 +534,23 @@ print(result)</code></pre>
         </p>
 
         <h2 class="section-title" style="margin-top: 4rem;">Create a plugin</h2>
-        <p class="section-subtitle">A plugin is a GitHub repository with a specific layout.</p>
+        <p class="section-subtitle">The fastest way to build a new plugin is to imitate existing ones. The code is the documentation.</p>
+
         <div class="code-window wide">
           <div class="code-header">
             <span class="dot red"></span>
             <span class="dot yellow"></span>
             <span class="dot green"></span>
-            <span class="code-title">plugin-layout</span>
+            <span class="code-title">workflow</span>
           </div>
-          <pre><code class="language-hay">my-plugin/
-├── Cargo.toml              # for native Rust plugins
-├── src/
-│   └── lib.rs              # exports `hayashi_init()`
-├── plugin.hay              # for script plugins
-└── README.md</code></pre>
+          <pre><code class="language-hay">0) clone hayashi and hayashi-plugin-sdk
+1) find 1-3 plugins that resemble what you want
+2) ask your preferred AI to study the code
+3) ask it to build your plugin</code></pre>
         </div>
+
         <p style="margin-top: 1.5rem; color: var(--text-muted);">
-          Native plugins expose functions through the Hayashi ABI. The package manager downloads the correct release asset for the user's platform. For a full SDK reference, see the books.
+          Native plugins are GitHub repositories that expose functions through the Hayashi ABI. The package manager downloads the correct release asset for the user's platform. For a full SDK reference, see the books.
         </p>
       </div>
     </section>

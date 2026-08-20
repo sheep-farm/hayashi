@@ -1,0 +1,39 @@
+id: pcse_wagepan
+title: Panel-corrected standard errors on Wooldridge wagepan
+estimator_family: pcse
+status: pass
+dimension: numerical
+
+dataset:
+  name: wooldridge::wagepan
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-4
+    standard_errors: 1e-4
+
+output_format: txt
+
+hayashi_script: cases/pcse_wagepan/hayashi/run.hay
+reference_scripts:
+  R: cases/pcse_wagepan/reference/run.R
+  Python: cases/pcse_wagepan/reference/run.py
+
+notes: PCSE estimation of log wage on education, experience, and dummies using the Hayashi/Greeners Beck-Katz covariance convention.
+
+result:
+  summary: "Hayashi is validated against R plm::vcovBK with explicit Beck-Katz options and an independent Python implementation of the Hayashi/Greeners PCSE covariance convention."
+  known_differences:
+    - "Bare plm::vcovBK defaults do not match this convention; the R reference uses cluster=\"time\" and type=\"HC0\" explicitly."
+  issues_opened:
+    - 99
+    - 103

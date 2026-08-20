@@ -9,13 +9,11 @@ dir.create(data_dir, recursive = TRUE, showWarnings = FALSE)
 
 csv_path <- file.path(data_dir, "grunfeld.csv")
 if (!file.exists(csv_path)) {
-  # Fallback to the panel_fe_grunfeld dataset if this case has not downloaded yet.
-  fallback <- "validation/cases/panel_fe_grunfeld/data/grunfeld.csv"
-  if (file.exists(fallback)) {
-    file.copy(fallback, csv_path)
-  } else {
-    stop("Grunfeld CSV not found. Run panel_fe_grunfeld reference first.")
-  }
+  # Generate the CSV from the plm package so the case is self-contained.
+  data(Grunfeld, package = "plm")
+  grunfeld <- Grunfeld
+  names(grunfeld)[names(grunfeld) == "firm"] <- "firm"
+  write.csv(grunfeld, csv_path, row.names = FALSE)
 }
 
 grunfeld <- read.csv(csv_path)

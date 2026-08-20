@@ -25,42 +25,70 @@ jobs:
             os: windows-latest
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Checkout Greeners dependency
-        run: git clone --depth 1 --branch develop https://github.com/sheep-farm/Greeners.git ../Greeners
-        shell: bash
+      - uses: actions/checkout@v5
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
           key: release-${{ matrix.target }}
 
-      - name: Build
-        run: cargo build --release
+      - name: Build binaries
+        run: cargo build --release --bin hay --bin hay-kernel
 
       - name: Package (Unix)
         if: runner.os != 'Windows'
-        run: tar czf hay-${{ github.ref_name }}-${{ matrix.target }}.tar.gz -C target/release hay
+        run: |
+          pkg="hay-${{ github.ref_name }}-${{ matrix.target }}"
+          mkdir -p "$pkg"
+          cp target/release/hay target/release/hay-kernel "$pkg/"
+          tar czf "$pkg.tar.gz" "$pkg"
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
-        run: Compress-Archive -Path target/release/hay.exe -DestinationPath hay-${{ github.ref_name }}-${{ matrix.target }}.zip
+        run: |
+          $pkg = "hay-${{ github.ref_name }}-${{ matrix.target }}"
+          New-Item -ItemType Directory -Force -Path "$pkg" | Out-Null
+          Copy-Item target/release/hay.exe -Destination "$pkg/"
+          Copy-Item target/release/hay-kernel.exe -Destination "$pkg/"
+          Compress-Archive -Path "$pkg/*" -DestinationPath "$pkg.zip"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: hay-${{ matrix.target }}
           path: hay-${{ github.ref_name }}-*
 
-  publish:
-    needs: build
+  vscode:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+
+      - name: Build VS Code extension
+        run: |
+          cd editors/vscode
+          npm install
+          npm run compile
+          npx --yes @vscode/vsce package -o "../../hay-vscode-${{ github.ref_name }}.vsix"
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: hay-vscode
+          path: hay-vscode-*.vsix
+
+  publish:
+    needs: [build, vscode]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v5
         with:
           merge-multiple: true
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: hay-*
           generate_release_notes: true

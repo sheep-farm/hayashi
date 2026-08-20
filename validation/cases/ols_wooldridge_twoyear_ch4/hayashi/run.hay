@@ -1,0 +1,8 @@
+// Wooldridge (Introductory Econometrics, 7e), Chapter 4, Example 4.10.
+// returns to two-year and four-year college credits: lwage ~ jc + univ + exper.
+
+load "validation/cases/ols_wooldridge_twoyear_ch4/data/twoyear.csv" as df
+
+let m = ols(lwage ~ jc + univ + exper, df)
+
+export(m, "csv", "/dev/stdout")

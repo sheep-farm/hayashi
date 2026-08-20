@@ -1,0 +1,10 @@
+// Load the simulated Panel Heckman dataset.
+load "validation/cases/panel_heckman_simulated/data/panel_heckman.csv" as df
+
+// Declare panel structure.
+xtset(df, entity, time)
+
+// Run Panel Heckman selection model.
+// Selection equation: selection ~ x1 + x2 + x3
+// Outcome equation: y ~ x1 + x2 + x3
+panel_heckman(y ~ x1 + x2 + x3, df, sel="selection ~ x1 + x2 + x3", id="entity")

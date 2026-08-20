@@ -1,11 +1,17 @@
+// `Value` uses `Arc` for DataFrame/List/Dict/Series/UserFn (to enable `parallel for`)
+// even though `Value` as a whole is not `Send+Sync` (model results use `Rc`).
+#![allow(clippy::arc_with_non_send_sync)]
+
 pub mod ast;
 pub mod commands;
+pub mod dap;
 pub mod error;
 pub mod help;
 pub mod interpreter;
 pub mod lexer;
 pub mod parser;
 pub mod plugin;
+pub mod predicate;
 
 use error::{HayashiError, Result};
 use interpreter::Interpreter;
@@ -13,10 +19,26 @@ use lexer::Lexer;
 use parser::Parser;
 
 pub fn run_source(src: &str, interp: &mut Interpreter) -> Result<()> {
-    run_source_verbose(src, interp, false)
+    run_source_with_path(src, interp, None)
 }
 
-pub fn run_source_verbose(src: &str, interp: &mut Interpreter, verbose: bool) -> Result<()> {
+pub fn run_source_with_path(
+    src: &str,
+    interp: &mut Interpreter,
+    source_path: Option<&std::path::Path>,
+) -> Result<()> {
+    run_source_verbose(src, interp, false, source_path)
+}
+
+pub fn run_source_verbose(
+    src: &str,
+    interp: &mut Interpreter,
+    verbose: bool,
+    source_path: Option<&std::path::Path>,
+) -> Result<()> {
+    if let Some(path) = source_path {
+        interp.set_current_source(path);
+    }
     let mut lexer = Lexer::new(src);
     let tokens = lexer.tokenize().map_err(|e| annotate_error(src, &e))?;
     if verbose {
@@ -124,6 +146,7 @@ fn stmt_label(s: &ast::Stmt) -> &'static str {
         ast::Stmt::Tsset { .. } => "tsset",
         ast::Stmt::If { .. } => "if",
         ast::Stmt::For { .. } => "for",
+        ast::Stmt::ParallelFor { .. } => "parallel for",
         ast::Stmt::While { .. } => "while",
         ast::Stmt::Fn { .. } => "fn",
         ast::Stmt::Return(_) => "return",

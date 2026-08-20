@@ -1,0 +1,14 @@
+load "validation/cases/bayes_lm_simulated/data/data.csv" as df
+let m = bayes_lm(y ~ x1 + x2, df)
+let c = m.coefficients
+let b1 = filter(c, variable == "x1").mean[0]
+let b2 = filter(c, variable == "x2").mean[0]
+let s1 = filter(c, variable == "x1").sd[0]
+let s2 = filter(c, variable == "x2").sd[0]
+let out = dataframe({
+  "variable": ["b1", "b2"],
+  "coef": [b1, b2],
+  "std_err": [s1, s2]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

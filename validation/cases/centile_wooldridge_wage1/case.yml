@@ -1,0 +1,29 @@
+id: centile_wooldridge_wage1
+title: Centiles for Wooldridge wage1 wage
+estimator_family: descriptive
+status: pass
+dimension: numerical
+dataset:
+  name: wooldridge::wage1
+  source: R package wooldridge / Python wooldridge-python
+  licence: public teaching dataset
+references:
+- R
+- Python
+comparison:
+  quantities:
+  - centile
+  - value
+  tolerances:
+    centile: 0
+    value: 1e-5
+output_format: json
+hayashi_script: cases/centile_wooldridge_wage1/hayashi/run.hay
+reference_scripts:
+  R: cases/centile_wooldridge_wage1/reference/run.R
+  Python: cases/centile_wooldridge_wage1/reference/run.py
+notes: Centiles 10, 25, 50, 75, 90 for the wage variable.
+result:
+  summary: ''
+  known_differences: []
+  issues_opened: []

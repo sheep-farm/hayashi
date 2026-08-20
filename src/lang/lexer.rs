@@ -6,6 +6,7 @@ pub enum Token {
     Ident(String),
     StringLit(String),
     FStringLit(String),
+    TemplateLit(String),
     DocString(String),
     Float(f64),
     Int(i64),
@@ -22,6 +23,7 @@ pub enum Token {
     If,
     Else,
     For,
+    Parallel,
     In,
     Count,
     Tsset,
@@ -165,6 +167,39 @@ impl Lexer {
                 break;
             }
         }
+
+        // Scientific notation: 1e-6, 1.5E+3
+        if matches!(self.peek(), Some('e' | 'E')) {
+            let exp_sign = matches!(self.peek2(), Some('+' | '-'));
+            let digit_offset = if exp_sign { 2 } else { 1 };
+            if self
+                .src
+                .get(self.pos + digit_offset)
+                .copied()
+                .is_some_and(|c| c.is_ascii_digit())
+            {
+                // consume 'e' or 'E'
+                if let Some(c) = self.advance() {
+                    s.push(c);
+                }
+                // consume optional sign
+                if exp_sign {
+                    if let Some(c) = self.advance() {
+                        s.push(c);
+                    }
+                }
+                while let Some(c) = self.peek() {
+                    if c.is_ascii_digit() {
+                        s.push(c);
+                        self.advance();
+                    } else {
+                        break;
+                    }
+                }
+                is_float = true;
+            }
+        }
+
         if is_float {
             Token::Float(s.parse().unwrap_or(0.0))
         } else {
@@ -194,6 +229,7 @@ impl Lexer {
             "if" => Token::If,
             "else" => Token::Else,
             "for" => Token::For,
+            "parallel" => Token::Parallel,
             "in" => Token::In,
             "count" => Token::Count,
             "tsset" => Token::Tsset,
@@ -276,6 +312,13 @@ impl Lexer {
                     self.advance(); // consume "
                     match self.read_string()? {
                         Token::StringLit(s) => tokens.push((Token::FStringLit(s), line)),
+                        _ => unreachable!(),
+                    }
+                }
+                Some('t') if self.peek() == Some('"') => {
+                    self.advance(); // consume "
+                    match self.read_string()? {
+                        Token::StringLit(s) => tokens.push((Token::TemplateLit(s), line)),
                         _ => unreachable!(),
                     }
                 }

@@ -1,7 +1,5 @@
 # Reference implementation in R for the Ridge hprice1 case.
 
-library(MASS)
-
 case_dir <- "validation/cases/ridge_hprice1"
 data_dir <- file.path(case_dir, "data")
 ref_dir <- file.path(case_dir, "reference")
@@ -11,11 +9,18 @@ dir.create(ref_dir, recursive = TRUE, showWarnings = FALSE)
 csv_path <- file.path(data_dir, "hprice1.csv")
 df <- read.csv(csv_path)
 
-# Ridge regression via MASS::lm.ridge (standardises X, intercept not penalised).
-model <- lm.ridge(lprice ~ llotsize + lsqrft + bdrms + colonial, data = df, lambda = 0.1)
+predictors <- c("llotsize", "lsqrft", "bdrms", "colonial")
+X <- as.matrix(df[, predictors])
+y <- df$lprice
 
-coefs <- as.numeric(coef(model))
-names(coefs) <- names(coef(model))
+# Hayashi's ridge convention includes the intercept in the design matrix and
+# penalises it together with the slope coefficients.
+X_aug <- cbind(Intercept = 1, X)
+alpha <- 0.1
+beta <- solve(t(X_aug) %*% X_aug + alpha * diag(ncol(X_aug)), t(X_aug) %*% y)
+
+coefs <- as.numeric(beta)
+names(coefs) <- colnames(X_aug)
 
 std_errors <- as.numeric(rep(0.0, length(coefs)))
 names(std_errors) <- names(coefs)

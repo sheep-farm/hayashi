@@ -1,0 +1,8 @@
+// Wooldridge (Introductory Econometrics, 7e), Chapter 10, Example 10.3.
+// Puerto Rican employment and minimum wage equation: lprepop ~ lmincov + lusgnp.
+
+load "validation/cases/ols_wooldridge_prminwge_ch10/data/prminwge.csv" as df
+
+let m = ols(lprepop ~ lmincov + lusgnp, df)
+
+export(m, "csv", "/dev/stdout")

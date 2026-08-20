@@ -1,0 +1,39 @@
+id: xtsum_wooldridge_wagepan
+title: Panel summary (xtsum) for Wooldridge wagepan lwage
+estimator_family: descriptive
+status: pass
+dimension: numerical
+dataset:
+  name: wooldridge::wagepan
+  source: R package wooldridge / Python wooldridge-python
+  licence: public teaching dataset
+references:
+- R
+- Python
+comparison:
+  quantities:
+  - variable
+  - type
+  - n
+  - mean
+  - sd
+  - min
+  - max
+  tolerances:
+    variable: 0
+    type: 0
+    n: 0
+    mean: 1e-6
+    sd: 1e-6
+    min: 1e-6
+    max: 1e-6
+output_format: json
+hayashi_script: cases/xtsum_wooldridge_wagepan/hayashi/run.hay
+reference_scripts:
+  R: cases/xtsum_wooldridge_wagepan/reference/run.R
+  Python: cases/xtsum_wooldridge_wagepan/reference/run.py
+notes: Overall, between, and within panel summary for lwage.
+result:
+  summary: ''
+  known_differences: []
+  issues_opened: []

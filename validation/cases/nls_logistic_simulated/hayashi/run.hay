@@ -1,0 +1,3 @@
+load "validation/cases/nls_logistic_simulated/data/data.csv" as df
+let m = nls_logistic(y ~ x, df, start=[8.0, 1.5, 2.0], max_iter=200, tol=1e-8)
+export(m.coefficients, "csv", "/dev/stdout")

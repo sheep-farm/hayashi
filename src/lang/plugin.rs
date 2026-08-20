@@ -1,5 +1,9 @@
+#[cfg(feature = "greeners-glm")]
+use super::interpreter::models::BinaryModel;
+use super::interpreter::models::OlsModel;
+#[cfg(feature = "greeners-ols")]
+use super::interpreter::models::PenalizedModel;
 use super::interpreter::Value;
-use super::interpreter::models::{OlsModel, BinaryModel, PenalizedModel};
 use arrow::array::{
     make_array, Array, ArrayRef, BooleanArray, Float64Array, Int64Array, StringArray,
 };
@@ -7,7 +11,6 @@ use arrow::ffi::{FFI_ArrowArray, FFI_ArrowSchema};
 use greeners::Column;
 use ndarray::Array1;
 use std::collections::HashMap;
-use std::rc::Rc;
 use std::sync::Arc;
 
 /// Unified Hayashi Plugin Trait
@@ -160,16 +163,16 @@ pub fn arrow_to_column(array: &ArrayRef) -> Result<Column, String> {
 /// Converte uma coluna do Greeners em um Value::List do Hayashi.
 pub fn column_to_value(col: &Column) -> Value {
     match col {
-        Column::Float(arr) => Value::List(Rc::new(arr.iter().map(|&x| Value::Float(x)).collect())),
-        Column::Int(arr) => Value::List(Rc::new(arr.iter().map(|&x| Value::Int(x)).collect())),
-        Column::Bool(arr) => Value::List(Rc::new(arr.iter().map(|&x| Value::Bool(x)).collect())),
-        Column::String(arr) => {
-            Value::List(Rc::new(arr.iter().map(|s| Value::Str(s.clone())).collect()))
-        }
-        Column::Categorical(cat) => Value::List(Rc::new(
+        Column::Float(arr) => Value::List(Arc::new(arr.iter().map(|&x| Value::Float(x)).collect())),
+        Column::Int(arr) => Value::List(Arc::new(arr.iter().map(|&x| Value::Int(x)).collect())),
+        Column::Bool(arr) => Value::List(Arc::new(arr.iter().map(|&x| Value::Bool(x)).collect())),
+        Column::String(arr) => Value::List(Arc::new(
+            arr.iter().map(|s| Value::Str(s.clone())).collect(),
+        )),
+        Column::Categorical(cat) => Value::List(Arc::new(
             cat.to_strings().into_iter().map(Value::Str).collect(),
         )),
-        Column::DateTime(arr) => Value::List(Rc::new(
+        Column::DateTime(arr) => Value::List(Arc::new(
             arr.iter().map(|dt| Value::Str(dt.to_string())).collect(),
         )),
     }
@@ -329,10 +332,14 @@ pub fn value_to_json(
         }
         // ── Model serialization: expose coefficients and fit stats as JSON dict ──
         Value::OlsResult(m) => ols_model_to_json(m),
+        #[cfg(feature = "greeners-ols")]
         Value::IvResult(r) => {
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("iv"));
-            map.insert("variable".into(), serde_json::json!(r.variable_names.clone().unwrap_or_default()));
+            map.insert(
+                "variable".into(),
+                serde_json::json!(r.variable_names.clone().unwrap_or_default()),
+            );
             map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
             map.insert("std_err".into(), serde_json::json!(r.std_errors.to_vec()));
             map.insert("t".into(), serde_json::json!(r.t_values.to_vec()));
@@ -342,11 +349,16 @@ pub fn value_to_json(
             map.insert("sigma".into(), serde_json::json!(r.sigma));
             serde_json::Value::Object(map)
         }
+        #[cfg(feature = "greeners-glm")]
         Value::BinaryResult(m) => binary_model_to_json(m),
+        #[cfg(feature = "greeners-panel")]
         Value::PanelResult(r) => {
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("panel_fe"));
-            map.insert("variable".into(), serde_json::json!(r.variable_names.clone().unwrap_or_default()));
+            map.insert(
+                "variable".into(),
+                serde_json::json!(r.variable_names.clone().unwrap_or_default()),
+            );
             map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
             map.insert("std_err".into(), serde_json::json!(r.std_errors.to_vec()));
             map.insert("t".into(), serde_json::json!(r.t_values.to_vec()));
@@ -357,10 +369,14 @@ pub fn value_to_json(
             map.insert("sigma".into(), serde_json::json!(r.sigma));
             serde_json::Value::Object(map)
         }
+        #[cfg(feature = "greeners-panel")]
         Value::ReResult(r) => {
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("panel_re"));
-            map.insert("variable".into(), serde_json::json!(r.variable_names.clone().unwrap_or_default()));
+            map.insert(
+                "variable".into(),
+                serde_json::json!(r.variable_names.clone().unwrap_or_default()),
+            );
             map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
             map.insert("std_err".into(), serde_json::json!(r.std_errors.to_vec()));
             map.insert("t".into(), serde_json::json!(r.t_values.to_vec()));
@@ -371,6 +387,7 @@ pub fn value_to_json(
             map.insert("theta".into(), serde_json::json!(r.theta));
             serde_json::Value::Object(map)
         }
+        #[cfg(feature = "greeners-ols")]
         Value::GmmResult(r) => {
             let names: Vec<String> = (0..r.params.len()).map(|i| format!("x{i}")).collect();
             let mut map = serde_json::Map::new();
@@ -386,10 +403,14 @@ pub fn value_to_json(
             map.insert("df_overid".into(), serde_json::json!(r.df_overid));
             serde_json::Value::Object(map)
         }
+        #[cfg(feature = "greeners-glm")]
         Value::PoissonResult(r) => {
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("poisson"));
-            map.insert("variable".into(), serde_json::json!(r.variable_names.clone().unwrap_or_default()));
+            map.insert(
+                "variable".into(),
+                serde_json::json!(r.variable_names.clone().unwrap_or_default()),
+            );
             map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
             map.insert("std_err".into(), serde_json::json!(r.std_errors.to_vec()));
             map.insert("z".into(), serde_json::json!(r.z_values.to_vec()));
@@ -401,10 +422,14 @@ pub fn value_to_json(
             map.insert("n".into(), serde_json::json!(r.n_obs));
             serde_json::Value::Object(map)
         }
+        #[cfg(feature = "greeners-glm")]
         Value::NegBinResult(r) => {
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("negbin"));
-            map.insert("variable".into(), serde_json::json!(r.variable_names.clone().unwrap_or_default()));
+            map.insert(
+                "variable".into(),
+                serde_json::json!(r.variable_names.clone().unwrap_or_default()),
+            );
             map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
             map.insert("std_err".into(), serde_json::json!(r.std_errors.to_vec()));
             map.insert("z".into(), serde_json::json!(r.z_values.to_vec()));
@@ -417,10 +442,14 @@ pub fn value_to_json(
             map.insert("n".into(), serde_json::json!(r.n_obs));
             serde_json::Value::Object(map)
         }
+        #[cfg(feature = "greeners-glm")]
         Value::GlmResult(r) => {
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("glm"));
-            map.insert("variable".into(), serde_json::json!(r.variable_names.clone().unwrap_or_default()));
+            map.insert(
+                "variable".into(),
+                serde_json::json!(r.variable_names.clone().unwrap_or_default()),
+            );
             map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
             map.insert("std_err".into(), serde_json::json!(r.std_errors.to_vec()));
             map.insert("z".into(), serde_json::json!(r.z_values.to_vec()));
@@ -433,10 +462,14 @@ pub fn value_to_json(
             map.insert("n".into(), serde_json::json!(r.n_obs));
             serde_json::Value::Object(map)
         }
+        #[cfg(feature = "greeners-ols")]
         Value::QuantileResult(r) => {
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("quantile"));
-            map.insert("variable".into(), serde_json::json!(r.variable_names.clone().unwrap_or_default()));
+            map.insert(
+                "variable".into(),
+                serde_json::json!(r.variable_names.clone().unwrap_or_default()),
+            );
             map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
             map.insert("std_err".into(), serde_json::json!(r.std_errors.to_vec()));
             map.insert("t".into(), serde_json::json!(r.t_values.to_vec()));
@@ -445,10 +478,14 @@ pub fn value_to_json(
             map.insert("pseudo_r2".into(), serde_json::json!(r.r_squared));
             serde_json::Value::Object(map)
         }
+        #[cfg(feature = "greeners-ols")]
         Value::TobitResult(r) => {
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("tobit"));
-            map.insert("variable".into(), serde_json::json!(r.variable_names.clone().unwrap_or_default()));
+            map.insert(
+                "variable".into(),
+                serde_json::json!(r.variable_names.clone().unwrap_or_default()),
+            );
             map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
             map.insert("std_err".into(), serde_json::json!(r.std_errors.to_vec()));
             map.insert("t".into(), serde_json::json!(r.t_values.to_vec()));
@@ -459,10 +496,14 @@ pub fn value_to_json(
             map.insert("n_censored".into(), serde_json::json!(r.n_censored));
             serde_json::Value::Object(map)
         }
+        #[cfg(feature = "greeners-ols")]
         Value::HeckmanResult(r) => {
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("heckman"));
-            map.insert("variable".into(), serde_json::json!(r.variable_names.clone().unwrap_or_default()));
+            map.insert(
+                "variable".into(),
+                serde_json::json!(r.variable_names.clone().unwrap_or_default()),
+            );
             map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
             map.insert("std_err".into(), serde_json::json!(r.std_errors.to_vec()));
             map.insert("t".into(), serde_json::json!(r.t_values.to_vec()));
@@ -472,10 +513,14 @@ pub fn value_to_json(
             map.insert("n".into(), serde_json::json!(r.n_obs));
             serde_json::Value::Object(map)
         }
+        #[cfg(feature = "greeners-glm")]
         Value::OrderedResult(r) => {
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("ordered"));
-            map.insert("variable".into(), serde_json::json!(r.variable_names.clone().unwrap_or_default()));
+            map.insert(
+                "variable".into(),
+                serde_json::json!(r.variable_names.clone().unwrap_or_default()),
+            );
             map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
             map.insert("std_err".into(), serde_json::json!(r.std_errors.to_vec()));
             map.insert("z".into(), serde_json::json!(r.z_values.to_vec()));
@@ -486,10 +531,14 @@ pub fn value_to_json(
             map.insert("pseudo_r2".into(), serde_json::json!(r.pseudo_r2));
             serde_json::Value::Object(map)
         }
+        #[cfg(feature = "greeners-panel")]
         Value::AbResult(r) => {
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("arellano_bond"));
-            map.insert("variable".into(), serde_json::json!(r.variable_names.clone().unwrap_or_default()));
+            map.insert(
+                "variable".into(),
+                serde_json::json!(r.variable_names.clone().unwrap_or_default()),
+            );
             map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
             map.insert("std_err".into(), serde_json::json!(r.std_errors.to_vec()));
             map.insert("t".into(), serde_json::json!(r.t_values.to_vec()));
@@ -497,31 +546,44 @@ pub fn value_to_json(
             map.insert("n".into(), serde_json::json!(r.n_obs));
             serde_json::Value::Object(map)
         }
+        #[cfg(feature = "greeners-ols")]
         Value::PenalizedResult(m) => penalized_model_to_json(m),
+        #[cfg(feature = "greeners-ols")]
         Value::RlmResult(r) => {
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("rlm"));
-            map.insert("variable".into(), serde_json::json!(r.variable_names.clone().unwrap_or_default()));
+            map.insert(
+                "variable".into(),
+                serde_json::json!(r.variable_names.clone().unwrap_or_default()),
+            );
             map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
             map.insert("std_err".into(), serde_json::json!(r.std_errors.to_vec()));
             map.insert("t".into(), serde_json::json!(r.t_values.to_vec()));
             map.insert("p_value".into(), serde_json::json!(r.p_values.to_vec()));
             serde_json::Value::Object(map)
         }
+        #[cfg(feature = "greeners-glm")]
         Value::BetaResult(r) => {
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("beta"));
-            map.insert("variable".into(), serde_json::json!(r.variable_names.clone().unwrap_or_default()));
+            map.insert(
+                "variable".into(),
+                serde_json::json!(r.variable_names.clone().unwrap_or_default()),
+            );
             map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
             map.insert("std_err".into(), serde_json::json!(r.std_errors.to_vec()));
             map.insert("z".into(), serde_json::json!(r.z_values.to_vec()));
             map.insert("p_value".into(), serde_json::json!(r.p_values.to_vec()));
             serde_json::Value::Object(map)
         }
+        #[cfg(feature = "greeners-glm")]
         Value::GeeResult(r) => {
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("gee"));
-            map.insert("variable".into(), serde_json::json!(r.variable_names.clone().unwrap_or_default()));
+            map.insert(
+                "variable".into(),
+                serde_json::json!(r.variable_names.clone().unwrap_or_default()),
+            );
             map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
             map.insert("std_err".into(), serde_json::json!(r.robust_se.to_vec()));
             map.insert("z".into(), serde_json::json!(r.z_values.to_vec()));
@@ -531,19 +593,38 @@ pub fn value_to_json(
             map.insert("n_groups".into(), serde_json::json!(r.n_groups));
             serde_json::Value::Object(map)
         }
+        #[cfg(feature = "greeners-timeseries")]
         Value::ArimaResult(r) => {
             let mut all_params = r.ar_params.to_vec();
             all_params.extend(r.ma_params.iter().cloned());
             all_params.push(r.intercept);
             let p = r.p_values.len();
-            let se = if r.std_errors.len() >= p { r.std_errors.slice(ndarray::s![..p]).to_vec() } else { vec![f64::NAN; p] };
-            let tv = if r.t_values.len() >= p { r.t_values.slice(ndarray::s![..p]).to_vec() } else { vec![f64::NAN; p] };
-            let pv = if r.p_values.len() >= p { r.p_values.slice(ndarray::s![..p]).to_vec() } else { vec![f64::NAN; p] };
-            let names: Vec<String> = (0..all_params.len()).map(|i| {
-                if i < r.ar_params.len() { format!("ar{}", i + 1) }
-                else if i < r.ar_params.len() + r.ma_params.len() { format!("ma{}", i - r.ar_params.len() + 1) }
-                else { "intercept".into() }
-            }).collect();
+            let se = if r.std_errors.len() >= p {
+                r.std_errors.slice(ndarray::s![..p]).to_vec()
+            } else {
+                vec![f64::NAN; p]
+            };
+            let tv = if r.t_values.len() >= p {
+                r.t_values.slice(ndarray::s![..p]).to_vec()
+            } else {
+                vec![f64::NAN; p]
+            };
+            let pv = if r.p_values.len() >= p {
+                r.p_values.slice(ndarray::s![..p]).to_vec()
+            } else {
+                vec![f64::NAN; p]
+            };
+            let names: Vec<String> = (0..all_params.len())
+                .map(|i| {
+                    if i < r.ar_params.len() {
+                        format!("ar{}", i + 1)
+                    } else if i < r.ar_params.len() + r.ma_params.len() {
+                        format!("ma{}", i - r.ar_params.len() + 1)
+                    } else {
+                        "intercept".into()
+                    }
+                })
+                .collect();
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("arima"));
             map.insert("variable".into(), serde_json::json!(names));
@@ -557,10 +638,14 @@ pub fn value_to_json(
             map.insert("sigma2".into(), serde_json::json!(r.sigma2));
             serde_json::Value::Object(map)
         }
+        #[cfg(feature = "greeners-timeseries")]
         Value::GarchResult(r) => {
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("garch"));
-            map.insert("variable".into(), serde_json::json!(r.variable_names.clone()));
+            map.insert(
+                "variable".into(),
+                serde_json::json!(r.variable_names.clone()),
+            );
             map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
             map.insert("std_err".into(), serde_json::json!(r.std_errors.to_vec()));
             map.insert("z".into(), serde_json::json!(r.z_values.to_vec()));
@@ -581,6 +666,20 @@ pub fn value_to_json(
             map.insert("__plot_format__".to_string(), serde_json::json!(format));
             serde_json::Value::Object(map)
         }
+        Value::DiagResult(r) => {
+            let mut map = serde_json::Map::new();
+            for (k, v) in r.fields.iter() {
+                map.insert(k.clone(), value_to_json(v, use_arrow, temp_boxes));
+            }
+            serde_json::Value::Object(map)
+        }
+        Value::ModelResult { fields, .. } => {
+            let mut map = serde_json::Map::new();
+            for (k, v) in fields.iter() {
+                map.insert(k.clone(), value_to_json(v, use_arrow, temp_boxes));
+            }
+            serde_json::Value::Object(map)
+        }
         _ => serde_json::Value::Null,
     }
 }
@@ -590,7 +689,10 @@ fn ols_model_to_json(m: &OlsModel) -> serde_json::Value {
     let r = &m.result;
     let mut map = serde_json::Map::new();
     map.insert("__model_type__".into(), serde_json::json!("ols"));
-    map.insert("variable".into(), serde_json::json!(r.variable_names.clone().unwrap_or_default()));
+    map.insert(
+        "variable".into(),
+        serde_json::json!(r.variable_names.clone().unwrap_or_default()),
+    );
     map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
     map.insert("std_err".into(), serde_json::json!(r.std_errors.to_vec()));
     map.insert("t".into(), serde_json::json!(r.t_values.to_vec()));
@@ -610,6 +712,7 @@ fn ols_model_to_json(m: &OlsModel) -> serde_json::Value {
 }
 
 /// Serialize a BinaryModel (logit/probit) to JSON dict for plugin consumption.
+#[cfg(feature = "greeners-glm")]
 fn binary_model_to_json(m: &BinaryModel) -> serde_json::Value {
     let r = &m.result;
     let mut map = serde_json::Map::new();
@@ -624,11 +727,14 @@ fn binary_model_to_json(m: &BinaryModel) -> serde_json::Value {
     serde_json::Value::Object(map)
 }
 
-/// Serialize a PenalizedModel (ridge/lasso/elasticnet) to JSON dict.
+#[cfg(feature = "greeners-ols")]
 fn penalized_model_to_json(m: &PenalizedModel) -> serde_json::Value {
     let mut map = serde_json::Map::new();
     map.insert("__model_type__".into(), serde_json::json!(m.kind.as_str()));
-    map.insert("variable".into(), serde_json::json!(m.variable_names.clone()));
+    map.insert(
+        "variable".into(),
+        serde_json::json!(m.variable_names.clone()),
+    );
     map.insert("coef".into(), serde_json::json!(m.params.to_vec()));
     map.insert("std_err".into(), serde_json::json!(m.std_errors.to_vec()));
     map.insert("r2".into(), serde_json::json!(m.r_squared));
@@ -662,7 +768,7 @@ pub fn json_to_value(
                 .iter()
                 .map(|v| json_to_value(v, returned_arrow_ptrs, host_allocated))
                 .collect();
-            Value::List(Rc::new(lst))
+            Value::List(Arc::new(lst))
         }
         serde_json::Value::Object(obj) => {
             if let (Some(arr_val), Some(sch_val)) = (
@@ -684,7 +790,7 @@ pub fn json_to_value(
                                         returned_arrow_ptrs
                                             .push((arr_ptr as usize, sch_ptr as usize));
                                     }
-                                    return Value::DataFrame(Rc::new(df));
+                                    return Value::DataFrame(Arc::new(df));
                                 }
                             } else {
                                 if let Ok(col) = arrow_to_column(&array_ref) {
@@ -725,7 +831,7 @@ pub fn json_to_value(
                     json_to_value(v, returned_arrow_ptrs, host_allocated),
                 );
             }
-            Value::Dict(Rc::new(map))
+            Value::Dict(Arc::new(map))
         }
     }
 }
@@ -734,14 +840,14 @@ pub fn json_to_value(
 // Rust Native Plugin Implementation (using libloading)
 // =============================================================================
 
-#[cfg(feature = "native")]
+#[cfg(feature = "network")]
 pub struct RustNativePlugin {
     #[allow(dead_code)]
     name: String,
     lib: libloading::Library,
 }
 
-#[cfg(feature = "native")]
+#[cfg(feature = "network")]
 impl RustNativePlugin {
     pub fn new(path: &str, name: &str) -> Result<Self, String> {
         let lib = unsafe { libloading::Library::new(path).map_err(|e| e.to_string())? };
@@ -752,7 +858,7 @@ impl RustNativePlugin {
     }
 }
 
-#[cfg(feature = "native")]
+#[cfg(feature = "network")]
 impl HayashiPlugin for RustNativePlugin {
     fn name(&self) -> &str {
         &self.name

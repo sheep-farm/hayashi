@@ -1,0 +1,8 @@
+// Wooldridge (Introductory Econometrics, 7e), Chapter 2, Examples 2.5 and 2.9.
+// election outcomes and campaign expenditure share equation: voteA ~ shareA.
+
+load "validation/cases/ols_wooldridge_vote1_ch2/data/vote1.csv" as df
+
+let m = ols(voteA ~ shareA, df)
+
+export(m, "csv", "/dev/stdout")

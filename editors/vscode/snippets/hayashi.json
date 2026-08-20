@@ -1,0 +1,131 @@
+{
+  "OLS regression": {
+    "prefix": "ols",
+    "body": [
+      "let model = ols(${1:dep} ~ ${2:indep}, ${3:df})",
+      "print(model)"
+    ],
+    "description": "Ordinary Least Squares regression"
+  },
+  "Logit": {
+    "prefix": "logit",
+    "body": [
+      "let model = logit(${1:dep} ~ ${2:indep}, ${3:df})",
+      "print(model)"
+    ],
+    "description": "Logistic regression"
+  },
+  "Probit": {
+    "prefix": "probit",
+    "body": [
+      "let model = probit(${1:dep} ~ ${2:indep}, ${3:df})",
+      "print(model)"
+    ],
+    "description": "Probit regression"
+  },
+  "IV / 2SLS": {
+    "prefix": "iv",
+    "body": [
+      "let model = iv(${1:dep} ~ ${2:endog} | ${3:instruments}, ${4:df})",
+      "print(model)"
+    ],
+    "description": "Instrumental Variables / 2SLS"
+  },
+  "Panel Fixed Effects": {
+    "prefix": "fe",
+    "body": [
+      "xtset ${1:df}, id=${2:panel_var}, time=${3:time_var}",
+      "let model = fe(${4:dep} ~ ${5:indep}, ${1:df})",
+      "print(model)"
+    ],
+    "description": "Panel fixed effects regression"
+  },
+  "VAR": {
+    "prefix": "var",
+    "body": [
+      "let model = var([${1:y1}, ${2:y2}], ${3:df}, lags=${4:2})",
+      "print(model)"
+    ],
+    "description": "Vector Autoregression"
+  },
+  "GARCH": {
+    "prefix": "garch",
+    "body": [
+      "let model = garch(${1:ret} ~ 1, ${2:df}, p=${3:1}, q=${4:1})",
+      "print(model)"
+    ],
+    "description": "GARCH volatility model"
+  },
+  "Load CSV": {
+    "prefix": "load",
+    "body": [
+      "load \"${1:path/to/file.csv}\" as ${2:df}"
+    ],
+    "description": "Load CSV file"
+  },
+  "Summarize": {
+    "prefix": "summarize",
+    "body": [
+      "summarize ${1:df}"
+    ],
+    "description": "Summary statistics"
+  },
+  "Generate variable": {
+    "prefix": "generate",
+    "body": [
+      "generate ${1:df} ${2:newvar} = ${3:expression}"
+    ],
+    "description": "Generate new variable"
+  },
+  "Pipe": {
+    "prefix": "pipe",
+    "body": [
+      "${1:df} |> ${2:transform}(${3:args})"
+    ],
+    "description": "Pipe operator"
+  },
+  "Function definition": {
+    "prefix": "fn",
+    "body": [
+      "fn ${1:name}(${2:args}) {",
+      "  return ${3:body}",
+      "}"
+    ],
+    "description": "Define a function"
+  },
+  "For loop": {
+    "prefix": "for",
+    "body": [
+      "for ${1:i} in ${2:range} {",
+      "  ${3:body}",
+      "}"
+    ],
+    "description": "For loop"
+  },
+  "If statement": {
+    "prefix": "if",
+    "body": [
+      "if ${1:condition} {",
+      "  ${2:body}",
+      "}"
+    ],
+    "description": "If statement"
+  },
+  "Match expression": {
+    "prefix": "match",
+    "body": [
+      "match ${1:expr} {",
+      "  ${2:pattern} => ${3:result}",
+      "  _ => ${4:default}",
+      "}"
+    ],
+    "description": "Match expression"
+  },
+  "Import plugin": {
+    "prefix": "import",
+    "body": [
+      "import(\"${1:user/plugin}\", as=${2:alias})"
+    ],
+    "description": "Import a plugin"
+  }
+}

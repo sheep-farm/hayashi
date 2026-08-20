@@ -31,6 +31,30 @@ let df2 = mutate(df, lincome = log(income), income2 = income^2)
 // df2 has them
 \end{lstlisting}
 
+\section{Random variate generators}
+
+All distributions below are available inside \lstinline{generate} expressions.
+They respect the global seed set by \lstinline{set_seed} and return one value per
+row, broadcasting scalar parameters to the DataFrame length.
+
+\begin{lstlisting}[caption={Simulating data}]
+set_seed(42)
+let df = dataframe(1000)
+
+generate df u = rnormal(0, 1)
+generate df treated = rbernoulli(0.5)
+generate df duration = rexponential(1)
+\end{lstlisting}
+
+\textbf{Continuous:} \lstinline{rnormal}, \lstinline{rlognormal}, \lstinline{rskewnormal}, \lstinline{rcauchy}, \lstinline{rstudentt} (alias \lstinline{rt}), \lstinline{rchisq}, \lstinline{rf}, \lstinline{rbeta}, \lstinline{rgamma}, \lstinline{rexponential}, \lstinline{rweibull}, \lstinline{rpareto}, \lstinline{rpert}, \lstinline{rtriangular}, \lstinline{rfrechet}, \lstinline{rgumbel}, \lstinline{rinversegaussian}, \lstinline{rnig}, \lstinline{runiform}.
+
+\textbf{Discrete:} \lstinline{rbernoulli}, \lstinline{rbinomial}, \lstinline{rpoisson}, \lstinline{rgeometric}, \lstinline{rhypergeometric}, \lstinline{rzeta}, \lstinline{rzipf}.
+
+\begin{nota}
+  \lstinline{rgeometric(p)} returns the number of failures before the first
+  success, with support $\{0, 1, 2, \ldots\}$.
+\end{nota}
+
 \section{\texttt{filter}}
 
 Selects rows that satisfy a condition:
@@ -92,7 +116,7 @@ let daily = ffill(daily)
 
 \section{\texttt{append}}
 
-Stacks two DataFrames vertically (equivalent to \texttt{rbind}):
+Stacks two DataFrames vertically:
 
 \begin{lstlisting}
 let df_total = append(df_2024, df_2025)
@@ -100,6 +124,23 @@ let df_total = append(df_2024, df_2025)
 
 Columns must be compatible. Columns missing from one DataFrame are filled
 with \texttt{NaN}.
+
+\section{\texttt{rbind}}
+
+Concatenates a \textit{list} of DataFrames vertically in a single pass.
+\texttt{nil} entries are silently skipped --- useful when combining
+results from \texttt{parallel for} where some iterations return
+\texttt{nil}:
+
+\begin{lstlisting}[caption={rbind with parallel for}]
+let results = parallel for i in 0..n, threads=8 {
+  let t = tickers[i]
+  if t == "SPY" { return nil }
+  let df_t = compute_betas(t)
+  df_t
+}
+let all_betas = rbind(results)
+\end{lstlisting}
 
 \section{\texttt{collapse} and \texttt{group\_by}}
 
@@ -191,6 +232,12 @@ returns a tidy DataFrame of coefficients, standard errors, and confidence
 intervals. For \texttt{rolling} models it returns one row per window
 with columns \texttt{date}, \texttt{r2}, and one coefficient column per
 variable. \texttt{glance} returns a one-row summary with fit statistics.
+
+Both functions support all model types: OLS, IV, logit, probit, ordered,
+multinomial, panel (FE, RE, PCSE, GLS, GLSAR, Arellano-Bond, SystemGMM),
+time series (ARIMA, AutoReg, ARDL, GARCH, VAR, VECM, VARMA, ETS, Kalman),
+survival (Cox, KM), causal (DiD, Threshold), multivariate (SUR, 3SLS),
+regularization (ridge, lasso, elasticnet), and more.
 
 \begin{lstlisting}[caption={Tidy and glance}]
 let m = ols(y ~ x1 + x2, df)

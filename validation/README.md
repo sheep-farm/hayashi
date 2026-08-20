@@ -33,15 +33,22 @@ Useful runner options:
 
 ```bash
 python validation/run.py --list
+python validation/run.py --check
 python validation/run.py --case heckman_mroz
 python validation/run.py --case heckman_mroz --case ols_cluster_wagepan --no-write
 ```
 
+Use `--check` before adding or editing cases. It validates the case registry,
+case metadata, declared script paths, and generated `MATRIX.md` without running
+Hayashi or reference estimators.
+
 Exit codes:
 
-- `0` — all selected cases passed.
+- `0` — selected cases completed with no failed, blocked, partial, or not-started result.
+- `0` — metadata is consistent when `--check` is passed.
 - `0` — validation blocked, but `--allow-blocked` was passed.
-- `1` — at least one case failed, or a case is blocked without `--allow-blocked`.
+- `1` — at least one case failed, was blocked without `--allow-blocked`, was partial without `--allow-partial`, or was not started.
+- `1` — metadata is inconsistent when `--check` is passed.
 
 The same options can be passed through `hay validate`, for example
 `hay validate --case heckman_mroz --no-write`.
@@ -49,9 +56,14 @@ The same options can be passed through `hay validate`, for example
 ## Requirements
 
 - Hayashi CLI (`hay`) built from the repository.
-- R with `Rscript` and the packages listed in `DESCRIPTION` (`wooldridge`, `jsonlite`, `MASS`, `glmnet`, `systemfit`).
+- R with `Rscript` and every package listed in `DESCRIPTION`.
 - Python 3 with the packages listed in `requirements.txt`.
 - Stata is optional and only used when `stata` is found in `$PATH`.
+
+The workflow pins the Greeners numerical-engine revision. The R and Python
+package sets are declared here but are not yet version-locked; #140 tracks the
+lockfile policy and CI restoration needed for a fully pinned reference
+environment.
 
 Install Python dependencies:
 
@@ -62,18 +74,51 @@ pip install -r validation/requirements.txt
 Install R dependencies:
 
 ```bash
-Rscript -e 'install.packages(c("wooldridge", "jsonlite", "MASS", "glmnet", "systemfit"), repos="https://cloud.r-project.org/")'
+Rscript -e 'd <- read.dcf("validation/DESCRIPTION"); pkgs <- trimws(strsplit(d[1, "Imports"], ",")[[1]]); install.packages(pkgs, repos="https://cloud.r-project.org/")'
 ```
 
 ## Reference implementation coverage
 
 Most cases provide both an R and a Python reference implementation. The
-validation runner runs every declared reference and blocks the case if any
-declared reference fails or is missing. Hayashi is then compared against one
-selected reference implementation, and the generated matrix marks that
-reference with `*`. A few cases implement the estimator manually in base
-R/Python because no suitable packaged reference is available; each case's
-`README.md` documents the exact packages and implementation choices.
+validation runner runs every declared reference and compares Hayashi
+independently against every reference that runs successfully. A case is
+`blocked` when no declared reference runs. It is `partial` when at least one
+reference runs but another declared reference fails or is missing; partial
+results exit non-zero unless `--allow-partial` is passed. `MATRIX.md` lists the
+declared references and recorded case status. When a runner result records
+per-reference execution details, `MATRIX.md` renders them in the Reference
+column. A few cases implement the
+estimator manually in base R/Python because no suitable packaged reference is
+available; each case's `README.md` documents the exact packages and
+implementation choices.
+
+## Cross-platform CI policy
+
+The validation workflow runs on Ubuntu, macOS and Windows.
+
+- **Ubuntu is the precision reference.** Both R and Python references run
+  reliably, and a `pass` on Ubuntu means Hayashi agrees with both references
+  within the declared tolerances. This is the strongest evidence of numerical
+  correctness.
+
+- **macOS and Windows are treated as compatibility smoke tests.** The runner
+  uses `--allow-partial` on these platforms because the reference environments
+  are more fragile:
+  - **macOS**: the R `renv` snapshot sometimes fails to restore or compile
+    native packages (e.g. `plm`, `wooldridge` dependencies), causing the R
+    reference to halt without output. When the Python reference runs and
+    Hayashi matches it, the case is recorded as `partial`.
+  - **Windows**: the reference scripts and the Hayashi scripts use Unix-only
+    idioms (`/dev/stdout`, repository-relative forward-slash paths, and UTF-8
+    console output such as `Δvalue`). The runner rewrites `run.hay` on the fly
+    to use concrete output files and absolute paths, and it forces UTF-8 I/O
+    decoding. Any remaining `partial` results on Windows are due to reference
+    scripts that fail for environment reasons (e.g. `UnicodeEncodeError` on
+    `cp1252` consoles) rather than numerical disagreement.
+
+A `partial` result on macOS or Windows still means Hayashi matched every
+available reference on that platform; it does not indicate a precision problem
+in Hayashi.
 
 ## Directory layout
 
@@ -103,11 +148,24 @@ validation/
 
 ## Status values
 
-- `pass` — Hayashi matches reference within declared tolerances.
+`case.yml` declares whether the runner should execute a case. In the current
+schema, `pass` means the case is active and runnable; `blocked`,
+`not-supported`, and `not-started` cause the runner to skip it. A selected
+`not-started` case exits non-zero, so an unimplemented case cannot create a
+green validation result. `matrix.yml`
+records the last observed status and is regenerated after a run. The runner
+retains the manifest status before merging the recorded matrix status so a stale
+result cannot alter execution eligibility. The metadata check rejects
+contradictions such as a `not-started` case with a recorded `pass` result.
+
+- `pass` — the recorded run matched reference within declared tolerances.
 - `fail` — Hayashi differs from reference beyond tolerances; an issue should
   be opened.
-- `blocked` — cannot run because of a missing feature or bug; link to issue.
-- `not-supported` — the estimator/workflow is not supported by Hayashi yet.
+- `blocked` — cannot be evaluated because a required dependency, feature, or
+  known defect prevents execution; link a repository defect to its issue.
+- `not-supported` — the validation programme cannot currently test the stated
+  estimator/workflow contract. This does not necessarily mean Hayashi lacks
+  the command.
 - `not-started` — case is registered but not implemented.
 
 ## Adding a new case
@@ -124,7 +182,8 @@ validation/
    `cases/<id>/hayashi/output.*` for debugging).
 5. Optional: add an entry to `matrix.yml` with `id`, `dimension`, and `notes`.
    If omitted, `hay validate` auto-discovers the case from the filesystem.
-6. Run `hay validate` and commit the updated `MATRIX.md`.
+6. Run `python validation/run.py --check`, then `hay validate`, and commit the
+   updated `MATRIX.md`.
 
 ### Book-based simulated cases
 
@@ -168,20 +227,37 @@ The validation programme covers four dimensions:
 ## Estimators not covered by validation
 
 Not every command in Hayashi is a validation case. The programme focuses on
-core empirical estimators and intentionally excludes some command categories:
+core empirical estimators and intentionally excludes some command categories.
+For a machine-readable list of all cases and their status, see `matrix.yml`
+and the generated `MATRIX.md`. For the most up-to-date list of implemented
+estimators that are not yet numerically validated, see `KNOWN_GAPS.md`.
 
-- **Diagnostic/test commands** (e.g., `adf`, `kpss`, `granger`,
-  `engle_granger`, `johansen`, `ljungbox`, `white`, `reset`, `bgodfrey`,
-  `archtest`, `hausman`) — validated indirectly through the estimators that use
-  them.
+- **Diagnostic/test commands without a dedicated case** (e.g., `ab_test`,
+  `adf`, `adtest`, `archtest`, `bgodfrey`, `bitest`, `bkfilter`, `bphet`,
+  `bptest`, `chisq2x2`, `condnum`, `cooks`, `cusumtest`, `durbinwatson`,
+  `engle_granger`, `gqtest`, `hausman`, `hpfilter`, `jb`, `johansen`, `kpss`,
+  `kruskal`, `leverage`, `lilliefors`, `linktest`, `ljungbox`, `lroc`, `lrtest`,
+  `multipletests`, `omnibus`, `pacf`, `pesaran_cd`, `pp`, `proptest`,
+  `proptest2`, `propci`, `ranksum`, `reset`, `sfevd`, `sfrancia`, `sirf`,
+  `sktest`, `spearman`, `swilk`, `test`, `testparm`, `vif`, `weak_iv`, `white`,
+  `za`) — validated indirectly through the estimators that use them.
+  Diagnostics with a case, such as `granger`, `ljungbox`, `white`, and
+  `reset`, are listed in the matrix.
 - **Utility/data manipulation commands** (e.g., `generate`, `filter`,
   `summarize`, `load`, `export`) — covered by `cargo test`, not by empirical
   validation.
 - **Visualization commands** (e.g., `plot`, `scatter`, `histogram`) — not part
   of numerical validation.
-- **Niche or hard-to-reference estimators** (e.g., `portfolio_sort`,
-  `double_sort`, Fama-MacBeth, dynamic factor, GAM, multiple imputation) —
+- **Niche or hard-to-reference estimators without a validation case** —
   require specialised datasets or lack canonical open-source reference
-  implementations.
-- **Estimators with output format limitations** (e.g., `svar`, `svec`) —
-  require changes to the Greeners export format before they can be parsed.
+  implementations. Examples include `bplm`, `cancorr`, `cffilter`,
+  `chamberlain`, `cmnlogit`, `decompose`, `gam`, `markov`, `mice`, `msauto`,
+  `mstl`, `pthresh`, `stl`, `ucm`, `bayes_sfa_production`, `bsc`, `bvar`,
+  `fapanel`, `fcoef`, `fmols`, `lstm`, `mfvar`, `spatial_durbin_error`,
+  `spatial_panel_sar`, `spatial_panel_sem`, `spectral`, `transformer`,
+  `tvcopula`, `tvp_var`, and `johansen_break`.
+- **Estimators with `not-supported` validation placeholders** — some of the
+  estimators above have a directory under `validation/cases/` whose
+  `case.yml` is marked `not-supported` (the `run.hay` is a placeholder)
+  because no stable R/Python reference is available. They are not numerically
+  validated, but they are implemented and callable.

@@ -1,0 +1,8 @@
+// Load the deterministic AML survival-time projection.
+load "validation/cases/km_aml/data/aml.csv" as df
+
+// Marginal Kaplan-Meier survival curve for relapse time.
+let model = km(time, event, df)
+
+// Print the table so validation/run.py can parse the survival checkpoints.
+print(model)

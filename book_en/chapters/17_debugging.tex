@@ -1,0 +1,71 @@
+\chapter{Debugging}
+
+\hayashi{} includes a built-in Debug Adapter Protocol (DAP) server. With the VS~Code extension you can set breakpoints, step through a script, and inspect variables.
+
+\section{Starting a debug session}
+
+Make sure the \hay{} binary is in \texttt{PATH}. In VS~Code open a \texttt{.hay} file, go to the \textbf{Run and Debug} panel, choose the \textbf{"Debug Hayashi script"} configuration, and start debugging.
+
+Behind the scenes VS~Code runs:
+
+\begin{lstlisting}[style=inline, language=sh]
+hay dap script.hay
+\end{lstlisting}
+
+The DAP server supports breakpoints, step over/in/out, continue, scopes (Locals / Globals), and variable inspection.
+
+\section{Inspecting model results}
+
+When execution pauses, model objects expand in the Variables panel with a concise summary and structured children.
+
+\begin{lstlisting}[style=inline]
+result: OLS(k=2, n=10000), R2=1.0000
+  coefficients    DataFrame(2 rows, 7 cols)
+  fit             Dict(13 entries)
+  residuals       Series(residuals: 10000 values)
+  fitted_values   Series(fitted_values: 10000 values)
+  params          Series(params: 2 values)
+  std_errors      Series(std_errors: 2 values)
+  test_values     Series(test_values: 2 values)
+  p_values        Series(p_values: 2 values)
+  conf_lower      Series(conf_lower: 2 values)
+  conf_upper      Series(conf_upper: 2 values)
+\end{lstlisting}
+
+\subsection{Children}
+
+\begin{description}
+  \item[\texttt{coefficients}] Coefficient table as a \texttt{DataFrame}: \texttt{variable}, \texttt{coef}, \texttt{std\_err}, \texttt{t} or \texttt{z}, \texttt{p\_value}, \texttt{conf\_low}, \texttt{conf\_high}.
+  \item[\texttt{fit}] Model-specific fit statistics as a \texttt{Dict} (R$^2$, pseudo R$^2$, log-likelihood, AIC/BIC, \texttt{n\_obs}, \texttt{df\_resid}, etc.).
+  \item[\texttt{params}, \texttt{std\_errors}, \texttt{test\_values}, \texttt{p\_values}] Raw coefficient vectors as \texttt{Series}.
+  \item[\texttt{conf\_lower} / \texttt{conf\_upper}] Confidence interval bounds, when available.
+  \item[\texttt{residuals} / \texttt{fitted\_values}] OLS only.
+\end{description}
+
+\section{Supported estimators}
+
+The structured expansion works for the following result types:
+
+\begin{itemize}
+  \item Cross-section: OLS, IV/2SLS, quantile regression, GMM, GLSAR
+  \item Panel: fixed effects, random effects, PCSE, PanelGLS, FE-2SLS, Arellano-Bond, system GMM
+  \item Binary: logit and probit
+  \item Count: Poisson, negative binomial, zero-inflated Poisson/negative binomial
+  \item Limited: Tobit, ordered logit/probit, multinomial logit
+  \item Other GLM: GLM, RLM, beta regression, mixed-effects / HLM
+  \item Systems: SUR and three-stage least squares (each equation is a child node)
+\end{itemize}
+
+\begin{nota}
+  Time-series models (ARIMA, GARCH, VAR, etc.) currently display as plain text in the debugger without structured children.
+\end{nota}
+
+\section{Command-line debugging}
+
+You can start the DAP server manually for testing or integration with other editors:
+
+\begin{lstlisting}[style=inline, language=sh]
+hay dap script.hay
+\end{lstlisting}
+
+It reads DAP messages from \texttt{stdin} and writes responses to \texttt{stdout}. The VS~Code extension handles the protocol automatically.

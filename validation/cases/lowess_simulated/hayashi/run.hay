@@ -1,0 +1,10 @@
+load "validation/cases/lowess_simulated/data/data.csv" as df
+let m = lowess(df, y, x, frac=0.4, it=3)
+predict df yhat = m, "smoothed"
+let out = dataframe({
+  "variable": ["mean_yhat", "yhat_first", "yhat_mid", "yhat_last"],
+  "coef": [mean(df.yhat), df.yhat[0], df.yhat[99], df.yhat[199]],
+  "std_err": [0.0, 0.0, 0.0, 0.0]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

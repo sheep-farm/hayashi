@@ -1,0 +1,3 @@
+load "validation/cases/panel_tobit_simulated/data/data.csv" as df
+let m = panel_tobit(y ~ x, df, id="id", censor=0)
+export(m.coefficients, "csv", "/dev/stdout")

@@ -54,15 +54,18 @@ Hayashi packages are convention-based and require zero configuration:
   \item \textbf{Native Plugins}: Set up a GitHub Actions workflow to build and upload compiled binaries (\texttt{.so}, \texttt{.dll}, \texttt{.dylib}, or \texttt{.wasm}) as assets to a GitHub Release.
 \end{itemize}
 
-Once your package is pushed to GitHub, any user in the world can install and use it in Hayashi:
+Once your package is pushed to GitHub, any user in the world can install and use it in Hayashi, either from the CLI or directly inside a script:
 \begin{lstlisting}[caption={Installing and importing a package}]
 // In the OS terminal:
 // hay install john/finance
 
-// In your Hayashi script:
+// Inside the Hayashi script itself:
+install("john/finance")
 import("john/finance/interest")
 let rate = finance::compute_rate(1000, 12)
 \end{lstlisting}
+
+The \lstinline{install("user/repo")} function also accepts the optional arguments \lstinline{version} (for a specific version, e.g. \lstinline{version="v1.2.3"}) and \lstinline{force=true} (to overwrite an existing installation without prompting).
 
 ---
 
@@ -106,9 +109,10 @@ hayashi_plugin!();
 
 Compiled as a \texttt{cdylib}, you can publish your plugin by creating a tag (e.g. \texttt{v0.1.0}) on GitHub. The GitHub Actions release workflow compiles the plugin for Linux (\texttt{.so}), macOS (\texttt{.dylib}), and Windows (\texttt{.dll}), uploading them as release assets.
 
-Any user can install it using the CLI:
+Any user can install it from the CLI or inside a script:
 \begin{lstlisting}[style=inline, numbers=none, frame=none]
-hay install john/spatial
+hay install john/spatial     // from the OS terminal
+install("john/spatial")      // inside a Hayashi script
 \end{lstlisting}
 The package manager automatically downloads the binary that matches the current operating system and architecture.
 

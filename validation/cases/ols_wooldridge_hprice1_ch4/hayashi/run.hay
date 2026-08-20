@@ -1,0 +1,8 @@
+// Wooldridge (Introductory Econometrics, 7e), Chapter 4, Section 4.5.
+// log housing price equation with qualitative information: lprice ~ llotsize + lsqrft + bdrms + colonial.
+
+load "validation/cases/ols_wooldridge_hprice1_ch4/data/hprice1.csv" as df
+
+let m = ols(lprice ~ llotsize + lsqrft + bdrms + colonial, df)
+
+export(m, "csv", "/dev/stdout")

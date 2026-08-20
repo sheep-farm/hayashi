@@ -23,7 +23,7 @@ else:
 
 panel_df = df.set_index(["firm", "year"])
 
-model = RandomEffects.from_formula("inv ~ value + capital", data=panel_df).fit()
+model = RandomEffects.from_formula("inv ~ 1 + value + capital", data=panel_df).fit()
 
 coefs = {name: float(val) for name, val in model.params.items()}
 std_errors = {name: float(val) for name, val in model.std_errors.items()}

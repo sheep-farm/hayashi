@@ -54,15 +54,18 @@ Os pacotes do Hayashi são baseados em convenção e exigem configuração zero:
   \item \textbf{Plugins Nativos}: Configure um workflow do GitHub Actions para compilar e subir os binários gerados (\texttt{.so}, \texttt{.dll}, \texttt{.dylib} ou \texttt{.wasm}) como assets em um GitHub Release.
 \end{itemize}
 
-Depois de subir seu pacote no GitHub, qualquer usuário do mundo poderá instalar e usar no Hayashi:
+Depois de subir seu pacote no GitHub, qualquer usuário do mundo poderá instalar e usar no Hayashi, seja pela CLI ou diretamente dentro de um script:
 \begin{lstlisting}[caption={Instalando e importando um pacote}]
 // No terminal do sistema operacional:
 // hay install joao/financas
 
-// No seu script Hayashi:
+// Dentro do proprio script Hayashi:
+install("joao/financas")
 import("joao/financas/juros")
 let taxa = financas::calcular_taxa(1000, 12)
 \end{lstlisting}
+
+A função \lstinline{install("usuario/repositorio")} também aceita os argumentos opcionais \lstinline{version} (para uma versão específica, ex.: \lstinline{version="v1.2.3"}) e \lstinline{force=true} (para sobrescrever uma instalação existida sem prompt).
 
 ---
 
@@ -106,9 +109,10 @@ hayashi_plugin!();
 
 Compilado como um \texttt{cdylib}, você pode publicar seu plugin criando uma tag (ex: \texttt{v0.1.0}) no GitHub. O workflow de GitHub Actions irá compilar o plugin para Linux (\texttt{.so}), macOS (\texttt{.dylib}) e Windows (\texttt{.dll}), fazendo o upload deles como assets do release.
 
-Qualquer usuário pode instalá-lo utilizando a CLI:
+Qualquer usuário pode instalá-lo pela CLI ou dentro de um script:
 \begin{lstlisting}[style=inline, numbers=none, frame=none]
-hay install john/spatial
+hay install john/spatial        // no terminal do sistema operacional
+install("john/spatial")        // dentro de um script Hayashi
 \end{lstlisting}
 O gerenciador de pacotes baixa automaticamente o binário correto correspondente ao sistema operacional e arquitetura do usuário.
 

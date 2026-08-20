@@ -1,0 +1,36 @@
+id: cloglog_wooldridge_affairs
+title: Complementary log-log on Wooldridge affairs
+estimator_family: cloglog
+status: pass
+dimension: numerical
+
+dataset:
+  name: wooldridge::affairs
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-3
+    standard_errors: 1e-2
+
+output_format: txt
+
+hayashi_script: cases/cloglog_wooldridge_affairs/hayashi/run.hay
+reference_scripts:
+  R: cases/cloglog_wooldridge_affairs/reference/run.R
+  Python: cases/cloglog_wooldridge_affairs/reference/run.py
+
+notes: Complementary log-log GLM on Wooldridge affairs. A sign error in the Greeners cloglog derivative caused IRLS divergence; the derivative is now positive and the model converges to the same estimates as R glm and statsmodels.
+
+result:
+  summary: "Hayashi matches R and Python references for binomial/cloglog coefficients and standard errors."
+  known_differences: []
+  issues_opened: []

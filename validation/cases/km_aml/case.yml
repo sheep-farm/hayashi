@@ -1,0 +1,37 @@
+id: km_aml
+title: Kaplan-Meier survival checkpoints on acute myelogenous leukaemia remission data
+estimator_family: km
+status: pass
+dimension: numerical
+
+dataset:
+  name: survival::aml
+  source: R survival package, Miller (1997)
+  licence: LGPL (>= 2)
+  checksum: f42328a147f464ac64dbf5b193a6968b488d4e201e40cb210008bcad97774053
+  download_script: cases/km_aml/data/gen.py
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - survival_probabilities
+  tolerances:
+    survival_probabilities: 1e-4
+
+output_format: txt
+
+hayashi_script: cases/km_aml/hayashi/run.hay
+reference_scripts:
+  R: cases/km_aml/reference/run.R
+  Python: cases/km_aml/reference/run.py
+
+notes: Kaplan-Meier right-continuous survival probabilities at seven checkpoints on survival::aml.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened:
+    - 113

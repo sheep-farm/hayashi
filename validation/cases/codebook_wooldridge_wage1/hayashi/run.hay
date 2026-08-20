@@ -1,0 +1,8 @@
+// Load the one-column Wooldridge wage1 dataset from CSV.
+load "validation/cases/codebook_wooldridge_wage1/data/wage.csv" as df
+
+// Codebook for the continuous wage variable.
+let cb = codebook(df)
+
+// Export the result as JSON for automated comparison.
+export(cb, "json", "/dev/stdout")

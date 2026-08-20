@@ -1,0 +1,3 @@
+load "validation/cases/cpoisson_simulated/data/data.csv" as df
+let m = cpoisson(y ~ x, df, group="group")
+print(m)

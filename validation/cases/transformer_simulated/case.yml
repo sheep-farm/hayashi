@@ -1,0 +1,21 @@
+id: transformer_simulated
+title: Transformer time-series (not supported for validation)
+estimator_family: transformer
+status: not-supported
+dimension: numerical
+dataset:
+  name: simulated
+  source: n/a
+  licence: n/a
+references: []
+comparison:
+  quantities: []
+  tolerances: {}
+output_format: csv
+hayashi_script: cases/transformer_simulated/hayashi/run.hay
+reference_scripts: {}
+notes: "PyTorch/TensorFlow stochastic training is not reproducible enough for numerical validation."
+result:
+  summary: "PyTorch/TensorFlow stochastic training is not reproducible enough for numerical validation."
+  known_differences: []
+  issues_opened: []

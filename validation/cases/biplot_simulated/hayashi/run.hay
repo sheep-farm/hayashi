@@ -1,0 +1,12 @@
+load "validation/cases/biplot_simulated/data/data.csv" as df
+let m = biplot(df, x="x1,x2,x3", type="symmetric")
+let s1 = sum(m.loadings["x1"])
+let s2 = sum(m.loadings["x2"])
+let nan = 0.0 / 0.0
+let out = dataframe({
+  "variable": ["ev1", "ev2", "sum_loadings_pc1_sq", "sum_loadings_pc2_sq"],
+  "coef": [m.explained_variance_ratio[0], m.explained_variance_ratio[1], s1 * s1, s2 * s2],
+  "std_err": [nan, nan, nan, nan]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

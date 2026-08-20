@@ -1,0 +1,20 @@
+load "validation/cases/influence_simulated/data/data.csv" as df
+let m = ols(y ~ x, df)
+let r = influence(m, df)
+let d = r.dffits
+let n = len(d)
+let i = 0
+let maxd = 0.0
+while i < n {
+  let v = abs(d[i])
+  if v > maxd { maxd = v }
+  i = i + 1
+}
+let se = 0.0
+let out = dataframe({
+  "variable": ["max_dffits"],
+  "coef": [maxd],
+  "std_err": [se]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

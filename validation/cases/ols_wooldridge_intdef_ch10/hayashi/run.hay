@@ -1,0 +1,8 @@
+// Wooldridge (Introductory Econometrics, 7e), Chapter 10, Example 10.2.
+// interest rate, inflation and deficit equation: i3 ~ inflation + deficit.
+
+load "validation/cases/ols_wooldridge_intdef_ch10/data/intdef.csv" as df
+
+let m = ols(i3 ~ inflation + deficit, df)
+
+export(m, "csv", "/dev/stdout")

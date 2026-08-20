@@ -1,0 +1,4 @@
+load "validation/cases/ljungbox_simulated/data/data.csv" as df
+let r = ljungbox(df, x, lags=10)
+let t = tidy(r)
+export(t, "json", "/dev/stdout")

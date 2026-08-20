@@ -1,0 +1,10 @@
+load "validation/cases/hclust_simulated/data/data.csv" as df
+let m = hclust(df, x="x1,x2", linkage="ward", cut=3.0)
+let nan = 0.0 / 0.0
+let out = dataframe({
+  "variable": ["n_clusters", "min_cluster_size", "max_cluster_size"],
+  "coef": [m.fit.n_clusters, min(m.cluster_sizes), max(m.cluster_sizes)],
+  "std_err": [nan, nan, nan]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

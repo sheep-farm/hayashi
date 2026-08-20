@@ -4,6 +4,7 @@ pub struct Formula {
     pub lhs: String,
     pub rhs: Vec<RhsTerm>,
     pub fe: Vec<String>, // after |
+    pub intercept: bool,
 }
 
 /// Um termo no RHS de uma fórmula econométrica.
@@ -68,11 +69,21 @@ pub(crate) fn expr_display(e: &Expr) -> String {
         Expr::Not(inner) => format!("!{}", expr_display(inner)),
         Expr::BinOp { op, lhs, rhs } => {
             let op_str = match op {
-                BinOp::Add => "+", BinOp::Sub => "-", BinOp::Mul => "*",
-                BinOp::Div => "/", BinOp::Pow => "^", BinOp::Mod => "%",
-                BinOp::Gt => ">", BinOp::Lt => "<", BinOp::GtEq => ">=",
-                BinOp::LtEq => "<=", BinOp::Eq => "==", BinOp::Ne => "!=",
-                BinOp::And => "&&", BinOp::Or => "||", BinOp::In => "in",
+                BinOp::Add => "+",
+                BinOp::Sub => "-",
+                BinOp::Mul => "*",
+                BinOp::Div => "/",
+                BinOp::Pow => "^",
+                BinOp::Mod => "%",
+                BinOp::Gt => ">",
+                BinOp::Lt => "<",
+                BinOp::GtEq => ">=",
+                BinOp::LtEq => "<=",
+                BinOp::Eq => "==",
+                BinOp::Ne => "!=",
+                BinOp::And => "&&",
+                BinOp::Or => "||",
+                BinOp::In => "in",
             };
             format!("({}{}{})", expr_display(lhs), op_str, expr_display(rhs))
         }
@@ -103,7 +114,7 @@ pub(crate) fn expr_display(e: &Expr) -> String {
         // time-series operators: L.price, L2.price, F.gdp, D.wage
         Expr::TsOp { op, var, n } => {
             let prefix = match op {
-                TsOpKind::Lag  => "L",
+                TsOpKind::Lag => "L",
                 TsOpKind::Lead => "F",
                 TsOpKind::Diff => "D",
             };
@@ -114,7 +125,11 @@ pub(crate) fn expr_display(e: &Expr) -> String {
             }
         }
         // if expression: if(cond,then,else)
-        Expr::If { cond, then_expr, else_expr } => {
+        Expr::If {
+            cond,
+            then_expr,
+            else_expr,
+        } => {
             format!(
                 "if({},{},{})",
                 expr_display(cond),
@@ -130,13 +145,31 @@ pub(crate) fn expr_display(e: &Expr) -> String {
             format!("[{}]", s.join(","))
         }
         // field access: obj.field or obj.method(args)
-        Expr::Field { obj, field, args, .. } => {
+        Expr::Field {
+            obj, field, args, ..
+        } => {
             if args.is_empty() {
                 format!("{}.{}", expr_display(obj), field)
             } else {
                 let args_s: Vec<String> = args.iter().map(expr_display).collect();
                 format!("{}.{}({})", expr_display(obj), field, args_s.join(","))
             }
+        }
+        // t-string template: reconstruct as t"lit{expr}lit"
+        Expr::Template(parts) => {
+            let mut s = String::from("t\"");
+            for part in parts {
+                match part {
+                    TStringPart::Lit(lit) => s.push_str(lit),
+                    TStringPart::Interp { expr } => {
+                        s.push('{');
+                        s.push_str(&expr_display(expr));
+                        s.push('}');
+                    }
+                }
+            }
+            s.push('"');
+            s
         }
         // remaining variants are not meaningful as column/coefficient names
         _ => "_".to_string(),
@@ -196,7 +229,22 @@ pub enum FStringPart {
     /// Literal text segment (already unescaped: `{{` → `{`, `}}` → `}`).
     Lit(String),
     /// Interpolated expression with an optional format specifier (e.g. `.2f`).
-    Interp { expr: Box<Expr>, fmt: Option<String> },
+    Interp {
+        expr: Box<Expr>,
+        fmt: Option<String>,
+    },
+}
+
+/// One segment of a t-string template.
+///
+/// `t"x{n}"` is parsed at parse-time into:
+/// `[Lit("x"), Interp { expr: Var("n") }]`
+#[derive(Debug, Clone)]
+pub enum TStringPart {
+    /// Literal text segment.
+    Lit(String),
+    /// Interpolated expression.
+    Interp { expr: Box<Expr> },
 }
 
 /// Language expressions
@@ -207,6 +255,7 @@ pub enum Expr {
     Bool(bool),
     Str(String),
     FString(Vec<FStringPart>),
+    Template(Vec<TStringPart>),
     Var(String),
     Formula(Formula),
     Nil,
@@ -298,9 +347,19 @@ pub enum Expr {
     RangeInclusive(Box<Expr>, Box<Expr>),
 
     // expression block: { stmt; ...; expr }
-    Block(Vec<Stmt>, Option<Box<Expr>>),
+    Block(Vec<Spanned>, Option<Box<SpannedExpr>>),
+
+    // parallel for as expression: returns the list of results
+    ParallelFor {
+        var: String,
+        var2: Option<String>,
+        iter: Box<Expr>, // boxed to break recursive type cycle (ForIter contains Expr)
+        body: Vec<Spanned>,
+        threads: Option<Box<Expr>>,
+    },
 }
 
+pub type SpannedExpr = (Expr, usize);
 pub type Spanned = (Stmt, usize);
 
 /// Language commands (statements)
@@ -351,11 +410,12 @@ pub enum Stmt {
     // print(expr, expr, ..., sep=" ", end="\n")
     Print(Vec<Expr>, Vec<Opt>),
 
-    // export(expr, format, "file")
+    // export(expr, format, "file", append=false)
     Export {
         value: Expr,
         fmt: Expr,
         path: Expr,
+        append: Expr,
     },
 
     // replace df varname = expr [if cond]
@@ -392,6 +452,19 @@ pub enum Stmt {
         var2: Option<String>,
         iter: ForIter,
         body: Vec<Spanned>,
+    },
+
+    // parallel for var in iter { ... } [, threads=N]
+    // Like `for`, but iterations run concurrently across threads.
+    // Each thread gets its own Interpreter; captured variables are Arc-cloned.
+    // Results are collected in order into a List.
+    // Optional `threads=N` limits the number of worker threads.
+    ParallelFor {
+        var: String,
+        var2: Option<String>,
+        iter: ForIter,
+        body: Vec<Spanned>,
+        threads: Option<Expr>,
     },
 
     // while cond { ... }

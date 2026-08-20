@@ -1,0 +1,49 @@
+\chapter{Recent Methods}
+
+\section{Linear DiD with staggered timing}
+
+\texttt{lpdid} (Local Projections DiD) and \texttt{eventstudy} estimate treatment
+effects in designs with staggered adoption. \texttt{eventstudy} constructs
+event-time dummies relative to treatment and drops the reference period.
+
+\begin{lstlisting}[caption={Event study}]
+let m_e = eventstudy(y ~ x, df, time=year, ref=-1,
+                     min=-5, max=5)
+print(m_e)
+\end{lstlisting}
+
+The coefficients on each event-time dummy show the average outcome path
+relative to the treatment period.
+
+\section{Synthetic DiD and CUPED}
+
+Synthetic DiD combines the synthetic-control idea with difference-in-
+differences. \texttt{synthdid} estimates unit and time weights from the pre-
+treatment outcomes and reports the ATT.
+
+\begin{lstlisting}[caption={Synthetic DiD}]
+let m_sd = synthdid(df, y, treated, 10, unit="state", period="year")
+print(m_sd)
+\end{lstlisting}
+
+CUPED adjusts the outcome with pre-treatment covariates to reduce
+variance in randomised experiments.
+
+\begin{lstlisting}[caption={CUPED}]
+let m_c = cuped(y ~ x, df, treated="treated")
+print(m_c)
+\end{lstlisting}
+
+\section{MIDAS regression}
+
+Mixed Data Sampling (Ghysels, Santa-Clara and Valkanov, 2004) regresses
+a low-frequency variable on high-frequency lags, with weights constrained
+by an Almon polynomial.
+
+\begin{lstlisting}[caption={MIDAS}]
+let m_midas = midas(y ~ x, df, freq=3, lags=12, poly=2)
+print(m_midas)
+\end{lstlisting}
+
+It is useful for nowcasting: using monthly predictors to forecast a
+quarterly target.

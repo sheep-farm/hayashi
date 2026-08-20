@@ -1,4 +1,5 @@
 use super::*;
+use std::sync::Arc;
 
 impl Interpreter {
     pub(super) fn eval_call(&mut self, func: &str, args: &[Expr], opts: &[Opt]) -> Result<Value> {
@@ -16,7 +17,9 @@ impl Interpreter {
                 if let Some(s) = self.rng_seed {
                     evaluated_args.push(Value::Int(s as i64));
                 }
-                let mut plugin = self.plugins.remove(ns)
+                let mut plugin = self
+                    .plugins
+                    .remove(ns)
                     .expect("plugin namespace verified by contains_key but missing on remove");
                 let res = plugin
                     .call(member, &evaluated_args)
@@ -29,7 +32,7 @@ impl Interpreter {
         let is_mutate = func == "mutate" || func == "generate";
         let opt_map: HashMap<String, Value> = opts
             .iter()
-            .filter(|o| o.name != "if" && o.name != "vars" && o.name != "dydx" && !is_mutate)
+            .filter(|o| o.name != "if" && o.name != "dydx" && !is_mutate)
             .map(|o| {
                 let val = self.eval_expr(&o.value).or_else(|e| {
                     if let Expr::Var(name) = &o.value {
@@ -71,7 +74,7 @@ impl Interpreter {
                         _ => None,
                     };
                     if let Some(x) = x {
-                        if let Ok(res) = greeners::Transforms::apply(&[x], other) {
+                        if let Ok(res) = greeners::transforms::Transforms::apply(&[x], other) {
                             return Ok(Value::Float(res[0]));
                         }
                     }
@@ -89,7 +92,8 @@ impl Interpreter {
                         _ => None,
                     };
                     if let (Some(a), Some(b)) = (xa, xb) {
-                        if let Ok(res) = greeners::Transforms::apply2(&[a], &[b], other) {
+                        if let Ok(res) = greeners::transforms::Transforms::apply2(&[a], &[b], other)
+                        {
                             return Ok(Value::Float(res[0]));
                         }
                     }
@@ -122,7 +126,9 @@ impl Interpreter {
                 .map(|e| self.eval_expr(e))
                 .collect::<Result<_>>()?;
 
-            self.call_stack.push((other.to_string(), self.current_line));
+            let call_scope_depth = self.env.scope_count();
+            self.call_stack
+                .push((other.to_string(), self.current_line, call_scope_depth));
             self.env.push_scope();
             for (param, val) in user_fn.params.iter().zip(arg_vals.iter()) {
                 self.env.declare_const(param, val.clone());
@@ -182,13 +188,31 @@ impl Interpreter {
         &mut self,
         args: &[Expr],
         opt_map: &HashMap<String, Value>,
-    ) -> Result<(Formula, Rc<DataFrame>, String, String)> {
+    ) -> Result<(Formula, Arc<DataFrame>, String, String)> {
+        self.extract_panel_args_with_policy(args, opt_map, FormulaInterceptPolicy::RequireIntercept)
+    }
+
+    #[allow(dead_code)]
+    pub(super) fn extract_panel_args_allow_no_intercept(
+        &mut self,
+        args: &[Expr],
+        opt_map: &HashMap<String, Value>,
+    ) -> Result<(Formula, Arc<DataFrame>, String, String)> {
+        self.extract_panel_args_with_policy(args, opt_map, FormulaInterceptPolicy::AllowNoIntercept)
+    }
+
+    fn extract_panel_args_with_policy(
+        &mut self,
+        args: &[Expr],
+        opt_map: &HashMap<String, Value>,
+        policy: FormulaInterceptPolicy,
+    ) -> Result<(Formula, Arc<DataFrame>, String, String)> {
         if args.len() < 2 {
             return Err(HayashiError::Runtime(
                 "panel estimator requires (formula, dataframe [, id=col])".into(),
             ));
         }
-        let formula_ast = self.resolve_formula(&args[0])?;
+        let formula_ast = self.resolve_formula_with_policy(&args[0], policy)?;
         let df_name = match &args[1] {
             Expr::Var(name) => name.clone(),
             _ => {

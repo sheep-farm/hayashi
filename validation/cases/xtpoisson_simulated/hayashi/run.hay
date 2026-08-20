@@ -1,0 +1,5 @@
+load "validation/cases/xtpoisson_simulated/data/data.csv" as df
+let m = xtpoisson(y ~ x, df, id="id")
+let t = tidy(m)
+let out = select(t, "variable", "coef", "std_err")
+export(out, "csv", "/dev/stdout")

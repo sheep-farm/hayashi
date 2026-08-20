@@ -1,0 +1,21 @@
+id: bsc_simulated
+title: Bayesian synthetic control (not supported for validation)
+estimator_family: bsc
+status: not-supported
+dimension: numerical
+dataset:
+  name: simulated
+  source: n/a
+  licence: n/a
+references: []
+comparison:
+  quantities: []
+  tolerances: {}
+output_format: csv
+hayashi_script: cases/bsc_simulated/hayashi/run.hay
+reference_scripts: {}
+notes: "No stable R CausalImpact/python pycausalimpact reference in the venv; Bayesian synthetic-control weights depend on prior tuning."
+result:
+  summary: "No stable R CausalImpact/python pycausalimpact reference in the venv; Bayesian synthetic-control weights depend on prior tuning."
+  known_differences: []
+  issues_opened: []

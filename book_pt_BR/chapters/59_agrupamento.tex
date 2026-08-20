@@ -1,0 +1,102 @@
+\chapter{Agrupamento e Redução de Dimensionalidade}
+
+\section{Métodos não supervisionados}
+
+Aprendizado não supervisionado encontra estrutura nos dados sem uma
+variável alvo. O \hayashi{} fornece algoritmos de agrupamento,
+embutimentos não lineares e ferramentas baseadas em PCA.
+
+\section{K-Means}
+
+K-Means particiona observações em $K$ grupos esféricos. É rápido e
+escala bem, mas assume grupos de tamanho e forma similares.
+
+\begin{lstlisting}[caption={K-Means}]
+set_seed(42)
+let n = 300
+generate df x1 = rnormal(n, 0, 0.7)
+generate df x2 = rnormal(n, 0, 0.7)
+
+let m_km = kmeans(df, x="x1,x2", k=3)
+print(m_km)
+\end{lstlisting}
+
+Use \texttt{m\_km.labels} para ler o cluster atribuído e \texttt{m\_km.centroids} para
+inspecionar as médias dos clusters.
+
+\section{Agrupamento hierárquico e DBSCAN}
+
+Agrupamento hierárquico constrói uma árvore de grupos aninhados.
+\texttt{hclust} pode ser cortado em qualquer número de grupos.
+
+\begin{lstlisting}[caption={Agrupamento hierárquico}]
+let m_hc = hclust(df, x="x1,x2", k=3, linkage="ward")
+print(m_hc)
+\end{lstlisting}
+
+DBSCAN encontra regiões densas e rotula observações esparsas como ruído.
+
+\begin{lstlisting}[caption={DBSCAN}]
+let m_db = dbscan(df, x="x1,x2", eps=0.8, min=5)
+print(m_db)
+\end{lstlisting}
+
+\section{Modelos de Mistura Gaussiana}
+
+GMM modela cada cluster como uma gaussiana multivariada. É uma variante
+suave do K-Means que permite clusters elípticos.
+
+\begin{lstlisting}[caption={Agrupamento por mistura gaussiana}]
+let m_gmm = gmm_clust(df, x="x1,x2", k=3)
+print(m_gmm)
+\end{lstlisting}
+
+\section{Embeddings não lineares}
+
+t-SNE e UMAP reduzem dados de alta dimensão para duas ou três
+dimensões preservando a estrutura local. São úteis para visualização.
+
+\begin{lstlisting}[caption={t-SNE}]
+let m_tsne = tsne(df, x="x1,x2,x3", k=2, perplexity=30)
+print(m_tsne)
+\end{lstlisting}
+
+\begin{lstlisting}[caption={UMAP}]
+let m_umap = umap(df, x="x1,x2,x3", k=2, neighbors=15)
+print(m_umap)
+\end{lstlisting}
+
+\section{Agrupamento espectral}
+
+Agrupamento espectral usa a estrutura de autovalores de um grafo de
+similaridade. Pode capturar formas de cluster não convexas onde
+K-Means falha.
+
+\begin{lstlisting}[caption={Agrupamento espectral}]
+let m_sc = spectral(df, x="x1,x2", k=3)
+print(m_sc)
+\end{lstlisting}
+
+\section{PCA, fator e biplot}
+
+PCA e análise fatorial reduzem a dimensionalidade linearmente. \texttt{biplot}
+visualiza observações e variáveis no mesmo espaço de PCA.
+
+\begin{lstlisting}[caption={PCA}]
+let m_pca = pca(df, x="x1,x2,x3", n=2)
+print(m_pca)
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Biplot}]
+let m_biplot = biplot(df, x="x1,x2,x3", type="symmetric")
+print(m_biplot)
+\end{lstlisting}
+
+\section{Estimativa de densidade kernel}
+
+\texttt{kde} estima a densidade de uma única variável com um kernel escolhido.
+
+\begin{lstlisting}[caption={KDE}]
+let m_kde = kde(df, x1, bw=0.5, kernel="gaussian")
+print(m_kde)
+\end{lstlisting}

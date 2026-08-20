@@ -1,0 +1,5 @@
+load "validation/cases/zinb_affairs/data/affairs.csv" as df
+
+let m = zinb(naffairs ~ age + yrsmarr + kids + educ + relig + ratemarr, df)
+
+export(m, "txt", "/dev/stdout")

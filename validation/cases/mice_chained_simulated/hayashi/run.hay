@@ -1,0 +1,6 @@
+// Load the simulated MICE dataset.
+load "validation/cases/mice_chained_simulated/data/mice.csv" as df
+
+// Run MICE chained equations imputation.
+// m=5 imputations, iter=10 iterations
+mice_chained(df, vars="x1,x2,x3", m=5, iter=10)

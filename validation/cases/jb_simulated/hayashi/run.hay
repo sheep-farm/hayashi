@@ -1,0 +1,3 @@
+load "validation/cases/jb_simulated/data/data.csv" as df
+let result = jb(df, x)
+export(result, "json", "/dev/stdout")

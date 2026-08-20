@@ -1,0 +1,21 @@
+id: fmols_simulated
+title: Fully-modified OLS (not supported for validation)
+estimator_family: fmols
+status: not-supported
+dimension: numerical
+dataset:
+  name: simulated
+  source: n/a
+  licence: n/a
+references: []
+comparison:
+  quantities: []
+  tolerances: {}
+output_format: csv
+hayashi_script: cases/fmols_simulated/hayashi/run.hay
+reference_scripts: {}
+notes: "R cointReg/urca packages not available; cointegration Fully-Modified OLS not in base R or statsmodels."
+result:
+  summary: "R cointReg/urca packages not available; cointegration Fully-Modified OLS not in base R or statsmodels."
+  known_differences: []
+  issues_opened: []

@@ -1,0 +1,5 @@
+load "validation/cases/pcse_wagepan/data/wagepan.csv" as df
+
+let m = pcse(lwage ~ educ + exper + expersq + married + union, df, id=nr, time=year)
+
+export(m, "txt", "/dev/stdout")

@@ -12,7 +12,7 @@ Quick reference for all Hayashi commands and functions. For detailed usage, type
 | `export` | `export(value, "fmt", "path")` | Export DataFrame or model (csv, json, tsv, xlsx, parquet, sqlite, latex, html) |
 | `input` | `input alias` ... `end` | Create DataFrame from inline numeric data |
 
-Load options: `sheet=`, `table=`, `query=`, `sep=`. URLs are downloaded automatically.
+Load options: `sheet=`, `table=`, `query=`, `sep=`, `columns=`, `where=`. URLs are downloaded automatically. `columns=` and `where=` push projection and filtering down to the source (Parquet, SQLite, ODBC, CSV/TSV, DTA, Excel) — see [Loading Data](../data/loading.md#column-projection-and-row-filtering-columns-where).
 
 ---
 
@@ -29,7 +29,8 @@ Load options: `sheet=`, `table=`, `query=`, `sep=`. URLs are downloaded automati
 | `sort` | `sort(df, var1 [, desc=true])` | Sort by columns |
 | `filter` | `filter(df, condition)` | Filter rows by condition |
 | `merge` | `merge(df1, df2, key=col [, type=])` | Merge two DataFrames (inner, left, right, outer) |
-| `append` | `append(df1, df2)` | Stack DataFrames vertically |
+| `append` | `append(df1, df2)` | Stack two DataFrames vertically |
+| `rbind` | `rbind(list_of_dfs)` | Concatenate a list of DataFrames vertically (skips nil) |
 | `collapse` | `collapse(df, stat, vars, by=group)` | Aggregate by group (mean, sd, min, max, median, count, sum) |
 | `reshape` | `reshape(df, id=col, stubs=[...])` | Reshape wide to long |
 | `encode` | `encode(df, col [, gen=new])` | String to numeric encoding |
@@ -43,7 +44,7 @@ Load options: `sheet=`, `table=`, `query=`, `sep=`. URLs are downloaded automati
 | `drop_collinear` | `drop_collinear(df [, vars=[...]])` | Remove perfectly collinear columns |
 | `preserve` | `preserve(df)` | Snapshot DataFrame |
 | `restore` | `restore(df)` | Restore to last snapshot |
-| `dataframe` | `dataframe({"x": [1, 2]})` | Build DataFrame from dict of lists |
+| `dataframe` | `dataframe({"x": [1, 2]})` or `dataframe(1000)` | Build DataFrame from dict of lists, or pre-dimension an empty DataFrame |
 
 ---
 
@@ -93,7 +94,6 @@ Load options: `sheet=`, `table=`, `query=`, `sep=`. URLs are downloaded automati
 | `wls` | `wls(Y ~ X, df, weights="w")` | Weighted least squares |
 | `fe` | `fe(Y ~ X, df [, id=col])` | Fixed effects (within) |
 | `re` | `re(Y ~ X, df [, id=col])` | Random effects (GLS) |
-| `be` | `be(Y ~ X, df [, id=col])` | Between estimator |
 | `feiv` | `feiv(Y ~ Xendog + X, ~ Z, df, id=col)` | Fixed-effects IV |
 | `ab` | `ab(Y ~ X, df, id=, time=)` | Arellano-Bond |
 | `sysgmm` | `sysgmm(Y ~ X, df, id=, time=)` | System GMM (Blundell-Bond) |
@@ -162,12 +162,109 @@ Covariance options (where applicable): `cov=nonrobust|HC1|HC2|HC3|HC4|robust`, `
 | `estclear` | `estclear()` | Clear stored models |
 | `testparm` | `testparm(m, ["x1", "x2"])` | Joint F-test |
 | `estat` / `ic` | `estat(m1, m2)` | AIC/BIC comparison |
+| `akaike_weights` | `akaike_weights(m1, m2)` | Akaike weights (dict) |
+| `lrtest` | `lrtest(m_restricted, m_unrestricted)` | Likelihood-ratio test |
+| `weak_iv` | `weak_iv(endog_formula, instr_formula, df)` | Weak instrument test (1st-stage F, Cragg-Donald) |
+| `estat_overid` | `estat_overid(endog_formula, instr_formula, df)` | Sargan/Hansen J overidentification test |
+| `estat_endog` | `estat_endog(endog_formula, instr_formula, df)` | Durbin-Wu-Hausman endogeneity test |
+| `estat_classification` | `estat_classification(model, threshold=0.5)` | Classification table (logit/probit) |
+| `lroc` | `lroc(model)` | ROC curve and AUC (logit/probit) |
+| `estat_gof` | `estat_gof(model, groups=10)` | Hosmer-Lemeshow goodness-of-fit |
+| `linktest` | `linktest(model)` | Specification test (logit/probit) |
+| `xtlogit` | `xtlogit(y ~ x, df, id="g")` | Panel logit (GEE) |
+| `xtprobit` | `xtprobit(y ~ x, df, id="g")` | Panel probit (GEE) |
+| `xtpoisson` | `xtpoisson(y ~ x, df, id="g")` | Panel Poisson (GEE) |
+| `eventstudy` | `eventstudy(y ~ etime + x, df, ref=-1, min=-5, max=5)` | Event study (dynamic DiD) |
+| `nls_exp` | `nls_exp(y ~ x, df, start=[a,b])` | NLS exponential: y = a*exp(b*x) |
+| `nls_power` | `nls_power(y ~ x, df, start=[a,b])` | NLS power: y = a*x^b |
+| `nls_logistic` | `nls_logistic(y ~ x, df, start=[a,b,c])` | NLS logistic: y = a/(1+exp(-b*(x-c))) |
+| `nls_cobb_douglas` | `nls_cobb_douglas(y ~ x1+x2, df, start=[a,b0,b1])` | Cobb-Douglas production |
+| `nls_ces` | `nls_ces(y ~ x1+x2, df, start=[a,b1,b2,rho])` | CES production |
+| `marginsplot` | `marginsplot(m)` | AME plot for logit/probit |
+| `spatial_sar` | `spatial_sar(y ~ x, df, w=W)` | Spatial autoregressive (SAR) |
+| `spatial_sem` | `spatial_sem(y ~ x, df, w=W)` | Spatial error model (SEM) |
+| `double_ml` | `double_ml(y ~ d + x1 + x2, df, folds=5)` | Double/debiased ML (Chernozhukov) |
+| `sfa_production` | `sfa_production(y ~ x1 + x2, df)` | Stochastic production frontier |
+| `sfa_cost` | `sfa_cost(y ~ x1 + x2, df)` | Stochastic cost frontier |
+| `panel_tobit` | `panel_tobit(y ~ x, df, id="firm", censor=0)` | Panel Tobit (random effects) |
+| `panel_heckman` | `panel_heckman(y ~ x, df, sel="z ~ w", id="firm")` | Panel Heckman (selection) |
+| `spatial_panel_sar` | `spatial_panel_sar(y ~ x, df, w=W, id="entity")` | Spatial panel SAR (FE) |
+| `spatial_panel_sem` | `spatial_panel_sem(y ~ x, df, w=W, id="entity")` | Spatial panel SEM (FE) |
+| `bayes_sfa_production` | `bayes_sfa_production(y ~ x, df, burn=, draws=)` | Bayesian SFA production |
+| `bayes_sfa_cost` | `bayes_sfa_cost(y ~ x, df, burn=, draws=)` | Bayesian SFA cost |
+| `midas` | `midas(y ~ x, df, freq=3, lags=12, poly=2)` | Mixed Data Sampling regression |
+| `tvp` | `tvp(y ~ x1 + x2, df)` | Time-Varying Parameter (Kalman filter) |
+| `setar` | `setar(y ~ 1, df, order=2, delay=1)` | Self-Exciting Threshold AR |
+| `panel_qreg` | `panel_qreg(y ~ x, df, id="firm", tau=0.5)` | Panel quantile (FE) |
+| `msvar` | `msvar(y1 ~ y2, df, regimes=2, lags=1)` | Markov-Switching VAR |
+| `favar` | `favar(y1 ~ y2 + y3, df, observed="r", factors=2)` | Factor-Augmented VAR |
+| `spatial_durbin` | `spatial_durbin(y ~ x, df, w=W, id="e")` | Spatial Durbin (panel FE) |
+| `johansen_break` | `johansen_break(y1 ~ y2, df, lags=1, breaks=[50])` | Johansen with breaks |
+| `tvp_var` | `tvp_var(y1 ~ y2, df, lags=1)` | Time-Varying Parameter VAR |
+| `spatial_durbin_error` | `spatial_durbin_error(y ~ x, df, w=W, id="e")` | Spatial Durbin Error (panel FE) |
+| `fmols` | `fmols(y ~ x, df)` | Fully Modified OLS (cointegration) |
+| `qvar` | `qvar(y1 ~ y2, df, lags=1, tau=0.5)` | Quantile VAR |
+| `pstr` | `pstr(y ~ x, df, q="var", id="e")` | Panel Smooth Transition |
+| `modwt` | `modwt(df, var, scales=4)` | Wavelet decomposition (MODWT) |
+| `copula` | `copula(y1 ~ y2, df, type="gaussian")` | Copula dependence |
+| `nardl` | `nardl(y ~ x, df, lags=1)` | Nonlinear ARDL (asymmetric cointegration) |
+| `pvar` | `pvar(y1 ~ y2, df, id="e", lags=1)` | Panel VAR (GMM) |
+| `fcoef` | `fcoef(y ~ x, df, z="mod", points=20)` | Functional coefficient (varying coef.) |
+| `dcc_garch` | `dcc_garch(y1 ~ y2, df)` | DCC-GARCH (dynamic correlation) |
+| `tvar` | `tvar(y1 ~ y2, df, q="var", lags=1)` | Threshold VAR (regime switching) |
+| `bvar` | `bvar(y1 ~ y2, df, lags=1, lambda1=0.1)` | Bayesian VAR (Minnesota prior) |
+| `mfvar` | `mfvar(df_l, y_l, df_h, y_h, agg=3)` | Mixed-Frequency VAR (MIDAS) |
+| `tvcopula` | `tvcopula(y1 ~ y2, df, type="gaussian")` | Time-varying copula |
+| `sv` | `sv(df, var, iter=100)` | Stochastic Volatility (MCMC) |
+| `fapanel` | `fapanel(y ~ x, df, aux="df", id="e", period="p")` | Factor-augmented panel |
+| `hawkes` | `hawkes(df, time_var, T=100)` | Hawkes self-exciting process |
+| `rf` | `rf(y ~ x1 + x2, df, trees=100, depth=10)` | Random Forest regression |
+| `gbm` | `gbm(y ~ x1 + x2, df, trees=100, lr=0.1)` | Gradient Boosting regression |
+| `mlp` | `mlp(y ~ x1 + x2, df, hidden=10, lr=0.01)` | Neural Network (MLP) regression |
+| `synthdid` | `synthdid(df, y, treated, period, unit="u", period="p")` | Synthetic DiD (Arkhangelsky 2021) |
+| `cuped` | `cuped(y ~ x, df, treated="var")` | CUPED variance reduction |
+| `qrf` | `qrf(y ~ x, df, quantiles="0.1,0.5,0.9")` | Quantile Regression Forest |
+| `xgboost` | `xgboost(y ~ x, df, trees=100, lr=0.3, lambda=1.0)` | XGBoost (L1/L2 regularized) |
+| `dml_crossfit` | `dml_crossfit(y ~ d, df, x="x1,x2", folds=5)` | Double ML with cross-fitting |
+| `bsc` | `bsc(df, y, "c1,c2", period, prior=1.0)` | Bayesian Synthetic Control |
+| `lstm` | `lstm(df, var, hidden=10, seqlen=10, forecast=5)` | LSTM recurrent neural network |
+| `causalforest` | `causalforest(y ~ t, df, x="x1,x2", trees=100)` | Causal Forest (Wager-Athey 2018) |
+| `grf` | `grf(y ~ t, df, x="x1,x2", trees=100)` | Generalized Random Forest (Athey 2019) |
+| `conformal` | `conformal(y ~ x, df, alpha=0.1, calib=0.3)` | Conformal prediction intervals |
+| `transformer` | `transformer(df, var, d_model=8, seqlen=10, forecast=5)` | Transformer for time series |
+| `dr_learner` | `dr_learner(y ~ t, df, x="x1,x2", folds=3)` | DR-Learner (Kennedy 2023) |
+| `bart` | `bart(y ~ x, df, trees=20, depth=3, iter=100)` | Bayesian Additive Regression Trees |
+| `gp` | `gp(y ~ x, df)` | Gaussian Process Regression (Kriging) |
+| `tmle` | `tmle(y ~ t, df, w="c1,c2")` | Targeted Maximum Likelihood Estimation |
+| `orf` | `orf(y ~ t, df, x="x1", w="c1", trees=50)` | Orthogonal Random Forest (ORF) |
+| `spectral` | `spectral(df, x="x1,x2", k=3)` | Spectral clustering (Ng-Jordan-Weiss) |
+| `isotonic` | `isotonic(y ~ x, df)` | Isotonic regression (PAVA) |
+| `causal_impact` | `causal_impact(df, y, controls="c1,c2", period=N)` | Causal Impact (Brodersen 2015) |
+| `mice_chained` | `mice_chained(df, vars="x1,x2", m=5, iter=10)` | MICE imputation (van Buuren 2011) |
+| `kmeans` | `kmeans(df, x="x1,x2", k=3)` | K-Means clustering (MacQueen 1967) |
+| `bayes_lm` | `bayes_lm(y ~ x, df)` | Bayesian linear regression (NIG prior) |
+| `dbscan` | `dbscan(df, x="x1,x2", eps=1.0, minpts=5)` | DBSCAN clustering (Ester 1996) |
+| `gmm_clust` | `gmm_clust(df, x="x1,x2", k=3)` | GMM clustering via EM (Dempster 1977) |
+| `reg_path` | `reg_path(y ~ x, df, type="lasso")` | Regularization path (Ridge/Lasso/ElasticNet) |
+| `qrf_inf` | `qrf_inf(y ~ x, df, q="0.1,0.5,0.9")` | QRF with bootstrap CIs (Meinshausen 2006) |
+| `hclust` | `hclust(df, x="x1,x2", linkage="ward")` | Hierarchical clustering (Ward 1963) |
+| `tsne` | `tsne(df, x="x1,x2", perplexity=30)` | t-SNE dimensionality reduction (van der Maaten 2008) |
+| `umap` | `umap(df, x="x1,x2", neighbors=15)` | UMAP manifold learning (McInnes 2018) |
+| `biplot` | `biplot(df, x="x1,x2,x3", type="symmetric")` | PCA biplot (Gabriel 1971) |
+| `hausman_robust` | `hausman_robust(fe, re)` | Robust Hausman test (Wooldridge 2010) |
+| `ftest_robust` | `ftest_robust(model, vars="x1,x2")` | Robust F-test (Wooldridge 2010) |
+| `tidy` | `tidy(model)` | Tidy coefficient table (variable, coef, std_err, t/z, p_value, conf_low, conf_high) |
+| `glance` | `glance(model)` | Model fit statistics (r2, adj_r2, AIC, BIC, log_lik, n, sigma, etc.) |
 | `hausman` | `hausman(m_fe, m_re)` | Hausman specification test |
 | `lincom` | `lincom(m, expr)` | Linear combination of coefficients |
 | `bootstrap` | `bootstrap(est, formula, df, n=)` | Generic bootstrap |
 | `bootse` | `bootse(est, formula, df, n=)` | Bootstrap standard errors |
 | `vif` | `vif(m)` | Variance inflation factors |
 | `influence` | `influence(m)` | DFFITS, Cook's D, leverage |
+| `cusumtest` | `cusumtest(m)` | CUSUM structural stability test |
+| `acf` | `acf(df, var [, lags=])` or `acf(m [, lags=])` | ACF values (list) |
+| `pacf` | `pacf(df, var [, lags=])` or `pacf(m [, lags=])` | PACF values (list) |
+| `gqtest` | `gqtest(m [, split=])` | Goldfeld-Quandt heteroskedasticity |
 | `irf` | `irf(m [, periods=])` | Impulse response function |
 | `fevd` | `fevd(m [, periods=])` | Forecast error variance decomposition |
 | `coefplot` | `coefplot(m [, width=])` | ASCII coefficient plot |
@@ -185,7 +282,12 @@ Covariance options (where applicable): `cov=nonrobust|HC1|HC2|HC3|HC4|robust`, `
 | `archtest` | `archtest(df, var [, lags=])` | Engle's ARCH test |
 | `granger` | `granger(df, y, x [, lags=])` | Granger causality |
 | `johansen` | `johansen(df, var1, var2 [, lags=])` | Johansen cointegration |
-| `bptest` | `bptest(df, formula, id=)` | Breusch-Pagan LM |
+| `bptest` | `bptest(df, formula, id=)` | Breusch-Pagan LM (RE vs OLS) |
+| `ftest_fe` | `ftest_fe(df, formula, id=)` | F-test (FE vs OLS) |
+| `wooldridge` | `wooldridge(df, formula, id=, time=)` | Wooldridge serial correlation |
+| `pesaran` | `pesaran(df, formula, id=, time=)` | Pesaran CD cross-sectional dependence |
+| `abtest` | `abtest(df, formula, id=, time=)` | Arellano-Bond m1/m2 |
+| `mundlak` | `mundlak(df, formula, id=)` | Mundlak (RE vs FE) |
 | `jb` | `jb(df, var)` | Jarque-Bera normality |
 | `reset` | `reset(m)` | Ramsey RESET |
 | `white` | `white(m)` | White heteroskedasticity |
@@ -227,6 +329,22 @@ Covariance options (where applicable): `cov=nonrobust|HC1|HC2|HC3|HC4|robust`, `
 Available inside `generate` expressions and general arithmetic:
 
 `abs`, `ceil`, `floor`, `round`, `log`, `log10`, `exp`, `sqrt`, `min`, `max`, `mean`, `sd`, `sum`, `mod`.
+
+---
+
+## Random Variate Functions
+
+Available inside `generate` expressions. All respect `set_seed` and produce one
+value per DataFrame row. See [Random Variates](../data/random.md) for full
+examples and parameter details.
+
+**Continuous:** `rnormal`, `rlognormal`, `rskewnormal`, `rcauchy`, `rstudentt`/`rt`,
+`rchisq`, `rf`, `rbeta`, `rgamma`, `rexponential`, `rweibull`, `rpareto`,
+`rpert`, `rtriangular`, `rfrechet`, `rgumbel`, `rinversegaussian`, `rnig`,
+`runiform`.
+
+**Discrete:** `rbernoulli`, `rbinomial`, `rpoisson`, `rgeometric`,
+`rhypergeometric`, `rzeta`, `rzipf`.
 
 ---
 

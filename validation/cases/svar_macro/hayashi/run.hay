@@ -1,0 +1,5 @@
+load "validation/cases/svar_macro/data/macrodata.csv" as df
+
+let m = svar(df, gdp, cons, lags=2, id=cholesky)
+
+export(m, "txt", "/dev/stdout")

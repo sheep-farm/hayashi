@@ -1,0 +1,8 @@
+// Wooldridge (Introductory Econometrics, 7e), Chapter 4, Example 4.4.
+// log-log campus crime and enrollment equation: lcrime ~ lenroll.
+
+load "validation/cases/ols_wooldridge_campus_ch4/data/campus.csv" as df
+
+let m = ols(lcrime ~ lenroll, df)
+
+export(m, "csv", "/dev/stdout")

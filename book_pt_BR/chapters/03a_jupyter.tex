@@ -1,0 +1,107 @@
+\chapter{Kernel Jupyter}
+
+\section{O que é o kernel Jupyter}
+
+O \hayashi{} inclui um kernel Jupyter nativo, chamado \texttt{hay-kernel}. Ele
+permite executar código \hayashi{} dentro de notebooks Jupyter, do JupyterLab ou
+de qualquer frontend compatível com o protocolo Jupyter.
+
+Diferente do REPL, o kernel mantém o estado entre células: variáveis, funções e
+dados definidos em uma célula ficam disponíveis nas células seguintes do mesmo
+notebook.
+
+\section{Compilação e instalação}
+
+O kernel faz parte do repositório \hayashi{} e é compilado com a feature
+\texttt{native}:
+
+\begin{lstlisting}[style=inline, language=sh]
+cd hayashi
+cargo build --release --bin hay-kernel --features native
+\end{lstlisting}
+
+Depois, instale o especificação do kernel:
+
+\begin{lstlisting}[style=inline, language=sh]
+./target/release/hay-kernel --install
+\end{lstlisting}
+
+Isso registra o kernel em \texttt{\$HOME/.local/share/jupyter/kernels/hayashi/}
+(ou o diretório equivalente na plataforma).
+
+Verifique se o kernel aparece na lista:
+
+\begin{lstlisting}[style=inline, language=sh]
+jupyter kernelspec list
+\end{lstlisting}
+
+A saída deve conter uma linha como:
+
+\begin{lstlisting}[style=inline]
+hayashi    ~/.local/share/jupyter/kernels/hayashi
+\end{lstlisting}
+
+\section{Usando o kernel}
+
+\subsection{JupyterLab}
+
+Inicie o JupyterLab:
+
+\begin{lstlisting}[style=inline, language=sh]
+jupyter lab
+\end{lstlisting}
+
+Crie um novo notebook e selecione o kernel \textbf{Hayashi} no launcher ou no menu
+de kernel.
+
+\subsection{Jupyter Notebook}
+
+Inicie o Jupyter Notebook:
+
+\begin{lstlisting}[style=inline, language=sh]
+jupyter notebook
+\end{lstlisting}
+
+Crie um novo notebook e escolha \textbf{Hayashi} na lista de kernels.
+
+\subsection{Executando células}
+
+As células aceitam código \hayashi{} diretamente:
+
+\begin{lstlisting}[caption={Exemplo de célula no Jupyter}]
+let x = 1 + 2
+print(x)
+\end{lstlisting}
+
+A saída \texttt{3} é exibida logo abaixo da célula. Variáveis persistem entre
+células:
+
+\begin{lstlisting}[caption={Célula posterior com a mesma sessão}]
+let y = x * 10
+print(y)
+\end{lstlisting}
+
+\subsection{Jupyter Console}
+
+Se estiver instalado, o console também pode ser usado:
+
+\begin{lstlisting}[style=inline, language=sh]
+jupyter console --kernel=hayashi
+\end{lstlisting}
+
+\section{Desinstalação}
+
+Remova o diretório do especificação do kernel:
+
+\begin{lstlisting}[style=inline, language=sh]
+rm -rf ~/.local/share/jupyter/kernels/hayashi
+\end{lstlisting}
+
+\section{Limitações em ambientes hospedados}
+
+Google Colab, Kaggle Notebooks e ambientes similares não permitem registrar
+kernels personalizados de forma simples e o runtime é efêmero. Nessas situações,
+a alternativa prática é subir um binário pré-compilado \texttt{hay} e chamá-lo de
+células Python, eventualmente com uma magic cell como \texttt{\%\%hay}.
+
+Veja o capítulo \ref{chap:colab} para um exemplo de gambiarra funcional.

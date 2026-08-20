@@ -1,0 +1,8 @@
+// Load the Wooldridge mroz dataset from CSV.
+load "validation/cases/tabulate_mroz_inlf_kidslt6/data/mroz.csv" as df
+
+// Cross-tabulation of inlf by kidslt6 with chi-square test.
+let t = tabulate(df, inlf, kidslt6, chi2=true)
+
+// Export the result as JSON for automated comparison.
+export(t, "json", "/dev/stdout")

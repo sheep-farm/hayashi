@@ -1,0 +1,96 @@
+\chapter{Outros Estimadores e Aliases}
+
+\section{Comandos não cobertos em detalhe}
+
+Este capítulo reúne comandos e aliases adicionais implementados no
+\hayashi{}, mas não tratados em capítulos dedicados.
+
+\section{Modelos discretos e de painel adicionais}
+
+\begin{itemize}
+\item \texttt{cmnlogit}: logit multinomial condicional
+\item \texttt{clogit}: logit condicional
+\item \texttt{cpoisson}: Poisson condicional / PPML
+\item \texttt{panel\_tobit}: Tobit em painel com efeitos aleatórios
+\item \texttt{panel\_heckman}: Heckman em painel
+\item \texttt{panel\_qreg}: quantil em painel
+\item \texttt{sysgmm}: GMM em sistema
+\item \texttt{pthresh}: modelo de limiar em painel
+\end{itemize}
+
+\section{Séries temporais adicionais}
+
+\begin{itemize}
+\item \texttt{varma} / \texttt{varmax}: VARMA/VARMAX
+\item \texttt{svar\_irf} / \texttt{sirf}: funções de resposta a impulsos de SVAR
+\item \texttt{svar\_fevd} / \texttt{sfevd}: decomposição de variância de erro de
+      previsão estrutural
+\item \texttt{qvar}: VAR quantílico
+\item \texttt{tvar}: VAR de limiar
+\item \texttt{mstl}: decomposição STL multi-sazonal
+\item \texttt{modwt}: transformada wavelet de máxima sobreposição discreta
+\item \texttt{decompose}: decomposição clássica de séries
+\item \texttt{dfm}: modelo de fator dinâmico
+\item \texttt{midas}: regressão com amostragem de frequência mista
+\item \texttt{hawkes}: processo de pontos auto-excitante
+\end{itemize}
+
+\section{Variantes espaciais adicionais}
+
+\begin{itemize}
+\item \texttt{spatial\_sar}, \texttt{spatial\_sem}, \texttt{spatial\_durbin},
+      \texttt{spatial\_panel\_sar}, \texttt{spatial\_panel\_sem},
+      \texttt{spatial\_durbin\_error}: as variantes espaciais também estão
+      disponíveis pelos aliases \texttt{sdm} e \texttt{sdem}.
+\item \texttt{fuzzy\_rd}: descontinuidade de regressão difusa
+\end{itemize}
+
+\section{Testes e diagnósticos adicionais}
+
+\begin{itemize}
+\item \texttt{breusch\_godfrey} / \texttt{bg} / \texttt{bgodfrey}: teste LM de
+      Breusch-Godfrey para autocorrelação
+\item \texttt{durbinwatson} / \texttt{dw}: teste de Durbin-Watson
+\item \texttt{phillips\_perron} / \texttt{pp}: teste de Phillips-Perron para
+      raiz unitária
+\item \texttt{zivot\_andrews} / \texttt{za}: teste de Zivot-Andrews com quebra
+      estrutural
+\item \texttt{engle\_granger}: teste de cointegração de Engle-Granger
+\item \texttt{anderson\_darling} / \texttt{adtest}: teste de Anderson-Darling
+      para normalidade
+\item \texttt{lilliefors}: teste de Lilliefors para normalidade
+\item \texttt{harvey\_collier}: teste de Harvey-Collier para
+      especificação
+\item \texttt{sktest}: teste de assimetria/curtose
+\item \texttt{spearman}, \texttt{wilcoxon\_rs}, \texttt{wilcoxon\_signed\_rank},
+      \texttt{kruskal\_wallis}: testes não paramétricos
+\item \texttt{proptest}, \texttt{proptest2}, \texttt{propci}, \texttt{chi2\_2x2},
+      \texttt{multipletests}: testes de proporção e múltiplas hipóteses
+\end{itemize}
+
+\section{Testes pós-estimação}
+
+\begin{itemize}
+\item \texttt{estat\_overid} / \texttt{sargan}: teste de Sargan/Hansen J
+\item \texttt{estat\_endog} / \texttt{dwh}: teste de Durbin-Wu-Hausman
+\item \texttt{estat\_classification}: tabela de classificação para
+      logit/probit
+\item \texttt{estat\_gof} / \texttt{hltest}: Hosmer-Lemeshow de aderência
+\end{itemize}
+
+\section{Aliases}
+
+Muitos estimadores têm aliases por conveniência. Os mais comuns são:
+
+\begin{itemize}
+\item \texttt{reg} para \texttt{ols}, \texttt{frontier} para \texttt{sfa\_production}
+\item \texttt{ridge} / \texttt{ridge\_reg} e \texttt{elasticnet} / \texttt{enet}: estimadores de regularização
+\item \texttt{neural\_net} para \texttt{mlp}, \texttt{xgb} para \texttt{xgboost}
+\item \texttt{causal\_forest} para \texttt{causalforest}, \texttt{random\_forest} para \texttt{rf}
+\item \texttt{gaussian\_process} para \texttt{gp}, \texttt{bayesian\_trees} para \texttt{bart}
+\item \texttt{gmm\_clustering} para \texttt{gmm\_clust}, \texttt{pca\_biplot} para \texttt{biplot}
+\item \texttt{three\_sls}, \texttt{threesl}, \texttt{3sls}, \texttt{reg3}: aliases para o
+      mesmo estimador 3SLS
+\end{itemize}
+
+Use o apêndice de referência rápida para a matriz completa de comandos.

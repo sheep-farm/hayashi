@@ -1,0 +1,8 @@
+// Wooldridge (Introductory Econometrics, 7e), Chapter 11, Example 11.5.
+// expectations-augmented Phillips curve: cinf ~ unem.
+
+load "validation/cases/ols_wooldridge_phillips_cinf_ch11/data/phillips.csv" as df
+
+let m = ols(cinf ~ unem, df)
+
+export(m, "csv", "/dev/stdout")

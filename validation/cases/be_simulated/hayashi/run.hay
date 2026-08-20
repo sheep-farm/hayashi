@@ -1,0 +1,3 @@
+load "validation/cases/be_simulated/data/data.csv" as df
+let m = be(y ~ x, df, id="id")
+print(m)

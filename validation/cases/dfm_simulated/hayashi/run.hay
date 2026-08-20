@@ -1,0 +1,4 @@
+load "validation/cases/dfm_simulated/data/data.csv" as df
+let m = dfm(df, y1, y2, y3, y4, y5, factors=2, order=1)
+let out = select(tidy(m), "variable", "coef", "std_err")
+export(out, "csv", "/dev/stdout")

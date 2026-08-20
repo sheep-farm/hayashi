@@ -1,0 +1,10 @@
+load "validation/cases/portsort_simulated/data/data.csv" as df
+let m = portsort(df, ret, size, n=5)
+let nan = 0.0 / 0.0
+let out = dataframe({
+  "variable": ["Low", "P2", "P3", "P4", "High", "hl_mean"],
+  "coef": [m.means[0], m.means[1], m.means[2], m.means[3], m.means[4], m.fit.hl_mean],
+  "std_err": [m.se[0], m.se[1], m.se[2], m.se[3], m.se[4], nan]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

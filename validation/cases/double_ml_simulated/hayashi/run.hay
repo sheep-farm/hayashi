@@ -1,0 +1,6 @@
+// Load the simulated Double ML dataset.
+load "validation/cases/double_ml_simulated/data/double_ml.csv" as df
+
+// Run Double Machine Learning.
+// First RHS variable is treatment (d), rest are controls
+double_ml(y ~ d + x1 + x2 + x3 + x4 + x5, df, poly=1)

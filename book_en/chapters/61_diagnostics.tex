@@ -1,0 +1,104 @@
+\chapter{Diagnostic Tests}
+
+\section{After a regression}
+
+`test(model, ...)` and other diagnostic commands check whether the
+assumptions behind an estimator are plausible. This chapter covers the
+most common post-estimation and standalone tests.
+
+\section{Heteroskedasticity}
+
+\begin{lstlisting}[caption={White and Breusch-Pagan tests}]
+test(m, "white")     // White test
+test(m, "bp")        // Breusch-Pagan
+\end{lstlisting}
+
+White is a general test based on the regression of squared residuals on
+cross-products and squares of $X$. Breusch-Pagan is a Lagrange
+multiplier test under normality.
+
+\section{Autocorrelation}
+
+\begin{lstlisting}[caption={Autocorrelation tests}]
+test(m, "dw")        // Durbin-Watson
+test(m, "bg")        // Breusch-Godfrey LM
+cusumtest(m)         // CUSUM stability
+\end{lstlisting}
+
+Durbin-Watson tests first-order autocorrelation in OLS residuals.
+Breusch-Godfrey tests up to a specified lag. \texttt{cusumtest} checks whether
+recursive residuals stay within 5\% bounds.
+
+\section{Normality}
+
+\begin{lstlisting}[caption={Normality tests}]
+swilk(df, y)         // Shapiro-Wilk
+sfrancia(df, y)      // Shapiro-Francia
+sktest(df, y)        // Skewness/kurtosis (Jarque-Bera + D'Agostino)
+jb(m)                // Jarque-Bera on residuals
+\end{lstlisting}
+
+\section{Specification}
+
+\begin{lstlisting}[caption={RESET and link test}]
+reset(m)             // Ramsey RESET
+linktest(m)          // Link test for logit/probit
+\end{lstlisting}
+
+RESET adds powers of fitted values to the regression; a significant
+coefficient indicates omitted non-linearity. \texttt{linktest} is the analogue
+for GLM models.
+
+\section{Outliers and influence}
+
+\begin{lstlisting}[caption={Influence diagnostics}]
+influence(m)         // DFFITS, leverage
+leverage(m)          // leverage only
+cooks(m)             // Cook's distance
+\end{lstlisting}
+
+High leverage means an observation has unusual regressors. High DFFITS
+or Cook's distance means an observation changes the fitted coefficients.
+
+\section{Multicollinearity}
+
+\begin{lstlisting}[caption={VIF}]
+vif(m)               // variance inflation factors
+\end{lstlisting}
+
+A VIF above 10 (or sometimes 5) suggests problematic multicollinearity.
+
+\section{Unit roots}
+
+\begin{lstlisting}[caption={Unit-root tests}]
+adf(df, y)           // Augmented Dickey-Fuller
+kpss(df, y)          // KPSS (stationarity null)
+pp(df, y)            // Phillips-Perron
+zivot(df, y)         // Zivot-Andrews (structural break)
+\end{lstlisting}
+
+ADF, PP and KPSS are the three classical tests. KPSS has a stationary
+null, so it complements ADF and PP, which have a unit-root null.
+
+\section{Cointegration}
+
+\begin{lstlisting}[caption={Cointegration tests}]
+engle_granger(df, y, x, lags=1)   // single equation
+johansen(df, y, x, lags=1)        // multivariate
+\end{lstlisting}
+
+Engle-Granger is simple but assumes a single cointegrating vector.
+Johansen tests the number of cointegrating vectors in a multivariate
+system.
+
+\section{Non-parametric tests}
+
+\begin{lstlisting}[caption={Non-parametric tests}]
+spearman(df, x, y)        // Spearman correlation
+ranksum(df, x, by=group)  // Wilcoxon rank-sum
+kruskal(df, y, by=group)  // Kruskal-Wallis
+signrank(df, x, y)        // Wilcoxon signed-rank
+\end{lstlisting}
+
+These are distribution-free alternatives to t-tests, ANOVA and Pearson
+correlation.

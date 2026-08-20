@@ -19,8 +19,8 @@ where `educ` is endogenous and instrumented by `nearc4`.
 
 ## Reference implementation
 
-- **R:** `AER::ivreg(lwage ~ educ + exper + expersq + smsa + black + south | nearc4 + exper + expersq + smsa + black + south, data = card)`
-- **Python:** `linearmodels.iv.IVGMM.from_formula("lwage ~ 1 + [educ ~ nearc4] + exper + expersq + smsa + black + south", data=card).fit()`
+- **R:** `gmm::gmm(..., type = "twoStep", vcov = "MDS", prewhite = 0)`
+- **Python:** `linearmodels.iv.IVGMM.from_formula("lwage ~ 1 + [educ ~ nearc4] + exper + expersq + smsa + black + south", data=card).fit(cov_type="robust")`
 - **Hayashi:** `gmm(lwage ~ educ + fexper + fexpersq + fsmsa + fblack + fsouth, ~ fnearc4 + fexper + fexpersq + fsmsa + fblack + fsouth, df)`
 
 ## Compared quantities
@@ -32,5 +32,5 @@ where `educ` is endogenous and instrumented by `nearc4`.
 
 | Quantity | Tolerance | Rationale |
 |---|---|---|
-| coefficients | 1e-3 | GMM/2SLS should match closely |
+| coefficients | 1e-3 | The R/Python/Hayashi GMM specifications are exactly identified and should match closely |
 | standard_errors | 1e-3 | Same tolerance as coefficients |

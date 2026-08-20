@@ -10,11 +10,21 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  validation-metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - run: pip install -r validation/requirements.txt
+      - run: python -m unittest validation/test_run.py
+      - run: python validation/run.py --check
+
   advisories:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - run: git clone --depth 1 --branch develop https://github.com/sheep-farm/Greeners.git ../Greeners
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -25,14 +35,13 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - run: git clone --depth 1 --branch develop https://github.com/sheep-farm/Greeners.git ../Greeners
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --check
-      - run: cargo clippy
+      - run: cargo clippy -- -D warnings
 
   test:
     strategy:
@@ -41,8 +50,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - run: git clone --depth 1 --branch develop https://github.com/sheep-farm/Greeners.git ../Greeners
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo test

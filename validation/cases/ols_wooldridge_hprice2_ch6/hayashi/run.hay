@@ -1,0 +1,8 @@
+// Wooldridge (Introductory Econometrics, 7e), Chapter 6, Example 6.2.
+// log housing price equation with quadratic in rooms: lprice ~ lnox + ldist + rooms + roomsq + stratio.
+
+load "validation/cases/ols_wooldridge_hprice2_ch6/data/hprice2.csv" as df
+
+let m = ols(lprice ~ lnox + ldist + rooms + roomsq + stratio, df)
+
+export(m, "csv", "/dev/stdout")

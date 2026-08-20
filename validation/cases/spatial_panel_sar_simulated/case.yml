@@ -1,0 +1,21 @@
+id: spatial_panel_sar_simulated
+title: Spatial panel SAR (not supported for validation)
+estimator_family: spatial_panel_sar
+status: not-supported
+dimension: numerical
+dataset:
+  name: simulated
+  source: n/a
+  licence: n/a
+references: []
+comparison:
+  quantities: []
+  tolerances: {}
+output_format: csv
+hayashi_script: cases/spatial_panel_sar_simulated/hayashi/run.hay
+reference_scripts: {}
+notes: "R spatialreg/spdep packages failed to install in previous sessions."
+result:
+  summary: "R spatialreg/spdep packages failed to install in previous sessions."
+  known_differences: []
+  issues_opened: []

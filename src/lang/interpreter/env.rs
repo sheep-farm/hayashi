@@ -78,9 +78,7 @@ impl Env {
                 )));
             }
         }
-        self.current_scope_mut()
-            .vars
-            .insert(name.to_string(), val);
+        self.current_scope_mut().vars.insert(name.to_string(), val);
         Ok(())
     }
 
@@ -104,9 +102,7 @@ impl Env {
                 return Ok(());
             }
         }
-        self.current_scope_mut()
-            .vars
-            .insert(name.to_string(), val);
+        self.current_scope_mut().vars.insert(name.to_string(), val);
         Ok(())
     }
 
@@ -148,6 +144,48 @@ impl Env {
                 }
             }
         }
+        names
+    }
+
+    pub fn scope_count(&self) -> usize {
+        self.scopes.len()
+    }
+
+    /// Returns the innermost value for each variable name across the half-open
+    /// scope range `[start, end)`.
+    pub fn values_in_range(&self, start: usize, end: usize) -> Vec<(String, Value)> {
+        let end = end.min(self.scopes.len());
+        if start >= end {
+            return Vec::new();
+        }
+        let mut seen = HashMap::new();
+        for scope in self.scopes[start..end].iter().rev() {
+            for (name, value) in scope.vars.iter() {
+                seen.entry(name.clone()).or_insert_with(|| value.clone());
+            }
+        }
+        let mut result: Vec<(String, Value)> = seen.into_iter().collect();
+        result.sort_by(|a, b| a.0.cmp(&b.0));
+        result
+    }
+
+    pub fn current_scope_names(&self) -> Vec<String> {
+        let mut names: Vec<String> = self
+            .scopes
+            .last()
+            .map(|s| s.vars.keys().cloned().collect())
+            .unwrap_or_default();
+        names.sort();
+        names
+    }
+
+    pub fn global_scope_names(&self) -> Vec<String> {
+        let mut names: Vec<String> = self
+            .scopes
+            .first()
+            .map(|s| s.vars.keys().cloned().collect())
+            .unwrap_or_default();
+        names.sort();
         names
     }
 }

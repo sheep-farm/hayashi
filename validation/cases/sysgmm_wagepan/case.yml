@@ -1,0 +1,37 @@
+id: sysgmm_wagepan
+title: System GMM (Blundell-Bond) on Wooldridge wagepan
+estimator_family: sysgmm
+status: pass
+dimension: numerical
+
+dataset:
+  name: wooldridge::wagepan
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-3
+    standard_errors: 1e-2
+
+output_format: txt
+
+hayashi_script: cases/sysgmm_wagepan/hayashi/run.hay
+reference_scripts:
+  R: cases/sysgmm_wagepan/reference/run.R
+  Python: cases/sysgmm_wagepan/reference/run.py
+
+notes: System GMM (Blundell-Bond) two-step on Wooldridge wagepan with lags=2. R and Python references explicitly implement the same two-step System GMM procedure used by Hayashi/Greeners; plm::pgmm is not used as the active R oracle because it uses different instrument and weighting conventions.
+
+result:
+  summary: "Hayashi matches the R and Python references for System GMM coefficients and standard errors."
+  known_differences: []
+  issues_opened:
+    - 117

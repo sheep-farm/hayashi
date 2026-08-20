@@ -1,0 +1,2 @@
+load "validation/cases/fuzzy_rd_simulated/data/data.csv" as df
+fuzzy_rd(y ~ x, "d", 0, df, bw=0.5)

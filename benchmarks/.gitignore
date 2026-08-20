@@ -1,0 +1,5 @@
+# Benchmark generated artifacts
+results/*
+!results/README.md
+datasets/generated/
+.tmp/

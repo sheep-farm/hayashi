@@ -1,0 +1,51 @@
+\chapter{Finance}
+
+\section{Fama-MacBeth}
+
+The Fama-MacBeth procedure estimates cross-sectional regressions period
+by period and then averages the resulting coefficients. It produces
+standard errors robust to cross-sectional correlation.
+
+\begin{lstlisting}[caption={Fama-MacBeth regression}]
+let n = 1000
+generate df month = ceil(_n / 100)
+generate df ret   = rnormal(n)
+generate df beta  = rnormal(n)
+generate df size  = rnormal(n)
+
+let m_fmb = fmb(ret ~ beta + size, df, time=month)
+print(m_fmb)
+\end{lstlisting}
+
+The command runs one cross-sectional regression per time period and
+averages the slopes, reporting the time-series mean and standard error
+of each coefficient.
+
+\section{Portfolio sorts}
+
+\texttt{portsort} forms portfolios by sorting stocks into quantiles of a
+characteristic. \texttt{doublesort} does it along two dimensions.
+
+\begin{lstlisting}[caption={Single portfolio sort}]
+let m_ps = portsort(df, ret, size, n=5)
+print(m_ps)
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Double sort}]
+let m_ds = doublesort(df, ret, size, bm, n1=5, n2=5)
+print(m_ds)
+\end{lstlisting}
+
+The output reports the mean return of each portfolio cell. Double sorts
+are useful for isolating the interaction between two characteristics.
+
+\section{Practical notes}
+
+\begin{itemize}
+\item Fama-MacBeth is appropriate when betas are estimated in a first
+      pass and then used as regressors in a second pass.
+\item Portfolio sorts are descriptive, not causal. They show patterns,
+      not identification.
+\item Use `if=` to exclude extreme observations or focus on a sample
+      period.
+\end{itemize}

@@ -1,0 +1,6 @@
+load "validation/cases/rolling_ols_simulated/data/data.csv" as df
+let roll = rolling(y ~ x, df, window=20)
+let p = roll.params
+print("variable,coef,std_err")
+print(f"_cons,{p[0]},0.0")
+print(f"x,{p[1]},0.0")

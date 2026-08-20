@@ -1,0 +1,5 @@
+load "validation/cases/rlm_wage1/data/wage1.csv" as df
+
+let m = rlm(lwage ~ educ + exper + tenure, df)
+
+export(m, "txt", "/dev/stdout")

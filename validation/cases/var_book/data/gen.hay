@@ -1,0 +1,25 @@
+// Generate deterministic VAR(1) data from Chapter 28 DGP.
+seed(42)
+input df
+id
+1
+end
+for i in 1..=9 { df = append(df, df) }
+df |> filter(_n <= 300)
+generate df e1 = rnormal()
+generate df e2 = rnormal()
+generate df y1 = 0.0
+generate df y2 = 0.0
+generate df t = _n
+let n = nrow(df)
+let i = 2
+while i <= n {
+    let l1 = mean(df, y1, if = t == i - 1)
+    let l2 = mean(df, y2, if = t == i - 1)
+    let a = mean(df, e1, if = t == i)
+    let b = mean(df, e2, if = t == i)
+    replace df y1 = 0.5 * l1 + 0.2 * l2 + a if t == i
+    replace df y2 = 0.1 * l1 + 0.6 * l2 + b if t == i
+    i = i + 1
+}
+export(df, "csv", "validation/cases/var_book/data/var.csv")

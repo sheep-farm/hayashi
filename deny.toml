@@ -6,9 +6,13 @@ ignore = [
     # quick-xml 0.39 is pulled in by calamine 0.35.0 (Excel I/O). The two
     # RUSTSEC-2026-019* advisories require XML parsing of untrusted input with
     # namespace resolution; Hayashi uses calamine only for local/user-supplied
-    # spreadsheets, not as a server-side XML parser. calamine has not released a
+    # spreadsheets, not as a server-side XML service. calamine has not released a
     # version using quick-xml >= 0.41 yet, so this is accepted until upstream
     # updates.
     { id = "RUSTSEC-2026-0194", reason = "Blocked by calamine 0.35.0; local-only Excel parsing, not a remote XML service." },
     { id = "RUSTSEC-2026-0195", reason = "Blocked by calamine 0.35.0; local-only Excel parsing, not a remote XML service." },
+    # `instant` is brought in by argmin 0.10 (itself a transitive dep of
+    # greeners). Upgrading argmin to 0.11 removes `instant` but reintroduces
+    # rand 0.9 duplicates; the dependency is only used for optimization timing.
+    { id = "RUSTSEC-2024-0384", reason = "Transitive via greeners/argmin 0.10; timing-only, no safe upgrade without reintroducing rand 0.9 duplicates." },
 ]

@@ -1,0 +1,8 @@
+// Wooldridge (Introductory Econometrics, 7e), Chapter 3, Example 3.5.
+// arrest records equation with average sentence length: narr86 ~ avgsen + pcnv + ptime86 + qemp86.
+
+load "validation/cases/ols_wooldridge_crime1_avgsen_ch3/data/crime1.csv" as df
+
+let m = ols(narr86 ~ avgsen + pcnv + ptime86 + qemp86, df)
+
+export(m, "csv", "/dev/stdout")

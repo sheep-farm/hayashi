@@ -1,24 +1,53 @@
 {
-  "name": "hayashi-lang",
+  "name": "hayashi",
   "displayName": "Hayashi",
-  "description": "Language support for Hayashi (.hay) — applied econometrics DSL",
+  "description": "Language support, formatter, runner and debugger for Hayashi (.hay)",
   "version": "0.2.0",
   "publisher": "sheep-farm",
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "repository": {
     "type": "git",
     "url": "https://github.com/sheep-farm/hayashi"
   },
   "engines": {
-    "vscode": "^1.75.0"
+    "vscode": "^1.80.0"
   },
-  "categories": ["Programming Languages"],
+  "categories": [
+    "Programming Languages",
+    "Formatters",
+    "Snippets",
+    "Debuggers"
+  ],
+  "activationEvents": [
+    "onLanguage:hayashi",
+    "onCommand:hayashi.runFile",
+    "onCommand:hayashi.runSelection",
+    "onDebugResolve:hayashi",
+    "onDebugInitialConfigurations"
+  ],
+  "main": "./out/extension.js",
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.80.0",
+    "typescript": "^5.3.0"
+  },
   "contributes": {
     "languages": [
       {
         "id": "hayashi",
-        "aliases": ["Hayashi", "hay"],
-        "extensions": [".hay"],
+        "aliases": [
+          "Hayashi",
+          "hayashi",
+          "hay"
+        ],
+        "extensions": [
+          ".hay"
+        ],
         "configuration": "./language-configuration.json"
       }
     ],
@@ -29,22 +58,129 @@
         "path": "./syntaxes/hayashi.tmLanguage.json"
       }
     ],
-    "keybindings": [
+    "snippets": [
       {
-        "command": "workbench.action.tasks.runTask",
-        "key": "ctrl+shift+r",
-        "when": "editorLangId == hayashi"
+        "language": "hayashi",
+        "path": "./snippets/hayashi.json"
       }
     ],
-    "taskDefinitions": [
+    "breakpoints": [
+      {
+        "language": "hayashi"
+      }
+    ],
+    "commands": [
+      {
+        "command": "hayashi.runFile",
+        "title": "Hayashi: Run File",
+        "category": "Hayashi"
+      },
+      {
+        "command": "hayashi.runSelection",
+        "title": "Hayashi: Run Selection",
+        "category": "Hayashi"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "hayashi.runFile",
+        "key": "ctrl+shift+r",
+        "mac": "cmd+shift+r",
+        "when": "editorLangId == hayashi"
+      },
+      {
+        "command": "hayashi.runSelection",
+        "key": "ctrl+shift+e",
+        "mac": "cmd+shift+e",
+        "when": "editorLangId == hayashi && editorHasSelection"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "hayashi.runFile",
+          "when": "editorLangId == hayashi",
+          "group": "hayashi@1"
+        },
+        {
+          "command": "hayashi.runSelection",
+          "when": "editorLangId == hayashi && editorHasSelection",
+          "group": "hayashi@2"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Hayashi",
+      "properties": {
+        "hayashi.format.indentSize": {
+          "type": "integer",
+          "default": 2,
+          "minimum": 1,
+          "maximum": 8,
+          "description": "Number of spaces per indent level"
+        },
+        "hayashi.format.alignEquals": {
+          "type": "boolean",
+          "default": true,
+          "description": "Align = signs in consecutive assignments"
+        },
+        "hayashi.runner.executable": {
+          "type": "string",
+          "default": "hay",
+          "description": "Path to the hay executable"
+        },
+        "hayashi.runner.clearOutput": {
+          "type": "boolean",
+          "default": true,
+          "description": "Clear output panel before each run"
+        }
+      }
+    },
+    "debuggers": [
       {
         "type": "hayashi",
-        "properties": {
-          "script": {
-            "type": "string",
-            "description": "The .hay file to run"
+        "label": "Hayashi Debug",
+        "configurationAttributes": {
+          "launch": {
+            "required": [
+              "program"
+            ],
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "Absolute path to the Hayashi script to debug.",
+                "default": "${file}"
+              },
+              "runtimeExecutable": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Path to the hay binary.",
+                "default": "hay"
+              },
+              "runtimeArgs": {
+                "type": "array",
+                "description": "Command-line arguments passed to the hay binary.",
+                "default": [
+                  "dap"
+                ]
+              }
+            }
           }
-        }
+        },
+        "initialConfigurations": [
+          {
+            "type": "hayashi",
+            "request": "launch",
+            "name": "Debug Hayashi script",
+            "program": "${file}",
+            "runtimeExecutable": "hay",
+            "runtimeArgs": [
+              "dap"
+            ]
+          }
+        ]
       }
     ]
   }

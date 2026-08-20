@@ -1,0 +1,105 @@
+\chapter{Séries Temporais e Dinâmica de Painel Avançadas}
+
+\section{Parâmetros variantes no tempo}
+
+Em \texttt{tvp} o vetor de coeficientes é um passeio aleatório observado com
+ruído:
+
+\[
+y_t = x_t'\beta_t + \varepsilon_t, \qquad
+\beta_t = \beta_{t-1} + \eta_t
+\]
+
+\texttt{tvp} estima as variâncias de $\varepsilon_t$ e $\eta_t$ por MV e
+reporta o caminho suavizado de $\beta_t$.
+
+\begin{lstlisting}[caption={Regressão com parâmetros variantes no tempo}]
+let n = 200
+generate df x = rnormal(n)
+generate df y = (1 + 0.02*_n) + (0.5 - 0.003*_n)*x + rnormal(n)
+
+let m_tvp = tvp(y ~ x, df)
+print(m_tvp)
+\end{lstlisting}
+
+Use \texttt{tvp\_var} para uma VAR completa com coeficientes variantes no tempo.
+
+\section{VAR de limiar e de mudança de regime Markov}
+
+\texttt{setar} permite dois regimes AR divididos por um valor de limiar da
+variável dependente defasada.
+
+\begin{lstlisting}[caption={SETAR}]
+let m_setar = setar(y, df, order=2, delay=1)
+print(m_setar)
+\end{lstlisting}
+
+\texttt{msvar} permite que os coeficientes mudem de acordo com uma cadeia
+latente de Markov.
+
+\begin{lstlisting}[caption={VAR com mudança de regime Markov}]
+let m_msvar = msvar(y1 + y2, df, regimes=2, lags=1)
+print(m_msvar)
+\end{lstlisting}
+
+\section{Dinâmicas assimétricas e não lineares}
+
+\texttt{nardl} decompõe um regressor em somas parciais positivas e negativas,
+permitindo respostas assimétricas de longo prazo.
+
+\begin{lstlisting}[caption={NARDL}]
+let m_nardl = nardl(y ~ x, df, lags=1)
+print(m_nardl)
+\end{lstlisting}
+
+\texttt{pstr} faz o mesmo em painel, com coeficientes que mudam suavemente de
+acordo com uma função de transição logística de uma variável observada.
+
+\begin{lstlisting}[caption={Regressão de Transição Suave em Painel}]
+let m_pstr = pstr(y ~ x1 + x2, df, q="z", id="firm")
+print(m_pstr)
+\end{lstlisting}
+
+\section{Coeficientes funcionais}
+
+\texttt{fcoef} estima coeficientes que variam suavemente com uma variável
+moderadora $z$, usando regressão kernel local linear.
+
+\begin{lstlisting}[caption={Modelo de coeficientes funcionais}]
+let m_fcoef = fcoef(y ~ x1 + x2, df, z="z", points=20)
+print(m_fcoef)
+\end{lstlisting}
+
+\section{Bayesian VAR e VAR de frequência mista}
+
+\texttt{bvar} estima uma VAR com priori de Minnesota, encolhendo defasagens
+próprias em direção a 1 e defasagens cruzadas em direção a 0.
+
+\begin{lstlisting}[caption={Bayesian VAR}]
+let m_bvar = bvar(y1 ~ y2, df, lags=1)
+print(m_bvar)
+\end{lstlisting}
+
+\texttt{mfvar} combina variáveis de baixa e alta frequência usando agregação
+Almon MIDAS exponencial.
+
+\begin{lstlisting}[caption={VAR de frequência mista}]
+let m_mfvar = mfvar(df_q, yq, df_m, ym, agg=3, lags=1)
+print(m_mfvar)
+\end{lstlisting}
+
+\section{VAR em painel}
+
+\texttt{pvar} estima uma VAR em painel usando GMM estilo Arellano-Bond:
+valores defasados em níveis instrumentam as equações em primeiras
+diferenças.
+
+\begin{lstlisting}[caption={VAR em painel}]
+let m_pvar = pvar(y1 ~ y2, df, id="firm", lags=1)
+print(m_pvar)
+\end{lstlisting}
+
+Esses comandos são poderosos, mas sensíveis a convenções. Sempre
+compare a saída com uma implementação de referência quando possível e
+inspecione as probabilidades de transição, autovalores ou estatísticas
+J reportadas pelo estimador.

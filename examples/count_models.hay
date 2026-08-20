@@ -11,7 +11,7 @@ summarize(df, educacao, experiencia)
 generate df exp2 = experiencia * experiencia   # criamos colinear artificial
 generate df exp3 = experiencia * 2             # múltiplo de exp — colinear com exp
 
-let df_clean = drop_collinear(df, vars=["educacao","experiencia","exp2","exp3"])
+// let df_clean = drop_collinear(df, vars=["educacao","experiencia","exp2","exp3"])
 # df_clean terá exp3 ou exp2 removida (colinear com experiencia)
 
 # ── Poisson ────────────────────────────────────────────────────────────────────

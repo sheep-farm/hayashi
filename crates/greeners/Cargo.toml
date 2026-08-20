@@ -1,0 +1,39 @@
+[package]
+name = "greeners"
+version = "2.0.0"
+edition = "2021"
+license = "MIT"
+description = "Conditional re-export facade for the greeners econometrics workspace"
+
+[dependencies]
+greeners-core = "2.0.0"
+greeners-ols = { version = "2.0.0", optional = true }
+greeners-glm = { version = "2.0.0", optional = true }
+greeners-panel = { version = "2.0.0", optional = true }
+greeners-timeseries = { version = "2.0.0", optional = true }
+greeners-bayesian = { version = "2.0.0", optional = true }
+greeners-causal = { version = "2.0.0", optional = true }
+greeners-ml = { version = "2.0.0", optional = true }
+greeners-spatial = { version = "2.0.0", optional = true }
+greeners-survival = { version = "2.0.0", optional = true }
+greeners-imputation = { version = "2.0.0", optional = true }
+greeners-diagnostics = { version = "2.0.0", optional = true }
+
+[features]
+default = ["full"]
+full = [
+    "dep:greeners-ols", "dep:greeners-glm", "dep:greeners-panel", "dep:greeners-timeseries",
+    "dep:greeners-bayesian", "dep:greeners-causal", "dep:greeners-ml", "dep:greeners-spatial",
+    "dep:greeners-survival", "dep:greeners-imputation", "dep:greeners-diagnostics",
+]
+ols = ["dep:greeners-ols"]
+glm = ["dep:greeners-glm"]
+panel = ["dep:greeners-panel"]
+timeseries = ["dep:greeners-timeseries"]
+bayesian = ["dep:greeners-bayesian"]
+causal = ["dep:greeners-causal"]
+ml = ["dep:greeners-ml"]
+spatial = ["dep:greeners-spatial"]
+survival = ["dep:greeners-survival"]
+imputation = ["dep:greeners-imputation"]
+diagnostics = ["dep:greeners-diagnostics"]

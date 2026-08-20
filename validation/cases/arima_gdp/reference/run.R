@@ -10,11 +10,14 @@ library(jsonlite)
 data_dir <- "validation/cases/arima_gdp/data"
 dir.create(data_dir, recursive = TRUE, showWarnings = FALSE)
 
-# Load macrodata from statsmodels mirror (Rdatasets).
+# Load macrodata from local CSV or statsmodels mirror (Rdatasets).
+local_csv <- "validation/cases/arima_gdp/data/macrodata.csv"
 url <- "https://raw.githubusercontent.com/vincentarelbundock/Rdatasets/master/csv/statsmodels/macrodata.csv"
-macro <- read.csv(url)
-macro <- macro[, c("year", "quarter", "realgdp")]
-names(macro)[names(macro) == "realgdp"] <- "gdp"
+macro <- if (file.exists(local_csv)) read.csv(local_csv) else read.csv(url)
+if (!"gdp" %in% names(macro)) {
+  macro <- macro[, c("year", "quarter", "realgdp")]
+  names(macro)[names(macro) == "realgdp"] <- "gdp"
+}
 
 # Write CSV for Hayashi to read.
 write.csv(macro, file.path(data_dir, "macrodata.csv"), row.names = FALSE)
@@ -70,8 +73,9 @@ exact_loglik <- function(phi, theta) {
     xhat <- 0.0
     if (t > 1) {
       prev <- phi_coefs[[t - 1]]
+      # R uses one-based indices; j = 1 is the most recent lag.
       for (j in seq_along(prev)) {
-        xhat <- xhat + prev[j] * zc[t - 1 - j]
+        xhat <- xhat + prev[j] * zc[t - j]
       }
     }
     eps <- zc[t] - xhat
@@ -90,7 +94,7 @@ exact_loglik <- function(phi, theta) {
       new_phi <- numeric(min(k, max_lag))
       for (j in 1:min(k - 1, max_lag)) {
         prev_j <- prev[j]
-        prev_kj <- if (k - 1 - j >= 1 && k - 1 - j <= length(prev)) prev[k - 1 - j] else 0.0
+        prev_kj <- if (k - j >= 1 && k - j <= length(prev)) prev[k - j] else 0.0
         new_phi[j] <- prev_j - phi_kk * prev_kj
       }
       new_phi[min(k, max_lag)] <- phi_kk
@@ -117,7 +121,7 @@ for (phi in phi_grid) {
       next
     }
     res <- exact_loglik(phi, theta)
-    if (res$log_lik > best_ll) {
+    if (!is.na(res$log_lik) && res$sigma2 > 0 && res$log_lik > best_ll) {
       best_ll <- res$log_lik
       best_phi <- phi
       best_theta <- theta
@@ -133,7 +137,7 @@ for (phi in seq(best_phi - 0.05, best_phi + 0.05, by = 0.01)) {
       next
     }
     res <- exact_loglik(phi, theta)
-    if (res$log_lik > best_ll) {
+    if (!is.na(res$log_lik) && res$sigma2 > 0 && res$log_lik > best_ll) {
       best_ll <- res$log_lik
       best_phi <- phi
       best_theta <- theta
@@ -152,4 +156,4 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 write_json(result, file.path(out_dir, "expected.json"), pretty = TRUE, auto_unbox = TRUE)
 
-cat(toJSON(result, pretty = TRUE, auto_unbox = TRUE))
+cat(toJSON(result, pretty = FALSE, digits = NA, auto_unbox = TRUE))

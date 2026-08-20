@@ -1,6 +1,9 @@
 use super::helpers::*;
 use super::*;
+use crate::lang::dap::model_expansion;
+use std::sync::Arc;
 
+#[cfg(feature = "greeners-timeseries")]
 mod timeseries_models;
 
 /// margins, VECM/VAR/IRF/FEVD, ARIMA/SARIMA/AutoReg/ARDL/Kalman/forecast,
@@ -61,25 +64,33 @@ impl Interpreter {
                 let sep = "─".repeat(60);
                 let sep2 = "═".repeat(60);
 
+                let mut var_vec: Vec<Value> = Vec::new();
+                let mut dy_dx_vec: Vec<Value> = Vec::new();
+                let mut se_vec: Vec<Value> = Vec::new();
+                let mut z_vec: Vec<Value> = Vec::new();
+                let mut p_vec: Vec<Value> = Vec::new();
+                let mut cat_vec: Vec<Value> = Vec::new();
+
                 match model {
                     // ── Logit / Probit ────────────────────────────────────────
+                    #[cfg(feature = "greeners-glm")]
                     Value::BinaryResult(bm) => {
                         let mut x_use = bm.x.clone();
                         for (var, val) in &at_vals {
                             if let Some(idx) = bm.coef_names.iter().position(|n| n == var) {
-                                x_use = greeners::Margins::with_at(&x_use, idx, *val);
+                                x_use = greeners::margins::Margins::with_at(&x_use, idx, *val);
                             }
                         }
                         let vcov = Self::binary_mle_vcov(&bm.kind, &bm.result.params, &bm.y, &bm.x);
                         let mut ame_result = if bm.kind == "logit" {
                             match &vcov {
-                                Some(v) => greeners::Margins::ame_logit_with_vcov(
+                                Some(v) => greeners::margins::Margins::ame_logit_with_vcov(
                                     &bm.result.params,
                                     &x_use,
                                     &bm.coef_names,
                                     v,
                                 ),
-                                None => greeners::Margins::ame_logit(
+                                None => greeners::margins::Margins::ame_logit(
                                     &bm.result.params,
                                     &x_use,
                                     &bm.coef_names,
@@ -87,13 +98,13 @@ impl Interpreter {
                             }
                         } else {
                             match &vcov {
-                                Some(v) => greeners::Margins::ame_probit_with_vcov(
+                                Some(v) => greeners::margins::Margins::ame_probit_with_vcov(
                                     &bm.result.params,
                                     &x_use,
                                     &bm.coef_names,
                                     v,
                                 ),
-                                None => greeners::Margins::ame_probit(
+                                None => greeners::margins::Margins::ame_probit(
                                     &bm.result.params,
                                     &x_use,
                                     &bm.coef_names,
@@ -163,6 +174,24 @@ impl Interpreter {
                             } else {
                                 println!("{:<22} {:>14.6}", name, ame_result.effects[i]);
                             }
+                            var_vec.push(Value::Str(name.clone()));
+                            dy_dx_vec.push(Value::Float(ame_result.effects[i]));
+                            se_vec.push(Value::Float(if has_se {
+                                ame_result.std_errors[i]
+                            } else {
+                                f64::NAN
+                            }));
+                            z_vec.push(Value::Float(if has_se {
+                                ame_result.z_values[i]
+                            } else {
+                                f64::NAN
+                            }));
+                            p_vec.push(Value::Float(if has_se {
+                                ame_result.p_values[i]
+                            } else {
+                                f64::NAN
+                            }));
+                            cat_vec.push(Value::Str("".into()));
                         }
                         println!("{sep}");
                         println!("n = {}", ame_result.n_obs);
@@ -170,6 +199,7 @@ impl Interpreter {
                     }
 
                     // ── Poisson / NegBin ──────────────────────────────────────
+                    #[cfg(feature = "greeners-glm")]
                     Value::PoissonResult(r) => {
                         let x = r.x_data();
                         let fb: Vec<String> =
@@ -178,11 +208,11 @@ impl Interpreter {
                         let mut x_use = x.to_owned();
                         for (var, val) in &at_vals {
                             if let Some(idx) = names.iter().position(|n| n == var) {
-                                x_use = greeners::Margins::with_at(&x_use, idx, *val);
+                                x_use = greeners::margins::Margins::with_at(&x_use, idx, *val);
                             }
                         }
                         let ame_result =
-                            greeners::Margins::ame_exponential(&r.params, &x_use, names);
+                            greeners::margins::Margins::ame_exponential(&r.params, &x_use, names);
                         let at_label = if at_vals.is_empty() {
                             String::new()
                         } else {
@@ -206,11 +236,18 @@ impl Interpreter {
                             }
                             let ame = ame_result.effects[k_idx];
                             println!("{:<22} {:>14.6}", name, ame);
+                            var_vec.push(Value::Str(name.clone()));
+                            dy_dx_vec.push(Value::Float(ame));
+                            se_vec.push(Value::Float(f64::NAN));
+                            z_vec.push(Value::Float(f64::NAN));
+                            p_vec.push(Value::Float(f64::NAN));
+                            cat_vec.push(Value::Str("".into()));
                         }
                         println!("{sep}");
                         println!("n = {}", ame_result.n_obs);
                         println!("{sep2}\n");
                     }
+                    #[cfg(feature = "greeners-glm")]
                     Value::NegBinResult(r) => {
                         let x = r.x_data();
                         let fb: Vec<String> =
@@ -219,11 +256,11 @@ impl Interpreter {
                         let mut x_use = x.to_owned();
                         for (var, val) in &at_vals {
                             if let Some(idx) = names.iter().position(|n| n == var) {
-                                x_use = greeners::Margins::with_at(&x_use, idx, *val);
+                                x_use = greeners::margins::Margins::with_at(&x_use, idx, *val);
                             }
                         }
                         let ame_result =
-                            greeners::Margins::ame_exponential(&r.params, &x_use, names);
+                            greeners::margins::Margins::ame_exponential(&r.params, &x_use, names);
                         let at_label = if at_vals.is_empty() {
                             String::new()
                         } else {
@@ -249,6 +286,12 @@ impl Interpreter {
                             }
                             let ame = ame_result.effects[k_idx];
                             println!("{:<22} {:>14.6}", name, ame);
+                            var_vec.push(Value::Str(name.clone()));
+                            dy_dx_vec.push(Value::Float(ame));
+                            se_vec.push(Value::Float(f64::NAN));
+                            z_vec.push(Value::Float(f64::NAN));
+                            p_vec.push(Value::Float(f64::NAN));
+                            cat_vec.push(Value::Str("".into()));
                         }
                         println!("{sep}");
                         println!("n = {}   α = {:.4}", ame_result.n_obs, r.alpha);
@@ -258,6 +301,7 @@ impl Interpreter {
                     // ── Ordered Logit / Probit ────────────────────────────────
                     // AME_k(Y=j) = (1/n) Σ_i [f(κ_{j-1} - X_iβ) - f(κ_j - X_iβ)] * β_k
                     // (com κ_0 = -∞ → f(κ_0 - ·) = 0;  κ_J = +∞ → f(κ_J - ·) = 0)
+                    #[cfg(feature = "greeners-glm")]
                     Value::OrderedResult(r) => {
                         let x = r.x_data();
                         let n = x.nrows();
@@ -284,7 +328,7 @@ impl Interpreter {
                             " Average Marginal Effects — {}",
                             r.model_name.to_uppercase()
                         );
-                        println!(" dP(Y=j)/dx — um painel por categoria");
+                        println!(" dP(Y=j)/dx — one panel per category");
                         println!("{sep2}");
                         // header
                         print!("{:<22}", "Variable");
@@ -318,11 +362,17 @@ impl Interpreter {
                                 };
                                 let ame = (f_lo - f_hi) * beta[k_idx];
                                 print!("  {:>10.5}", ame);
+                                var_vec.push(Value::Str(name.to_string()));
+                                dy_dx_vec.push(Value::Float(ame));
+                                se_vec.push(Value::Float(f64::NAN));
+                                z_vec.push(Value::Float(f64::NAN));
+                                p_vec.push(Value::Float(f64::NAN));
+                                cat_vec.push(Value::Str(format!("P(Y={})", cat_j + 1)));
                             }
                             println!();
                         }
                         println!("{sep}");
-                        println!("n = {n}   Categorias: {j}   Modelo: {}", r.model_name);
+                        println!("n = {n}   Categories: {j}   Model: {}", r.model_name);
                         println!("{sep2}\n");
                     }
 
@@ -333,26 +383,211 @@ impl Interpreter {
                         ))
                     }
                 }
-                Ok(Value::Nil)
+                let mut columns = HashMap::new();
+                columns.insert("variable".into(), Value::List(Arc::new(var_vec)));
+                columns.insert("dy_dx".into(), Value::List(Arc::new(dy_dx_vec)));
+                columns.insert("std_err".into(), Value::List(Arc::new(se_vec)));
+                columns.insert("z".into(), Value::List(Arc::new(z_vec)));
+                columns.insert("p".into(), Value::List(Arc::new(p_vec)));
+                columns.insert("category".into(), Value::List(Arc::new(cat_vec)));
+                let df = self.dict_to_dataframe(&columns)?;
+                Ok(Value::DataFrame(Arc::new(df)))
+            }
+
+            // ── marginsplot ─────────────────────────────────────────────────
+            // marginsplot(model [, width=50])
+            "marginsplot" | "margins_plot" => {
+                if args.is_empty() {
+                    return Err(HayashiError::Runtime(
+                        "marginsplot(model) requires an estimated model".into(),
+                    ));
+                }
+                let model = self.eval_expr(&args[0])?;
+                let width = match opt_map.get("width") {
+                    Some(Value::Int(v)) => *v as usize,
+                    Some(Value::Float(v)) => *v as usize,
+                    _ => 50,
+                };
+
+                match model {
+                    #[cfg(feature = "greeners-glm")]
+                    Value::BinaryResult(bm) => {
+                        let vcov = Self::binary_mle_vcov(&bm.kind, &bm.result.params, &bm.y, &bm.x);
+                        let ame = if bm.kind == "logit" {
+                            match &vcov {
+                                Some(v) => greeners::margins::Margins::ame_logit_with_vcov(
+                                    &bm.result.params,
+                                    &bm.x,
+                                    &bm.coef_names,
+                                    v,
+                                ),
+                                None => greeners::margins::Margins::ame_logit(
+                                    &bm.result.params,
+                                    &bm.x,
+                                    &bm.coef_names,
+                                ),
+                            }
+                        } else {
+                            match &vcov {
+                                Some(v) => greeners::margins::Margins::ame_probit_with_vcov(
+                                    &bm.result.params,
+                                    &bm.x,
+                                    &bm.coef_names,
+                                    v,
+                                ),
+                                None => greeners::margins::Margins::ame_probit(
+                                    &bm.result.params,
+                                    &bm.x,
+                                    &bm.coef_names,
+                                ),
+                            }
+                        };
+
+                        // Collect rows (name, effect, ci_lo, ci_hi) excluding constant
+                        let z = 1.96_f64;
+                        let mut rows: Vec<(String, f64, f64, f64)> = Vec::new();
+                        for (i, name) in ame.variable_names.iter().enumerate() {
+                            if name == "_cons" || name == "const" {
+                                continue;
+                            }
+                            let eff = ame.effects[i];
+                            let se = ame.std_errors[i];
+                            rows.push((name.clone(), eff, eff - z * se, eff + z * se));
+                        }
+
+                        if rows.is_empty() {
+                            return Ok(Some(model_expansion::model_result(
+                                "(no marginal effects to plot)",
+                                "marginsplot: no marginal effects",
+                                "MarginsPlotResult",
+                                vec![],
+                            )));
+                        }
+
+                        let label_w = rows
+                            .iter()
+                            .map(|(n, _, _, _)| n.len())
+                            .max()
+                            .unwrap_or(4)
+                            .max(8);
+                        let all_lo = rows
+                            .iter()
+                            .map(|(_, _, lo, _)| *lo)
+                            .fold(f64::INFINITY, f64::min);
+                        let all_hi = rows
+                            .iter()
+                            .map(|(_, _, _, hi)| *hi)
+                            .fold(f64::NEG_INFINITY, f64::max);
+                        let range = (all_hi - all_lo).max(1e-15);
+                        let plot_lo = all_lo.min(0.0) - range * 0.05;
+                        let plot_hi = all_hi.max(0.0) + range * 0.05;
+                        let plot_range = (plot_hi - plot_lo).max(1e-15);
+
+                        let to_col = |v: f64| -> usize {
+                            ((v - plot_lo) / plot_range * (width - 1) as f64)
+                                .round()
+                                .clamp(0.0, (width - 1) as f64) as usize
+                        };
+                        let zero_col = to_col(0.0);
+
+                        let mut display = String::new();
+                        display.push_str(&format!("\n  Marginal Effects Plot ({})\n", bm.kind));
+                        display.push_str(&format!("  {}\n", "─".repeat(width + 4)));
+                        let mut var_vec = Vec::new();
+                        let mut effect_vec = Vec::new();
+                        let mut ci_lo_vec = Vec::new();
+                        let mut ci_hi_vec = Vec::new();
+                        for (name, eff, ci_lo, ci_hi) in &rows {
+                            let c_lo = to_col(*ci_lo);
+                            let c_hi = to_col(*ci_hi).min(width - 1);
+                            let c_pt = to_col(*eff);
+                            let mut line = vec![' '; width];
+                            if zero_col < width {
+                                line[zero_col] = '│';
+                            }
+                            if c_lo <= c_hi {
+                                line[c_lo..=c_hi].fill('─');
+                            }
+                            if c_pt < width {
+                                line[c_pt] = '●';
+                            }
+                            let bar: String = line.into_iter().collect();
+                            display.push_str(&format!(
+                                "{:>lw$} │{bar}  {eff:>8.4}\n",
+                                name,
+                                lw = label_w,
+                                bar = bar,
+                                eff = eff
+                            ));
+                            var_vec.push(Value::Str(name.clone()));
+                            effect_vec.push(Value::Float(*eff));
+                            ci_lo_vec.push(Value::Float(*ci_lo));
+                            ci_hi_vec.push(Value::Float(*ci_hi));
+                        }
+                        display.push_str(&format!("  {}\n", "─".repeat(width + 4)));
+                        display.push_str(&format!("  {zero_col} (zero reference)\n"));
+
+                        let mut columns = HashMap::new();
+                        columns.insert("variable".into(), Value::List(Arc::new(var_vec)));
+                        columns.insert("effect".into(), Value::List(Arc::new(effect_vec)));
+                        columns.insert("ci_lo".into(), Value::List(Arc::new(ci_lo_vec)));
+                        columns.insert("ci_hi".into(), Value::List(Arc::new(ci_hi_vec)));
+                        let effects_df = self.dict_to_dataframe(&columns)?;
+
+                        let fields: Vec<(String, Value)> = vec![
+                            ("effects".into(), Value::DataFrame(Arc::new(effects_df))),
+                            (
+                                "fit".into(),
+                                model_expansion::fit_dict(&[
+                                    ("model_kind", Value::Str(bm.kind.clone())),
+                                    ("n", Value::Int(bm.y.len() as i64)),
+                                    ("width", Value::Int(width as i64)),
+                                ]),
+                            ),
+                        ];
+                        let summary = format!(
+                            "Marginal effects plot ({}): {} variables",
+                            bm.kind,
+                            rows.len()
+                        );
+                        return Ok(Some(model_expansion::model_result(
+                            display,
+                            summary,
+                            "MarginsPlotResult",
+                            fields,
+                        )));
+                    }
+                    _ => {
+                        return Err(HayashiError::Runtime(
+                            "marginsplot: supports logit/probit models".into(),
+                        ))
+                    }
+                }
             }
 
             // ── vecm ─────────────────────────────────────────────────────────
+            #[cfg(feature = "greeners-timeseries")]
             "vecm" => self.eval_vecm(args, opt_map),
 
             // ── var ──────────────────────────────────────────────────────────
+            #[cfg(feature = "greeners-timeseries")]
             "var" => self.eval_var(args, opt_map),
 
             // ── irf ──────────────────────────────────────────────────────────
+            #[cfg(feature = "greeners-timeseries")]
             "irf" => self.eval_irf(args, opt_map),
 
             // ── fevd ─────────────────────────────────────────────────────────
+            #[cfg(feature = "greeners-timeseries")]
             "fevd" => self.eval_fevd(args, opt_map),
 
             // ── arima / sarima ───────────────────────────────────────────────
+            #[cfg(feature = "greeners-timeseries")]
             "arima" | "sarima" => self.eval_arima(func, args, opt_map),
 
             // ── autoreg ──────────────────────────────────────────────────────
             // autoreg(df, y, lags=p, trend="c")
+            #[cfg(feature = "greeners-timeseries")]
             "autoreg" | "ar" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
@@ -364,7 +599,7 @@ impl Interpreter {
                     Expr::Var(n) => n.clone(),
                     _ => {
                         return Err(HayashiError::Type(
-                            "autoreg: primeiro argumento deve ser um DataFrame".into(),
+                            "autoreg(): first argument must be a DataFrame".into(),
                         ))
                     }
                 };
@@ -404,6 +639,7 @@ impl Interpreter {
 
             // ── ardl ─────────────────────────────────────────────────────────
             // ardl(y ~ x1 + x2, df, lags=p, xlags=q)
+            #[cfg(feature = "greeners-timeseries")]
             "ardl" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
@@ -417,7 +653,7 @@ impl Interpreter {
                     Expr::Var(n) => n.clone(),
                     _ => {
                         return Err(HayashiError::Type(
-                            "ardl: segundo argumento deve ser um DataFrame".into(),
+                            "ardl(): second argument must be a DataFrame".into(),
                         ))
                     }
                 };
@@ -474,6 +710,7 @@ impl Interpreter {
             //                               nu_t = nu_{t-1} + zeta_t
             //
             // Adiciona colunas {var}_filtered e {var}_smoothed ao DataFrame.
+            #[cfg(feature = "greeners-timeseries")]
             "kalman" | "kfilter" | "ssm" => {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime(
@@ -485,7 +722,7 @@ impl Interpreter {
                     Expr::Var(n) => n.clone(),
                     _ => {
                         return Err(HayashiError::Type(
-                            "kalman: primeiro argumento deve ser um DataFrame".into(),
+                            "kalman(): first argument must be a DataFrame".into(),
                         ))
                     }
                 };
@@ -548,18 +785,10 @@ impl Interpreter {
 
                 let ss_result = match model_kind.as_str() {
                     "ll" | "local_level" => {
-                        // H=[[1]], F=[[1]], R=[[1]], Q=[[sigma_state^2]], R_obs=[[sigma_obs^2]]
-                        let model = greeners::StateSpaceModel {
-                            h: ndarray::Array2::from_elem((1, 1), 1.0),
-                            f: ndarray::Array2::from_elem((1, 1), 1.0),
-                            r: ndarray::Array2::from_elem((1, 1), 1.0),
-                            q: ndarray::Array2::from_elem((1, 1), sigma_state.powi(2)),
-                            r_obs: ndarray::Array2::from_elem((1, 1), sigma_obs.powi(2)),
-                            s0: ndarray::Array1::from_vec(vec![y_vec[0]]),
-                            p0: ndarray::Array2::from_elem((1, 1), sigma_obs.powi(2) * 10.0),
-                        };
-                        greeners::state_space_estimate(&model, &obs)
-                            .map_err(|e| self.rt_err(format!("kalman (ll): {e}")))?
+                        // Local-level model: fit variances by MLE and return a result object.
+                        let result = greeners::statespace::LocalLevel::fit(&y_vec)
+                            .map_err(|e| self.rt_err(format!("kalman (ll): {e}")))?;
+                        return Ok(Some(Value::LocalLevelResult(Rc::new(result))));
                     }
                     "llt" | "local_linear_trend" => {
                         // States: [level, slope]
@@ -593,7 +822,7 @@ impl Interpreter {
                     }
                     other => {
                         return Err(HayashiError::Runtime(format!(
-                            "kalman: modelo '{other}' desconhecido — use \"ll\" ou \"llt\""
+                            "kalman(): unknown model '{other}' — use \"ll\" or \"llt\""
                         )))
                     }
                 };
@@ -609,15 +838,36 @@ impl Interpreter {
                 let filt_name = format!("{var_name}_filtered");
                 let smooth_name = format!("{var_name}_smoothed");
 
-                Rc::make_mut(&mut df)
+                let mut fields: Vec<(String, Value)> = vec![
+                    (
+                        "fit".into(),
+                        model_expansion::fit_dict(&[
+                            ("model_kind", Value::Str(model_kind.clone())),
+                            ("n", Value::Int(n as i64)),
+                            ("log_likelihood", Value::Float(ss_result.log_likelihood)),
+                            ("sigma_obs", Value::Float(sigma_obs)),
+                            ("sigma_state", Value::Float(sigma_state)),
+                        ]),
+                    ),
+                    (
+                        "filtered".into(),
+                        model_expansion::array1_to_series(&filt_name, &filtered),
+                    ),
+                    (
+                        "smoothed".into(),
+                        model_expansion::array1_to_series(&smooth_name, &smoothed),
+                    ),
+                ];
+
+                Arc::make_mut(&mut df)
                     .insert(filt_name.clone(), filtered)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                Rc::make_mut(&mut df)
+                Arc::make_mut(&mut df)
                     .insert(smooth_name.clone(), smoothed)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
                 // For LLT, also add trend (slope = state 1)
-                if matches!(model_kind.as_str(), "llt" | "local_linear_trend") {
+                let display = if matches!(model_kind.as_str(), "llt" | "local_linear_trend") {
                     let slope_filt: ndarray::Array1<f64> = ndarray::Array1::from_vec(
                         ss_result.filtered_states.iter().map(|s| s[1]).collect(),
                     );
@@ -626,34 +876,55 @@ impl Interpreter {
                     );
                     let sf_name = format!("{var_name}_slope_filtered");
                     let ss_name = format!("{var_name}_slope_smoothed");
-                    Rc::make_mut(&mut df)
+
+                    fields.push((
+                        "slope_filtered".into(),
+                        model_expansion::array1_to_series(&sf_name, &slope_filt),
+                    ));
+                    fields.push((
+                        "slope_smoothed".into(),
+                        model_expansion::array1_to_series(&ss_name, &slope_smooth),
+                    ));
+                    if let Some(Value::Dict(fit)) =
+                        fields.iter_mut().find(|(k, _)| k == "fit").map(|(_, v)| v)
+                    {
+                        Arc::make_mut(fit).insert("sigma_slope".into(), Value::Float(sigma_slope));
+                    }
+
+                    Arc::make_mut(&mut df)
                         .insert(sf_name.clone(), slope_filt)
                         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                    Rc::make_mut(&mut df)
+                    Arc::make_mut(&mut df)
                         .insert(ss_name.clone(), slope_smooth)
                         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-                    println!(
-                        "\nKalman ({}):  T={}  loglik={:.4}  σ_obs={:.4}  σ_state={:.4}  σ_slope={:.4}",
+                    format!(
+                        "\nKalman ({}):  T={}  loglik={:.4}  σ_obs={:.4}  σ_state={:.4}  σ_slope={:.4}\n  → {filt_name}, {smooth_name}, {sf_name}, {ss_name} added to {df_name}\n",
                         model_kind, n, ss_result.log_likelihood, sigma_obs, sigma_state, sigma_slope
-                    );
-                    println!(
-                        "  → {filt_name}, {smooth_name}, {sf_name}, {ss_name} adicionadas a {df_name}"
-                    );
+                    )
                 } else {
-                    println!(
-                        "\nKalman ({}):  T={}  loglik={:.4}  σ_obs={:.4}  σ_state={:.4}",
+                    format!(
+                        "\nKalman ({}):  T={}  loglik={:.4}  σ_obs={:.4}  σ_state={:.4}\n  → {filt_name}, {smooth_name} added to {df_name}\n",
                         model_kind, n, ss_result.log_likelihood, sigma_obs, sigma_state
-                    );
-                    println!("  → {filt_name}, {smooth_name} adicionadas a {df_name}");
-                }
+                    )
+                };
 
                 self.env.set(&df_name, Value::DataFrame(df))?;
-                Ok(Value::Nil)
+                let summary = format!(
+                    "Kalman {}: T={}, loglik={:.4}",
+                    model_kind, n, ss_result.log_likelihood
+                );
+                Ok(model_expansion::model_result(
+                    display,
+                    summary,
+                    "KalmanResult",
+                    fields,
+                ))
             }
 
             // ── forecast ─────────────────────────────────────────────────────
             // forecast(model, steps=8)
             // forecast(model, steps=8, alpha=0.05)
+            #[cfg(feature = "greeners-timeseries")]
             "forecast" | "fcast" | "predict_h" => {
                 if args.is_empty() {
                     return Err(HayashiError::Runtime(
@@ -662,6 +933,7 @@ impl Interpreter {
                 }
 
                 let model = match self.eval_expr(&args[0])? {
+                    #[cfg(feature = "greeners-timeseries")]
                     Value::ArimaResult(m) => m,
                     _ => {
                         return Err(HayashiError::Type(
@@ -697,6 +969,10 @@ impl Interpreter {
                     "h", "forecast", "lower", "upper"
                 );
                 println!("{sep}");
+                let mut h_vec = Vec::new();
+                let mut fc_vec = Vec::new();
+                let mut lo_vec = Vec::new();
+                let mut hi_vec = Vec::new();
                 for h in 0..steps {
                     println!(
                         "{:<6} {:>12.4} {:>12.4} {:>12.4}",
@@ -705,11 +981,24 @@ impl Interpreter {
                         lo[h],
                         hi[h]
                     );
+                    h_vec.push((h + 1) as i64);
+                    fc_vec.push(Value::Float(fc[h]));
+                    lo_vec.push(Value::Float(lo[h]));
+                    hi_vec.push(Value::Float(hi[h]));
                 }
                 println!("{sep}");
                 println!();
 
-                Ok(Value::Nil)
+                let mut columns = HashMap::new();
+                columns.insert(
+                    "h".into(),
+                    Value::List(Arc::new(h_vec.into_iter().map(Value::Int).collect())),
+                );
+                columns.insert("forecast".into(), Value::List(Arc::new(fc_vec)));
+                columns.insert("lower".into(), Value::List(Arc::new(lo_vec)));
+                columns.insert("upper".into(), Value::List(Arc::new(hi_vec)));
+                let df = self.dict_to_dataframe(&columns)?;
+                Ok(Value::DataFrame(Arc::new(df)))
             }
 
             // ── lincom ───────────────────────────────────────────────────────
@@ -845,7 +1134,9 @@ impl Interpreter {
                 // nomes dos coeficientes via API do Greeners (sem parse de CSV)
                 let var_names: Vec<String> =
                     ols.result.variable_names.clone().ok_or_else(|| {
-                        HayashiError::Runtime("modelo sem variable_names — use from_formula".into())
+                        HayashiError::Runtime(
+                            "model has no variable_names — use from_formula".into(),
+                        )
                     })?;
 
                 let k = var_names.len();
@@ -947,14 +1238,21 @@ impl Interpreter {
                     estimate, se, t, df_t, p
                 );
                 println!("{sep}");
-                println!(
-                    "95% CI: [{:.6},  {:.6}]",
-                    estimate - tc * se,
-                    estimate + tc * se
-                );
+                let ci_lower = estimate - tc * se;
+                let ci_upper = estimate + tc * se;
+                println!("95% CI: [{:.6},  {:.6}]", ci_lower, ci_upper);
                 println!();
 
-                Ok(Value::Nil)
+                let mut map = HashMap::new();
+                map.insert("estimate".into(), Value::Float(estimate));
+                map.insert("std_err".into(), Value::Float(se));
+                map.insert("t".into(), Value::Float(t));
+                map.insert("df".into(), Value::Float(df_t));
+                map.insert("p_value".into(), Value::Float(p));
+                map.insert("ci_lower".into(), Value::Float(ci_lower));
+                map.insert("ci_upper".into(), Value::Float(ci_upper));
+                map.insert("expression".into(), Value::Str(expr_label));
+                Ok(Value::Dict(Arc::new(map)))
             }
 
             _ => return Ok(None),

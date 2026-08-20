@@ -1,0 +1,13 @@
+load "validation/cases/copula_simulated/data/data.csv" as df
+let m = copula(y ~ x, df, type="gaussian")
+let corr_yx = (m.corr_matrix["y"])[1]
+let kendall_yx = (m.kendall_tau["y"])[1]
+let spearman_yx = (m.spearman_rho["y"])[1]
+let se = 0.0
+let out = dataframe({
+  "variable": ["corr_yx", "kendall_yx", "spearman_yx"],
+  "coef": [corr_yx, kendall_yx, spearman_yx],
+  "std_err": [se, se, se]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

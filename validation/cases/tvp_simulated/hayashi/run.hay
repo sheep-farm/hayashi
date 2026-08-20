@@ -1,0 +1,10 @@
+load "validation/cases/tvp_simulated/data/data.csv" as df
+let m = tvp(y ~ x, df)
+let last = nrow(m.beta_smoothed) - 1
+let out0 = dataframe({
+  "variable": ["Intercept", "x"],
+  "coef": [m.beta_smoothed["x"][last], m.beta_smoothed["col1"][last]],
+  "std_err": [m.beta_se["x"][last], m.beta_se["col1"][last]]
+})
+let out = select(out0, "variable", "coef", "std_err")
+export(out, "csv", "/dev/stdout")

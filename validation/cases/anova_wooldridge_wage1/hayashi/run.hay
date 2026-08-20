@@ -1,0 +1,8 @@
+// Load the Wooldridge wage1 dataset from CSV.
+load "validation/cases/anova_wooldridge_wage1/data/wage1.csv" as df
+
+// One-way ANOVA of wage by education level.
+let a = anova(df, wage, by=educ)
+
+// Export the result as JSON for automated comparison.
+export(a, "json", "/dev/stdout")

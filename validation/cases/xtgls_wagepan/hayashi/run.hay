@@ -1,0 +1,5 @@
+load "validation/cases/xtgls_wagepan/data/wagepan.csv" as df
+
+let m = xtgls(lwage ~ educ + exper + expersq + married + union, df, id=nr, time=year, panels=hetero)
+
+export(m, "txt", "/dev/stdout")

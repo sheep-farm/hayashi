@@ -60,6 +60,18 @@ mesmo número de valores.
   \lstinline{load}.
 \end{nota}
 
+\subsection*{\texttt{dataframe(n)} — DataFrame vazio pré-dimensionado}
+
+Cria um DataFrame vazio com um número fixo de linhas. Útil para
+pré-dimensionar antes de preenchê-lo com \lstinline{generate}:
+
+\begin{lstlisting}[caption={DataFrame pré-dimensionado}]
+let df = dataframe(1000)
+
+generate df u = rnormal(0, 1)
+generate df treat = rbernoulli(0.5)
+\end{lstlisting}
+
 \subsection*{\texttt{load} — arquivos externos}
 
 \begin{lstlisting}[caption={Carregando arquivos}]
@@ -68,10 +80,211 @@ load "painel.dta" as painel        // formato Stata
 load "resultado.parquet" as df
 load "planilha.xlsx" as df         // primeira aba
 load "planilha.xlsx" sheet="Dados" as df
+load "base.db" as df, table=precos
+load "base.db" as df, query="SELECT * FROM precos WHERE ano > 2020"
+load "dados.csv" as df, sep=";"
 \end{lstlisting}
 
-Formatos suportados: CSV, Parquet, Stata (\texttt{.dta}), Excel (\texttt{.xlsx}),
-SQLite.
+Formatos suportados: CSV, TSV, JSON, Parquet, Stata (\texttt{.dta}),
+Excel (\texttt{.xlsx}/\texttt{.xls}/\texttt{.ods}), SQLite, ODBC. URLs HTTP(S)
+são baixadas automaticamente.
+
+\subsection*{Projeção de colunas e filtro de linhas (\texttt{columns=}, \texttt{where=})}
+
+Para arquivos grandes, carregar todas as colunas e linhas em RAM pode ser
+desperdício ou inviável. As opções \texttt{columns=} e \texttt{where=} fazem
+\textit{pushdown} da projeção e do filtro para a fonte de dados: apenas as
+colunas pedidas e as linhas que casam com o predicado são materializadas em
+memória.
+
+\begin{lstlisting}[caption={Pushdown de colunas e filtro}]
+load "cotacoes.parquet" as aapl, columns=[ticker, date, adj_close], where="ticker == \"AAPL\""
+load "base.db" as df, table=precos, columns=[data, close], where="close > 100"
+load "survey.csv" as df, where="age >= 18 && region == \"South\""
+load "painel.dta" as df, columns=[id, year, y], where="year >= 2000"
+load "planilha.xlsx" as df, columns=[name, score], where="score > 75"
+\end{lstlisting}
+
+\begin{center}
+\begin{tabular}{llll}
+\toprule
+\textbf{Fonte} & \textbf{\texttt{columns=}} & \textbf{\texttt{where=}} & \textbf{Mecanismo de pushdown} \\
+\midrule
+Parquet   & sim & sim & Arrow \texttt{ProjectionMask} + \texttt{RowFilter} + \textit{row group pruning} por min/max \\
+SQLite    & sim & sim & \texttt{SELECT cols FROM t WHERE pred} \\
+ODBC      & sim & sim & idem SQLite \\
+CSV / TSV & sim & sim & projeção no loop, predicado linha a linha \\
+DTA       & sim & sim & projeção em \texttt{read\_record}, predicado linha a linha \\
+Excel     & sim & sim & projeção após \texttt{worksheet\_range}, filtro nas células \\
+JSON      & ainda não & ainda não & --- \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Passar \texttt{columns=} ou \texttt{where=} para um \texttt{load} JSON retorna
+erro. \texttt{query=} não pode ser combinado com \texttt{columns=} ou
+\texttt{where=} --- se você precisa de SQL customizado, escreva a projeção e o
+filtro dentro da própria string de \texttt{query}.
+
+\subsubsection*{Sintaxe de \texttt{columns=}}
+
+Aceita uma lista de nomes de colunas (identificadores ou strings):
+
+\begin{lstlisting}
+columns=[ticker, date, adj_close]
+columns=["ticker", "date", "adj_close"]
+columns=ticker              // coluna única também aceita
+\end{lstlisting}
+
+Os nomes são validados contra o \textit{schema} da fonte antes de qualquer
+dado ser lido; colunas inexistentes produzem erro listando as disponíveis.
+
+\subsubsection*{Sintaxe de \texttt{where=}}
+
+\texttt{where=} aceita uma expressão Hayashi da forma \texttt{coluna OP literal},
+combinada com \texttt{\&\&}, \texttt{||}, \texttt{!} e \texttt{in [...]}.
+A expressão é parseada pelo parser do Hayashi e normalizada em um
+\texttt{RowPredicate} que cada loader avalia (ou empurra para a fonte).
+
+\begin{lstlisting}
+where="ticker == \"AAPL\""                     // igualdade de string
+where="preco > 100"                            // comparação numérica
+where="preco > 100 && volume > 1e6"            // AND
+where="ticker in [\"AAPL\", \"MSFT\"]"         // pertinência
+where="!(setor == \"Financeiro\")"             // negação
+where="ano >= 2022 && produto == \"Soja\""     // combinado
+\end{lstlisting}
+
+Operadores suportados: \texttt{==}, \texttt{!=}, \texttt{>}, \texttt{>=},
+\texttt{<}, \texttt{<=}, \texttt{in}, \texttt{\&\&} (e), \texttt{||} (ou),
+\texttt{!} (não). Comparações devem ser \texttt{coluna OP literal} ---
+comparar duas colunas não é suportado (use \texttt{generate} + \texttt{filter}
+para isso).
+
+\begin{nota}
+  Em arquivos Parquet grandes, o \textit{pushdown} de filtro é especialmente
+  eficaz: o predicado é avaliado durante o \textit{scan} do \textit{row group},
+  antes de qualquer dado ser decodificado para a memória. Em um arquivo de
+  837\,MB com 30 milhões de linhas e 8.292 \textit{tickers}, carregar
+  \texttt{columns=[ticker, date, adj\_close], where="ticker == \textbackslash"AAPL\textbackslash""}
+  reduziu o pico de RAM de $\sim$7{,}5\,GB (carga \textit{eager} completa) para
+  $\sim$4\,MB.
+\end{nota}
+
+\subsection*{Controle de inferência de tipos (\texttt{types=}, \texttt{na=}) para CSV/TSV}
+
+Para arquivos CSV e TSV, o \hayashi{} delega a inferência de tipos para o Greeners,
+que oferece controle explícito sobre os tipos de colunas e o tratamento de valores
+nulos.
+
+\subsubsection*{\texttt{types=} --- tipos de coluna explícitos}
+
+\begin{lstlisting}[caption={Tipos de coluna explícitos}]
+load "dados.csv" as df, types=[ticker:string, preco:float, data:date]
+\end{lstlisting}
+
+Formato: \texttt{types=[coluna:tipo, ...]}. Cada entrada é \texttt{coluna:tipo}
+onde \texttt{tipo} pode ser:
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Tipo} & \textbf{Significado} \\
+\midrule
+\texttt{int}       & Inteiro de 64 bits com sinal \\
+\texttt{float}    & Ponto flutuante de 64 bits (\texttt{NaN} para ausentes) \\
+\texttt{bool}     & Booleano (verdadeiro/falso) \\
+\texttt{string}   & Texto livre (alta cardinalidade) \\
+\texttt{categorical} & String de baixa cardinalidade com codificação inteira \\
+\texttt{date} / \texttt{datetime} & Data/hora ISO-8601 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Colunas não listadas em \texttt{types=} são inferidas automaticamente usando as
+regras padrão do Greeners.
+
+\textbf{Exemplo --- evitando inferência errada de \textit{tickers}:}
+
+\begin{lstlisting}[caption={Forçando \textit{ticker} e \textit{símbolo} como string}]
+load "tickers.csv" as df, types=[ticker:string, simbolo:string, preco:float]
+\end{lstlisting}
+
+Sem \texttt{types=}, \textit{tickers} como \texttt{T}, \texttt{F}, \texttt{NAN}
+seriam inferidos como \texttt{bool}/\texttt{float}. Com \texttt{types=}, eles
+permanecem strings.
+
+\subsubsection*{\texttt{na=} --- valores nulos customizados}
+
+\begin{lstlisting}[caption={Valores nulos customizados}]
+load "dados.csv" as df, na=["NA", "NaN", "NULL", "null", "", "."]
+\end{lstlisting}
+
+Valores que casem com qualquer string da lista são tratados como ausentes (nulo).
+Padrão: \texttt{["", "NA", ".", "NaN", "NULL", "null"]}.
+
+\textbf{Exemplo --- tratando strings vazias como ausentes:}
+
+\begin{lstlisting}[caption={Nulls customizados para dados de pesquisa}]
+load "pesquisa.csv" as df, na=["", "NA", "N/A", "null"]
+\end{lstlisting}
+
+\begin{nota}
+  Em arquivos Parquet grandes, o \textit{pushdown} de filtro é especialmente
+  eficaz: o predicado é avaliado durante o \textit{scan} do \textit{row group},
+  antes de qualquer dado ser decodificado para a memória. Em um arquivo de
+  837\,MB com 30 milhões de linhas e 8.292 \textit{tickers}, carregar
+  \texttt{columns=[ticker, date, adj\_close], where="ticker == \textbackslash"AAPL\textbackslash""}
+  reduziu o pico de RAM de $\sim$7{,}5\,GB (carga \textit{eager} completa) para
+  $\sim$4\,MB.
+\end{nota}
+
+\subsubsection*{\textit{Row group pruning} por estatísticas (Parquet)}
+
+Além do \texttt{RowFilter} (que avalia o predicado em cada linha durante o
+\textit{scan}), o loader do Parquet lê as estatísticas de min/max de cada
+\textit{row group} nos metadados do arquivo e pula \textit{row groups} inteiros
+onde o predicado não pode casar. Isso é especialmente eficaz quando os dados
+estão ordenados ou agrupados pela coluna filtrada.
+
+No mesmo arquivo de 799\,MB com 30 milhões de linhas e 8.292 \textit{row groups}
+ordenados por \textit{ticker}, \texttt{where="ticker == \textbackslash"AAPL\textbackslash""}
+podou 8.291 de 8.292 \textit{row groups}, reduzindo o tempo de carga de
+$\sim$62\,s (\textit{full scan}) para $\sim$312\,ms (212$\times$ mais rápido)
+com $\sim$60\,MB de RAM.
+
+\begin{nota}
+  Para \textit{point lookups} (buscar um único valor, como um \textit{ticker}
+  específico), SQLite com índice B-tree em \texttt{(ticker, date)} ainda é
+  mais rápido ($\sim$42\,ms, $\sim$26\,MB de RAM) porque faz \textit{seek}
+  direto sem ler metadados de todos os \textit{row groups}. Para análise
+  colunar completa (todas as linhas, poucas colunas), Parquet com \textit{pruning}
+  é superior devido à compressão colunar.
+\end{nota}
+
+\subsubsection*{Tipos temporais no Parquet}
+
+Colunas do tipo \texttt{Timestamp(s|ms|$\mu$s|ns)}, \texttt{Date32} e
+\texttt{Date64} no Parquet são convertidas para \textbf{strings ISO 8601}:
+\texttt{YYYY-MM-DD} quando a parte de tempo é meia-noite, ou
+\texttt{YYYY-MM-DDTHH:MM:SS} caso contrário. O Hayashi não possui tipo
+\textit{Date} nativo, então a representação textual é a mais prática para
+econometria --- permite extração de componentes via \texttt{substr} e
+conversão para \textit{timestamp} Unix quando necessário.
+
+\begin{lstlisting}[caption={Extraindo componentes de datas}]
+load "cotacoes.parquet" as df, columns=[ticker, date, close]
+
+generate df ano = substr(date, 0, 4)        // "2024"  (vetorial)
+generate df mes = substr(date, 5, 2)        // "03"    (vetorial)
+\end{lstlisting}
+
+\begin{nota}
+  \texttt{substr()} é vetorial e funciona dentro de \texttt{generate}, produzindo
+  colunas de string. Já \texttt{date()} e \texttt{datetime()} são funções
+  escalares --- aceitam uma única string ISO e retornam um \texttt{Float}
+  (segundos desde 1970-01-01). Exemplo: \texttt{let ts = date("2024-03-15")}.
+\end{nota}
 
 \section{Salvando DataFrames}
 

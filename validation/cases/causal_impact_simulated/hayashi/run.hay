@@ -1,0 +1,7 @@
+// Load the simulated Causal Impact dataset.
+load "validation/cases/causal_impact_simulated/data/causal_impact.csv" as df
+
+// Run Causal Impact analysis.
+// Treatment period starts at t=100
+generate df time_num = _n
+causal_impact(df, y, controls=time_num, period=100)

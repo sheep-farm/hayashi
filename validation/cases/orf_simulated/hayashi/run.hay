@@ -1,0 +1,10 @@
+load "validation/cases/orf_simulated/data/data.csv" as df
+let m = orf(y ~ treated, df, x="x1,x2", w="w1,w2", trees=50, depth=4)
+let nan = 0.0/0.0
+let out = dataframe({
+  "variable": ["ate"],
+  "coef": [m.fit.ate],
+  "std_err": [m.fit.ate_se]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

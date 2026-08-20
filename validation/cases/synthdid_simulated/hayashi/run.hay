@@ -1,0 +1,10 @@
+load "validation/cases/synthdid_simulated/data/data.csv" as df
+let m = synthdid(df, y, treated, 6, unit="unit", period="period")
+let nan = 0.0/0.0
+let out = dataframe({
+  "variable": ["ATT"],
+  "coef": [m.fit.att],
+  "std_err": [nan]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

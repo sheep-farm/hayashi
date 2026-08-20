@@ -95,6 +95,13 @@ is_fn(|x| x)      // true
 let df = dataframe({"x": [1, 2, 3], "y": [4, 5, 6]})
 ```
 
+## Pre-dimension an empty DataFrame
+
+```
+let df = dataframe(1000)
+generate df u = rnormal(0, 1)
+```
+
 ## List operations
 
 Lists are ordered, heterogeneous collections. `push` and `pop` mutate in-place; all others return a new list.

@@ -31,6 +31,31 @@ let df2 = mutate(df, lrenda = log(renda), renda2 = renda^2)
 // df2 as possui
 \end{lstlisting}
 
+\section{Geradores de variáveis aleatórias}
+
+Todas as distribuições abaixo estão disponíveis dentro de expressões
+\lstinline{generate}. Elas respeitam a semente global definida por
+\lstinline{set_seed} e retornam um valor por linha, propagando parâmetros
+escalares para o comprimento do DataFrame.
+
+\begin{lstlisting}[caption={Simulando dados}]
+set_seed(42)
+let df = dataframe(1000)
+
+generate df u = rnormal(0, 1)
+generate df treated = rbernoulli(0.5)
+generate df duration = rexponential(1)
+\end{lstlisting}
+
+\textbf{Contínuas:} \lstinline{rnormal}, \lstinline{rlognormal}, \lstinline{rskewnormal}, \lstinline{rcauchy}, \lstinline{rstudentt} (alias \lstinline{rt}), \lstinline{rchisq}, \lstinline{rf}, \lstinline{rbeta}, \lstinline{rgamma}, \lstinline{rexponential}, \lstinline{rweibull}, \lstinline{rpareto}, \lstinline{rpert}, \lstinline{rtriangular}, \lstinline{rfrechet}, \lstinline{rgumbel}, \lstinline{rinversegaussian}, \lstinline{rnig}, \lstinline{runiform}.
+
+\textbf{Discretas:} \lstinline{rbernoulli}, \lstinline{rbinomial}, \lstinline{rpoisson}, \lstinline{rgeometric}, \lstinline{rhypergeometric}, \lstinline{rzeta}, \lstinline{rzipf}.
+
+\begin{nota}
+  \lstinline{rgeometric(p)} retorna o número de falhas antes do primeiro
+  sucesso, com suporte $\{0, 1, 2, \ldots\}$.
+\end{nota}
+
 \section{\texttt{filter}}
 
 Seleciona linhas que satisfazem uma condição:
@@ -92,7 +117,7 @@ let daily = ffill(daily)
 
 \section{\texttt{append}}
 
-Empilha dois DataFrames verticalmente (equivalente a \texttt{rbind}):
+Empilha dois DataFrames verticalmente:
 
 \begin{lstlisting}
 let df_total = append(df_2024, df_2025)
@@ -100,6 +125,23 @@ let df_total = append(df_2024, df_2025)
 
 As colunas devem ser compatíveis. Colunas ausentes em um dos DataFrames são
 preenchidas com \texttt{NaN}.
+
+\section{\texttt{rbind}}
+
+Concatena uma \textit{lista} de DataFrames verticalmente em uma única
+passada. Entradas \texttt{nil} são silenciosamente ignoradas --- útil ao
+combinar resultados de \texttt{parallel for} onde algumas iterações
+retornam \texttt{nil}:
+
+\begin{lstlisting}[caption={rbind com parallel for}]
+let resultados = parallel for i in 0..n, threads=8 {
+  let t = tickers[i]
+  if t == "SPY" { return nil }
+  let df_t = calcular_betas(t)
+  df_t
+}
+let todos_betas = rbind(resultados)
+\end{lstlisting}
 
 \section{\texttt{collapse} e \texttt{group\_by}}
 
@@ -192,6 +234,13 @@ intervalos de confiança. Para modelos \texttt{rolling}, retorna uma
 linha por janela com colunas \texttt{date}, \texttt{r2} e uma coluna de
 coeficiente por variável. \texttt{glance} retorna um resumo de uma
 linha com estatísticas de ajuste.
+
+Ambas as funções suportam todos os tipos de modelo: OLS, IV, logit,
+probit, ordenado, multinomial, painel (FE, RE, PCSE, GLS, GLSAR,
+Arellano-Bond, SystemGMM), séries temporais (ARIMA, AutoReg, ARDL,
+GARCH, VAR, VECM, VARMA, ETS, Kalman), sobrevivência (Cox, KM), causal
+(DiD, Threshold), multivariada (SUR, 3SLS), regularização (ridge, lasso,
+elasticnet), entre outros.
 
 \begin{lstlisting}[caption={Tidy e glance}]
 let m = ols(y ~ x1 + x2, df)

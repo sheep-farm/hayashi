@@ -23,6 +23,7 @@ model <- glmnet(X, y, alpha = 1, lambda = 1.0, standardize = TRUE)
 
 coefs <- as.numeric(coef(model))
 names(coefs) <- rownames(coef(model))
+names(coefs)[names(coefs) == "(Intercept)"] <- "Intercept"
 
 # glmnet does not provide analytical standard errors for Lasso.
 std_errors <- as.numeric(rep(0.0, length(coefs)))
@@ -38,4 +39,4 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 write_json(result, file.path(out_dir, "expected.json"), pretty = TRUE, auto_unbox = TRUE)
 
-cat(toJSON(result, pretty = TRUE, auto_unbox = TRUE))
+cat(toJSON(result, pretty = FALSE, digits = NA, auto_unbox = TRUE))

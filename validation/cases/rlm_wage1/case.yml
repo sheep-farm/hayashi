@@ -1,0 +1,36 @@
+id: rlm_wage1
+title: Robust linear model on Wooldridge wage1
+estimator_family: rlm
+status: pass
+dimension: numerical
+
+dataset:
+  name: wooldridge::wage1
+  source: R package wooldridge / Python wooldridge package
+  licence: public teaching dataset
+
+references:
+  - R
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - standard_errors
+  tolerances:
+    coefficients: 1e-3
+    standard_errors: 1e-2
+
+output_format: txt
+
+hayashi_script: cases/rlm_wage1/hayashi/run.hay
+reference_scripts:
+  R: cases/rlm_wage1/reference/run.R
+  Python: cases/rlm_wage1/reference/run.py
+
+notes: Huber robust linear regression of log wage on education, experience, and tenure.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []

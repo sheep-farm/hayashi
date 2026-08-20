@@ -1,35 +1,164 @@
 use crate::lang::error::{HayashiError, Result};
-use arrow::array::{self, Array, AsArray};
+use crate::lang::predicate::{GroupBounds, RowAccess, RowPredicate};
+use arrow::array::{self, Array, AsArray, BooleanArray};
 use arrow::datatypes::DataType as ArrowType;
+use arrow::record_batch::RecordBatch;
+use arrow::temporal_conversions::{
+    date32_to_datetime, date64_to_datetime, timestamp_ms_to_datetime, timestamp_ns_to_datetime,
+    timestamp_s_to_datetime, timestamp_us_to_datetime,
+};
 use greeners::DataFrame;
-use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
-use parquet::arrow::ArrowWriter;
+use parquet::arrow::arrow_reader::{ArrowPredicateFn, ParquetRecordBatchReaderBuilder, RowFilter};
+use parquet::arrow::{ArrowWriter, ProjectionMask};
 use parquet::basic::Compression;
 use parquet::file::properties::WriterProperties;
+use parquet::file::statistics::Statistics;
+use std::collections::HashMap;
 use std::fs::File;
 use std::sync::Arc;
 
-pub fn load_parquet(path: &str) -> Result<(DataFrame, usize)> {
+pub fn load_parquet(
+    path: &str,
+    columns: Option<&[String]>,
+    predicate: Option<&RowPredicate>,
+) -> Result<(DataFrame, usize)> {
     let file = File::open(path)
         .map_err(|e| HayashiError::Runtime(format!("cannot open '{path}': {e}")))?;
 
-    let reader = ParquetRecordBatchReaderBuilder::try_new(file)
-        .map_err(|e| HayashiError::Runtime(format!("parquet error: {e}")))?
+    let mut builder_reader = ParquetRecordBatchReaderBuilder::try_new(file)
+        .map_err(|e| HayashiError::Runtime(format!("parquet error: {e}")))?;
+
+    let schema_desc = builder_reader.parquet_schema().clone();
+    let arrow_schema = builder_reader.schema().clone();
+
+    // ── Projeção: colunas pedidas pelo usuário (ou todas). ───────────────
+    let projection_cols: Vec<String> = match columns {
+        Some(cols) if !cols.is_empty() => cols.to_vec(),
+        _ => arrow_schema
+            .fields()
+            .iter()
+            .map(|f| f.name().to_string())
+            .collect(),
+    };
+
+    // Validar que as colunas pedidas existem no schema.
+    let avail: std::collections::HashSet<String> = arrow_schema
+        .fields()
+        .iter()
+        .map(|f| f.name().to_string())
+        .collect();
+    for c in &projection_cols {
+        if !avail.contains(c) {
+            return Err(HayashiError::Runtime(format!(
+                "load parquet: column '{c}' not found — available: {}",
+                arrow_schema
+                    .fields()
+                    .iter()
+                    .map(|f| f.name().as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )));
+        }
+    }
+
+    let projection_mask =
+        ProjectionMask::columns(&schema_desc, projection_cols.iter().map(|s| s.as_str()));
+
+    // ── Filtro: where= via RowFilter do parquet (pushdown ao row group). ─
+    if let Some(pred) = predicate {
+        // Validar que todas as colunas referenciadas pelo predicado existem.
+        for c in pred.referenced_columns() {
+            if !avail.contains(&c) {
+                return Err(HayashiError::Runtime(format!(
+                    "load parquet: where references unknown column '{c}'"
+                )));
+            }
+        }
+
+        // ── Row group pruning por estatísticas (min/max). ───────────────
+        // Antes de aplicar o RowFilter (que decodifica as colunas do
+        // predicado), lemos os metadados de cada row group e pulamos os
+        // groups onde o predicado não pode casar. Isso evita ler e
+        // decodificar row groups inteiros.
+        let parquet_metadata = builder_reader.metadata().clone();
+        let row_groups = parquet_metadata.row_groups();
+        let total_rgs = row_groups.len();
+
+        // Mapear nome da coluna → índice no schema do parquet.
+        let parquet_schema = parquet_metadata.file_metadata().schema_descr();
+        let col_name_to_idx: HashMap<String, usize> = parquet_schema
+            .columns()
+            .iter()
+            .enumerate()
+            .map(|(i, c)| (c.name().to_string(), i))
+            .collect();
+
+        let mut kept_rgs: Vec<usize> = Vec::with_capacity(total_rgs);
+        let mut pruned_count: usize = 0;
+        for (rg_idx, rg) in row_groups.iter().enumerate() {
+            let bounds = RowGroupStatsLookup {
+                rg,
+                col_name_to_idx: &col_name_to_idx,
+            };
+            if pred.can_match(&bounds) {
+                kept_rgs.push(rg_idx);
+            } else {
+                pruned_count += 1;
+            }
+        }
+
+        if pruned_count > 0 {
+            builder_reader = builder_reader.with_row_groups(kept_rgs);
+        }
+
+        // A máscara do predicado inclui só as colunas que ele precisa.
+        let pred_cols = pred.referenced_columns();
+        let pred_mask = ProjectionMask::columns(&schema_desc, pred_cols.iter().map(|s| s.as_str()));
+        let pred_clone = pred.clone();
+        let arrow_pred = ArrowPredicateFn::new(pred_mask, move |batch: RecordBatch| {
+            let n = batch.num_rows();
+            let schema = batch.schema();
+            let col_idx: HashMap<String, usize> = schema
+                .fields()
+                .iter()
+                .enumerate()
+                .map(|(i, f)| (f.name().to_string(), i))
+                .collect();
+            let mut bools = Vec::with_capacity(n);
+            for i in 0..n {
+                let row = ArrowRow {
+                    batch: &batch,
+                    idx: i,
+                    col_idx: &col_idx,
+                };
+                bools.push(pred_clone.evaluate(&row));
+            }
+            Ok(BooleanArray::from(bools))
+        });
+        builder_reader = builder_reader.with_row_filter(RowFilter::new(vec![Box::new(arrow_pred)]));
+    }
+
+    builder_reader = builder_reader.with_projection(projection_mask);
+
+    let reader = builder_reader
         .build()
         .map_err(|e| HayashiError::Runtime(format!("parquet reader error: {e}")))?;
 
-    let mut builder = DataFrame::builder();
-    let mut n_rows: usize = 0;
+    // ── Acumulação: mesmas regras de conversão do loader original. ───────
+    // A coluna i do batch corresponde à coluna i de projection_cols, porque
+    // o parquet devolve apenas as colunas projetadas, na ordem informada.
     let mut col_data: Vec<(String, ColAccum)> = Vec::new();
     let mut initialized = false;
+    let mut n_rows: usize = 0;
 
     for batch_result in reader {
         let batch =
             batch_result.map_err(|e| HayashiError::Runtime(format!("parquet batch error: {e}")))?;
 
-        let schema = batch.schema();
         if !initialized {
-            for field in schema.fields() {
+            // Mapear nome → índice no batch projetado (não no schema original).
+            let batch_schema = batch.schema();
+            for field in batch_schema.fields().iter() {
                 let name = field.name().clone();
                 let is_num = matches!(
                     field.data_type(),
@@ -46,6 +175,8 @@ pub fn load_parquet(path: &str) -> Result<(DataFrame, usize)> {
                         | ArrowType::UInt64
                         | ArrowType::Boolean
                 );
+                // Para colunas que o usuário pediu mas não são numéricas,
+                // acumular como String (timestamp/caem no braço de strings).
                 col_data.push((
                     name,
                     if is_num {
@@ -74,18 +205,19 @@ pub fn load_parquet(path: &str) -> Result<(DataFrame, usize)> {
         }
     }
 
+    let mut df_builder = DataFrame::builder();
     for (name, accum) in col_data {
         match accum {
             ColAccum::Floats(vals) => {
-                builder = builder.add_column(&name, vals);
+                df_builder = df_builder.add_column(&name, vals);
             }
             ColAccum::Strings(vals) => {
-                builder = builder.add_string(&name, vals);
+                df_builder = df_builder.add_string(&name, vals);
             }
         }
     }
 
-    let df = builder
+    let df = df_builder
         .build()
         .map_err(|e| HayashiError::Runtime(format!("DataFrame build error: {e}")))?;
 
@@ -94,7 +226,6 @@ pub fn load_parquet(path: &str) -> Result<(DataFrame, usize)> {
 
 pub fn write_parquet(df: &DataFrame, path: &str) -> Result<()> {
     use arrow::datatypes::{Field, Schema};
-    use arrow::record_batch::RecordBatch;
 
     let col_names = df.column_names();
     let n_rows = df.n_rows();
@@ -294,6 +425,82 @@ fn append_as_string(col: &dyn Array, out: &mut Vec<String>) {
                 });
             }
         }
+        // Timestamps: formatar como ISO 8601 (YYYY-MM-DD ou YYYY-MM-DDTHH:MM:SS).
+        // O Hayashi não tem tipo Date nativo, então a melhor representação para
+        // econometria é string ISO — o usuário pode fazer substr() para extrair
+        // ano/mês/dia, ou generate para converter em numérico (dias desde epoch).
+        ArrowType::Timestamp(arrow::datatypes::TimeUnit::Second, _) => {
+            let arr = col.as_primitive::<arrow::datatypes::TimestampSecondType>();
+            for i in 0..arr.len() {
+                out.push(if arr.is_null(i) {
+                    String::new()
+                } else {
+                    timestamp_s_to_datetime(arr.value(i))
+                        .map(|dt| format_iso(&dt))
+                        .unwrap_or_default()
+                });
+            }
+        }
+        ArrowType::Timestamp(arrow::datatypes::TimeUnit::Millisecond, _) => {
+            let arr = col.as_primitive::<arrow::datatypes::TimestampMillisecondType>();
+            for i in 0..arr.len() {
+                out.push(if arr.is_null(i) {
+                    String::new()
+                } else {
+                    timestamp_ms_to_datetime(arr.value(i))
+                        .map(|dt| format_iso(&dt))
+                        .unwrap_or_default()
+                });
+            }
+        }
+        ArrowType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, _) => {
+            let arr = col.as_primitive::<arrow::datatypes::TimestampMicrosecondType>();
+            for i in 0..arr.len() {
+                out.push(if arr.is_null(i) {
+                    String::new()
+                } else {
+                    timestamp_us_to_datetime(arr.value(i))
+                        .map(|dt| format_iso(&dt))
+                        .unwrap_or_default()
+                });
+            }
+        }
+        ArrowType::Timestamp(arrow::datatypes::TimeUnit::Nanosecond, _) => {
+            let arr = col.as_primitive::<arrow::datatypes::TimestampNanosecondType>();
+            for i in 0..arr.len() {
+                out.push(if arr.is_null(i) {
+                    String::new()
+                } else {
+                    timestamp_ns_to_datetime(arr.value(i))
+                        .map(|dt| format_iso(&dt))
+                        .unwrap_or_default()
+                });
+            }
+        }
+        ArrowType::Date32 => {
+            let arr = col.as_primitive::<arrow::datatypes::Date32Type>();
+            for i in 0..arr.len() {
+                out.push(if arr.is_null(i) {
+                    String::new()
+                } else {
+                    date32_to_datetime(arr.value(i))
+                        .map(|dt| format_iso(&dt))
+                        .unwrap_or_default()
+                });
+            }
+        }
+        ArrowType::Date64 => {
+            let arr = col.as_primitive::<arrow::datatypes::Date64Type>();
+            for i in 0..arr.len() {
+                out.push(if arr.is_null(i) {
+                    String::new()
+                } else {
+                    date64_to_datetime(arr.value(i))
+                        .map(|dt| format_iso(&dt))
+                        .unwrap_or_default()
+                });
+            }
+        }
         _ => {
             for i in 0..col.len() {
                 out.push(if col.is_null(i) {
@@ -303,5 +510,237 @@ fn append_as_string(col: &dyn Array, out: &mut Vec<String>) {
                 });
             }
         }
+    }
+}
+
+/// Formata um `NaiveDateTime` como ISO 8601. Se a parte de tempo for meia-noite
+/// (00:00:00), retorna apenas a data (YYYY-MM-DD); caso contrário, retorna
+/// data e hora (YYYY-MM-DDTHH:MM:SS).
+fn format_iso(dt: &chrono::NaiveDateTime) -> String {
+    if dt.time() == chrono::NaiveTime::default() {
+        dt.format("%Y-%m-%d").to_string()
+    } else {
+        dt.format("%Y-%m-%dT%H:%M:%S").to_string()
+    }
+}
+
+// ── Suporte ao where= via RowFilter do parquet ─────────────────────────────
+
+/// Wrapper sobre um row group do Parquet para implementar `GroupBounds`.
+/// Permite avaliar `RowPredicate::can_match` contra as estatísticas
+/// (min/max) de cada coluna sem decodificar os dados.
+struct RowGroupStatsLookup<'a> {
+    rg: &'a parquet::file::metadata::RowGroupMetaData,
+    col_name_to_idx: &'a HashMap<String, usize>,
+}
+
+impl<'a> GroupBounds for RowGroupStatsLookup<'a> {
+    fn f64_bounds(&self, col: &str) -> Option<(f64, f64)> {
+        let idx = *self.col_name_to_idx.get(col)?;
+        let col_chunk = self.rg.column(idx);
+        let stats = col_chunk.statistics()?;
+        match stats {
+            Statistics::Int32(s) => {
+                let min = (*s.min_opt()?) as f64;
+                let max = (*s.max_opt()?) as f64;
+                Some((min, max))
+            }
+            Statistics::Int64(s) => {
+                let min = (*s.min_opt()?) as f64;
+                let max = (*s.max_opt()?) as f64;
+                Some((min, max))
+            }
+            Statistics::Int96(_) => None, // raro, conservador
+            Statistics::Float(s) => {
+                let min = (*s.min_opt()?) as f64;
+                let max = (*s.max_opt()?) as f64;
+                Some((min, max))
+            }
+            Statistics::Double(s) => {
+                let min = *s.min_opt()?;
+                let max = *s.max_opt()?;
+                Some((min, max))
+            }
+            Statistics::Boolean(s) => {
+                let min = if *s.min_opt()? { 1.0 } else { 0.0 };
+                let max = if *s.max_opt()? { 1.0 } else { 0.0 };
+                Some((min, max))
+            }
+            _ => None,
+        }
+    }
+
+    fn str_bounds(&self, col: &str) -> Option<(&str, &str)> {
+        let idx = *self.col_name_to_idx.get(col)?;
+        let col_chunk = self.rg.column(idx);
+        let stats = col_chunk.statistics()?;
+        match stats {
+            Statistics::ByteArray(s) => {
+                let min_bytes = s.min_bytes_opt()?;
+                let max_bytes = s.max_bytes_opt()?;
+                let min = std::str::from_utf8(min_bytes).ok()?;
+                let max = std::str::from_utf8(max_bytes).ok()?;
+                Some((min, max))
+            }
+            Statistics::FixedLenByteArray(s) => {
+                let min_bytes = s.min_bytes_opt()?;
+                let max_bytes = s.max_bytes_opt()?;
+                let min = std::str::from_utf8(min_bytes).ok()?;
+                let max = std::str::from_utf8(max_bytes).ok()?;
+                Some((min, max))
+            }
+            _ => None,
+        }
+    }
+}
+
+/// Linha de um `RecordBatch` projetada para avaliação do predicado `where`.
+struct ArrowRow<'a> {
+    batch: &'a RecordBatch,
+    idx: usize,
+    col_idx: &'a HashMap<String, usize>,
+}
+
+impl<'a> RowAccess for ArrowRow<'a> {
+    fn get_f64(&self, col: &str) -> Option<f64> {
+        let i = *self.col_idx.get(col)?;
+        arrow_array_to_f64(self.batch.column(i).as_ref(), self.idx)
+    }
+
+    fn get_str(&self, col: &str) -> Option<&str> {
+        let i = *self.col_idx.get(col)?;
+        let arr = self.batch.column(i);
+        match arr.data_type() {
+            ArrowType::Utf8 => {
+                let a = arr.as_string::<i32>();
+                Some(if a.is_null(self.idx) {
+                    ""
+                } else {
+                    a.value(self.idx)
+                })
+            }
+            ArrowType::LargeUtf8 => {
+                let a = arr.as_string::<i64>();
+                Some(if a.is_null(self.idx) {
+                    ""
+                } else {
+                    a.value(self.idx)
+                })
+            }
+            _ => None,
+        }
+    }
+}
+
+fn arrow_array_to_f64(arr: &dyn Array, idx: usize) -> Option<f64> {
+    use arrow::datatypes as dt;
+    match arr.data_type() {
+        ArrowType::Float64 => {
+            let a = arr.as_primitive::<dt::Float64Type>();
+            Some(if a.is_null(idx) {
+                f64::NAN
+            } else {
+                a.value(idx)
+            })
+        }
+        ArrowType::Float32 => {
+            let a = arr.as_primitive::<dt::Float32Type>();
+            Some(if a.is_null(idx) {
+                f64::NAN
+            } else {
+                a.value(idx) as f64
+            })
+        }
+        ArrowType::Int64 => {
+            let a = arr.as_primitive::<dt::Int64Type>();
+            Some(if a.is_null(idx) {
+                f64::NAN
+            } else {
+                a.value(idx) as f64
+            })
+        }
+        ArrowType::Int32 => {
+            let a = arr.as_primitive::<dt::Int32Type>();
+            Some(if a.is_null(idx) {
+                f64::NAN
+            } else {
+                a.value(idx) as f64
+            })
+        }
+        ArrowType::Int16 => {
+            let a = arr.as_primitive::<dt::Int16Type>();
+            Some(if a.is_null(idx) {
+                f64::NAN
+            } else {
+                a.value(idx) as f64
+            })
+        }
+        ArrowType::Int8 => {
+            let a = arr.as_primitive::<dt::Int8Type>();
+            Some(if a.is_null(idx) {
+                f64::NAN
+            } else {
+                a.value(idx) as f64
+            })
+        }
+        ArrowType::UInt64 => {
+            let a = arr.as_primitive::<dt::UInt64Type>();
+            Some(if a.is_null(idx) {
+                f64::NAN
+            } else {
+                a.value(idx) as f64
+            })
+        }
+        ArrowType::UInt32 => {
+            let a = arr.as_primitive::<dt::UInt32Type>();
+            Some(if a.is_null(idx) {
+                f64::NAN
+            } else {
+                a.value(idx) as f64
+            })
+        }
+        ArrowType::UInt16 => {
+            let a = arr.as_primitive::<dt::UInt16Type>();
+            Some(if a.is_null(idx) {
+                f64::NAN
+            } else {
+                a.value(idx) as f64
+            })
+        }
+        ArrowType::UInt8 => {
+            let a = arr.as_primitive::<dt::UInt8Type>();
+            Some(if a.is_null(idx) {
+                f64::NAN
+            } else {
+                a.value(idx) as f64
+            })
+        }
+        ArrowType::Boolean => {
+            let a = arr.as_boolean();
+            Some(if a.is_null(idx) {
+                f64::NAN
+            } else if a.value(idx) {
+                1.0
+            } else {
+                0.0
+            })
+        }
+        ArrowType::Utf8 => {
+            let a = arr.as_string::<i32>();
+            if a.is_null(idx) {
+                Some(f64::NAN)
+            } else {
+                Some(a.value(idx).parse::<f64>().unwrap_or(f64::NAN))
+            }
+        }
+        ArrowType::LargeUtf8 => {
+            let a = arr.as_string::<i64>();
+            if a.is_null(idx) {
+                Some(f64::NAN)
+            } else {
+                Some(a.value(idx).parse::<f64>().unwrap_or(f64::NAN))
+            }
+        }
+        _ => None,
     }
 }

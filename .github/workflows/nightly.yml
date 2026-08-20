@@ -27,13 +27,9 @@ jobs:
             os: windows-latest
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: dev
-
-      - name: Checkout Greeners dependency
-        run: git clone --depth 1 --branch develop https://github.com/sheep-farm/Greeners.git ../Greeners
-        shell: bash
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -51,7 +47,7 @@ jobs:
         if: runner.os == 'Windows'
         run: Compress-Archive -Path target/release/hay.exe -DestinationPath hay-nightly-${{ matrix.target }}.zip
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: hay-${{ matrix.target }}
           path: hay-nightly-*
@@ -60,7 +56,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           merge-multiple: true
 
@@ -70,7 +66,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           tag_name: nightly
           name: Nightly Build

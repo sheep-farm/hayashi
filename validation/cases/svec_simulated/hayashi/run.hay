@@ -1,0 +1,3 @@
+load "validation/cases/svec_simulated/data/data.csv" as df
+let m = svec(df, y1, y2, lags=1, id=longrun)
+print(m)

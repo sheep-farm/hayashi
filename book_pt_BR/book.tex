@@ -7,7 +7,7 @@
 % ── Encoding & language ─────────────────────────────────────
 % LuaLaTeX: fontspec substitui T1/inputenc
 \usepackage{fontspec}
-\usepackage[brazil]{babel}
+\usepackage[brazilian]{babel}
 
 % ── Typography ───────────────────────────────────────────────
 \usepackage{microtype}
@@ -94,6 +94,7 @@
 
 % ── Math ─────────────────────────────────────────────────────
 \usepackage{amsmath,amssymb}
+\newcommand{\E}{\mathbb{E}}
 
 % ── Tables ───────────────────────────────────────────────────
 \usepackage{booktabs}
@@ -156,7 +157,7 @@
 % ── Custom commands ──────────────────────────────────────────
 \newcommand{\hay}{\texttt{hay}}
 \newcommand{\hayashi}{\textsc{Hayashi}}
-\newcommand{\version}{0.2.8-dev}
+\newcommand{\version}{0.2.10}
 
 % ============================================================
 \begin{document}
@@ -170,9 +171,7 @@
   {\large\itshape A Language for Applied Econometrics \par}
   \vspace{2cm}
   \renewcommand{\thefootnote}{\fnsymbol{footnote}}%
-  {\large Flávio de Vasconcellos Corrêa\footnote{Mestre em Economia Aplicada pelo
-    Programa de Pós-Graduação em Organizações e Mercados (PPGOM),
-    Universidade Federal de Pelotas (UFPel).} \par}%
+  {\large Flávio de Vasconcellos Corrêa\footnote{M.Sc.~Applied Economics, UFPel} \par}%
   \renewcommand{\thefootnote}{\arabic{footnote}}
   \vspace{1cm}
   {\normalsize Versão \version{} \par}
@@ -200,6 +199,7 @@
 \include{chapters/01_introducao}
 \include{chapters/02_instalacao}
 \include{chapters/03_repl}
+\include{chapters/03a_jupyter}
 \include{chapters/04_tipos_valores}
 \include{chapters/05_variaveis_escopos}
 \include{chapters/06_operadores}
@@ -213,67 +213,86 @@
 \include{chapters/14_manipulacao}
 \include{chapters/15_pipes}
 \include{chapters/16_modulos}
+\include{chapters/17_depuracao}
 
 % ── Parte II: Econometria Aplicada ───────────────────────────
 \part{Econometria Aplicada}
 
-\include{chapters/17_probabilidade}
-\include{chapters/18_ols}
-\include{chapters/19_iv}
-\include{chapters/20_painel}
-\include{chapters/21_did}
-\include{chapters/22_logit_probit}
-\include{chapters/23_qreg}
-\include{chapters/24_rdd}
-\include{chapters/25_gmm}
+\include{chapters/18_probabilidade}
+\include{chapters/19_ols}
+\include{chapters/20_iv}
+\include{chapters/21_painel}
+\include{chapters/22_did}
+\include{chapters/23_logit_probit}
+\include{chapters/24_qreg}
+\include{chapters/25_rdd}
+\include{chapters/26_gmm}
 
 % ── Parte III: Séries Temporais ──────────────────────────────
 \part{Séries Temporais}
 
-\include{chapters/26_arma}
-\include{chapters/27_arima}
-\include{chapters/28_var}
-\include{chapters/29_coint}
-\include{chapters/30_garch}
+\include{chapters/27_arma}
+\include{chapters/28_arima}
+\include{chapters/29_var}
+\include{chapters/30_coint}
+\include{chapters/31_garch}
 
 % ── Parte IV: Inferência Causal ──────────────────────────────
 \part{Inferência Causal}
 
-\include{chapters/31_psm}
-\include{chapters/32_synth}
+\include{chapters/32_psm}
+\include{chapters/33_synth}
 
 % ── Parte V: Resposta Qualitativa, Contagem e Limitada ───────
 \part{Resposta Qualitativa e Dependência Limitada}
 
-\include{chapters/33_contagem}
-\include{chapters/34_limitada}
-\include{chapters/35_multinomial}
-\include{chapters/36_sobrevivencia}
+\include{chapters/34_contagem}
+\include{chapters/35_limitada}
+\include{chapters/36_multinomial}
+\include{chapters/37_sobrevivencia}
 
 % ── Parte VI: Métodos Avançados ──────────────────────────────
 \part{Métodos Avançados}
 
-\include{chapters/37_painel_avancado}
-\include{chapters/38_sur}
-\include{chapters/39_regularizacao}
-\include{chapters/40_bootstrap}
-\include{chapters/41_multivariada}
-\include{chapters/42_glm}
-\include{chapters/43_regime}
-\include{chapters/44_filtros}
-\include{chapters/45_svar}
+\include{chapters/38_painel_avancado}
+\include{chapters/39_sur}
+\include{chapters/40_regularizacao}
+\include{chapters/41_bootstrap}
+\include{chapters/42_multivariada}
+\include{chapters/43_glm}
+\include{chapters/44_regime}
+\include{chapters/45_filtros}
+\include{chapters/46_svar}
 
 % ── Parte VII: Métodos Complementares ────────────────────────
 \part{Métodos Complementares}
 
-\include{chapters/46_inferencia}
-\include{chapters/47_painel2}
-\include{chapters/48_raiz_unitaria2}
-\include{chapters/49_filtros2}
-\include{chapters/50_svar2}
-\include{chapters/51_local}
-\include{chapters/52_ardl}
-\include{chapters/53_kalman}
+\include{chapters/47_inferencia}
+\include{chapters/48_painel2}
+\include{chapters/49_raiz_unitaria2}
+\include{chapters/50_filtros2}
+\include{chapters/51_svar2}
+\include{chapters/52_local}
+\include{chapters/53_ardl}
+\include{chapters/54_kalman}
+
+% ── Parte VIII: Aprendizado de Máquina e Espacial ────────────
+\part{Aprendizado de Máquina e Econometria Espacial}
+
+\include{chapters/55_ml_supervisionado}
+\include{chapters/56_ml_causal}
+\include{chapters/57_espacial}
+\include{chapters/58_bayesiano}
+\include{chapters/59_agrupamento}
+\include{chapters/60_volatilidade}
+\include{chapters/61_diagnosticos}
+\include{chapters/62_series_avancadas}
+\include{chapters/63_financas}
+\include{chapters/64_estrutural}
+\include{chapters/65_recentes}
+\include{chapters/66_robusto}
+\include{chapters/67_espaco_estado}
+\include{chapters/68_diversos}
 
 % ── Backmatter ───────────────────────────────────────────────
 \backmatter

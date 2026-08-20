@@ -1,7 +1,7 @@
 id: oprobit_beauty
 title: Ordered probit of beauty rating on Wooldridge beauty
 estimator_family: oprobit
-status: active
+status: pass
 dimension: numerical
 
 dataset:

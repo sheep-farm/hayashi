@@ -1,0 +1,8 @@
+// Wooldridge (Introductory Econometrics, 7e), Chapter 13, Example 13.1.
+// difference-in-differences housing price equation: lprice ~ y81 + nearinc + y81nrinc.
+
+load "validation/cases/ols_wooldridge_kielmc_ch13/data/kielmc.csv" as df
+
+let m = ols(lprice ~ y81 + nearinc + y81nrinc, df)
+
+export(m, "csv", "/dev/stdout")

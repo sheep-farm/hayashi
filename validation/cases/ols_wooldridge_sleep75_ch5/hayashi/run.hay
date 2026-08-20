@@ -1,0 +1,8 @@
+// Wooldridge (Introductory Econometrics, 7e), Chapter 5, Problem 3.3.
+// sleep-work tradeoff equation: sleep ~ totwrk + educ + age.
+
+load "validation/cases/ols_wooldridge_sleep75_ch5/data/sleep75.csv" as df
+
+let m = ols(sleep ~ totwrk + educ + age, df)
+
+export(m, "csv", "/dev/stdout")

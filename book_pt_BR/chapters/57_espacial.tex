@@ -1,0 +1,115 @@
+\chapter{Econometria Espacial}
+
+\section{Por que espacial?}
+
+Quando as observações estão localizadas no espaço ou conectadas por uma
+rede, os distúrbios ou resultados podem transbordar de uma unidade para
+seus vizinhos. Ignorar essa dependência produz erros padrão enviesados,
+viés de coeficientes e inferência enganosa.
+
+\section{A matriz de pesos espaciais}
+
+Todo modelo espacial no \hayashi{} exige uma matriz de pesos $W$
+padronizada por linha. Se os dados estão ordenados por unidade,
+$W_{ij}$ é o peso que a unidade $j$ recebe ao prever o resultado da
+unidade $i$.
+
+\begin{lstlisting}[caption={Matriz de pesos espaciais}]
+// 3 regiões com vizinhos mútuos
+let W = [[0, 0.5, 0.5],
+         [0.5, 0, 0.5],
+         [0.5, 0.5, 0]]
+\end{lstlisting}
+
+Para grades maiores, gere $W$ a partir do DataFrame ou carregue-a de um
+arquivo.
+
+\section{SAR espacial}
+
+O modelo Autorregressivo Espacial é
+
+\[
+y = \rho W y + X\beta + \varepsilon
+\]
+
+onde $\rho$ é o parâmetro autorregressivo espacial. A estimação usa
+verossimilhança concentrada: para cada valor em uma grade de $\rho$,
+transforma a variável dependente e roda OLS; depois seleciona o $\rho$
+que maximiza a log-verossimilhança concentrada.
+
+\begin{lstlisting}[caption={SAR espacial}]
+let n = 100
+let W = makeweights(df, "region", type="rook")  // ou lista de listas
+generate df x1 = rnormal(n)
+generate df y = 0.5*x1 + rnormal(n)
+generate df wy = spatial_lag(W, y)
+generate df y = y + 0.3*wy
+
+let m_sar = spatial_sar(y ~ x1, df, w=W)
+print(m_sar)
+\end{lstlisting}
+
+A saída reporta $\rho$, $\beta$, seus erros padrão e um teste de
+verossimilhança para $\rho = 0$.
+
+\section{SEM espacial}
+
+O Modelo de Erro Espacial é
+
+\[
+y = X\beta + u, \qquad u = \lambda W u + \varepsilon
+\]
+
+Os erros são espacialmente correlacionados, mas o resultado em si não é
+diretamente influenciado pelos resultados dos vizinhos.
+
+\begin{lstlisting}[caption={SEM espacial}]
+let m_sem = spatial_sem(y ~ x1, df, w=W)
+print(m_sem)
+\end{lstlisting}
+
+\section{Durbin espacial e extensões em painel}
+
+O Modelo de Durbin Espacial adiciona regressores defasados
+espacialmente:
+
+\[
+y = \rho W y + X\beta + W X \theta + \varepsilon
+\]
+
+Ele encaixa SAR ($\theta = 0$) e o modelo de defasagem espacial
+($\rho = 0$).
+
+\begin{lstlisting}[caption={Durbin espacial}]
+let m_sdm = spatial_durbin(y ~ x1, df, w=W)
+print(m_sdm)
+\end{lstlisting}
+
+Para dados em painel com efeitos fixos, use as variantes de painel:
+
+\begin{lstlisting}[caption={SAR em painel}]
+let m_panelsar = spatial_panel_sar(y ~ x1, df, w=W, id="region")
+print(m_panelsar)
+\end{lstlisting}
+
+\section{Interpretando efeitos diretos e indiretos}
+
+No modelo de Durbin Espacial o coeficiente de $x$ não é o efeito total.
+O efeito total na unidade $i$ inclui o impacto direto $\beta$ mais o
+impacto indireto que viaja pela rede através de $\theta$ e $\rho$.
+
+\hayashi{} reporta efeitos diretos, indiretos e totais no resumo de
+\texttt{m\_sdm} quando disponíveis.
+
+\section{Notas práticas}
+
+\begin{itemize}
+\item Sempre verifique se $W$ está padronizada por linha; $W$ não
+      padronizada distorce a interpretação de $\rho$ e $\lambda$.
+\item Amostras maiores são necessárias para MLE espacial do que para OLS.
+\item Modelos espaciais de corte transversal assumem uma rede estável.
+      Modelos espaciais em painel adicionam efeitos fixos, mas ainda
+      exigem $W$ constante no tempo.
+\item O modelo \texttt{spatial\_durbin\_error} combina regressores defasados
+      espacialmente com um termo de erro espacial.
+\end{itemize}

@@ -1,0 +1,8 @@
+// Wooldridge (Introductory Econometrics, 7e), Chapter 2, Example 2.11.
+// log-log CEO salary equation: lsalary ~ lsales.
+
+load "validation/cases/ols_wooldridge_ceosal1_ch2/data/ceosal1.csv" as df
+
+let m = ols(lsalary ~ lsales, df)
+
+export(m, "csv", "/dev/stdout")

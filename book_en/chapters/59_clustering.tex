@@ -1,0 +1,104 @@
+\chapter{Clustering and Dimension Reduction}
+
+\section{Unsupervised methods}
+
+Unsupervised learning finds structure in data without a target variable.
+\hayashi{} provides clustering algorithms, non-linear embeddings, and
+PCA-based tools.
+
+\section{K-Means}
+
+K-Means partitions observations into $K$ spherical clusters. It is fast
+and scales well, but it assumes clusters of similar size and shape.
+
+\begin{lstlisting}[caption={K-Means}]
+set_seed(42)
+let n = 300
+let c1 = [0, 0]
+let c2 = [5, 0]
+let c3 = [2.5, 4]
+generate df x1 = rnormal(n, 0, 0.7)
+generate df x2 = rnormal(n, 0, 0.7)
+
+let m_km = kmeans(df, x="x1,x2", k=3)
+print(m_km)
+\end{lstlisting}
+
+Use \texttt{m\_km.labels} to read the assigned cluster and \texttt{m\_km.centroids} to
+inspect the cluster means.
+
+\section{Hierarchical clustering and DBSCAN}
+
+Hierarchical clustering builds a tree of nested clusters. \texttt{hclust}
+can be cut at any number of groups.
+
+\begin{lstlisting}[caption={Hierarchical clustering}]
+let m_hc = hclust(df, x="x1,x2", k=3, linkage="ward")
+print(m_hc)
+\end{lstlisting}
+
+DBSCAN finds dense regions and labels sparse observations as noise.
+
+\begin{lstlisting}[caption={DBSCAN}]
+let m_db = dbscan(df, x="x1,x2", eps=0.8, min=5)
+print(m_db)
+\end{lstlisting}
+
+\section{Gaussian Mixture Models}
+
+GMM clustering models each cluster as a multivariate Gaussian. It is a
+soft variant of K-Means that allows elliptical clusters.
+
+\begin{lstlisting}[caption={GMM clustering}]
+let m_gmm = gmm_clust(df, x="x1,x2", k=3)
+print(m_gmm)
+\end{lstlisting}
+
+\section{Non-linear embeddings}
+
+t-SNE and UMAP reduce high-dimensional data to two or three dimensions
+while preserving local structure. They are useful for visualisation.
+
+\begin{lstlisting}[caption={t-SNE}]
+let m_tsne = tsne(df, x="x1,x2,x3", k=2, perplexity=30)
+print(m_tsne)
+\end{lstlisting}
+
+\begin{lstlisting}[caption={UMAP}]
+let m_umap = umap(df, x="x1,x2,x3", k=2, neighbors=15)
+print(m_umap)
+\end{lstlisting}
+
+\section{Spectral clustering}
+
+Spectral clustering uses the eigenstructure of a similarity graph. It
+can capture non-convex cluster shapes where K-Means fails.
+
+\begin{lstlisting}[caption={Spectral clustering}]
+let m_sc = spectral(df, x="x1,x2", k=3)
+print(m_sc)
+\end{lstlisting}
+
+\section{PCA, factor, and biplot}
+
+PCA and factor analysis reduce dimensionality linearly. \texttt{biplot}
+visualises observations and variables in the same PCA space.
+
+\begin{lstlisting}[caption={PCA}]
+let m_pca = pca(df, x="x1,x2,x3", n=2)
+print(m_pca)
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Biplot}]
+let m_biplot = biplot(df, x="x1,x2,x3", type="symmetric")
+print(m_biplot)
+\end{lstlisting}
+
+\section{Kernel density estimation}
+
+\texttt{kde} estimates the density of a single variable with a chosen kernel.
+
+\begin{lstlisting}[caption={KDE}]
+let m_kde = kde(df, x1, bw=0.5, kernel="gaussian")
+print(m_kde)
+\end{lstlisting}

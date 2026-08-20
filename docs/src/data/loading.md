@@ -28,9 +28,137 @@ load "wages.xlsx" as df, sheet="Panel2010"
 load "survey.db" as df, table="respondents"
 load "survey.db" as df, query="SELECT * FROM resp WHERE year >= 2000"
 load "raw.txt" as df, sep="|"
+load "panel.parquet" as df, columns=[ticker, date, close], where="ticker == \"AAPL\""
 ```
 
 `query=` is raw SQL executed by SQLite or the configured ODBC database. Use `table=` for simple table loads, and see the [Trust Model](../trust-model.md#raw-sql) before running SQL against shared databases.
+
+`query=` cannot be combined with `columns=` or `where=` — if you need custom SQL, write the projection and filter inside the query string yourself.
+
+## Type inference control (`types=`, `na=`)
+
+For CSV/TSV loads, Hayashi now delegates type inference to Greeners, which provides explicit control over column types and null value handling.
+
+### `types=` — explicit column types
+
+```
+load "data.csv" as df, types=[ticker:string, price:float, date:date]
+```
+
+Format: `types=[colname:type, ...]`. Each entry is `column:type` where `type` is one of:
+
+| Type | Meaning |
+|------|---------|
+| `int` | 64-bit signed integer |
+| `float` | 64-bit floating point (NaN for missing) |
+| `bool` | Boolean (true/false) |
+| `string` | Free text (high cardinality) |
+| `categorical` | Low-cardinality string with integer encoding |
+| `date` / `datetime` | ISO-8601 date/time |
+
+Columns not listed in `types=` are inferred automatically using Greeners' default rules.
+
+**Example — preventing ticker mis-inference:**
+
+```hay
+load "tickers.csv" as df, types=[ticker:string, symbol:string, price:float]
+```
+
+Without `types=`, tickers like `T`, `F`, `NAN` would be inferred as `bool`/`float`. With `types=`, they remain strings.
+
+### `na=` — custom null values
+
+```
+load "data.csv" as df, na=["NA", "NaN", "NULL", "null", "", "."]
+```
+
+Values matching any string in the list are treated as missing (null). Defaults: `["", "NA", ".", "NaN", "NULL", "null"]`.
+
+**Example — treating empty strings as missing:**
+
+```hay
+load "survey.csv" as df, na=["", "NA", "N/A", "null"]
+```
+
+---
+
+## Column projection and row filtering (`columns=`, `where=`)
+
+For large datasets, loading every column and row into RAM can be wasteful or
+impossible. The `columns=` and `where=` options push projection and filtering
+down to the data source, so only the requested columns and matching rows are
+materialized.
+
+```
+load "cotacoes.parquet" as aapl, columns=[ticker, date, adj_close], where="ticker == \"AAPL\""
+load "panel.db" as df, table=prices, columns=[date, close], where="close > 100"
+load "survey.csv" as df, where="age >= 18 && region == \"South\""
+load "panel.dta" as df, columns=[id, year, y], where="year >= 2000"
+load "sheet.xlsx" as df, columns=[name, score], where="score > 75"
+```
+
+### Supported sources
+
+| Source    | `columns=`            | `where=`              | Pushdown mechanism |
+|-----------|-----------------------|-----------------------|--------------------|
+| Parquet   | yes                   | yes                   | Arrow `ProjectionMask` + `RowFilter` (filter evaluated during row-group scan) + **row group pruning** by min/max statistics |
+| SQLite    | yes                   | yes                   | `SELECT cols FROM t WHERE pred` (validated against `PRAGMA table_info`) |
+| ODBC      | yes                   | yes                   | same as SQLite |
+| CSV / TSV | yes                   | yes                   | projection in read loop, row-by-row predicate evaluation |
+| DTA       | yes                   | yes                   | projection in `read_record`, row-by-row predicate |
+| Excel     | yes                   | yes                   | projection after `worksheet_range`, row filter on cells |
+| JSON      | not yet               | not yet               | — |
+
+Passing `columns=` or `where=` to a JSON load returns an error.
+
+### `columns=` syntax
+
+Accepts a list of column names (identifiers or string literals):
+
+```
+columns=[ticker, date, adj_close]
+columns=["ticker", "date", "adj_close"]
+columns=ticker              // single column also accepted
+```
+
+Column names are matched against the source schema before any data is read;
+unknown columns produce a clear error listing the available ones.
+
+### `where=` syntax
+
+`where=` accepts a Hayashi expression of the form `column OP literal`,
+combined with `&&`, `||`, `!`, and `in [...]`. The expression is parsed by
+the Hayashi parser and normalized into a `RowPredicate` that each loader
+evaluates (or pushes down to the source).
+
+```
+where="ticker == \"AAPL\""                              // string equality
+where="price > 100"                                     // numeric comparison
+where="price > 100 && volume > 1e6"                     // AND
+where="ticker in [\"AAPL\", \"MSFT\"]"                  // membership
+where="!(sector == \"Finance\")"                        // negation
+where="ano >= 2022 && produto == \"Soja\""              // combined
+```
+
+Supported operators: `==`, `!=`, `>`, `>=`, `<`, `<=`, `in`, `&&` (and),
+`||` (or), `!` (not). Comparisons must be `column OP literal` — comparing
+two columns is not supported (use `generate` + `filter` for that).
+
+### Row group pruning (Parquet)
+
+In addition to `RowFilter` (which evaluates the predicate on each row during
+scan), the Parquet loader reads per-row-group min/max statistics from the file
+metadata and skips row groups where the predicate cannot possibly match. This
+is effective when the data is sorted or clustered by the filtered column.
+
+On a 799 MB / 30 M-row / 8 292-row-group Parquet file sorted by ticker,
+`where="ticker == \"AAPL\""` pruned 8 291 of 8 292 row groups, reducing load
+time from ~62 s (full scan) to ~312 ms with ~60 MB peak RSS.
+
+For point lookups on a single value (e.g. one ticker), SQLite with a B-tree
+index on `(ticker, date)` is still faster (~42 ms, ~26 MB RSS) because it seeks
+directly without reading all row-group metadata. For full-column analytics across
+all tickers, Parquet with pruning is superior due to columnar compression.
 
 ## Remote files
 
@@ -86,4 +214,10 @@ ODBC DSNs can point at production databases and require external system drivers.
 - DTA files support Stata 12--118 format (`.dta` versions 113--118).
 - Excel reads `.xlsx` only (not legacy `.xls`).
 - Parquet preserves column types exactly; prefer it for large datasets.
+- **Temporal types in Parquet** (`Timestamp(s|ms|µs|ns)`, `Date32`, `Date64`) are
+  converted to Hayashi strings formatted as ISO 8601 (`YYYY-MM-DD` when the time
+  component is midnight, otherwise `YYYY-MM-DDTHH:MM:SS`). To extract components
+  vectorially use `generate df ano = substr(date, 0, 4)`; to convert a single ISO
+  date string to a Unix timestamp use the scalar builtin `date("YYYY-MM-DD")` or
+  `datetime("YYYY-MM-DDTHH:MM:SS")`.
 - JSON expects an array of objects (one object per row).

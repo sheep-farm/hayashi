@@ -1,0 +1,11 @@
+load "validation/cases/testparm_simulated/data/data.csv" as df
+let m = ols(y ~ x1 + x2, df)
+let r = testparm(m, ["x1", "x2"])
+let se = 0.0
+let out = dataframe({
+  "variable": ["f_stat", "p_value"],
+  "coef": [r.f_stat, r.p_value],
+  "std_err": [se, se]
+})
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

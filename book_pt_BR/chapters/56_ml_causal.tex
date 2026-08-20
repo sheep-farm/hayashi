@@ -1,0 +1,126 @@
+\chapter{Aprendizado de Máquina Causal}
+
+\section{Da previsão aos efeitos de tratamento}
+
+Estimadores de aprendizado de máquina também podem ser usados para
+inferência causal quando o objetivo é estimar um efeito de tratamento
+$Y(1) - Y(0)$. Os comandos deste capítulo visam duas quantidades:
+
+\begin{itemize}
+\item o \textbf{Efeito Médio do Tratamento} (ATE)
+\item o \textbf{Efeito Médio do Tratamento Condicional} (CATE),
+      $\tau(x) = \E[Y(1) - Y(0) \mid X = x]$
+\end{itemize}
+
+Todos exigem um indicador de tratamento \texttt{d} e um conjunto de covariáveis
+\texttt{x}. Eles não substituem um desenho de pesquisa claro, mas podem ajudar
+a descobrir efeitos heterogêneos e melhorar a precisão.
+
+\section{Causal Forest}
+
+Causal Forest (Athey e Wager, 2018) adapta Random Forest para estimar
+efeitos de tratamento heterogêneos. Divide as covariáveis para
+maximizar a variância dos efeitos estimados entre folhas.
+
+\begin{lstlisting}[caption={Causal Forest}]
+set_seed(42)
+let n = 1000
+generate df x1 = rnormal(n)
+generate df x2 = rnormal(n)
+generate df d = (0.5 + 0.3*x1 > runiform(n))
+generate df y = 1 + 2*x1 - x2 + d*(0.5 + 0.4*x1) + rnormal(n)
+
+let m_cf = causalforest(y ~ d, df, x="x1,x2", trees=200, depth=5)
+print(m_cf)
+\end{lstlisting}
+
+A saída inclui:
+
+\begin{itemize}
+\item o ATE estimado
+\item uma distribuição do CATE (média, quartis)
+\item importância das variáveis
+\end{itemize}
+
+\section{DR-Learner e TMLE}
+
+O \textbf{DR-Learner} (Kennedy, 2023) e o \textbf{TMLE} (van der Laan e
+Rubin, 2006) são abordagens duplamente robustas. Cada um constrói um
+pseudo-resultado a partir de funções nuisance estimadas e depois
+regredide o pseudo-resultado sobre as covariáveis para recuperar o CATE
+ou ATE.
+
+\begin{lstlisting}[caption={DR-Learner}]
+let m_dr = dr_learner(y ~ d, df, x="x1,x2", folds=5)
+print(m_dr)
+\end{lstlisting}
+
+\begin{lstlisting}[caption={TMLE}]
+let m_tmle = tmle(y ~ d, df, w="x1,x2")
+print(m_tmle)
+\end{lstlisting}
+
+Métodos duplamente robustos são atraentes porque o ATE permanece
+consistente se o escore de propensão ou o modelo de resultado estiver
+bem especificado.
+
+\section{Orthogonal Random Forest}
+
+ORF (Oprescu, Syrgkanis e Wu, 2019) residualisa o tratamento e o
+resultado em relação às confundidoras antes de rodar uma floresta nos
+sinais residualisados.
+
+\begin{lstlisting}[caption={Orthogonal Random Forest}]
+let m_orf = orf(y ~ d, df, x="x1,x2", w="x1,x2", trees=100, depth=5)
+print(m_orf)
+\end{lstlisting}
+
+É útil quando o tratamento não é randomizado e a heterogeneidade
+relevante vem de um subconjunto de covariáveis.
+
+\section{Controle Sintético Bayesiano}
+
+\texttt{bsc} implementa uma versão bayesiana do estimador de controle
+sintético. É apropriado quando uma única unidade tratada é comparada a
+várias unidades doadoras e o objetivo é um contrafactual com
+intervalos credíveis.
+
+\begin{lstlisting}[caption={Controle Sintético Bayesiano}]
+// df tem colunas y, c1, c2, ..., t
+let m_bsc = bsc(df, y, "c1,c2", 25, prior=1.0)
+print(m_bsc)
+\end{lstlisting}
+
+A saída reporta o efeito do tratamento $\tau$, seu desvio padrão, um
+intervalo credível de 95\% e os pesos do controle sintético.
+
+\section{Double Machine Learning}
+
+\texttt{dml\_crossfit} estima o ATE no modelo parcialmente linear
+
+\[
+Y = \theta D + g(X) + \varepsilon
+\]
+
+usando validação cruzada K-fold para a função nuisance $g(X)$.
+
+\begin{lstlisting}[caption={Double Machine Learning}]
+let m_dml = dml_crossfit(y ~ d, df, x="x1,x2", folds=5)
+print(m_dml)
+\end{lstlisting}
+
+Como a nuisance é estimada em um fold separado, o ATE resultante tem
+distribuição de taxa $\sqrt{n}$ padrão e erros padrão honestos.
+
+\section{Escolhendo um método}
+
+\begin{itemize}
+\item \textbf{Efeitos heterogêneos:} Causal Forest ou ORF
+\item \textbf{ATE duplamente robusto:} DR-Learner, TMLE, DML
+\item \textbf{Unidade única tratada:} BSC
+\end{itemize}
+
+Todos esses comandos são \textit{experimentais}. A validação contra
+implementações de referência é parcial ou não suportada para alguns.
+Use-os para exploração e como complementos a um desenho claro, não como
+substitutos.

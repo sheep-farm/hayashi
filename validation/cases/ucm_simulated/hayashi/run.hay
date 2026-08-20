@@ -1,0 +1,14 @@
+load "validation/cases/ucm_simulated/data/data.csv" as df
+
+let m = ucm(df, y, level="local_linear", seasonal="stochastic", period=12)
+
+let c = m.coefficients
+
+let out = dataframe({
+  "variable": ["sigma2_irregular", "level_first", "level_last"],
+  "coef": [c.coef[0], m.level[0], m.level[len(m.level)-1]],
+  "std_err": [0.0, 0.0, 0.0]
+})
+
+let out2 = select(out, "variable", "coef", "std_err")
+export(out2, "csv", "/dev/stdout")

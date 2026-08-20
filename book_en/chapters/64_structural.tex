@@ -1,0 +1,80 @@
+\chapter{Structural and Multivariate Equations}
+
+\section{SUR}
+
+Seemingly Unrelated Regressions (Zellner, 1962) estimate several linear
+equations simultaneously, exploiting the correlation between their
+disturbances. It is a GLS estimator applied to a stacked system.
+
+\begin{lstlisting}[caption={SUR}]
+let m_sur = sur(df, y1 ~ x1, y2 ~ x2)
+print(m_sur)
+\end{lstlisting}
+
+If the equations share the same regressors, SUR gives the same estimates
+as equation-by-equation OLS, but the covariance structure is still
+useful for inference.
+
+\section{Three-stage least squares}
+
+\texttt{three\_sls} extends SUR to models with endogenous regressors. It is 2SLS
+followed by a GLS step on the transformed residuals.
+
+\begin{lstlisting}[caption={3SLS}]
+let m_3sls = three_sls(df, y1 ~ x1, y2 ~ x2,
+                       instruments=["z1", "z2", "z3"])
+print(m_3sls)
+\end{lstlisting}
+
+\section{MANOVA}
+
+MANOVA tests whether group means differ on several dependent variables
+simultaneously.
+
+\begin{lstlisting}[caption={MANOVA}]
+let m_manova = manova(df, [y1, y2], by=group)
+print(m_manova)
+\end{lstlisting}
+
+The output includes Wilks' Lambda, Pillai's Trace, and the corresponding
+F-statistics.
+
+\section{Canonical correlation}
+
+\texttt{cancorr} finds linear combinations of $X$ and $Y$ that maximise
+correlation.
+
+\begin{lstlisting}[caption={Canonical correlation}]
+let m_can = cancorr(df, xvars=["x1", "x2"], yvars=["y1", "y2"])
+print(m_can)
+\end{lstlisting}
+
+\section{Factor-augmented models}
+
+\texttt{favar} augments a small VAR with principal-components factors extracted
+from a large panel. It is useful when the number of candidate predictors
+exceeds the number of observations.
+
+\begin{lstlisting}[caption={Factor-augmented VAR}]
+let m_favar = favar(y1 ~ y2 + y3, df, observed="rate", factors=2)
+print(m_favar)
+\end{lstlisting}
+
+\texttt{fapanel} adds estimated factors to a panel regression.
+
+\begin{lstlisting}[caption={Factor-augmented panel}]
+let m_fapanel = fapanel(y ~ x1 + x2, df, aux="aux_df",
+                        id="firm", factors=2)
+print(m_fapanel)
+\end{lstlisting}
+
+\section{Fully Modified OLS}
+
+\texttt{fmols} estimates a cointegrating regression with non-parametric
+corrections for endogeneity and serial correlation in the long-run
+covariance.
+
+\begin{lstlisting}[caption={FM-OLS}]
+let m_fm = fmols(y ~ x1 + x2, df)
+print(m_fm)
+\end{lstlisting}

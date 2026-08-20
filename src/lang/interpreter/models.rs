@@ -17,6 +17,7 @@ impl std::fmt::Display for OlsModel {
 }
 
 #[derive(Clone)]
+#[cfg(feature = "greeners-ols")]
 pub struct PenalizedModel {
     pub params: Array1<f64>,
     pub std_errors: Array1<f64>,
@@ -28,6 +29,7 @@ pub struct PenalizedModel {
     pub kind: String,
 }
 
+#[cfg(feature = "greeners-ols")]
 impl std::fmt::Display for PenalizedModel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let title = match self.kind.as_str() {
@@ -63,6 +65,7 @@ impl std::fmt::Display for PenalizedModel {
 }
 
 #[derive(Clone)]
+#[cfg(feature = "greeners-glm")]
 pub struct BinaryModel {
     pub result: Rc<greeners::discrete::BinaryModelResult>,
     pub y: Array1<f64>,
@@ -71,6 +74,7 @@ pub struct BinaryModel {
     pub coef_names: Vec<String>, // coefficient names for margins
 }
 
+#[cfg(feature = "greeners-glm")]
 impl std::fmt::Display for BinaryModel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.result)
@@ -80,11 +84,13 @@ impl std::fmt::Display for BinaryModel {
 // ── SUR wrapper (preserves variable names per equation) ─────────────────────
 
 #[derive(Clone)]
+#[cfg(feature = "greeners-ols")]
 pub struct SurModel {
     pub result: Rc<greeners::sur::SurResult>,
     pub eq_var_names: Vec<Vec<String>>, // names per equation
 }
 
+#[cfg(feature = "greeners-ols")]
 impl std::fmt::Display for SurModel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let r = &self.result;
@@ -127,7 +133,7 @@ impl std::fmt::Display for SurModel {
 // ── PCA wrapper (adds variable names to PCAResult) ───────────────────────────
 #[derive(Clone)]
 pub struct PcaModel {
-    pub result: Rc<greeners::PCAResult>,
+    pub result: Rc<greeners::multivariate::PCAResult>,
     pub var_names: Vec<String>,
 }
 
@@ -179,7 +185,7 @@ impl std::fmt::Display for PcaModel {
 // ── Factor Analysis wrapper ───────────────────────────────────────────────────
 #[derive(Clone)]
 pub struct FactorModel {
-    pub result: Rc<greeners::FactorResult>,
+    pub result: Rc<greeners::multivariate::FactorResult>,
     pub var_names: Vec<String>,
 }
 
@@ -215,12 +221,14 @@ impl std::fmt::Display for FactorModel {
 
 // ── DFM wrapper ───────────────────────────────────────────────────────────────
 #[derive(Clone)]
+#[cfg(feature = "greeners-timeseries")]
 pub struct DFMModel {
-    pub result: Rc<greeners::DynamicFactorResult>,
+    pub result: Rc<greeners::dynamic_factor::DynamicFactorResult>,
     #[allow(dead_code)]
     pub var_names: Vec<String>,
 }
 
+#[cfg(feature = "greeners-timeseries")]
 impl std::fmt::Display for DFMModel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.result)
@@ -229,27 +237,16 @@ impl std::fmt::Display for DFMModel {
 
 // ── 3SLS wrapper ──────────────────────────────────────────────────────────────
 #[derive(Clone)]
+#[cfg(feature = "greeners-ols")]
 pub struct ThreeSLSModel {
     pub result: Rc<greeners::three_sls::ThreeSLSResult>,
     #[allow(dead_code)]
     pub eq_var_names: Vec<Vec<String>>,
 }
 
+#[cfg(feature = "greeners-ols")]
 impl std::fmt::Display for ThreeSLSModel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.result)
-    }
-}
-
-// ── Diagnostic test result (print-on-demand) ───────────────────────────────
-
-#[derive(Debug, Clone)]
-pub struct DiagResult {
-    pub rendered: String, // pre-rendered output by the test
-}
-
-impl std::fmt::Display for DiagResult {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.rendered)
     }
 }

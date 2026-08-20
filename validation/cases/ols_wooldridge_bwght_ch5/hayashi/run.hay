@@ -1,0 +1,8 @@
+// Wooldridge (Introductory Econometrics, 7e), Chapter 5, Example 5.2.
+// birth weight and maternal smoking equation: lbwght ~ cigs + lfaminc.
+
+load "validation/cases/ols_wooldridge_bwght_ch5/data/bwght.csv" as df
+
+let m = ols(lbwght ~ cigs + lfaminc, df)
+
+export(m, "csv", "/dev/stdout")

@@ -1,0 +1,5 @@
+load "validation/cases/sfa_production_simulated/data/data.csv" as df
+
+let m = sfa_production(ly ~ lx1 + lx2, df)
+let out = select(m.coefficients, "variable", "coef", "std_err")
+export(out, "csv", "/dev/stdout")

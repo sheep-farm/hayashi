@@ -1,0 +1,8 @@
+// Wooldridge (Introductory Econometrics, 7e), Chapter 6, Example 6.3.
+// attendance effects on standardized final exam score: stndfnl ~ atndrte + priGPA + ACT.
+
+load "validation/cases/ols_wooldridge_attend_ch6/data/attend.csv" as df
+
+let m = ols(stndfnl ~ atndrte + priGPA + ACT, df)
+
+export(m, "csv", "/dev/stdout")

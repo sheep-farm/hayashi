@@ -1,0 +1,89 @@
+\chapter{Robust, Flexible and Imputation Methods}
+
+\section{Robust M-estimation}
+
+\texttt{rlm} fits a linear model with M-estimators that down-weight outliers.
+The default is a Huber loss with a tuning constant, which gives OLS-like
+behaviour near the centre and L1-like behaviour in the tails.
+
+\begin{lstlisting}[caption={Robust regression}]
+let m_rlm = rlm(y ~ x1 + x2, df)
+print(m_rlm)
+\end{lstlisting}
+
+Use \texttt{rlm} when the data contain influential outliers but the majority of
+the distribution is approximately normal.
+
+\section{Generalised Linear Models}
+
+\texttt{glm} fits a linear predictor through a link function. It generalises
+OLS to exponential families such as Poisson, Binomial, and Gamma.
+
+\begin{lstlisting}[caption={GLM}]
+let m_glm = glm(y ~ x1 + x2, df, family=poisson, link=log)
+print(m_glm)
+\end{lstlisting}
+
+Available families include \texttt{gaussian}, \texttt{poisson}, \texttt{binomial}, \texttt{gamma},
+\texttt{inverse\_gaussian}, and \texttt{negative\_binomial}. Links include \texttt{identity},
+\texttt{log}, \texttt{logit}, \texttt{probit}, \texttt{cloglog}, and \texttt{inverse}.
+
+\section{GEE}
+
+Generalised Estimating Equations fit a marginal model while accounting
+for within-group correlation. It is the population-averaged analogue of
+mixed models.
+
+\begin{lstlisting}[caption={GEE}]
+let m_gee = gee(y ~ x1 + x2, df, id="group", family=poisson)
+print(m_gee)
+\end{lstlisting}
+
+Correlation structures include \texttt{independence}, \texttt{exchangeable}, \texttt{ar1}, and
+\texttt{unstructured}.
+
+\section{Beta regression}
+
+\texttt{betareg} is appropriate when the dependent variable is bounded in
+$(0,1)$.
+
+\begin{lstlisting}[caption={Beta regression}]
+let m_beta = betareg(share ~ x1 + x2, df)
+print(m_beta)
+\end{lstlisting}
+
+It models the mean through a logit link and the dispersion through a
+separate precision parameter.
+
+\section{GAM and lowess}
+
+\texttt{gam} fits a generalised additive model with smoothing splines for
+nonlinear effects.
+
+\begin{lstlisting}[caption={GAM}]
+let m_gam = gam(y ~ x1 + s(x2) + x3, df)
+print(m_gam)
+\end{lstlisting}
+
+\texttt{lowess} is a local polynomial smoother for visual exploration and
+partial regression.
+
+\begin{lstlisting}[caption={Lowess}]
+let m_low = lowess(df, y, x2, frac=0.3)
+print(m_low)
+\end{lstlisting}
+
+\section{Multiple imputation}
+
+\texttt{mice} performs multiple imputation by chained equations. It fills in
+missing values using a sequence of conditional models and returns a set
+of completed datasets.
+
+\begin{lstlisting}[caption={MICE}]
+let m_mice = mice(df, vars=["y", "x1", "x2"], m=5)
+print(m_mice)
+\end{lstlisting}
+
+Rubin's rules combine the results from each imputed dataset into a
+single estimate with a proper variance that reflects imputation
+uncertainty.

@@ -1,0 +1,5 @@
+load "validation/cases/did_simulated/data/data.csv" as df
+let m = did(y ~ treat + post, df)
+let t = tidy(m)
+let out = select(t, "variable", "coef", "std_err")
+export(out, "csv", "/dev/stdout")

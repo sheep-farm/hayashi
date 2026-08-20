@@ -1,0 +1,8 @@
+// Wooldridge (Introductory Econometrics, 7e), Chapter 10, Example 10.1.
+// static Phillips curve: inf ~ unem.
+
+load "validation/cases/ols_wooldridge_phillips_ch10/data/phillips.csv" as df
+
+let m = ols(inf ~ unem, df)
+
+export(m, "csv", "/dev/stdout")

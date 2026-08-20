@@ -3,6 +3,10 @@ cases:
   notes: Arellano-Bond difference GMM for dynamic panel investment demand.
   dimension: numerical
   status: pass
+- id: anova_wooldridge_wage1
+  notes: One-way ANOVA of wage across education groups.
+  dimension: numerical
+  status: pass
 - id: ar_book
   notes: Uses the same simulated AR(1) DGP as Chapter 26 of the book.
   dimension: numerical
@@ -12,34 +16,229 @@ cases:
   dimension: numerical
   status: pass
 - id: arima_book
-  notes: ARIMA(1,1,0) on a simulated random walk with seed 42. Intercept is excluded
-    from comparison because R/Python references are estimated without trend.
+  notes: ARIMA(1,1,0) on a simulated random walk with seed 42. The intercept reported
+    by Hayashi is excluded from comparison because the R/Python references are estimated
+    without trend.
   dimension: numerical
   status: pass
 - id: arima_gdp
-  notes: ARIMA(1,1,1) on log US real GDP via exact Gaussian MLE.
+  notes: R and Python exact-likelihood references agree after correcting two R one-based
+    indexing errors; current Hayashi estimates match both within tolerance.
   dimension: numerical
   status: pass
 - id: arma_book
-  notes: Uses the same simulated ARMA(1,1) DGP as Chapter 26 of the book. Intercept
-    is excluded from comparison because Hayashi profiles it out in MLE (SE = 0).
+  notes: Uses the same simulated ARMA(1,1) DGP as Chapter 26 of the book. Reference
+    replicates Hayashi's default Hannan-Rissanen two-step estimator.
   dimension: numerical
   status: pass
 - id: autoreg_gdp
-  notes: AR(1) on US real GDP with constant and trend.
+  notes: The R and Python references use the same conditional AR(1) design with a
+    constant and linear trend; current Hayashi estimates match both within tolerance.
+  dimension: numerical
+  status: pass
+- id: bart_simulated
+  notes: Simulated data y = 3*x1 + N(0, 0.1), x2 irrelevant. BART with 20 trees, depth
+    3, 500 post-burn draws and 200 burn-in. Reference is a scikit-learn GradientBoostingRegressor
+    approximation because a full BART posterior is too heavy for the venv.
+  dimension: numerical
+  status: pass
+- id: bayes_lm_simulated
+  notes: Simulated y = 1 + 2x1 - 1.5x2 + noise. Compares posterior means of x1 and
+    x2 from Hayashi's conjugate bayes_lm against OLS (which the diffuse prior should
+    recover).
+  dimension: numerical
+  status: pass
+- id: bayes_sfa_production_simulated
+  notes: No stable R/Python reference with half-normal inefficiency MCMC available;
+    PyMC implementation too heavy and fragile for the validation venv.
+  dimension: numerical
+  status: not-supported
+- id: be_simulated
+  notes: Panel with N=50 entities and T=4 periods. The between estimator collapses
+    each entity to its temporal means and runs OLS on the collapsed data.
+  dimension: numerical
+  status: pass
+- id: betareg_wooldridge_401k
+  notes: Beta regression on 401k participation rates. Greeners now estimates the model
+    by BFGS with an analytic gradient and computes standard errors from the observed
+    inverse Hessian, matching R betareg.
+  dimension: numerical
+  status: pass
+- id: biplot_simulated
+  notes: Symmetric PCA biplot. Compare explained-variance ratios and sign-robust squared
+    loading sums.
+  dimension: numerical
+  status: pass
+- id: bootstrap_ols_simulated
+  notes: Simulated OLS data (y = 1 + 2x + noise). Hayashi bootstrap(ols, ...) is compared
+    with R boot::boot and a Python statsmodels OLS pairs bootstrap; quantities are
+    the mean and standard deviation of the bootstrap slope and intercept distributions.
+  dimension: numerical
+  status: pass
+- id: bplm_wagepan
+  notes: Pooled OLS residuals from lwage ~ union + married. The Hayashi Breusch-Pagan
+    LM statistic for individual effects matches the closed-form expression nT/(2(T-1))
+    * ((A/B) - 1)^2, where A = (1/T) * sum_i (sum_t e_it)^2 and B = sum_it e_it^2.
+  dimension: numerical
+  status: pass
+- id: bsc_simulated
+  notes: No stable R CausalImpact/python pycausalimpact reference in the venv; Bayesian
+    synthetic-control weights depend on prior tuning.
+  dimension: numerical
+  status: not-supported
+- id: bvar_simulated
+  notes: R mfbvar/bvar packages fail to install; PyMC implementation is too heavy
+    for a deterministic CI reference.
+  dimension: numerical
+  status: not-supported
+- id: cancorr_simulated
+  notes: Simulated dataset with two X and two Y variables. Compares the two canonical
+    correlations and Wilks' lambda. The reference uses the generalised-eigenvalue
+    formulation.
+  dimension: numerical
+  status: pass
+- id: causal_impact_simulated
+  notes: Bayesian structural time series for counterfactual inference (Brodersen 2015).
+    Uses simulated data with known treatment effect.
+  dimension: numerical
+  status: pass
+- id: causalforest_simulated
+  notes: Simulated data y = 1 + 2*x1 - x2 + 0.5*treated + N(0,1). Hayashi causalforest()
+    reports the average treatment effect. R reference uses grf::causal_forest; Python
+    uses econml.grf.CausalForest.
+  dimension: numerical
+  status: pass
+- id: centile_wooldridge_wage1
+  notes: Centiles 10, 25, 50, 75, 90 for the wage variable.
+  dimension: numerical
+  status: pass
+- id: chamberlain_wagepan
+  notes: 'Chamberlain test on lwage ~ union + married. The Python reference builds
+    the unrestricted model y_it = const + X_it beta + sum_s X_i,s Pi_s and tests H0:
+    all Pi_s = 0 with an F-test, matching the Hayashi/Greeners formulation.'
+  dimension: numerical
+  status: pass
+- id: ci_wooldridge_wage1
+  notes: 95% confidence interval for the wage mean.
+  dimension: numerical
+  status: pass
+- id: clogit_simulated
+  notes: Simulated matched groups with group fixed effects and a single endogenous
+    regressor. R reference is survival::clogit; groups without within-group variation
+    are dropped at generation time.
+  dimension: numerical
+  status: pass
+- id: cloglog_wooldridge_affairs
+  notes: Complementary log-log GLM on Wooldridge affairs. A sign error in the Greeners
+    cloglog derivative caused IRLS divergence; the derivative is now positive and
+    the model converges to the same estimates as R glm and statsmodels.
+  dimension: numerical
+  status: pass
+- id: codebook_wooldridge_wage1
+  notes: Codebook summary for the continuous wage variable.
   dimension: numerical
   status: pass
 - id: coint_book
   notes: VECM(1) on a simulated cointegrated system where y = 2*x + e2 and x = cumsum(e1).
-    Only the cointegration (beta) and adjustment (alpha) coefficients are compared.
+    The cointegration (beta) and adjustment (alpha) coefficients and standard errors
+    are compared. Beta SEs are approximate Engle-Granger/OLS proxies; alpha SEs are
+    OLS conditional SEs given the estimated beta. The 5e-1 tolerance accommodates
+    the bootstrap SEs produced by Hayashi.
+  dimension: numerical
+  status: pass
+- id: condnum_simulated
+  notes: Condition number of the OLS regressor matrix on simulated data.
+  dimension: numerical
+  status: pass
+- id: conformal_simulated
+  notes: Simulated linear DGP y = 1 + 2x1 - 1.5x2 + noise. Compares split-conformal
+    empirical coverage and conformal quantile.
+  dimension: numerical
+  status: pass
+- id: copula_simulated
+  notes: Simulated bivariate normal with Pearson correlation 0.6. Dependence measures
+    exported as a coefficient table; standard errors are not defined for copula summary
+    statistics.
+  dimension: numerical
+  status: pass
+- id: correlate_wooldridge_wage1
+  notes: Pairwise correlations of wage, educ, exper, tenure.
   dimension: numerical
   status: pass
 - id: cox_heart
   notes: Cox proportional hazards regression for survival time after heart transplant.
   dimension: numerical
   status: pass
+- id: cpoisson_simulated
+  notes: Simulated panel counts with group fixed effects; the reference implements
+    the exact conditional Poisson likelihood (multinomial fixed-total) using analytic
+    gradient and Hessian.
+  dimension: numerical
+  status: pass
+- id: cuped_simulated
+  notes: Simulated A/B test with pre-experiment covariate. Compare CUPED-adjusted
+    ATE.
+  dimension: numerical
+  status: pass
+- id: dbscan_simulated
+  notes: Three dense 2D blobs plus five isolated noise points. Compare cluster and
+    noise counts.
+  dimension: numerical
+  status: pass
+- id: dcc_garch_nyse
+  notes: DCC-GARCH (Dynamic Conditional Correlation GARCH) on NYSE returns. Uses simplified
+    DCC-GARCH(1,1) model.
+  dimension: numerical
+  status: pass
+- id: decompose_simulated
+  notes: Simulated monthly series (trend + sinusoidal seasonal + noise). Compares
+    selected non-boundary observations of trend, seasonal, and residual components
+    from classical additive decomposition against statsmodels.seasonal_decompose.
+  dimension: numerical
+  status: pass
+- id: dfm_simulated
+  notes: Simulated four observed series driven by two common factors. All variables
+    are standardised in data/gen.py, so the quantities compared are communalities
+    (1 minus observation-noise/uniqueness variance). This is invariant to the arbitrary
+    sign/rotation of the estimated factors. Standard errors are not available in the
+    tidy output and are therefore set to NaN on both sides.
+  dimension: numerical
+  status: pass
 - id: did_kielmc
   notes: Difference-in-differences effect of incinerator proximity on log house prices.
+  dimension: numerical
+  status: pass
+- id: did_simulated
+  notes: Simulated 2x2 DiD with ATT=1.5. Coefficients and heteroskedasticity-consistent
+    (HC0) standard errors are compared against base-R/sandwich and statsmodels.
+  dimension: numerical
+  status: pass
+- id: dml_crossfit_simulated
+  notes: Simulated partially linear causal model y = 1.5*d + g(x) + eps with binary
+    d confounded by x. Compares the DML cross-fitted ATE.
+  dimension: numerical
+  status: pass
+- id: double_ml_simulated
+  notes: Double Machine Learning (Chernozhukov et al. 2018) for heterogeneous treatment
+    effects. Uses simulated data with known treatment effect.
+  dimension: numerical
+  status: pass
+- id: doublesort_simulated
+  notes: Simulated return data with size and book-to-market. Compares the mean return
+    of the small-size / high-BM (low size, high bm) portfolio from a 5x5 double sort.
+  dimension: numerical
+  status: pass
+- id: dr_learner_simulated
+  notes: Simulated data with a single confounder x, binary treatment d, and constant
+    ATE=2.0. DR-Learner average treatment effect compared against a manual AIPW reference.
+  dimension: numerical
+  status: pass
+- id: dw_simulated
+  notes: Durbin-Watson test for first-order autocorrelation on simulated OLS residuals.
+  dimension: numerical
+  status: pass
+- id: egarch_nyse
+  notes: EGARCH(1,1) on NYSE returns.
   dimension: numerical
   status: pass
 - id: elasticnet_hprice1
@@ -47,26 +246,168 @@ cases:
     bedrooms and colonial dummy.
   dimension: numerical
   status: pass
+- id: estat_classification_simulated
+  notes: Simulated logit. Sensitivity, specificity and correct rate at threshold 0.5.
+  dimension: numerical
+  status: pass
+- id: estat_endog_simulated
+  notes: Simulated endogenous regressor with one instrument. Wu-Hausman F and p-value.
+  dimension: numerical
+  status: pass
+- id: estat_gof_simulated
+  notes: Simulated strong predictor logit. Hosmer-Lemeshow chi-square by deciles.
+  dimension: numerical
+  status: pass
+- id: estat_overid_simulated
+  notes: Simulated IV with two instruments and one endogenous regressor. Sargan J-statistic
+    and p-value.
+  dimension: numerical
+  status: pass
 - id: ets_gdp
-  notes: Exponential smoothing state-space model on US real GDP. Blocked because Hayashi
-    uses SSE grid search while references use MLE.
+  notes: 'Simple exponential smoothing (ETS(A,N,N)) on US real GDP.  Hayashi uses
+    `ses(df, gdp)`,
+
+    and the R/Python references use SES with SSE grid search / statsmodels optimisation.
+
+    Only the smoothing parameter alpha is compared because the Hayashi text output
+    does
+
+    not expose the initial level.'
+  dimension: numerical
+  status: pass
+- id: eventstudy_simulated
+  notes: 'Simulated panel with 60 units and 5 time periods. Half the units are treated
+
+    at time 2 and the other half are never treated. The outcome has a calendar
+
+    trend and a post-treatment effect. Standard errors are clustered by unit and
+
+    compared with R (sandwich::vcovCL) and Python (statsmodels OLS with
+
+    cov_type=''cluster'').'
+  dimension: numerical
+  status: pass
+- id: factor_simulated
+  notes: Simulated four variables from two factors. Compares the first two eigenvalues
+    of the correlation matrix (invariant to sign/rotation of loadings).
+  dimension: numerical
+  status: pass
+- id: fapanel_simulated
+  notes: Requires plm + factor combination; no single canonical reference implementation.
+  dimension: numerical
+  status: not-supported
+- id: favar_simulated
+  notes: Simulated three observable series driven by one common factor plus the observed
+    y1. Python reference extracts the first PCA factor and estimates a VAR(1) by OLS,
+    matching the FAVAR two-step approach.
+  dimension: numerical
+  status: pass
+- id: fcoef_simulated
+  notes: No standard R/Python package for the same functional-coefficient estimator.
+  dimension: numerical
+  status: not-supported
+- id: feiv_simulated
+  notes: Panel with N=200 entities and T=5 periods; x is endogenous and instrumented
+    by z. Independent R and Python within-2SLS references use the Greeners residual
+    degrees-of-freedom convention n - k - (G - 1).
+  dimension: numerical
+  status: pass
+- id: fmb_simulated
+  notes: Classic Fama-MacBeth regression on a deterministic simulated asset panel.
+  dimension: numerical
+  status: pass
+- id: fmols_simulated
+  notes: R cointReg/urca packages not available; cointegration Fully-Modified OLS
+    not in base R or statsmodels.
+  dimension: numerical
+  status: not-supported
+- id: ftest_robust_wooldridge_wage1
+  notes: Robust F-test (Wooldridge 2010) with cluster-robust covariance for joint
+    significance test.
+  dimension: numerical
+  status: pass
+- id: fuzzy_rd_simulated
+  notes: Fuzzy RD with 70% compliance at the cutoff. Compare local average treatment
+    effect (LATE).
   dimension: numerical
   status: pass
 - id: garch_book
-  notes: Uses the same simulated GARCH(1,1) DGP as Chapter 30 of the book. MLE tolerances
-    are looser because the optimizer may stop at slightly different points.
+  notes: Uses the same simulated GARCH(1,1) DGP as Chapter 30 of the book. Coefficients
+    only because GARCH standard-error approximations differ widely between implementations.
   dimension: numerical
   status: pass
 - id: garch_nyse
   notes: GARCH(1,1) on NYSE returns.
   dimension: numerical
   status: pass
+- id: gbm_simulated
+  notes: Simulated data y = 3*x1 + N(0, 0.1), x2 irrelevant. Gradient Boosting with
+    50 trees, learning rate 0.1, max depth 3. MSE and R^2 compared against scikit-learn.
+  dimension: numerical
+  status: pass
+- id: gee_wooldridge_wagepan_ch14
+  notes: Wooldridge Introductory Econometrics Chapter 14, Example 14.4 generalized
+    estimating equations wage equation.
+  dimension: numerical
+  status: pass
+- id: glm_wooldridge_fertil2_poisson
+  notes: Wooldridge dataset fertil2 Poisson GLM for number of children.
+  dimension: numerical
+  status: pass
 - id: glsar_hprice1
-  notes: GLS with AR(1) errors on housing price equation.
+  notes: R, Python, and Hayashi use the same iterative GLSAR(1) procedure and agree
+    on coefficients and standard errors within tolerance.
   dimension: numerical
   status: pass
 - id: gmm_card
-  notes: GMM returns to schooling with nearc4 as instrument for education.
+  notes: R and Python use robust two-step GMM references with matching covariance
+    conventions; current Hayashi estimates match both within tolerance.
+  dimension: numerical
+  status: pass
+- id: gmm_clust_simulated
+  notes: Two Gaussian clusters. Compare sorted component means.
+  dimension: numerical
+  status: pass
+- id: gmm_overidentified_simulated
+  notes: The DGP has one endogenous regressor and two excluded, valid instruments,
+    so L-K=1. R gmm and Python linearmodels use two-step heteroskedastic GMM. The
+    maximum standard-error difference is 2.569e-6; 1e-5 accepts the asymptotically
+    equivalent finite-sample covariance forms. Coefficients and the Hansen J statistic
+    agree to numerical precision.
+  dimension: numerical
+  status: pass
+- id: gp_simulated
+  notes: Simulated 1-D regression with a fixed seed; compares training-set R2 and
+    MSE between Hayashi, R kernlab and Python sklearn. Tolerances reflect different
+    hyperparameter-optimisation conventions.
+  dimension: numerical
+  status: pass
+- id: granger_simulated
+  notes: Granger causality test on simulated AR(1) series.
+  dimension: numerical
+  status: pass
+- id: grf_simulated
+  notes: Simulated data y = 1 + 2*x1 - x2 + 0.5*treated + N(0,1). Hayashi grf() reports
+    the average treatment effect. R reference uses grf::causal_forest to match the
+    ATE quantity; Python uses econml.grf.CausalForest.
+  dimension: numerical
+  status: pass
+- id: harveycollier_simulated
+  notes: Harvey-Collier recursive t test on simulated OLS residuals.
+  dimension: numerical
+  status: pass
+- id: hausman_robust_wooldridge_wagepan
+  notes: Robust Hausman test (Cameron-Trivedi 2005, Wooldridge 2010) with cluster-robust
+    covariance.
+  dimension: numerical
+  status: pass
+- id: hawkes_simulated
+  notes: Simulated self-exciting Hawkes process. Python reference fits the same MLE
+    via L-BFGS-B.
+  dimension: numerical
+  status: pass
+- id: hclust_simulated
+  notes: Three well-separated 2D blobs. Ward linkage with cut=3.0 and cophenetic correlation.
   dimension: numerical
   status: pass
 - id: heckman_mroz
@@ -74,32 +415,195 @@ cases:
     the reference implementations are two-step.
   dimension: numerical
   status: pass
+- id: influence_simulated
+  notes: Simulated OLS with an outlier. Hayashi exposes DFFITS; reference uses the
+    maximum absolute DFFITS value (Cook's D not exported).
+  dimension: numerical
+  status: pass
+- id: isotonic_simulated
+  notes: Simulated three-step data. PAVA fitted values at x=1,50,100 compared.
+  dimension: numerical
+  status: pass
 - id: iv_card
   notes: IV with education endogenous and nearc4 as instrument.
+  dimension: numerical
+  status: pass
+- id: iv_cluster_card
+  notes: IV returns-to-schooling equation with one-way clustered standard errors by
+    Census region.
+  dimension: numerical
+  status: pass
+- id: iv_robust_mroz
+  notes: IV returns-to-schooling equation with HC1 heteroskedasticity-robust standard
+    errors.
+  dimension: numerical
+  status: pass
+- id: iv_wooldridge_mroz_ch15
+  notes: Wooldridge Introductory Econometrics Chapter 15, Example 15.1 returns to
+    schooling IV equation for married women.
+  dimension: numerical
+  status: pass
+- id: jb_simulated
+  notes: Jarque-Bera normality test on a simulated random sample.
+  dimension: numerical
+  status: pass
+- id: johansen_break_simulated
+  notes: Structural-break Johansen test. Python statsmodels.tsa.vecm coint_johansen
+    does not support exogenous break dummies. R urca::ca.jo accepts the dummy but
+    uses conventional rather than Hayashi's break-adjusted rank critical values. Neither
+    provides a fully comparable reference for the declared rank-and-trace contract.
+  dimension: numerical
+  status: not-supported
+- id: kalman_nyse
+  notes: Local-level Kalman filter on NYSE returns. Hayashi now estimates sigma_obs
+    and sigma_state by maximum likelihood and returns a printable result object. sigma_state
+    is very small and the likelihood is flat in that direction, so the absolute tolerance
+    is set to 1e-3.
+  dimension: numerical
+  status: pass
+- id: kde_simulated
+  notes: Simulated N(2, 1.5). Compares fixed bandwidth, peak density and peak x of
+    a Gaussian KDE.
+  dimension: numerical
+  status: pass
+- id: km_aml
+  notes: Kaplan-Meier right-continuous survival probabilities at seven checkpoints
+    on survival::aml.
+  dimension: numerical
+  status: pass
+- id: kmeans_simulated
+  notes: K-Means clustering (MacQueen 1967) with k-means++ initialization. Uses simulated
+    2D data with 3 Gaussian clusters.
   dimension: numerical
   status: pass
 - id: lasso_hprice1
   notes: Lasso regression of house price on lot size, square footage and bedrooms.
   dimension: numerical
   status: pass
+- id: linktest_simulated
+  notes: Simulated logit. Linktest yhat and yhat2 coefficients and standard errors.
+  dimension: numerical
+  status: pass
+- id: ljungbox_simulated
+  notes: Ljung-Box autocorrelation test on a simulated AR(1) series.
+  dimension: numerical
+  status: pass
+- id: logit_margins_mroz
+  notes: Logit average marginal effects and delta-method standard errors match R/statsmodels
+    within tolerance.
+  dimension: numerical
+  status: pass
 - id: logit_mroz
   notes: Logit labour-force participation on the Mroz dataset.
   dimension: numerical
   status: pass
+- id: lowess_simulated
+  notes: Simulated y = sin(x) + N(0, 0.2). Compare LOWESS fitted values at mean, first,
+    middle and last observations.
+  dimension: numerical
+  status: pass
+- id: lpdid_pylpdid_quickstart
+  notes: Uses the same absorbing staggered-adoption DGP as pylpdid's quickstart example.
+    The constant treatment effect is 2.0, so post-treatment coefficients should be
+    close to 2.0. Only the Python reference is provided (R is left aside for now).
+  dimension: numerical
+  status: pass
+- id: lroc_simulated
+  notes: Simulated strong predictor logit. AUC and Gini exported as a coefficient
+    table.
+  dimension: numerical
+  status: pass
+- id: lstm_simulated
+  notes: PyTorch/TensorFlow stochastic training is not reproducible enough for numerical
+    validation.
+  dimension: numerical
+  status: not-supported
 - id: ma_book
   notes: Uses the same simulated MA(1) DGP as Chapter 26 of the book.
   dimension: numerical
   status: pass
+- id: manova_simulated
+  notes: Simulated three groups with distinct bivariate means. Compare Pillai, Wilks,
+    Hotelling-Lawley and Roy multivariate test statistics.
+  dimension: numerical
+  status: pass
+- id: mfvar_simulated
+  notes: R mfbvar package failed to install in the previous session.
+  dimension: numerical
+  status: not-supported
+- id: mice_chained_simulated
+  notes: MICE (Multiple Imputation by Chained Equations, van Buuren 2011) with m=5,
+    iter=10. Uses simulated data with MCAR missing values.
+  dimension: numerical
+  status: pass
+- id: midas_simulated
+  notes: Simulated low-frequency y (T=100) and high-frequency x (T*3). y = 1.0 + 2.0
+    * x_midas + noise. Compare alpha, beta and R-squared against R optim and Python
+    MIDAS grid+minimize references.
+  dimension: numerical
+  status: pass
+- id: mixed_wooldridge_wagepan_ch14
+  notes: Wooldridge Introductory Econometrics Chapter 14, Example 14.4 mixed linear
+    model wage equation.
+  dimension: numerical
+  status: pass
 - id: mlogit_mode
   notes: Multinomial logit of chosen travel mode (air=1, train=2, bus=3, car=4) on
-    income, wait time, vehicle cost and travel time. Alternative-specific attributes
-    are averaged per individual to make them individual-specific covariates.
+    income, wait time, vehicle cost and travel time.
+  dimension: numerical
+  status: pass
+- id: mlp_simulated
+  notes: Simulated linear-ish y from x1 and x2 with small noise. Compare R-squared
+    against R nnet and scikit-learn MLPRegressor. Tolerance is relaxed because different
+    initialisation and optimisers produce different R-squared.
+  dimension: numerical
+  status: pass
+- id: modwt_simulated
+  notes: Simulated series (trend + 16-period sine + noise). Greeners MODWT uses unnormalised
+    Haar filters, equivalent to pywt.swt(..., norm=False). Wavelet energies are compared
+    as coefficient-like quantities; standard errors are not meaningful.
+  dimension: numerical
+  status: pass
+- id: msvar_simulated
+  notes: Simulated two-regime VAR with known intercepts and transition matrix; compares
+    regime-specific y1 intercepts and transition probabilities against R MSwM and
+    Python statsmodels MarkovRegression. Tolerances reflect label/algorithm sensitivity
+    in regime-switching models.
+  dimension: numerical
+  status: pass
+- id: nardl_simulated
+  notes: Simulated NARDL(1,1) with asymmetric long-run multipliers and short-run dynamics.
+    y and x are random walks with positive and negative shock decomposition.
   dimension: numerical
   status: pass
 - id: nbreg_fertil2
   notes: Negative binomial regression for number of children on age, education, electric
-    and urban indicators. Dispersion parameter (alpha) is not compared because Hayashi
-    does not report it; coefficient tolerance is 2e-1 due to different alpha estimates.
+    and urban indicators.
+  dimension: numerical
+  status: pass
+- id: nls_ces_simulated
+  notes: Simulated data from y = a * (b1*x1^rho + (1-b1)*x2^rho)^(1/rho) + N(0, 0.1).
+    The CES function is now identified by the share restriction b2 = 1 - b1.
+  dimension: numerical
+  status: pass
+- id: nls_cobb_douglas_simulated
+  notes: Simulated data from y = a * x1^b1 * x2^b2 + N(0, 0.3). Coefficients and standard
+    errors compared against R `nls` and Python `curve_fit`.
+  dimension: numerical
+  status: pass
+- id: nls_exp_simulated
+  notes: Simulated data from y = a * exp(b * x) + N(0, 0.1). Coefficients and standard
+    errors compared against R `nls` and Python `scipy.optimize.curve_fit`.
+  dimension: numerical
+  status: pass
+- id: nls_logistic_simulated
+  notes: Simulated data from y = a / (1 + exp(-b*(x-c))) + N(0, 0.2). Coefficients
+    and standard errors compared against R `nls` and Python `scipy.optimize.curve_fit`.
+  dimension: numerical
+  status: pass
+- id: nls_power_simulated
+  notes: Simulated data from y = a * x^b + N(0, 0.3). Coefficients and standard errors
+    compared against R `nls` and Python `scipy.optimize.curve_fit`.
   dimension: numerical
   status: pass
 - id: ologit_beauty
@@ -110,8 +614,174 @@ cases:
   notes: OLS wage equation with one-way cluster-robust standard errors by worker id.
   dimension: numerical
   status: pass
+- id: ols_hc3_wooldridge_wage1
+  notes: OLS log-wage equation with HC3 heteroskedasticity-robust standard errors.
+  dimension: numerical
+  status: pass
+- id: ols_newey_west_phillips
+  notes: OLS expectations-augmented Phillips curve with Newey-West HAC standard errors.
+  dimension: numerical
+  status: pass
+- id: ols_twoway_cluster_wagepan
+  notes: OLS wage equation with two-way clustered standard errors by worker id and
+    year.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_401k_ch3
+  notes: Wooldridge Introductory Econometrics Chapter 3 Example 3.3 401(k) participation
+    equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_attend_ch6
+  notes: Wooldridge Introductory Econometrics Chapter 6, Example 6.3 attendance effects
+    on standardized final exam score.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_barium_ch10
+  notes: Wooldridge Introductory Econometrics Chapter 10, Example 10.5 barium chloride
+    import demand and antidumping filings.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_bwght_ch5
+  notes: Wooldridge Introductory Econometrics Chapter 5, Example 5.2 birth weight
+    and maternal smoking equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_campus_ch4
+  notes: Wooldridge Introductory Econometrics Chapter 4, Example 4.4 log-log campus
+    crime and enrollment equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_ceosal1_ch2
+  notes: Wooldridge Introductory Econometrics Chapter 2, Example 2.11 log-log CEO
+    salary equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_ceosal1_roe_ch2
+  notes: Wooldridge Introductory Econometrics Chapter 2, Example 2.3 CEO salary and
+    return on equity equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_consump_ch10
+  notes: Wooldridge Introductory Econometrics Chapter 10, Example 10.4 consumption
+    growth on income growth equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_crime1_avgsen_ch3
+  notes: Wooldridge Introductory Econometrics Chapter 3, Example 3.5 arrest records
+    equation with average sentence length.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_crime1_ch3
+  notes: Wooldridge Introductory Econometrics Chapter 3 Example 3.5 arrest records
+    equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_fertil3_ch13
+  notes: Wooldridge Introductory Econometrics Chapter 13, Example 13.3 fertility distributed
+    lag equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_gpa1_ch3
+  notes: Wooldridge Introductory Econometrics Chapter 3 Example 3.1 college GPA equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_hprice1_ch4
+  notes: Wooldridge Introductory Econometrics Chapter 4, Section 4.5 log housing price
+    equation with qualitative information.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_hprice2_ch6
+  notes: Wooldridge Introductory Econometrics Chapter 6, Example 6.2 log housing price
+    equation with quadratic in rooms.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_htv_ch9
+  notes: Wooldridge Introductory Econometrics Chapter 9, Example 9.3 education and
+    parental education/ability equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_intdef_ch10
+  notes: Wooldridge Introductory Econometrics Chapter 10, Example 10.2 interest rate,
+    inflation and deficit equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_jtrain_pooled_ch14
+  notes: Wooldridge Introductory Econometrics Chapter 14, Example 14.3 pooled job
+    training scrap rate equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_kielmc_ch13
+  notes: Wooldridge Introductory Econometrics Chapter 13, Example 13.1 difference-in-differences
+    housing price equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_meap93_ch4
+  notes: Wooldridge Introductory Econometrics Chapter 4, Examples 4.2 and 4.10 math
+    pass rate equation with log salary, staff and enrollment.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_nyse_ch11
+  notes: Wooldridge Introductory Econometrics Chapter 11, Example 11.4 AR(1) test
+    of efficient markets hypothesis.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_phillips_ch10
+  notes: Wooldridge Introductory Econometrics Chapter 10, Example 10.1 static Phillips
+    curve.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_phillips_cinf_ch11
+  notes: Wooldridge Introductory Econometrics Chapter 11, Example 11.5 expectations-augmented
+    Phillips curve.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_prminwge_ch10
+  notes: Wooldridge Introductory Econometrics Chapter 10, Example 10.3 Puerto Rican
+    employment and minimum wage equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_sleep75_ch5
+  notes: Wooldridge Introductory Econometrics Chapter 5, Problem 3.3 sleep-work tradeoff
+    equation.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_twoyear_ch4
+  notes: Wooldridge Introductory Econometrics Chapter 4, Example 4.10 returns to two-year
+    and four-year college credits.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_vote1_ch2
+  notes: Wooldridge Introductory Econometrics Chapter 2, Examples 2.5 and 2.9 election
+    outcomes and campaign expenditure share equation.
+  dimension: numerical
+  status: pass
 - id: ols_wooldridge_wage1
   notes: First real-dataset validation case.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_wage1_ch2
+  notes: First textbook example using wage1. Log-linear returns to education.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_wage1_female_ch7
+  notes: Wooldridge Introductory Econometrics Chapter 7, Example 7.1 hourly wage equation
+    with a qualitative dummy variable.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_wage1_interaction_ch7
+  notes: Wooldridge Introductory Econometrics Chapter 7, Example 7.6 hourly wage equation
+    with marriage and gender dummy interactions.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_wage1_log_female_ch7
+  notes: Wooldridge Introductory Econometrics Chapter 7, Example 7.1 log hourly wage
+    equation with a qualitative dummy variable.
+  dimension: numerical
+  status: pass
+- id: ols_wooldridge_wage1_quad_ch6
+  notes: Wooldridge Introductory Econometrics Chapter 6, Section 6.2 wage equation
+    with a quadratic in experience.
   dimension: numerical
   status: pass
 - id: oprobit_beauty
@@ -119,12 +789,75 @@ cases:
     education, experience and black indicators.
   dimension: numerical
   status: pass
+- id: orf_simulated
+  notes: Simulated data y = 1 + 2*x1 - x2 + 0.5*treated + 0.3*w1 - 0.2*w2 + N(0,1).
+    Hayashi orf() reports the average treatment effect. R reference uses grf::causal_forest
+    on the full set of covariates; Python uses econml.orf.DROrthoForest.
+  dimension: numerical
+  status: pass
+- id: panel_fe_cluster_wagepan
+  notes: Panel fixed-effects wage equation with worker-clustered standard errors using
+    explicit within-transformed CR1 reference implementations. Tolerance reflects
+    Hayashi's four-decimal text export.
+  dimension: numerical
+  status: pass
 - id: panel_fe_grunfeld
   notes: Panel fixed-effects investment demand model (Grunfeld).
   dimension: numerical
   status: pass
+- id: panel_fe_time_cluster_wagepan
+  notes: Panel fixed-effects wage equation with time-clustered standard errors using
+    explicit within-transformed CR1 reference implementations.
+  dimension: numerical
+  status: pass
+- id: panel_fe_twoway_cluster_wagepan
+  notes: Panel fixed-effects wage equation with two-way (entity + time) clustered
+    standard errors using explicit within-transformed CR1 reference implementations.
+  dimension: numerical
+  status: pass
+- id: panel_fe_wooldridge_wagepan_ch14
+  notes: Wooldridge Introductory Econometrics Chapter 14, Example 14.4 panel fixed-effects
+    wage equation.
+  dimension: numerical
+  status: pass
+- id: panel_heckman_simulated
+  notes: Panel Heckman selection model (two-step) with selection equation and outcome
+    equation. Uses simulated panel data with known selection mechanism.
+  dimension: numerical
+  status: pass
+- id: panel_qreg_simulated
+  notes: Simulated panel with entity fixed effects and heteroskedastic errors. References
+    demean the data and run quantile regression without an intercept; standard errors
+    are convention-sensitive.
+  dimension: numerical
+  status: pass
+- id: panel_tobit_simulated
+  notes: Simulated panel with N=50, T=4, random effects, left-censored at 0. Coefficients
+    and standard errors compared against pooled Tobit (censReg and MLE).
+  dimension: numerical
+  status: pass
+- id: pca_wooldridge_wage1
+  notes: 'PCA is run on educ, exper, tenure, and wage with centering and unit-variance
+
+    scaling. Loadings are compared in absolute value because each eigenvector''s
+
+    sign is arbitrary. Hayashi displays four decimal places, so tolerances allow
+
+    for output rounding.'
+  dimension: numerical
+  status: pass
+- id: pcse_wagepan
+  notes: PCSE estimation of log wage on education, experience, and dummies using the
+    Hayashi/Greeners Beck-Katz covariance convention.
+  dimension: numerical
+  status: pass
 - id: poisson_fertil2
   notes: Poisson regression for number of children on the fertil2 dataset.
+  dimension: numerical
+  status: pass
+- id: portsort_simulated
+  notes: Five equal-count portfolios sorted by size. Compare mean returns and high-low
+    spread.
   dimension: numerical
   status: pass
 - id: probit_mroz
@@ -132,12 +865,50 @@ cases:
   dimension: numerical
   status: pass
 - id: psm_jtrain3
-  notes: 1:1 nearest-neighbor propensity score matching with caliper 0.2 and bootstrap
-    SE.
+  notes: R, Python, and Hayashi use the same absolute-caliper, no-replacement matching
+    protocol; ATT agrees and bootstrap SEs are within tolerance.
+  dimension: numerical
+  status: pass
+- id: pstr_simulated
+  notes: Simulated panel with N=50, T=10. y = beta0*x + beta1*x*g(q; gamma=5, c=0.5)
+    + FE + noise. Gamma, c, beta0_x and beta1_x compared against grid-search references.
+  dimension: numerical
+  status: pass
+- id: pvar_simulated
+  notes: Simulated bivariate panel VAR with N=50 and T=100. Hayashi GMM and within-OLS
+    references agree within moderate tolerance due to the Nickell bias in within estimation.
+  dimension: numerical
+  status: pass
+- id: qreg_simulated
+  notes: Simulated heteroskedastic data. Quantile regression at tau=0.75 with bootstrap
+    standard errors compared against R quantreg and statsmodels.
+  dimension: numerical
+  status: pass
+- id: qrf_inf_simulated
+  notes: Simulated heteroskedastic data y = 3*x1 + N(0, 0.1*(1+0.5*x1)), with x2 irrelevant.
+    qrf_inf() at q=0.75 with 50 trees, depth 5, 50 bootstrap samples. OOB R^2 compared
+    against grf::quantile_forest and quantile_forest.RandomForestQuantileRegressor.
+  dimension: numerical
+  status: pass
+- id: qrf_simulated
+  notes: Simulated heteroskedastic data y = 3*x1 + N(0, 0.1*(1+0.5*x1)). QRF at tau=0.75
+    with 50 trees, depth 5. OOB R^2 compared against quantile_forest.RandomForestQuantileRegressor.
   dimension: numerical
   status: pass
 - id: quantile_wage1
   notes: Median quantile regression of wage on education, experience, and tenure.
+  dimension: numerical
+  status: pass
+- id: qvar_simulated
+  notes: 'Simulated bivariate VAR(1) process. Both R (quantreg::rq) and Python
+
+    (statsmodels QuantReg) are run separately for each equation at the median
+
+    (tau=0.5). Quantile-regression standard errors are algorithm- and
+
+    implementation-specific, so only coefficients are compared and std_err is
+
+    set to NaN.'
   dimension: numerical
   status: pass
 - id: rdd_book
@@ -149,23 +920,192 @@ cases:
   notes: Random-effects investment demand model (Grunfeld).
   dimension: numerical
   status: pass
+- id: reg_path_simulated
+  notes: Simulated data where y = 0.5 + x1 + noise and x2 is noise. Hayashi reg_path
+    selects an elastic-net lambda by BIC; references fit glmnet and sklearn ElasticNet
+    at the same optimal lambda and standardisation.
+  dimension: numerical
+  status: pass
+- id: reset_simulated
+  notes: Ramsey RESET specification test on simulated OLS residuals.
+  dimension: numerical
+  status: pass
+- id: rf_simulated
+  notes: Simulated data y = 3*x1 + N(0, 0.1). In-sample R² compared against scikit-learn.
+    Standard errors are not defined for an out-of-bag R² summary.
+  dimension: numerical
+  status: pass
 - id: ridge_hprice1
   notes: Ridge regression of log house price on log lot size, log square footage,
     bedrooms and colonial dummy.
+  dimension: numerical
+  status: pass
+- id: rlm_wage1
+  notes: Huber robust linear regression of log wage on education, experience, and
+    tenure.
+  dimension: numerical
+  status: pass
+- id: rolling_ols_simulated
+  notes: Simulated linear trend (y = 1 + 2x + noise). Compares the last-window rolling
+    OLS coefficients produced by Hayashi's rolling() against a zoo::rollapply reference
+    and a statsmodels OLS fit on the final window.
+  dimension: numerical
+  status: pass
+- id: setar_simulated
+  notes: Simulated SETAR(1,1,1) with two regimes split by y_{t-1}. Hayashi grid search
+    may differ slightly from R tsDyn; tolerances are relaxed accordingly.
+  dimension: numerical
+  status: pass
+- id: sfa_production_simulated
+  notes: Simulated Cobb-Douglas production frontier with negligible inefficiency so
+    MLE/OLS references align with Hayashi.
+  dimension: numerical
+  status: pass
+- id: spatial_durbin_error_simulated
+  notes: R spatialreg/spdep packages failed to install in previous sessions.
+  dimension: numerical
+  status: not-supported
+- id: spatial_durbin_simulated
+  notes: Data generated on a 7x7 grid with rook contiguity W, rho=-0.95, beta=0.5.
+    The Durbin model is highly collinear; only the spatial autoregressive parameter
+    is compared.
+  dimension: numerical
+  status: pass
+- id: spatial_panel_sar_simulated
+  notes: R spatialreg/spdep packages failed to install in previous sessions.
+  dimension: numerical
+  status: not-supported
+- id: spatial_sar_simulated
+  notes: Data generated on a 7x7 grid with rook contiguity W, rho=0.3, beta=0.5. Reference
+    implements the same concentrated MLE independently.
+  dimension: numerical
+  status: pass
+- id: spatial_sem_simulated
+  notes: Data generated on a 7x7 grid with rook contiguity W, lambda=0.1, beta=0.5.
+    Reference implements the same concentrated MLE independently.
+  dimension: numerical
+  status: pass
+- id: spectral_simulated
+  notes: Results are sensitive to random k-means initialisation and normalised Laplacian
+    details; no deterministic numeric reference.
+  dimension: numerical
+  status: not-supported
+- id: summarize_wooldridge_wage1
+  notes: Summary statistics with detail (percentiles, skewness, kurtosis) for wage.
   dimension: numerical
   status: pass
 - id: sur_grunfeld
   notes: Two-equation SUR (Zellner FGLS) on the Grunfeld investment data.
   dimension: numerical
   status: pass
+- id: sv_simulated
+  notes: Simulated Taylor (1986) SV data; compares the posterior mean of the latent
+    log-volatility h_t between Hayashi, R stochvol and PyMC. Tight tolerance because
+    R and PyMC agree closely on this DGP.
+  dimension: numerical
+  status: pass
+- id: svar_macro
+  notes: Cholesky-identified SVAR(2) on log US real GDP and consumption.
+  dimension: numerical
+  status: pass
+- id: svec_simulated
+  notes: Simulated stable VAR(1) with 250 observations. Blanchard-Quah long-run identification
+    via lower Cholesky of the long-run covariance.
+  dimension: numerical
+  status: pass
+- id: swilk_simulated
+  notes: Shapiro-Wilk normality test on a simulated random sample.
+  dimension: numerical
+  status: pass
 - id: synth_smoking
-  notes: Synthetic-control ATT on a simulated panel with 10 donors and 1 treated unit.
+  notes: R, Python, and Hayashi implement the same outcome-only simplex SCM and agree
+    on ATT within tolerance.
+  dimension: numerical
+  status: pass
+- id: synthdid_simulated
+  notes: Simulated panel with 20 units, 10 periods, treatment begins at period 6 for
+    unit 0 with ATT=2.0. Reference uses a simple synthetic-control-style pre-treatment
+    weighting and computes the post-treatment mean gap. The ATT has no standard error.
+  dimension: numerical
+  status: pass
+- id: sysgmm_wagepan
+  notes: System GMM (Blundell-Bond) two-step on Wooldridge wagepan with lags=2. R
+    and Python references explicitly implement the same two-step System GMM procedure
+    used by Hayashi/Greeners; plm::pgmm is not used as the active R oracle because
+    it uses different instrument and weighting conventions.
+  dimension: numerical
+  status: pass
+- id: tabstat_wooldridge_wage1
+  notes: Tabstat statistics (mean, sd, min, max, p50) for wage, educ, exper, tenure.
+  dimension: numerical
+  status: pass
+- id: tabulate_mroz_inlf_kidslt6
+  notes: Two-way frequency table with Pearson chi-square test.
+  dimension: numerical
+  status: pass
+- id: testparm_simulated
+  notes: 'Simulated OLS. testparm F and p-value for H0: x1 = x2 = 0.'
+  dimension: numerical
+  status: pass
+- id: threesl_simulated
+  notes: Simultaneous two-equation system with correlated errors. Each equation includes
+    an intercept, one exogenous and one endogenous regressor; the excluded exogenous
+    from the other equation is used as an instrument. Python reference is linearmodels.system.IV3SLS
+    with an explicit constant column.
+  dimension: numerical
+  status: pass
+- id: tmle_simulated
+  notes: Simulated data with true ATE 0.7; compares TMLE point estimate and standard
+    error against R tmle and a manual Python implementation.
   dimension: numerical
   status: pass
 - id: tobit_mroz
   notes: Tobit regression of hours worked with left censoring at zero. Hayashi matches
-    AER::tobit at displayed precision; the custom Python MLE is retained as a diagnostic
-    script but is not the active reference.
+    AER::tobit at displayed precision; the new Python reference is a manual MLE refined
+    with Nelder-Mead and uses a numerical Hessian for standard errors.
+  dimension: numerical
+  status: pass
+- id: transformer_simulated
+  notes: PyTorch/TensorFlow stochastic training is not reproducible enough for numerical
+    validation.
+  dimension: numerical
+  status: not-supported
+- id: tsne_simulated
+  notes: t-SNE embedding of three 3D blobs; cluster quality measured via K-Means inertia.
+  dimension: numerical
+  status: pass
+- id: ttest_wooldridge_wage1
+  notes: One-sample t-test of wage mean against mu=5.
+  dimension: numerical
+  status: pass
+- id: tvar_simulated
+  notes: Simulated bivariate TVAR with exogenous threshold q; references use no-intercept
+    regime OLS to match Hayashi's output.
+  dimension: numerical
+  status: pass
+- id: tvcopula_simulated
+  notes: R rmgarch/ccgarch packages not available; Python copula packages do not match
+    Hayashi output.
+  dimension: numerical
+  status: not-supported
+- id: tvp_simulated
+  notes: Simulated TVP data with smooth intercept and slope drift. The reference is
+    the true final coefficient vector because Greeners TVP uses a simple Kalman-grid
+    implementation with no readily available reference implementation.
+  dimension: numerical
+  status: pass
+- id: tvp_var_simulated
+  notes: No stable PyMC or R TVP reference implementation in the venv.
+  dimension: numerical
+  status: not-supported
+- id: ucm_simulated
+  notes: Simulated monthly series with local-linear trend and deterministic seasonal
+    (period=12). Compares the estimated irregular variance and the first/last smoothed
+    level state.
+  dimension: numerical
+  status: pass
+- id: umap_simulated
+  notes: UMAP embedding of three 3D blobs; cluster quality measured via K-Means inertia.
   dimension: numerical
   status: pass
 - id: var_book
@@ -176,7 +1116,68 @@ cases:
   notes: VAR(2) on US real GDP and consumption.
   dimension: numerical
   status: pass
+- id: varma_simulated
+  notes: Bivariate VARMA(1,1) with known AR and MA matrices. Hayashi uses the Hannan-Rissanen
+    algorithm; the Python reference uses statsmodels VARMAX with no trend. Coefficients
+    are compared (standard errors are not computed by the current Hayashi VARMA implementation).
+  dimension: numerical
+  status: pass
+- id: vif_simulated
+  notes: Variance inflation factors for the OLS regressor matrix on simulated data.
+  dimension: numerical
+  status: pass
+- id: weak_iv_simulated
+  notes: Simulated weak instrument. First-stage partial F and p-value.
+  dimension: numerical
+  status: pass
+- id: white_simulated
+  notes: White heteroskedasticity test on simulated OLS residuals.
+  dimension: numerical
+  status: pass
 - id: wls_hprice1
   notes: WLS with weights generated inside Hayashi to avoid sandbox file issues.
+  dimension: numerical
+  status: pass
+- id: xgboost_simulated
+  notes: Simulated data y = 3*x1 + N(0, 0.1), x2 irrelevant. XGBoost with 50 trees,
+    learning rate 0.1, max depth 3, default regularization. MSE and R^2 compared against
+    xgboost.XGBRegressor.
+  dimension: numerical
+  status: pass
+- id: xtgls_wagepan
+  notes: Panel feasible GLS with panel-level heteroskedasticity (Parks/Kmenta, Stata
+    xtgls panels(heteroskedastic)). R and Python references implement the same two-step
+    FGLS procedure used by Hayashi/Greeners.
+  dimension: numerical
+  status: pass
+- id: xtlogit_simulated
+  notes: Simulated panel with N=50 groups and T=4 periods. GEE logit with exchangeable
+    working correlation; coefficients and sandwich standard errors compared.
+  dimension: numerical
+  status: pass
+- id: xtpoisson_simulated
+  notes: Simulated panel with N=50 groups and T=4 periods. GEE Poisson with exchangeable
+    working correlation; coefficients and sandwich standard errors compared.
+  dimension: numerical
+  status: pass
+- id: xtprobit_simulated
+  notes: Simulated panel with N=50 groups and T=4 periods. GEE probit with exchangeable
+    working correlation; coefficients and sandwich standard errors compared.
+  dimension: numerical
+  status: pass
+- id: xtsum_wooldridge_wagepan
+  notes: Overall, between, and within panel summary for lwage.
+  dimension: numerical
+  status: pass
+- id: zinb_affairs
+  notes: ZINB model of number of affairs on demographic predictors.
+  dimension: numerical
+  status: pass
+- id: zip_affairs
+  notes: ZIP model of number of affairs on demographic predictors.
+  dimension: numerical
+  status: pass
+- id: zivot_andrews_simulated
+  notes: Zivot-Andrews structural-break unit-root test on a simulated random walk.
   dimension: numerical
   status: pass

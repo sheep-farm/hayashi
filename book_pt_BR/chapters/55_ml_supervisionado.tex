@@ -1,0 +1,120 @@
+\chapter{Aprendizado de Máquina Supervisionado}
+
+\section{Por que aprendizado de máquina em uma linguagem de econometria?}
+
+A econometria clássica é forte quando o objetivo é inferência:
+estimar um parâmetro, testar uma hipótese ou recuperar um efeito
+causal. O aprendizado de máquina é mais útil quando o objetivo é
+previsão: encontrar uma função flexível $\hat f(X)$ que aproxime $Y$
+bem fora da amostra.
+
+\hayashi{} faz a ponte entre os dois. Seus comandos de ML usam a mesma
+sintaxe de fórmula do OLS ou logit e retornam objetos compatíveis com
+\texttt{predict}, \texttt{glance} e \texttt{tidy}.
+
+Este capítulo cobre métodos baseados em árvores, redes neurais e um
+processo gaussiano. Não é um curso completo de ML; mostra como estimar,
+interpretar e comparar esses modelos dentro do \hayashi{}.
+
+\section{Random Forest}
+
+Random Forest (Breiman, 2001) ajusta um conjunto de árvores de decisão
+em amostras bootstrap, média suas previsões para reduzir variância.
+
+\begin{lstlisting}[caption={Regressão com Random Forest}]
+set_seed(42)
+let n = 500
+generate df x1 = rnormal(n)
+generate df x2 = rnormal(n)
+generate df y = 2 + 0.5*x1 - 0.3*x2 + 0.4*x1*x2 + rnormal(n)
+
+let m_rf = rf(y ~ x1 + x2, df, trees=200, depth=10)
+print(m_rf)
+
+let g = glance(m_rf)
+print(g)
+\end{lstlisting}
+
+Principais saídas:
+
+\begin{itemize}
+\item \texttt{r2} e \texttt{oob\_r2}: $R^2$ dentro da amostra e out-of-bag
+\item importância de variáveis: redução de impureza atribuível a cada
+      regressor
+\end{itemize}
+
+Use \texttt{predict(df, yhat = m\_rf)} para obter valores ajustados em um
+DataFrame.
+
+\section{Gradient Boosting e XGBoost}
+
+Gradient Boosting constrói árvores sequencialmente, cada uma ajustando
+os resíduos do conjunto anterior. XGBoost (Chen e Guestrin, 2016)
+extende isso com informação de segunda ordem e regularização.
+
+\begin{lstlisting}[caption={Regressão com XGBoost}]
+let m_xgb = xgboost(y ~ x1 + x2, df, trees=100, depth=4, lr=0.1)
+print(glance(m_xgb))
+\end{lstlisting}
+
+Boosting tende a superar Random Forest em dados tabulares estruturados,
+mas é mais sensível a hiperparâmetros e pode sofrer overfit.
+
+\section{Perceptron Multicamadas}
+
+O comando \texttt{mlp} ajusta uma rede feed-forward com uma camada oculta,
+função de ativação sigmoide e backpropagation com momentum.
+
+\begin{lstlisting}[caption={Rede neural}]
+let m_mlp = mlp(y ~ x1 + x2, df, hidden=20, lr=0.01, epochs=500)
+print(glance(m_mlp))
+\end{lstlisting}
+
+É útil para capturar interações não lineares, mas oferece menos
+transparência que árvores e geralmente precisa de ajustes.
+
+\section{LSTM e Transformer para séries}
+
+Para séries temporais, \texttt{lstm} e \texttt{transformer} usam janelas de
+observações para prever o próximo valor. Eles padronizam o alvo
+internamente.
+
+\begin{lstlisting}[caption={Previsão com LSTM}]
+let n = 200
+generate df y = 0.1*(_n - n/2) + 0.5*sin(2*pi()*_n/20) + rnormal(n)
+let m_lstm = lstm(df, y, seqlen=10, hidden=10, epochs=100, forecast=5)
+print(m_lstm)
+\end{lstlisting}
+
+Esses modelos são determinísticos uma vez fixada a semente, mas sua
+qualidade preditiva é sensível a convenções. São experimentais.
+
+\section{Processo Gaussiano}
+
+Um Processo Gaussiano define uma distribuição sobre funções. É não
+paramétrico no sentido de que não fixa uma forma funcional e reporta
+incerteza em torno de cada previsão.
+
+\begin{lstlisting}[caption={Regressão com Processo Gaussiano}]
+let m_gp = gp(y ~ x1 + x2, df)
+print(m_gp)
+\end{lstlisting}
+
+GP é atraente para conjuntos pequenos e quando a propagação de
+incerteza importa. É mais lento e mais intensivo em memória que métodos
+baseados em árvores.
+
+\section{Quando preferir qual?}
+
+\begin{itemize}
+\item \textbf{Interpretabilidade + robustez:} Random Forest ou Gradient Boosting
+\item \textbf{Acurácia preditiva com ajuste:} XGBoost
+\item \textbf{Funções não lineares suaves:} MLP ou GP
+\item \textbf{Séries:} LSTM / Transformer
+\item \textbf{Incerteza:} GP ou BART
+\end{itemize}
+
+Todos os comandos aceitam uma fórmula padrão do \hayashi{} e retornam um
+objeto compatível com \texttt{predict} e \texttt{glance}. Erros padrão geralmente não
+são reportados porque esses métodos não são projetados para inferência
+direta sobre coeficientes individuais.

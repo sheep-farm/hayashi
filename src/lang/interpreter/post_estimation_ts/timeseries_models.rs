@@ -2,6 +2,7 @@ use super::*;
 
 impl Interpreter {
     /// `vecm(df, y1, y2, ..., lags=2, rank=1)` — Vector Error Correction.
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn eval_vecm(
         &mut self,
         args: &[Expr],
@@ -17,7 +18,7 @@ impl Interpreter {
             Value::DataFrame(d) => d,
             _ => {
                 return Err(HayashiError::Type(
-                    "primeiro argumento deve ser um DataFrame".into(),
+                    "vecm(): first argument must be a DataFrame".into(),
                 ))
             }
         };
@@ -55,6 +56,7 @@ impl Interpreter {
     }
 
     /// `var(df, y1, y2, ..., lags=2)` — Vetor Auto-regressivo.
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn eval_var(
         &mut self,
         args: &[Expr],
@@ -70,7 +72,7 @@ impl Interpreter {
             Value::DataFrame(d) => d,
             _ => {
                 return Err(HayashiError::Type(
-                    "primeiro argumento deve ser um DataFrame".into(),
+                    "var(): first argument must be a DataFrame".into(),
                 ))
             }
         };
@@ -101,6 +103,7 @@ impl Interpreter {
     }
 
     /// `irf(model, steps=10)` — Impulse Response Function.
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn eval_irf(
         &mut self,
         args: &[Expr],
@@ -110,6 +113,7 @@ impl Interpreter {
             return Err(HayashiError::Runtime("irf() requires a VAR model".into()));
         }
         let model = match self.eval_expr(&args[0])? {
+            #[cfg(feature = "greeners-timeseries")]
             Value::VarResult(m) => m,
             _ => return Err(HayashiError::Type("irf() requires a VAR model".into())),
         };
@@ -128,10 +132,15 @@ impl Interpreter {
         let names = &model.var_names;
         let sep = "─".repeat(14 + k * 12);
 
-        println!("\nIRF — VAR({}) — {} passos", model.lags, steps);
+        println!("\nIRF — VAR({}) — {} steps", model.lags, steps);
+
+        let mut h_vec = Vec::new();
+        let mut impulse_vec = Vec::new();
+        let mut response_vec = Vec::new();
+        let mut irf_vec = Vec::new();
 
         for j in 0..k {
-            println!("\n  Impulso: {}", names[j]);
+            println!("\n  Impulse: {}", names[j]);
             println!("  {sep}");
             let header: String = names
                 .iter()
@@ -142,7 +151,13 @@ impl Interpreter {
             println!("  {sep}");
             for h in 0..steps {
                 let row: String = (0..k)
-                    .map(|i| format!("{:>12.4}", tensor[[h, i, j]]))
+                    .map(|i| {
+                        h_vec.push((h + 1) as i64);
+                        impulse_vec.push(Value::Str(names[j].clone()));
+                        response_vec.push(Value::Str(names[i].clone()));
+                        irf_vec.push(Value::Float(tensor[[h, i, j]]));
+                        format!("{:>12.4}", tensor[[h, i, j]])
+                    })
                     .collect::<Vec<_>>()
                     .join("");
                 println!("  {:>6}{row}", h + 1);
@@ -151,10 +166,20 @@ impl Interpreter {
         }
         println!();
 
-        Ok(Value::Nil)
+        let mut columns = HashMap::new();
+        columns.insert(
+            "h".into(),
+            Value::List(Arc::new(h_vec.into_iter().map(Value::Int).collect())),
+        );
+        columns.insert("impulse".into(), Value::List(Arc::new(impulse_vec)));
+        columns.insert("response".into(), Value::List(Arc::new(response_vec)));
+        columns.insert("irf".into(), Value::List(Arc::new(irf_vec)));
+        let df = self.dict_to_dataframe(&columns)?;
+        Ok(Value::DataFrame(Arc::new(df)))
     }
 
     /// `fevd(model, steps=10)` — Forecast Error Variance Decomposition.
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn eval_fevd(
         &mut self,
         args: &[Expr],
@@ -164,6 +189,7 @@ impl Interpreter {
             return Err(HayashiError::Runtime("fevd() requires a VAR model".into()));
         }
         let model = match self.eval_expr(&args[0])? {
+            #[cfg(feature = "greeners-timeseries")]
             Value::VarResult(m) => m,
             _ => return Err(HayashiError::Type("fevd() requires a VAR model".into())),
         };
@@ -188,6 +214,11 @@ impl Interpreter {
             model.lags, steps
         );
 
+        let mut h_vec = Vec::new();
+        let mut response_vec = Vec::new();
+        let mut source_vec = Vec::new();
+        let mut fevd_vec = Vec::new();
+
         for i in 0..k {
             println!("\n  Variable: {}", names[i]);
             println!("  {sep}");
@@ -200,7 +231,13 @@ impl Interpreter {
             println!("  {sep}");
             for h in 0..steps {
                 let row: String = (0..k)
-                    .map(|j| format!("{:>col_w$.1}%", tensor[[h, i, j]] * 100.0))
+                    .map(|j| {
+                        h_vec.push((h + 1) as i64);
+                        response_vec.push(Value::Str(names[i].clone()));
+                        source_vec.push(Value::Str(names[j].clone()));
+                        fevd_vec.push(Value::Float(tensor[[h, i, j]]));
+                        format!("{:>col_w$.1}%", tensor[[h, i, j]] * 100.0)
+                    })
                     .collect::<Vec<_>>()
                     .join("");
                 println!("  {:>6}{row}", h + 1);
@@ -209,10 +246,20 @@ impl Interpreter {
         }
         println!();
 
-        Ok(Value::Nil)
+        let mut columns = HashMap::new();
+        columns.insert(
+            "h".into(),
+            Value::List(Arc::new(h_vec.into_iter().map(Value::Int).collect())),
+        );
+        columns.insert("response".into(), Value::List(Arc::new(response_vec)));
+        columns.insert("source".into(), Value::List(Arc::new(source_vec)));
+        columns.insert("fevd".into(), Value::List(Arc::new(fevd_vec)));
+        let df = self.dict_to_dataframe(&columns)?;
+        Ok(Value::DataFrame(Arc::new(df)))
     }
 
     /// `arima` / `sarima(df, varname, p=1, d=1, q=1, ...)`.
+    #[cfg(feature = "greeners-timeseries")]
     pub(super) fn eval_arima(
         &mut self,
         func: &str,
@@ -228,18 +275,18 @@ impl Interpreter {
         let df = match self.eval_expr(&args[0])? {
             Value::DataFrame(d) => d,
             _ => {
-                return Err(HayashiError::Type(
-                    "primeiro argumento deve ser um DataFrame".into(),
-                ))
+                return Err(HayashiError::Type(format!(
+                    "{func}(): first argument must be a DataFrame"
+                )))
             }
         };
 
         let col_name = match &args[1] {
             Expr::Var(n) | Expr::Str(n) => n.clone(),
             _ => {
-                return Err(HayashiError::Type(
-                    "second argument must be o variable name".into(),
-                ))
+                return Err(HayashiError::Type(format!(
+                    "{func}(): second argument must be a variable name"
+                )))
             }
         };
 

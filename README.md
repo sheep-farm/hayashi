@@ -3,7 +3,7 @@
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
 [![Docs: CC BY-SA 4.0](https://img.shields.io/badge/Docs-CC%20BY--SA%204.0-lightgrey.svg)](LICENSE-BOOKS.md)
 [![Rust](https://img.shields.io/badge/Rust-2021-orange.svg)](https://www.rust-lang.org)
-[![Version](https://img.shields.io/badge/version-0.2.8-blue.svg)](Cargo.toml)
+[![Version](https://img.shields.io/badge/version-0.2.10-blue.svg)](Cargo.toml)
 [![crates.io](https://img.shields.io/crates/v/hayashi-lang.svg)](https://crates.io/crates/hayashi-lang)
 [![CI](https://github.com/sheep-farm/hayashi/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/sheep-farm/hayashi/actions/workflows/ci.yml?query=branch%3Amaster)
 
@@ -57,6 +57,20 @@ hay --help           # list commands
 ```
 
 REPL features: tab completion for keywords + variables, syntax highlighting (keywords blue, strings green, numbers yellow), history hints (fish-style).
+
+## Debugging
+
+The VS Code extension supports breakpoints, stepping, and variable inspection via the Debug Adapter Protocol (`hay dap`). Model objects expand in the Variables panel with a concise summary and structured children:
+
+```
+result: OLS(k=2, n=10000), R2=1.0000
+  coefficients    DataFrame(2 rows, 7 cols)
+  fit             Dict(13 entries)
+  params          Series(params: 2 values)
+  ...
+```
+
+See the [debugging guide](docs/src/debugging.md) and the [VS Code extension README](editors/vscode/README.md) for details.
 
 ## Quick start
 
@@ -130,6 +144,7 @@ Function parameters are `const` by default — data enters immutable, result exi
 | Match | `match expr { pat => result, _ => default }` | Yes |
 | Block expression | `{ stmt; ...; expr }` | Yes |
 | For loop | `for i in 1..10 { }` / `for v in list { }` | No |
+| Parallel for | `let r = parallel for v in list, threads=N { }` | No |
 | While loop | `while cond { }` | No |
 | Try/catch | `try { } catch e { }` | No |
 | Break/continue | `break` / `continue` | — |
@@ -245,6 +260,7 @@ load "file.db" as df, query="SELECT * FROM prices WHERE year > 2020"
 load "odbc://DSN=mydb" as df, query="SELECT * FROM t"  // ODBC (feature flag)
 load "https://...data.csv" as df         // URL (auto-download)
 load "data.csv" as df, sep=";"           // custom delimiter
+load "panel.parquet" as df, columns=[ticker, date, close], where="ticker == \"AAPL\""  // projection + filter pushdown
 
 // Export — 8 formats
 export(df, "csv", "out.csv")
@@ -257,14 +273,14 @@ export(m, "latex", "table.tex")
 export(m, "html", "table.html")
 ```
 
-`query=` is raw SQL executed by SQLite or the configured ODBC database. Remote `load` downloads untrusted input even with URL validation and size/time limits. ODBC support is optional and requires system ODBC drivers. See the [Trust Model](docs/src/trust-model.md).
+`query=` is raw SQL executed by SQLite or the configured ODBC database. `columns=` and `where=` push column projection and row filtering down to the data source (Parquet uses Arrow `ProjectionMask` + `RowFilter`; SQLite/ODBC rewrites the `SELECT`/`WHERE`; CSV/TSV/DTA/Excel filter row-by-row), avoiding loading the full dataset into RAM — useful for large files. `query=` cannot be combined with `columns=` or `where=`. Remote `load` downloads untrusted input even with URL validation and size/time limits. ODBC support is optional and requires system ODBC drivers. See the [Trust Model](docs/src/trust-model.md).
 
 ## Estimators
 
 | Category | Commands |
 |---|---|
 | Linear | `ols` `reg` `iv` `wls` `glsar` |
-| Panel | `fe` `re` `be` `feiv` `ab` `sysgmm` `pcse` `xtgls` |
+| Panel | `fe` `re` `feiv` `ab` `sysgmm` `pcse` `xtgls` |
 | Binary | `logit` `probit` `clogit` |
 | Count | `poisson` `nbreg` `zip` `zinb` |
 | Ordinal | `ologit` `oprobit` `mlogit` `cmnlogit` |
@@ -277,8 +293,20 @@ export(m, "html", "table.html")
 | VAR | `var` `vecm` `varma` `svar` `irf` `fevd` |
 | Causal | `did` `rd` `fuzzy_rd` `synth` `psm` |
 | Finance | `fmb` `portsort` `doublesort` |
-| Robust / flexible | `rlm` `gee` `glm` `betareg` `mixed` `lowess` `gam` |
-| Systems / factors | `sur` `three_sls` `pca` `factor` `dfm` |
+| Robust / flexible | `rlm` `gee` `glm` `betareg` `mixed` `lowess` `gam` `isotonic` |
+| Systems / factors | `sur` `three_sls` `pca` `factor` `dfm` `manova` `cancorr` |
+
+### Machine learning, clustering, and spatial
+
+Hayashi also exposes a growing set of ML, clustering, spatial, and Bayesian estimators:
+
+| Category | Commands |
+|---|---|
+| Machine learning | `rf` `gbm` `qrf` `xgboost` `mlp` `lstm` `transformer` `bart` `gp` |
+| Causal ML | `causalforest` `grf` `dr_learner` `tmle` `orf` `bsc` `dml_crossfit` |
+| Clustering / unsupervised | `kmeans` `dbscan` `hclust` `tsne` `umap` `spectral` `gmm_clust` `biplot` `kde` |
+| Spatial | `spatial_sar` `spatial_sem` `spatial_durbin` `spatial_panel_sar` `spatial_panel_sem` `spatial_durbin_error` |
+| Bayesian / frontier | `bayes_lm` `bayes_sfa_production` `bayes_sfa_cost` `sfa_production` `sfa_cost` |
 
 Common options include `if=` for subsamples and `cov=`/`cluster=`/`nw=` where supported. Core regression estimators auto-detect and drop perfectly collinear variables (Stata-style `(omitted)` display).
 
@@ -435,6 +463,9 @@ hay validate
 See `validation/README.md` for the full protocol and `validation/MATRIX.md` for
 the current status of every case.
 
+The matrix now covers **215 cases across 115 estimators**, with 199 passing
+against R and Python reference implementations.
+
 ## Graphs
 
 ```
@@ -522,6 +553,7 @@ let name = match code {
 // Loops
 for i in 1..10 { display i }
 for v in ["X1", "X2"] { eststo(ols("Y ~ " + v, df)) }
+let r = parallel for v in list, threads=4 { eststo(ols("Y ~ " + v, df)) }
 while cond { ... }
 
 // Try/catch
@@ -565,6 +597,13 @@ let ratio = finance::sharpe(ret, rf)
 ```
 // String interpolation
 let msg = f"mean = {mu:.2f}, n = {n}, p = {p:.4e}"
+
+// Template strings (t-strings) re-evaluate the generated text as code
+let n = 1
+let x1 = 42
+let y = t"x{n}"                     // y == 42, as if you had written x1
+let gen_y = "x1 + x2 + x3"
+generate df y = t"{gen_y}"          // creates column y from x1 + x2 + x3
 
 // Pipe operator (|>)
 [5, 3, 1, 4, 2] |> sort |> reverse |> map(|x| x * 10)
@@ -651,7 +690,10 @@ import("finance")                    // finance::sharpe(), finance::sortino()
 import("finance", as=fin)            // fin::sharpe()
 
 // Install script or native plugin from GitHub (-y to bypass overwrite prompt)
-// $ hay install user/repo [-y]
+// $ hay install user/repo [version] [-y]
+install("user/repo")                    // callable from inside a Hayashi script
+install("user/repo", version="v1.2.3")
+install("user/repo", force=true)        // overwrite if already installed
 
 // Uninstall a package (successfully deletes native plugin files, dirs, and metadata)
 // $ hay remove user/repo

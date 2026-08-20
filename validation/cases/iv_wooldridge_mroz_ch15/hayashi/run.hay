@@ -1,0 +1,8 @@
+// Wooldridge (Introductory Econometrics, 7e), Chapter 15, Example 15.1.
+// returns to schooling IV equation for married women: lwage ~ educ + exper + expersq, instruments: fatheduc, motheduc, exper, expersq.
+
+load "validation/cases/iv_wooldridge_mroz_ch15/data/mroz.csv" as df
+
+let m = iv(lwage ~ educ + exper + expersq, ~ fatheduc + motheduc + exper + expersq, df)
+
+export(m, "txt", "/dev/stdout")

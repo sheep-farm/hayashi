@@ -68,6 +68,19 @@ Para entrar no REPL interativo:
 hay
 \end{lstlisting}
 
+\section{Kernel Jupyter}
+
+O \hayashi{} também fornece um kernel Jupyter. Para compilá-lo e instalá-lo a
+partir do código-fonte:
+
+\begin{lstlisting}[style=inline, language=sh]
+cargo build --release --bin hay-kernel --features native
+./target/release/hay-kernel --install
+\end{lstlisting}
+
+Depois inicie o JupyterLab ou Jupyter Notebook e selecione o kernel
+\textbf{Hayashi}. Veja o capítulo correspondente para mais detalhes.
+
 \begin{nota}
   No Arch Linux com Omarchy/Hyprland, \texttt{\$HOME/.cargo/bin} já costuma estar no
   \texttt{PATH} se o shell foi configurado com \texttt{rustup}. Caso contrário, adicione

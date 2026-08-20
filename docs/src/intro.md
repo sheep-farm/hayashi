@@ -19,7 +19,7 @@ esttab(m1, m2, m3)
 - **Free and open source** (GPL-3.0) — no license fees, no restrictions
 - **Single binary** (~20 MB) — no installers, no dependencies for the default build
 - **Broad estimator coverage** — OLS, IV, panel models, Logit/Probit, ARIMA, GARCH, VAR, DID, and more
-- **Modern language** — closures, pipe (`|>`), namespaces (`mod::func()`), f-strings, try/catch
+- **Modern language** — closures, pipe (`|>`), namespaces (`mod::func()`), f-strings, t-strings, try/catch
 - **8 I/O formats** — CSV, DTA, Excel, Parquet, JSON, SQLite, TSV, ODBC
 - **Built-in `esttab`** — publication-ready comparison tables in one line
 - **100% Rust** — no C, no Fortran, no BLAS/LAPACK to install

@@ -1,0 +1,8 @@
+// Wooldridge (Introductory Econometrics, 7e), Chapter 14, Example 14.3.
+// pooled job training scrap rate equation: lscrap ~ d88 + d89 + grant + grant_1 + lsales + lemploy.
+
+load "validation/cases/ols_wooldridge_jtrain_pooled_ch14/data/jtrain.csv" as df
+
+let m = ols(lscrap ~ d88 + d89 + grant + grant_1 + lsales + lemploy, df)
+
+export(m, "csv", "/dev/stdout")

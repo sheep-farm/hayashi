@@ -687,6 +687,7 @@ SUR             & \texttt{sur()}        & \texttt{sureg}        & \texttt{system
 FE (within)     & \texttt{fe()}         & \texttt{xtreg, fe}    & \texttt{plm(within)}   & \texttt{PanelOLS()} \\
 RE (GLS)        & \texttt{re()}         & \texttt{xtreg, re}    & \texttt{plm(random)}   & \texttt{RandomEffects()} \\
 Hausman         & \texttt{hausman()}    & \texttt{hausman}      & \texttt{phtest()}      & manual \\
+Hausman robusto & \texttt{hausman\_robust()} & manual           & \texttt{phtest(robust)} & manual \\
 AB-GMM          & \texttt{ab()}         & \texttt{xtabond2}     & \texttt{pgmm()}        & \texttt{FirstDifferenceGMM()} \\
 PCSE            & \texttt{pcse()}       & \texttt{xtpcse}       & \texttt{pcse()}        & — \\
 GEE             & \texttt{gee()}        & \texttt{xtgee}        & \texttt{geeglm()}      & \texttt{GEE()} \\
@@ -749,6 +750,18 @@ PCA             & \texttt{pca()}        & \texttt{pca}          & \texttt{prcomp
 Análise fatorial & \texttt{factor()}    & \texttt{factor}       & \texttt{factanal()}    & \texttt{FactorAnalysis()} \\
 Cor. canônica   & \texttt{cancorr()}    & \texttt{canon}        & \texttt{cancor()}      & \texttt{CCA()} \\
 MANOVA          & \texttt{manova()}     & \texttt{manova}       & \texttt{manova()}      & \texttt{MANOVA()} \\
+\midrule
+\multicolumn{5}{l}{\textit{Agrupamento e redução de dimensionalidade}} \\
+K-Means         & \texttt{kmeans()}     & \texttt{cluster kmeans} & \texttt{kmeans()}    & \texttt{KMeans()} \\
+Hierárquico     & \texttt{hclust()}     & \texttt{cluster single} & \texttt{hclust()}    & \texttt{AgglomerativeClustering()} \\
+DBSCAN          & \texttt{dbscan()}     & —                     & \texttt{dbscan()}      & \texttt{DBSCAN()} \\
+t-SNE           & \texttt{tsne()}       & —                     & \texttt{tsne()}        & \texttt{TSNE()} \\
+UMAP            & \texttt{umap()}       & —                     & \texttt{umap()}        & \texttt{UMAP()} \\
+Biplot PCA      & \texttt{biplot()}     & \texttt{pca}          & \texttt{biplot()}      & manual \\
+\midrule
+\multicolumn{5}{l}{\textit{Pós-estimação}} \\
+Coefs. tidy     & \texttt{tidy()}       & —                     & \texttt{broom::tidy()} & \texttt{statsmodels summary} \\
+Glance          & \texttt{glance()}     & —                     & \texttt{broom::glance()} & manual \\
 \midrule
 \multicolumn{5}{l}{\textit{Inferência e testes}} \\
 Teste $t$       & \texttt{ttest()}      & \texttt{ttest}        & \texttt{t.test()}      & \texttt{ttest\_ind()} \\

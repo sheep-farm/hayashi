@@ -19,4 +19,4 @@ result <- list(
   )
 )
 
-cat(toJSON(result, pretty = TRUE, auto_unbox = TRUE))
+cat(toJSON(result, pretty = FALSE, digits = NA, auto_unbox = TRUE))

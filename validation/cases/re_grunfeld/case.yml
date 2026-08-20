@@ -1,36 +1,30 @@
-id: re-grunfeld
+id: re_grunfeld
 title: Random-effects investment demand on Grunfeld
 estimator_family: re
-status: active
+status: pass
 dimension: numerical
-
 dataset:
   name: grunfeld
   source: statsmodels.datasets / plm package
   licence: public teaching dataset
-
 references:
-  - R
-  - Python
-
+- R
+- Python
 comparison:
   quantities:
-    - coefficients
-    - standard_errors
+  - coefficients
+  - standard_errors
   tolerances:
-    coefficients: 1e-1
-    standard_errors: 1e-3
-
+    coefficients: 1e-4
+    standard_errors: 1e-4
 output_format: txt
-
 hayashi_script: cases/re_grunfeld/hayashi/run.hay
 reference_scripts:
   R: cases/re_grunfeld/reference/run.R
   Python: cases/re_grunfeld/reference/run.py
-
 notes: Random-effects investment demand model (Grunfeld).
-
 result:
-  summary: ""
+  summary: "Hayashi matches R plm and Python linearmodels random-effects references with an explicit intercept."
   known_differences: []
-  issues_opened: []
+  issues_opened:
+  - 101

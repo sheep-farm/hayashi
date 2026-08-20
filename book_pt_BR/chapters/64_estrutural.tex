@@ -1,0 +1,79 @@
+\chapter{Equações Estruturais e Multivariadas}
+
+\section{SUR}
+
+Regressões Aparentemente Não Relacionadas (Zellner, 1962) estimam várias
+equações lineares simultaneamente, explorando a correlação entre seus
+distúrbios. É um estimador GLS aplicado a um sistema empilhado.
+
+\begin{lstlisting}[caption={SUR}]
+let m_sur = sur(df, y1 ~ x1, y2 ~ x2)
+print(m_sur)
+\end{lstlisting}
+
+Se as equações compartilham os mesmos regressores, SUR fornece as
+mesmas estimativas que OLS equação por equação, mas a estrutura de
+covariância ainda é útil para inferência.
+
+\section{Três estágios de mínimos quadrados}
+
+\texttt{three\_sls} estende SUR para modelos com regressores endógenos. É 2SLS
+seguido de um passo GLS nos resíduos transformados.
+
+\begin{lstlisting}[caption={3SLS}]
+let m_3sls = three_sls(df, y1 ~ x1, y2 ~ x2,
+                       instruments=["z1", "z2", "z3"])
+print(m_3sls)
+\end{lstlisting}
+
+\section{MANOVA}
+
+MANOVA testa se as médias dos grupos diferem em várias variáveis
+dependentes simultaneamente.
+
+\begin{lstlisting}[caption={MANOVA}]
+let m_manova = manova(df, [y1, y2], by=grupo)
+print(m_manova)
+\end{lstlisting}
+
+A saída inclui Lambda de Wilks, Traço de Pillai e as estatísticas F
+correspondentes.
+
+\section{Correlação canônica}
+
+\texttt{cancorr} encontra combinações lineares de $X$ e $Y$ que maximizam a
+correlação.
+
+\begin{lstlisting}[caption={Correlação canônica}]
+let m_can = cancorr(df, xvars=["x1", "x2"], yvars=["y1", "y2"])
+print(m_can)
+\end{lstlisting}
+
+\section{Modelos aumentados por fatores}
+
+\texttt{favar} aumenta uma VAR pequena com fatores de componentes principais
+extraídos de um painel amplo. É útil quando o número de preditores
+candidatos excede o número de observações.
+
+\begin{lstlisting}[caption={VAR aumentada por fatores}]
+let m_favar = favar(y1 ~ y2 + y3, df, observed="rate", factors=2)
+print(m_favar)
+\end{lstlisting}
+
+\texttt{fapanel} adiciona fatores estimados a uma regressão em painel.
+
+\begin{lstlisting}[caption={Painel aumentado por fatores}]
+let m_fapanel = fapanel(y ~ x1 + x2, df, aux="aux_df",
+                        id="empresa", factors=2)
+print(m_fapanel)
+\end{lstlisting}
+
+\section{FM-OLS}
+
+\texttt{fmols} estima uma regressão cointegrada com correções não paramétricas
+para endogeneidade e correlação serial na covariância de longo prazo.
+
+\begin{lstlisting}[caption={FM-OLS}]
+let m_fm = fmols(y ~ x1 + x2, df)
+print(m_fm)
+\end{lstlisting}

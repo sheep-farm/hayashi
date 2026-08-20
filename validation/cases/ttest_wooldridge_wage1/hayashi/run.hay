@@ -1,0 +1,8 @@
+// Load the Wooldridge wage1 dataset from CSV.
+load "validation/cases/ttest_wooldridge_wage1/data/wage1.csv" as df
+
+// One-sample t-test of wage mean against 5.
+let t = ttest(df, wage, mu=5.0)
+
+// Export the result as JSON for automated comparison.
+export(t, "json", "/dev/stdout")
