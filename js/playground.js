@@ -176,7 +176,7 @@ async function loadWasm() {
   outputArea.innerHTML = '<span class="output-placeholder">Loading Hayashi WebAssembly… (~6 MB)</span>';
 
   try {
-    const init = await import('../wasm/hayashi_lang.js');
+    const init = await import(`../wasm/hayashi_lang.js?cb=${Date.now()}`);
     // Fetch wasm with cache-busting to avoid stale module
     const wasmResp = await fetch('../wasm/hayashi_lang_bg.wasm?v=' + Date.now());
     const wasmBytes = await wasmResp.arrayBuffer();
