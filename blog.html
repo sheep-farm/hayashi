@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blog — Hayashi</title>
+  <meta name="description" content="Articles, tutorials, and use cases for the Hayashi econometrics language.">
+  <meta name="keywords" content="Hayashi blog, econometrics tutorials, applied econometrics, Hayashi examples">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+JP:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .blog {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 3rem 0 5rem;
+    }
+    .post-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .post-card {
+      margin-bottom: 2.5rem;
+      padding-bottom: 2.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .post-card:last-child {
+      border-bottom: none;
+    }
+    .post-title {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+      color: var(--text);
+      text-decoration: none;
+      display: inline-block;
+    }
+    .post-title:hover {
+      text-decoration: underline;
+    }
+    .post-meta {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+    }
+    .post-summary {
+      color: var(--text-muted);
+      font-size: 1.05rem;
+      line-height: 1.6;
+      margin-bottom: 1rem;
+    }
+    .post-body h2 {
+      font-size: 1.35rem;
+      margin-top: 2rem;
+      margin-bottom: 1rem;
+    }
+    .post-body h3 {
+      font-size: 1.15rem;
+      margin-top: 1.5rem;
+      margin-bottom: 0.75rem;
+    }
+    .post-body p {
+      line-height: 1.7;
+      margin-bottom: 1.25rem;
+    }
+    .post-body ul {
+      margin-bottom: 1.25rem;
+      padding-left: 1.5rem;
+    }
+    .post-body li {
+      margin-bottom: 0.5rem;
+      line-height: 1.6;
+    }
+    .post-body code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.9em;
+      background: var(--code-bg);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+    }
+    .post-body pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      overflow-x: auto;
+      margin-bottom: 1.25rem;
+    }
+    .post-body pre code {
+      background: none;
+      padding: 0;
+      font-size: 0.85rem;
+    }
+    .post-tag {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      background: var(--code-bg);
+      color: var(--text-muted);
+      margin-right: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="index.html" class="logo">
+        <span class="logo-mark" aria-label="Hayashi" title="林 (Hayashi, forest)">林</span>
+        <span class="logo-text">Hayashi Language</span>
+      </a>
+      <nav class="main-nav">
+        <a href="index.html">Home</a>
+        <a href="docs.html">Docs</a>
+        <a href="playground.html">Playground</a>
+        <a href="plugins.html">Plugins</a>
+        <a href="community.html">Community</a>
+        <a href="about.html">About</a>
+        <a href="blog.html">Blog</a>
+        <a href="changelog.html">Changelog</a>
+        <a href="https://github.com/sheep-farm/hayashi" target="_blank" rel="noopener">GitHub</a>
+      </nav>
+      <button class="menu-toggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <section class="page-hero">
+      <div class="container">
+        <h1>Blog</h1>
+        <p class="page-subtitle">Articles, tutorials, and real-world use cases for Hayashi.</p>
+      </div>
+    </section>
+
+    <div class="container">
+      <div class="blog">
+        <ul class="post-list">
+          <li class="post-card" id="hayashi-0-2-10">
+            <a href="#hayashi-0-2-10" class="post-title">Hayashi 0.2.10 is out</a>
+            <div class="post-meta">20 August 2026 · <span class="post-tag">release</span><span class="post-tag">validation</span></div>
+            <p class="post-summary">
+              115 estimators, 234 validation cases, a rebuilt WebAssembly playground, and a fully native Rust implementation. What changed, why it matters, and where the project goes next.
+            </p>
+
+            <div class="post-body">
+              <p>
+                The 0.2.10 release is the most comprehensive version of Hayashi so far. It is also a turning point: after this cycle, the focus shifts from adding estimators to showing what the language can already do.
+              </p>
+
+              <h2>The numbers</h2>
+              <ul>
+                <li><strong>115</strong> implemented estimators, from OLS and IV to spatial SAR/SEM, panel GEE, non-linear least squares, stochastic frontiers, machine-learning baselines, and copula models.</li>
+                <li><strong>234</strong> empirical validation cases: <strong>219 pass</strong>, <strong>15 not-supported</strong>, <strong>0 fail</strong>.</li>
+                <li><strong>100% Rust</strong>: no C, no Fortran, no system BLAS/LAPACK.</li>
+                <li><strong>9.6 MB</strong> WebAssembly bundle that runs the same interpreter in the browser.</li>
+              </ul>
+
+              <h2>What is new in 0.2.10</h2>
+              <p>
+                The biggest change is the move to <code>greeners = "2.0.0"</code> on crates.io. The numerical facade is now a single published crate, which removes the external Greeners checkout from CI and makes the project easier to build from source.
+              </p>
+              <p>
+                The release also brings a wave of new commands and diagnostics:
+              </p>
+              <ul>
+                <li><strong>Spatial econometrics</strong>: <code>spatial_sar</code>, <code>spatial_sem</code>, <code>spatial_durbin</code>, and panel variants.</li>
+                <li><strong>Panel GEE</strong>: <code>xtlogit</code>, <code>xtprobit</code>, <code>xtpoisson</code>.</li>
+                <li><strong>Non-linear least squares</strong>: <code>nls_exp</code>, <code>nls_power</code>, <code>nls_logistic</code>, <code>nls_cobb_douglas</code>, <code>nls_ces</code>.</li>
+                <li><strong>Causal inference</strong>: <code>did</code>, <code>synthdid</code>, <code>eventstudy</code>, <code>double_ml</code>.</li>
+                <li><strong>Time series</strong>: <code>modwt</code>, <code>tvp</code>, <code>setar</code>, <code>tvp_var</code>, <code>msvar</code>, <code>bvar</code>.</li>
+                <li><strong>ML baselines</strong>: <code>rf</code>, <code>gbm</code>, <code>mlp</code>, <code>qrf</code>.</li>
+                <li><strong>Diagnostics</strong>: <code>cusumtest</code>, <code>lrtest</code>, <code>akaike_weights</code>, <code>estat_overid</code>, <code>estat_endog</code>, <code>lroc</code>, <code>estat_gof</code>, <code>linktest</code>, and <code>marginsplot</code>.</li>
+              </ul>
+
+              <h2>Validation, not just features</h2>
+              <p>
+                A language for econometrics is only useful if the numbers are right. The validation programme runs Hayashi scripts against reference implementations in R, Python, and Stata, then checks coefficients, standard errors, and fit statistics within tolerance.
+              </p>
+              <p>
+                The 0.2.10 audit covers 234 cases. The previous 9 fail and 2 blocked cases are now passing. New cases include <code>decompose</code>, <code>ucm</code>, <code>cancorr</code>, <code>bplm</code>, <code>chamberlain</code>, NLS variants, spatial models, and several panel estimators.
+              </p>
+
+              <h2>Try it in the browser</h2>
+              <p>
+                The <a href="playground.html">playground</a> now ships a fresh WebAssembly build of the full interpreter. You can run small scripts, test syntax, or prototype a regression without installing anything.
+              </p>
+              <pre><code>let d = {"x": [1.0, 2.0, 3.0, 4.0, 5.0], "y": [2.0, 4.0, 5.0, 4.0, 5.0]}
+let df = dataframe(d)
+ols(y ~ x, df)</code></pre>
+
+              <h2>What comes next</h2>
+              <p>
+                With the numerical core validated and the language stabilized, the next months will focus on content: tutorials, reproductions of published papers, migration guides, and case studies. If you have a dataset or a paper you would like to see ported to Hayashi, open an issue or start a discussion on GitHub.
+              </p>
+              <p>
+                The 1.0.0 roadmap still includes an LSP, a formatter, and a debugger, but the priority now is to make 0.2.10 useful for real work.
+              </p>
+
+              <h2>Get the release</h2>
+              <p>
+                Install Hayashi 0.2.10 with the installer:
+              </p>
+              <pre><code>curl -sSL https://raw.githubusercontent.com/sheep-farm/hayashi/master/install.sh | bash -s v0.2.10</code></pre>
+              <p>
+                Or run it from the <a href="playground.html">playground</a>.
+              </p>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <span class="logo-mark" aria-label="Hayashi" title="林 (Hayashi, forest)">林</span>
+        <span>Hayashi Language</span>
+      </div>
+      <div class="footer-links">
+        <a href="https://github.com/sheep-farm/hayashi">GitHub</a>
+        <a href="https://github.com/sheep-farm/Greeners">Greeners</a>
+      </div>
+      <div class="footer-copy">
+        Hayashi: GPL-3.0-only · Greeners: MIT · Books &amp; docs: CC BY-SA 4.0
+        No cookies. No tracking. Your privacy is respected.
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>
