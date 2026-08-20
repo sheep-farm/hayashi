@@ -1796,7 +1796,7 @@ dependencies = [
 
 [[package]]
 name = "hayashi-lang"
-version = "0.2.10"
+version = "0.2.11-dev"
 dependencies = [
  "anyhow",
  "arrow",
