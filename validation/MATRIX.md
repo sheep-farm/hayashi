@@ -17,14 +17,14 @@
 | betareg | wooldridge::401k | R, Python | pass | 125 | Beta regression on 401k participation rates. Greeners now estimates the model by BFGS with an analytic gradient and computes standard errors from the observed inverse Hessian, matching R betareg. |
 | biplot | simulated | Python | pass | — | Symmetric PCA biplot. Compare explained-variance ratios and sign-robust squared loading sums. |
 | bootstrap | simulated | R, Python | pass | — | Simulated OLS data (y = 1 + 2x + noise). Hayashi bootstrap(ols, ...) is compared with R boot::boot and a Python statsmodels OLS pairs bootstrap; quantities are the mean and standard deviation of the bootstrap slope and intercept distributions. |
-| bplm | wooldridge::wagepan | Python | pass | — | Pooled OLS residuals from lwage ~ union + married. The Hayashi Breusch-Pagan LM statistic for individual effects matches the closed-form expression nT/(2(T-1)) * ((A/B) - 1)^2, where A = (1/T) * sum_i (sum_t e_it)^2 and B = sum_it e_it^2. |
+| bplm | wooldridge::wagepan | Python:passed * | pass | — | Pooled OLS residuals from lwage ~ union + married. The Hayashi Breusch-Pagan LM statistic for individual effects matches the closed-form expression nT/(2(T-1)) * ((A/B) - 1)^2, where A = (1/T) * sum_i (sum_t e_it)^2 and B = sum_it e_it^2. |
 | bsc | simulated |  | not-supported | — | No stable R CausalImpact/python pycausalimpact reference in the venv; Bayesian synthetic-control weights depend on prior tuning. |
 | bvar | simulated |  | not-supported | — | R mfbvar/bvar packages fail to install; PyMC implementation is too heavy for a deterministic CI reference. |
-| cancorr | simulated | Python | pass | — | Simulated dataset with two X and two Y variables. Compares the two canonical correlations and Wilks' lambda. The reference uses the generalised-eigenvalue formulation. |
+| cancorr | simulated | Python:passed * | pass | — | Simulated dataset with two X and two Y variables. Compares the two canonical correlations and Wilks' lambda. The reference uses the generalised-eigenvalue formulation. |
 | causal_impact | simulated_causal_impact | R, Python | pass | — | Bayesian structural time series for counterfactual inference (Brodersen 2015). Uses simulated data with known treatment effect. |
 | causalforest | simulated | R, Python | pass | — | Simulated data y = 1 + 2*x1 - x2 + 0.5*treated + N(0,1). Hayashi causalforest() reports the average treatment effect. R reference uses grf::causal_forest; Python uses econml.grf.CausalForest. |
 | descriptive | wooldridge::wage1 | R, Python | pass | — | Centiles 10, 25, 50, 75, 90 for the wage variable. |
-| chamberlain | wooldridge::wagepan | Python | pass | — | Chamberlain test on lwage ~ union + married. The Python reference builds the unrestricted model y_it = const + X_it beta + sum_s X_i,s Pi_s and tests H0: all Pi_s = 0 with an F-test, matching the Hayashi/Greeners formulation. |
+| chamberlain | wooldridge::wagepan | Python:passed * | pass | — | Chamberlain test on lwage ~ union + married. The Python reference builds the unrestricted model y_it = const + X_it beta + sum_s X_i,s Pi_s and tests H0: all Pi_s = 0 with an F-test, matching the Hayashi/Greeners formulation. |
 | descriptive | wooldridge::wage1 | R, Python | pass | — | 95% confidence interval for the wage mean. |
 | clogit | simulated | R, Python | pass | — | Simulated matched groups with group fixed effects and a single endogenous regressor. R reference is survival::clogit; groups without within-group variation are dropped at generation time. |
 | cloglog | wooldridge::affairs | R, Python | pass | — | Complementary log-log GLM on Wooldridge affairs. A sign error in the Greeners cloglog derivative caused IRLS divergence; the derivative is now positive and the model converges to the same estimates as R glm and statsmodels. |
@@ -39,7 +39,7 @@
 | cuped | simulated | Python, R | pass | — | Simulated A/B test with pre-experiment covariate. Compare CUPED-adjusted ATE. |
 | dbscan | simulated | Python | pass | — | Three dense 2D blobs plus five isolated noise points. Compare cluster and noise counts. |
 | dcc_garch | wooldridge::nyse | R, Python | pass | — | DCC-GARCH (Dynamic Conditional Correlation GARCH) on NYSE returns. Uses simplified DCC-GARCH(1,1) model. |
-| decompose | simulated | Python | pass | — | Simulated monthly series (trend + sinusoidal seasonal + noise). Compares selected non-boundary observations of trend, seasonal, and residual components from classical additive decomposition against statsmodels.seasonal_decompose. |
+| decompose | simulated | Python:passed * | pass | — | Simulated monthly series (trend + sinusoidal seasonal + noise). Compares selected non-boundary observations of trend, seasonal, and residual components from classical additive decomposition against statsmodels.seasonal_decompose. |
 | dfm | simulated | R, Python | pass | — | Simulated four observed series driven by two common factors. All variables are standardised in data/gen.py, so the quantities compared are communalities (1 minus observation-noise/uniqueness variance). This is invariant to the arbitrary sign/rotation of the estimated factors. Standard errors are not available in the tidy output and are therefore set to NaN on both sides. |
 | did | wooldridge::kielmc | R, Python | pass | — | Difference-in-differences effect of incinerator proximity on log house prices. |
 | did | simulated | R, Python | pass | — | Simulated 2x2 DiD with ATT=1.5. Coefficients and heteroskedasticity-consistent (HC0) standard errors are compared against base-R/sandwich and statsmodels. |
@@ -218,7 +218,7 @@
 | tvcopula | simulated |  | not-supported | — | R rmgarch/ccgarch packages not available; Python copula packages do not match Hayashi output. |
 | tvp | simulated | R, Python | pass | — | Simulated TVP data with smooth intercept and slope drift. The reference is the true final coefficient vector because Greeners TVP uses a simple Kalman-grid implementation with no readily available reference implementation. |
 | tvp_var | simulated |  | not-supported | — | No stable PyMC or R TVP reference implementation in the venv. |
-| ucm | simulated | Python | pass | — | Simulated monthly series with local-linear trend and deterministic seasonal (period=12). Compares the estimated irregular variance and the first/last smoothed level state. |
+| ucm | simulated | Python:passed * | pass | — | Simulated monthly series with local-linear trend and deterministic seasonal (period=12). Compares the estimated irregular variance and the first/last smoothed level state. |
 | umap | simulated | Python | pass | — | UMAP embedding of three 3D blobs; cluster quality measured via K-Means inertia. |
 | var | simulated_var1 | R, Python | pass | — | Uses the same simulated bivariate VAR(1) DGP as Chapter 28 of the book. |
 | var | statsmodels::macrodata | R, Python | pass | — | VAR(2) on US real GDP and consumption. |
