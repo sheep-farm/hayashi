@@ -19,7 +19,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Validation
 
-- The strict validation audit records 234 cases across 115 implemented estimators: 221 `pass` and 15 `not-supported`. The previous 9 `fail` and 2 `blocked` cases are now passing with Greeners 1.6.2.
+- The strict validation audit records 234 cases across 115 implemented estimators: 219 `pass` and 15 `not-supported`. The previous 9 `fail` and 2 `blocked` cases are now passing with Greeners 1.6.2.
 - Added `decompose_simulated`, `ucm_simulated`, `cancorr_simulated`, `bplm_wagepan`, `chamberlain_wagepan`, `nls_exp_simulated`, `nls_power_simulated`, `nls_logistic_simulated`, `nls_cobb_douglas_simulated`, `copula_simulated`, `spatial_sar_simulated`, `spatial_sem_simulated`, `xtlogit_simulated`, `xtprobit_simulated`, `xtpoisson_simulated`, `modwt_simulated`, `did_simulated`, `qreg_simulated`, `synthdid_simulated`, and finalised coverage for estimators previously marked as unvalidated in #128.
 - Estimators with single-language or algorithm-matched references: `bplm` (Python), `cancorr` (Python), `chamberlain` (Python), `decompose` (Python), `ucm` (Python), `clogit` (R), `kalman` (R), `tobit` (R), `cpoisson` (Python), `elasticnet` (Python), `feiv` (Python), `garch` (Python), `lpdid` (Python), `three_sls` (Python), `varma` (Python).
 - Thin or convention-sensitive coverage remains for `kalman`, `svar` (Cholesky), `sysgmm`, `pcse`, and `xtgls`.

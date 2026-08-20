@@ -5,7 +5,7 @@ This document tracks estimator families that are implemented and exposed to user
 ## Status of the validation programme
 
 - As of this update, `validation/matrix.yml` contains 234 cases.
-- 221 cases currently `pass`; 15 remain `not-supported` because a stable
+- 219 cases currently `pass`; 15 remain `not-supported` because a stable
   comparable reference is unavailable.
 - The cases compare Hayashi output against R and/or Python reference implementations (statsmodels, linearmodels, wooldridge, etc.) with family-specific tolerances.
 
