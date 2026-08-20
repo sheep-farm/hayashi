@@ -17,6 +17,7 @@
 | betareg | wooldridge::401k | R, Python | pass | 125 | Beta regression on 401k participation rates. Greeners now estimates the model by BFGS with an analytic gradient and computes standard errors from the observed inverse Hessian, matching R betareg. |
 | biplot | simulated | Python | pass | — | Symmetric PCA biplot. Compare explained-variance ratios and sign-robust squared loading sums. |
 | bootstrap | simulated | R, Python | pass | — | Simulated OLS data (y = 1 + 2x + noise). Hayashi bootstrap(ols, ...) is compared with R boot::boot and a Python statsmodels OLS pairs bootstrap; quantities are the mean and standard deviation of the bootstrap slope and intercept distributions. |
+| bplm | wooldridge::wagepan | Python | pass | — | Pooled OLS residuals from lwage ~ union + married. The Hayashi Breusch-Pagan LM statistic for individual effects matches the closed-form expression nT/(2(T-1)) * ((A/B) - 1)^2, where A = (1/T) * sum_i (sum_t e_it)^2 and B = sum_it e_it^2. |
 | bsc | simulated |  | not-supported | — | No stable R CausalImpact/python pycausalimpact reference in the venv; Bayesian synthetic-control weights depend on prior tuning. |
 | bvar | simulated |  | not-supported | — | R mfbvar/bvar packages fail to install; PyMC implementation is too heavy for a deterministic CI reference. |
 | cancorr | simulated | Python | pass | — | Simulated dataset with two X and two Y variables. Compares the two canonical correlations and Wilks' lambda. The reference uses the generalised-eigenvalue formulation. |

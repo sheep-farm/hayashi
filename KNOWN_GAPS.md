@@ -4,8 +4,8 @@ This document tracks estimator families that are implemented and exposed to user
 
 ## Status of the validation programme
 
-- As of this update, `validation/matrix.yml` contains 230 cases.
-- 217 cases currently `pass`; 15 remain `not-supported` because a stable
+- As of this update, `validation/matrix.yml` contains 233 cases.
+- 220 cases currently `pass`; 15 remain `not-supported` because a stable
   comparable reference is unavailable.
 - The cases compare Hayashi output against R and/or Python reference implementations (statsmodels, linearmodels, wooldridge, etc.) with family-specific tolerances.
 
@@ -13,7 +13,6 @@ This document tracks estimator families that are implemented and exposed to user
 
 These commands exist in the interpreter dispatch and are listed in user-facing docs, but have no corresponding case under `validation/cases/` (no numerical validation against a reference implementation):
 
-- `bplm` — (`src/lang/interpreter/estimators_panel.rs`)
 - `cffilter` / `cf_filter` / `christiano_fitzgerald` — Christiano-Fitzgerald band-pass filter (`src/lang/interpreter/estimators_misc.rs`)
 - `chamberlain` — Chamberlain panel estimator (`src/lang/interpreter/estimators_panel.rs`)
 - `cmnlogit` / `cmlogit` / `conditional_mlogit` — conditional multinomial logit (`src/lang/interpreter/estimators_panel.rs`)
@@ -24,9 +23,10 @@ These commands exist in the interpreter dispatch and are listed in user-facing d
 - `msauto` / `markov_ar` / `ms_ar` / `hamilton` — Markov-switching autoregression (`src/lang/interpreter/estimators_timeseries.rs`)
 - `pthresh` / `xtthresh` / `panel_threshold` / `threshold` — panel threshold regression (`src/lang/interpreter/estimators_misc.rs`)
 
-The following estimators were previously in this list but are now covered by validation cases (`be_simulated`, `feiv_simulated`, `clogit_simulated`, `cpoisson_simulated`, `varma_simulated`, `threesl_simulated`, `svec_simulated`, `decompose_simulated`, `ucm_simulated`, `cancorr_simulated`):
+The following estimators were previously in this list but are now covered by validation cases (`be_simulated`, `feiv_simulated`, `clogit_simulated`, `cpoisson_simulated`, `varma_simulated`, `threesl_simulated`, `svec_simulated`, `decompose_simulated`, `ucm_simulated`, `cancorr_simulated`, `bplm_wagepan`):
 
 - `be` — between estimator (`src/lang/interpreter/estimators_panel.rs`)
+- `bplm` — Breusch-Pagan LM test for individual effects (`src/lang/interpreter/estimators_panel.rs`)
 - `cancorr` — canonical correlation (`src/lang/interpreter/estimators_misc.rs`)
 - `clogit` — conditional logit (`src/lang/interpreter/estimators_panel.rs`)
 - `cpoisson` — conditional Poisson / PPML (`src/lang/interpreter/estimators_panel.rs`)

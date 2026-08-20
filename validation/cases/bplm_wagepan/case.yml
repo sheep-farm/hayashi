@@ -1,0 +1,30 @@
+id: bplm_wagepan
+title: Breusch-Pagan LM test for individual effects on Wooldridge wagepan
+estimator_family: bplm
+status: pass
+dimension: numerical
+
+dataset:
+  name: wooldridge::wagepan
+  source: R package wooldridge / Python wooldridge package
+  licence: n/a
+
+references:
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+  tolerances:
+    coefficients: 1e-12
+
+hayashi_script: cases/bplm_wagepan/hayashi/run.hay
+reference_scripts:
+  Python: cases/bplm_wagepan/reference/run.py
+
+notes: Pooled OLS residuals from lwage ~ union + married. The Hayashi Breusch-Pagan LM statistic for individual effects matches the closed-form expression nT/(2(T-1)) * ((A/B) - 1)^2, where A = (1/T) * sum_i (sum_t e_it)^2 and B = sum_it e_it^2.
+
+result:
+  summary: ""
+  known_differences: []
+  issues_opened: []

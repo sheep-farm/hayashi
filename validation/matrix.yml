@@ -75,6 +75,12 @@ cases:
     the mean and standard deviation of the bootstrap slope and intercept distributions.
   dimension: numerical
   status: pass
+- id: bplm_wagepan
+  notes: Pooled OLS residuals from lwage ~ union + married. The Hayashi Breusch-Pagan
+    LM statistic for individual effects matches the closed-form expression nT/(2(T-1))
+    * ((A/B) - 1)^2, where A = (1/T) * sum_i (sum_t e_it)^2 and B = sum_it e_it^2.
+  dimension: numerical
+  status: pass
 - id: bsc_simulated
   notes: No stable R CausalImpact/python pycausalimpact reference in the venv; Bayesian
     synthetic-control weights depend on prior tuning.
