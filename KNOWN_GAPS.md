@@ -9,11 +9,31 @@ This document tracks estimator families that are implemented and exposed to user
   comparable reference is unavailable.
 - The cases compare Hayashi output against R and/or Python reference implementations (statsmodels, linearmodels, wooldridge, etc.) with family-specific tolerances.
 
+## Known upstream numerical bugs
+
+Bugs in the Greeners version this release resolves to (`greeners 2.0.0`, pinned
+in `Cargo.lock`). They are user-visible in Hayashi and can only be fixed by a
+deliberate Greeners bump.
+
+- `cffilter` / `cf_filter` / `christiano_fitzgerald` — wrong filter. Greeners
+  2.0.0 computes a symmetric ideal-weight convolution followed by global mean
+  subtraction, while the documented (and reference) algorithm is the asymmetric
+  Christiano-Fitzgerald random-walk filter. The output diverges materially from
+  R `mFilter::cffilter` and Python `statsmodels.tsa.filters.cf_filter.cffilter`
+  — different shape and severe endpoint distortion with `drift=false` — and the
+  endpoints are exactly what the filter is used for (current-quarter cycle).
+  Reported as
+  [hayashi#148](https://github.com/sheep-farm/hayashi/issues/148); fixed in
+  Greeners `develop` (`f80b34c`, asymmetric weights plus reference-vector
+  regression tests), which is unreleased. Users of `cffilter` should treat the
+  current output as incorrect until Hayashi moves to a Greeners release that
+  carries the fix (a numerical change, so it lands as a Greeners minor version).
+
 ## Implemented estimators not yet in the validation matrix
 
 These commands exist in the interpreter dispatch and are listed in user-facing docs, but have no corresponding case under `validation/cases/` (no numerical validation against a reference implementation):
 
-- `cffilter` / `cf_filter` / `christiano_fitzgerald` — Christiano-Fitzgerald band-pass filter (`src/lang/interpreter/estimators_misc.rs`)
+- `cffilter` / `cf_filter` / `christiano_fitzgerald` — Christiano-Fitzgerald band-pass filter (`src/lang/interpreter/estimators_misc.rs`); the missing validation case is why the upstream bug above went unnoticed
 - `cmnlogit` / `cmlogit` / `conditional_mlogit` — conditional multinomial logit (`src/lang/interpreter/estimators_panel.rs`)
 - `gam` / `gamfit` — generalized additive model (`src/lang/interpreter/estimators_timeseries.rs`)
 - `markov` / `msar` / `markovswitching` — Markov-switching model (`src/lang/interpreter/estimators_panel.rs`)
