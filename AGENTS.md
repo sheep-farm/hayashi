@@ -95,7 +95,7 @@ Hayashi is a Rust interpreter split into two crates in this repo:
 - **Hayashi** (`hayashi-lang`): lexer, parser, interpreter, CLI,
   REPL, DAP server, I/O loaders, Jupyter kernel, documentation, examples,
   validation programme, benchmarks, and books.
-- **Greeners** (`greeners = "2.0.0"` on crates.io): the published facade
+- **Greeners** (`greeners = "=2.0.0"` on crates.io): the published facade
   aggregates the `greeners-*` sub-crates (`greeners-core`, `greeners-ols`,
   etc.). Hayashi's own Cargo features still gate estimator dispatch modules
   in `src/lang/interpreter`, but every sub-crate is now resolved through the
@@ -156,10 +156,17 @@ Public surface:
 
 ## 3. Greeners integration
 
-- `crates/greeners` is a local feature-gated facade that re-exports the
-  `greeners-*` sub-crates from crates.io. `Cargo.toml` depends on
-  `greeners = { path = "crates/greeners", default-features = false }` and
-  forwards feature flags (`greeners-ols`, `greeners-glm`, etc.) to the facade.
+- `Cargo.toml` depends on the published facade,
+  `greeners = { version = "=2.0.0", default-features = false }`. The local
+  `crates/greeners` facade is no longer wired into the build and the
+  `greeners-*` features are empty lists that only gate Hayashi's own dispatch
+  modules — `default-features = false` merely drops the facade's `url` feature.
+- The `=` pin plus a committed `Cargo.lock` and `--locked` in CI mean a Greeners
+  fix (including one that changes numbers) can only reach Hayashi through a
+  deliberate commit: either `cargo update -p greeners-<crate> --precise <ver>`
+  for a sub-crate patch, or a facade bump in a dedicated PR that runs the full
+  validation matrix. Never depend on a Greeners pre-release (`-rc`) outside
+  `dev`.
 - `src/lang/interpreter.rs` has `materialize_formula()` (lines ~1292–1441).
   It turns a Hayashi `Formula` into a Greeners `GFormula` by:
   1. Evaluating complex RHS terms (`log(K)`, `I(x^2)`) and inserting them
@@ -224,7 +231,9 @@ Public surface:
 - `ci.yml`: validation metadata check, `cargo deny check advisories`,
   `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test` on
   Ubuntu/macOS/Windows. Greeners is consumed as the published `greeners`
-  facade crate from crates.io; versions are pinned in `Cargo.lock`.
+  facade crate from crates.io; versions are pinned in `Cargo.lock` and CI runs
+  with `--locked`, so a lockfile drift fails the build instead of being
+  silently resolved.
 - `validation.yml`: full empirical validation on Ubuntu/macOS/Windows with
   R + Python.
 - `nightly.yml`: builds `dev` and publishes a `nightly` GitHub release.
@@ -269,9 +278,10 @@ Workflow: PRs target `dev`; `master` is release-only.
 
 ## 8. Design decisions, not fragilities
 
-- **Greeners dependency**: Hayashi consumes the published `greeners-*`
-  sub-crates from crates.io through a local `crates/greeners` feature-gated
-  re-export facade. The exact versions are pinned in `Cargo.lock`.
+- **Greeners dependency**: Hayashi consumes the published `greeners` facade
+  from crates.io with an exact pin (`=2.0.0`) and the versions frozen in
+  `Cargo.lock`. Greeners moves on its own release train; Hayashi follows it
+  only when someone bumps the pin.
 - **`parallel for` does not capture `Rc` model results**: this is
   intentional. Each iteration is an independent, self-contained sandbox
   whose state must die at the end of the block. Preventing `Rc`-backed
