@@ -261,3 +261,10 @@ estimators that are not yet numerically validated, see `KNOWN_GAPS.md`.
   `case.yml` is marked `not-supported` (the `run.hay` is a placeholder)
   because no stable R/Python reference is available. They are not numerically
   validated, but they are implemented and callable.
+
+Implemented is not validated. A command in the lists above may be numerically
+wrong and CI will stay green: `cffilter` shipped a different filter than the one
+documented for several releases, and only a hand-written comparison against R
+`mFilter` and statsmodels found it (hayashi#148). Treat output from an
+unvalidated command as unverified until a case exists, and record any confirmed
+defect in `KNOWN_GAPS.md` under "Known upstream numerical bugs".
