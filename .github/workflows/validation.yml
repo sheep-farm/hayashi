@@ -47,6 +47,20 @@ jobs:
           pip install --require-hashes -r validation/requirements.txt
           pip install -r validation/requirements-git.txt
 
+      # Source builds of R packages on macOS (e.g. data.table) include
+      # <libintl.h>, which the runner image no longer ships. R CMD INSTALL reads
+      # compiler flags from ~/.R/Makevars, not from the environment.
+      - name: Point R builds at gettext (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install gettext
+          prefix="$(brew --prefix gettext)"
+          mkdir -p "$HOME/.R"
+          {
+            echo "CPPFLAGS += -I$prefix/include"
+            echo "LDFLAGS += -L$prefix/lib"
+          } >> "$HOME/.R/Makevars"
+
       - name: Install R dependencies
         run: |
           Rscript -e 'install.packages("renv", repos="https://cloud.r-project.org")'
