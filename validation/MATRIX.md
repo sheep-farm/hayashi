@@ -214,7 +214,7 @@
 | transformer | simulated |  | not-supported | — | PyTorch/TensorFlow stochastic training is not reproducible enough for numerical validation. |
 | tsne | simulated | Python:passed * | pass | — | t-SNE embedding of three 3D blobs; cluster quality measured via K-Means inertia. |
 | descriptive | wooldridge::wage1 | R:passed *, Python:passed * | pass | — | One-sample t-test of wage mean against mu=5. |
-| tvar | simulated | R:passed *, Python:passed * | pass | — | Simulated bivariate TVAR with exogenous threshold q; references use no-intercept regime OLS to match Hayashi's output. |
+| tvar | simulated | R:failed, Python:passed * | partial | — | Simulated bivariate TVAR with exogenous threshold q; references use no-intercept regime OLS to match Hayashi's output. |
 | tvcopula | simulated |  | not-supported | — | R rmgarch/ccgarch packages not available; Python copula packages do not match Hayashi output. |
 | tvp | simulated | R:passed *, Python:passed * | pass | — | Simulated TVP data with smooth intercept and slope drift. The reference is the true final coefficient vector because Greeners TVP uses a simple Kalman-grid implementation with no readily available reference implementation. |
 | tvp_var | simulated |  | not-supported | — | No stable PyMC or R TVP reference implementation in the venv. |

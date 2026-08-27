@@ -1,4 +1,6 @@
 use super::super::helpers::*;
+#[allow(unused_imports)]
+use super::super::models::{BinaryModel, OlsModel};
 use super::super::*;
 use crate::lang::dap::model_expansion;
 
@@ -487,7 +489,11 @@ impl Interpreter {
         let v = self.eval_expr(&args[0])?;
         let model = match &v {
             #[cfg(feature = "greeners-glm")]
-            Value::BinaryResult(m) => m.clone(),
+            Value::Model(m) => m
+                .as_any()
+                .downcast_ref::<BinaryModel>()
+                .cloned()
+                .ok_or_else(|| self.rt_err("expected a logit/probit model".to_string()))?,
             _ => {
                 return Err(
                     self.rt_err("estat_classification: argument must be a logit/probit model")
@@ -533,7 +539,11 @@ impl Interpreter {
         let v = self.eval_expr(&args[0])?;
         let model = match &v {
             #[cfg(feature = "greeners-glm")]
-            Value::BinaryResult(m) => m.clone(),
+            Value::Model(m) => m
+                .as_any()
+                .downcast_ref::<BinaryModel>()
+                .cloned()
+                .ok_or_else(|| self.rt_err("expected a logit/probit model".to_string()))?,
             _ => return Err(self.rt_err("lroc: argument must be a logit/probit model")),
         };
         let probs = model.result.predict_proba(&model.x);
@@ -575,7 +585,11 @@ impl Interpreter {
         let v = self.eval_expr(&args[0])?;
         let model = match &v {
             #[cfg(feature = "greeners-glm")]
-            Value::BinaryResult(m) => m.clone(),
+            Value::Model(m) => m
+                .as_any()
+                .downcast_ref::<BinaryModel>()
+                .cloned()
+                .ok_or_else(|| self.rt_err("expected a logit/probit model".to_string()))?,
             _ => return Err(self.rt_err("estat_gof: argument must be a logit/probit model")),
         };
         let n_groups = match opt_map.get("groups") {
@@ -621,7 +635,11 @@ impl Interpreter {
         let v = self.eval_expr(&args[0])?;
         let model = match &v {
             #[cfg(feature = "greeners-glm")]
-            Value::BinaryResult(m) => m.clone(),
+            Value::Model(m) => m
+                .as_any()
+                .downcast_ref::<BinaryModel>()
+                .cloned()
+                .ok_or_else(|| self.rt_err("expected a logit/probit model".to_string()))?,
             _ => return Err(self.rt_err("linktest: argument must be a logit/probit model")),
         };
         let result = BinaryDiagnostics::linktest(&model.y, &model.x, &model.result.params)
@@ -663,7 +681,11 @@ impl Interpreter {
         }
         let model_val = self.eval_expr(&args[0])?;
         match &model_val {
-            Value::OlsResult(m) => {
+            Value::Model(m) => {
+                let m = m
+                    .as_any()
+                    .downcast_ref::<OlsModel>()
+                    .ok_or_else(|| self.rt_err("expected an OLS model".to_string()))?;
                 let mse = m.result.sigma * m.result.sigma;
                 let result = greeners::Influence::compute(&m.residuals, &m.x, mse)
                     .map_err(|e| HayashiError::Runtime(e.to_string()))?;

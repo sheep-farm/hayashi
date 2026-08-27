@@ -1,4 +1,6 @@
 use super::eval_expr::ColResult;
+#[allow(unused_imports)]
+use super::models::OlsModel;
 use super::*;
 use std::sync::Arc;
 
@@ -663,9 +665,7 @@ impl Interpreter {
             }
         }
         match (model_val, kind) {
-            (Value::OlsResult(m), k) => self.predict_ols_vals(m, k),
-            #[cfg(feature = "greeners-glm")]
-            (Value::BinaryResult(m), k) => self.predict_binary_vals(m, k),
+            (Value::Model(m), k) => m.predict(k, None),
             #[cfg(feature = "greeners-glm")]
             (Value::PoissonResult(r), k) => self.predict_poisson_vals(r, k),
             #[cfg(feature = "greeners-glm")]
@@ -705,11 +705,7 @@ impl Interpreter {
             #[cfg(feature = "greeners-glm")]
             (Value::GlmResult(r), k) => self.predict_glm_vals(r, k, df),
             (Value::LowessResult(r), k) => self.predict_lowess_vals(r, k),
-            (Value::PcaResult(m), k) => self.predict_pca_vals(m, k),
-            (Value::FactorResult(_), _) => Self::unsupported_predict(
-                "Factor Analysis",
-                "scores not available via FA — use pca() for scores; FA is for loadings analysis",
-            ),
+
             #[cfg(feature = "greeners-timeseries")]
             (Value::MarkovResult(r), k) => self.predict_markov_vals(r, k),
             #[cfg(feature = "greeners-glm")]
@@ -739,13 +735,7 @@ impl Interpreter {
                 "svar",
                 "no fitted values — use sirf() and sfevd() for impulse-response analysis",
             ),
-            #[cfg(feature = "greeners-ols")]
-            (Value::ThreeSLSResult(_), _) => Self::unsupported_predict(
-                "3sls",
-                "multiple equations — use print() to see coefficients per equation",
-            ),
-            #[cfg(feature = "greeners-timeseries")]
-            (Value::DFMResult(m), k) => self.predict_dfm_vals(m, k),
+
             #[cfg(feature = "greeners-timeseries")]
             (Value::MSARResult(r), k) => self.predict_msar_vals(r, k),
             #[cfg(feature = "greeners-timeseries")]
@@ -769,26 +759,6 @@ impl Interpreter {
     ) -> Result<Vec<f64>> {
         let x = build_x_from_varnames(df, names.unwrap_or(&[]))?;
         Ok(x.dot(params).to_vec())
-    }
-
-    fn predict_ols_vals(&self, m: &OlsModel, kind: &str) -> Result<Vec<f64>> {
-        match kind {
-            "xb" | "fitted" => Ok(m.x.dot(&m.result.params).to_vec()),
-            "residuals" | "resid" | "e" => Ok(m.residuals.to_vec()),
-            k => Err(HayashiError::Runtime(format!(
-                "predict OLS: kind '{k}' unknown — use: xb, residuals"
-            ))),
-        }
-    }
-
-    #[cfg(feature = "greeners-glm")]
-    fn predict_binary_vals(&self, m: &BinaryModel, kind: &str) -> Result<Vec<f64>> {
-        match kind {
-            "pr" | "xb" | "fitted" => Ok(m.result.predict_proba(&m.x).to_vec()),
-            k => Err(HayashiError::Runtime(format!(
-                "predict logit/probit: kind '{k}' unknown — use: pr"
-            ))),
-        }
     }
 
     #[cfg(feature = "greeners-glm")]
@@ -1159,6 +1129,7 @@ impl Interpreter {
         }
     }
 
+    #[allow(dead_code)]
     fn predict_pca_vals(&self, m: &PcaModel, kind: &str) -> Result<Vec<f64>> {
         if kind.starts_with("pc") && kind.len() > 2 {
             let comp: usize = kind[2..].parse::<usize>().map_err(|_| {
@@ -1249,6 +1220,7 @@ impl Interpreter {
     }
 
     #[cfg(feature = "greeners-timeseries")]
+    #[allow(dead_code)]
     fn predict_dfm_vals(&self, m: &DFMModel, kind: &str) -> Result<Vec<f64>> {
         if let Some(rest) = kind.strip_prefix('f') {
             let idx = rest
@@ -1563,30 +1535,42 @@ impl Interpreter {
                 println!("DataFrame exported to '{path_str}' ({} rows)", df.n_rows());
             }
 
-            // ── OLS → CSV / LaTeX / HTML ──────────────────────────────
-            (Value::OlsResult(m), "csv") => {
+            // ── OLS / Model → CSV / LaTeX / HTML ──────────────────────────────
+            (Value::Model(m), "csv") => {
                 if append_bool {
                     return Err(self.rt_err("Model result export does not support append mode - use DataFrame export for append operations"));
                 }
-                let content = m.result.to_csv();
+                let (content, label) = if let Some(ols) = m.as_any().downcast_ref::<OlsModel>() {
+                    (ols.result.to_csv(), "OLS")
+                } else {
+                    (m.to_model_view().to_csv(), m.type_name())
+                };
                 std::fs::write(&path_str, &content).map_err(|e| HayashiError::Io(e.to_string()))?;
-                println!("Exported OLS → '{path_str}'");
+                println!("Exported {label} → '{path_str}'");
             }
-            (Value::OlsResult(m), "latex" | "tex") => {
+            (Value::Model(m), "latex" | "tex") => {
                 if append_bool {
                     return Err(self.rt_err("Model result export does not support append mode - use DataFrame export for append operations"));
                 }
-                let content = m.result.to_latex();
+                let (content, label) = if let Some(ols) = m.as_any().downcast_ref::<OlsModel>() {
+                    (ols.result.to_latex(), "OLS")
+                } else {
+                    (m.to_model_view().to_latex(), m.type_name())
+                };
                 std::fs::write(&path_str, &content).map_err(|e| HayashiError::Io(e.to_string()))?;
-                println!("Exported OLS → '{path_str}'");
+                println!("Exported {label} → '{path_str}'");
             }
-            (Value::OlsResult(m), "html" | "htm") => {
+            (Value::Model(m), "html" | "htm") => {
                 if append_bool {
                     return Err(self.rt_err("Model result export does not support append mode - use DataFrame export for append operations"));
                 }
-                let content = m.result.to_html();
+                let (content, label) = if let Some(ols) = m.as_any().downcast_ref::<OlsModel>() {
+                    (ols.result.to_html(), "OLS")
+                } else {
+                    (m.to_model_view().to_html(), m.type_name())
+                };
                 std::fs::write(&path_str, &content).map_err(|e| HayashiError::Io(e.to_string()))?;
-                println!("Exported OLS → '{path_str}'");
+                println!("Exported {label} → '{path_str}'");
             }
 
             // ── Any model result → TXT via Display ─────────────────────────

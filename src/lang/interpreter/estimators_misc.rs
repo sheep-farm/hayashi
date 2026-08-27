@@ -1918,7 +1918,7 @@ impl Interpreter {
             println!("  {:<20} {:>12.6}", name, params[i]);
         }
         let std_errors = ndarray::Array1::<f64>::zeros(params.len());
-        Ok(Value::PenalizedResult(PenalizedModel {
+        Ok(Value::Model(Rc::new(PenalizedModel {
             params,
             std_errors,
             variable_names: display_names,
@@ -1927,7 +1927,7 @@ impl Interpreter {
             alpha,
             l1_ratio: None,
             kind: "ridge".to_string(),
-        }))
+        })))
     }
 
     #[cfg(feature = "greeners-ols")]
@@ -2086,7 +2086,7 @@ impl Interpreter {
             println!("  {:<20} {:>12.6}", name, params[i]);
         }
         let std_errors = ndarray::Array1::<f64>::zeros(params.len());
-        Ok(Value::PenalizedResult(PenalizedModel {
+        Ok(Value::Model(Rc::new(PenalizedModel {
             params,
             std_errors,
             variable_names: display_names,
@@ -2095,7 +2095,7 @@ impl Interpreter {
             alpha,
             l1_ratio: None,
             kind: "lasso".to_string(),
-        }))
+        })))
     }
 
     #[cfg(feature = "greeners-ols")]
@@ -2257,7 +2257,7 @@ impl Interpreter {
             println!("  {:<20} {:>12.6}", name, params[i]);
         }
         let std_errors = ndarray::Array1::<f64>::zeros(params.len());
-        Ok(Value::PenalizedResult(PenalizedModel {
+        Ok(Value::Model(Rc::new(PenalizedModel {
             params,
             std_errors,
             variable_names: display_names,
@@ -2266,7 +2266,7 @@ impl Interpreter {
             alpha,
             l1_ratio: Some(l1_ratio),
             kind: "elasticnet".to_string(),
-        }))
+        })))
     }
 
     #[cfg(feature = "greeners-timeseries")]

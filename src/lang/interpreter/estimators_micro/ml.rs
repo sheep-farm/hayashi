@@ -2685,10 +2685,10 @@ impl Interpreter {
         }
         let result = greeners::PCA::fit(&data, n_components)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        Ok(Value::PcaResult(PcaModel {
+        Ok(Value::Model(Rc::new(PcaModel {
             result: Rc::new(result),
             var_names,
-        }))
+        })))
     }
 
     #[cfg(feature = "greeners-ml")]
@@ -2741,9 +2741,9 @@ impl Interpreter {
         }
         let result = greeners::FactorAnalysis::fit(&data, n_factors, rotation)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        Ok(Value::FactorResult(FactorModel {
+        Ok(Value::Model(Rc::new(FactorModel {
             result: Rc::new(result),
             var_names,
-        }))
+        })))
     }
 }

@@ -676,9 +676,14 @@ impl Interpreter {
                 }
                 let (fitted, resids, mname) =
                     match self.eval_expr(&args[0])? {
-                        Value::OlsResult(m) => {
-                            let yhat = m.x.dot(&m.result.params).to_vec();
-                            (yhat, m.residuals.to_vec(), "OLS".to_string())
+                        Value::Model(m) => {
+                            let yhat = m.fitted_values().ok_or_else(|| {
+                                HayashiError::Runtime("model has no fitted values".into())
+                            })?;
+                            let resids = m.residuals().ok_or_else(|| {
+                                HayashiError::Runtime("model has no residuals".into())
+                            })?;
+                            (yhat.to_vec(), resids.to_vec(), m.type_name().to_string())
                         }
                         _ => return Err(HayashiError::Type(
                             "residplot() only supports OLS models; for GLM use predict + scatter"

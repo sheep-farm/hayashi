@@ -1,4 +1,6 @@
 use super::helpers::*;
+#[allow(unused_imports)]
+use super::models::{BinaryModel, OlsModel};
 use super::*;
 use crate::lang::dap::model_expansion;
 use std::sync::Arc;
@@ -1875,49 +1877,53 @@ impl Interpreter {
                 }
             }
             match val {
-                Value::OlsResult(m) => {
-                    use greeners::export::ExportableResult;
-                    let coefs = esttab_parse_csv(&m.result.to_csv());
-                    let n = m.residuals.len();
-                    let cov_label = match &m.result.cov_type {
-                        CovarianceType::NonRobust => "",
-                        CovarianceType::HC1 => " (robust)",
-                        CovarianceType::HC2 => " (HC2)",
-                        CovarianceType::HC3 => " (HC3)",
-                        CovarianceType::HC4 => " (HC4)",
-                        CovarianceType::NeweyWest(l) => {
-                            let _ = l;
-                            " (NW)"
+                Value::Model(m) => {
+                    if let Some(ols) = m.as_any().downcast_ref::<OlsModel>() {
+                        use greeners::export::ExportableResult;
+                        let coefs = esttab_parse_csv(&ols.result.to_csv());
+                        let n = ols.residuals.len();
+                        let cov_label = match &ols.result.cov_type {
+                            CovarianceType::NonRobust => "",
+                            CovarianceType::HC1 => " (robust)",
+                            CovarianceType::HC2 => " (HC2)",
+                            CovarianceType::HC3 => " (HC3)",
+                            CovarianceType::HC4 => " (HC4)",
+                            CovarianceType::NeweyWest(l) => {
+                                let _ = l;
+                                " (NW)"
+                            }
+                            CovarianceType::Clustered(_) => " (cluster)",
+                            CovarianceType::ClusteredTwoWay(_, _) => " (2w-cluster)",
+                        };
+                        models.push(ModelInfo {
+                            label: format!("OLS{cov_label}"),
+                            coefs,
+                            n,
+                            r2: Some(ols.result.r_squared),
+                            adj_r2: Some(ols.result.adj_r_squared),
+                            ll: Some(ols.result.log_likelihood),
+                        });
+                    } else if let Some(bm) = m.as_any().downcast_ref::<BinaryModel>() {
+                        let label = if bm.kind == "logit" {
+                            "Logit"
+                        } else {
+                            "Probit"
                         }
-                        CovarianceType::Clustered(_) => " (cluster)",
-                        CovarianceType::ClusteredTwoWay(_, _) => " (2w-cluster)",
-                    };
-                    models.push(ModelInfo {
-                        label: format!("OLS{cov_label}"),
-                        coefs,
-                        n,
-                        r2: Some(m.result.r_squared),
-                        adj_r2: Some(m.result.adj_r_squared),
-                        ll: Some(m.result.log_likelihood),
-                    });
-                }
-                #[cfg(feature = "greeners-glm")]
-                Value::BinaryResult(bm) => {
-                    let label = if bm.kind == "logit" {
-                        "Logit"
+                        .to_string();
+                        let n = bm.x.nrows();
+                        models.push(esttab_extract_std(
+                            &label,
+                            &bm.result.variable_names,
+                            &bm.result.params,
+                            &bm.result.std_errors,
+                            &bm.result.p_values,
+                            n,
+                        ));
                     } else {
-                        "Probit"
+                        return Err(HayashiError::Runtime(
+                            "esttab() does not support this model type".into(),
+                        ));
                     }
-                    .to_string();
-                    let n = bm.x.nrows();
-                    models.push(esttab_extract_std(
-                        &label,
-                        &bm.result.variable_names,
-                        &bm.result.params,
-                        &bm.result.std_errors,
-                        &bm.result.p_values,
-                        n,
-                    ));
                 }
                 #[cfg(feature = "greeners-ols")]
                 Value::IvResult(r) => {
@@ -2179,11 +2185,6 @@ impl Interpreter {
                             .into(),
                     ));
                 }
-                Value::PcaResult(_) | Value::FactorResult(_) => {
-                    return Err(HayashiError::Runtime(
-                    "esttab() does not support PCA/Factor — use print() to see loadings and explained variance".into()
-                ));
-                }
                 #[cfg(feature = "greeners-glm")]
                 Value::ConditionalResult(r) => {
                     models.push(esttab_extract_std(
@@ -2228,12 +2229,6 @@ impl Interpreter {
                 Value::ZeroInflatedResult(_) => {
                     return Err(HayashiError::Runtime(
                         "esttab() does not support zip/zinb (two equations) — use print()".into(),
-                    ));
-                }
-                #[cfg(feature = "greeners-ols")]
-                Value::SurResult(_) => {
-                    return Err(HayashiError::Runtime(
-                        "esttab() does not support sur (multiple equations) — use print()".into(),
                     ));
                 }
                 #[cfg(feature = "greeners-ols")]
@@ -2313,18 +2308,6 @@ impl Interpreter {
                     return Err(HayashiError::Runtime(
                         "esttab() does not support SVAR (structural A/B matrices) — use print()"
                             .into(),
-                    ));
-                }
-                #[cfg(feature = "greeners-ols")]
-                Value::ThreeSLSResult(_) => {
-                    return Err(HayashiError::Runtime(
-                        "esttab() does not support 3SLS (multiple equations) — use print()".into(),
-                    ));
-                }
-                #[cfg(feature = "greeners-timeseries")]
-                Value::DFMResult(_) => {
-                    return Err(HayashiError::Runtime(
-                        "esttab() does not support DFM (fatores latentes) — use print()".into(),
                     ));
                 }
                 #[cfg(feature = "greeners-timeseries")]

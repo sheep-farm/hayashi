@@ -1,4 +1,6 @@
 use super::helpers::*;
+#[allow(unused_imports)]
+use super::models::{BinaryModel, OlsModel};
 use super::*;
 use crate::lang::dap::model_expansion;
 use indexmap::IndexMap;
@@ -354,7 +356,11 @@ impl Interpreter {
         }
         let model_val = self.eval_expr(&args[0])?;
         match &model_val {
-            Value::OlsResult(m) => {
+            Value::Model(m) => {
+                let m = m
+                    .as_any()
+                    .downcast_ref::<OlsModel>()
+                    .ok_or_else(|| self.rt_err("expected an OLS model".to_string()))?;
                 let y_hat = m.x.dot(&m.result.params);
                 let y_vec = &y_hat + &m.residuals;
                 let boot_coefs = greeners::Bootstrap::pairs_bootstrap(&y_vec, &m.x, n_boot)
@@ -704,7 +710,11 @@ impl Interpreter {
             return Err(HayashiError::Runtime("gqtest(model, split=0.2)".into()));
         }
         let ols = match self.eval_expr(&args[0])? {
-            Value::OlsResult(m) => m,
+            Value::Model(m) => m
+                .as_any()
+                .downcast_ref::<OlsModel>()
+                .cloned()
+                .ok_or_else(|| self.rt_err("expected an OLS model".to_string()))?,
             _ => {
                 return Err(HayashiError::Type(
                     "gqtest(): only supports OLS models".into(),
@@ -777,7 +787,11 @@ impl Interpreter {
             return Err(HayashiError::Runtime("bphet(model)".into()));
         }
         let ols = match self.eval_expr(&args[0])? {
-            Value::OlsResult(m) => m,
+            Value::Model(m) => m
+                .as_any()
+                .downcast_ref::<OlsModel>()
+                .cloned()
+                .ok_or_else(|| self.rt_err("expected an OLS model".to_string()))?,
             _ => {
                 return Err(HayashiError::Type(
                     "bphet(): only supports OLS models".into(),
@@ -1002,10 +1016,10 @@ impl Interpreter {
         }
         let result =
             greeners::SUR::fit(&equations).map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        Ok(Value::SurResult(SurModel {
+        Ok(Value::Model(Rc::new(SurModel {
             result: Rc::new(result),
             eq_var_names,
-        }))
+        })))
     }
 
     #[cfg(all(
@@ -1041,14 +1055,20 @@ impl Interpreter {
             };
             let val = self.eval_expr(arg)?;
             let (ll, k, n) = match &val {
-                Value::OlsResult(m) => (
-                    m.result.log_likelihood,
-                    m.result.params.len(),
-                    m.result.n_obs,
-                ),
-                #[cfg(feature = "greeners-glm")]
-                Value::BinaryResult(b) => {
-                    (b.result.log_likelihood, b.result.params.len(), b.x.nrows())
+                Value::Model(m) => {
+                    if let Some(ols) = m.as_any().downcast_ref::<OlsModel>() {
+                        (
+                            ols.result.log_likelihood,
+                            ols.result.params.len(),
+                            ols.result.n_obs,
+                        )
+                    } else if let Some(b) = m.as_any().downcast_ref::<BinaryModel>() {
+                        (b.result.log_likelihood, b.result.params.len(), b.x.nrows())
+                    } else {
+                        return Err(HayashiError::Runtime(format!(
+                            "ic(): '{label}' has no log-likelihood"
+                        )));
+                    }
                 }
                 #[cfg(feature = "greeners-glm")]
                 Value::PoissonResult(r) => (r.log_likelihood, r.params.len(), r.n_obs),
@@ -1238,9 +1258,18 @@ impl Interpreter {
             };
             let val = self.eval_expr(arg)?;
             let ll = match &val {
-                Value::OlsResult(m) => m.result.log_likelihood,
-                #[cfg(feature = "greeners-glm")]
-                Value::BinaryResult(b) => b.result.log_likelihood,
+                Value::Model(m) => {
+                    if let Some(ols) = m.as_any().downcast_ref::<OlsModel>() {
+                        ols.result.log_likelihood
+                    } else if let Some(b) = m.as_any().downcast_ref::<BinaryModel>() {
+                        b.result.log_likelihood
+                    } else {
+                        return Err(
+                            self.rt_err(format!("akaike_weights: '{label}' has no log-likelihood"))
+                        );
+                    }
+                }
+
                 #[cfg(feature = "greeners-glm")]
                 Value::PoissonResult(r) => r.log_likelihood,
                 #[cfg(feature = "greeners-glm")]
@@ -1260,9 +1289,18 @@ impl Interpreter {
                 }
             };
             let k = match &val {
-                Value::OlsResult(m) => m.result.params.len(),
-                #[cfg(feature = "greeners-glm")]
-                Value::BinaryResult(b) => b.result.params.len(),
+                Value::Model(m) => {
+                    if let Some(ols) = m.as_any().downcast_ref::<OlsModel>() {
+                        ols.result.params.len()
+                    } else if let Some(b) = m.as_any().downcast_ref::<BinaryModel>() {
+                        b.result.params.len()
+                    } else {
+                        return Err(
+                            self.rt_err(format!("akaike_weights: '{label}' has no parameters"))
+                        );
+                    }
+                }
+
                 #[cfg(feature = "greeners-glm")]
                 Value::PoissonResult(r) => r.params.len(),
                 #[cfg(feature = "greeners-glm")]
@@ -1323,9 +1361,18 @@ impl Interpreter {
         // Extract (log_likelihood, n_params) from a model Value
         let extract = |v: &Value| -> Result<(f64, usize)> {
             Ok(match v {
-            Value::OlsResult(m) => (m.result.log_likelihood, m.result.params.len()),
-                        #[cfg(feature = "greeners-glm")]
-Value::BinaryResult(b) => (b.result.log_likelihood, b.result.params.len()),
+            Value::Model(m) => {
+                if let Some(ols) = m.as_any().downcast_ref::<OlsModel>() {
+                    (ols.result.log_likelihood, ols.result.params.len())
+                } else if let Some(b) = m.as_any().downcast_ref::<BinaryModel>() {
+                    (b.result.log_likelihood, b.result.params.len())
+                } else {
+                    return Err(HayashiError::Runtime(
+                        "lrtest: model has no log-likelihood".into(),
+                    ));
+                }
+            }
+
                         #[cfg(feature = "greeners-glm")]
 Value::PoissonResult(r) => (r.log_likelihood, r.params.len()),
                         #[cfg(feature = "greeners-glm")]
@@ -2914,7 +2961,11 @@ Value::ArimaResult(r) => {
 
         // Extract beta and vcov from model
         let (beta, vcov, n, names) = match &model {
-            Value::OlsResult(m) => {
+            Value::Model(m) => {
+                let m = m
+                    .as_any()
+                    .downcast_ref::<OlsModel>()
+                    .ok_or_else(|| self.rt_err("expected an OLS model".to_string()))?;
                 let p = m.result.params.len();
                 let mut vcov = ndarray::Array2::<f64>::zeros((p, p));
                 for i in 0..p {
@@ -3018,7 +3069,11 @@ Value::ArimaResult(r) => {
         let model = self.eval_expr(&args[0])?;
 
         let ols = match &model {
-            Value::OlsResult(m) => m.clone(),
+            Value::Model(m) => m
+                .as_any()
+                .downcast_ref::<OlsModel>()
+                .cloned()
+                .ok_or_else(|| self.rt_err("expected an OLS model".to_string()))?,
             _ => {
                 return Err(HayashiError::Type(
                     "test() currently supports OLS models only".into(),

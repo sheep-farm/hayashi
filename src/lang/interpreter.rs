@@ -86,6 +86,7 @@ mod estimators_timeseries;
 mod eval_expr;
 mod execution;
 mod helpers;
+pub mod model;
 pub mod model_view;
 pub mod models;
 mod post_estimation_ts;
@@ -96,6 +97,7 @@ use self::helpers::*;
 
 pub use builtins::BUILTIN_NAMES;
 pub use env::Env;
+pub use model::Model;
 #[cfg(feature = "greeners-glm")]
 pub use models::BinaryModel;
 #[cfg(feature = "greeners-timeseries")]
@@ -802,11 +804,9 @@ impl Interpreter {
             Value::DataFrame(_) => "DataFrame",
             Value::UserFn(_) => "Function",
             Value::Error(_) => "Error",
-            Value::OlsResult(_) => "OlsResult",
+            Value::Model(_) => "Model",
             #[cfg(feature = "greeners-ols")]
             Value::IvResult(_) => "IvResult",
-            #[cfg(feature = "greeners-ols")]
-            Value::PenalizedResult(_) => "PenalizedResult",
             _ => "Object",
         }
     }

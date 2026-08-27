@@ -1,4 +1,6 @@
 use super::super::helpers::*;
+#[allow(unused_imports)]
+use super::super::models::OlsModel;
 use super::super::*;
 use crate::lang::dap::model_expansion;
 
@@ -53,11 +55,11 @@ impl Interpreter {
         let residuals = &y - &fitted;
         let x_used = result.x_clean.clone().unwrap_or(x);
 
-        Ok(Value::OlsResult(OlsModel {
+        Ok(Value::Model(Rc::new(OlsModel {
             result: Rc::new(result),
             residuals,
             x: x_used,
-        }))
+        })))
     }
 
     #[cfg(feature = "greeners-ols")]
@@ -175,11 +177,11 @@ impl Interpreter {
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         let fitted = x.dot(&result.params);
         let residuals = &y - &fitted;
-        Ok(Value::OlsResult(OlsModel {
+        Ok(Value::Model(Rc::new(OlsModel {
             result: Rc::new(result),
             residuals,
             x,
-        }))
+        })))
     }
 
     pub(super) fn testparm(
@@ -212,7 +214,11 @@ impl Interpreter {
             }
         };
         match &model_val {
-        Value::OlsResult(m) => {
+        Value::Model(m) => {
+            let m = m
+                .as_any()
+                .downcast_ref::<OlsModel>()
+                .ok_or_else(|| self.rt_err("expected an OLS model".to_string()))?;
             let vnames = m.result.variable_names.as_deref().unwrap_or(&[]);
             let indices: Vec<usize> = tested.iter().map(|v| {
                 vnames.iter().position(|n| n == v)

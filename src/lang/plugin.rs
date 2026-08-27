@@ -1,8 +1,3 @@
-#[cfg(feature = "greeners-glm")]
-use super::interpreter::models::BinaryModel;
-use super::interpreter::models::OlsModel;
-#[cfg(feature = "greeners-ols")]
-use super::interpreter::models::PenalizedModel;
 use super::interpreter::Value;
 use arrow::array::{
     make_array, Array, ArrayRef, BooleanArray, Float64Array, Int64Array, StringArray,
@@ -331,7 +326,7 @@ pub fn value_to_json(
             serde_json::Value::Object(map)
         }
         // ── Model serialization: expose coefficients and fit stats as JSON dict ──
-        Value::OlsResult(m) => ols_model_to_json(m),
+        Value::Model(m) => m.to_json(),
         #[cfg(feature = "greeners-ols")]
         Value::IvResult(r) => {
             let mut map = serde_json::Map::new();
@@ -350,7 +345,6 @@ pub fn value_to_json(
             serde_json::Value::Object(map)
         }
         #[cfg(feature = "greeners-glm")]
-        Value::BinaryResult(m) => binary_model_to_json(m),
         #[cfg(feature = "greeners-panel")]
         Value::PanelResult(r) => {
             let mut map = serde_json::Map::new();
@@ -547,7 +541,6 @@ pub fn value_to_json(
             serde_json::Value::Object(map)
         }
         #[cfg(feature = "greeners-ols")]
-        Value::PenalizedResult(m) => penalized_model_to_json(m),
         #[cfg(feature = "greeners-ols")]
         Value::RlmResult(r) => {
             let mut map = serde_json::Map::new();
@@ -682,68 +675,6 @@ pub fn value_to_json(
         }
         _ => serde_json::Value::Null,
     }
-}
-
-/// Serialize an OlsModel to JSON dict for plugin consumption.
-fn ols_model_to_json(m: &OlsModel) -> serde_json::Value {
-    let r = &m.result;
-    let mut map = serde_json::Map::new();
-    map.insert("__model_type__".into(), serde_json::json!("ols"));
-    map.insert(
-        "variable".into(),
-        serde_json::json!(r.variable_names.clone().unwrap_or_default()),
-    );
-    map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
-    map.insert("std_err".into(), serde_json::json!(r.std_errors.to_vec()));
-    map.insert("t".into(), serde_json::json!(r.t_values.to_vec()));
-    map.insert("p_value".into(), serde_json::json!(r.p_values.to_vec()));
-    map.insert("conf_low".into(), serde_json::json!(r.conf_lower.to_vec()));
-    map.insert("conf_high".into(), serde_json::json!(r.conf_upper.to_vec()));
-    map.insert("r2".into(), serde_json::json!(r.r_squared));
-    map.insert("adj_r2".into(), serde_json::json!(r.adj_r_squared));
-    map.insert("n".into(), serde_json::json!(r.n_obs));
-    map.insert("f_stat".into(), serde_json::json!(r.f_statistic));
-    map.insert("prob_f".into(), serde_json::json!(r.prob_f));
-    map.insert("aic".into(), serde_json::json!(r.aic));
-    map.insert("bic".into(), serde_json::json!(r.bic));
-    map.insert("log_lik".into(), serde_json::json!(r.log_likelihood));
-    map.insert("sigma".into(), serde_json::json!(r.sigma));
-    serde_json::Value::Object(map)
-}
-
-/// Serialize a BinaryModel (logit/probit) to JSON dict for plugin consumption.
-#[cfg(feature = "greeners-glm")]
-fn binary_model_to_json(m: &BinaryModel) -> serde_json::Value {
-    let r = &m.result;
-    let mut map = serde_json::Map::new();
-    map.insert("__model_type__".into(), serde_json::json!(m.kind.as_str()));
-    map.insert("variable".into(), serde_json::json!(m.coef_names.clone()));
-    map.insert("coef".into(), serde_json::json!(r.params.to_vec()));
-    map.insert("std_err".into(), serde_json::json!(r.std_errors.to_vec()));
-    map.insert("z".into(), serde_json::json!(r.z_values.to_vec()));
-    map.insert("p_value".into(), serde_json::json!(r.p_values.to_vec()));
-    map.insert("pseudo_r2".into(), serde_json::json!(r.pseudo_r2));
-    map.insert("log_lik".into(), serde_json::json!(r.log_likelihood));
-    serde_json::Value::Object(map)
-}
-
-#[cfg(feature = "greeners-ols")]
-fn penalized_model_to_json(m: &PenalizedModel) -> serde_json::Value {
-    let mut map = serde_json::Map::new();
-    map.insert("__model_type__".into(), serde_json::json!(m.kind.as_str()));
-    map.insert(
-        "variable".into(),
-        serde_json::json!(m.variable_names.clone()),
-    );
-    map.insert("coef".into(), serde_json::json!(m.params.to_vec()));
-    map.insert("std_err".into(), serde_json::json!(m.std_errors.to_vec()));
-    map.insert("r2".into(), serde_json::json!(m.r_squared));
-    map.insert("n".into(), serde_json::json!(m.n_obs));
-    map.insert("alpha".into(), serde_json::json!(m.alpha));
-    if let Some(l1) = m.l1_ratio {
-        map.insert("l1_ratio".into(), serde_json::json!(l1));
-    }
-    serde_json::Value::Object(map)
 }
 
 /// Helper to deserialize JSON back into Value

@@ -19,13 +19,13 @@ impl Interpreter {
         let result = Logit::from_formula(&g_formula, &df)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         let coef_names = coef_names_from_formula(&formula_ast, &df, x.ncols());
-        Ok(Value::BinaryResult(BinaryModel {
+        Ok(Value::Model(Rc::new(BinaryModel {
             result: Rc::new(result),
             y,
             x,
             kind: "logit".into(),
             coef_names,
-        }))
+        })))
     }
 
     #[cfg(feature = "greeners-glm")]
@@ -45,13 +45,13 @@ impl Interpreter {
         let result = Probit::from_formula(&g_formula, &df)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         let coef_names = coef_names_from_formula(&formula_ast, &df, x.ncols());
-        Ok(Value::BinaryResult(BinaryModel {
+        Ok(Value::Model(Rc::new(BinaryModel {
             result: Rc::new(result),
             y,
             x,
             kind: "probit".into(),
             coef_names,
-        }))
+        })))
     }
 
     #[cfg(all(feature = "greeners-glm", feature = "greeners-ols"))]

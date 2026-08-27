@@ -3,6 +3,11 @@ use super::*;
 use crate::lang::dap::model_expansion;
 use std::sync::Arc;
 
+#[allow(unused_imports)]
+use super::models::BinaryModel;
+#[allow(unused_imports)]
+use super::models::OlsModel;
+
 #[cfg(feature = "greeners-timeseries")]
 mod timeseries_models;
 
@@ -74,7 +79,10 @@ impl Interpreter {
                 match model {
                     // ── Logit / Probit ────────────────────────────────────────
                     #[cfg(feature = "greeners-glm")]
-                    Value::BinaryResult(bm) => {
+                    Value::Model(m) => {
+                        let bm = m.as_any().downcast_ref::<BinaryModel>().ok_or_else(|| {
+                            HayashiError::Type("margins: expected binary model".into())
+                        })?;
                         let mut x_use = bm.x.clone();
                         for (var, val) in &at_vals {
                             if let Some(idx) = bm.coef_names.iter().position(|n| n == var) {
@@ -411,7 +419,10 @@ impl Interpreter {
 
                 match model {
                     #[cfg(feature = "greeners-glm")]
-                    Value::BinaryResult(bm) => {
+                    Value::Model(m) => {
+                        let bm = m.as_any().downcast_ref::<BinaryModel>().ok_or_else(|| {
+                            HayashiError::Type("margins: expected binary model".into())
+                        })?;
                         let vcov = Self::binary_mle_vcov(&bm.kind, &bm.result.params, &bm.y, &bm.x);
                         let ame = if bm.kind == "logit" {
                             match &vcov {
@@ -1011,10 +1022,14 @@ impl Interpreter {
                 if args.len() < 2 {
                     return Err(HayashiError::Runtime("nlcom(model, expression)".into()));
                 }
-                let ols = match self.eval_expr(&args[0])? {
-                    Value::OlsResult(m) => m,
+                let m = match self.eval_expr(&args[0])? {
+                    Value::Model(m) => m,
                     _ => return Err(HayashiError::Type("nlcom() requires an OLS model".into())),
                 };
+                let ols = m
+                    .as_any()
+                    .downcast_ref::<OlsModel>()
+                    .ok_or_else(|| HayashiError::Type("nlcom() requires an OLS model".into()))?;
                 let names =
                     ols.result.variable_names.as_ref().ok_or_else(|| {
                         HayashiError::Runtime("model has no variable names".into())
@@ -1122,14 +1137,17 @@ impl Interpreter {
                     ));
                 }
 
-                let ols = match self.eval_expr(&args[0])? {
-                    Value::OlsResult(m) => m,
+                let m = match self.eval_expr(&args[0])? {
+                    Value::Model(m) => m,
                     _ => {
                         return Err(HayashiError::Type(
                             "lincom() only supports OLS models".into(),
                         ))
                     }
                 };
+                let ols = m.as_any().downcast_ref::<OlsModel>().ok_or_else(|| {
+                    HayashiError::Type("lincom() only supports OLS models".into())
+                })?;
 
                 // nomes dos coeficientes via API do Greeners (sem parse de CSV)
                 let var_names: Vec<String> =

@@ -1,5 +1,6 @@
 use crate::lang::ast::{Expr, Spanned};
 use crate::lang::error::HayashiError;
+use crate::lang::interpreter::Model;
 use ndarray::{Array1, Array2};
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -213,12 +214,12 @@ pub enum Value {
     Bool(bool),
     Str(String),
     DataFrame(Arc<greeners::DataFrame>),
+
     OlsResult(super::models::OlsModel),
     #[cfg(feature = "greeners-ols")]
     IvResult(Rc<greeners::iv::IvResult>),
     #[cfg(feature = "greeners-glm")]
     BinaryResult(super::models::BinaryModel),
-    #[cfg(feature = "greeners-panel")]
     PanelResult(Rc<greeners::panel::PanelResult>),
     #[cfg(feature = "greeners-panel")]
     BetweenResult(Rc<greeners::panel::BetweenResult>),
@@ -283,17 +284,19 @@ pub enum Value {
     BetaResult(Rc<greeners::beta_model::BetaResult>),
     #[cfg(feature = "greeners-ols")]
     GlsarResult(Rc<greeners::glsar::GlsarResult>),
+
     #[cfg(feature = "greeners-ols")]
     SurResult(super::models::SurModel),
     #[cfg(feature = "greeners-ols")]
     RollingResult(Rc<greeners::rolling::RollingResult>),
     #[cfg(feature = "greeners-ols")]
     RecursiveLSResult(Rc<greeners::rolling::RecursiveLSResult>),
+    PcaResult(super::models::PcaModel),
+    FactorResult(super::models::FactorModel),
     #[cfg(feature = "greeners-glm")]
     GlmResult(Rc<greeners::glm::GlmResult>),
     LowessResult(Rc<greeners::nonparametric::LowessResult>),
-    PcaResult(super::models::PcaModel),
-    FactorResult(super::models::FactorModel),
+
     #[cfg(feature = "greeners-timeseries")]
     MarkovResult(Rc<greeners::markov::MarkovSwitchingResult>),
     #[cfg(feature = "greeners-glm")]
@@ -314,14 +317,10 @@ pub enum Value {
     MSARResult(Rc<greeners::markov_autoreg::MarkovAutoregResult>),
     #[cfg(feature = "greeners-timeseries")]
     SVarResult(Rc<greeners::svar::SVarResult>),
-    #[cfg(feature = "greeners-ols")]
-    ThreeSLSResult(super::models::ThreeSLSModel),
-    #[cfg(feature = "greeners-timeseries")]
-    DFMResult(super::models::DFMModel),
+
     #[cfg(feature = "greeners-timeseries")]
     EtsResult(Rc<greeners::ets::ETSResult>),
-    #[cfg(feature = "greeners-ols")]
-    PenalizedResult(super::models::PenalizedModel),
+
     #[cfg(feature = "greeners-panel")]
     ThresholdResult(Rc<greeners::threshold::ThresholdResult>),
     #[cfg(feature = "greeners-timeseries")]
@@ -345,6 +344,17 @@ pub enum Value {
     HierarchicalResult(Rc<greeners::hierarchical::HierarchicalResult>),
     #[cfg(feature = "greeners-timeseries")]
     SpectralResult(Rc<greeners::spectral::SpectralResult>),
+
+    #[cfg(feature = "greeners-timeseries")]
+    DFMResult(super::models::DFMModel),
+    #[cfg(feature = "greeners-ols")]
+    ThreeSLSResult(super::models::ThreeSLSModel),
+    #[cfg(feature = "greeners-ols")]
+    PenalizedResult(super::models::PenalizedModel),
+
+    /// First-class model result trait object. Used for unified model
+    /// access, replacing the scattered `Value::*Result` variants over time.
+    Model(Rc<dyn Model>),
     /// Generic first-class model result: a display string plus a dict of
     /// named children.  Used for estimators that do not yet have a dedicated
     /// `Value` variant, while still exposing every field to DAP and to the
@@ -569,6 +579,7 @@ impl Value {
             Value::UserFn(_) => true,
             Value::Plot { .. } => true,
             Value::ModelResult { fields, .. } => fields.values().all(|v| v.is_send_safe()),
+            Value::Model(_) => false,
             // All model result variants use Rc — not Send.
             _ => false,
         }
@@ -738,6 +749,7 @@ impl std::fmt::Display for Value {
             Value::HierarchicalResult(r) => write!(f, "{r}"),
             #[cfg(feature = "greeners-timeseries")]
             Value::SpectralResult(r) => write!(f, "{r}"),
+            Value::Model(m) => write!(f, "{m}"),
             Value::ModelResult { display, .. } => write!(f, "{display}"),
             Value::List(v) => {
                 write!(f, "[")?;

@@ -389,15 +389,14 @@ impl Interpreter {
             (Value::DataFrame(_), _) => Err(HayashiError::Type(
                 "DataFrame column index must be a string".into(),
             )),
-            (Value::OlsResult(m), Value::Str(key)) => match self.ols_field(m, key) {
+            (Value::Model(m), Value::Str(key)) => match m.field(key) {
                 Ok(v) => Ok(v),
                 Err(_) => model_expansion::value_field(&obj_val, key).ok_or_else(|| {
-                    HayashiError::Runtime(format!("OLS result has no field '{key}'"))
+                    HayashiError::Runtime(format!("{} has no field '{key}'", m.type_name()))
                 }),
             },
-            (Value::OlsResult(_), _) => Err(HayashiError::Type(
-                "OLS result index must be a string".into(),
-            )),
+
+            (Value::Model(_), _) => Err(HayashiError::Type("model index must be a string".into())),
             (Value::Series(s), _) => {
                 let i = match idx_val {
                     Value::Int(i) => i,
@@ -557,15 +556,14 @@ impl Interpreter {
         let val = self.eval_expr(obj)?;
 
         match (&val, field) {
-            (Value::OlsResult(m), field) => match self.ols_field(m, field) {
+            (Value::Model(m), field) => match m.field(field) {
                 Ok(v) => Ok(v),
                 Err(_) => model_expansion::value_field(&val, field)
                     .ok_or_else(|| self.rt_err(format!("unknown method or field '{field}'"))),
             },
+
             #[cfg(feature = "greeners-ols")]
             (Value::IvResult(r), "summary") => Ok(Value::Str(format!("{r}"))),
-            #[cfg(feature = "greeners-glm")]
-            (Value::BinaryResult(m), "summary") => Ok(Value::Str(format!("{m}"))),
             #[cfg(feature = "greeners-panel")]
             (Value::PanelResult(r), "summary") => Ok(Value::Str(format!("{r}"))),
             #[cfg(feature = "greeners-panel")]
@@ -577,70 +575,6 @@ impl Interpreter {
                     Err(self.rt_err(format!("unknown method or field '{field}'")))
                 }
             }
-        }
-    }
-
-    /// Returns a `Value` extracted from an OLS model result by field name.
-    fn ols_field(&self, m: &super::models::OlsModel, field: &str) -> Result<Value> {
-        use greeners::Column;
-        use indexmap::IndexMap;
-
-        let r = &m.result;
-        let names = r.variable_names.clone().unwrap_or_default();
-
-        let vec_to_series = |v: &[f64], name: &str| {
-            let vals: Vec<Value> = v.iter().map(|&x| Value::Float(x)).collect();
-            Value::Series(Arc::new(Series::new(name, vals)))
-        };
-
-        let vec_to_dataframe = |v: &ndarray::Array1<f64>, col: &str| {
-            let mut columns: IndexMap<String, Column> = IndexMap::new();
-            let var_col: Vec<String> = (0..v.len())
-                .map(|i| names.get(i).cloned().unwrap_or_else(|| format!("x{i}")))
-                .collect();
-            let val_col: Vec<f64> = v.iter().copied().collect();
-            columns.insert(
-                "variable".into(),
-                Column::String(ndarray::Array1::from(var_col)),
-            );
-            columns.insert(col.into(), Column::Float(ndarray::Array1::from(val_col)));
-            DataFrame::from_columns(columns)
-                .map_or_else(|_e| Value::Nil, |df| Value::DataFrame(Arc::new(df)))
-        };
-
-        match field {
-            "params" | "coef" | "coefficients" => Ok(vec_to_dataframe(&r.params, "coef")),
-            "std_errors" | "se" => Ok(vec_to_dataframe(&r.std_errors, "std_err")),
-            "t_values" | "t" => Ok(vec_to_dataframe(&r.t_values, "t")),
-            "p_values" | "p" => Ok(vec_to_dataframe(&r.p_values, "p_value")),
-            "conf_lower" => Ok(vec_to_dataframe(&r.conf_lower, "conf_low")),
-            "conf_upper" => Ok(vec_to_dataframe(&r.conf_upper, "conf_high")),
-            "residuals" => Ok(vec_to_series(&m.residuals.to_vec(), "residuals")),
-            "fitted" | "fitted_values" => {
-                let fitted = m.x.dot(&r.params);
-                Ok(vec_to_series(&fitted.to_vec(), "fitted"))
-            }
-            "r_squared" | "r2" => Ok(Value::Float(r.r_squared)),
-            "adj_r_squared" | "adj_r2" => Ok(Value::Float(r.adj_r_squared)),
-            "f_statistic" | "f" => Ok(Value::Float(r.f_statistic)),
-            "prob_f" => Ok(Value::Float(r.prob_f)),
-            "log_lik" | "log_likelihood" => Ok(Value::Float(r.log_likelihood)),
-            "aic" => Ok(Value::Float(r.aic)),
-            "bic" => Ok(Value::Float(r.bic)),
-            "sigma" => Ok(Value::Float(r.sigma)),
-            "n" | "n_obs" => Ok(Value::Int(r.n_obs as i64)),
-            "df_resid" => Ok(Value::Int(r.df_resid as i64)),
-            "df_model" => Ok(Value::Int(r.df_model as i64)),
-            "cov_type" => Ok(Value::Str(format!("{:?}", r.cov_type))),
-            "inference_type" => Ok(Value::Str(format!("{:?}", r.inference_type))),
-            "variable_names" => {
-                let lst: Vec<Value> = names.into_iter().map(Value::Str).collect();
-                Ok(Value::List(Arc::new(lst)))
-            }
-            "summary" => Ok(Value::Str(format!("{}", m.result))),
-            _ => Err(HayashiError::Runtime(format!(
-                "OLS result has no field '{field}'"
-            ))),
         }
     }
 

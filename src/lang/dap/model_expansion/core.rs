@@ -479,6 +479,7 @@ pub fn value_field(v: &Value, field: &str) -> Option<Value> {
 
 pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
     match v {
+        Value::Model(m) => (format!("{m}"), "Model"),
         Value::Float(f) => (format!("{f}"), "Float"),
         Value::Int(i) => (format!("{i}"), "Int"),
         Value::Bool(b) => (format!("{b}"), "Bool"),

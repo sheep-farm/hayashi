@@ -1,4 +1,6 @@
 use super::helpers::*;
+#[allow(unused_imports)]
+use super::models::OlsModel;
 use super::*;
 use crate::lang::dap::model_expansion;
 
@@ -201,7 +203,10 @@ impl Interpreter {
             #[cfg(feature = "greeners-timeseries")]
             Value::ArimaResult(m) => Array1::from_vec(m.residuals().to_vec()),
             // OLS residuals
-            Value::OlsResult(m) => m.residuals.clone(),
+            Value::Model(m) => m
+                .residuals()
+                .ok_or_else(|| HayashiError::Runtime("model has no residuals".into()))?
+                .clone(),
             _ => {
                 return Err(HayashiError::Type(
                     "ljungbox(): argument must be a DataFrame, GARCH, ARIMA, or OLS".into(),
@@ -297,7 +302,11 @@ impl Interpreter {
             ));
         }
         let ols = match self.eval_expr(&args[0])? {
-            Value::OlsResult(m) => m,
+            Value::Model(m) => m
+                .as_any()
+                .downcast_ref::<OlsModel>()
+                .cloned()
+                .ok_or_else(|| HayashiError::Type("expected an OLS model".into()))?,
             _ => {
                 return Err(HayashiError::Type(
                     "leverage() only supports OLS models".into(),
@@ -399,7 +408,11 @@ impl Interpreter {
             ));
         }
         let ols = match self.eval_expr(&args[0])? {
-            Value::OlsResult(m) => m,
+            Value::Model(m) => m
+                .as_any()
+                .downcast_ref::<OlsModel>()
+                .cloned()
+                .ok_or_else(|| HayashiError::Type("expected an OLS model".into()))?,
             _ => {
                 return Err(HayashiError::Type(
                     "cooks() only supports OLS models".into(),
@@ -497,7 +510,11 @@ impl Interpreter {
             return Err(HayashiError::Runtime("vif() requires an OLS model".into()));
         }
         let ols = match self.eval_expr(&args[0])? {
-            Value::OlsResult(m) => m,
+            Value::Model(m) => m
+                .as_any()
+                .downcast_ref::<OlsModel>()
+                .cloned()
+                .ok_or_else(|| HayashiError::Type("expected an OLS model".into()))?,
             _ => return Err(HayashiError::Type("vif() only supports OLS models".into())),
         };
 
@@ -566,7 +583,11 @@ impl Interpreter {
             ));
         }
         let ols = match self.eval_expr(&args[0])? {
-            Value::OlsResult(m) => m,
+            Value::Model(m) => m
+                .as_any()
+                .downcast_ref::<OlsModel>()
+                .cloned()
+                .ok_or_else(|| HayashiError::Type("expected an OLS model".into()))?,
             _ => {
                 return Err(HayashiError::Type(
                     "condnum() only supports OLS models".into(),
@@ -626,7 +647,11 @@ impl Interpreter {
             ));
         }
         let ols = match self.eval_expr(&args[0])? {
-            Value::OlsResult(m) => m,
+            Value::Model(m) => m
+                .as_any()
+                .downcast_ref::<OlsModel>()
+                .cloned()
+                .ok_or_else(|| HayashiError::Type("expected an OLS model".into()))?,
             _ => {
                 return Err(HayashiError::Type(
                     "durbinwatson() only supports OLS models".into(),
@@ -675,7 +700,11 @@ impl Interpreter {
             ));
         }
         let ols = match self.eval_expr(&args[0])? {
-            Value::OlsResult(m) => m,
+            Value::Model(m) => m
+                .as_any()
+                .downcast_ref::<OlsModel>()
+                .cloned()
+                .ok_or_else(|| HayashiError::Type("expected an OLS model".into()))?,
             _ => {
                 return Err(HayashiError::Type(
                     "white() only supports OLS models".into(),
@@ -735,7 +764,11 @@ impl Interpreter {
             ));
         }
         let ols = match self.eval_expr(&args[0])? {
-            Value::OlsResult(m) => m,
+            Value::Model(m) => m
+                .as_any()
+                .downcast_ref::<OlsModel>()
+                .cloned()
+                .ok_or_else(|| HayashiError::Type("expected an OLS model".into()))?,
             _ => {
                 return Err(HayashiError::Type(
                     "reset() only supports OLS models".into(),
@@ -819,7 +852,10 @@ impl Interpreter {
                 };
                 Array1::from(self.eval_col_expr(&Expr::Var(col_name), &df)?)
             }
-            Value::OlsResult(m) => m.residuals.clone(),
+            Value::Model(m) => m
+                .residuals()
+                .ok_or_else(|| HayashiError::Runtime("model has no residuals".into()))?
+                .clone(),
             #[cfg(feature = "greeners-timeseries")]
             Value::ArimaResult(m) => Array1::from_vec(m.residuals().to_vec()),
             #[cfg(feature = "greeners-timeseries")]
@@ -882,7 +918,11 @@ impl Interpreter {
         }
 
         let ols = match self.eval_expr(&args[0])? {
-            Value::OlsResult(m) => m,
+            Value::Model(m) => m
+                .as_any()
+                .downcast_ref::<OlsModel>()
+                .cloned()
+                .ok_or_else(|| HayashiError::Type("expected an OLS model".into()))?,
             _ => {
                 return Err(HayashiError::Type(
                     "bgodfrey() only supports OLS models".into(),
@@ -1070,7 +1110,10 @@ impl Interpreter {
                 };
                 Array1::from(self.eval_col_expr(&Expr::Var(col_name), &df)?)
             }
-            Value::OlsResult(m) => m.residuals.clone(),
+            Value::Model(m) => m
+                .residuals()
+                .ok_or_else(|| HayashiError::Runtime("model has no residuals".into()))?
+                .clone(),
             #[cfg(feature = "greeners-timeseries")]
             Value::GarchResult(m) => m.standardized_residuals.clone(),
             #[cfg(feature = "greeners-timeseries")]
@@ -1115,7 +1158,10 @@ impl Interpreter {
                 };
                 Array1::from(self.eval_col_expr(&Expr::Var(col_name), &df)?)
             }
-            Value::OlsResult(m) => m.residuals.clone(),
+            Value::Model(m) => m
+                .residuals()
+                .ok_or_else(|| HayashiError::Runtime("model has no residuals".into()))?
+                .clone(),
             #[cfg(feature = "greeners-timeseries")]
             Value::GarchResult(m) => m.standardized_residuals.clone(),
             #[cfg(feature = "greeners-timeseries")]
@@ -1149,7 +1195,11 @@ impl Interpreter {
             return Err(self.rt_err("cusumtest(model) requires an OLS model"));
         }
         let ols = match self.eval_expr(&args[0])? {
-            Value::OlsResult(m) => m,
+            Value::Model(m) => m
+                .as_any()
+                .downcast_ref::<OlsModel>()
+                .cloned()
+                .ok_or_else(|| HayashiError::Type("expected an OLS model".into()))?,
             _ => {
                 return Err(HayashiError::Type(
                     "cusumtest(): only supports OLS models".into(),
@@ -1324,7 +1374,14 @@ impl Interpreter {
 
         let diagnostics = match self.eval_expr(&args[0])? {
             #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-ols"))]
-            Value::OlsResult(ref ols) => self.diagnostics_ols(ols, &thick, &thin)?,
+            Value::Model(m) => {
+                let ols = m
+                    .as_any()
+                    .downcast_ref::<OlsModel>()
+                    .cloned()
+                    .ok_or_else(|| HayashiError::Type("expected an OLS model".into()))?;
+                self.diagnostics_ols(&ols, &thick, &thin)?
+            }
             #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-timeseries"))]
             Value::GarchResult(ref m) => self.diagnostics_garch(m, &thick, &thin)?,
             #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-timeseries"))]
@@ -3545,10 +3602,10 @@ impl Interpreter {
         }
         let result = greeners::ThreeSLS::fit(&equations, &z_instr)
             .map_err(|e| self.rt_err(format!("threesl: {e}")))?;
-        Ok(Value::ThreeSLSResult(ThreeSLSModel {
+        Ok(Value::Model(Rc::new(ThreeSLSModel {
             result: Rc::new(result),
             eq_var_names,
-        }))
+        })))
     }
 
     #[cfg(feature = "greeners-timeseries")]
@@ -3606,10 +3663,10 @@ impl Interpreter {
         }
         let result = greeners::dynamic_factor::DynamicFactor::fit(&data, k_factors, factor_order)
             .map_err(|e| self.rt_err(format!("dfm: {e}")))?;
-        Ok(Value::DFMResult(DFMModel {
+        Ok(Value::Model(Rc::new(DFMModel {
             result: Rc::new(result),
             var_names,
-        }))
+        })))
     }
 
     #[cfg(feature = "greeners-diagnostics")]
@@ -3787,7 +3844,10 @@ impl Interpreter {
             return Err(HayashiError::Runtime("omnibus(model)".into()));
         }
         let resids = match self.eval_expr(&args[0])? {
-            Value::OlsResult(m) => m.residuals.to_vec(),
+            Value::Model(m) => m
+                .residuals()
+                .ok_or_else(|| HayashiError::Runtime("model has no residuals".into()))?
+                .to_vec(),
             _ => {
                 return Err(HayashiError::Type(
                     "omnibus() only supports OLS models".into(),
@@ -4138,7 +4198,11 @@ impl Interpreter {
             return Err(HayashiError::Runtime("harveycollier(model)".into()));
         }
         let ols = match self.eval_expr(&args[0])? {
-            Value::OlsResult(m) => m,
+            Value::Model(m) => m
+                .as_any()
+                .downcast_ref::<OlsModel>()
+                .cloned()
+                .ok_or_else(|| HayashiError::Type("expected an OLS model".into()))?,
             _ => {
                 return Err(HayashiError::Type(
                     "harveycollier() only supports OLS models".into(),
