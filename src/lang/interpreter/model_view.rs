@@ -154,9 +154,9 @@ impl ModelView {
             .collect()
     }
 
-    /// Export coefficients as CSV (tidy format).
+    /// Export coefficients as CSV (same layout as OLS result export).
     pub fn to_csv(&self) -> String {
-        let mut out = String::from("variable,coef,std_err,t,p_value,conf_low,conf_high\n");
+        let mut out = String::from("Variable,Coef,Std_Err,t_z,P_value,CI_Lower,CI_Upper\n");
         let n = self.params.len();
         let se = &self.std_errors;
         let t = &self.test_values;
@@ -170,7 +170,7 @@ impl ModelView {
                 .cloned()
                 .unwrap_or_else(|| format!("x{i}"));
             out.push_str(&format!(
-                "{},{:.7},{:.7},{:.7},{:.7},{:.7},{:.7}\n",
+                "{},{},{},{},{},{},{}\n",
                 name,
                 self.params[i],
                 se.get(i).copied().unwrap_or(f64::NAN),

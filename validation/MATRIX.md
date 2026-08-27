@@ -208,7 +208,7 @@
 | descriptive | wooldridge::wage1 | R, Python | pass | — | Tabstat statistics (mean, sd, min, max, p50) for wage, educ, exper, tenure. |
 | descriptive | wooldridge::mroz | R, Python | pass | — | Two-way frequency table with Pearson chi-square test. |
 | ols | simulated | R, Python | pass | — | Simulated OLS. testparm F and p-value for H0: x1 = x2 = 0. |
-| three_sls | simulated | R, Python | pass | — | Simultaneous two-equation system with correlated errors. Each equation includes an intercept, one exogenous and one endogenous regressor; the excluded exogenous from the other equation is used as an instrument. Python reference is linearmodels.system.IV3SLS with an explicit constant column. |
+| three_sls | simulated | R:passed *, Python:passed * | pass | — | Simultaneous two-equation system with correlated errors. Each equation includes an intercept, one exogenous and one endogenous regressor; the excluded exogenous from the other equation is used as an instrument. Python reference is linearmodels.system.IV3SLS with an explicit constant column. |
 | tmle | simulated_tmle | R, Python | pass | — | Simulated data with true ATE 0.7; compares TMLE point estimate and standard error against R tmle and a manual Python implementation. |
 | tobit | wooldridge::mroz | R, Python | pass | — | Tobit regression of hours worked with left censoring at zero. Hayashi matches AER::tobit at displayed precision; the new Python reference is a manual MLE refined with Nelder-Mead and uses a numerical Hessian for standard errors. |
 | transformer | simulated |  | not-supported | — | PyTorch/TensorFlow stochastic training is not reproducible enough for numerical validation. |

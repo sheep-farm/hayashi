@@ -1540,13 +1540,10 @@ impl Interpreter {
                 if append_bool {
                     return Err(self.rt_err("Model result export does not support append mode - use DataFrame export for append operations"));
                 }
-                let (content, label) = if let Some(ols) = m.as_any().downcast_ref::<OlsModel>() {
-                    (ols.result.to_csv(), "OLS")
-                } else {
-                    (m.to_model_view().to_csv(), m.type_name())
-                };
+                let mv = m.to_model_view();
+                let content = mv.to_csv();
                 std::fs::write(&path_str, &content).map_err(|e| HayashiError::Io(e.to_string()))?;
-                println!("Exported {label} → '{path_str}'");
+                println!("Exported {} → '{path_str}'", mv.type_name);
             }
             (Value::Model(m), "latex" | "tex") => {
                 if append_bool {
