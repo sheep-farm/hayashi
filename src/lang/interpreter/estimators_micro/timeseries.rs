@@ -1315,7 +1315,29 @@ impl Interpreter {
                 .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
         let var_names = &result.var_names;
-        let param_names = model_expansion::var_param_names(result.n_vars, result.lags, var_names);
+        let n_vars = result.n_vars;
+        let lags = result.lags;
+        // Flatten BVAR coefficient matrices (row-major: each equation is a row).
+        let params: Array1<f64> =
+            ndarray::Array1::from_iter(result.coeffs.iter().cloned());
+        let std_errors: Array1<f64> =
+            ndarray::Array1::from_iter(result.std_errors.iter().cloned());
+        let t_values: Array1<f64> =
+            ndarray::Array1::from_iter(result.t_values.iter().cloned());
+        let p_values: Array1<f64> =
+            ndarray::Array1::from_iter(result.p_values.iter().cloned());
+
+        // One label per (equation, lag, variable) coefficient.
+        let mut variable_names = Vec::with_capacity(params.len());
+        for eq in var_names.iter() {
+            for lag in 1..=lags {
+                for name in var_names.iter() {
+                    variable_names.push(format!("{eq}_L{lag}.{name}"));
+                }
+            }
+        }
+
+        let param_names = model_expansion::var_param_names(n_vars, lags, var_names);
         let summary = format!(
             "BVAR(lags={}), n={}, vars={}",
             result.lags, result.n_obs, result.n_vars
@@ -1323,42 +1345,51 @@ impl Interpreter {
         let fields = vec![
             (
                 "coeffs".into(),
-                model_expansion::array2_to_dataframe_named(&result.coeffs, &param_names),
+                model_expansion::array2_to_dataframe_named(&result.coeffs, &param_names[1..]),
             ),
             (
                 "std_errors".into(),
-                model_expansion::array2_to_dataframe_named(&result.std_errors, &param_names),
+                model_expansion::array2_to_dataframe_named(&result.std_errors, &param_names[1..]),
             ),
             (
                 "t_values".into(),
-                model_expansion::array2_to_dataframe_named(&result.t_values, &param_names),
+                model_expansion::array2_to_dataframe_named(&result.t_values, &param_names[1..]),
             ),
             (
                 "p_values".into(),
-                model_expansion::array2_to_dataframe_named(&result.p_values, &param_names),
+                model_expansion::array2_to_dataframe_named(&result.p_values, &param_names[1..]),
             ),
             (
                 "resid_cov".into(),
                 model_expansion::array2_to_dataframe_named(&result.resid_cov, var_names),
             ),
-            (
-                "fit".into(),
-                model_expansion::fit_dict(&[
-                    ("lambda1", Value::Float(result.hyperparams[0])),
-                    ("lambda2", Value::Float(result.hyperparams[1])),
-                    ("lambda3", Value::Float(result.hyperparams[2])),
-                    ("mu", Value::Float(result.hyperparams[3])),
-                    ("log_marginal", Value::Float(result.log_marginal)),
-                    ("n_obs", Value::Int(result.n_obs as i64)),
-                    ("n_vars", Value::Int(result.n_vars as i64)),
-                    ("lags", Value::Int(result.lags as i64)),
-                ]),
-            ),
         ];
-        Ok(model_expansion::model_result(
+        let mut fit = HashMap::new();
+        fit.insert("lambda1".into(), Value::Float(result.hyperparams[0]));
+        fit.insert("lambda2".into(), Value::Float(result.hyperparams[1]));
+        fit.insert("lambda3".into(), Value::Float(result.hyperparams[2]));
+        fit.insert("mu".into(), Value::Float(result.hyperparams[3]));
+        fit.insert("log_marginal".into(), Value::Float(result.log_marginal));
+        fit.insert("n_obs".into(), Value::Int(result.n_obs as i64));
+        fit.insert("n_vars".into(), Value::Int(result.n_vars as i64));
+        fit.insert("lags".into(), Value::Int(result.lags as i64));
+
+        Ok(model_expansion::model_result_full(
             result.to_string(),
             summary,
             "BvarResult",
+            variable_names,
+            Some(params),
+            Some(std_errors),
+            Some(t_values),
+            Some(p_values),
+            None,
+            None,
+            fit,
+            None,
+            None,
+            None,
+            HashMap::new(),
             fields,
         ))
     }
