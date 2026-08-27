@@ -52,6 +52,12 @@ jobs:
           Rscript -e 'install.packages("renv", repos="https://cloud.r-project.org")'
           Rscript -e 'renv::restore(lockfile="validation/renv.lock", prompt=FALSE)'
 
+      - name: Install tsDyn from GitHub
+        if: runner.os == 'Linux'
+        run: |
+          Rscript -e 'install.packages("remotes", repos="https://cloud.r-project.org")'
+          Rscript -e 'remotes::install_github("MatthieuStigler/tsDyn")'
+
       - name: Record installed environment versions
         run: |
           mkdir -p validation/reports

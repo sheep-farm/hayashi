@@ -1082,7 +1082,7 @@ cases:
   notes: Simulated bivariate TVAR with exogenous threshold q; references use no-intercept
     regime OLS to match Hayashi's output.
   dimension: numerical
-  status: partial
+  status: pass
 - id: tvcopula_simulated
   notes: R rmgarch/ccgarch packages not available; Python copula packages do not match
     Hayashi output.
