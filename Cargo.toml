@@ -132,3 +132,7 @@ lto = "fat"
 codegen-units = 256
 panic = 'abort'
 strip = 'symbols'
+
+[patch.crates-io]
+greeners-core = { git = "https://github.com/sheep-farm/Greeners.git", branch = "dev" }
+greeners-ols = { git = "https://github.com/sheep-farm/Greeners.git", branch = "dev" }

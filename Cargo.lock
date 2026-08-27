@@ -1505,8 +1505,7 @@ dependencies = [
 [[package]]
 name = "greeners-core"
 version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "332f2c813d68f35c9091f426bf0df69839be3551a3751c85617392694c417df7"
+source = "git+https://github.com/sheep-farm/Greeners.git?branch=dev#9c22e449e3f3f9ae5940dc2320ea3d26ea07eed1"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1633,8 +1632,7 @@ dependencies = [
 [[package]]
 name = "greeners-ols"
 version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d04d092739a9a61d5d3df1e7ff0ffca44e77347f8f0e8661740e9d47dee58120"
+source = "git+https://github.com/sheep-farm/Greeners.git?branch=dev#9c22e449e3f3f9ae5940dc2320ea3d26ea07eed1"
 dependencies = [
  "argmin",
  "argmin-math",
