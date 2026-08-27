@@ -393,6 +393,16 @@ impl Interpreter {
             "FMOLS(k={}, n={}), R2={:.4}",
             result.n_regressors, result.n_obs, result.r_squared
         );
+        let mut fit = HashMap::new();
+        fit.insert("n_obs".into(), Value::Int(result.n_obs as i64));
+        fit.insert(
+            "n_regressors".into(),
+            Value::Int(result.n_regressors as i64),
+        );
+        fit.insert("bandwidth".into(), Value::Int(result.bandwidth as i64));
+        fit.insert("r_squared".into(), Value::Float(result.r_squared));
+        fit.insert("alpha".into(), Value::Float(result.alpha));
+        fit.insert("alpha_se".into(), Value::Float(result.alpha_se));
         let fields: Vec<(String, Value)> = vec![
             (
                 "coefficients".into(),
@@ -410,22 +420,23 @@ impl Interpreter {
                 "omega".into(),
                 model_expansion::array2_to_dataframe("omega", &result.omega),
             ),
-            (
-                "fit".into(),
-                model_expansion::fit_dict(&[
-                    ("n_obs", Value::Int(result.n_obs as i64)),
-                    ("n_regressors", Value::Int(result.n_regressors as i64)),
-                    ("bandwidth", Value::Int(result.bandwidth as i64)),
-                    ("r_squared", Value::Float(result.r_squared)),
-                    ("alpha", Value::Float(result.alpha)),
-                    ("alpha_se", Value::Float(result.alpha_se)),
-                ]),
-            ),
         ];
-        Ok(model_expansion::model_result(
+        Ok(model_expansion::model_result_full(
             result.to_string(),
             summary,
             "FmolsResult",
+            result.variable_names,
+            Some(result.beta),
+            Some(result.beta_se),
+            Some(result.beta_t),
+            Some(result.beta_p),
+            None,
+            None,
+            fit,
+            None,
+            None,
+            None,
+            HashMap::new(),
             fields,
         ))
     }
