@@ -91,6 +91,18 @@ The CF retains periodic variations between 6 and 32 months (1{,}5 to 8 years —
 cycles). The advantage over the BK is that all 120 observations are kept
 (no edge trimming).
 
+\begin{aviso}
+  \textbf{Known bug --- do not use for published results.} \texttt{cffilter}
+  has no validation case against a reference implementation, and the engine
+  version currently shipped computes a \emph{different} filter: symmetric ideal
+  weights plus global mean subtraction instead of the asymmetric
+  Christiano-Fitzgerald random-walk weights. The output diverges materially from
+  R \texttt{mFilter::cffilter} and Python \texttt{statsmodels}, worst at the
+  endpoints --- exactly where the filter is used. See \texttt{KNOWN\_GAPS.md} and
+  issue \#148. Use \texttt{hpfilter} or \texttt{bkfilter} until a release
+  carries the fix.
+\end{aviso}
+
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Syntax}
 
