@@ -33,8 +33,9 @@ path = "src/bin/hay-kernel/main.rs"
 required-features = ["native"]
 
 [dependencies]
-# Greeners econometrics facade (crates.io)
-greeners = { version = "2.0.0", default-features = false }
+# Greeners econometrics facade (crates.io). Exact pin: numerical changes in
+# Greeners must reach Hayashi through a deliberate bump, never `cargo update`.
+greeners = { version = "=2.0.0", default-features = false }
 ndarray = "0.17"
 chrono = "0.4"
 statrs = "0.18"
@@ -82,7 +83,7 @@ indexmap = { version = "2", features = ["serde"] }
 [features]
 default = ["plotters", "wasm", "native", "full"]
 
-# Greeners sub-crate toggles. `greeners = "2.0.0"` is now the published facade
+# Greeners sub-crate toggles. `greeners = "=2.0.0"` is now the published facade
 # and always includes every sub-crate, so these features only gate Hayashi's
 # conditional compilation of estimator modules.
 greeners-ols = []
