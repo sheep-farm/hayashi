@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed
+
+- Pinned the Greeners facade to `=2.0.0` and added `--locked` to `cargo clippy`
+  and `cargo test` in CI, so a Greeners release (including a numerical fix) can
+  only reach Hayashi through a deliberate bump instead of a lockfile resolution.
+
 ## [0.2.10] — 2026-08-20
 
 ### Changed
