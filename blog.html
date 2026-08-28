@@ -199,6 +199,7 @@
           <ul>
             <li><a href="#hayashi-0-2-10-1">Hayashi 0.2.10-1 is out</a></li>
             <li><a href="#descriptive-wage1">Descriptive statistics with Hayashi: a first walk through wooldridge wage1</a></li>
+            <li><a href="#mincer-wage1">A Mincer wage equation in Hayashi: returns to schooling and experience</a></li>
             <li><a href="#hayashi-0-2-10">Hayashi 0.2.10 is out</a></li>
           </ul>
         </nav>
@@ -248,7 +249,7 @@
               <pre><code>cargo install --path .  # or download the release binary
 hay --version           # should show 0.2.10-1</code></pre>
               <p>
-                The next development cycle bumps Hayashi to <code>0.2.11-dev</code> and restores the <code>[patch.crates-io]</code> override against the Greeners <code>dev</code> branch for continued R&D.
+                The next development cycle bumps Hayashi to <code>0.2.11-dev</code> and restores the <code>[patch.crates-io]</code> override against the Greeners <code>dev</code> branch for continued R&amp;D.
               </p>
             </div>
           </li>
@@ -312,7 +313,7 @@ let wage1 = wool::wooldridge_data("wage1")</code></pre>
 
               <h2>Where to go next</h2>
               <p>
-                These commands prepare the ground for regression. The next tutorial in this series will run the first OLS model on the same dataset and interpret coefficients, standard errors, and goodness-of-fit.
+                These commands prepare the ground for regression. The next tutorial in this series estimates a Mincer-style log-wage equation on the same dataset and interprets returns to schooling and experience.
               </p>
 
               <pre><code># Run this in the terminal first:
@@ -331,6 +332,90 @@ centile(wage1, wage, percentiles=[10, 25, 50, 75, 90])
 tabulate(wage1, female)
 
 pwcorr(wage1, wage, educ, exper, tenure)</code></pre>
+            </div>
+          </li>
+          <li class="post-card" id="mincer-wage1">
+            <a href="#mincer-wage1" class="post-title">A Mincer wage equation in Hayashi: returns to schooling and experience</a>
+            <div class="post-meta">28 August 2026 · <span class="post-tag">tutorial</span><span class="post-tag">basics</span><span class="post-tag">ols</span><span class="post-tag">mincer</span></div>
+            <p class="post-summary">
+              Estimate the classic log-wage regression on the wooldridge wage1 data, add the experience-quadratic, use robust standard errors, and interpret the coefficients as percentage returns.
+            </p>
+
+            <div class="post-body">
+              <p>
+                This is the second tutorial in the wage1 series. After describing the data, we run a Mincer-style wage equation: log hourly wage on years of schooling, experience, and experience squared. This is the standard starting point for discussing returns to education in labour econometrics.
+              </p>
+
+              <h2>1. Load the data</h2>
+              <pre><code># Run in the terminal first:
+# hay install sheep-farm/haywooldridge
+
+import("sheep-farm/haywooldridge", as=wool)
+let wage1 = wool::wooldridge_data("wage1")</code></pre>
+
+              <h2>2. Why log wage?</h2>
+              <p>
+                Wage distributions are right-skewed, so the log transformation makes the relationship with schooling and experience closer to additive. Interpreting the coefficient on log wage as a percentage change is also simpler: a coefficient of <code>0.09</code> on <code>educ</code> means each additional year of schooling is associated with about a 9% increase in earnings, holding experience constant.
+              </p>
+
+              <h2>3. Fit the Mincer equation</h2>
+              <pre><code>let m = ols(lwage ~ educ + exper + expersq, wage1)</code></pre>
+              <p>
+                The <code>wage1</code> dataset already has <code>lwage</code> (the natural log of wage) and <code>expersq</code> (experience squared), so the regression is a one-liner. The intercept is included by default.
+              </p>
+
+              <h2>4. Read the coefficient table</h2>
+              <pre><code>tidy(m)
+glance(m)</code></pre>
+              <p>
+                From this specification you should see roughly the following pattern: an <code>educ</code> coefficient near <code>0.09</code>, an <code>exper</code> coefficient near <code>0.04</code> and a small negative <code>expersq</code> coefficient. With 526 observations the model explains about 30% of the variation in log wages. R-squared, adjusted R-squared, AIC, BIC and the F-statistic are available in <code>glance(m)</code>.
+              </p>
+
+              <h2>5. Robust standard errors</h2>
+              <pre><code>let m_hc3 = ols(lwage ~ educ + exper + expersq, wage1, cov="HC3")
+tidy(m_hc3)</code></pre>
+              <p>
+                Use quoted option values to avoid shadowing. <code>"HC3"</code> is a MacKinnon-White heteroskedasticity-consistent estimator. The alternative <code>cov="HC1"</code> through <code>cov="HC4"</code> are also accepted, and <code>cov="robust"</code> is an alias for <code>HC1</code>.
+              </p>
+
+              <h2>6. Interpret the returns</h2>
+              <p>
+                The schooling coefficient is the percentage return to one more year of education, ceteris paribus. The experience terms work together: the marginal effect of an extra year of experience is <code>exper + 2 * expersq * exper</code>, or about <code>0.04 - 0.0014 * exper</code> in this sample. With those numbers, returns to experience rise early and then fall, turning negative after about 28 years on the job.
+              </p>
+
+              <h2>7. Joint test of the experience terms</h2>
+              <pre><code>test(m, "exper", "expersq")</code></pre>
+              <p>
+                Even though the linear and squared terms are individually significant, a joint F-test checks whether experience as a whole belongs in the model.
+              </p>
+
+              <h2>8. Store and export a table</h2>
+              <pre><code>eststo(m)
+esttab()</code></pre>
+              <p>
+                <code>eststo</code> saves the model and <code>esttab</code> prints a formatted coefficient table with standard errors in parentheses and significance stars. This sets up the next tutorial, where we will compare multiple specifications side by side.
+              </p>
+
+              <h2>Where to go next</h2>
+              <p>
+                The third tutorial in this series will add controls, interactions, and a comparison table with <code>esttab</code>, turning the simple Mincer model into a small wage-gap analysis.
+              </p>
+
+              <pre><code># Full Mincer script
+import("sheep-farm/haywooldridge", as=wool)
+let wage1 = wool::wooldridge_data("wage1")
+
+let m = ols(lwage ~ educ + exper + expersq, wage1)
+tidy(m)
+glance(m)
+
+let m_hc3 = ols(lwage ~ educ + exper + expersq, wage1, cov="HC3")
+tidy(m_hc3)
+
+test(m, "exper", "expersq")
+
+eststo(m)
+esttab()</code></pre>
             </div>
           </li>
           <li class="post-card" id="hayashi-0-2-10">
