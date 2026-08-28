@@ -114,9 +114,9 @@ jobs:
         shell: bash
         run: |
           if [ "$RUNNER_OS" = "Linux" ]; then
-            python validation/run.py
+            python validation/run.py --experimental
           else
-            python validation/run.py --allow-partial
+            python validation/run.py --experimental --allow-partial
           fi
 
       - name: Upload validation report

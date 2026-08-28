@@ -1730,6 +1730,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         action="store_true",
         help="Only show cases that fail or are blocked; passing cases are run silently.",
     )
+    parser.add_argument(
+        "--experimental",
+        action="store_true",
+        help="Run validation cases that depend on Hayashi's experimental feature flag.",
+    )
     return parser.parse_args(argv)
 
 
@@ -1926,6 +1931,9 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as e:
         log(f"ERROR: {e}")
         return 1
+
+    if not args.case_ids and not args.experimental:
+        selected_cases = [c for c in selected_cases if not c.get("experimental")]
 
     if args.case_ids:
         log(f"Selected {len(selected_cases)} validation case(s)")
