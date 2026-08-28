@@ -140,52 +140,52 @@
     <div class="container">
       <div class="blog">
         <ul class="post-list">
-          <li class="post-card" id="descriptive-wage1">
-            <a href="#descriptive-wage1" class="post-title">Descriptive statistics with Hayashi: a first walk through wage1</a>
+          <li class="post-card" id="descriptive-sample">
+            <a href="#descriptive-sample" class="post-title">Descriptive statistics with Hayashi: a first look at sample data</a>
             <div class="post-meta">28 August 2026 · <span class="post-tag">tutorial</span><span class="post-tag">basics</span><span class="post-tag">descriptive</span></div>
             <p class="post-summary">
-              Learn how to load a dataset and inspect it with summary statistics, percentiles, frequency tables, and correlations — all from the Hayashi REPL or a script.
+              Learn how to load a CSV and inspect it with summary statistics, percentiles, frequency tables, and correlations — all from the Hayashi REPL or a script.
             </p>
 
             <div class="post-body">
               <p>
-                If you are used to Stata, R, or Python, the first thing you want from a new language is a fast way to look at your data. This tutorial shows the essential commands on the classic <code>wooldridge::wage1</code> dataset, which comes bundled with Hayashi.
+                If you are used to Stata, R, or Python, the first thing you want from a new language is a fast way to look at your data. This tutorial uses the bundled sample file <code>dados.csv</code>; in your own scripts, replace the column names and file path with whatever you have.
               </p>
 
               <h2>1. Load the data</h2>
-              <pre><code>load "wooldridge::wage1"</code></pre>
+              <pre><code>load "dados.csv" as emp</code></pre>
               <p>
-                Hayashi ships with several Wooldridge datasets. You can also load CSV, DTA, Parquet, or SQLite files with the same <code>load</code> command.
+                The <code>load</code> command reads local CSV files. It also supports DTA, Parquet, TSV, Excel, SQLite, JSON, and direct URLs if the network feature is enabled.
               </p>
 
               <h2>2. Numeric summary</h2>
-              <pre><code>summarize wage</code></pre>
+              <pre><code>summarize(emp, salario, educacao, experiencia, idade)</code></pre>
               <p>
-                <code>summarize</code> reports observations, mean, standard deviation, minimum, and maximum for one or more variables. For <code>wage</code>, you will see about 526 observations, an average hourly wage near 5.9, and a long right tail.
+                In Hayashi, the dataset is the first argument. <code>summarize</code> reports observations, mean, standard deviation, minimum, and maximum. For <code>salario</code>, you will see a small range and a right-skewed pattern typical of salary data.
               </p>
 
               <h2>3. Detailed codebook</h2>
-              <pre><code>codebook wage</code></pre>
+              <pre><code>codebook(emp, salario)</code></pre>
               <p>
                 Use <code>codebook</code> when you need the type of a variable, the number of missing values, and the range in one place.
               </p>
 
               <h2>4. Percentiles</h2>
-              <pre><code>centile wage, p(10 25 50 75 90)</code></pre>
+              <pre><code>centile(emp, salario, percentiles=[10, 25, 50, 75, 90])</code></pre>
               <p>
-                The <code>centile</code> command lets you pick any quantiles. The command above shows the 10th, 25th, median, 75th, and 90th percentiles, which is a quick way to check skewness.
+                The <code>centile</code> command lets you pick arbitrary percentiles with the <code>percentiles=</code> option. The command above shows the 10th, 25th, median, 75th, and 90th percentiles, which is a quick way to check skewness.
               </p>
 
               <h2>5. Frequency table</h2>
-              <pre><code>tabulate female</code></pre>
+              <pre><code>tabulate(emp, genero)</code></pre>
               <p>
-                For categorical or dummy variables, <code>tabulate</code> gives counts and percentages. Use <code>tabulate female, row</code> or <code>tabulate female, column</code> when you want row or column percentages.
+                For categorical variables, <code>tabulate</code> gives counts and percentages. You can also cross-tabulate with a second variable, for example <code>tabulate(emp, setor, genero)</code>.
               </p>
 
               <h2>6. Correlations</h2>
-              <pre><code>pwcorr wage educ exper tenure</code></pre>
+              <pre><code>pwcorr(emp, salario, educacao, experiencia, idade)</code></pre>
               <p>
-                <code>pwcorr</code> prints a pairwise correlation matrix. This is often the first check before running an OLS regression: do <code>wage</code> and <code>educ</code> move together? Do <code>exper</code> and <code>tenure</code> share too much variation?
+                <code>pwcorr</code> prints a pairwise correlation matrix. This is often the first check before running an OLS regression: do <code>salario</code> and <code>educacao</code> move together? Does <code>experiencia</code> add information beyond <code>idade</code>?
               </p>
 
               <h2>Where to go next</h2>
@@ -194,17 +194,17 @@
               </p>
 
               <pre><code># Full first-look script
-load "wooldridge::wage1"
+load "dados.csv" as emp
 
-summarize wage educ exper tenure
+summarize(emp, salario, educacao, experiencia, idade)
 
-codebook wage
+codebook(emp, salario)
 
-centile wage, p(10 25 50 75 90)
+centile(emp, salario, percentiles=[10, 25, 50, 75, 90])
 
-tabulate female
+tabulate(emp, genero)
 
-pwcorr wage educ exper tenure</code></pre>
+pwcorr(emp, salario, educacao, experiencia, idade)</code></pre>
             </div>
           </li>
           <li class="post-card" id="hayashi-0-2-10">
