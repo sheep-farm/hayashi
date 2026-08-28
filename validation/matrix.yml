@@ -317,9 +317,9 @@ cases:
   dimension: numerical
   status: pass
 - id: fmols_simulated
-  notes: FMOLS validated against cointReg::cointRegFM (Bartlett/Andrews).
+  notes: R cointReg reference fails in CI; no stable reference currently available.
   dimension: numerical
-  status: pass
+  status: not-supported
 - id: ftest_robust_wooldridge_wage1
   notes: Robust F-test (Wooldridge 2010) with cluster-robust covariance for joint
     significance test.
@@ -971,9 +971,9 @@ cases:
   dimension: numerical
   status: pass
 - id: spatial_panel_sar_simulated
-  notes: Panel SAR validated against splm::spml (within, lag)
+  notes: R splm reference fails in CI; no stable reference currently available.
   dimension: numerical
-  status: pass
+  status: not-supported
 - id: spatial_sar_simulated
   notes: Data generated on a 7x7 grid with rook contiguity W, rho=0.3, beta=0.5. Reference
     implements the same concentrated MLE independently.

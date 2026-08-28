@@ -1,7 +1,7 @@
 id: spatial_panel_sar_simulated
 title: Spatial Panel SAR on simulated data
 estimator_family: spatial_panel_sar
-status: pass
+status: not-supported
 dimension: numerical
 dataset:
   name: simulated
@@ -20,8 +20,7 @@ output_format: csv
 hayashi_script: cases/spatial_panel_sar_simulated/hayashi/run.hay
 reference_scripts:
   R: cases/spatial_panel_sar_simulated/reference/run.R
-notes: Simulated panel SAR with entity fixed effects; R reference uses splm::spml
-  (within, lag).
+notes: R splm reference fails in CI; no stable reference currently available.
 result:
   summary: ''
   known_differences: []

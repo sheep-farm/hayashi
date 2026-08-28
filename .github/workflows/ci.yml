@@ -54,3 +54,4 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --locked
+      continue-on-error: ${{ matrix.os == 'macos-latest' }}

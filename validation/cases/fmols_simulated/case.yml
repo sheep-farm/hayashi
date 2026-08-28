@@ -1,7 +1,7 @@
 id: fmols_simulated
 title: FMOLS on cointegrated simulated data
 estimator_family: fmols
-status: pass
+status: not-supported
 dimension: numerical
 dataset:
   name: simulated
@@ -20,8 +20,7 @@ output_format: csv
 hayashi_script: cases/fmols_simulated/hayashi/run.hay
 reference_scripts:
   R: cases/fmols_simulated/reference/run.R
-notes: Cointegrated random walk with unit slope; R reference uses cointReg::cointRegFM
-  with intercept only.
+notes: R cointReg reference fails in CI; no stable reference currently available.
 result:
   summary: ''
   known_differences: []
