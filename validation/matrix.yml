@@ -317,10 +317,9 @@ cases:
   dimension: numerical
   status: pass
 - id: fmols_simulated
-  notes: R cointReg/urca packages not available; cointegration Fully-Modified OLS
-    not in base R or statsmodels.
+  notes: FMOLS validated against cointReg::cointRegFM (Bartlett/Andrews).
   dimension: numerical
-  status: not-supported
+  status: pass
 - id: ftest_robust_wooldridge_wage1
   notes: Robust F-test (Wooldridge 2010) with cluster-robust covariance for joint
     significance test.
@@ -972,7 +971,8 @@ cases:
   dimension: numerical
   status: pass
 - id: spatial_panel_sar_simulated
-  notes: R spatialreg/spdep packages failed to install in previous sessions.
+  notes: Greeners spatial_panel_sar returns rho=1 and zero x coefficient on all tested
+    data; needs estimator fix before validation.
   dimension: numerical
   status: not-supported
 - id: spatial_sar_simulated

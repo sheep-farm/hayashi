@@ -62,7 +62,7 @@
 | fcoef | simulated |  | not-supported | — | No standard R/Python package for the same functional-coefficient estimator. |
 | feiv | simulated | R, Python | pass | 134 | Panel with N=200 entities and T=5 periods; x is endogenous and instrumented by z. Independent R and Python within-2SLS references use the Greeners residual degrees-of-freedom convention n - k - (G - 1). |
 | fmb | simulated_fmb_panel | R, Python | pass | 49 | Classic Fama-MacBeth regression on a deterministic simulated asset panel. |
-| fmols | simulated |  | not-supported | — | R cointReg/urca packages not available; cointegration Fully-Modified OLS not in base R or statsmodels. |
+| fmols | simulated | R | pass | — | FMOLS validated against cointReg::cointRegFM (Bartlett/Andrews). |
 | ftest_robust | wooldridge::wage1 | R, Python | pass | — | Robust F-test (Wooldridge 2010) with cluster-robust covariance for joint significance test. |
 | rd | simulated | Python | pass | — | Fuzzy RD with 70% compliance at the cutoff. Compare local average treatment effect (LATE). |
 | garch | simulated_garch11 | R, Python | pass | — | Uses the same simulated GARCH(1,1) DGP as Chapter 30 of the book. Coefficients only because GARCH standard-error approximations differ widely between implementations. |
@@ -192,7 +192,7 @@
 | sfa | simulated | R, Python | pass | — | Simulated Cobb-Douglas production frontier with negligible inefficiency so MLE/OLS references align with Hayashi. |
 | spatial_durbin_error | simulated |  | not-supported | — | R spatialreg/spdep packages failed to install in previous sessions. |
 | spatial_durbin | simulated | R, Python | pass | — | Data generated on a 7x7 grid with rook contiguity W, rho=-0.95, beta=0.5. The Durbin model is highly collinear; only the spatial autoregressive parameter is compared. |
-| spatial_panel_sar | simulated |  | not-supported | — | R spatialreg/spdep packages failed to install in previous sessions. |
+| spatial_panel_sar | simulated | R | not-supported | — | Greeners spatial_panel_sar returns rho=1 and zero x coefficient on all tested data; needs estimator fix before validation. |
 | spatial_sar | simulated | R, Python | pass | — | Data generated on a 7x7 grid with rook contiguity W, rho=0.3, beta=0.5. Reference implements the same concentrated MLE independently. |
 | spatial_sem | simulated | R, Python | pass | — | Data generated on a 7x7 grid with rook contiguity W, lambda=0.1, beta=0.5. Reference implements the same concentrated MLE independently. |
 | spectral | simulated |  | not-supported | — | Results are sensitive to random k-means initialisation and normalised Laplacian details; no deterministic numeric reference. |
@@ -208,13 +208,13 @@
 | descriptive | wooldridge::wage1 | R, Python | pass | — | Tabstat statistics (mean, sd, min, max, p50) for wage, educ, exper, tenure. |
 | descriptive | wooldridge::mroz | R, Python | pass | — | Two-way frequency table with Pearson chi-square test. |
 | ols | simulated | R, Python | pass | — | Simulated OLS. testparm F and p-value for H0: x1 = x2 = 0. |
-| three_sls | simulated | R:passed *, Python:passed * | pass | — | Simultaneous two-equation system with correlated errors. Each equation includes an intercept, one exogenous and one endogenous regressor; the excluded exogenous from the other equation is used as an instrument. Python reference is linearmodels.system.IV3SLS with an explicit constant column. |
+| three_sls | simulated | R, Python | pass | — | Simultaneous two-equation system with correlated errors. Each equation includes an intercept, one exogenous and one endogenous regressor; the excluded exogenous from the other equation is used as an instrument. Python reference is linearmodels.system.IV3SLS with an explicit constant column. |
 | tmle | simulated_tmle | R, Python | pass | — | Simulated data with true ATE 0.7; compares TMLE point estimate and standard error against R tmle and a manual Python implementation. |
 | tobit | wooldridge::mroz | R, Python | pass | — | Tobit regression of hours worked with left censoring at zero. Hayashi matches AER::tobit at displayed precision; the new Python reference is a manual MLE refined with Nelder-Mead and uses a numerical Hessian for standard errors. |
 | transformer | simulated |  | not-supported | — | PyTorch/TensorFlow stochastic training is not reproducible enough for numerical validation. |
 | tsne | simulated | Python | pass | — | t-SNE embedding of three 3D blobs; cluster quality measured via K-Means inertia. |
 | descriptive | wooldridge::wage1 | R, Python | pass | — | One-sample t-test of wage mean against mu=5. |
-| tvar | simulated | R:passed *, Python:passed * | pass | — | Simulated bivariate TVAR with exogenous threshold q; references use no-intercept regime OLS to match Hayashi's output. |
+| tvar | simulated | R, Python | pass | — | Simulated bivariate TVAR with exogenous threshold q; references use no-intercept regime OLS to match Hayashi's output. |
 | tvcopula | simulated |  | not-supported | — | R rmgarch/ccgarch packages not available; Python copula packages do not match Hayashi output. |
 | tvp | simulated | R, Python | pass | — | Simulated TVP data with smooth intercept and slope drift. The reference is the true final coefficient vector because Greeners TVP uses a simple Kalman-grid implementation with no readily available reference implementation. |
 | tvp_var | simulated |  | not-supported | — | No stable PyMC or R TVP reference implementation in the venv. |

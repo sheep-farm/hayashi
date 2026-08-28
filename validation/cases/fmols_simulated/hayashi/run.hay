@@ -1,1 +1,4 @@
-print('not-supported')
+load "validation/cases/fmols_simulated/data/data.csv" as df
+let m = fmols(y ~ x, df)
+let out = select(m.coefficients, "variable", "coef", "std_err")
+export(out, "csv", "/dev/stdout")

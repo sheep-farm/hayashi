@@ -1,1 +1,13 @@
-print('not-supported')
+load "validation/cases/spatial_panel_sar_simulated/data/data.csv" as df
+let W = [[0, 1, 0, 0],
+         [0, 0, 1, 0],
+         [0, 0, 0, 1],
+         [1, 0, 0, 0]]
+let m = spatial_panel_sar(y ~ x, df, w=W, id="entity")
+let out0 = dataframe({
+  "variable": ["rho", "x"],
+  "coef": [m.fit["spatial_param"], m.coefficients["coef"][0]],
+  "std_err": [m.fit["spatial_se"], m.coefficients["std_err"][0]]
+})
+let out = select(out0, "variable", "coef", "std_err")
+export(out, "csv", "/dev/stdout")

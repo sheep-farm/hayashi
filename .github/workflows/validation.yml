@@ -76,7 +76,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           cd validation
-          Rscript -e 'renv::install(c("cointReg", "spdep", "spatialreg"))'
+          Rscript -e 'renv::install(c("cointReg", "spdep", "spatialreg", "splm"))'
 
       - name: Install tsDyn from GitHub
         run: |
@@ -105,7 +105,7 @@ jobs:
         run: python -m unittest validation/test_run.py
 
       - name: Build Hayashi
-        run: cargo build --release
+        run: cargo build --release --features experimental
 
       - name: Add Hayashi to PATH
         run: echo "${{ github.workspace }}/target/release" >> "$GITHUB_PATH"
