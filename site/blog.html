@@ -199,6 +199,7 @@
           <ul>
             <li><a href="#hayashi-0-2-10-1">Hayashi 0.2.10-1 is out</a></li>
             <li><a href="#descriptive-wage1">Descriptive statistics with Hayashi: a first walk through wooldridge wage1</a></li>
+            <li><a href="#first-ols-wage1">Your first OLS model in Hayashi: wage on education and experience</a></li>
             <li><a href="#hayashi-0-2-10">Hayashi 0.2.10 is out</a></li>
           </ul>
         </nav>
@@ -331,6 +332,88 @@ centile(wage1, wage, percentiles=[10, 25, 50, 75, 90])
 tabulate(wage1, female)
 
 pwcorr(wage1, wage, educ, exper, tenure)</code></pre>
+            </div>
+          </li>
+          <li class="post-card" id="first-ols-wage1">
+            <a href="#first-ols-wage1" class="post-title">Your first OLS model in Hayashi: wage on education and experience</a>
+            <div class="post-meta">28 August 2026 · <span class="post-tag">tutorial</span><span class="post-tag">basics</span><span class="post-tag">ols</span></div>
+            <p class="post-summary">
+              Run a simple linear regression on the wooldridge wage1 dataset, interpret the coefficients, inspect fit statistics, and add robust standard errors.
+            </p>
+
+            <div class="post-body">
+              <p>
+                This is the second tutorial in the wage1 series. We already described the data; now we model it. We will estimate a Mincer-style wage equation with education, experience, and tenure.
+              </p>
+
+              <h2>1. Load the data (same as before)</h2>
+              <pre><code># Run in the terminal first:
+# hay install sheep-farm/haywooldridge
+
+import("sheep-farm/haywooldridge", as=wool)
+let wage1 = wool::wooldridge_data("wage1")</code></pre>
+
+              <h2>2. Fit the model</h2>
+              <pre><code>let m = ols(wage ~ educ + exper + tenure, wage1)</code></pre>
+              <p>
+                The first argument is a formula, the second is the <code>DataFrame</code>. The intercept is included by default. You can inspect the model by printing it, or ask for a tidy coefficient table.
+              </p>
+
+              <h2>3. Coefficient table</h2>
+              <pre><code>tidy(m)
+
+glance(m)</code></pre>
+              <p>
+                <code>tidy(m)</code> returns the variable names, coefficient estimates, standard errors, t-statistics, p-values, and confidence intervals. <code>glance(m)</code> gives the one-row fit summary: R-squared, adjusted R-squared, number of observations, and more.
+              </p>
+
+              <h2>4. Robust standard errors</h2>
+              <pre><code>let m_hc3 = ols(wage ~ educ + exper + tenure, wage1, cov=HC3)
+tidy(m_hc3)</code></pre>
+              <p>
+                The <code>cov=</code> option accepts <code>HC1</code> through <code>HC4</code> or <code>robust</code> for heteroskedasticity-consistent standard errors. In cross-section wage data, this is usually the safer choice.
+              </p>
+
+              <h2>5. Predicted values and residuals</h2>
+              <pre><code>predict wage1 yhat = m
+predict wage1 resid = m, "residuals"
+
+summarize(wage1, yhat, resid)
+pwcorr(wage1, yhat, wage)</code></pre>
+              <p>
+                <code>predict</code> stores fitted values and residuals as new columns in the original <code>DataFrame</code>. Summarizing them is a quick sanity check: residuals should be centred near zero, and the fitted values should correlate strongly with the actual wages.
+              </p>
+
+              <h2>6. Test a joint hypothesis</h2>
+              <pre><code>test(m, "educ", "tenure")</code></pre>
+              <p>
+                The <code>test()</code> command runs an F-test for the joint significance of one or more coefficients. Use it when you want to check whether several variables matter together, not individually.
+              </p>
+
+              <h2>7. Where to go next</h2>
+              <p>
+                With one model working, the next step is to compare specifications. The third tutorial in this series will show how to build a regression table with <code>eststo</code> and <code>esttab</code>, and how to add controls, interactions, and log-transformed variables.
+              </p>
+
+              <pre><code># Full OLS script
+import("sheep-farm/haywooldridge", as=wool)
+let wage1 = wool::wooldridge_data("wage1")
+
+let m = ols(wage ~ educ + exper + tenure, wage1)
+
+tidy(m)
+glance(m)
+
+let m_hc3 = ols(wage ~ educ + exper + tenure, wage1, cov=HC3)
+tidy(m_hc3)
+
+predict wage1 yhat = m
+predict wage1 resid = m, "residuals"
+
+summarize(wage1, yhat, resid)
+pwcorr(wage1, yhat, wage)
+
+test(m, "educ", "tenure")</code></pre>
             </div>
           </li>
           <li class="post-card" id="hayashi-0-2-10">
