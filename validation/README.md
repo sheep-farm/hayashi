@@ -16,9 +16,10 @@ expected outputs, and comparison reports.
 
 ```bash
 python validation/run.py
+python validation/run.py --experimental
 ```
 
-The orchestrator reads `validation/matrix.yml`, runs the Hayashi script and
+Use `--experimental` to include cases whose `case.yml` is marked `experimental: true`; without it, those cases are skipped. The orchestrator reads `validation/matrix.yml`, runs the Hayashi script and
 the reference scripts for each selected case, compares the declared quantities
 against tolerances, and updates `MATRIX.md`.
 
@@ -256,8 +257,9 @@ estimators that are not yet numerically validated, see `KNOWN_GAPS.md`.
   `fapanel`, `fcoef`, `fmols`, `lstm`, `mfvar`, `spatial_durbin_error`,
   `spatial_panel_sar`, `spatial_panel_sem`, `spectral`, `transformer`,
   `tvcopula`, `tvp_var`, and `johansen_break`.
-- **Estimators with `not-supported` validation placeholders** — some of the
-  estimators above have a directory under `validation/cases/` whose
-  `case.yml` is marked `not-supported` (the `run.hay` is a placeholder)
-  because no stable R/Python reference is available. They are not numerically
-  validated, but they are implemented and callable.
+- **Experimental estimators** — commands gated by the `experimental` Cargo
+  feature (`bvar`, `mfvar`, `fmols`, `spatial_*`, etc.) are also excluded
+  unless `validation/run.py` is invoked with `--experimental`. Some of these
+  are still `not-supported` while their reference implementations are
+  assembled; two of them, `fmols` and `spatial_panel_sar`, are now `pass` but
+  remain behind the `experimental` feature flag.

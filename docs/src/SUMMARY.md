@@ -28,6 +28,7 @@
 - [Binary Choice](./estimation/binary.md)
 - [Time Series](./estimation/timeseries.md)
 - [All Estimators](./estimation/reference.md)
+- [Experimental Estimators](./estimation/experimental.md)
 
 # Post-Estimation
 

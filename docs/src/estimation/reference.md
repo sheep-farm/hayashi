@@ -4,6 +4,10 @@ Quick reference for the implemented estimator and model commands in Hayashi.
 Aliases are shown with `/`. Common post-estimation commands are listed at the
 end of the page.
 
+> Commands that require the `experimental` feature are documented in the
+> [Experimental estimators](./experimental.md) page. Build with
+> `cargo build --features experimental` to enable them.
+
 ## Cross-Section
 
 | Command | Description | Syntax |
