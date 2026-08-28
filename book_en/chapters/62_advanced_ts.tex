@@ -88,6 +88,9 @@ let m_mfvar = mfvar(df_q, yq, df_m, ym, agg=3, lags=1)
 print(m_mfvar)
 \end{lstlisting}
 
+\texttt{fcoef}, \texttt{bvar} and \texttt{mfvar} are experimental and
+require \texttt{--features experimental}.
+
 \section{Panel VAR}
 
 \texttt{pvar} estimates a panel VAR using Arellano-Bond style GMM: lagged

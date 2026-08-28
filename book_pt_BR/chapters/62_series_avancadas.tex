@@ -88,6 +88,9 @@ let m_mfvar = mfvar(df_q, yq, df_m, ym, agg=3, lags=1)
 print(m_mfvar)
 \end{lstlisting}
 
+\texttt{fcoef}, \texttt{bvar} e \texttt{mfvar} são experimentais e
+exigem \texttt{--features experimental}.
+
 \section{VAR em painel}
 
 \texttt{pvar} estima uma VAR em painel usando GMM estilo Arellano-Bond:

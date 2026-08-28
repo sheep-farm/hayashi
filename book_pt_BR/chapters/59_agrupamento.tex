@@ -70,7 +70,8 @@ print(m_umap)
 
 Agrupamento espectral usa a estrutura de autovalores de um grafo de
 similaridade. Pode capturar formas de cluster não convexas onde
-K-Means falha.
+K-Means falha. O \texttt{spectral} é experimental e exige
+\texttt{--features experimental}.
 
 \begin{lstlisting}[caption={Agrupamento espectral}]
 let m_sc = spectral(df, x="x1,x2", k=3)

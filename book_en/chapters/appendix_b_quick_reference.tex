@@ -1,5 +1,10 @@
 \chapter{Quick Reference}
 \label{apendice:referencia}
+
+\paragraph*{Experimental feature.} Commands marked with \textdagger{} in this
+appendix are only available when Hayashi is built with
+\texttt{--features experimental}.
+
 % ── index ───────────────────────────────────────────────────────
 \index{quick reference|textbf}
 \index{syntax|textbf}
@@ -393,7 +398,7 @@ PCA biplot        & \texttt{biplot(df, x="v1,v2,v3", type="symmetric")} \\
 K-Means           & \texttt{kmeans(df, x="v1,v2", k=3)} \\
 DBSCAN            & \texttt{dbscan(df, x="v1,v2", eps=1.0, minpts=5)} \\
 GMM clustering    & \texttt{gmm\_clust(df, x="v1,v2", k=3)} \\
-Spectral          & \texttt{spectral(df, x="v1,v2", k=3)} \\
+Spectral\textdagger{}          & \texttt{spectral(df, x="v1,v2", k=3)} \\
 Hierarchical      & \texttt{hclust(df, x="v1,v2", linkage="ward")} \\
 t-SNE             & \texttt{tsne(df, x="v1,v2", perplexity=30)} \\
 UMAP              & \texttt{umap(df, x="v1,v2", neighbors=15)} \\
@@ -468,8 +473,8 @@ Gradient boosting   & \texttt{gbm(y \textasciitilde{} x1 + x2, df, trees=100)} \
 Quantile RF         & \texttt{qrf(y \textasciitilde{} x1 + x2, df, quantiles="0.1,0.5,0.9")} \\
 XGBoost             & \texttt{xgboost(y \textasciitilde{} x1 + x2, df)} \\
 MLP                 & \texttt{mlp(y \textasciitilde{} x1 + x2, df, hidden=10)} \\
-LSTM                & \texttt{lstm(df, y, hidden=10, seqlen=12, forecast=5)} \\
-Transformer         & \texttt{transformer(df, y, d\_model=8, seqlen=12)} \\
+LSTM\textdagger{}                & \texttt{lstm(df, y, hidden=10, seqlen=12, forecast=5)} \\
+Transformer\textdagger{}         & \texttt{transformer(df, y, d\_model=8, seqlen=12)} \\
 BART                & \texttt{bart(y \textasciitilde{} x1 + x2, df, trees=20)} \\
 Gaussian process    & \texttt{gp(y \textasciitilde{} x1 + x2, df)} \\
 \midrule
@@ -491,12 +496,12 @@ DML cross-fit       & \texttt{dml\_crossfit(y \textasciitilde{} d, df, x="x1,x2"
 \toprule
 \textbf{Model} & \textbf{Syntax} \\
 \midrule
-Spatial SAR         & \texttt{spatial\_sar(y \textasciitilde{} x1 + x2, df, w=W)} \\
-Spatial SEM         & \texttt{spatial\_sem(y \textasciitilde{} x1 + x2, df, w=W)} \\
-Spatial Durbin      & \texttt{spatial\_durbin(y \textasciitilde{} x1 + x2, df, w=W)} \\
-Spatial panel SAR   & \texttt{spatial\_panel\_sar(y \textasciitilde{} x, df, w=W, id="e")} \\
-Spatial panel SEM   & \texttt{spatial\_panel\_sem(y \textasciitilde{} x, df, w=W, id="e")} \\
-Spatial Durbin error & \texttt{spatial\_durbin\_error(y \textasciitilde{} x, df, w=W, id="e")} \\
+Spatial SAR\textdagger{}         & \texttt{spatial\_sar(y \textasciitilde{} x1 + x2, df, w=W)} \\
+Spatial SEM\textdagger{}         & \texttt{spatial\_sem(y \textasciitilde{} x1 + x2, df, w=W)} \\
+Spatial Durbin\textdagger{}      & \texttt{spatial\_durbin(y \textasciitilde{} x1 + x2, df, w=W)} \\
+Spatial panel SAR\textdagger{}   & \texttt{spatial\_panel\_sar(y \textasciitilde{} x, df, w=W, id="e")} \\
+Spatial panel SEM\textdagger{}   & \texttt{spatial\_panel\_sem(y \textasciitilde{} x, df, w=W, id="e")} \\
+Spatial Durbin error\textdagger{} & \texttt{spatial\_durbin\_error(y \textasciitilde{} x, df, w=W, id="e")} \\
 \bottomrule
 \end{tabular}
 \end{center}

@@ -73,6 +73,7 @@ print(m_umap)
 
 Spectral clustering uses the eigenstructure of a similarity graph. It
 can capture non-convex cluster shapes where K-Means fails.
+\texttt{spectral} is experimental and requires \texttt{--features experimental}.
 
 \begin{lstlisting}[caption={Spectral clustering}]
 let m_sc = spectral(df, x="x1,x2", k=3)
