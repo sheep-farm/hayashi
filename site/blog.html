@@ -103,6 +103,61 @@
       color: var(--text-muted);
       margin-right: 0.5rem;
     }
+    .blog-layout {
+      display: flex;
+      align-items: flex-start;
+      gap: 2.5rem;
+    }
+    .blog-index {
+      width: 220px;
+      flex-shrink: 0;
+      position: sticky;
+      top: 2rem;
+      align-self: flex-start;
+      font-size: 0.9rem;
+      padding-top: 3rem;
+    }
+    .blog-index .index-year {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.75rem;
+    }
+    .blog-index ul {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 2rem 0;
+      border-left: 2px solid var(--border);
+      padding-left: 1rem;
+    }
+    .blog-index li {
+      margin-bottom: 0.75rem;
+      line-height: 1.4;
+    }
+    .blog-index a {
+      color: var(--text);
+      text-decoration: none;
+    }
+    .blog-index a:hover {
+      text-decoration: underline;
+    }
+    .blog-main {
+      flex: 1;
+      min-width: 0;
+    }
+    @media (max-width: 900px) {
+      .blog-layout {
+        flex-direction: column;
+      }
+      .blog-index {
+        position: relative;
+        top: 0;
+        width: auto;
+        padding-top: 0;
+      }
+    }
   </style>
 </head>
 <body>
@@ -138,8 +193,17 @@
     </section>
 
     <div class="container">
-      <div class="blog">
-        <ul class="post-list">
+      <div class="blog-layout">
+        <nav class="blog-index" aria-label="Blog index">
+          <div class="index-year">2026</div>
+          <ul>
+            <li><a href="#descriptive-wage1">Descriptive statistics with Hayashi: a first walk through wooldridge wage1</a></li>
+            <li><a href="#hayashi-0-2-10">Hayashi 0.2.10 is out</a></li>
+          </ul>
+        </nav>
+        <div class="blog-main">
+          <div class="blog">
+            <ul class="post-list">
           <li class="post-card" id="descriptive-wage1">
             <a href="#descriptive-wage1" class="post-title">Descriptive statistics with Hayashi: a first walk through wooldridge wage1</a>
             <div class="post-meta">28 August 2026 · <span class="post-tag">tutorial</span><span class="post-tag">basics</span><span class="post-tag">descriptive</span></div>
@@ -294,6 +358,8 @@ ols(y ~ x, df)</code></pre>
           </li>
         </ul>
       </div>
+    </div>
+  </div>
     </div>
   </main>
 
