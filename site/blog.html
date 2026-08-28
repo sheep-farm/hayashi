@@ -200,6 +200,7 @@
             <li><a href="#hayashi-0-2-10-1">Hayashi 0.2.10-1 is out</a></li>
             <li><a href="#descriptive-wage1">Descriptive statistics with Hayashi: a first walk through wooldridge wage1</a></li>
             <li><a href="#mincer-wage1">A Mincer wage equation in Hayashi: returns to schooling and experience</a></li>
+            <li><a href="#wage-gap-wage1">Wage gaps and interactions in Hayashi: comparing OLS specifications</a></li>
             <li><a href="#hayashi-0-2-10">Hayashi 0.2.10 is out</a></li>
           </ul>
         </nav>
@@ -398,7 +399,7 @@ esttab()</code></pre>
 
               <h2>Where to go next</h2>
               <p>
-                The third tutorial in this series will add controls, interactions, and a comparison table with <code>esttab</code>, turning the simple Mincer model into a small wage-gap analysis.
+                The next tutorial in this series adds gender and marriage dummies, an interaction, and a side-by-side table with <code>esttab</code>, turning the simple Mincer model into a small wage-gap analysis.
               </p>
 
               <pre><code># Full Mincer script
@@ -415,6 +416,80 @@ tidy(m_hc3)
 test(m, "exper", "expersq")
 
 eststo(m)
+esttab()</code></pre>
+            </div>
+          </li>
+          <li class="post-card" id="wage-gap-wage1">
+            <a href="#wage-gap-wage1" class="post-title">Wage gaps and interactions in Hayashi: comparing OLS specifications</a>
+            <div class="post-meta">28 August 2026 · <span class="post-tag">tutorial</span><span class="post-tag">basics</span><span class="post-tag">ols</span><span class="post-tag">interactions</span></div>
+            <p class="post-summary">
+              Add gender and marriage dummies, an interaction term, and build a side-by-side regression table using eststo and esttab on the wooldridge wage1 data.
+            </p>
+
+            <div class="post-body">
+              <p>
+                This is the third tutorial in the wage1 series. We start from the Mincer model and ask whether log wages differ by gender and marital status. Adding dummies and an interaction turns a purely descriptive model into a small wage-gap analysis.
+              </p>
+
+              <h2>1. Load the data</h2>
+              <pre><code># Run in the terminal first:
+# hay install sheep-farm/haywooldridge
+
+import("sheep-farm/haywooldridge", as=wool)
+let wage1 = wool::wooldridge_data("wage1")</code></pre>
+
+              <h2>2. The baseline Mincer model</h2>
+              <pre><code>let m_base = ols(lwage ~ educ + exper + expersq, wage1)</code></pre>
+              <p>
+                We keep the same baseline as the previous tutorial: log wage on schooling, experience, and experience squared. This is the reference we want to compare against.
+              </p>
+
+              <h2>3. Add dummies and an interaction</h2>
+              <pre><code>let m_ext = ols(lwage ~ educ + exper + expersq + female + married + female:married, wage1)</code></pre>
+              <p>
+                <code>female</code> and <code>married</code> are 0/1 dummies. The <code>female:married</code> term creates the product of the two, capturing whether the marriage premium differs for women. In the output the column is literally named <code>female:married</code>, making it easy to identify.
+              </p>
+
+              <h2>4. Inspect the extended model</h2>
+              <pre><code>tidy(m_ext)
+glance(m_ext)</code></pre>
+              <p>
+                In this sample, the results should look like this: the coefficient on <code>female</code> is negative and the coefficient on <code>married</code> is positive, but the interaction <code>female:married</code> is also negative and sizable. That means being married raises wages for men more than for women. Model fit improves substantially: R-squared moves from about 0.30 to about 0.43.
+              </p>
+
+              <h2>5. Test the joint contribution of the new terms</h2>
+              <pre><code>test(m_ext, "female", "married", "female:married")</code></pre>
+              <p>
+                An F-test checks whether all three demographic terms are jointly zero. If the p-value is below 0.01, the group of variables belongs in the model.
+              </p>
+
+              <h2>6. Build a side-by-side table</h2>
+              <pre><code>eststo(m_base)
+eststo(m_ext)
+esttab()</code></pre>
+              <p>
+                <code>eststo</code> stores each model, and <code>esttab</code> prints a compact comparison table with coefficients, standard errors in parentheses, and significance stars. Empty cells appear for variables that are not in the first model.
+              </p>
+
+              <h2>7. Where to go next</h2>
+              <p>
+                The next tutorial will use this same framework to add robust standard errors to both columns and test whether the gender gap differs after controlling for industry and occupation.
+              </p>
+
+              <pre><code># Full wage-gap script
+import("sheep-farm/haywooldridge", as=wool)
+let wage1 = wool::wooldridge_data("wage1")
+
+let m_base = ols(lwage ~ educ + exper + expersq, wage1)
+let m_ext = ols(lwage ~ educ + exper + expersq + female + married + female:married, wage1)
+
+tidy(m_ext)
+glance(m_ext)
+
+test(m_ext, "female", "married", "female:married")
+
+eststo(m_base)
+eststo(m_ext)
 esttab()</code></pre>
             </div>
           </li>
