@@ -140,52 +140,62 @@
     <div class="container">
       <div class="blog">
         <ul class="post-list">
-          <li class="post-card" id="descriptive-sample">
-            <a href="#descriptive-sample" class="post-title">Descriptive statistics with Hayashi: a first look at sample data</a>
+          <li class="post-card" id="descriptive-wage1">
+            <a href="#descriptive-wage1" class="post-title">Descriptive statistics with Hayashi: a first walk through wooldridge wage1</a>
             <div class="post-meta">28 August 2026 · <span class="post-tag">tutorial</span><span class="post-tag">basics</span><span class="post-tag">descriptive</span></div>
             <p class="post-summary">
-              Learn how to load a CSV and inspect it with summary statistics, percentiles, frequency tables, and correlations — all from the Hayashi REPL or a script.
+              Learn how to install the Wooldridge datasets plugin, load a built-in dataset, and inspect it with summary statistics, percentiles, frequency tables, and correlations.
             </p>
 
             <div class="post-body">
               <p>
-                If you are used to Stata, R, or Python, the first thing you want from a new language is a fast way to look at your data. This tutorial uses the bundled sample file <code>dados.csv</code>; in your own scripts, replace the column names and file path with whatever you have.
+                If you are used to Stata, R, or Python, the first thing you want from a new language is a fast way to look at your data. This tutorial uses the Wooldridge datasets plugin to load <code>wage1</code>, a small labour-economics dataset with 526 observations.
               </p>
 
-              <h2>1. Load the data</h2>
-              <pre><code>load "dados.csv" as emp</code></pre>
+              <h2>1. Install the plugin</h2>
               <p>
-                The <code>load</code> command reads local CSV files. It also supports DTA, Parquet, TSV, Excel, SQLite, JSON, and direct URLs if the network feature is enabled.
+                The Wooldridge datasets live in a separate Hayashi plugin. Install it once from the command line:
               </p>
-
-              <h2>2. Numeric summary</h2>
-              <pre><code>summarize(emp, salario, educacao, experiencia, idade)</code></pre>
+              <pre><code>hay install sheep-farm/haywooldridge</code></pre>
               <p>
-                In Hayashi, the dataset is the first argument. <code>summarize</code> reports observations, mean, standard deviation, minimum, and maximum. For <code>salario</code>, you will see a small range and a right-skewed pattern typical of salary data.
+                After this, any Hayashi script can import the plugin. To list the available datasets, call <code>wool::wooldridge_datasets()</code>.
               </p>
 
-              <h2>3. Detailed codebook</h2>
-              <pre><code>codebook(emp, salario)</code></pre>
+              <h2>2. Import and load the data</h2>
+              <pre><code>import("sheep-farm/haywooldridge", as=wool)
+let wage1 = wool::wooldridge_data("wage1")</code></pre>
+              <p>
+                The <code>import()</code> command loads the plugin under the <code>wool</code> namespace. The <code>wooldridge_data()</code> function returns the requested dataset as a Hayashi <code>DataFrame</code>.
+              </p>
+
+              <h2>3. Numeric summary</h2>
+              <pre><code>summarize(wage1, wage, educ, exper, tenure)</code></pre>
+              <p>
+                In Hayashi, the dataset is the first argument. <code>summarize</code> reports observations, mean, standard deviation, minimum, and maximum for one or more variables. For <code>wage</code>, you will see 526 observations, an average hourly wage near 5.9, and a long right tail.
+              </p>
+
+              <h2>4. Detailed codebook</h2>
+              <pre><code>codebook(wage1, wage)</code></pre>
               <p>
                 Use <code>codebook</code> when you need the type of a variable, the number of missing values, and the range in one place.
               </p>
 
-              <h2>4. Percentiles</h2>
-              <pre><code>centile(emp, salario, percentiles=[10, 25, 50, 75, 90])</code></pre>
+              <h2>5. Percentiles</h2>
+              <pre><code>centile(wage1, wage, percentiles=[10, 25, 50, 75, 90])</code></pre>
               <p>
                 The <code>centile</code> command lets you pick arbitrary percentiles with the <code>percentiles=</code> option. The command above shows the 10th, 25th, median, 75th, and 90th percentiles, which is a quick way to check skewness.
               </p>
 
-              <h2>5. Frequency table</h2>
-              <pre><code>tabulate(emp, genero)</code></pre>
+              <h2>6. Frequency table</h2>
+              <pre><code>tabulate(wage1, female)</code></pre>
               <p>
-                For categorical variables, <code>tabulate</code> gives counts and percentages. You can also cross-tabulate with a second variable, for example <code>tabulate(emp, setor, genero)</code>.
+                For categorical or dummy variables, <code>tabulate</code> gives counts and percentages. You can also cross-tabulate with a second variable, for example <code>tabulate(wage1, female, married)</code>.
               </p>
 
-              <h2>6. Correlations</h2>
-              <pre><code>pwcorr(emp, salario, educacao, experiencia, idade)</code></pre>
+              <h2>7. Correlations</h2>
+              <pre><code>pwcorr(wage1, wage, educ, exper, tenure)</code></pre>
               <p>
-                <code>pwcorr</code> prints a pairwise correlation matrix. This is often the first check before running an OLS regression: do <code>salario</code> and <code>educacao</code> move together? Does <code>experiencia</code> add information beyond <code>idade</code>?
+                <code>pwcorr</code> prints a pairwise correlation matrix. This is often the first check before running an OLS regression: do <code>wage</code> and <code>educ</code> move together? Do <code>exper</code> and <code>tenure</code> share too much variation?
               </p>
 
               <h2>Where to go next</h2>
@@ -194,17 +204,20 @@
               </p>
 
               <pre><code># Full first-look script
-load "dados.csv" as emp
+hay install sheep-farm/haywooldridge
 
-summarize(emp, salario, educacao, experiencia, idade)
+import("sheep-farm/haywooldridge", as=wool)
+let wage1 = wool::wooldridge_data("wage1")
 
-codebook(emp, salario)
+summarize(wage1, wage, educ, exper, tenure)
 
-centile(emp, salario, percentiles=[10, 25, 50, 75, 90])
+codebook(wage1, wage)
 
-tabulate(emp, genero)
+centile(wage1, wage, percentiles=[10, 25, 50, 75, 90])
 
-pwcorr(emp, salario, educacao, experiencia, idade)</code></pre>
+tabulate(wage1, female)
+
+pwcorr(wage1, wage, educ, exper, tenure)</code></pre>
             </div>
           </li>
           <li class="post-card" id="hayashi-0-2-10">
