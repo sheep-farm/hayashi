@@ -103,6 +103,61 @@
       color: var(--text-muted);
       margin-right: 0.5rem;
     }
+    .blog-layout {
+      display: flex;
+      align-items: flex-start;
+      gap: 2.5rem;
+    }
+    .blog-index {
+      width: 220px;
+      flex-shrink: 0;
+      position: sticky;
+      top: 2rem;
+      align-self: flex-start;
+      font-size: 0.9rem;
+      padding-top: 3rem;
+    }
+    .blog-index .index-year {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.75rem;
+    }
+    .blog-index ul {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 2rem 0;
+      border-left: 2px solid var(--border);
+      padding-left: 1rem;
+    }
+    .blog-index li {
+      margin-bottom: 0.75rem;
+      line-height: 1.4;
+    }
+    .blog-index a {
+      color: var(--text);
+      text-decoration: none;
+    }
+    .blog-index a:hover {
+      text-decoration: underline;
+    }
+    .blog-main {
+      flex: 1;
+      min-width: 0;
+    }
+    @media (max-width: 900px) {
+      .blog-layout {
+        flex-direction: column;
+      }
+      .blog-index {
+        position: relative;
+        top: 0;
+        width: auto;
+        padding-top: 0;
+      }
+    }
   </style>
 </head>
 <body>
@@ -138,8 +193,146 @@
     </section>
 
     <div class="container">
-      <div class="blog">
-        <ul class="post-list">
+      <div class="blog-layout">
+        <nav class="blog-index" aria-label="Blog index">
+          <div class="index-year">2026</div>
+          <ul>
+            <li><a href="#hayashi-0-2-10-1">Hayashi 0.2.10-1 is out</a></li>
+            <li><a href="#descriptive-wage1">Descriptive statistics with Hayashi: a first walk through wooldridge wage1</a></li>
+            <li><a href="#hayashi-0-2-10">Hayashi 0.2.10 is out</a></li>
+          </ul>
+        </nav>
+        <div class="blog-main">
+          <div class="blog">
+            <ul class="post-list">
+          <li class="post-card" id="hayashi-0-2-10-1">
+            <a href="#hayashi-0-2-10-1" class="post-title">Hayashi 0.2.10-1 is out</a>
+            <div class="post-meta">28 August 2026 · <span class="post-tag">release</span><span class="post-tag">crates</span></div>
+            <p class="post-summary">
+              A stable release that moves Hayashi off the Greeners dev branch and onto the published Greeners 2.0.1 on crates.io, plus a tighter validation policy and clearer documentation of known gaps.
+            </p>
+
+            <div class="post-body">
+              <p>
+                Version 0.2.10-1 is a focused maintenance release. The language, parser, and 219 validation cases are unchanged; the work is in how Hayashi consumes and documents its numerical core.
+              </p>
+
+              <h2>Greeners 2.0.1 from crates.io</h2>
+              <p>
+                The main blocker for a stable release was the <code>[patch.crates-io]</code> override that pointed Hayashi to the Greeners <code>dev</code> branch. Greeners 2.0.1 was published to crates.io for all 13 sub-crates, and Hayashi now consumes the published facade directly.
+              </p>
+              <ul>
+                <li>Greeners is pinned with <code>greeners = "=2.0.1"</code>.</li>
+                <li>The <code>[patch.crates-io]</code> block was removed from the release branch.</li>
+                <li><code>Cargo.lock</code> is committed, and CI runs <code>--locked</code> to avoid silent numerical drift.</li>
+              </ul>
+
+              <h2>Validation reference policy</h2>
+              <p>
+                The validation documentation now states the reference policy explicitly: a case is <code>pass</code> with at least one deterministic reference (R, Python, Stata, or an independent hand-coded comparison). Cases without a stable reference are <code>not-supported</code> with the reason recorded in the case metadata.
+              </p>
+
+              <h2>Known gaps and cffilter</h2>
+              <p>
+                A confirmed numerical bug in the upstream <code>cffilter</code> implementation is now documented in <code>KNOWN_GAPS.md</code> and the validation notes. This is an example of how the project treats unvalidated estimators: they remain callable, but any confirmed defect is recorded visibly.
+              </p>
+
+              <h2>What did not change</h2>
+              <ul>
+                <li>219 passing validation cases, 15 <code>not-supported</code>.</li>
+                <li>133 fully validated estimator families in the standard build.</li>
+                <li>All smoke, DAP, and numerical-golden tests continue to pass on Linux.</li>
+              </ul>
+
+              <h2>How to update</h2>
+              <pre><code>cargo install --path .  # or download the release binary
+hay --version           # should show 0.2.10-1</code></pre>
+              <p>
+                The next development cycle bumps Hayashi to <code>0.2.11-dev</code> and restores the <code>[patch.crates-io]</code> override against the Greeners <code>dev</code> branch for continued R&D.
+              </p>
+            </div>
+          </li>
+          <li class="post-card" id="descriptive-wage1">
+            <a href="#descriptive-wage1" class="post-title">Descriptive statistics with Hayashi: a first walk through wooldridge wage1</a>
+            <div class="post-meta">28 August 2026 · <span class="post-tag">tutorial</span><span class="post-tag">basics</span><span class="post-tag">descriptive</span></div>
+            <p class="post-summary">
+              Learn how to install the Wooldridge datasets plugin, load a built-in dataset, and inspect it with summary statistics, percentiles, frequency tables, and correlations.
+            </p>
+
+            <div class="post-body">
+              <p>
+                If you are used to Stata, R, or Python, the first thing you want from a new language is a fast way to look at your data. This tutorial uses the Wooldridge datasets plugin to load <code>wage1</code>, a small labour-economics dataset with 526 observations.
+              </p>
+
+              <h2>1. Install the plugin</h2>
+              <p>
+                The Wooldridge datasets live in a separate Hayashi plugin. Install it once from the command line:
+              </p>
+              <pre><code>hay install sheep-farm/haywooldridge</code></pre>
+              <p>
+                After this, any Hayashi script can import the plugin. To list the available datasets, call <code>wool::wooldridge_datasets()</code>.
+              </p>
+
+              <h2>2. Import and load the data</h2>
+              <pre><code>import("sheep-farm/haywooldridge", as=wool)
+let wage1 = wool::wooldridge_data("wage1")</code></pre>
+              <p>
+                The <code>import()</code> command loads the plugin under the <code>wool</code> namespace. The <code>wooldridge_data()</code> function returns the requested dataset as a Hayashi <code>DataFrame</code>.
+              </p>
+
+              <h2>3. Numeric summary</h2>
+              <pre><code>summarize(wage1, wage, educ, exper, tenure)</code></pre>
+              <p>
+                In Hayashi, the dataset is the first argument. <code>summarize</code> reports observations, mean, standard deviation, minimum, and maximum for one or more variables. For <code>wage</code>, you will see 526 observations, an average hourly wage near 5.9, and a long right tail.
+              </p>
+
+              <h2>4. Detailed codebook</h2>
+              <pre><code>codebook(wage1, wage)</code></pre>
+              <p>
+                Use <code>codebook</code> when you need the type of a variable, the number of missing values, and the range in one place.
+              </p>
+
+              <h2>5. Percentiles</h2>
+              <pre><code>centile(wage1, wage, percentiles=[10, 25, 50, 75, 90])</code></pre>
+              <p>
+                The <code>centile</code> command lets you pick arbitrary percentiles with the <code>percentiles=</code> option. The command above shows the 10th, 25th, median, 75th, and 90th percentiles, which is a quick way to check skewness.
+              </p>
+
+              <h2>6. Frequency table</h2>
+              <pre><code>tabulate(wage1, female)</code></pre>
+              <p>
+                For categorical or dummy variables, <code>tabulate</code> gives counts and percentages. You can also cross-tabulate with a second variable, for example <code>tabulate(wage1, female, married)</code>.
+              </p>
+
+              <h2>7. Correlations</h2>
+              <pre><code>pwcorr(wage1, wage, educ, exper, tenure)</code></pre>
+              <p>
+                <code>pwcorr</code> prints a pairwise correlation matrix. This is often the first check before running an OLS regression: do <code>wage</code> and <code>educ</code> move together? Do <code>exper</code> and <code>tenure</code> share too much variation?
+              </p>
+
+              <h2>Where to go next</h2>
+              <p>
+                These commands prepare the ground for regression. The next tutorial in this series will run the first OLS model on the same dataset and interpret coefficients, standard errors, and goodness-of-fit.
+              </p>
+
+              <pre><code># Run this in the terminal first:
+# hay install sheep-farm/haywooldridge
+
+# Then run the script:
+import("sheep-farm/haywooldridge", as=wool)
+let wage1 = wool::wooldridge_data("wage1")
+
+summarize(wage1, wage, educ, exper, tenure)
+
+codebook(wage1, wage)
+
+centile(wage1, wage, percentiles=[10, 25, 50, 75, 90])
+
+tabulate(wage1, female)
+
+pwcorr(wage1, wage, educ, exper, tenure)</code></pre>
+            </div>
+          </li>
           <li class="post-card" id="hayashi-0-2-10">
             <a href="#hayashi-0-2-10" class="post-title">Hayashi 0.2.10 is out</a>
             <div class="post-meta">20 August 2026 · <span class="post-tag">release</span><span class="post-tag">validation</span></div>
@@ -213,6 +406,8 @@ ols(y ~ x, df)</code></pre>
           </li>
         </ul>
       </div>
+    </div>
+  </div>
     </div>
   </main>
 
