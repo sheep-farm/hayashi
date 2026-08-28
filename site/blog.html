@@ -159,12 +159,15 @@
       }
     }
   </style>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" crossorigin="anonymous">
   <style>
+    :root {
+      --code-bg: #020617;
+    }
     pre[class*="language-"],
     code[class*="language-"] {
       background: var(--code-bg);
-      color: var(--text);
+      color: #e2e8f0;
       text-shadow: none;
       font-family: 'JetBrains Mono', monospace;
     }
@@ -188,17 +191,6 @@
       padding: 0.15rem 0.4rem;
       font-size: 0.9em;
     }
-    .token.comment,
-    .token.prolog,
-    .token.doctype,
-    .token.cdata { color: #6a737d; }
-    .token.string { color: #032f62; }
-    .token.number { color: #005cc5; }
-    .token.keyword { color: #d73a49; }
-    .token.function { color: #6f42c1; }
-    .token.operator { color: #d73a49; }
-    .token.punctuation { color: var(--text-muted); }
-    .token.variable { color: var(--text); }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" data-manual crossorigin="anonymous"></script>
   <script>
