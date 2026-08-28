@@ -140,6 +140,73 @@
     <div class="container">
       <div class="blog">
         <ul class="post-list">
+          <li class="post-card" id="descriptive-wage1">
+            <a href="#descriptive-wage1" class="post-title">Descriptive statistics with Hayashi: a first walk through wage1</a>
+            <div class="post-meta">28 August 2026 · <span class="post-tag">tutorial</span><span class="post-tag">basics</span><span class="post-tag">descriptive</span></div>
+            <p class="post-summary">
+              Learn how to load a dataset and inspect it with summary statistics, percentiles, frequency tables, and correlations — all from the Hayashi REPL or a script.
+            </p>
+
+            <div class="post-body">
+              <p>
+                If you are used to Stata, R, or Python, the first thing you want from a new language is a fast way to look at your data. This tutorial shows the essential commands on the classic <code>wooldridge::wage1</code> dataset, which comes bundled with Hayashi.
+              </p>
+
+              <h2>1. Load the data</h2>
+              <pre><code>load "wooldridge::wage1"</code></pre>
+              <p>
+                Hayashi ships with several Wooldridge datasets. You can also load CSV, DTA, Parquet, or SQLite files with the same <code>load</code> command.
+              </p>
+
+              <h2>2. Numeric summary</h2>
+              <pre><code>summarize wage</code></pre>
+              <p>
+                <code>summarize</code> reports observations, mean, standard deviation, minimum, and maximum for one or more variables. For <code>wage</code>, you will see about 526 observations, an average hourly wage near 5.9, and a long right tail.
+              </p>
+
+              <h2>3. Detailed codebook</h2>
+              <pre><code>codebook wage</code></pre>
+              <p>
+                Use <code>codebook</code> when you need the type of a variable, the number of missing values, and the range in one place.
+              </p>
+
+              <h2>4. Percentiles</h2>
+              <pre><code>centile wage, p(10 25 50 75 90)</code></pre>
+              <p>
+                The <code>centile</code> command lets you pick any quantiles. The command above shows the 10th, 25th, median, 75th, and 90th percentiles, which is a quick way to check skewness.
+              </p>
+
+              <h2>5. Frequency table</h2>
+              <pre><code>tabulate female</code></pre>
+              <p>
+                For categorical or dummy variables, <code>tabulate</code> gives counts and percentages. Use <code>tabulate female, row</code> or <code>tabulate female, column</code> when you want row or column percentages.
+              </p>
+
+              <h2>6. Correlations</h2>
+              <pre><code>pwcorr wage educ exper tenure</code></pre>
+              <p>
+                <code>pwcorr</code> prints a pairwise correlation matrix. This is often the first check before running an OLS regression: do <code>wage</code> and <code>educ</code> move together? Do <code>exper</code> and <code>tenure</code> share too much variation?
+              </p>
+
+              <h2>Where to go next</h2>
+              <p>
+                These commands prepare the ground for regression. The next tutorial in this series will run the first OLS model on the same dataset and interpret coefficients, standard errors, and goodness-of-fit.
+              </p>
+
+              <pre><code># Full first-look script
+load "wooldridge::wage1"
+
+summarize wage educ exper tenure
+
+codebook wage
+
+centile wage, p(10 25 50 75 90)
+
+tabulate female
+
+pwcorr wage educ exper tenure</code></pre>
+            </div>
+          </li>
           <li class="post-card" id="hayashi-0-2-10">
             <a href="#hayashi-0-2-10" class="post-title">Hayashi 0.2.10 is out</a>
             <div class="post-meta">20 August 2026 · <span class="post-tag">release</span><span class="post-tag">validation</span></div>
