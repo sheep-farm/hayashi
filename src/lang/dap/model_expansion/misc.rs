@@ -457,6 +457,7 @@ pub fn hierarchical_fit_dict(r: &greeners::hierarchical::HierarchicalResult) -> 
     ])
 }
 #[cfg(feature = "greeners-timeseries")]
+#[cfg(feature = "experimental")]
 pub fn spectral_children(r: &greeners::spectral::SpectralResult) -> Vec<(String, Value)> {
     let mut vars = Vec::new();
     let labels: Vec<Value> = r.labels.iter().map(|&l| Value::Int(l as i64)).collect();
@@ -484,6 +485,7 @@ pub fn spectral_children(r: &greeners::spectral::SpectralResult) -> Vec<(String,
     vars
 }
 #[cfg(feature = "greeners-timeseries")]
+#[cfg(feature = "experimental")]
 pub fn spectral_fit_dict(r: &greeners::spectral::SpectralResult) -> Value {
     fit_dict(&[
         ("n_obs", Value::Int(r.n_obs as i64)),

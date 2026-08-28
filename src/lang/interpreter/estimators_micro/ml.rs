@@ -462,6 +462,7 @@ impl Interpreter {
     }
 
     #[cfg(all(feature = "greeners-ml", feature = "greeners-timeseries"))]
+    #[cfg(feature = "experimental")]
     pub(super) fn lstm(
         &mut self,
         func: &str,
@@ -918,6 +919,7 @@ impl Interpreter {
     }
 
     #[cfg(feature = "greeners-ml")]
+    #[cfg(feature = "experimental")]
     pub(super) fn transformer(
         &mut self,
         func: &str,
@@ -1498,6 +1500,7 @@ impl Interpreter {
     }
 
     #[cfg(all(feature = "greeners-ml", feature = "greeners-timeseries"))]
+    #[cfg(feature = "experimental")]
     pub(super) fn spectral(
         &mut self,
         func: &str,

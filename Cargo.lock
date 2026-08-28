@@ -798,7 +798,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -950,7 +950,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1418,8 +1418,7 @@ dependencies = [
 [[package]]
 name = "greeners"
 version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e15664176baa939b2abe3a38772d7a0b7ead36544b55a12af9b9d5d075d45c6"
+source = "git+https://github.com/sheep-farm/Greeners.git?branch=dev#9376eecd0373935bfea82976df8d52b728bcdef5"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1454,8 +1453,7 @@ dependencies = [
 [[package]]
 name = "greeners-bayesian"
 version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c75ae1cd55149cf746d383070b5d661ee02df025c769a0ad6b28e926fcc8dc4"
+source = "git+https://github.com/sheep-farm/Greeners.git?branch=dev#9376eecd0373935bfea82976df8d52b728bcdef5"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1479,8 +1477,7 @@ dependencies = [
 [[package]]
 name = "greeners-causal"
 version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "faf1927c188bb9615acf8c6457dfc51c0a3cb6d1c3a677329d76ca81ffd504de"
+source = "git+https://github.com/sheep-farm/Greeners.git?branch=dev#9376eecd0373935bfea82976df8d52b728bcdef5"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1505,7 +1502,7 @@ dependencies = [
 [[package]]
 name = "greeners-core"
 version = "2.0.0"
-source = "git+https://github.com/sheep-farm/Greeners.git?branch=dev#9c22e449e3f3f9ae5940dc2320ea3d26ea07eed1"
+source = "git+https://github.com/sheep-farm/Greeners.git?branch=dev#9376eecd0373935bfea82976df8d52b728bcdef5"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1528,8 +1525,7 @@ dependencies = [
 [[package]]
 name = "greeners-diagnostics"
 version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31685c9104e3136f472d4eec3a70f55a219b3c2f663dbe9481f61bb14c83e674"
+source = "git+https://github.com/sheep-farm/Greeners.git?branch=dev#9376eecd0373935bfea82976df8d52b728bcdef5"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1555,8 +1551,7 @@ dependencies = [
 [[package]]
 name = "greeners-glm"
 version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f86e82f949b5ee00a7127ac52f622515d1ac2aae9e716605ace0d1bc9bc3ada3"
+source = "git+https://github.com/sheep-farm/Greeners.git?branch=dev#9376eecd0373935bfea82976df8d52b728bcdef5"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1581,8 +1576,7 @@ dependencies = [
 [[package]]
 name = "greeners-imputation"
 version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "766e9d87faa3fc2e7e112786abb3ea4cebd0a03dc347e095685424164b62cba5"
+source = "git+https://github.com/sheep-farm/Greeners.git?branch=dev#9376eecd0373935bfea82976df8d52b728bcdef5"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1607,8 +1601,7 @@ dependencies = [
 [[package]]
 name = "greeners-ml"
 version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ccc1b78557bb0bf213f8ee16567cbc31ae6c57a3c92064babbd09797f1467560"
+source = "git+https://github.com/sheep-farm/Greeners.git?branch=dev#9376eecd0373935bfea82976df8d52b728bcdef5"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1632,7 +1625,7 @@ dependencies = [
 [[package]]
 name = "greeners-ols"
 version = "2.0.0"
-source = "git+https://github.com/sheep-farm/Greeners.git?branch=dev#9c22e449e3f3f9ae5940dc2320ea3d26ea07eed1"
+source = "git+https://github.com/sheep-farm/Greeners.git?branch=dev#9376eecd0373935bfea82976df8d52b728bcdef5"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1656,8 +1649,7 @@ dependencies = [
 [[package]]
 name = "greeners-panel"
 version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea18c1808d1387ecfab6fae6aa02f574c9443da2f9f4b7386cddc8c80ae8c4fa"
+source = "git+https://github.com/sheep-farm/Greeners.git?branch=dev#9376eecd0373935bfea82976df8d52b728bcdef5"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1682,8 +1674,7 @@ dependencies = [
 [[package]]
 name = "greeners-spatial"
 version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3018740be0b0edfdb582a2f5fe1000da3ec14280d288c6f3ce6786ad82c43a66"
+source = "git+https://github.com/sheep-farm/Greeners.git?branch=dev#9376eecd0373935bfea82976df8d52b728bcdef5"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1707,8 +1698,7 @@ dependencies = [
 [[package]]
 name = "greeners-survival"
 version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19ef7db8fed60beb9c3cd9df96824e2c2ba79803085b5770c9e94c2b14312f04"
+source = "git+https://github.com/sheep-farm/Greeners.git?branch=dev#9376eecd0373935bfea82976df8d52b728bcdef5"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1732,8 +1722,7 @@ dependencies = [
 [[package]]
 name = "greeners-timeseries"
 version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "98d0dd587c1dc858606988c1dfebde22942a1d525fb2e6bcead5be736fe5a202"
+source = "git+https://github.com/sheep-farm/Greeners.git?branch=dev#9376eecd0373935bfea82976df8d52b728bcdef5"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -2516,7 +2505,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3461,7 +3450,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3854,10 +3843,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.3",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -4375,7 +4364,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]

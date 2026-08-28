@@ -432,6 +432,7 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
         #[cfg(feature = "greeners-ml")]
         Value::HierarchicalResult(r) => hierarchical_children(r),
         #[cfg(feature = "greeners-timeseries")]
+        #[cfg(feature = "experimental")]
         Value::SpectralResult(r) => spectral_children(r),
         Value::ModelResult { fields, .. } => {
             fields.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
@@ -1079,6 +1080,7 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
             "HierarchicalResult",
         ),
         #[cfg(feature = "greeners-timeseries")]
+        #[cfg(feature = "experimental")]
         Value::SpectralResult(r) => (
             format!(
                 "Spectral(k={}, n={}), inertia={:.4}",

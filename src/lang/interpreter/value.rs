@@ -343,6 +343,7 @@ pub enum Value {
     #[cfg(feature = "greeners-ml")]
     HierarchicalResult(Rc<greeners::hierarchical::HierarchicalResult>),
     #[cfg(feature = "greeners-timeseries")]
+    #[cfg(feature = "experimental")]
     SpectralResult(Rc<greeners::spectral::SpectralResult>),
 
     #[cfg(feature = "greeners-timeseries")]
@@ -748,6 +749,7 @@ impl std::fmt::Display for Value {
             #[cfg(feature = "greeners-ml")]
             Value::HierarchicalResult(r) => write!(f, "{r}"),
             #[cfg(feature = "greeners-timeseries")]
+            #[cfg(feature = "experimental")]
             Value::SpectralResult(r) => write!(f, "{r}"),
             Value::Model(m) => write!(f, "{m}"),
             Value::ModelResult { display, .. } => write!(f, "{display}"),

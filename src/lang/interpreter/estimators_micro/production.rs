@@ -95,6 +95,7 @@ impl Interpreter {
 
     #[cfg(feature = "greeners-bayesian")]
     #[cfg(feature = "greeners-bayesian")]
+    #[cfg(feature = "experimental")]
     pub(super) fn bayes_sfa_production(
         &mut self,
         func: &str,

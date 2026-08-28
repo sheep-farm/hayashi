@@ -515,6 +515,7 @@ impl Interpreter {
     }
 
     #[cfg(feature = "greeners-timeseries")]
+    #[cfg(feature = "experimental")]
     pub(super) fn johansen_break(
         &mut self,
         func: &str,
@@ -627,6 +628,7 @@ impl Interpreter {
     }
 
     #[cfg(feature = "greeners-timeseries")]
+    #[cfg(feature = "experimental")]
     pub(super) fn tvp_var(
         &mut self,
         func: &str,
@@ -1262,6 +1264,7 @@ impl Interpreter {
     }
 
     #[cfg(all(feature = "greeners-bayesian", feature = "greeners-timeseries"))]
+    #[cfg(feature = "experimental")]
     pub(super) fn bvar(
         &mut self,
         func: &str,
@@ -1318,14 +1321,10 @@ impl Interpreter {
         let n_vars = result.n_vars;
         let lags = result.lags;
         // Flatten BVAR coefficient matrices (row-major: each equation is a row).
-        let params: Array1<f64> =
-            ndarray::Array1::from_iter(result.coeffs.iter().cloned());
-        let std_errors: Array1<f64> =
-            ndarray::Array1::from_iter(result.std_errors.iter().cloned());
-        let t_values: Array1<f64> =
-            ndarray::Array1::from_iter(result.t_values.iter().cloned());
-        let p_values: Array1<f64> =
-            ndarray::Array1::from_iter(result.p_values.iter().cloned());
+        let params: Array1<f64> = ndarray::Array1::from_iter(result.coeffs.iter().cloned());
+        let std_errors: Array1<f64> = ndarray::Array1::from_iter(result.std_errors.iter().cloned());
+        let t_values: Array1<f64> = ndarray::Array1::from_iter(result.t_values.iter().cloned());
+        let p_values: Array1<f64> = ndarray::Array1::from_iter(result.p_values.iter().cloned());
 
         // One label per (equation, lag, variable) coefficient.
         let mut variable_names = Vec::with_capacity(params.len());
@@ -1395,6 +1394,7 @@ impl Interpreter {
     }
 
     #[cfg(feature = "greeners-timeseries")]
+    #[cfg(feature = "experimental")]
     pub(super) fn tvcopula(
         &mut self,
         func: &str,

@@ -11762,6 +11762,7 @@ marginsplot(m)
 }
 
 #[test]
+#[cfg(feature = "experimental")]
 fn spatial_sar_basic() {
     assert_ok_contains(
         "spatial_sar",
@@ -11792,6 +11793,7 @@ spatial_sar(y ~ x, df, w=W)
 }
 
 #[test]
+#[cfg(feature = "experimental")]
 fn spatial_sem_basic() {
     assert_ok_contains(
         "spatial_sem",
@@ -12053,6 +12055,7 @@ fn panel_heckman_rejects_selection_fixed_effects() {
 }
 
 #[test]
+#[cfg(feature = "experimental")]
 fn spatial_panel_sar_basic() {
     assert_ok_contains(
         "spatial_panel_sar",
@@ -12083,6 +12086,7 @@ spatial_panel_sar(y ~ x, df, w=W, id="entity")
 }
 
 #[test]
+#[cfg(feature = "experimental")]
 fn bayes_sfa_basic() {
     assert_ok_contains(
         "bayes_sfa",
@@ -12281,6 +12285,7 @@ favar(ip ~ cpi + emp, df, observed="rate", factors=1, lags=1)
 }
 
 #[test]
+#[cfg(feature = "experimental")]
 fn spatial_durbin_basic() {
     assert_ok_contains(
         "spatial_durbin",
@@ -12311,6 +12316,7 @@ spatial_durbin(y ~ x, df, w=W, id="entity")
 }
 
 #[test]
+#[cfg(feature = "experimental")]
 fn johansen_break_basic() {
     assert_ok_contains(
         "johansen_break",
@@ -12346,6 +12352,7 @@ johansen_break(y1 ~ y2, df, lags=1, breaks=[10])
 }
 
 #[test]
+#[cfg(feature = "experimental")]
 fn tvp_var_basic() {
     assert_ok_contains(
         "tvp_var",
@@ -12376,6 +12383,7 @@ tvp_var(y1 ~ y2, df, lags=1)
 }
 
 #[test]
+#[cfg(feature = "experimental")]
 fn spatial_durbin_error_basic() {
     assert_ok_contains(
         "spatial_durbin_error",
@@ -12406,6 +12414,7 @@ spatial_durbin_error(y ~ x, df, w=W, id="entity")
 }
 
 #[test]
+#[cfg(feature = "experimental")]
 fn fmols_basic() {
     assert_ok_contains(
         "fmols",
@@ -12649,6 +12658,7 @@ pvar(y1 ~ y2, df, id="entity", lags=1)
 }
 
 #[test]
+#[cfg(feature = "experimental")]
 fn fcoef_basic() {
     assert_ok_contains(
         "fcoef",
@@ -12679,6 +12689,7 @@ fcoef(y ~ x, df, z="z", points=10)
 }
 
 #[test]
+#[cfg(feature = "experimental")]
 fn fcoef_rejects_no_intercept_formula() {
     assert_err_contains(
         "fcoef_no_intercept",
@@ -12778,6 +12789,7 @@ tvar(y1 ~ y2, df, q="q", lags=1, delay=1)
 }
 
 #[test]
+#[cfg(feature = "experimental")]
 fn bvar_basic() {
     assert_ok_contains(
         "bvar",
@@ -12808,6 +12820,7 @@ bvar(y1 ~ y2, df, lags=1, lambda1=0.1, lambda2=0.2)
 }
 
 #[test]
+#[cfg(feature = "experimental")]
 fn mfvar_basic() {
     assert_ok_contains(
         "mfvar",
@@ -12858,6 +12871,7 @@ mfvar(df_q, gdp, df_m, cpi, agg=3, lags=1)
 }
 
 #[test]
+#[cfg(feature = "experimental")]
 fn tvcopula_basic() {
     assert_ok_contains(
         "tvcopula",
@@ -12936,6 +12950,7 @@ sv(df, r, iter=20)
 }
 
 #[test]
+#[cfg(feature = "experimental")]
 fn fapanel_basic() {
     assert_ok_contains(
         "fapanel",
@@ -13232,6 +13247,7 @@ dml_crossfit(y ~ d, df, x="x1,x2", folds=4)
 }
 
 #[test]
+#[cfg(feature = "experimental")]
 fn bsc_basic() {
     assert_ok_contains(
         "bsc",
@@ -13254,6 +13270,7 @@ bsc(df, y_treated, "c1,c2", 4, prior=1.0)
 }
 
 #[test]
+#[cfg(feature = "experimental")]
 fn lstm_basic() {
     assert_ok_contains(
         "lstm",
@@ -13391,6 +13408,7 @@ conformal(y ~ x1 + x2, df, alpha=0.1, calib=0.3)
 }
 
 #[test]
+#[cfg(feature = "experimental")]
 fn transformer_basic() {
     assert_ok_contains(
         "transformer",
@@ -13624,6 +13642,7 @@ orf(y ~ treated, df, x="x1", w="w1", trees=10, depth=3)
 }
 
 #[test]
+#[cfg(feature = "experimental")]
 fn spectral_basic() {
     assert_ok_contains(
         "spectral",

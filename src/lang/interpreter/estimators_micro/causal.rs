@@ -1128,6 +1128,7 @@ impl Interpreter {
     }
 
     #[cfg(all(feature = "greeners-bayesian", feature = "greeners-causal"))]
+    #[cfg(feature = "experimental")]
     pub(super) fn bsc(
         &mut self,
         func: &str,

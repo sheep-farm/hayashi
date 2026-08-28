@@ -371,6 +371,7 @@ impl Interpreter {
     }
 
     #[cfg(all(feature = "greeners-ols", feature = "greeners-panel"))]
+    #[cfg(feature = "experimental")]
     pub(super) fn fmols(
         &mut self,
         _func: &str,
@@ -660,6 +661,7 @@ impl Interpreter {
     }
 
     #[cfg(feature = "greeners-panel")]
+    #[cfg(feature = "experimental")]
     pub(super) fn fcoef(
         &mut self,
         func: &str,
@@ -749,6 +751,7 @@ impl Interpreter {
     }
 
     #[cfg(all(feature = "greeners-bayesian", feature = "greeners-panel"))]
+    #[cfg(feature = "experimental")]
     pub(super) fn mfvar(
         &mut self,
         func: &str,
@@ -933,6 +936,7 @@ impl Interpreter {
     }
 
     #[cfg(feature = "greeners-panel")]
+    #[cfg(feature = "experimental")]
     pub(super) fn fapanel(
         &mut self,
         func: &str,

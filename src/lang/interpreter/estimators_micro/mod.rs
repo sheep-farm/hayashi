@@ -15,7 +15,7 @@ mod nls;
 mod panel;
 mod production;
 mod robust;
-#[cfg(feature = "greeners-spatial")]
+#[cfg(all(feature = "greeners-spatial", feature = "experimental"))]
 mod spatial;
 #[cfg(feature = "greeners-survival")]
 mod survival;
@@ -107,11 +107,11 @@ impl Interpreter {
             "panel_tobit" => self.panel_tobit(func, args, opts, opt_map),
             #[cfg(feature = "greeners-panel")]
             "panel_heckman" => self.panel_heckman(func, args, opts, opt_map),
-            #[cfg(feature = "greeners-spatial")]
+            #[cfg(all(feature = "greeners-spatial", feature = "experimental"))]
             "spatial_panel_sar" | "spatial_panel_sem" => {
                 self.spatial_panel_sar(func, args, opts, opt_map)
             }
-            #[cfg(feature = "greeners-bayesian")]
+            #[cfg(all(feature = "greeners-bayesian", feature = "experimental"))]
             "bayes_sfa_production" | "bayes_sfa_cost" | "bayes_frontier" => {
                 self.bayes_sfa_production(func, args, opts, opt_map)
             }
@@ -127,15 +127,18 @@ impl Interpreter {
             "msvar" | "ms_var" => self.msvar(func, args, opts, opt_map),
             #[cfg(all(feature = "greeners-bayesian", feature = "greeners-timeseries"))]
             "favar" => self.favar(func, args, opts, opt_map),
-            #[cfg(feature = "greeners-spatial")]
+            #[cfg(all(feature = "greeners-spatial", feature = "experimental"))]
             "spatial_durbin" | "sdm" => self.spatial_durbin(func, args, opts, opt_map),
-            #[cfg(feature = "greeners-timeseries")]
+            #[cfg(all(feature = "greeners-timeseries", feature = "experimental"))]
             "johansen_break" => self.johansen_break(func, args, opts, opt_map),
-            #[cfg(feature = "greeners-timeseries")]
+            #[cfg(all(feature = "greeners-timeseries", feature = "experimental"))]
             "tvp_var" => self.tvp_var(func, args, opts, opt_map),
-            #[cfg(feature = "greeners-spatial")]
+            #[cfg(all(feature = "greeners-spatial", feature = "experimental"))]
             "spatial_durbin_error" | "sdem" => self.spatial_durbin_error(func, args, opts, opt_map),
-            #[cfg(all(feature = "greeners-ols", feature = "greeners-panel"))]
+            #[cfg(all(
+                all(feature = "greeners-ols", feature = "greeners-panel"),
+                feature = "experimental"
+            ))]
             "fmols" => self.fmols(func, args, opts, opt_map),
             #[cfg(feature = "greeners-timeseries")]
             "qvar" | "quantile_var" => self.qvar(func, args, opts, opt_map),
@@ -149,21 +152,27 @@ impl Interpreter {
             "nardl" => self.nardl(func, args, opts, opt_map),
             #[cfg(feature = "greeners-panel")]
             "pvar" | "panel_var" => self.pvar(func, args, opts, opt_map),
-            #[cfg(feature = "greeners-panel")]
+            #[cfg(all(feature = "greeners-panel", feature = "experimental"))]
             "fcoef" | "functional_coef" => self.fcoef(func, args, opts, opt_map),
             #[cfg(feature = "greeners-timeseries")]
             "dcc_garch" | "dcc" => self.dcc_garch(func, args, opts, opt_map),
             #[cfg(feature = "greeners-timeseries")]
             "tvar" | "threshold_var" => self.tvar(func, args, opts, opt_map),
-            #[cfg(all(feature = "greeners-bayesian", feature = "greeners-timeseries"))]
+            #[cfg(all(
+                all(feature = "greeners-bayesian", feature = "greeners-timeseries"),
+                feature = "experimental"
+            ))]
             "bvar" | "bayesian_var" => self.bvar(func, args, opts, opt_map),
-            #[cfg(all(feature = "greeners-bayesian", feature = "greeners-panel"))]
+            #[cfg(all(
+                all(feature = "greeners-bayesian", feature = "greeners-panel"),
+                feature = "experimental"
+            ))]
             "mfvar" | "mixed_freq_var" => self.mfvar(func, args, opts, opt_map),
-            #[cfg(feature = "greeners-timeseries")]
+            #[cfg(all(feature = "greeners-timeseries", feature = "experimental"))]
             "tvcopula" | "tv_copula" => self.tvcopula(func, args, opts, opt_map),
             #[cfg(feature = "greeners-timeseries")]
             "sv" | "stochastic_vol" => self.sv(func, args, opts, opt_map),
-            #[cfg(feature = "greeners-panel")]
+            #[cfg(all(feature = "greeners-panel", feature = "experimental"))]
             "fapanel" | "fa_panel" => self.fapanel(func, args, opts, opt_map),
             #[cfg(feature = "greeners-timeseries")]
             "hawkes" => self.hawkes(func, args, opts, opt_map),
@@ -183,9 +192,15 @@ impl Interpreter {
             "xgboost" | "xgb" => self.xgboost(func, args, opts, opt_map),
             #[cfg(feature = "greeners-causal")]
             "dml_crossfit" | "dml_cf" => self.dml_crossfit(func, args, opts, opt_map),
-            #[cfg(all(feature = "greeners-bayesian", feature = "greeners-causal"))]
+            #[cfg(all(
+                all(feature = "greeners-bayesian", feature = "greeners-causal"),
+                feature = "experimental"
+            ))]
             "bsc" | "bayesian_sc" => self.bsc(func, args, opts, opt_map),
-            #[cfg(all(feature = "greeners-ml", feature = "greeners-timeseries"))]
+            #[cfg(all(
+                all(feature = "greeners-ml", feature = "greeners-timeseries"),
+                feature = "experimental"
+            ))]
             "lstm" => self.lstm(func, args, opts, opt_map),
             #[cfg(all(feature = "greeners-causal", feature = "greeners-ml"))]
             "causalforest" | "causal_forest" => self.causalforest(func, args, opts, opt_map),
@@ -193,7 +208,7 @@ impl Interpreter {
             "grf" | "generalized_rf" => self.grf(func, args, opts, opt_map),
             #[cfg(all(feature = "greeners-causal", feature = "greeners-ml"))]
             "conformal" | "conformal_pred" => self.conformal(func, args, opts, opt_map),
-            #[cfg(feature = "greeners-ml")]
+            #[cfg(all(feature = "greeners-ml", feature = "experimental"))]
             "transformer" | "transformer_ts" => self.transformer(func, args, opts, opt_map),
             #[cfg(all(feature = "greeners-causal", feature = "greeners-ml"))]
             "dr_learner" | "drlearner" => self.dr_learner(func, args, opts, opt_map),
@@ -205,7 +220,10 @@ impl Interpreter {
             "tmle" => self.tmle(func, args, opts, opt_map),
             #[cfg(feature = "greeners-ml")]
             "orf" | "orthogonal_forest" => self.orf(func, args, opts, opt_map),
-            #[cfg(all(feature = "greeners-ml", feature = "greeners-timeseries"))]
+            #[cfg(all(
+                all(feature = "greeners-ml", feature = "greeners-timeseries"),
+                feature = "experimental"
+            ))]
             "spectral" | "spectral_clustering" => self.spectral(func, args, opts, opt_map),
             #[cfg(feature = "greeners-ml")]
             "isotonic" | "isotonic_reg" => self.isotonic(func, args, opts, opt_map),
@@ -233,7 +251,7 @@ impl Interpreter {
             "umap" => self.umap(func, args, opts, opt_map),
             #[cfg(feature = "greeners-ml")]
             "biplot" | "pca_biplot" => self.biplot(func, args, opts, opt_map),
-            #[cfg(feature = "greeners-spatial")]
+            #[cfg(all(feature = "greeners-spatial", feature = "experimental"))]
             "spatial_sar" | "spatial_sem" => self.spatial_sar(func, args, opts, opt_map),
             #[cfg(feature = "greeners-ols")]
             "qreg" => self.qreg(func, args, opts, opt_map),

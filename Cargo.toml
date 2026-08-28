@@ -86,6 +86,7 @@ default = ["plotters", "wasm", "native", "full"]
 # Greeners sub-crate toggles. `greeners = "=2.0.0"` is now the published facade
 # and always includes every sub-crate, so these features only gate Hayashi's
 # conditional compilation of estimator modules.
+experimental = ["greeners/experimental"]
 greeners-ols = []
 greeners-glm = []
 greeners-panel = []
@@ -134,5 +135,4 @@ panic = 'abort'
 strip = 'symbols'
 
 [patch.crates-io]
-greeners-core = { git = "https://github.com/sheep-farm/Greeners.git", branch = "dev" }
-greeners-ols = { git = "https://github.com/sheep-farm/Greeners.git", branch = "dev" }
+greeners = { git = "https://github.com/sheep-farm/Greeners.git", branch = "dev" }
