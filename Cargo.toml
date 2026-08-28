@@ -1,6 +1,6 @@
 [package]
 name = "hayashi-lang"
-version = "0.2.11-dev"
+version = "0.2.10-1"
 authors = ["Flávio de Vasconcellos Corrêa <flavio.vcorrea@ufpel.edu.br>"]
 edition = "2021"
 description = "An interpreted language for applied econometrics — Stata-like syntax, modern features, zero cost"
@@ -35,7 +35,7 @@ required-features = ["native"]
 [dependencies]
 # Greeners econometrics facade (crates.io). Exact pin: numerical changes in
 # Greeners must reach Hayashi through a deliberate bump, never `cargo update`.
-greeners = { version = "=2.0.0", default-features = false }
+greeners = { version = "=2.0.1", default-features = false }
 ndarray = "0.17"
 chrono = "0.4"
 statrs = "0.18"
@@ -134,5 +134,4 @@ codegen-units = 256
 panic = 'abort'
 strip = 'symbols'
 
-[patch.crates-io]
-greeners = { git = "https://github.com/sheep-farm/Greeners.git", branch = "dev" }
+
