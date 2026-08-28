@@ -307,3 +307,24 @@ Typical steps:
 
 When commits are made in this environment, the canonical author/committer email is:
 - `flavio.vcorrea@ufpel.edu.br`
+
+## 11. Validation reference policy
+
+Every validation case must declare which reference implementations it runs
+against, and the reason must be explicit when both R and Python are not
+available:
+
+- `pass` is recorded when at least one declared reference (R, Python, Stata,
+  or an independent implementation) runs and Hayashi matches it within the
+  declared tolerances.
+- `not-supported` is recorded when no deterministic, reproducible reference
+  can be made to work in CI. The reason is written in the case `notes` and
+  reflected in `matrix.yml` and `MATRIX.md`.
+- `partial` is allowed on macOS and Windows because those runners have more
+  fragile R and Python environments, but `partial` is not accepted on Ubuntu
+  unless `--allow-partial` is explicitly passed.
+
+A case is never left silently unvalidated. If both R and Python references
+exist but one of them fails, that is recorded as `partial` (or `not-supported`
+if the failure is not fixable). If a reference does not exist at all, the
+case is marked `not-supported` and the missing reference is documented.

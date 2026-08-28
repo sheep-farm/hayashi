@@ -166,7 +166,9 @@ contradictions such as a `not-started` case with a recorded `pass` result.
   known defect prevents execution; link a repository defect to its issue.
 - `not-supported` — the validation programme cannot currently test the stated
   estimator/workflow contract. This does not necessarily mean Hayashi lacks
-  the command.
+  the command. This status is used explicitly when a reliable R and/or Python
+  reference is not available, and the reason is recorded in `case.yml`,
+  `matrix.yml`, and `MATRIX.md`.
 - `not-started` — case is registered but not implemented.
 
 ## Adding a new case
@@ -259,7 +261,9 @@ estimators that are not yet numerically validated, see `KNOWN_GAPS.md`.
   `tvcopula`, `tvp_var`, and `johansen_break`.
 - **Experimental estimators** — commands gated by the `experimental` Cargo
   feature (`bvar`, `mfvar`, `fmols`, `spatial_*`, etc.) are also excluded
-  unless `validation/run.py` is invoked with `--experimental`. Some of these
-  are still `not-supported` while their reference implementations are
-  assembled; two of them, `fmols` and `spatial_panel_sar`, are now `pass` but
-  remain behind the `experimental` feature flag.
+  unless `validation/run.py` is invoked with `--experimental`. Several of these
+  are `not-supported` because a stable R and/or Python reference is not yet
+  available in CI; this is recorded explicitly in the case metadata. Cases
+  that were previously `pass` but lost their only working reference (e.g.
+  `fmols` and `spatial_panel_sar`) are marked `not-supported` until a
+  reproducible reference is restored.
