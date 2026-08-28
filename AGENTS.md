@@ -302,3 +302,8 @@ Typical steps:
    - Add smoke tests in `tests/smoke.rs` and a validation case in
      `validation/cases/<id>/` if a reference implementation exists.
    - Update `help()` topics and examples if user-facing.
+
+## 10. Git identity
+
+When commits are made in this environment, the canonical author/committer email is:
+- `flavio.vcorrea@ufpel.edu.br`
