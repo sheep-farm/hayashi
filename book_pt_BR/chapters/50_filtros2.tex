@@ -91,6 +91,18 @@ O CF retém variações periódicas entre 6 e 32 meses (1{,}5 a 8 anos — ciclo
 de negócios). A vantagem sobre o BK é que todas as 120 observações são mantidas
 (sem trimagem de pontas).
 
+\begin{aviso}
+  \textbf{Bug conhecido --- não use para resultados publicados.} O
+  \texttt{cffilter} não tem caso de validação contra uma implementação de
+  referência, e a versão do motor atualmente distribuída calcula um filtro
+  \emph{diferente}: pesos ideais simétricos mais subtração da média global, em
+  vez dos pesos assimétricos de random-walk de Christiano-Fitzgerald. A saída
+  diverge materialmente de R \texttt{mFilter::cffilter} e Python
+  \texttt{statsmodels}, pior nas pontas --- exatamente onde o filtro é usado.
+  Veja \texttt{KNOWN\_GAPS.md} e a issue \#148. Use \texttt{hpfilter} ou
+  \texttt{bkfilter} até uma release trazer a correção.
+\end{aviso}
+
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Sintaxe}
 
