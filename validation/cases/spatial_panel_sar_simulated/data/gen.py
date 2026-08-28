@@ -14,7 +14,7 @@ W = np.array([
     [1.0, 0.0, 0.0, 0.0],
 ])
 
-fe = np.repeat([0.0, 1.0, 2.0, 3.0], n_periods)
+fe = np.tile([0.0, 1.0, 2.0, 3.0], n_periods)
 x = np.random.normal(0.0, 1.0, n)
 eps = np.random.normal(0.0, 0.5, n)
 

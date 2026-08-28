@@ -1,7 +1,7 @@
 id: spatial_panel_sar_simulated
 title: Spatial Panel SAR on simulated data
 estimator_family: spatial_panel_sar
-status: not-supported
+status: pass
 dimension: numerical
 dataset:
   name: simulated
@@ -14,14 +14,14 @@ comparison:
   - coefficients
   - standard_errors
   tolerances:
-    coefficients: 5e-1
-    standard_errors: 1e0
+    coefficients: 0.15
+    standard_errors: 0.25
 output_format: csv
 hayashi_script: cases/spatial_panel_sar_simulated/hayashi/run.hay
 reference_scripts:
   R: cases/spatial_panel_sar_simulated/reference/run.R
-notes: Case files created, but Greeners spatial_panel_sar estimator returns degenerate
-  results (rho=1, x=0); not validated yet.
+notes: Simulated panel SAR with entity fixed effects; R reference uses splm::spml
+  (within, lag).
 result:
   summary: ''
   known_differences: []

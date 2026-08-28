@@ -192,7 +192,7 @@
 | sfa | simulated | R, Python | pass | — | Simulated Cobb-Douglas production frontier with negligible inefficiency so MLE/OLS references align with Hayashi. |
 | spatial_durbin_error | simulated |  | not-supported | — | R spatialreg/spdep packages failed to install in previous sessions. |
 | spatial_durbin | simulated | R, Python | pass | — | Data generated on a 7x7 grid with rook contiguity W, rho=-0.95, beta=0.5. The Durbin model is highly collinear; only the spatial autoregressive parameter is compared. |
-| spatial_panel_sar | simulated | R | not-supported | — | Greeners spatial_panel_sar returns rho=1 and zero x coefficient on all tested data; needs estimator fix before validation. |
+| spatial_panel_sar | simulated | R | pass | — | Panel SAR validated against splm::spml (within, lag) |
 | spatial_sar | simulated | R, Python | pass | — | Data generated on a 7x7 grid with rook contiguity W, rho=0.3, beta=0.5. Reference implements the same concentrated MLE independently. |
 | spatial_sem | simulated | R, Python | pass | — | Data generated on a 7x7 grid with rook contiguity W, lambda=0.1, beta=0.5. Reference implements the same concentrated MLE independently. |
 | spectral | simulated |  | not-supported | — | Results are sensitive to random k-means initialisation and normalised Laplacian details; no deterministic numeric reference. |

@@ -971,10 +971,9 @@ cases:
   dimension: numerical
   status: pass
 - id: spatial_panel_sar_simulated
-  notes: Greeners spatial_panel_sar returns rho=1 and zero x coefficient on all tested
-    data; needs estimator fix before validation.
+  notes: Panel SAR validated against splm::spml (within, lag)
   dimension: numerical
-  status: not-supported
+  status: pass
 - id: spatial_sar_simulated
   notes: Data generated on a 7x7 grid with rook contiguity W, rho=0.3, beta=0.5. Reference
     implements the same concentrated MLE independently.
