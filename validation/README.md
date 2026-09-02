@@ -61,10 +61,9 @@ The same options can be passed through `hay validate`, for example
 - Python 3 with the packages listed in `requirements.txt`.
 - Stata is optional and only used when `stata` is found in `$PATH`.
 
-The workflow pins the Greeners numerical-engine revision. The R and Python
-package sets are declared here but are not yet version-locked; #140 tracks the
-lockfile policy and CI restoration needed for a fully pinned reference
-environment.
+The workflow pins the Greeners numerical-engine revision. The Python and R
+reference environments are locked in `requirements.txt` and `renv.lock`; see
+[`ENVIRONMENTS.md`](ENVIRONMENTS.md) for the restoration and update policy.
 
 Install Python dependencies:
 
