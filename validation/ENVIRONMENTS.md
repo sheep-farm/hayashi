@@ -2,9 +2,9 @@
 
 The Hayashi validation programme compares Hayashi output against reference
 implementations written in Python and R. To keep that evidence reproducible,
-both language environments are now locked: every CI run installs the same
-package versions, and the resolved versions are recorded in the validation
-artefact.
+both language reference environments are now locked: every CI run restores
+the declared reference package versions, and the resolved versions are
+recorded in the validation artefact.
 
 This document covers the R/Python package environments. The numerical engine
 (Greeners) is pinned in `Cargo.lock` and consumed from crates.io; the validation
@@ -32,7 +32,7 @@ Then commit both `requirements.in` and `requirements.txt`.
 
 ```bash
 pip install --require-hashes -r validation/requirements.txt
-pip install -r validation/requirements-git.txt
+pip install --no-deps -r validation/requirements-git.txt
 ```
 
 ## R
@@ -55,7 +55,7 @@ run `renv::snapshot` with `type = "explicit"` so only packages listed in
 ### Installing R dependencies
 
 ```R
-renv::restore(lockfile = "validation/renv.lock", prompt = FALSE)
+renv::restore(project = "validation", lockfile = "validation/renv.lock", prompt = FALSE)
 ```
 
 ## CI
@@ -63,15 +63,24 @@ renv::restore(lockfile = "validation/renv.lock", prompt = FALSE)
 The `Validation` workflow:
 
 1. Installs Python from `requirements.txt` with hash verification.
-2. Installs the small set of git-only packages from `requirements-git.txt`.
-3. Restores the R environment from `renv.lock`.
+2. Installs the small set of git-only packages from `requirements-git.txt`
+   without resolving additional dependencies.
+3. Installs the `renv` 1.2.4 bootstrap package from its exact CRAN source
+   archive, then restores the R environment from `renv.lock` into the
+   `validation` project library. Reference scripts use that same library.
 4. Records the resolved package versions in
    `validation/reports/environment-versions.txt` and uploads it as part of the
    validation report.
 
+No numerical-validation CI step installs an undeclared R reference package or
+replaces a locked package after restore. Add a reference package to
+`DESCRIPTION`, regenerate `renv.lock`, and review the resulting lockfile
+before using it in a case.
+
 ## Platform note
 
-The locked environments are verified on the `ubuntu-latest` runner. Exact
-binary wheels and CRAN packages can differ slightly across operating systems,
-so the reproducibility guarantee is for the Ubuntu CI baseline used by the
-validation workflow.
+The locked numerical-evidence baseline is `ubuntu-24.04` with R 4.6.1 and the
+Python version declared by the workflow. Exact binary wheels and CRAN packages
+can differ across operating systems, so macOS and Windows validation runs are
+portability checks unless every declared reference also runs there without
+partial-result allowances.
