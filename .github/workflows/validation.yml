@@ -24,7 +24,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-24.04, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
@@ -41,6 +41,8 @@ jobs:
 
       - name: Install R
         uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: '4.6.1'
 
       - name: Install system dependencies for spatial R packages (Ubuntu)
         if: runner.os == 'Linux'
@@ -51,7 +53,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install --require-hashes -r validation/requirements.txt
-          pip install -r validation/requirements-git.txt
+          pip install --no-deps -r validation/requirements-git.txt
 
       # Source builds of R packages on macOS (e.g. data.table) include
       # <libintl.h>, which the runner image no longer ships. R CMD INSTALL reads
@@ -68,22 +70,13 @@ jobs:
           } >> "$HOME/.R/Makevars"
 
       - name: Install R dependencies
+        shell: bash
         run: |
-          Rscript -e 'install.packages("renv", repos="https://cloud.r-project.org")'
-          Rscript -e 'renv::restore(lockfile="validation/renv.lock", prompt=FALSE)'
-
-      - name: Install additional spatial and cointegration R packages
-        if: runner.os == 'Linux'
-        run: |
-          cd validation
-          Rscript -e 'renv::install(c("cointReg", "spdep", "spatialreg", "splm"))'
-
-      - name: Install tsDyn from GitHub
-        run: |
-          Rscript -e 'install.packages("remotes", repos="https://cloud.r-project.org")'
-          Rscript -e 'remotes::install_github("MatthieuStigler/tsDyn")'
-        env:
-          GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+          Rscript -e 'install.packages("https://cloud.r-project.org/src/contrib/renv_1.2.4.tar.gz", repos=NULL, type="source")'
+          validation_r_lib="$(Rscript -e 'cat(renv::paths$library(project="validation"))')"
+          mkdir -p "$validation_r_lib"
+          VALIDATION_R_LIB="$validation_r_lib" Rscript -e 'renv::restore(project="validation", library=Sys.getenv("VALIDATION_R_LIB"), lockfile="validation/renv.lock", prompt=FALSE)'
+          echo "R_LIBS_USER=$validation_r_lib" >> "$GITHUB_ENV"
 
       - name: Record installed environment versions
         run: |
