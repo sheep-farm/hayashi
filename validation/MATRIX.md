@@ -10,7 +10,7 @@
 | arima | statsmodels::macrodata | R, Python | pass | — | R and Python exact-likelihood references agree after correcting two R one-based indexing errors; current Hayashi estimates match both within tolerance. |
 | arima | simulated_arma11 | R, Python | pass | — | Uses the same simulated ARMA(1,1) DGP as Chapter 26 of the book. Reference replicates Hayashi's default Hannan-Rissanen two-step estimator. |
 | autoreg | statsmodels::macrodata | R, Python | pass | — | The R and Python references use the same conditional AR(1) design with a constant and linear trend; current Hayashi estimates match both within tolerance. |
-| bart | simulated | R, Python | pass | — | Simulated data y = 3*x1 + N(0, 0.1), x2 irrelevant. BART with 20 trees, depth 3, 500 post-burn draws and 200 burn-in. Reference is a scikit-learn GradientBoostingRegressor approximation because a full BART posterior is too heavy for the venv. |
+| bart | simulated | R, Python | pass | — | Simulated data y = 3*x1 + N(0, 0.1), x2 irrelevant. BART with 20 trees, depth 3, 500 post-burn draws and 200 burn-in. R gbm and Python GradientBoostingRegressor provide predictive diagnostics, not BART posterior or inference validation. Evidence: Python (behavioural-proxy: coefficients.mse, coefficients.r_squared); R (behavioural-proxy: coefficients.mse, coefficients.r_squared). |
 | bayes_lm | simulated | R, Python | pass | — | Simulated y = 1 + 2x1 - 1.5x2 + noise. Compares posterior means of x1 and x2 from Hayashi's conjugate bayes_lm against OLS (which the diffuse prior should recover). |
 | bayes_sfa_production | simulated |  | not-supported | — | No stable R/Python reference with half-normal inefficiency MCMC available; PyMC implementation too heavy and fragile for the validation venv. |
 | be | simulated | R, Python | pass | — | Panel with N=50 entities and T=4 periods. The between estimator collapses each entity to its temporal means and runs OLS on the collapsed data. |
@@ -29,7 +29,7 @@
 | clogit | simulated | R, Python | pass | — | Simulated matched groups with group fixed effects and a single endogenous regressor. R reference is survival::clogit; groups without within-group variation are dropped at generation time. |
 | cloglog | wooldridge::affairs | R, Python | pass | — | Complementary log-log GLM on Wooldridge affairs. A sign error in the Greeners cloglog derivative caused IRLS divergence; the derivative is now positive and the model converges to the same estimates as R glm and statsmodels. |
 | descriptive | wooldridge::wage1 | R, Python | pass | — | Codebook summary for the continuous wage variable. |
-| vecm | simulated_cointegrated | R, Python | pass | — | VECM(1) on a simulated cointegrated system where y = 2*x + e2 and x = cumsum(e1). The cointegration (beta) and adjustment (alpha) coefficients and standard errors are compared. Beta SEs are approximate Engle-Granger/OLS proxies; alpha SEs are OLS conditional SEs given the estimated beta. The 5e-1 tolerance accommodates the bootstrap SEs produced by Hayashi. |
+| vecm | simulated_cointegrated | R, Python | pass | — | VECM(1) on a simulated cointegrated system where y = 2*x + e2 and x = cumsum(e1). Johansen coefficients use aligned rank and normalisation conventions. Legacy beta Engle-Granger/OLS and conditional alpha OLS SE comparisons are retained proxy diagnostics at tolerance 5e-1, not validation of Hayashi bootstrap uncertainty. Evidence: Python (behavioural-proxy: standard_errors; convention-matched: coefficients); R (behavioural-proxy: standard_errors; convention-matched: coefficients). |
 | diagnostics | simulated | R | pass | — | Condition number of the OLS regressor matrix on simulated data. |
 | conformal | simulated | R, Python | pass | — | Simulated linear DGP y = 1 + 2x1 - 1.5x2 + noise. Compares split-conformal empirical coverage and conformal quantile. |
 | copula | simulated | R, Python | pass | — | Simulated bivariate normal with Pearson correlation 0.6. Dependence measures exported as a coefficient table; standard errors are not defined for copula summary statistics. |
@@ -62,7 +62,7 @@
 | fcoef | simulated |  | not-supported | — | No standard R/Python package for the same functional-coefficient estimator. |
 | feiv | simulated | R, Python | pass | 134 | Panel with N=200 entities and T=5 periods; x is endogenous and instrumented by z. Independent R and Python within-2SLS references use the Greeners residual degrees-of-freedom convention n - k - (G - 1). |
 | fmb | simulated_fmb_panel | R, Python | pass | 49 | Classic Fama-MacBeth regression on a deterministic simulated asset panel. |
-| fmols | simulated | | not-supported | — | R cointReg reference fails in CI; no stable reference currently available. |
+| fmols | simulated | R | not-supported | — | R cointReg reference fails in CI; no stable reference currently available. |
 | ftest_robust | wooldridge::wage1 | R, Python | pass | — | Robust F-test (Wooldridge 2010) with cluster-robust covariance for joint significance test. |
 | rd | simulated | Python | pass | — | Fuzzy RD with 70% compliance at the cutoff. Compare local average treatment effect (LATE). |
 | garch | simulated_garch11 | R, Python | pass | — | Uses the same simulated GARCH(1,1) DGP as Chapter 30 of the book. Coefficients only because GARCH standard-error approximations differ widely between implementations. |
@@ -158,7 +158,7 @@
 | ols | wooldridge::wage1 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 7, Example 7.1 log hourly wage equation with a qualitative dummy variable. |
 | ols | wooldridge::wage1 | R, Python | pass | — | Wooldridge Introductory Econometrics Chapter 6, Section 6.2 wage equation with a quadratic in experience. |
 | oprobit | wooldridge::beauty | R, Python | pass | — | Ordered probit model of self-reported beauty rating (looks 2-5) on female, education, experience and black indicators. |
-| orf | simulated | R, Python | pass | — | Simulated data y = 1 + 2*x1 - x2 + 0.5*treated + 0.3*w1 - 0.2*w2 + N(0,1). Hayashi orf() reports the average treatment effect. R reference uses grf::causal_forest on the full set of covariates; Python uses econml.orf.DROrthoForest. |
+| orf | simulated | R, Python | pass | — | Simulated data y = 1 + 2*x1 - x2 + 0.5*treated + 0.3*w1 - 0.2*w2 + N(0,1). R grf::causal_forest and Python econml.orf.DROrthoForest provide ATE proxy comparisons, not validation of the complete Hayashi ORF fitting contract. Emitted SEs are not compared. Evidence: Python (behavioural-proxy: coefficients.ate); R (behavioural-proxy: coefficients.ate). |
 | panel_fe | wooldridge::wagepan | R, Python | pass | 115 | Panel fixed-effects wage equation with worker-clustered standard errors using explicit within-transformed CR1 reference implementations. Tolerance reflects Hayashi's four-decimal text export. |
 | panel_fe | wooldridge::grunfeld | R, Python | pass | — | Panel fixed-effects investment demand model (Grunfeld). |
 | panel_fe | wooldridge::wagepan | R, Python | pass | — | Panel fixed-effects wage equation with time-clustered standard errors using explicit within-transformed CR1 reference implementations. |
@@ -192,7 +192,7 @@
 | sfa | simulated | R, Python | pass | — | Simulated Cobb-Douglas production frontier with negligible inefficiency so MLE/OLS references align with Hayashi. |
 | spatial_durbin_error | simulated |  | not-supported | — | R spatialreg/spdep packages failed to install in previous sessions. |
 | spatial_durbin | simulated | R, Python | pass | — | Data generated on a 7x7 grid with rook contiguity W, rho=-0.95, beta=0.5. The Durbin model is highly collinear; only the spatial autoregressive parameter is compared. |
-| spatial_panel_sar | simulated | | not-supported | — | R splm reference fails in CI; no stable reference currently available. |
+| spatial_panel_sar | simulated | R | not-supported | — | R splm reference fails in CI; no stable reference currently available. |
 | spatial_sar | simulated | R, Python | pass | — | Data generated on a 7x7 grid with rook contiguity W, rho=0.3, beta=0.5. Reference implements the same concentrated MLE independently. |
 | spatial_sem | simulated | R, Python | pass | — | Data generated on a 7x7 grid with rook contiguity W, lambda=0.1, beta=0.5. Reference implements the same concentrated MLE independently. |
 | spectral | simulated |  | not-supported | — | Results are sensitive to random k-means initialisation and normalised Laplacian details; no deterministic numeric reference. |
@@ -252,7 +252,13 @@ A declared reference that fails or is missing no longer blocks
 comparison when `--allow-partial` is used; otherwise partial cases
 fail the runner.
 
-This matrix is generated from `validation/matrix.yml` by `validation/run.py`.
+Notes summarise optional [reference evidence classes](README.md#reference-evidence-classes)
+per reference and compared quantity. Unannotated cases are unclassified, not exact.
+Evidence classes do not change tolerances or status; a proxy pass does not validate
+the target estimator or inference contract.
+
+This matrix is generated from `validation/cases/*/case.yml` manifests and
+`validation/matrix.yml` by `validation/run.py`.
 
 This matrix covers the core empirical estimators. Some commands are
 intentionally excluded for the reasons described in the "Estimators not

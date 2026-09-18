@@ -20,6 +20,11 @@ Describe the regression or workflow being validated.
 - **Python:** package `...`, function `...`, options `...`
 - **Stata:** command `...`, options `...` (if applicable)
 
+Optional: document reviewed [reference evidence classes](../README.md#reference-evidence-classes)
+for each reference and literal tolerance key, with a rationale in `case.yml`.
+Unannotated references are unclassified, not exact. Distinguish related
+diagnostics from evidence for the estimator and its inference contract.
+
 ## Compared quantities
 
 - coefficients

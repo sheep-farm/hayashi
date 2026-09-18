@@ -16,6 +16,17 @@ references:
   - Python
   # - Stata  # uncomment only if Stata is available locally
 
+# Optional reference_evidence: see ../README.md#reference-evidence-classes.
+# Absence is unclassified, not exact. After reviewing every reference and
+# tolerance key, supply the complete mapping. Example entry (not a full mapping):
+# reference_evidence:
+#   Python:
+#     coefficients:
+#       class: convention-matched
+#       rationale: Same estimator after the documented intercept alignment.
+# Allowed classes: exact, convention-matched, behavioural-proxy.
+# Each entry requires class and a non-empty rationale; no defaults or overrides.
+
 comparison:
   quantities:
     - coefficients
