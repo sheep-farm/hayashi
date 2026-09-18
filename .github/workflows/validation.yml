@@ -92,12 +92,11 @@ jobs:
           Rscript -e 'install.packages("https://cloud.r-project.org/src/contrib/renv_1.2.4.tar.gz", repos=NULL, type="source")'
           validation_r_lib="$(Rscript -e 'cat(renv::paths$library(project="validation"))')"
           mkdir -p "$validation_r_lib"
-          VALIDATION_R_LIB="$validation_r_lib" Rscript -e '
-            if (Sys.getenv("RUNNER_OS") == "macOS") {
-              options(configure.args = c(sf = Sys.getenv("SF_CONFIGURE_ARGS")))
-            }
-            renv::restore(project="validation", library=Sys.getenv("VALIDATION_R_LIB"), lockfile="validation/renv.lock", prompt=FALSE)
-          '
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            VALIDATION_R_LIB="$validation_r_lib" Rscript -e 'options(configure.args = c(sf = Sys.getenv("SF_CONFIGURE_ARGS"))); renv::restore(project="validation", library=Sys.getenv("VALIDATION_R_LIB"), lockfile="validation/renv.lock", prompt=FALSE)'
+          else
+            VALIDATION_R_LIB="$validation_r_lib" Rscript -e 'renv::restore(project="validation", library=Sys.getenv("VALIDATION_R_LIB"), lockfile="validation/renv.lock", prompt=FALSE)'
+          fi
           echo "R_LIBS_USER=$validation_r_lib" >> "$GITHUB_ENV"
 
       - name: Record installed environment versions
