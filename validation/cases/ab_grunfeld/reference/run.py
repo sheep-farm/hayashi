@@ -191,10 +191,10 @@ def compute_reference() -> dict[str, dict[str, float]]:
     }
 
     REF_DIR.mkdir(parents=True, exist_ok=True)
-    with open(REF_DIR / "expected.json", "w") as f:
+    with open(REF_DIR / "expected.json", "w", encoding="utf-8") as f:
         json.dump(result, f, indent=2, ensure_ascii=False)
 
-    print(json.dumps(result, indent=2, ensure_ascii=False))
+    print(json.dumps(result, indent=2, ensure_ascii=True))
     return result
 
 
