@@ -196,6 +196,7 @@
 | spatial_sar | simulated | R, Python | pass | — | Data generated on a 7x7 grid with rook contiguity W, rho=0.3, beta=0.5. Reference implements the same concentrated MLE independently. |
 | spatial_sem | simulated | R, Python | pass | — | Data generated on a 7x7 grid with rook contiguity W, lambda=0.1, beta=0.5. Reference implements the same concentrated MLE independently. |
 | spectral | simulated |  | not-supported | — | Results are sensitive to random k-means initialisation and normalised Laplacian details; no deterministic numeric reference. |
+| stl | AirPassengers | Python:passed * | fail | 160 | Draft failing regression (#160): all 144 log AirPassengers trend/seasonal/remainder values against statsmodels 0.14.6, period 12, windows 7/23/23, degrees/jumps 1, inner 2, outer 1. Python-only median-weight contract; the R robust agreement gate failed (non-robust agreement is diagnostic only). Component atol 1e-8 selected after exploration; reconstruction 1e-12 is not STL qualification. No tolerance widening or estimator repair; keep draft until contract and implementation are settled. See case README. |
 | descriptive | wooldridge::wage1 | R, Python | pass | — | Summary statistics with detail (percentiles, skewness, kurtosis) for wage. |
 | sur | wooldridge::grunfeld | R, Python | pass | — | Two-equation SUR (Zellner FGLS) on the Grunfeld investment data. |
 | sv | simulated_sv | R, Python | pass | — | Simulated Taylor (1986) SV data; compares the posterior mean of the latent log-volatility h_t between Hayashi, R stochvol and PyMC. Tight tolerance because R and PyMC agree closely on this DGP. |
@@ -261,4 +262,3 @@ covered by validation" section of the README.
 Esta matriz abrange os estimadores empíricos centrais. Alguns comandos são
 deixados de fora intencionalmente pelos motivos descritos na seção
 "Estimators not covered by validation" do README.
-

@@ -1,0 +1,43 @@
+id: stl_airpassengers
+title: Robust STL full components on log AirPassengers
+estimator_family: stl
+status: fail
+dimension: numerical
+
+dataset:
+  name: AirPassengers
+  source: R datasets::AirPassengers, generated locally by data/gen.R
+  licence: Distributed with R datasets; no separate dataset licence asserted
+
+references:
+  - Python
+
+comparison:
+  quantities:
+    - coefficients
+    - coefficients.nobs
+    - coefficients.reconstruction_max
+  tolerances:
+    coefficients: 1.0e-8
+    coefficients.nobs: 0
+    coefficients.reconstruction_max: 1.0e-12
+
+hayashi_script: cases/stl_airpassengers/hayashi/run.hay
+reference_scripts:
+  Python: cases/stl_airpassengers/reference/run.py
+
+notes: >-
+  Draft failing regression (#160): all 144 log AirPassengers trend/seasonal/remainder
+  values against statsmodels 0.14.6, period 12, windows 7/23/23, degrees/jumps 1,
+  inner 2, outer 1. Python-only median-weight contract; the R robust agreement
+  gate failed (non-robust agreement is diagnostic only). Component atol 1e-8
+  selected after exploration; reconstruction 1e-12 is not STL qualification.
+  No tolerance widening or estimator repair; keep draft until contract and
+  implementation are settled. See case README.
+
+result:
+  summary: Draft failing regression; full components differ from the Python contract.
+  known_differences:
+    - Pinned Hayashi differs on all three full component vectors; reconstruction alone passes.
+    - R robust STL disagrees with Python and is not a declared reference.
+  issues_opened: [160]
