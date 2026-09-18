@@ -109,7 +109,7 @@ class MetadataCheckTests(unittest.TestCase):
                 else:
                     for entries in case["reference_evidence"].values():
                         entries["coefficients"]["class"] = evidence_class
-                self.module.MATRIX_MD.write_text(self.module.render_matrix_md([case]))
+                self.module.MATRIX_MD.write_text(self.module.render_matrix_md([case]), encoding="utf-8")
                 self.assertEqual(self.module.check_metadata(*loaded), [])
 
     def test_evidence_rejects_malformed_metadata_without_traceback(self):
@@ -143,7 +143,7 @@ class MetadataCheckTests(unittest.TestCase):
         for evidence, message in invalid:
             with self.subTest(evidence=evidence):
                 case["reference_evidence"] = evidence
-                self.module.MATRIX_MD.write_text(self.module.render_matrix_md([case]))
+                self.module.MATRIX_MD.write_text(self.module.render_matrix_md([case]), encoding="utf-8")
                 findings = self.module.check_metadata(*loaded)
                 self.assertTrue(any(message in finding for finding in findings), findings)
                 with patch.object(self.module, "load_cases", return_value=loaded), patch.object(
@@ -166,7 +166,7 @@ class MetadataCheckTests(unittest.TestCase):
         for evidence in invalid:
             with self.subTest(evidence=evidence):
                 case["reference_evidence"] = evidence
-                self.module.MATRIX_MD.write_text(self.module.render_matrix_md([case]))
+                self.module.MATRIX_MD.write_text(self.module.render_matrix_md([case]), encoding="utf-8")
                 findings = self.module.check_metadata(*loaded)
                 self.assertTrue(any("must cover exactly" in finding for finding in findings))
 
@@ -208,7 +208,7 @@ class MetadataCheckTests(unittest.TestCase):
         self.assertTrue(self.module.matrix_md_metadata_matches([case], with_execution_details))
         case["reference_evidence"]["Python"]["coefficients"]["class"] = "convention-matched"
         self.assertFalse(self.module.matrix_md_metadata_matches([case], rendered))
-        self.module.MATRIX_MD.write_text(rendered)
+        self.module.MATRIX_MD.write_text(rendered, encoding="utf-8")
         self.assertIn("validation/MATRIX.md is stale; regenerate it with validation/run.py",
                       self.module.check_metadata(*loaded))
         del case["reference_evidence"]
