@@ -988,6 +988,16 @@ cases:
     details; no deterministic numeric reference.
   dimension: numerical
   status: not-supported
+- id: stl_airpassengers
+  notes: 'Draft failing regression (#160): all 144 log AirPassengers trend/seasonal/remainder
+    values against statsmodels 0.14.6, period 12, windows 7/23/23, degrees/jumps 1,
+    inner 2, outer 1. Python-only median-weight contract; the R robust agreement gate
+    failed (non-robust agreement is diagnostic only). Component atol 1e-8 selected
+    after exploration; reconstruction 1e-12 is not STL qualification. No tolerance
+    widening or estimator repair; keep draft until contract and implementation are
+    settled. See case README.'
+  dimension: numerical
+  status: fail
 - id: summarize_wooldridge_wage1
   notes: Summary statistics with detail (percentiles, skewness, kurtosis) for wage.
   dimension: numerical

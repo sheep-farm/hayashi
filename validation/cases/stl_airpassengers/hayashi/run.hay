@@ -1,0 +1,48 @@
+load "validation/cases/stl_airpassengers/data/data.csv" as df
+assert(nrow(df) == 144, "Expected all 144 observations")
+for i in 0..144 {
+    assert(df.index[i] == i + 1, "Expected chronological indices")
+    assert(df.passengers[i] > 0, "Expected positive counts")
+}
+generate df y = log(passengers)
+let m = stl(df, y, period=12, sw=7, tw=23)
+predict df observed = m, "observed"
+predict df trend = m, "trend"
+predict df seasonal = m, "seasonal"
+predict df remainder = m, "residual"
+assert(len(df.observed) == 144 && len(df.trend) == 144, "Invalid observed/trend shape")
+assert(len(df.seasonal) == 144 && len(df.remainder) == 144, "Invalid component shape")
+
+let labels = []
+let values = []
+let placeholders = []
+let reconstruction_max = 0.0
+for i in 0..144 {
+    // x - x is zero only for finite x, including when x is zero.
+    assert(df.observed[i] - df.observed[i] == 0, "Non-finite observed value")
+    assert(df.trend[i] - df.trend[i] == 0, "Non-finite trend")
+    assert(df.seasonal[i] - df.seasonal[i] == 0, "Non-finite seasonal")
+    assert(df.remainder[i] - df.remainder[i] == 0, "Non-finite remainder")
+    assert(df.observed[i] == log(df.passengers[i]), "Observed input changed")
+    let error = abs(df.observed[i] - df.trend[i] - df.seasonal[i] - df.remainder[i])
+    assert(error <= 1e-12, "Reconstruction exceeds 1e-12")
+    if error > reconstruction_max { reconstruction_max = error }
+    push(labels, f"observed_{i + 1}")
+    push(values, df.observed[i])
+    push(labels, f"trend_{i + 1}")
+    push(values, df.trend[i])
+    push(labels, f"seasonal_{i + 1}")
+    push(values, df.seasonal[i])
+    push(labels, f"remainder_{i + 1}")
+    push(values, df.remainder[i])
+    for j in 0..4 { push(placeholders, 0.0) }
+}
+push(labels, "nobs")
+push(values, nrow(df))
+push(placeholders, 0.0)
+push(labels, "reconstruction_max")
+push(values, reconstruction_max)
+push(placeholders, 0.0)
+let out = dataframe({"variable": labels, "coef": values, "std_err": placeholders})
+let ordered = select(out, "variable", "coef", "std_err")
+export(ordered, "csv", "/dev/stdout")
