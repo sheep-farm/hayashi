@@ -79,6 +79,15 @@ before using it in a case.
 
 ## Platform note
 
+Before `renv::restore()` on macOS, CI installs Homebrew GDAL, GEOS, PROJ,
+UDUNITS and `pkg-config`, checks build-tool availability and prints versions.
+For `sf` source builds, it passes `--with-proj-lib=$(brew --prefix)/lib/`
+through the package-specific `renv` configure option, following the
+[official sf installation guidance](https://r-spatial.github.io/sf/#installing).
+The prefix is discovered rather than tied to Intel or Apple Silicon. These
+system libraries are not pinned by `renv.lock`; locked R package versions,
+package-type selection, gettext handling and the validation library stay unchanged.
+
 The locked numerical-evidence baseline is `ubuntu-24.04` with R 4.6.1 and the
 Python version declared by the workflow. Exact binary wheels and CRAN packages
 can differ across operating systems, so macOS and Windows validation runs are
