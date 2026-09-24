@@ -18,7 +18,7 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -r validation/requirements.txt
-      - run: python -m unittest validation/test_run.py
+      - run: python -m unittest validation/test_run.py validation/test_ab_reference.py
       - run: python validation/run.py --check
 
   advisories:

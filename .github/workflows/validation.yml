@@ -116,7 +116,7 @@ jobs:
         run: python validation/run.py --check
 
       - name: Test validation runner
-        run: python -m unittest validation/test_run.py
+        run: python -m unittest validation/test_run.py validation/test_ab_reference.py
 
       - name: Build Hayashi
         run: cargo build --release --features experimental
