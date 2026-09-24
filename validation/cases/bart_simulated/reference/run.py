@@ -10,8 +10,8 @@ df = pd.read_csv(Path(__file__).resolve().parent.parent / "data" / "data.csv")
 X = df[["x1", "x2"]].values
 y = df["y"].values
 
-# BART's exact Bayesian posterior mean is approximated here with a small
-# deterministic gradient-boosting ensemble of the same tree count and depth.
+# Gradient boosting supplies predictive diagnostics, not a BART posterior mean.
+# Matching tree count and depth does not establish the same fitting contract.
 model = GradientBoostingRegressor(
     n_estimators=20,
     learning_rate=0.1,

@@ -13,6 +13,16 @@ references:
   - R
   - Python
 
+reference_evidence:
+  R:
+    coefficients.ate:
+      class: behavioural-proxy
+      rationale: grf causal_forest uses all covariates together and is an ATE proxy, not the Hayashi ORF fitting contract.
+  Python:
+    coefficients.ate:
+      class: behavioural-proxy
+      rationale: DROrthoForest is related ORF evidence but is not an established match to the complete Hayashi fitting contract.
+
 comparison:
   quantities:
     - coefficients.ate
@@ -26,7 +36,7 @@ reference_scripts:
   R: cases/orf_simulated/reference/run.R
   Python: cases/orf_simulated/reference/run.py
 
-notes: Simulated data y = 1 + 2*x1 - x2 + 0.5*treated + 0.3*w1 - 0.2*w2 + N(0,1). Hayashi orf() reports the average treatment effect. R reference uses grf::causal_forest on the full set of covariates; Python uses econml.orf.DROrthoForest.
+notes: Simulated data y = 1 + 2*x1 - x2 + 0.5*treated + 0.3*w1 - 0.2*w2 + N(0,1). R grf::causal_forest and Python econml.orf.DROrthoForest provide ATE proxy comparisons, not validation of the complete Hayashi ORF fitting contract. Emitted SEs are not compared.
 
 result:
   summary: ""

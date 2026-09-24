@@ -2,6 +2,7 @@
 """Focused tests for validation runner metadata checks."""
 
 import importlib.util
+from copy import deepcopy
 import subprocess
 import tempfile
 import unittest
@@ -83,6 +84,178 @@ class MetadataCheckTests(unittest.TestCase):
     def write_matrix(self, entries: list[dict]) -> None:
         with open(self.module.MATRIX_YML, "w", encoding="utf-8") as f:
             yaml.safe_dump({"cases": entries}, f, sort_keys=False)
+
+    def evidence_case(self):
+        self.write_case(references=["R", "Python"])
+        case_dir = self.validation_dir / "cases" / "ols_example"
+        (case_dir / "reference" / "run.R").write_text("# R reference\n", encoding="utf-8")
+        self.write_matrix([{"id": "ols_example", "status": "pass"}])
+        loaded = self.module.load_cases()
+        case = loaded[1][0]
+        case["reference_scripts"]["R"] = "cases/ols_example/reference/run.R"
+        case["reference_evidence"] = {
+            ref: {"coefficients": {"class": "exact", "rationale": "Same contract."}}
+            for ref in case["references"]
+        }
+        return loaded
+
+    def test_evidence_accepts_all_classes_and_absence(self):
+        loaded = self.evidence_case()
+        case = loaded[1][0]
+        for evidence_class in ("exact", "convention-matched", "behavioural-proxy", None):
+            with self.subTest(evidence_class=evidence_class):
+                if evidence_class is None:
+                    del case["reference_evidence"]
+                else:
+                    for entries in case["reference_evidence"].values():
+                        entries["coefficients"]["class"] = evidence_class
+                self.module.MATRIX_MD.write_text(self.module.render_matrix_md([case]), encoding="utf-8")
+                self.assertEqual(self.module.check_metadata(*loaded), [])
+
+    def test_evidence_rejects_malformed_metadata_without_traceback(self):
+        loaded = self.evidence_case()
+        case = loaded[1][0]
+        valid = deepcopy(case["reference_evidence"])
+        invalid = []
+        for value in (None, [], "exact", 42, True):
+            invalid.append((value, "must be a mapping"))
+            changed = deepcopy(valid)
+            changed["Python"] = value
+            invalid.append((changed, "must be a mapping"))
+            changed = deepcopy(valid)
+            changed["Python"]["coefficients"] = value
+            invalid.append((changed, "must be a mapping"))
+        for value in (None, [], {}, 1, True, "EXACT", "proxy", ""):
+            changed = deepcopy(valid)
+            changed["Python"]["coefficients"]["class"] = value
+            invalid.append((changed, ".class must be"))
+        for value in (None, [], {}, 1, True, "", " \n\t"):
+            changed = deepcopy(valid)
+            changed["Python"]["coefficients"]["rationale"] = value
+            invalid.append((changed, ".rationale must be"))
+        for field in ("class", "rationale"):
+            changed = deepcopy(valid)
+            del changed["Python"]["coefficients"][field]
+            invalid.append((changed, "must contain only class and rationale"))
+        changed = deepcopy(valid)
+        changed["Python"]["coefficients"]["override"] = "exact"
+        invalid.append((changed, "must contain only class and rationale"))
+        for evidence, message in invalid:
+            with self.subTest(evidence=evidence):
+                case["reference_evidence"] = evidence
+                self.module.MATRIX_MD.write_text(self.module.render_matrix_md([case]), encoding="utf-8")
+                findings = self.module.check_metadata(*loaded)
+                self.assertTrue(any(message in finding for finding in findings), findings)
+                with patch.object(self.module, "load_cases", return_value=loaded), patch.object(
+                    self.module, "run_cases"
+                ) as run_cases, patch.object(self.module, "log"):
+                    self.assertEqual(self.module.main(["--check"]), 1)
+                run_cases.assert_not_called()
+
+    def test_evidence_requires_exact_reference_and_tolerance_key_coverage(self):
+        loaded = self.evidence_case()
+        case = loaded[1][0]
+        valid = deepcopy(case["reference_evidence"])
+        invalid = [{}, {"Python": valid["Python"]}, {**valid, "Stata": valid["R"]},
+                   {**valid, 1: valid["R"]}]
+        for keys in ([], ["coefficients.x"], ["coefficient"],
+                     ["coefficients", "standard_errors"], ["coefficients", 1]):
+            changed = deepcopy(valid)
+            changed["Python"] = {key: valid["Python"]["coefficients"] for key in keys}
+            invalid.append(changed)
+        for evidence in invalid:
+            with self.subTest(evidence=evidence):
+                case["reference_evidence"] = evidence
+                self.module.MATRIX_MD.write_text(self.module.render_matrix_md([case]), encoding="utf-8")
+                findings = self.module.check_metadata(*loaded)
+                self.assertTrue(any("must cover exactly" in finding for finding in findings))
+
+        # Literal dotted keys, not comparison.quantities or prefix expansion, govern coverage.
+        case["comparison"]["tolerances"] = {"coefficients.x": 1e-6}
+        case["reference_evidence"] = {
+            ref: {"coefficients.x": entries["coefficients"]}
+            for ref, entries in valid.items()
+        }
+        self.assertEqual(self.module.check_reference_evidence(case), [])
+
+    def test_evidence_notes_are_stable_and_freshness_detects_class_changes(self):
+        loaded = self.evidence_case()
+        case = loaded[1][0]
+        case["notes"] = "Existing\nnotes."
+        case["comparison"]["tolerances"]["standard_errors"] = 0.5
+        for entries in case["reference_evidence"].values():
+            entries["standard_errors"] = {
+                "class": "behavioural-proxy", "rationale": "Proxy | not inference.\nMore."
+            }
+        expected = (
+            "Existing notes. Evidence: Python (behavioural-proxy: standard_errors; "
+            "exact: coefficients); R (behavioural-proxy: standard_errors; exact: coefficients)."
+        )
+        rendered = self.module.render_matrix_md([case])
+        self.assertIn(expected, rendered)
+        self.assertIn("README.md#reference-evidence-classes", rendered)
+        self.assertIn("Unannotated cases are unclassified, not exact.", rendered)
+        rows = [line for line in rendered.splitlines() if line.startswith("| ")]
+        self.assertTrue(all(len(row.strip("|").split("|")) == 6 for row in rows))
+        reordered = deepcopy(case)
+        reordered["reference_evidence"] = {
+            ref: dict(reversed(list(entries.items())))
+            for ref, entries in reversed(list(case["reference_evidence"].items()))
+        }
+        self.assertEqual(rendered, self.module.render_matrix_md([reordered]))
+        self.assertEqual(rendered, self.module.render_matrix_md([case]))
+        with_execution_details = rendered.replace("| R, Python |", "| R:passed *, Python:passed * |")
+        self.assertTrue(self.module.matrix_md_metadata_matches([case], with_execution_details))
+        case["reference_evidence"]["Python"]["coefficients"]["class"] = "convention-matched"
+        self.assertFalse(self.module.matrix_md_metadata_matches([case], rendered))
+        self.module.MATRIX_MD.write_text(rendered, encoding="utf-8")
+        self.assertIn("validation/MATRIX.md is stale; regenerate it with validation/run.py",
+                      self.module.check_metadata(*loaded))
+        del case["reference_evidence"]
+        self.assertNotIn("Evidence:", self.module.render_matrix_md([case]))
+        self.assertFalse(self.module.matrix_md_metadata_matches([case], rendered))
+
+    def test_evidence_does_not_change_comparison_or_reference_failure_results(self):
+        case = self.evidence_case()[1][0]
+        evidence = case.pop("reference_evidence")
+        scenarios = {
+            "match": "pass", "mismatch": "fail", "unavailable": "partial",
+            "failed": "partial", "all_unavailable": "blocked", "malformed": "blocked",
+            "empty": "blocked",
+        }
+        for scenario, expected_status in scenarios.items():
+            def fake_run_command(cmd, cwd=None, quiet=False):
+                if cmd[0] == "Rscript":
+                    stdout = '{"coefficients": {"x": 1.0}}'
+                elif cmd[0] == "python":
+                    stdout = '{"coefficients": {"x": 2.0}}' if scenario == "mismatch" else '{"coefficients": {"x": 1.0}}'
+                    if scenario == "malformed":
+                        stdout = "not JSON"
+                    elif scenario == "empty":
+                        stdout = ""
+                    elif scenario == "failed":
+                        return subprocess.CompletedProcess(cmd, 1, stdout="", stderr="failed")
+                else:
+                    stdout = "Variable,Coef,Std_Err\nx,1.0,0.1\n"
+                return subprocess.CompletedProcess(cmd, 0, stdout=stdout, stderr="")
+
+            def executable_available(name):
+                if name == "Rscript" and scenario in ("unavailable", "all_unavailable"):
+                    return False
+                return not (name == "python" and scenario == "all_unavailable")
+
+            with patch.object(self.module, "python_executable", return_value="python"), patch.object(
+                self.module, "check_executable", side_effect=executable_available
+            ), patch.object(self.module, "run_command", side_effect=fake_run_command):
+                baseline = self.module.run_case(case, quiet=True)
+                self.assertEqual(baseline[0], expected_status)
+                for evidence_class in ("exact", "convention-matched", "behavioural-proxy"):
+                    with self.subTest(scenario=scenario, evidence_class=evidence_class):
+                        annotated = deepcopy(case)
+                        annotated["reference_evidence"] = deepcopy(evidence)
+                        for entries in annotated["reference_evidence"].values():
+                            entries["coefficients"]["class"] = evidence_class
+                        self.assertEqual(self.module.run_case(annotated, quiet=True), baseline)
 
     def test_metadata_check_accepts_consistent_case(self):
         self.write_case()
@@ -321,6 +494,14 @@ class MainExitStatusTests(unittest.TestCase):
             {"id": "example_1", "title": "Example 1"},
             {"id": "example_2", "title": "Example 2"},
         ]
+        for case in self.cases:
+            case["references"] = ["Python"]
+            case["comparison"] = {"tolerances": {"coefficients": 1e-6}}
+            case["reference_evidence"] = {
+                "Python": {"coefficients": {
+                    "class": "behavioural-proxy", "rationale": "Related diagnostic."
+                }}
+            }
 
     def run_main_with_status(
         self,

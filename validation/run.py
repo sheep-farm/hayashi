@@ -1505,6 +1505,68 @@ def run_case(case: dict[str, Any], quiet: bool = False) -> tuple[str, list[str],
     return status, failures, ref_report
 
 
+def check_reference_evidence(case: dict[str, Any]) -> list[str]:
+    """Check optional evidence against references and literal tolerance keys."""
+    if "reference_evidence" not in case:
+        return []
+    label = f"{case['id']}: reference_evidence"
+    evidence = case["reference_evidence"]
+    if not isinstance(evidence, dict):
+        return [f"{label} must be a mapping"]
+
+    findings: list[str] = []
+    references = set(case.get("references", []))
+    quantities = set(case.get("comparison", {}).get("tolerances", {}))
+    if set(evidence) != references:
+        findings.append(f"{label} must cover exactly the declared references")
+    for ref in sorted(evidence, key=str):
+        entries = evidence[ref]
+        ref_label = f"{label}[{ref!r}]"
+        if not isinstance(entries, dict):
+            findings.append(f"{ref_label} must be a mapping")
+            continue
+        if set(entries) != quantities:
+            findings.append(f"{ref_label} must cover exactly comparison.tolerances keys")
+        for quantity in sorted(entries, key=str):
+            entry = entries[quantity]
+            entry_label = f"{ref_label}[{quantity!r}]"
+            if not isinstance(entry, dict):
+                findings.append(f"{entry_label} must be a mapping")
+                continue
+            if set(entry) != {"class", "rationale"}:
+                findings.append(f"{entry_label} must contain only class and rationale")
+            if entry.get("class") not in (
+                "exact", "convention-matched", "behavioural-proxy"
+            ):
+                findings.append(
+                    f"{entry_label}.class must be exact, convention-matched or behavioural-proxy"
+                )
+            rationale = entry.get("rationale")
+            if not isinstance(rationale, str) or not rationale.strip():
+                findings.append(f"{entry_label}.rationale must be a non-empty string")
+    return findings
+
+
+def _case_matrix_notes(case: dict[str, Any]) -> str:
+    notes = case.get("notes", "").strip().replace("\n", " ")
+    # Malformed metadata is reported by --check, not interpreted for display.
+    if "reference_evidence" not in case or check_reference_evidence(case):
+        return notes
+    summaries = []
+    for ref, entries in sorted(case["reference_evidence"].items()):
+        by_class: dict[str, list[str]] = {}
+        for quantity, entry in sorted(entries.items()):
+            by_class.setdefault(entry["class"], []).append(quantity)
+        groups = "; ".join(
+            f"{evidence_class}: {', '.join(quantities)}"
+            for evidence_class, quantities in sorted(by_class.items())
+        )
+        summaries.append(f"{ref} ({groups})")
+    if summaries:
+        return f"{notes} Evidence: {'; '.join(summaries)}.".strip()
+    return notes
+
+
 def render_matrix_md(cases: list[dict[str, Any]]) -> str:
     lines = [
         "# Hayashi Validation Matrix",
@@ -1530,7 +1592,7 @@ def render_matrix_md(cases: list[dict[str, Any]]) -> str:
         status = case.get("status", "not-started")
         issue = case.get("result", {}).get("issues_opened", [])
         issue_str = ", ".join(str(i) for i in issue) if issue else "—"
-        notes = case.get("notes", "").strip().replace("\n", " ")
+        notes = _case_matrix_notes(case)
         lines.append(f"| {family} | {dataset} | {refs} | {status} | {issue_str} | {notes} |")
 
     lines.extend([
@@ -1557,7 +1619,13 @@ def render_matrix_md(cases: list[dict[str, Any]]) -> str:
         "comparison when `--allow-partial` is used; otherwise partial cases",
         "fail the runner.",
         "",
-        "This matrix is generated from `validation/matrix.yml` by `validation/run.py`.",
+        "Notes summarise optional [reference evidence classes](README.md#reference-evidence-classes)",
+        "per reference and compared quantity. Unannotated cases are unclassified, not exact.",
+        "Evidence classes do not change tolerances or status; a proxy pass does not validate",
+        "the target estimator or inference contract.",
+        "",
+        "This matrix is generated from `validation/cases/*/case.yml` manifests and",
+        "`validation/matrix.yml` by `validation/run.py`.",
         "",
         "This matrix covers the core empirical estimators. Some commands are",
         "intentionally excluded for the reasons described in the \"Estimators not",
@@ -1581,7 +1649,7 @@ def _case_matrix_metadata(case: dict[str, Any]) -> tuple[str, str, str, str, str
     status = case.get("status", "not-started")
     issue = case.get("result", {}).get("issues_opened", [])
     issue_str = ", ".join(str(i) for i in issue) if issue else "—"
-    notes = case.get("notes", "").strip().replace("\n", " ")
+    notes = _case_matrix_notes(case)
     return family, dataset, status, issue_str, notes
 
 
@@ -1642,6 +1710,7 @@ def check_metadata(
 
     for case in sorted(cases, key=lambda c: c["id"]):
         case_id = case["id"]
+        findings.extend(check_reference_evidence(case))
         case_dir = VALIDATION_DIR / "cases" / case_id
         if not (case_dir / "README.md").exists():
             findings.append(f"{case_id}: missing README.md")

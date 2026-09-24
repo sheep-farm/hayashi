@@ -10,6 +10,21 @@ dataset:
 references:
 - R
 - Python
+reference_evidence:
+  R:
+    coefficients:
+      class: convention-matched
+      rationale: Manual Johansen ML aligns rank 1, lag order, intercept residualisation and Cholesky-based beta scaling with reciprocal alpha scaling.
+    standard_errors:
+      class: behavioural-proxy
+      rationale: Engle-Granger/OLS beta proxies and conditional OLS alpha SEs are retained diagnostics, not validation of Hayashi bootstrap uncertainty.
+  Python:
+    coefficients:
+      class: convention-matched
+      rationale: Manual Johansen ML aligns rank 1, lag order, intercept residualisation and Cholesky-based beta scaling with reciprocal alpha scaling.
+    standard_errors:
+      class: behavioural-proxy
+      rationale: Engle-Granger/OLS beta proxies and conditional OLS alpha SEs are retained diagnostics, not validation of Hayashi bootstrap uncertainty.
 reference_scripts:
   R: cases/coint_book/reference/run.R
   Python: cases/coint_book/reference/run.py
@@ -23,7 +38,6 @@ comparison:
     coefficients: 1e-2
     standard_errors: 5e-1
 notes: VECM(1) on a simulated cointegrated system where y = 2*x + e2 and x = cumsum(e1).
-  The cointegration (beta) and adjustment (alpha) coefficients and standard errors
-  are compared. Beta SEs are approximate Engle-Granger/OLS proxies; alpha SEs are
-  OLS conditional SEs given the estimated beta. The 5e-1 tolerance accommodates the
-  bootstrap SEs produced by Hayashi.
+  Johansen coefficients use aligned rank and normalisation conventions. Legacy beta
+  Engle-Granger/OLS and conditional alpha OLS SE comparisons are retained proxy
+  diagnostics at tolerance 5e-1, not validation of Hayashi bootstrap uncertainty.

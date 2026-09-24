@@ -13,6 +13,22 @@ references:
   - R
   - Python
 
+reference_evidence:
+  R:
+    coefficients.mse:
+      class: behavioural-proxy
+      rationale: gbm boosting MSE is a predictive diagnostic, not a BART posterior comparison.
+    coefficients.r_squared:
+      class: behavioural-proxy
+      rationale: gbm boosting R-squared does not establish the BART fitting or inference contract.
+  Python:
+    coefficients.mse:
+      class: behavioural-proxy
+      rationale: GradientBoostingRegressor MSE is a predictive diagnostic, not a BART posterior comparison.
+    coefficients.r_squared:
+      class: behavioural-proxy
+      rationale: GradientBoostingRegressor R-squared does not establish the BART fitting or inference contract.
+
 comparison:
   quantities:
     - coefficients.mse
@@ -28,7 +44,7 @@ reference_scripts:
   R: cases/bart_simulated/reference/run.R
   Python: cases/bart_simulated/reference/run.py
 
-notes: Simulated data y = 3*x1 + N(0, 0.1), x2 irrelevant. BART with 20 trees, depth 3, 500 post-burn draws and 200 burn-in. Reference is a scikit-learn GradientBoostingRegressor approximation because a full BART posterior is too heavy for the venv.
+notes: Simulated data y = 3*x1 + N(0, 0.1), x2 irrelevant. BART with 20 trees, depth 3, 500 post-burn draws and 200 burn-in. R gbm and Python GradientBoostingRegressor provide predictive diagnostics, not BART posterior or inference validation.
 
 result:
   summary: ""

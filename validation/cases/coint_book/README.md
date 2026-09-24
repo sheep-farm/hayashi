@@ -13,7 +13,9 @@ x_t = x_{t-1} + e1_t
 y_t = 2 * x_t + e2_t
 ```
 
-Equivalently, `y_t - 2*x_t` is a stationary cointegration error. With the Johansen normalization used by Hayashi, the long-run cointegration vector should be close to `[1, -2]`.
+Equivalently, `y_t - 2*x_t` is a stationary cointegration error. The long-run
+cointegration vector is proportional to `[1, -2]`; the references use
+Cholesky-based Johansen scaling, not a first coefficient fixed at one.
 
 ## Dataset
 
@@ -28,6 +30,19 @@ Equivalently, `y_t - 2*x_t` is a stationary cointegration error. With the Johans
 - **Python:** manual Johansen ML procedure implemented with NumPy.
 - **Hayashi:** `vecm(df, y, x, lags=1)`.
 
+## Reference evidence
+
+For both R and Python, `coefficients` is `convention-matched`: the manual
+Johansen procedures align rank 1, lag order 1, intercept residualisation and
+Cholesky-based beta normalisation with corresponding alpha scaling.
+This classification does not certify independent provenance.
+
+`standard_errors` is `behavioural-proxy`. These legacy comparisons are retained
+diagnostics, not validation of Hayashi's bootstrap uncertainty. Neither their
+recorded pass nor their existing loose tolerance justifies new loose-SE
+comparisons as estimator inference validation. See
+[evidence classes](../../README.md#reference-evidence-classes).
+
 ## Compared quantities
 
 - coefficients
@@ -38,12 +53,12 @@ Equivalently, `y_t - 2*x_t` is a stationary cointegration error. With the Johans
 | Quantity | Tolerance | Rationale |
 |---|---|---|
 | coefficients | 1e-2 | Johansen ML estimates should match closely for the beta and alpha coefficients. |
-| standard_errors | 5e-1 | Bootstrap SEs from Hayashi (`with_inference(200)`) are compared against simple reference SEs. The tolerance is loose because the reference uses approximations rather than the same bootstrap. |
+| standard_errors | 5e-1 | Retained legacy proxy diagnostic comparing Hayashi bootstrap SEs (`with_inference(200)`) with different reference SE constructions; not validation of bootstrap uncertainty. |
 
 ## Reference standard errors
 
 - **Alpha:** OLS conditional SEs from the regression of each `Δy_jt` on the estimated cointegration term `β' y_{t-1}` (orthogonal to the constant).
-- **Beta:** Rough Engle-Granger/OLS proxies from the static long-run regression `y ~ x` (with intercept). The intercept SE is used as a proxy for `beta_1_y1` and the slope SE as a proxy for `beta_1_y2`. These are not the exact Johansen asymptotic SEs, but they are easy to compute and stay within the declared tolerance.
+- **Beta:** Rough Engle-Granger/OLS proxies from the static long-run regression `y ~ x` (with intercept). The intercept SE is used as a proxy for `beta_1_y1` and the slope SE as a proxy for `beta_1_y2`. These are neither Johansen asymptotic SEs nor the bootstrap uncertainty produced by Hayashi. Agreement within the tolerance cannot establish inference equivalence.
 
 ## Output format
 

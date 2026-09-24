@@ -92,14 +92,54 @@ estimator manually in base R/Python because no suitable packaged reference is
 available; each case's `README.md` documents the exact packages and
 implementation choices.
 
+## Reference evidence classes
+
+The optional `reference_evidence` field in `case.yml` classifies each reference
+and compared quantity. Absence means **unclassified**, not `exact`; legacy cases
+are not required to adopt metadata before their references have been reviewed.
+When present, the field must map every declared reference to every literal key
+in `comparison.tolerances`, with no missing or additional keys. Those tolerance
+keys govern what the runner compares, not `comparison.quantities`. Dotted keys
+such as `coefficients.ate` are literal keys, not prefixes or overrides.
+
+Each quantity entry contains exactly `class` and a non-empty string `rationale`:
+
+- `exact`: the same stated estimator and finite-sample/inference contract.
+  This does not mean bitwise equality or prove correctness.
+- `convention-matched`: the same target after documented alignment of conventions,
+  such as rank, normalisation or deterministic terms.
+- `behavioural-proxy`: a related diagnostic or algorithm whose success cannot
+  establish the target estimator or inference contract.
+
+For a case declaring only Python and comparing only `coefficients.ate`:
+
+```yaml
+reference_evidence:
+  Python:
+    coefficients.ate:
+      class: behavioural-proxy
+      rationale: Related ATE diagnostic; the full fitting contract is not matched.
+```
+
+`python validation/run.py --check` validates the optional metadata. There are no
+default or inferred classes. Reference independence and provenance are separate
+questions; an evidence class does not certify either.
+
+The dashboard keeps six columns and appends a stable summary to Notes for
+annotated cases only. The case manifest retains the per-quantity rationales.
+Classes do not change numerical execution, tolerances, comparisons, statuses or
+exit policy. A proxy mismatch still fails. A proxy pass establishes only the
+declared diagnostic agreement, not estimator or uncertainty validation.
+
 ## Cross-platform CI policy
 
 The validation workflow runs on Ubuntu, macOS and Windows.
 
 - **Ubuntu is the precision reference.** Both R and Python references run
-  reliably, and a `pass` on Ubuntu means Hayashi agrees with both references
-  within the declared tolerances. This is the strongest evidence of numerical
-  correctness.
+  reliably, and a `pass` means agreement with all declared references within
+  the declared tolerances. The strength of that evidence depends on each
+  reference/quantity contract: a behavioural-proxy pass remains diagnostic
+  agreement on Ubuntu, and an unclassified case is not implicitly exact.
 
 - **macOS and Windows are treated as compatibility smoke tests.** The runner
   uses `--allow-partial` on these platforms because the reference environments
@@ -195,6 +235,12 @@ used by Hayashi (e.g., Hannan-Rissanen for the default `arima()` path) so that
 coefficients match exactly. Coefficients and standard errors are compared
 when the reference can reproduce the same inference; otherwise only
 coefficients are compared with a documented rationale.
+
+The legacy `coint_book` standard-error comparisons are retained as
+`behavioural-proxy` diagnostics: Engle-Granger/OLS beta proxies and conditional
+OLS alpha SEs do not validate Hayashi's bootstrap uncertainty. Keeping their
+existing `5e-1` tolerance preserves the historical diagnostic; it does not
+justify new loose-SE comparisons as estimator inference validation.
 
 ## Methodological guardrails
 

@@ -38,8 +38,8 @@ cases:
   status: pass
 - id: bart_simulated
   notes: Simulated data y = 3*x1 + N(0, 0.1), x2 irrelevant. BART with 20 trees, depth
-    3, 500 post-burn draws and 200 burn-in. Reference is a scikit-learn GradientBoostingRegressor
-    approximation because a full BART posterior is too heavy for the venv.
+    3, 500 post-burn draws and 200 burn-in. R gbm and Python GradientBoostingRegressor
+    provide predictive diagnostics, not BART posterior or inference validation.
   dimension: numerical
   status: pass
 - id: bayes_lm_simulated
@@ -140,10 +140,9 @@ cases:
   status: pass
 - id: coint_book
   notes: VECM(1) on a simulated cointegrated system where y = 2*x + e2 and x = cumsum(e1).
-    The cointegration (beta) and adjustment (alpha) coefficients and standard errors
-    are compared. Beta SEs are approximate Engle-Granger/OLS proxies; alpha SEs are
-    OLS conditional SEs given the estimated beta. The 5e-1 tolerance accommodates
-    the bootstrap SEs produced by Hayashi.
+    Johansen coefficients use aligned rank and normalisation conventions. Legacy beta
+    Engle-Granger/OLS and conditional alpha OLS SE comparisons are retained proxy
+    diagnostics at tolerance 5e-1, not validation of Hayashi bootstrap uncertainty.
   dimension: numerical
   status: pass
 - id: condnum_simulated
@@ -790,8 +789,8 @@ cases:
   status: pass
 - id: orf_simulated
   notes: Simulated data y = 1 + 2*x1 - x2 + 0.5*treated + 0.3*w1 - 0.2*w2 + N(0,1).
-    Hayashi orf() reports the average treatment effect. R reference uses grf::causal_forest
-    on the full set of covariates; Python uses econml.orf.DROrthoForest.
+    R grf::causal_forest and Python econml.orf.DROrthoForest provide ATE proxy comparisons,
+    not validation of the complete Hayashi ORF fitting contract. Emitted SEs are not compared.
   dimension: numerical
   status: pass
 - id: panel_fe_cluster_wagepan

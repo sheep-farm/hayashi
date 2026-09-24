@@ -6,3 +6,14 @@ Orthogonal Random Forest validation on simulated data.
 - Hayashi: `orf(y ~ treated, df, x="x1,x2", w="w1,w2", trees=50, depth=4)`.
 - References: `grf::causal_forest` (R) as an ATE proxy and `econml.orf.DROrthoForest` (Python).
 - Output: `variable,coef,std_err` CSV with the average treatment effect.
+
+## Reference evidence
+
+`coefficients.ate` is a `behavioural-proxy` for both references. R combines
+features and confounders in `grf::causal_forest`; Python's `DROrthoForest` is a
+related ORF implementation, not an established match to Hayashi's complete
+fitting contract. The existing ATE tolerance `0.9` and recorded status are
+unchanged. A pass does not validate that full contract.
+
+Scripts emit SEs, but this case does not compare them. It provides no SE or
+uncertainty validation. See [evidence classes](../../README.md#reference-evidence-classes).
