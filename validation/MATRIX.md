@@ -62,7 +62,7 @@
 | fcoef | simulated |  | not-supported | — | No standard R/Python package for the same functional-coefficient estimator. |
 | feiv | simulated | R, Python | pass | 134 | Panel with N=200 entities and T=5 periods; x is endogenous and instrumented by z. Independent R and Python within-2SLS references use the Greeners residual degrees-of-freedom convention n - k - (G - 1). |
 | fmb | simulated_fmb_panel | R, Python | pass | 49 | Classic Fama-MacBeth regression on a deterministic simulated asset panel. |
-| fmols | simulated | R | not-supported | — | R cointReg reference fails in CI; no stable reference currently available. |
+| fmols | simulated | R | not-supported | — | FMOLS remains unqualified: the engine omits the one-sided bias correction and uses unconditional long-run variance. Native R/Python diagnostics exist; finite-sample conventions and numerical acceptance bounds are not adopted. See Greeners issue 23, Hayashi issue 152 and the case README. |
 | ftest_robust | wooldridge::wage1 | R, Python | pass | — | Robust F-test (Wooldridge 2010) with cluster-robust covariance for joint significance test. |
 | rd | simulated | Python | pass | — | Fuzzy RD with 70% compliance at the cutoff. Compare local average treatment effect (LATE). |
 | garch | simulated_garch11 | R, Python | pass | — | Uses the same simulated GARCH(1,1) DGP as Chapter 30 of the book. Coefficients only because GARCH standard-error approximations differ widely between implementations. |

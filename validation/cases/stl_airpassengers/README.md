@@ -107,8 +107,16 @@ diagnostic exits 1. The separate non-robust diagnostic agrees within `2e-14`.
 Initial-fit residual audits use six times the true median absolute residual,
 the `<=0.001` / `<=0.999` biweight cut-offs and the zero-scale rule. Python's
 weights agree (zero discrepancy in this run); R's differ by about `0.0166271`.
-The exact R internal cause is unresolved. Non-robust agreement does not make R
-a passing robust reference. See the [R STL documentation](https://stat.ethz.ch/R-manual/R-devel/library/stats/html/stl.html).
+The 14 October 2026 source experiment identifies the cause for this dataset:
+R's [`stlrwt` median selection](https://github.com/wch/r-source/blob/1471c2d587e9b872a4e9b7c7947245ef9b41ef7d/src/library/stats/src/stl.c#L373)
+passes ranks 73 and 72 to a partial sorter that expects ascending ranks.
+Compiling that source reproduces installed R 4.6.1's vectors. Reordering only
+those two ranks reduces the robust component discrepancies to below `8e-14`
+and the weight discrepancy to below `4e-14`; the 143-observation control agrees
+without the change because both median ranks are 72. All windows, degrees,
+jumps and iteration counts are held fixed. This is a controlled diagnostic,
+not a replacement R reference or proof of equivalence for other inputs. The
+installed R result still fails the robust gate. See the [R STL documentation](https://stat.ethz.ch/R-manual/R-devel/library/stats/html/stl.html).
 
 Every component gate passes for the provisional immutable fork. Maintain the
 draft/release boundary until maintainers settle the reference contract and the

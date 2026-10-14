@@ -316,7 +316,11 @@ cases:
   dimension: numerical
   status: pass
 - id: fmols_simulated
-  notes: R cointReg reference fails in CI; no stable reference currently available.
+  notes: >-
+    FMOLS remains unqualified: the engine omits the one-sided bias correction
+    and uses unconditional long-run variance. Native R/Python diagnostics exist;
+    finite-sample conventions and numerical acceptance bounds are not adopted.
+    See Greeners issue 23, Hayashi issue 152 and the case README.
   dimension: numerical
   status: not-supported
 - id: ftest_robust_wooldridge_wage1
