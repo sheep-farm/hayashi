@@ -217,7 +217,7 @@ pub enum Value {
 
     OlsResult(super::models::OlsModel),
     #[cfg(feature = "greeners-ols")]
-    IvResult(Rc<greeners::iv::IvResult>),
+    IvResult(Rc<super::models::IvModel>),
     #[cfg(feature = "greeners-glm")]
     BinaryResult(super::models::BinaryModel),
     PanelResult(Rc<greeners::panel::PanelResult>),
@@ -620,7 +620,7 @@ impl std::fmt::Display for Value {
             Value::DataFrame(df) => write!(f, "{df}"),
             Value::OlsResult(m) => write!(f, "{m}"),
             #[cfg(feature = "greeners-ols")]
-            Value::IvResult(r) => write!(f, "{r}"),
+            Value::IvResult(r) => write!(f, "{}", r.result),
             #[cfg(feature = "greeners-glm")]
             Value::BinaryResult(m) => write!(f, "{m}"),
             #[cfg(feature = "greeners-panel")]

@@ -632,12 +632,17 @@ impl Interpreter {
 
     #[cfg(feature = "greeners-ols")]
     fn predict_model_values(
-        &self,
+        &mut self,
         model_val: &Value,
         kind: &str,
-        df: &DataFrame,
+        df: &Arc<DataFrame>,
         varname: &str,
     ) -> Result<Vec<f64>> {
+        // IV display names are labels, not physical predictor columns. Always
+        // replay its fitted formula before considering the ModelView shortcut.
+        if let Value::IvResult(model) = model_val {
+            return self.predict_iv_vals(model, kind, df);
+        }
         // Canonical linear predictor: any ModelView whose variable names map
         // directly to DataFrame columns can produce xb/fitted/residuals without
         // a dedicated method.  Specific predictors (proba, count, hazard,
@@ -672,8 +677,6 @@ impl Interpreter {
             (Value::NegBinResult(r), k) => self.predict_negbin_vals(r, k),
             #[cfg(feature = "greeners-glm")]
             (Value::OrderedResult(r), k) => self.predict_ordered_vals(r, k, df),
-            #[cfg(feature = "greeners-ols")]
-            (Value::IvResult(r), k) => self.predict_iv_vals(r, k, df),
             #[cfg(feature = "greeners-panel")]
             (Value::PanelResult(r), k) => self.predict_panel_vals(r, k, df),
             #[cfg(feature = "greeners-panel")]
@@ -843,15 +846,27 @@ impl Interpreter {
 
     #[cfg(feature = "greeners-ols")]
     fn predict_iv_vals(
-        &self,
-        r: &greeners::iv::IvResult,
+        &mut self,
+        model: &super::models::IvModel,
         kind: &str,
-        df: &DataFrame,
+        df: &Arc<DataFrame>,
     ) -> Result<Vec<f64>> {
         match kind {
-            "xb" | "fitted" => Self::linear_xb(df, r.variable_names.as_deref(), &r.params),
+            "xb" | "fitted" | "linear" | "yhat" => {
+                let x = self.iv_prediction_matrix(&model.design, df)?;
+                if x.ncols() != model.result.params.len() {
+                    return Err(
+                        self.rt_err("IV prediction columns disagree with fitted coefficients")
+                    );
+                }
+                let values = model.result.predict(&x).to_vec();
+                if values.iter().any(|value| !value.is_finite()) {
+                    return Err(self.rt_err("IV prediction produced non-finite fitted values"));
+                }
+                Ok(values)
+            }
             k => Err(HayashiError::Runtime(format!(
-                "predict IV: kind '{k}' unknown — use: xb"
+                "predict IV: kind '{k}' unknown; use: xb, fitted, linear, yhat"
             ))),
         }
     }

@@ -86,6 +86,8 @@ mod estimators_timeseries;
 mod eval_expr;
 mod execution;
 mod helpers;
+#[cfg(feature = "greeners-ols")]
+mod iv_design;
 pub mod model;
 pub mod model_view;
 pub mod models;

@@ -298,6 +298,46 @@ export(m, "html", "table.html")
 
 ### Machine learning, clustering, and spatial
 
+Formula-based OLS labels expanded categorical columns in fitted order. IV uses
+separate structural and instrument designs after applying `if=` once; WLS
+predictions use retained original-scale columns. IV diagnostics share the same
+formula materialisation and filtered sample as fitting. Instrument formulas specify
+the full instrument matrix, including common exogenous regressors; these are not
+added implicitly. IV prediction evaluates the fitted structural RHS and preserves
+its intercept and category encoding on new predictor-only data. Unknown category
+levels are errors. Numeric categorical terms retain the backend's existing
+rounded-integer coding; typed string categories retain their labels. Finite
+floating cluster labels retain exact group identity, with signed zeros treated
+as one group.
+
+`bayes_lm` supplies one intercept to the conjugate backend and uses its returned
+coefficient names; no-intercept formulas remain unsupported. SFA coefficient
+output expands categorical and transformed names in fitted order and omits sign
+probabilities because the backend does not supply them.
+`testparm` reports scaled Wald with a chi-square reference under Normal inference
+and uses direct survival probabilities for small representable tails.
+`nlcom` uses fitted covariance and the selected Student-t or Normal distribution.
+It returns a dictionary containing `estimate`, `std_err`, `p_value`, `ci_lower`,
+`ci_upper`, `reference_distribution` and `t` or `z`; Student-t results also contain
+`df`. Use `nlcom(m, expression).estimate` where a scalar return value was used.
+Unresolved numerical derivatives and nonrepresentable intervals return errors,
+and coefficient bindings are restored after expression failures.
+`estat_overid` is the classical homoskedastic Sargan test, and `estat_endog` uses
+the classical augmented Durbin-Wu-Hausman test, conditional on valid identifying
+instruments. Unrepresentable structural/instrument quadratic moments produce a
+rescaling error before backend evaluation. This range guard does not diagnose
+weak instruments or general ill-conditioning. Diagnostic responses are internally
+rescaled without changing test statistics; unresolved residual variation returns
+an error. Their non-rejection does not establish instrument validity or OLS
+consistency.
+The numerical engine is provisionally pinned to an immutable combined fork,
+containing the statistical corrections in [Greeners PR #26](https://github.com/sheep-farm/Greeners/pull/26)
+and the STL repair in draft [PR #25](https://github.com/sheep-farm/Greeners/pull/25).
+Both contributions remain unmerged; STL attribution is retained and its
+contribution-terms question remains open. See [`validation/ENVIRONMENTS.md`](validation/ENVIRONMENTS.md)
+for the exact revision and provenance. This pin does not imply upstream acceptance
+or release qualification; an accepted revision requires a separate dependency change.
+
 Hayashi also exposes a growing set of ML, clustering, spatial, and Bayesian estimators:
 
 | Category | Commands |
@@ -463,8 +503,20 @@ hay validate
 See `validation/README.md` for the full protocol and `validation/MATRIX.md` for
 the current status of every case.
 
-The matrix now covers **215 cases across 115 estimators**, with 199 passing
-against R and Python reference implementations.
+Numerical comparison requires finite, present, nonempty evidence and finite,
+nonnegative numerical tolerances. Matching undefined quantities do not establish
+agreement; invalid evidence from any executed reference fails the case.
+
+Each case qualifies only its declared comparison quantities. Wavelet energies,
+forest fit summaries and selected point estimates can pass without qualifying
+uncertainty. Synthetic DiD proxy agreement does not establish general estimator
+validity or causal identification. The two-way clustered wage-panel case tests
+an explicit availability contract: its raw covariance is materially indefinite,
+so inference must be rejected. A passing rejection check does not qualify panel
+coefficient accuracy or uncertainty; references preserve the raw covariance.
+
+The maintained matrix records each case's comparison scope and availability;
+stored statuses are not a substitute for a fresh numerical run.
 
 ## Graphs
 
@@ -765,4 +817,3 @@ Flávio de Vasconcellos Corrêa — [@sheep-farm](https://github.com/sheep-farm)
 GPL-3.0 with **Plugin Exception** — see [LICENSE](LICENSE).
 
 This exception explicitly allows linking and loading proprietary/closed-source plugins developed using `hayashi-plugin-sdk` into Hayashi without triggering copyleft requirements.
-

@@ -1,8 +1,11 @@
 # Robust STL on log AirPassengers
 
-**Draft failing regression.** Refs [#160](https://github.com/sheep-farm/hayashi/issues/160).
-This case exposes a numerical mismatch; it does not repair or resolve the STL
-contract. The manifest remains runnable with `status: fail`.
+**Passing provisional fork repair.** Refs [#160](https://github.com/sheep-farm/hayashi/issues/160).
+The immutable Greeners fork pin reproduces this declared Python full-vector
+contract at unchanged tolerances. The repair is submitted in draft
+[Greeners #25](https://github.com/sheep-farm/Greeners/pull/25), with its complete
+third-party notice retained. Upstream contract acceptance and contribution-terms
+clarification remain open; this result does not resolve either decision.
 
 ## Data and reference contract
 
@@ -34,12 +37,13 @@ after investigating the failed R/Python gate, on the basis of that algorithm
 and the initial-fit weight audit, not proximity to Hayashi. R and Python share
 STL algorithm lineage; they are not fully independent methodological sources.
 
-## Checks and known failure
+## Checks, repaired agreement and limits
 
 The existing runner compares every trend, seasonal and remainder value, including
 endpoints, at absolute tolerance `1e-8` (relative tolerance zero). This tolerance
 was selected **after** exploratory comparison and full-precision export review;
-it was not predeclared and does not establish achieved numerical equivalence.
+it was not predeclared. Passing it establishes agreement for these fixed vectors,
+rather than general STL accuracy.
 The input hash, exact ordered indices and finite vector shapes are checked.
 Hayashi predicts the model's observed vector and checks it against logged counts.
 
@@ -58,6 +62,13 @@ units. Hayashi reconstructs exactly. Reconstruction is an accounting check, not
 STL validation. Tests include offsetting trend/remainder perturbations which
 preserve reconstruction but fail the component comparison.
 
+Against the current immutable combined fork `e7f57bc8450bdd62c6c2105788b689b839158b6a`,
+all 578 quantities pass without changing data, settings or tolerances. Maximum
+absolute errors are approximately `7.91e-14` (trend), `4.92e-14` (seasonal) and
+`3.01e-14` (remainder); observed values match and reconstruction error is zero.
+This is agreement with the specified Python contract, not R equivalence or a
+whole-domain guarantee.
+
 ## Reproduce
 
 From the repository root, with `hay` on PATH (or a local built binary), Rscript
@@ -71,15 +82,17 @@ python validation/cases/stl_airpassengers/reference/diagnostic.py
 ```
 
 The first command generates data, runs only this case and regenerates the matrix;
-on the pinned base it exits **1, fail**, not blocked. The metadata check and six
-harness tests pass. The actual CSV test requires `hay` on PATH and otherwise
+with the provisional repaired pin it exits **0, pass**; the historical base exited
+1 with a numerical failure. The metadata check and six harness tests pass. The actual CSV test requires `hay` on PATH and otherwise
 reports a skip. It uses the runner's file-output rewrite on Windows and tests
 both stdout and rewritten-file transport on other platforms. Ensure the runner's
 selected Python uses the pinned dependencies.
-The executed environment uses Python 3.12.11, statsmodels 0.14.6, NumPy 2.4.6,
+The repaired-pin verification uses Python 3.11.15, statsmodels 0.14.6, NumPy 2.4.6,
 SciPy 1.17.1, pandas 3.0.5, patsy 1.0.2, PyYAML 6.0.3 and R/stats/datasets 4.6.1.
-The local venv allows system-site-packages; this is not a full validation
-environment restore. No dependency files are changed.
+The task-local Python environment was restored from the hashed requirements;
+R packages were restored from renv.lock into a task-local library. Reference
+package lockfiles are unchanged. See [`ENVIRONMENTS.md`](../../ENVIRONMENTS.md)
+for engine provenance and environment policy.
 
 ## Optional R diagnostic and promotion gate
 
@@ -94,10 +107,19 @@ diagnostic exits 1. The separate non-robust diagnostic agrees within `2e-14`.
 Initial-fit residual audits use six times the true median absolute residual,
 the `<=0.001` / `<=0.999` biweight cut-offs and the zero-scale rule. Python's
 weights agree (zero discrepancy in this run); R's differ by about `0.0166271`.
-The exact R internal cause is unresolved. Non-robust agreement does not make R
-a passing robust reference. See the [R STL documentation](https://stat.ethz.ch/R-manual/R-devel/library/stats/html/stl.html).
+The 14 October 2026 source experiment identifies the cause for this dataset:
+R's [`stlrwt` median selection](https://github.com/wch/r-source/blob/1471c2d587e9b872a4e9b7c7947245ef9b41ef7d/src/library/stats/src/stl.c#L373)
+passes ranks 73 and 72 to a partial sorter that expects ascending ranks.
+Compiling that source reproduces installed R 4.6.1's vectors. Reordering only
+those two ranks reduces the robust component discrepancies to below `8e-14`
+and the weight discrepancy to below `4e-14`; the 143-observation control agrees
+without the change because both median ranks are 72. All windows, degrees,
+jumps and iteration counts are held fixed. This is a controlled diagnostic,
+not a replacement R reference or proof of equivalence for other inputs. The
+installed R result still fails the robust gate. See the [R STL documentation](https://stat.ethz.ch/R-manual/R-devel/library/stats/html/stl.html).
 
-Keep the PR draft and unmergeable until maintainers settle the reference contract
-and the implementation passes every component gate without widening tolerances.
-An estimator repair, MSTL, full-matrix execution and cross-platform qualification
-are outside this case. This evidence alone must not close #160.
+Every component gate passes for the provisional immutable fork. Maintain the
+draft/release boundary until maintainers settle the reference contract and the
+STL contribution-terms question. MSTL and robust R equivalence are outside this
+case; full-matrix and platform results are separate evidence. This fixed-case
+agreement alone must not close #160.

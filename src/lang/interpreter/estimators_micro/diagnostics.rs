@@ -301,62 +301,70 @@ impl Interpreter {
         &mut self,
         _func: &str,
         args: &[Expr],
-        _opts: &[Opt],
+        opts: &[Opt],
         _opt_map: &HashMap<String, Value>,
     ) -> Result<Value> {
-        if args.len() < 3 {
-            return Err(self.rt_err(
-                "estat_overid(endog_formula, instrument_formula, df) requires 3 arguments",
-            ));
+        self.classical_iv_options(opts)?;
+        let prepared = self.prepare_iv(args, opts)?;
+        let response =
+            self.classical_iv_response(&prepared.y, prepared.design.formula.intercept)?;
+        let (y, x, z) = (&response, &prepared.x, &prepared.z);
+        if z.ncols() <= x.ncols() {
+            return Err(self.rt_err("Sargan requires more instruments than structural regressors"));
         }
-        let endog_ast = self.resolve_formula_allow_no_intercept(&args[0])?;
-        let instr_ast = self.resolve_formula_allow_no_intercept(&args[1])?;
-        let df_name = match &args[2] {
-            Expr::Var(n) => n.clone(),
-            _ => return Err(self.rt_err("third argument must be a DataFrame variable")),
-        };
-        let df = match self.env.get(&df_name) {
-            Some(Value::DataFrame(df)) => df.clone(),
-            _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
-        };
-        let (df_endog, g_endog, _) = self.prepare_formula_allow_no_intercept(&endog_ast, &df)?;
-        let g_instr = if instr_ast.lhs.is_empty() {
-            let (_, g_i, _) = self.prepare_formula_allow_no_intercept(&instr_ast, &df)?;
-            GFormula {
-                dependent: String::new(),
-                independents: g_i.independents,
-                intercept: g_i.intercept,
-            }
-        } else {
-            let (_, g_i, _) = self.prepare_formula_allow_no_intercept(&instr_ast, &df)?;
-            g_i
-        };
-        // Build y, x, z
-        let (y, x) = df_endog
-            .to_design_matrix(&g_endog)
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        let instr_formula = GFormula {
-            dependent: g_endog.dependent.clone(),
-            independents: g_instr.independents.clone(),
-            intercept: g_instr.intercept,
-        };
-        let (_, z) = df_endog
-            .to_design_matrix(&instr_formula)
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         // Fit IV to get beta
-        let iv_result = IV::fit_with_names(&y, &x, &z, CovarianceType::NonRobust, None)
+        let iv_result = IV::fit_with_names(y, x, z, CovarianceType::NonRobust, None)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        let result = IV::sargan_test(&y, &x, &z, &iv_result.params)
+        // No names are passed: retain the existing full-X classical fit, whose
+        // numerical rank errors remain errors rather than changing the null.
+        if iv_result.params.len() != x.ncols() {
+            return Err(
+                self.rt_err("Sargan fitted coefficients disagree with the structural design")
+            );
+        }
+        let residuals = y - x.dot(&iv_result.params);
+        // The unchanged backend floors the auxiliary R2 at this absolute SST.
+        // A scaled outcome removes arbitrary response units; remaining tiny
+        // residuals must be reported as unresolved instead of a fabricated J=0.
+        if residuals.dot(&residuals) <= 1e-15 {
+            return Err(self
+                .rt_err("Sargan residual variation is unresolved at backend numerical precision"));
+        }
+        let result = IV::sargan_test(y, x, z, &iv_result.params)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        print!("{result}");
+        if !result.sargan_stat.is_finite() || result.sargan_stat < 0.0 {
+            return Err(self.rt_err("Sargan statistic is outside its finite numerical domain"));
+        }
+        let reference = statrs::distribution::ChiSquared::new(result.df as f64)
+            .map_err(|e| self.rt_err(format!("Sargan: {e}")))?;
+        let p_value = reference.sf(result.sargan_stat);
+        let conclusion = if p_value < 0.05 {
+            "rejects the overidentifying moment restrictions at 5%"
+        } else {
+            "does not reject the overidentifying moment restrictions at 5%"
+        };
+        crate::emitln!(
+            self,
+            "\nSargan overidentification test (classical homoskedastic)"
+        );
+        crate::emitln!(self, "H0: the overidentifying moment restrictions hold");
+        crate::emitln!(
+            self,
+            "J = {:.6}; chi-square({}); p-value = {:.6e}",
+            result.sargan_stat,
+            result.df,
+            p_value
+        );
+        crate::emitln!(self, "{conclusion}");
         let mut map = HashMap::new();
         map.insert(
             "test".into(),
-            Value::Str("Sargan / Hansen J Overidentification Test".into()),
+            Value::Str("Sargan Overidentification Test".into()),
         );
         map.insert("j_stat".into(), Value::Float(result.sargan_stat));
         map.insert("df".into(), Value::Int(result.df as i64));
-        map.insert("p_value".into(), Value::Float(result.p_value));
+        map.insert("p_value".into(), Value::Float(p_value));
+        map.insert("conclusion".into(), Value::Str(conclusion.into()));
         map.insert(
             "n_instruments".into(),
             Value::Int(result.n_instruments as i64),
@@ -373,85 +381,87 @@ impl Interpreter {
         &mut self,
         _func: &str,
         args: &[Expr],
-        _opts: &[Opt],
+        opts: &[Opt],
         _opt_map: &HashMap<String, Value>,
     ) -> Result<Value> {
-        if args.len() < 3 {
-            return Err(self.rt_err(
-                "estat_endog(endog_formula, instrument_formula, df) requires 3 arguments",
-            ));
-        }
-        let endog_ast = self.resolve_formula_allow_no_intercept(&args[0])?;
-        let instr_ast = self.resolve_formula_allow_no_intercept(&args[1])?;
-        let df_name = match &args[2] {
-            Expr::Var(n) => n.clone(),
-            _ => return Err(self.rt_err("third argument must be a DataFrame variable")),
-        };
-        let df = match self.env.get(&df_name) {
-            Some(Value::DataFrame(df)) => df.clone(),
-            _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
-        };
-        let (df_endog, g_endog, _) = self.prepare_formula_allow_no_intercept(&endog_ast, &df)?;
-
-        // Identify endogenous variables (in endog but NOT in instr)
-        let instr_vars: std::collections::HashSet<String> = instr_ast
-            .rhs
-            .iter()
-            .filter_map(|t| t.as_var().map(|s| s.to_string()))
-            .collect();
-        let endog_var_names: Vec<String> = endog_ast
-            .rhs
-            .iter()
-            .filter_map(|t| t.as_var().map(|s| s.to_string()))
-            .filter(|v| !instr_vars.contains(v))
-            .collect();
-
-        if endog_var_names.is_empty() {
-            return Err(self.rt_err(
-            "estat_endog: no endogenous variable found (variables in endog formula not present in instrument formula)",
-        ));
-        }
-
-        let g_instr = if instr_ast.lhs.is_empty() {
-            let (_, g_i, _) = self.prepare_formula_allow_no_intercept(&instr_ast, &df)?;
-            GFormula {
-                dependent: String::new(),
-                independents: g_i.independents,
-                intercept: g_i.intercept,
-            }
-        } else {
-            let (_, g_i, _) = self.prepare_formula_allow_no_intercept(&instr_ast, &df)?;
-            g_i
-        };
-
-        // Build y, x, z
-        let (y, x) = df_endog
-            .to_design_matrix(&g_endog)
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        let instr_formula = GFormula {
-            dependent: g_endog.dependent.clone(),
-            independents: g_instr.independents.clone(),
-            intercept: g_instr.intercept,
-        };
-        let (_, z) = df_endog
-            .to_design_matrix(&instr_formula)
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-
-        // Find column indices of endogenous variables in X
-        // X columns come from g_endog.independents (+ intercept if present)
-        let x_names = df_endog
-            .formula_var_names(&g_endog)
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        let endog_cols: Vec<usize> = x_names
+        self.classical_iv_options(opts)?;
+        let prepared = self.prepare_iv(args, opts)?;
+        let endog_cols = prepared
+            .design
+            .names
             .iter()
             .enumerate()
-            .filter(|(_, name)| endog_var_names.contains(name))
-            .map(|(i, _)| i)
-            .collect();
-
-        let result = IV::endogeneity_test(&y, &x, &z, &endog_cols, endog_var_names)
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        print!("{result}");
+            .filter(|(index, name)| {
+                // The intercept is a structural position, not a reserved name:
+                // a no-intercept formula can contain a real column called const.
+                let actual_intercept = prepared.design.formula.intercept && *index == 0;
+                !(actual_intercept || prepared.instrument_terms.contains(name))
+            })
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        let endog_var_names = endog_cols
+            .iter()
+            .map(|index| {
+                prepared
+                    .design
+                    .names
+                    .get(*index)
+                    .cloned()
+                    .ok_or_else(|| self.rt_err("DWH endogenous position is outside its design"))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        if endog_cols.is_empty() {
+            return Err(self.rt_err(
+                "estat_endog: no endogenous expanded column found outside the instrument formula",
+            ));
+        }
+        let augmented_width = prepared
+            .x
+            .ncols()
+            .checked_add(endog_cols.len())
+            .ok_or_else(|| self.rt_err("DWH augmented design is too large"))?;
+        if prepared.y.len() <= augmented_width {
+            return Err(
+                self.rt_err("DWH requires more observations than augmented regression columns")
+            );
+        }
+        let df_resid = prepared.y.len() - augmented_width;
+        let response =
+            self.classical_iv_response(&prepared.y, prepared.design.formula.intercept)?;
+        let result = IV::endogeneity_test(
+            &response,
+            &prepared.x,
+            &prepared.z,
+            &endog_cols,
+            endog_var_names,
+        )
+        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        if !result.f_stat.is_finite() || result.f_stat < 0.0 {
+            return Err(self.rt_err("DWH statistic is outside its finite numerical domain"));
+        }
+        let reference =
+            statrs::distribution::FisherSnedecor::new(result.df as f64, df_resid as f64)
+                .map_err(|e| self.rt_err(format!("DWH: {e}")))?;
+        let p_value = reference.sf(result.f_stat);
+        let conclusion = if p_value < 0.05 {
+            "rejects exogeneity of the tested regressors at 5%"
+        } else {
+            "does not reject exogeneity of the tested regressors at 5%"
+        };
+        crate::emitln!(
+            self,
+            "\nDurbin-Wu-Hausman Endogeneity Test (classical homoskedastic)"
+        );
+        crate::emitln!(self, "H0: the tested structural regressors are exogenous");
+        crate::emitln!(
+            self,
+            "F({}, {}) = {:.6}; p-value = {:.6e}",
+            result.df,
+            df_resid,
+            result.f_stat,
+            p_value
+        );
+        crate::emitln!(self, "{conclusion}");
         let mut map = HashMap::new();
         map.insert(
             "test".into(),
@@ -459,20 +469,59 @@ impl Interpreter {
         );
         map.insert("f_stat".into(), Value::Float(result.f_stat));
         map.insert("df".into(), Value::Int(result.df as i64));
-        map.insert("p_value".into(), Value::Float(result.p_value));
+        map.insert("df_resid".into(), Value::Int(df_resid as i64));
+        map.insert("p_value".into(), Value::Float(p_value));
         map.insert(
             "endogenous_vars".into(),
             Value::List(Arc::new(
                 result.endogenous_vars.into_iter().map(Value::Str).collect(),
             )),
         );
-        let conclusion = if result.p_value < 0.05 {
-            "reject H0 -> endogeneity present, IV/2SLS preferred"
-        } else {
-            "do not reject H0 -> OLS consistent"
-        };
         map.insert("conclusion".into(), Value::Str(conclusion.into()));
         Ok(Value::Dict(Arc::new(map)))
+    }
+
+    #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-ols"))]
+    fn classical_iv_options(&self, options: &[Opt]) -> Result<()> {
+        if let Some(option) = options.iter().find(|option| {
+            matches!(
+                option.name.as_str(),
+                "cov" | "cluster" | "cluster2" | "nw" | "robust"
+            )
+        }) {
+            return Err(self.rt_err(format!(
+                "IV diagnostics are classical homoskedastic tests; '{}' is unsupported",
+                option.name
+            )));
+        }
+        Ok(())
+    }
+
+    #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-ols"))]
+    fn classical_iv_response(
+        &self,
+        response: &Array1<f64>,
+        intercept: bool,
+    ) -> Result<Array1<f64>> {
+        let maximum = response
+            .iter()
+            .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
+        let divisor = if maximum > 0.0 { maximum } else { 1.0 };
+        let normalised = response / divisor;
+        if normalised.iter().any(|value| !value.is_finite()) {
+            return Err(self.rt_err("IV diagnostic response exceeds numerical precision"));
+        }
+        if maximum == 0.0
+            || (intercept
+                && normalised
+                    .first()
+                    .is_some_and(|first| normalised.iter().all(|value| value == first)))
+        {
+            return Err(
+                self.rt_err("IV diagnostics are undefined for zero structural residual variation")
+            );
+        }
+        Ok(normalised)
     }
 
     #[cfg(all(feature = "greeners-diagnostics", feature = "greeners-glm"))]

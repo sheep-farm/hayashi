@@ -329,6 +329,7 @@ pub fn value_to_json(
         Value::Model(m) => m.to_json(),
         #[cfg(feature = "greeners-ols")]
         Value::IvResult(r) => {
+            let r = &r.result;
             let mut map = serde_json::Map::new();
             map.insert("__model_type__".into(), serde_json::json!("iv"));
             map.insert(

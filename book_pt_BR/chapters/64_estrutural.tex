@@ -70,8 +70,20 @@ print(m_fapanel)
 
 \section{FM-OLS}
 
-\texttt{fmols} estima uma regressão cointegrada com correções não paramétricas
-para endogeneidade e correlação serial na covariância de longo prazo.
+\texttt{fmols} estima uma regressão cointegrada de séries temporais com
+intercepto, pressupondo cointegração e dependência fraca, sem testá-las.
+O MQO inicial usa todas as $N$ linhas; o FMOLS usa as linhas 2 a $N$, a
+correção unilateral de viés de Phillips--Hansen e a variância condicional de
+longo prazo de Bartlett, com inferência Normal assintótica. Posto deficiente ou
+precisão numérica não resolvida produzem erros; o R-quadrado conserva o
+significado do MQO inicial com todas as $N$ observações.
+
+A concordância numérica com referências não estabelece a calibração nominal
+dos intervalos. Em um diagnóstico predefinido com erros autorregressivos
+endógenos e 500 replicações por desenho, os intervalos nominais de 95\% para
+a inclinação tiveram cobertura de 90,0\% com $N=300$ e 91,8\% com $N=1.000$.
+Ambos os intervalos de Monte Carlo excluem 95\%, portanto o FMOLS permanece
+experimental e sua cobertura em amostras finitas não está validada.
 
 \begin{lstlisting}[caption={FM-OLS}]
 let m_fm = fmols(y ~ x1 + x2, df)

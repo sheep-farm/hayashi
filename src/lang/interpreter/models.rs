@@ -1,3 +1,5 @@
+//! Fitted-model wrappers and retained interpreter metadata.
+
 use crate::lang::error::{HayashiError, Result};
 use crate::lang::interpreter::model::Model;
 use crate::lang::interpreter::model_view::ModelView;
@@ -9,6 +11,16 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 // ── Wrappers that preserve the X matrix for diagnostics and predict ─────────
+
+/// IV result with its fitted structural formula and category/column schema.
+/// Prediction must rematerialise this schema rather than treat display names
+/// as physical DataFrame columns.
+#[cfg(feature = "greeners-ols")]
+pub struct IvModel {
+    /// Numerical backend result, including its retained coefficient order.
+    pub result: greeners::iv::IvResult,
+    pub(super) design: super::iv_design::IvPredictionDesign,
+}
 
 #[derive(Clone)]
 pub struct OlsModel {

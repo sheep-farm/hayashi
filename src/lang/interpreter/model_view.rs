@@ -425,7 +425,8 @@ impl ModelView {
 // ── Rc<GreenersResult> converters ───────────────────────────────────────────
 #[cfg(feature = "greeners-ols")]
 #[cfg(feature = "greeners-ols")]
-fn model_view_from_iv(r: &std::rc::Rc<greeners::iv::IvResult>) -> ModelView {
+fn model_view_from_iv(model: &std::rc::Rc<super::models::IvModel>) -> ModelView {
+    let r = &model.result;
     let mut fit = HashMap::new();
     fit.insert("n_obs".into(), Value::Int(r.n_obs as i64));
     fit.insert("df_resid".into(), Value::Int(r.df_resid as i64));

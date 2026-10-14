@@ -78,14 +78,14 @@ pub fn value_children(v: &Value) -> Vec<(String, Value)> {
         }),
         #[cfg(feature = "greeners-ols")]
         Value::IvResult(r) => regression_children(RegressionCtx {
-            names: r.variable_names.clone().unwrap_or_default(),
-            params: &r.params,
-            std_errors: &r.std_errors,
-            test_values: &r.t_values,
-            p_values: &r.p_values,
+            names: r.result.variable_names.clone().unwrap_or_default(),
+            params: &r.result.params,
+            std_errors: &r.result.std_errors,
+            test_values: &r.result.t_values,
+            p_values: &r.result.p_values,
             conf_lower: None,
             conf_upper: None,
-            fit: iv_fit_dict(r),
+            fit: iv_fit_dict(&r.result),
             residuals: None,
             fitted_values: None,
             x: None,
@@ -513,9 +513,9 @@ pub fn value_summary_and_type(v: &Value) -> (String, &'static str) {
         Value::IvResult(r) => (
             format!(
                 "IV(k={}, n={}), R2={:.4}",
-                r.params.len(),
-                r.n_obs,
-                r.r_squared
+                r.result.params.len(),
+                r.result.n_obs,
+                r.result.r_squared
             ),
             "IvResult",
         ),

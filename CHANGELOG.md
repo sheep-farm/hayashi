@@ -5,8 +5,78 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Correct experimental FMOLS to use the N-1 regression sample, one-sided
+  endogeneity bias correction and conditional long-run variance, with
+  rank-checked solves and asymptotic Normal probabilities. The numerical
+  outputs and reported observation count intentionally change. Native arch
+  and convention-matched cointReg comparisons qualify the declared calculation;
+  endogenous AR simulations covered nominal 95% slope intervals in 90.0% and
+  91.8% of runs at N=300 and N=1,000, so general interval calibration is not
+  established. The provisional Greeners pin remains subject to maintainer review.
+
+- Update the locked HTTPS dependency rustls to 0.23.46, addressing the TLS
+  session-debug, ECH rejection, certificate-decompression and key-exchange
+  advisories. Numerical dependencies and the Greeners pin are unchanged.
+- Integrate the reviewed STL seasonal extension, low-pass support, local-linear
+  smoothing and median-weight repair. All log-AirPassengers component quantities
+  meet the stated Python contract at unchanged tolerances; robust R disagreement
+  and the maintainer contribution-terms decision remain separate limits.
+- Align both IV book chapters with classical Sargan/Durbin-Wu-Hausman
+  assumptions and full instrument designs; non-rejection does not establish
+  instrument validity or OLS consistency.
+- Limit MODWT, forest, spatial-Durbin and synthetic-DiD validation to their
+  estimable point quantities, preserving tolerances and strict NaN rejection.
+- Preserve raw two-way panel covariance in validation references and expose
+  unavailable inference instead of fabricating zero uncertainty by clipping.
+  Check the wage-panel case as an explicit availability contract with a successful
+  ordinary FE control and covariance-specific rejection. Unexpected success or
+  unrelated errors fail; a pass does not qualify numerical panel inference.
+- Read plain scientific YAML tolerance scalars as numbers while preserving
+  quoted-string rejection and the strict numerical comparison contract.
+- IV fitting and Sargan/endogeneity diagnostics share structural/instrument
+  preparation and row filtering; transformed and categorical endogenous terms
+  are identified in actual fitted column order.
+- IV prediction retains structural transformations and category encoding,
+  including subset levels and predictor-only new data. Unseen levels fail.
+- Classical IV diagnostic labels and conclusions no longer imply a robust
+  Hansen test, instrument validity or OLS consistency after non-rejection.
+- IV diagnostic response rescaling preserves test statistics across outcome
+  units; unresolved residual variation errors rather than fabricating p=1.
+- Validation comparisons reject non-finite values, nulls, missing nested values,
+  empty reference containers and invalid or empty tolerance contracts, so these
+  cannot produce a false numerical pass.
+- IV transformations use their own instrument design, and `if=` selects the
+  estimation sample before formula materialisation.
+- Expanded categorical coefficient names follow the fitted design; floating
+  cluster labels retain their group identities without integer truncation.
+- Collinear WLS computes fitted values from the retained original-scale design.
+- Bayesian linear regression supplies one intercept and matching predictor
+  names. SFA coefficient output omits unavailable sign probabilities.
+- Linear contrasts retain uncertainty at zero estimates and use the selected
+  reference distribution for their confidence intervals.
+- Normal-inference joint tests identify their statistic as scaled Wald rather
+  than reporting an F reference distribution, and preserve representable small
+  tail probabilities through direct survival functions.
+- Nonlinear contrasts propagate the fitted covariance and use the selected
+  scalar inference distribution, including weighted and robust fits.
+- Bayesian production and cost frontier coefficient names match categorical
+  and transformed design columns without invented sign probabilities.
+
 ### Changed
 
+- Provisionally pin Greeners to immutable reviewed fork revision `e7f57bc8`,
+  combining unmerged statistical PR #26 with the exact STL repair from draft
+  PR #25 and a test-only Gaussian inference fixture correction. Third-party
+  attribution is retained; the STL contribution-terms question remains open.
+  This deliberately advances the fork pin before acceptance and is not a release.
+- The Rust `Value::IvResult` payload holds `IvModel` with the engine result and
+  fitted structural metadata. Embedding code accesses engine fields via `.result`
+  and constructs fitted IV values through the interpreter estimation path.
+- `nlcom` returns an inference dictionary instead of a scalar. Use `.estimate`
+  for the former numerical return value; the dictionary also exposes standard
+  error, interval, probability and the selected reference distribution.
 - Pinned the Greeners facade to `=2.0.0` and added `--locked` to `cargo clippy`
   and `cargo test` in CI, so a Greeners release (including a numerical fix) can
   only reach Hayashi through a deliberate bump instead of a lockfile resolution.

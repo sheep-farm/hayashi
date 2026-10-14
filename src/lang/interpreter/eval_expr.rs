@@ -563,7 +563,7 @@ impl Interpreter {
             },
 
             #[cfg(feature = "greeners-ols")]
-            (Value::IvResult(r), "summary") => Ok(Value::Str(format!("{r}"))),
+            (Value::IvResult(r), "summary") => Ok(Value::Str(format!("{}", r.result))),
             #[cfg(feature = "greeners-panel")]
             (Value::PanelResult(r), "summary") => Ok(Value::Str(format!("{r}"))),
             #[cfg(feature = "greeners-panel")]

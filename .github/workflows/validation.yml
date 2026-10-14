@@ -89,7 +89,7 @@ jobs:
       - name: Install R dependencies
         shell: bash
         run: |
-          Rscript -e 'install.packages("https://cloud.r-project.org/src/contrib/renv_1.2.4.tar.gz", repos=NULL, type="source")'
+          Rscript -e 'install.packages("https://cloud.r-project.org/src/contrib/Archive/renv/renv_1.2.4.tar.gz", repos=NULL, type="source"); stopifnot(as.character(utils::packageVersion("renv")) == "1.2.4")'
           validation_r_lib="$(Rscript -e 'cat(renv::paths$library(project="validation"))')"
           mkdir -p "$validation_r_lib"
           if [ "$RUNNER_OS" = "macOS" ]; then
@@ -123,6 +123,9 @@ jobs:
 
       - name: Add Hayashi to PATH
         run: echo "${{ github.workspace }}/target/release" >> "$GITHUB_PATH"
+
+      - name: Test panel inference availability guards
+        run: python -m unittest validation/test_panel_availability.py -v
 
       - name: Run validation programme
         shell: bash

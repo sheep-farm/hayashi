@@ -6,9 +6,17 @@ both language reference environments are now locked: every CI run restores
 the declared reference package versions, and the resolved versions are
 recorded in the validation artefact.
 
-This document covers the R/Python package environments. The numerical engine
-(Greeners) is pinned in `Cargo.lock` and consumed from crates.io; the validation
-workflow no longer checks out Greeners from source.
+This document covers the R/Python package environments. The numerical engine (Greeners) is resolved by the exact facade dependency and
+immutable Git patch in `Cargo.toml`/`Cargo.lock`. The current provisional fork
+revision is `e7f57bc8450bdd62c6c2105788b689b839158b6a`. It combines the
+statistical corrections submitted in [PR #26](https://github.com/sheep-farm/Greeners/pull/26)
+with the exact STL repair from draft [PR #25](https://github.com/sheep-farm/Greeners/pull/25),
+plus a test-only Gaussian inference fixture correction. Both engine contributions
+remain unmerged; PR #25 retains third-party attribution and awaits contribution-terms
+clarification in [issue #24](https://github.com/sheep-farm/Greeners/issues/24).
+This is a provisional fork pin, not upstream acceptance or a release. Cargo fetches
+that immutable source; the validation workflow does not maintain a separate mutable
+engine checkout.
 
 ## Python
 
@@ -65,8 +73,8 @@ The `Validation` workflow:
 1. Installs Python from `requirements.txt` with hash verification.
 2. Installs the small set of git-only packages from `requirements-git.txt`
    without resolving additional dependencies.
-3. Installs the `renv` 1.2.4 bootstrap package from its exact CRAN source
-   archive, then restores the R environment from `renv.lock` into the
+3. Installs the `renv` 1.2.4 bootstrap package from CRAN's version archive
+   and verifies the installed version, then restores `renv.lock` into the
    `validation` project library. Reference scripts use that same library.
 4. Records the resolved package versions in
    `validation/reports/environment-versions.txt` and uploads it as part of the
