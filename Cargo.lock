@@ -1418,7 +1418,7 @@ dependencies = [
 [[package]]
 name = "greeners"
 version = "2.0.2-dev"
-source = "git+https://github.com/shawcharles/Greeners.git?rev=e7f57bc8450bdd62c6c2105788b689b839158b6a#e7f57bc8450bdd62c6c2105788b689b839158b6a"
+source = "git+https://github.com/shawcharles/Greeners.git?rev=73412437389ec74dc5e51b1cb23c06af296575c4#73412437389ec74dc5e51b1cb23c06af296575c4"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1453,7 +1453,7 @@ dependencies = [
 [[package]]
 name = "greeners-bayesian"
 version = "2.0.2-dev"
-source = "git+https://github.com/shawcharles/Greeners.git?rev=e7f57bc8450bdd62c6c2105788b689b839158b6a#e7f57bc8450bdd62c6c2105788b689b839158b6a"
+source = "git+https://github.com/shawcharles/Greeners.git?rev=73412437389ec74dc5e51b1cb23c06af296575c4#73412437389ec74dc5e51b1cb23c06af296575c4"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1477,7 +1477,7 @@ dependencies = [
 [[package]]
 name = "greeners-causal"
 version = "2.0.2-dev"
-source = "git+https://github.com/shawcharles/Greeners.git?rev=e7f57bc8450bdd62c6c2105788b689b839158b6a#e7f57bc8450bdd62c6c2105788b689b839158b6a"
+source = "git+https://github.com/shawcharles/Greeners.git?rev=73412437389ec74dc5e51b1cb23c06af296575c4#73412437389ec74dc5e51b1cb23c06af296575c4"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1502,7 +1502,7 @@ dependencies = [
 [[package]]
 name = "greeners-core"
 version = "2.0.2-dev"
-source = "git+https://github.com/shawcharles/Greeners.git?rev=e7f57bc8450bdd62c6c2105788b689b839158b6a#e7f57bc8450bdd62c6c2105788b689b839158b6a"
+source = "git+https://github.com/shawcharles/Greeners.git?rev=73412437389ec74dc5e51b1cb23c06af296575c4#73412437389ec74dc5e51b1cb23c06af296575c4"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1525,7 +1525,7 @@ dependencies = [
 [[package]]
 name = "greeners-diagnostics"
 version = "2.0.2-dev"
-source = "git+https://github.com/shawcharles/Greeners.git?rev=e7f57bc8450bdd62c6c2105788b689b839158b6a#e7f57bc8450bdd62c6c2105788b689b839158b6a"
+source = "git+https://github.com/shawcharles/Greeners.git?rev=73412437389ec74dc5e51b1cb23c06af296575c4#73412437389ec74dc5e51b1cb23c06af296575c4"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1551,7 +1551,7 @@ dependencies = [
 [[package]]
 name = "greeners-glm"
 version = "2.0.2-dev"
-source = "git+https://github.com/shawcharles/Greeners.git?rev=e7f57bc8450bdd62c6c2105788b689b839158b6a#e7f57bc8450bdd62c6c2105788b689b839158b6a"
+source = "git+https://github.com/shawcharles/Greeners.git?rev=73412437389ec74dc5e51b1cb23c06af296575c4#73412437389ec74dc5e51b1cb23c06af296575c4"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1576,7 +1576,7 @@ dependencies = [
 [[package]]
 name = "greeners-imputation"
 version = "2.0.2-dev"
-source = "git+https://github.com/shawcharles/Greeners.git?rev=e7f57bc8450bdd62c6c2105788b689b839158b6a#e7f57bc8450bdd62c6c2105788b689b839158b6a"
+source = "git+https://github.com/shawcharles/Greeners.git?rev=73412437389ec74dc5e51b1cb23c06af296575c4#73412437389ec74dc5e51b1cb23c06af296575c4"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1601,7 +1601,7 @@ dependencies = [
 [[package]]
 name = "greeners-ml"
 version = "2.0.2-dev"
-source = "git+https://github.com/shawcharles/Greeners.git?rev=e7f57bc8450bdd62c6c2105788b689b839158b6a#e7f57bc8450bdd62c6c2105788b689b839158b6a"
+source = "git+https://github.com/shawcharles/Greeners.git?rev=73412437389ec74dc5e51b1cb23c06af296575c4#73412437389ec74dc5e51b1cb23c06af296575c4"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1625,7 +1625,7 @@ dependencies = [
 [[package]]
 name = "greeners-ols"
 version = "2.0.2-dev"
-source = "git+https://github.com/shawcharles/Greeners.git?rev=e7f57bc8450bdd62c6c2105788b689b839158b6a#e7f57bc8450bdd62c6c2105788b689b839158b6a"
+source = "git+https://github.com/shawcharles/Greeners.git?rev=73412437389ec74dc5e51b1cb23c06af296575c4#73412437389ec74dc5e51b1cb23c06af296575c4"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1649,7 +1649,7 @@ dependencies = [
 [[package]]
 name = "greeners-panel"
 version = "2.0.2-dev"
-source = "git+https://github.com/shawcharles/Greeners.git?rev=e7f57bc8450bdd62c6c2105788b689b839158b6a#e7f57bc8450bdd62c6c2105788b689b839158b6a"
+source = "git+https://github.com/shawcharles/Greeners.git?rev=73412437389ec74dc5e51b1cb23c06af296575c4#73412437389ec74dc5e51b1cb23c06af296575c4"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1674,7 +1674,7 @@ dependencies = [
 [[package]]
 name = "greeners-spatial"
 version = "2.0.2-dev"
-source = "git+https://github.com/shawcharles/Greeners.git?rev=e7f57bc8450bdd62c6c2105788b689b839158b6a#e7f57bc8450bdd62c6c2105788b689b839158b6a"
+source = "git+https://github.com/shawcharles/Greeners.git?rev=73412437389ec74dc5e51b1cb23c06af296575c4#73412437389ec74dc5e51b1cb23c06af296575c4"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1698,7 +1698,7 @@ dependencies = [
 [[package]]
 name = "greeners-survival"
 version = "2.0.2-dev"
-source = "git+https://github.com/shawcharles/Greeners.git?rev=e7f57bc8450bdd62c6c2105788b689b839158b6a#e7f57bc8450bdd62c6c2105788b689b839158b6a"
+source = "git+https://github.com/shawcharles/Greeners.git?rev=73412437389ec74dc5e51b1cb23c06af296575c4#73412437389ec74dc5e51b1cb23c06af296575c4"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1722,7 +1722,7 @@ dependencies = [
 [[package]]
 name = "greeners-timeseries"
 version = "2.0.2-dev"
-source = "git+https://github.com/shawcharles/Greeners.git?rev=e7f57bc8450bdd62c6c2105788b689b839158b6a#e7f57bc8450bdd62c6c2105788b689b839158b6a"
+source = "git+https://github.com/shawcharles/Greeners.git?rev=73412437389ec74dc5e51b1cb23c06af296575c4#73412437389ec74dc5e51b1cb23c06af296575c4"
 dependencies = [
  "argmin",
  "argmin-math",
