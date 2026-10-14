@@ -7,6 +7,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Fixed
 
+- Update the locked HTTPS dependency rustls to 0.23.46, addressing the TLS
+  session-debug, ECH rejection, certificate-decompression and key-exchange
+  advisories. Numerical dependencies and the Greeners pin are unchanged.
 - Integrate the reviewed STL seasonal extension, low-pass support, local-linear
   smoothing and median-weight repair. All log-AirPassengers component quantities
   meet the stated Python contract at unchanged tolerances; robust R disagreement
