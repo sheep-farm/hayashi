@@ -317,12 +317,15 @@ cases:
   status: pass
 - id: fmols_simulated
   notes: >-
-    FMOLS remains unqualified: the engine omits the one-sided bias correction
-    and uses unconditional long-run variance. Native R/Python diagnostics exist;
-    finite-sample conventions and numerical acceptance bounds are not adopted.
-    See Greeners issue 23, Hayashi issue 152 and the case README.
+    Phillips-Hansen FMOLS with an intercept and one I(1) slope; initial N=300,
+    FM sample n=299, Bartlett B=5, no HAC centring/df adjustment, n bias multiplier.
+    Native arch 8.0.0 and convention-adjusted cointReg 0.2.0 qualify the selected
+    coefficients and SEs, including alpha; native R coefficients remain in diagnostics.
+    Numerical pass does not qualify nominal 95% interval calibration: prespecified
+    endogenous AR coverage was 90.0%/91.8% at N=300/N=1,000. Normal probabilities
+    are checked by engine tests, not this case. See Greeners issue 23 and Hayashi issue 152.
   dimension: numerical
-  status: not-supported
+  status: pass
 - id: ftest_robust_wooldridge_wage1
   notes: Robust F-test (Wooldridge 2010) with cluster-robust covariance for joint
     significance test.

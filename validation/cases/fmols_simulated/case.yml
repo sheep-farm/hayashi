@@ -1,7 +1,7 @@
 id: fmols_simulated
 title: FMOLS on cointegrated simulated data
 estimator_family: fmols
-status: not-supported
+status: pass
 dimension: numerical
 dataset:
   name: simulated
@@ -9,24 +9,74 @@ dataset:
   licence: n/a
 references:
 - R
+- Python
+reference_evidence:
+  R:
+    coefficients.Intercept:
+      class: convention-matched
+      rationale: Native cointReg intercept with Bartlett B+1; reconcile its N bias multiplier to n=N-1, retaining the native estimate in diagnostics.
+    coefficients.x:
+      class: convention-matched
+      rationale: Native cointReg slope with Bartlett B+1; reconcile its N bias multiplier to n=N-1, retaining the native estimate in diagnostics.
+    coefficients.n_obs:
+      class: exact
+      rationale: The declared fully modified regression sample contains the final N-1 rows, exactly 299.
+    coefficients.bandwidth:
+      class: convention-matched
+      rationale: Report the declared Bartlett lag count B=5; native cointReg bandwidth B+1 gives the same weights.
+    standard_errors.Intercept:
+      class: convention-matched
+      rationale: Native intercept SE from conditional long-run variance and the common FM sample; no variance clipping.
+    standard_errors.x:
+      class: convention-matched
+      rationale: Native slope SE from conditional long-run variance and the common FM sample; no variance clipping.
+  Python:
+    coefficients.Intercept:
+      class: convention-matched
+      rationale: Native arch 8.0.0 intercept with explicit Bartlett bandwidth and n=N-1 bias multiplier.
+    coefficients.x:
+      class: convention-matched
+      rationale: Native arch 8.0.0 slope with explicit Bartlett bandwidth and n=N-1 bias multiplier.
+    coefficients.n_obs:
+      class: exact
+      rationale: The declared fully modified regression sample contains the final N-1 rows, exactly 299.
+    coefficients.bandwidth:
+      class: exact
+      rationale: Native arch uses the explicit Bartlett lag count B=5.
+    standard_errors.Intercept:
+      class: convention-matched
+      rationale: Native arch intercept SE uses conditional variance without HAC demeaning or df adjustment; fixed-case numerical evidence only.
+    standard_errors.x:
+      class: convention-matched
+      rationale: Native arch slope SE uses conditional variance without HAC demeaning or df adjustment; fixed-case numerical evidence only.
 comparison:
   quantities:
   - coefficients
   - standard_errors
   tolerances:
-    coefficients: 5e-2
-    standard_errors: 5e-1
+    coefficients.Intercept: 1.0e-10
+    coefficients.x: 1.0e-10
+    coefficients.n_obs: 0
+    coefficients.bandwidth: 0
+    standard_errors.Intercept: 1.0e-10
+    standard_errors.x: 1.0e-10
 output_format: csv
 hayashi_script: cases/fmols_simulated/hayashi/run.hay
 reference_scripts:
   R: cases/fmols_simulated/reference/run.R
+  Python: cases/fmols_simulated/reference/run.py
 notes: >-
-  FMOLS remains unqualified: the engine omits the one-sided bias correction
-  and uses unconditional long-run variance. Native R/Python diagnostics exist;
-  finite-sample conventions and numerical acceptance bounds are not adopted.
-  See Greeners issue 23, Hayashi issue 152 and the case README.
+  Phillips-Hansen FMOLS with an intercept and one I(1) slope; initial N=300, FM sample n=299,
+  Bartlett B=5, no HAC centring/df adjustment, n bias multiplier.
+  Native arch8.0.0 and convention-adjusted cointReg0.2.0 compare coefficients
+  and SEs, including alpha. R native coefficients remain in diagnostics.
+  Fixed-case numerical agreement does not qualify 95% interval calibration:
+  prespecified endogenous AR coverage was 90.0%/91.8% at N=300/N=1,000.
+  Normal probabilities are qualified by engine tests, not this case.
 result:
-  summary: ''
-  known_differences: []
-  issues_opened: []
+  summary: Declared scalar FMOLS coefficients and SEs agree with matched references.
+  known_differences:
+    - R uses original-N bias multiplier and Student-t probabilities; the declared coefficient adapter selects n=N-1.
+    - Endogenous AR simulation intervals undercover nominal 95%; numerical pass is not coverage qualification.
+  issues_opened: [152]
 experimental: true

@@ -7,6 +7,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Fixed
 
+- Correct experimental FMOLS to use the N-1 regression sample, one-sided
+  endogeneity bias correction and conditional long-run variance, with
+  rank-checked solves and asymptotic Normal probabilities. The numerical
+  outputs and reported observation count intentionally change. Native arch
+  and convention-matched cointReg comparisons qualify the declared calculation;
+  endogenous AR simulations covered nominal 95% slope intervals in 90.0% and
+  91.8% of runs at N=300 and N=1,000, so general interval calibration is not
+  established. The provisional Greeners pin remains subject to maintainer review.
+
 - Update the locked HTTPS dependency rustls to 0.23.46, addressing the TLS
   session-debug, ECH rejection, certificate-decompression and key-exchange
   advisories. Numerical dependencies and the Greeners pin are unchanged.
