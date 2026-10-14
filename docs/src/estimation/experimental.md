@@ -65,6 +65,7 @@ Without `--experimental`, the runner skips cases whose `case.yml` has
   does not qualify nominal interval calibration: a prespecified endogenous AR
   study found 90.0% and 91.8% coverage of nominal 95% slope intervals at N=300
   and N=1,000. Both Monte Carlo intervals exclude 95%, so it remains experimental.
-- `spatial_panel_sar` is validated (`pass`) but remains experimental.
+- The `spatial_panel_sar` case remains `not-supported`; its required R reference
+  is unqualified.
 - The remaining experimental estimators are listed in the validation matrix as
   `not-supported` while their reference implementations are being assembled.
