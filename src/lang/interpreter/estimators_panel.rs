@@ -543,7 +543,7 @@ impl Interpreter {
         };
         let result = greeners::MarkovSwitching::fit(&y_vec, k, p)
             .map_err(|e| self.rt_err(format!("markov: {e}")))?;
-        Ok(Value::MarkovResult(Rc::new(result)))
+        Ok(Value::MarkovResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-glm")]
@@ -589,7 +589,7 @@ impl Interpreter {
         let result =
             greeners::ConditionalLogit::fit_with_names(&y_vec, &x_mat, &groups, Some(var_names))
                 .map_err(|e| self.rt_err(format!("clogit: {e}")))?;
-        Ok(Value::ConditionalResult(Rc::new(result)))
+        Ok(Value::ConditionalResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-glm")]
@@ -635,7 +635,7 @@ impl Interpreter {
         let result =
             greeners::ConditionalPoisson::fit_with_names(&y_vec, &x_mat, &groups, Some(var_names))
                 .map_err(|e| self.rt_err(format!("cpoisson: {e}")))?;
-        Ok(Value::ConditionalResult(Rc::new(result)))
+        Ok(Value::ConditionalResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-glm")]
@@ -695,7 +695,7 @@ impl Interpreter {
             Some(var_names),
         )
         .map_err(|e| self.rt_err(format!("cmnlogit: {e}")))?;
-        Ok(Value::ConditionalResult(Rc::new(result)))
+        Ok(Value::ConditionalResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-diagnostics")]
@@ -1016,8 +1016,8 @@ impl Interpreter {
         }
         let result =
             greeners::SUR::fit(&equations).map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        Ok(Value::Model(Rc::new(SurModel {
-            result: Rc::new(result),
+        Ok(Value::Model(Arc::new(SurModel {
+            result: Arc::new(result),
             eq_var_names,
         })))
     }
@@ -1459,7 +1459,7 @@ Value::ArimaResult(r) => {
             )));
         };
 
-        Ok(Value::PanelResult(Rc::new(result)))
+        Ok(Value::PanelResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-panel")]
@@ -1489,7 +1489,7 @@ Value::ArimaResult(r) => {
         let result = RandomEffects::from_formula(&g_formula, &df, ids)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        Ok(Value::ReResult(Rc::new(result)))
+        Ok(Value::ReResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-panel")]
@@ -1518,7 +1518,7 @@ Value::ArimaResult(r) => {
         let result = greeners::BetweenEstimator::from_formula(&g_formula, &df, ids)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        Ok(Value::BetweenResult(Rc::new(result)))
+        Ok(Value::BetweenResult(Arc::new(result)))
     }
 
     #[cfg(all(
@@ -2136,7 +2136,7 @@ Value::ArimaResult(r) => {
         )
         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        Ok(Value::AbResult(Rc::new(result)))
+        Ok(Value::AbResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-ols")]
@@ -2209,7 +2209,7 @@ Value::ArimaResult(r) => {
 
         let result =
             greeners::GMM::fit(&y, &x, &z).map_err(|e| self.rt_err(format!("gmm: {e}")))?;
-        Ok(Value::GmmResult(Rc::new(result)))
+        Ok(Value::GmmResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-panel")]
@@ -2286,7 +2286,7 @@ Value::ArimaResult(r) => {
         )
         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        Ok(Value::SysGmmResult(Rc::new(result)))
+        Ok(Value::SysGmmResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-panel")]
@@ -2381,7 +2381,7 @@ Value::ArimaResult(r) => {
             greeners::panel::FE2SLS::fit(&y_vec, &x_mat, &z_mat, &entity_ids, Some(var_names))
                 .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        Ok(Value::FE2SLSResult(Rc::new(result)))
+        Ok(Value::FE2SLSResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-panel")]
@@ -2408,7 +2408,7 @@ Value::ArimaResult(r) => {
         let result =
             greeners::panel::PCSE::fit(&y_vec, &x_mat, &entity_ids, &time_ids, Some(var_names))
                 .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        Ok(Value::PcseResult(Rc::new(result)))
+        Ok(Value::PcseResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-panel")]
@@ -2453,7 +2453,7 @@ Value::ArimaResult(r) => {
             Some(var_names),
         )
         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        Ok(Value::PanelGlsResult(Rc::new(result)))
+        Ok(Value::PanelGlsResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-diagnostics")]

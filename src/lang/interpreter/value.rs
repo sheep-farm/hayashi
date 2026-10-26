@@ -3,7 +3,6 @@ use crate::lang::error::HayashiError;
 use crate::lang::interpreter::Model;
 use ndarray::{Array1, Array2};
 use std::collections::HashMap;
-use std::rc::Rc;
 use std::sync::Arc;
 
 // ── User-defined function ──────────────────────────────────────────────────
@@ -217,134 +216,134 @@ pub enum Value {
 
     OlsResult(super::models::OlsModel),
     #[cfg(feature = "greeners-ols")]
-    IvResult(Rc<greeners::iv::IvResult>),
+    IvResult(Arc<greeners::iv::IvResult>),
     #[cfg(feature = "greeners-glm")]
     BinaryResult(super::models::BinaryModel),
-    PanelResult(Rc<greeners::panel::PanelResult>),
+    PanelResult(Arc<greeners::panel::PanelResult>),
     #[cfg(feature = "greeners-panel")]
-    BetweenResult(Rc<greeners::panel::BetweenResult>),
+    BetweenResult(Arc<greeners::panel::BetweenResult>),
     #[cfg(feature = "greeners-panel")]
-    ReResult(Rc<greeners::panel::RandomEffectsResult>),
+    ReResult(Arc<greeners::panel::RandomEffectsResult>),
     #[cfg(feature = "greeners-timeseries")]
-    ArimaResult(Rc<greeners::arima::ArimaResult>),
+    ArimaResult(Arc<greeners::arima::ArimaResult>),
     #[cfg(feature = "greeners-timeseries")]
-    VarResult(Rc<greeners::var::VarResult>),
+    VarResult(Arc<greeners::var::VarResult>),
     #[cfg(feature = "greeners-timeseries")]
-    VecmResult(Rc<greeners::vecm::VecmResult>),
+    VecmResult(Arc<greeners::vecm::VecmResult>),
     #[cfg(feature = "greeners-timeseries")]
-    GarchResult(Rc<greeners::garch::GarchResult>),
-    DiagResult(Rc<DiagResult>),
+    GarchResult(Arc<greeners::garch::GarchResult>),
+    DiagResult(Arc<DiagResult>),
     #[cfg(feature = "greeners-panel")]
-    AbResult(Rc<greeners::dynamic_panel::ArellanoBondResult>),
+    AbResult(Arc<greeners::dynamic_panel::ArellanoBondResult>),
     #[cfg(feature = "greeners-ols")]
-    GmmResult(Rc<greeners::gmm::GmmResult>),
+    GmmResult(Arc<greeners::gmm::GmmResult>),
     #[cfg(feature = "greeners-panel")]
-    SysGmmResult(Rc<greeners::dynamic_panel::SystemGmmResult>),
+    SysGmmResult(Arc<greeners::dynamic_panel::SystemGmmResult>),
     #[cfg(feature = "greeners-panel")]
-    FE2SLSResult(Rc<greeners::panel::PanelIvResult>),
+    FE2SLSResult(Arc<greeners::panel::PanelIvResult>),
     #[cfg(feature = "greeners-panel")]
-    PcseResult(Rc<greeners::panel::PcseResult>),
+    PcseResult(Arc<greeners::panel::PcseResult>),
     #[cfg(feature = "greeners-panel")]
-    PanelGlsResult(Rc<greeners::panel::PanelGlsResult>),
+    PanelGlsResult(Arc<greeners::panel::PanelGlsResult>),
     #[cfg(feature = "greeners-ols")]
-    TobitResult(Rc<greeners::tobit::TobitResult>),
+    TobitResult(Arc<greeners::tobit::TobitResult>),
     #[cfg(feature = "greeners-ols")]
-    HeckmanResult(Rc<greeners::heckman::HeckmanResult>),
+    HeckmanResult(Arc<greeners::heckman::HeckmanResult>),
     #[cfg(feature = "greeners-causal")]
-    RdResult(Rc<greeners::rd::RdResult>),
+    RdResult(Arc<greeners::rd::RdResult>),
     #[cfg(feature = "greeners-causal")]
-    SynthResult(Rc<greeners::synth::SynthResult>),
+    SynthResult(Arc<greeners::synth::SynthResult>),
     #[cfg(feature = "greeners-causal")]
-    PsmResult(Rc<greeners::psm::PsmResult>),
+    PsmResult(Arc<greeners::psm::PsmResult>),
     #[cfg(feature = "greeners-glm")]
-    PoissonResult(Rc<greeners::poisson::PoissonResult>),
+    PoissonResult(Arc<greeners::poisson::PoissonResult>),
     #[cfg(feature = "greeners-glm")]
-    NegBinResult(Rc<greeners::negbin::NegBinResult>),
+    NegBinResult(Arc<greeners::negbin::NegBinResult>),
     #[cfg(feature = "greeners-glm")]
-    OrderedResult(Rc<greeners::ordered::OrderedResult>),
+    OrderedResult(Arc<greeners::ordered::OrderedResult>),
     #[cfg(feature = "greeners-glm")]
-    MNLogitResult(Rc<greeners::mnlogit::MNLogitResult>),
+    MNLogitResult(Arc<greeners::mnlogit::MNLogitResult>),
     #[cfg(feature = "greeners-causal")]
-    DidResult(Rc<greeners::did::DidResult>),
+    DidResult(Arc<greeners::did::DidResult>),
     #[cfg(feature = "greeners-ols")]
-    QuantileResult(Rc<greeners::quantile::QuantileResult>),
+    QuantileResult(Arc<greeners::quantile::QuantileResult>),
     #[cfg(feature = "greeners-survival")]
-    KMResult(Rc<greeners::survival::KMResult>),
+    KMResult(Arc<greeners::survival::KMResult>),
     #[cfg(feature = "greeners-survival")]
-    CoxResult(Rc<greeners::survival::CoxResult>),
+    CoxResult(Arc<greeners::survival::CoxResult>),
     #[cfg(feature = "greeners-ols")]
-    RlmResult(Rc<greeners::rlm::RlmResult>),
+    RlmResult(Arc<greeners::rlm::RlmResult>),
     #[cfg(feature = "greeners-glm")]
-    GeeResult(Rc<greeners::gee::GeeResult>),
+    GeeResult(Arc<greeners::gee::GeeResult>),
     #[cfg(feature = "greeners-glm")]
-    ZeroInflatedResult(Rc<greeners::zero_inflated::ZeroInflatedResult>),
+    ZeroInflatedResult(Arc<greeners::zero_inflated::ZeroInflatedResult>),
     #[cfg(feature = "greeners-bayesian")]
-    MixedResult(Rc<greeners::mixed::MixedResult>),
+    MixedResult(Arc<greeners::mixed::MixedResult>),
     #[cfg(feature = "greeners-glm")]
-    BetaResult(Rc<greeners::beta_model::BetaResult>),
+    BetaResult(Arc<greeners::beta_model::BetaResult>),
     #[cfg(feature = "greeners-ols")]
-    GlsarResult(Rc<greeners::glsar::GlsarResult>),
+    GlsarResult(Arc<greeners::glsar::GlsarResult>),
 
     #[cfg(feature = "greeners-ols")]
     SurResult(super::models::SurModel),
     #[cfg(feature = "greeners-ols")]
-    RollingResult(Rc<greeners::rolling::RollingResult>),
+    RollingResult(Arc<greeners::rolling::RollingResult>),
     #[cfg(feature = "greeners-ols")]
-    RecursiveLSResult(Rc<greeners::rolling::RecursiveLSResult>),
+    RecursiveLSResult(Arc<greeners::rolling::RecursiveLSResult>),
     PcaResult(super::models::PcaModel),
     FactorResult(super::models::FactorModel),
     #[cfg(feature = "greeners-glm")]
-    GlmResult(Rc<greeners::glm::GlmResult>),
-    LowessResult(Rc<greeners::nonparametric::LowessResult>),
+    GlmResult(Arc<greeners::glm::GlmResult>),
+    LowessResult(Arc<greeners::nonparametric::LowessResult>),
 
     #[cfg(feature = "greeners-timeseries")]
-    MarkovResult(Rc<greeners::markov::MarkovSwitchingResult>),
+    MarkovResult(Arc<greeners::markov::MarkovSwitchingResult>),
     #[cfg(feature = "greeners-glm")]
-    ConditionalResult(Rc<greeners::conditional::ConditionalResult>),
+    ConditionalResult(Arc<greeners::conditional::ConditionalResult>),
     #[cfg(feature = "greeners-timeseries")]
-    VarmaResult(Rc<greeners::varma::VarmaResult>),
+    VarmaResult(Arc<greeners::varma::VarmaResult>),
     #[cfg(feature = "greeners-timeseries")]
-    DecompResult(Rc<greeners::decomposition::DecompositionResult>),
+    DecompResult(Arc<greeners::decomposition::DecompositionResult>),
     #[cfg(feature = "greeners-timeseries")]
-    MstlResult(Rc<greeners::mstl::MSTLResult>),
+    MstlResult(Arc<greeners::mstl::MSTLResult>),
     #[cfg(feature = "greeners-timeseries")]
-    UCResult(Rc<greeners::unobserved_components::UCResult>),
+    UCResult(Arc<greeners::unobserved_components::UCResult>),
     #[cfg(feature = "greeners-glm")]
-    GamResult(Rc<greeners::glmgam::GamResult>),
+    GamResult(Arc<greeners::glmgam::GamResult>),
     #[cfg(feature = "greeners-imputation")]
-    MiceResult(Rc<greeners::imputation::MICEResult>),
+    MiceResult(Arc<greeners::imputation::MICEResult>),
     #[cfg(feature = "greeners-timeseries")]
-    MSARResult(Rc<greeners::markov_autoreg::MarkovAutoregResult>),
+    MSARResult(Arc<greeners::markov_autoreg::MarkovAutoregResult>),
     #[cfg(feature = "greeners-timeseries")]
-    SVarResult(Rc<greeners::svar::SVarResult>),
+    SVarResult(Arc<greeners::svar::SVarResult>),
 
     #[cfg(feature = "greeners-timeseries")]
-    EtsResult(Rc<greeners::ets::ETSResult>),
+    EtsResult(Arc<greeners::ets::ETSResult>),
 
     #[cfg(feature = "greeners-panel")]
-    ThresholdResult(Rc<greeners::threshold::ThresholdResult>),
+    ThresholdResult(Arc<greeners::threshold::ThresholdResult>),
     #[cfg(feature = "greeners-timeseries")]
-    AutoRegResult(Rc<greeners::autoreg::AutoRegResult>),
+    AutoRegResult(Arc<greeners::autoreg::AutoRegResult>),
     #[cfg(feature = "greeners-timeseries")]
-    ArdlResult(Rc<greeners::autoreg::ARDLResult>),
+    ArdlResult(Arc<greeners::autoreg::ARDLResult>),
     #[cfg(feature = "greeners-timeseries")]
-    LocalLevelResult(Rc<greeners::statespace::LocalLevelResult>),
+    LocalLevelResult(Arc<greeners::statespace::LocalLevelResult>),
     #[cfg(feature = "greeners-ml")]
-    KmeansResult(Rc<greeners::kmeans::KmeansResult>),
+    KmeansResult(Arc<greeners::kmeans::KmeansResult>),
     #[cfg(feature = "greeners-ml")]
-    DbscanResult(Rc<greeners::dbscan::DbscanResult>),
-    IsotonicResult(Rc<greeners::isotonic::IsotonicResult>),
-    KdeResult(Rc<greeners::nonparametric::KDEResult>),
+    DbscanResult(Arc<greeners::dbscan::DbscanResult>),
+    IsotonicResult(Arc<greeners::isotonic::IsotonicResult>),
+    KdeResult(Arc<greeners::nonparametric::KDEResult>),
     #[cfg(feature = "greeners-ml")]
-    BartResult(Rc<greeners::bart::BartResult>),
+    BartResult(Arc<greeners::bart::BartResult>),
     #[cfg(feature = "greeners-ml")]
-    GpResult(Rc<greeners::gp::GpResult>),
-    GmmClusteringResult(Rc<greeners::gmm_clustering::GmmResult>),
+    GpResult(Arc<greeners::gp::GpResult>),
+    GmmClusteringResult(Arc<greeners::gmm_clustering::GmmResult>),
     #[cfg(feature = "greeners-ml")]
-    HierarchicalResult(Rc<greeners::hierarchical::HierarchicalResult>),
+    HierarchicalResult(Arc<greeners::hierarchical::HierarchicalResult>),
     #[cfg(feature = "greeners-timeseries")]
     #[cfg(feature = "experimental")]
-    SpectralResult(Rc<greeners::spectral::SpectralResult>),
+    SpectralResult(Arc<greeners::spectral::SpectralResult>),
 
     #[cfg(feature = "greeners-timeseries")]
     DFMResult(super::models::DFMModel),
@@ -355,7 +354,7 @@ pub enum Value {
 
     /// First-class model result trait object. Used for unified model
     /// access, replacing the scattered `Value::*Result` variants over time.
-    Model(Rc<dyn Model>),
+    Model(Arc<dyn Model>),
     /// Generic first-class model result: a display string plus a dict of
     /// named children.  Used for estimators that do not yet have a dedicated
     /// `Value` variant, while still exposing every field to DAP and to the
@@ -395,7 +394,7 @@ pub enum Value {
     Dict(Arc<HashMap<String, Value>>),
     Series(Arc<Series>),
     UserFn(Arc<UserFn>),
-    Error(Rc<ErrorValue>),
+    Error(Arc<ErrorValue>),
     /// Geometria vetorial em WKT. Produzida por plugins geoespaciais.
     Geometry(String),
     /// Output visual composável. Produzido por plugins de visualização.
@@ -558,13 +557,13 @@ impl Value {
 // ── Send-safety for parallel for ───────────────────────────────────────────
 
 impl Value {
-    /// Returns `true` if this value contains no `Rc`-backed model results,
-    /// meaning it can safely cross a thread boundary inside `parallel for`.
+    /// Returns `true` when this value is allowed in a captured environment
+    /// snapshot for `parallel for`, preserving the model capture policy.
     ///
-    /// `DataFrame`, `List`, `Dict`, `Series`, `UserFn` use `Arc` (Send).
-    /// Primitive variants (`Float`, `Int`, `Bool`, `Str`, `Nil`, `Geometry`,
-    /// `Plot`) are inherently Send.  All `*Result` variants wrap `Rc` and are
-    /// NOT Send — they cannot be captured into a `parallel for` block.
+    /// All `Value` variants implement `Send + Sync` through their fields.
+    /// Containers are checked recursively so that model, diagnostic and error
+    /// values remain iterator-only, even when nested inside other values.
+    /// Generic model results may be captured when all their fields qualify.
     pub fn is_send_safe(&self) -> bool {
         match self {
             Value::Float(_)
@@ -576,39 +575,62 @@ impl Value {
             Value::DataFrame(_) => true,
             Value::List(lst) => lst.iter().all(|v| v.is_send_safe()),
             Value::Dict(d) => d.values().all(|v| v.is_send_safe()),
-            Value::Series(_) => true,
+            Value::Series(s) => s.values.iter().all(|v| v.is_send_safe()),
             Value::UserFn(_) => true,
             Value::Plot { .. } => true,
-            Value::ModelResult { fields, .. } => fields.values().all(|v| v.is_send_safe()),
+            Value::ModelResult {
+                fit,
+                extras,
+                fields,
+                ..
+            } => fit
+                .values()
+                .chain(extras.values())
+                .chain(fields.values())
+                .all(|v| v.is_send_safe()),
             Value::Model(_) => false,
-            // All model result variants use Rc — not Send.
+            // Dedicated models, diagnostics and errors remain iterator-only.
             _ => false,
         }
     }
 }
 
-/// Wrapper that guarantees the inner `Value` is `Send`-safe.
-/// Constructed only via `SendValue::new` which checks `is_send_safe`.
+/// Wrapper for values accepted by parallel environment snapshots.
+/// `SendValue::new` checks the capture policy in `is_send_safe`.
+/// Used for **captured environment variables** that are cloned into every
+/// child thread while sharing their data through `Arc`.
+// Send and Sync are inferred from Value's fields, not asserted with unsafe.
+// The constructor's check enforces capture policy, not memory safety.
 #[derive(Clone)]
 pub struct SendValue(pub Value);
 
-// SAFETY: SendValue is only constructed from values that pass `is_send_safe`,
-// meaning they contain no `Rc`-backed model results. Arc and primitives are Send.
-unsafe impl Send for SendValue {}
-unsafe impl Sync for SendValue {}
-
 impl SendValue {
-    /// Wraps a `Value` if it is send-safe, otherwise returns an error.
+    /// Wraps a `Value` if it may be captured, otherwise returns an error.
     pub fn new(v: Value) -> std::result::Result<Self, String> {
         if v.is_send_safe() {
             Ok(Self(v))
         } else {
             Err(format!(
-                "parallel for: captured value is not thread-safe (contains model result with Rc): {v}"
+                "parallel for: value cannot be captured; pass it as an iterator item: {v}"
             ))
         }
     }
 }
+
+/// Wrapper for **iterator items** in `parallel for`.
+///
+/// Unlike `SendValue`, this accepts any `Value`, including shared model
+/// results. All shared values use `Arc`, so aliases in different items or
+/// retained by the parent have atomic reference counts. Model implementations
+/// must also satisfy `Send + Sync`, allowing the compiler to check the same
+/// guarantees for iterator items and results returning from child threads.
+///
+/// This does not apply the capture policy required for environment snapshots.
+/// Use `SendValue::new` when preparing values to capture in every worker.
+// Send and Sync are inferred structurally, including nested model values.
+// Moving an item does not imply exclusive ownership of its allocations.
+// Shared allocations remain safe because their reference counts are atomic.
+pub struct ParallelItem(pub Value);
 
 impl std::fmt::Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -813,6 +835,81 @@ impl std::fmt::Display for Value {
                 }
             }
             Value::Nil => write!(f, "nil"),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn diagnostic_value() -> Value {
+        Value::DiagResult(
+            DiagResult {
+                rendered: "diagnostic".into(),
+                fields: HashMap::new(),
+            }
+            .into(),
+        )
+    }
+
+    #[test]
+    fn parallel_values_are_send_and_sync() {
+        fn assert_send_sync<T: Send + Sync>() {}
+
+        assert_send_sync::<Value>();
+        assert_send_sync::<SendValue>();
+        assert_send_sync::<ParallelItem>();
+    }
+
+    #[test]
+    fn parallel_capture_checks_series_values() {
+        let plain = Value::Series(Arc::new(Series::new(
+            "plain",
+            vec![Value::Int(1), Value::Float(2.0), Value::Nil],
+        )));
+        assert!(SendValue::new(plain).is_ok());
+
+        let nested = Value::Series(Arc::new(Series::new(
+            "models",
+            vec![Value::List(Arc::new(vec![diagnostic_value()]))],
+        )));
+        assert!(SendValue::new(nested).is_err());
+    }
+
+    #[test]
+    fn parallel_capture_checks_all_model_result_maps() {
+        for member in ["fit", "extras", "fields"] {
+            let mut value = crate::lang::dap::model_expansion::model_result(
+                "result",
+                "result",
+                "TestResult",
+                Vec::new(),
+            );
+            assert!(SendValue::new(value.clone()).is_ok());
+
+            let Value::ModelResult {
+                fit,
+                extras,
+                fields,
+                ..
+            } = &mut value
+            else {
+                panic!("expected a generic model result");
+            };
+            let map = match member {
+                "fit" => fit,
+                "extras" => extras,
+                _ => Arc::make_mut(fields),
+            };
+            map.insert(
+                "nested".into(),
+                Value::Dict(Arc::new(HashMap::from([(
+                    "model".into(),
+                    diagnostic_value(),
+                )]))),
+            );
+            assert!(SendValue::new(value).is_err(), "unchecked {member}");
         }
     }
 }

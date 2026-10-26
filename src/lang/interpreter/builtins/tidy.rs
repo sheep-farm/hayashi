@@ -38,6 +38,57 @@ impl Interpreter {
                     return Ok(Value::Dict(d));
                 }
 
+                // RollingResult carries a full time-series of coefficients and
+                // R² that to_model_view() cannot represent (it only exposes
+                // the final window). Handle it before the model-view fallback.
+                //
+                // Canonical tidy format (long): one row per (date, term).
+                // Columns: date, term, estimate, std_error, statistic, p_value,
+                //          conf_low, conf_high, r_squared.
+                #[cfg(feature = "greeners-ols")]
+                if let Value::RollingResult(r) = &val {
+                    let dates = r.dates.clone();
+                    let n = r.n_obs;
+                    let k = r.params_history.ncols();
+                    let names = r.variable_names.clone().unwrap_or_default();
+                    let mut date_col = Vec::new();
+                    let mut term_col = Vec::new();
+                    let mut estimate_col = Vec::new();
+                    let mut r2_col = Vec::new();
+                    for t in (r.window - 1)..n {
+                        if r.params_history.row(t).iter().any(|v| v.is_nan()) {
+                            continue;
+                        }
+                        let d = dates.get(t).cloned().unwrap_or_else(|| format!("{t}"));
+                        for j in 0..k {
+                            let name = names.get(j).cloned().unwrap_or_else(|| {
+                                if j == 0 {
+                                    "intercept".into()
+                                } else {
+                                    format!("x{j}")
+                                }
+                            });
+                            date_col.push(Value::Str(d.clone()));
+                            term_col.push(Value::Str(name));
+                            estimate_col.push(Value::Float(r.params_history[[t, j]]));
+                            r2_col.push(Value::Float(r.r_squared_history[t]));
+                        }
+                    }
+                    let n_rows = estimate_col.len();
+                    let nan_col = vec![Value::Float(f64::NAN); n_rows];
+                    let mut map = std::collections::HashMap::<String, Value>::new();
+                    map.insert("date".into(), Value::List(Arc::new(date_col)));
+                    map.insert("term".into(), Value::List(Arc::new(term_col)));
+                    map.insert("estimate".into(), Value::List(Arc::new(estimate_col)));
+                    map.insert("std_error".into(), Value::List(Arc::new(nan_col.clone())));
+                    map.insert("statistic".into(), Value::List(Arc::new(nan_col.clone())));
+                    map.insert("p_value".into(), Value::List(Arc::new(nan_col.clone())));
+                    map.insert("conf_low".into(), Value::List(Arc::new(nan_col.clone())));
+                    map.insert("conf_high".into(), Value::List(Arc::new(nan_col)));
+                    map.insert("r_squared".into(), Value::List(Arc::new(r2_col)));
+                    return Ok(Value::Dict(Arc::new(map)));
+                }
+
                 let mut map = std::collections::HashMap::<String, Value>::new();
 
                 if let Some(mv) = val.to_model_view() {
@@ -55,43 +106,6 @@ impl Interpreter {
                                 &r.conf_lower,
                                 &r.conf_upper,
                             );
-                        }
-                        #[cfg(feature = "greeners-ols")]
-                        Value::RollingResult(r) => {
-                            let dates = r.dates.clone();
-                            let n = r.n_obs;
-                            let k = r.params_history.ncols();
-                            let names = r.variable_names.clone().unwrap_or_default();
-                            let mut date_col = Vec::new();
-                            let mut r2_col = Vec::new();
-                            let mut coef_cols: Vec<(String, Vec<Value>)> = (0..k)
-                                .map(|j| {
-                                    let name = names.get(j).cloned().unwrap_or_else(|| {
-                                        if j == 0 {
-                                            "const".into()
-                                        } else {
-                                            format!("x{j}")
-                                        }
-                                    });
-                                    (name, Vec::new())
-                                })
-                                .collect();
-                            for t in (r.window - 1)..n {
-                                if r.params_history.row(t).iter().any(|v| v.is_nan()) {
-                                    continue;
-                                }
-                                let d = dates.get(t).cloned().unwrap_or_else(|| format!("{t}"));
-                                date_col.push(Value::Str(d));
-                                r2_col.push(Value::Float(r.r_squared_history[t]));
-                                for (j, col) in coef_cols.iter_mut().enumerate().take(k) {
-                                    col.1.push(Value::Float(r.params_history[[t, j]]));
-                                }
-                            }
-                            map.insert("date".into(), Value::List(Arc::new(date_col)));
-                            map.insert("r2".into(), Value::List(Arc::new(r2_col)));
-                            for (name, vals) in coef_cols {
-                                map.insert(name, Value::List(Arc::new(vals)));
-                            }
                         }
                         #[cfg(feature = "greeners-ols")]
                         Value::IvResult(r) => {
@@ -637,36 +651,37 @@ impl Interpreter {
                         }
                         #[cfg(feature = "greeners-causal")]
                         Value::PsmResult(r) => {
-                            let mut cov = Vec::new();
-                            let mut mt = Vec::new();
-                            let mut mcr = Vec::new();
-                            let mut mcm = Vec::new();
-                            let mut smdb = Vec::new();
-                            let mut smda = Vec::new();
+                            let mut term = Vec::new();
+                            let mut estimate = Vec::new();
+                            let mut smd_before = Vec::new();
+                            let mut smd_after = Vec::new();
                             for b in &r.balance {
-                                cov.push(Value::Str(b.covariate.clone()));
-                                mt.push(Value::Float(b.mean_treated));
-                                mcr.push(Value::Float(b.mean_control_raw));
-                                mcm.push(Value::Float(b.mean_control_matched));
-                                smdb.push(Value::Float(b.smd_before));
-                                smda.push(Value::Float(b.smd_after));
+                                term.push(Value::Str(b.covariate.clone()));
+                                estimate.push(Value::Float(b.smd_before));
+                                smd_before.push(Value::Float(b.smd_before));
+                                smd_after.push(Value::Float(b.smd_after));
                             }
-                            map.insert("covariate".into(), Value::List(Arc::new(cov)));
-                            map.insert("mean_treated".into(), Value::List(Arc::new(mt)));
-                            map.insert("mean_control_raw".into(), Value::List(Arc::new(mcr)));
-                            map.insert("mean_control_matched".into(), Value::List(Arc::new(mcm)));
-                            map.insert("smd_before".into(), Value::List(Arc::new(smdb)));
-                            map.insert("smd_after".into(), Value::List(Arc::new(smda)));
+                            let n = estimate.len();
+                            let nan_col = vec![Value::Float(f64::NAN); n];
+                            map.insert("term".into(), Value::List(Arc::new(term)));
+                            map.insert("estimate".into(), Value::List(Arc::new(estimate)));
+                            map.insert("std_error".into(), Value::List(Arc::new(nan_col.clone())));
+                            map.insert("statistic".into(), Value::List(Arc::new(nan_col.clone())));
+                            map.insert("p_value".into(), Value::List(Arc::new(nan_col.clone())));
+                            map.insert("conf_low".into(), Value::List(Arc::new(nan_col.clone())));
+                            map.insert("conf_high".into(), Value::List(Arc::new(nan_col)));
+                            map.insert("smd_before".into(), Value::List(Arc::new(smd_before)));
+                            map.insert("smd_after".into(), Value::List(Arc::new(smd_after)));
                         }
                         #[cfg(feature = "greeners-glm")]
                         Value::MNLogitResult(r) => {
                             let k = r.params.nrows();
                             let j = r.params.ncols();
-                            let mut var = Vec::new();
+                            let mut term = Vec::new();
                             let mut outcome = Vec::new();
-                            let mut coef = Vec::new();
+                            let mut estimate = Vec::new();
                             let mut se = Vec::new();
-                            let mut z = Vec::new();
+                            let mut stat = Vec::new();
                             let mut p = Vec::new();
                             let vnames = r.variable_names.clone().unwrap_or_default();
                             for col in 0..j {
@@ -680,18 +695,18 @@ impl Interpreter {
                                         .get(row)
                                         .cloned()
                                         .unwrap_or_else(|| format!("x{row}"));
-                                    var.push(name);
+                                    term.push(name);
                                     outcome.push(out.clone());
-                                    coef.push(r.params[[row, col]]);
+                                    estimate.push(r.params[[row, col]]);
                                     se.push(r.std_errors[[row, col]]);
-                                    z.push(r.z_values[[row, col]]);
+                                    stat.push(r.z_values[[row, col]]);
                                     p.push(r.p_values[[row, col]]);
                                 }
                             }
-                            let n = coef.len();
+                            let n = estimate.len();
                             map.insert(
-                                "variable".into(),
-                                Value::List(Arc::new(var.into_iter().map(Value::Str).collect())),
+                                "term".into(),
+                                Value::List(Arc::new(term.into_iter().map(Value::Str).collect())),
                             );
                             map.insert(
                                 "outcome".into(),
@@ -700,16 +715,18 @@ impl Interpreter {
                                 )),
                             );
                             map.insert(
-                                "coef".into(),
-                                Value::List(Arc::new(coef.into_iter().map(Value::Float).collect())),
+                                "estimate".into(),
+                                Value::List(Arc::new(
+                                    estimate.into_iter().map(Value::Float).collect(),
+                                )),
                             );
                             map.insert(
-                                "std_err".into(),
+                                "std_error".into(),
                                 Value::List(Arc::new(se.into_iter().map(Value::Float).collect())),
                             );
                             map.insert(
-                                "z".into(),
-                                Value::List(Arc::new(z.into_iter().map(Value::Float).collect())),
+                                "statistic".into(),
+                                Value::List(Arc::new(stat.into_iter().map(Value::Float).collect())),
                             );
                             map.insert(
                                 "p_value".into(),
@@ -723,20 +740,23 @@ impl Interpreter {
                         Value::KMResult(r) => {
                             let n = r.times.len();
                             let mut time = Vec::new();
-                            let mut surv = Vec::new();
+                            let mut estimate = Vec::new();
                             let mut se = Vec::new();
                             let mut cl = Vec::new();
                             let mut cu = Vec::new();
                             for i in 0..n {
                                 time.push(Value::Float(r.times[i]));
-                                surv.push(Value::Float(r.survival_probs[i]));
+                                estimate.push(Value::Float(r.survival_probs[i]));
                                 se.push(Value::Float(r.std_errors[i]));
                                 cl.push(Value::Float(r.conf_lower[i]));
                                 cu.push(Value::Float(r.conf_upper[i]));
                             }
+                            let nan_col = vec![Value::Float(f64::NAN); n];
                             map.insert("time".into(), Value::List(Arc::new(time)));
-                            map.insert("survival".into(), Value::List(Arc::new(surv)));
-                            map.insert("std_err".into(), Value::List(Arc::new(se)));
+                            map.insert("estimate".into(), Value::List(Arc::new(estimate)));
+                            map.insert("std_error".into(), Value::List(Arc::new(se)));
+                            map.insert("statistic".into(), Value::List(Arc::new(nan_col.clone())));
+                            map.insert("p_value".into(), Value::List(Arc::new(nan_col.clone())));
                             map.insert("conf_low".into(), Value::List(Arc::new(cl)));
                             map.insert("conf_high".into(), Value::List(Arc::new(cu)));
                         }
@@ -744,44 +764,46 @@ impl Interpreter {
                         Value::SurResult(m) => {
                             let r = &m.result;
                             let mut eq_vec = Vec::new();
-                            let mut var = Vec::new();
-                            let mut coef = Vec::new();
+                            let mut term = Vec::new();
+                            let mut estimate = Vec::new();
                             let mut se = Vec::new();
-                            let mut t = Vec::new();
+                            let mut stat = Vec::new();
                             let mut p = Vec::new();
                             for (ei, eq) in r.equations.iter().enumerate() {
                                 let names = m.eq_var_names.get(ei).cloned().unwrap_or_default();
                                 for i in 0..eq.params.len() {
                                     eq_vec.push(eq.name.clone());
-                                    var.push(
+                                    term.push(
                                         names.get(i).cloned().unwrap_or_else(|| format!("x{i}")),
                                     );
-                                    coef.push(eq.params[i]);
+                                    estimate.push(eq.params[i]);
                                     se.push(eq.std_errors[i]);
-                                    t.push(eq.t_values[i]);
+                                    stat.push(eq.t_values[i]);
                                     p.push(eq.p_values[i]);
                                 }
                             }
-                            let n = coef.len();
+                            let n = estimate.len();
                             map.insert(
                                 "equation".into(),
                                 Value::List(Arc::new(eq_vec.into_iter().map(Value::Str).collect())),
                             );
                             map.insert(
-                                "variable".into(),
-                                Value::List(Arc::new(var.into_iter().map(Value::Str).collect())),
+                                "term".into(),
+                                Value::List(Arc::new(term.into_iter().map(Value::Str).collect())),
                             );
                             map.insert(
-                                "coef".into(),
-                                Value::List(Arc::new(coef.into_iter().map(Value::Float).collect())),
+                                "estimate".into(),
+                                Value::List(Arc::new(
+                                    estimate.into_iter().map(Value::Float).collect(),
+                                )),
                             );
                             map.insert(
-                                "std_err".into(),
+                                "std_error".into(),
                                 Value::List(Arc::new(se.into_iter().map(Value::Float).collect())),
                             );
                             map.insert(
-                                "t".into(),
-                                Value::List(Arc::new(t.into_iter().map(Value::Float).collect())),
+                                "statistic".into(),
+                                Value::List(Arc::new(stat.into_iter().map(Value::Float).collect())),
                             );
                             map.insert(
                                 "p_value".into(),
@@ -795,44 +817,46 @@ impl Interpreter {
                         Value::ThreeSLSResult(m) => {
                             let r = &m.result;
                             let mut eq_vec = Vec::new();
-                            let mut var = Vec::new();
-                            let mut coef = Vec::new();
+                            let mut term = Vec::new();
+                            let mut estimate = Vec::new();
                             let mut se = Vec::new();
-                            let mut t = Vec::new();
+                            let mut stat = Vec::new();
                             let mut p = Vec::new();
                             for (ei, eq) in r.equations.iter().enumerate() {
                                 let names = m.eq_var_names.get(ei).cloned().unwrap_or_default();
                                 for i in 0..eq.params.len() {
                                     eq_vec.push(eq.name.clone());
-                                    var.push(
+                                    term.push(
                                         names.get(i).cloned().unwrap_or_else(|| format!("x{i}")),
                                     );
-                                    coef.push(eq.params[i]);
+                                    estimate.push(eq.params[i]);
                                     se.push(eq.std_errors[i]);
-                                    t.push(eq.t_values[i]);
+                                    stat.push(eq.t_values[i]);
                                     p.push(eq.p_values[i]);
                                 }
                             }
-                            let n = coef.len();
+                            let n = estimate.len();
                             map.insert(
                                 "equation".into(),
                                 Value::List(Arc::new(eq_vec.into_iter().map(Value::Str).collect())),
                             );
                             map.insert(
-                                "variable".into(),
-                                Value::List(Arc::new(var.into_iter().map(Value::Str).collect())),
+                                "term".into(),
+                                Value::List(Arc::new(term.into_iter().map(Value::Str).collect())),
                             );
                             map.insert(
-                                "coef".into(),
-                                Value::List(Arc::new(coef.into_iter().map(Value::Float).collect())),
+                                "estimate".into(),
+                                Value::List(Arc::new(
+                                    estimate.into_iter().map(Value::Float).collect(),
+                                )),
                             );
                             map.insert(
-                                "std_err".into(),
+                                "std_error".into(),
                                 Value::List(Arc::new(se.into_iter().map(Value::Float).collect())),
                             );
                             map.insert(
-                                "t".into(),
-                                Value::List(Arc::new(t.into_iter().map(Value::Float).collect())),
+                                "statistic".into(),
+                                Value::List(Arc::new(stat.into_iter().map(Value::Float).collect())),
                             );
                             map.insert(
                                 "p_value".into(),
@@ -845,41 +869,44 @@ impl Interpreter {
                         #[cfg(feature = "greeners-timeseries")]
                         Value::SVarResult(r) => {
                             let mut matrix = Vec::new();
-                            let mut row = Vec::new();
-                            let mut col = Vec::new();
-                            let mut value = Vec::new();
+                            let mut from = Vec::new();
+                            let mut to = Vec::new();
+                            let mut estimate = Vec::new();
                             let k = r.a_matrix.nrows();
                             let vnames = r.var_result.var_names.clone();
                             for i in 0..k {
                                 for j in 0..k {
                                     matrix.push(Value::Str("A".into()));
-                                    row.push(Value::Str(
+                                    from.push(Value::Str(
                                         vnames.get(i).cloned().unwrap_or_else(|| format!("v{i}")),
                                     ));
-                                    col.push(Value::Str(
+                                    to.push(Value::Str(
                                         vnames.get(j).cloned().unwrap_or_else(|| format!("v{j}")),
                                     ));
-                                    value.push(Value::Float(r.a_matrix[[i, j]]));
+                                    estimate.push(Value::Float(r.a_matrix[[i, j]]));
                                 }
                             }
                             for i in 0..r.b_matrix.nrows() {
                                 for j in 0..r.b_matrix.ncols() {
                                     matrix.push(Value::Str("B".into()));
-                                    row.push(Value::Str(
+                                    from.push(Value::Str(
                                         vnames.get(i).cloned().unwrap_or_else(|| format!("v{i}")),
                                     ));
-                                    col.push(Value::Str(
+                                    to.push(Value::Str(
                                         vnames.get(j).cloned().unwrap_or_else(|| format!("v{j}")),
                                     ));
-                                    value.push(Value::Float(r.b_matrix[[i, j]]));
+                                    estimate.push(Value::Float(r.b_matrix[[i, j]]));
                                 }
                             }
-                            let n = value.len();
-                            map.insert("matrix".into(), Value::List(Arc::new(matrix)));
-                            map.insert("row".into(), Value::List(Arc::new(row)));
-                            map.insert("col".into(), Value::List(Arc::new(col)));
-                            map.insert("value".into(), Value::List(Arc::new(value)));
+                            let n = estimate.len();
                             let nan_col = vec![Value::Float(f64::NAN); n];
+                            map.insert("matrix".into(), Value::List(Arc::new(matrix)));
+                            map.insert("from".into(), Value::List(Arc::new(from)));
+                            map.insert("to".into(), Value::List(Arc::new(to)));
+                            map.insert("estimate".into(), Value::List(Arc::new(estimate)));
+                            map.insert("std_error".into(), Value::List(Arc::new(nan_col.clone())));
+                            map.insert("statistic".into(), Value::List(Arc::new(nan_col.clone())));
+                            map.insert("p_value".into(), Value::List(Arc::new(nan_col.clone())));
                             map.insert("conf_low".into(), Value::List(Arc::new(nan_col.clone())));
                             map.insert("conf_high".into(), Value::List(Arc::new(nan_col)));
                         }
@@ -889,7 +916,7 @@ impl Interpreter {
                             let mut lag_vec = Vec::new();
                             let mut from_vec = Vec::new();
                             let mut to_vec = Vec::new();
-                            let mut value_vec = Vec::new();
+                            let mut estimate = Vec::new();
                             let k = r.n_vars;
                             let vnames: Vec<String> =
                                 (0..k).map(|i| format!("y{}", i + 1)).collect();
@@ -899,7 +926,7 @@ impl Interpreter {
                                 lag_vec.push(Value::Int(0));
                                 from_vec.push(Value::Str("-".into()));
                                 to_vec.push(Value::Str(vnames[col].clone()));
-                                value_vec.push(Value::Float(r.ar_params[[0, col]]));
+                                estimate.push(Value::Float(r.ar_params[[0, col]]));
                             }
                             for l in 0..r.p_lags {
                                 for src in 0..k {
@@ -909,7 +936,7 @@ impl Interpreter {
                                         lag_vec.push(Value::Int((l + 1) as i64));
                                         from_vec.push(Value::Str(vnames[src].clone()));
                                         to_vec.push(Value::Str(vnames[col].clone()));
-                                        value_vec.push(Value::Float(r.ar_params[[row, col]]));
+                                        estimate.push(Value::Float(r.ar_params[[row, col]]));
                                     }
                                 }
                             }
@@ -921,7 +948,7 @@ impl Interpreter {
                                         lag_vec.push(Value::Int((l + 1) as i64));
                                         from_vec.push(Value::Str(vnames[src].clone()));
                                         to_vec.push(Value::Str(vnames[col].clone()));
-                                        value_vec.push(Value::Float(r.ma_params[[row, col]]));
+                                        estimate.push(Value::Float(r.ma_params[[row, col]]));
                                     }
                                 }
                             }
@@ -932,153 +959,171 @@ impl Interpreter {
                                         lag_vec.push(Value::Int(0));
                                         from_vec.push(Value::Str(format!("ex{ex_i}")));
                                         to_vec.push(Value::Str(vnames[col].clone()));
-                                        value_vec.push(Value::Float(ex[[ex_i, col]]));
+                                        estimate.push(Value::Float(ex[[ex_i, col]]));
                                     }
                                 }
                             }
-                            let n = value_vec.len();
+                            let n = estimate.len();
+                            let nan_col = vec![Value::Float(f64::NAN); n];
                             map.insert("type".into(), Value::List(Arc::new(type_vec)));
                             map.insert("lag".into(), Value::List(Arc::new(lag_vec)));
                             map.insert("from".into(), Value::List(Arc::new(from_vec)));
                             map.insert("to".into(), Value::List(Arc::new(to_vec)));
-                            map.insert("value".into(), Value::List(Arc::new(value_vec)));
-                            let nan_col = vec![Value::Float(f64::NAN); n];
+                            map.insert("estimate".into(), Value::List(Arc::new(estimate)));
+                            map.insert("std_error".into(), Value::List(Arc::new(nan_col.clone())));
+                            map.insert("statistic".into(), Value::List(Arc::new(nan_col.clone())));
+                            map.insert("p_value".into(), Value::List(Arc::new(nan_col.clone())));
                             map.insert("conf_low".into(), Value::List(Arc::new(nan_col.clone())));
                             map.insert("conf_high".into(), Value::List(Arc::new(nan_col)));
                         }
                         #[cfg(feature = "greeners-timeseries")]
                         Value::MarkovResult(r) => {
                             let mut regime = Vec::new();
-                            let mut parameter = Vec::new();
-                            let mut value = Vec::new();
+                            let mut term = Vec::new();
+                            let mut estimate = Vec::new();
                             for (i, params) in r.regime_params.iter().enumerate() {
                                 for (j, &v) in params.iter().enumerate() {
                                     regime.push(Value::Int((i + 1) as i64));
-                                    parameter.push(Value::Str(if j == 0 {
+                                    term.push(Value::Str(if j == 0 {
                                         "intercept".into()
                                     } else {
                                         format!("ar{}", j - 1)
                                     }));
-                                    value.push(Value::Float(v));
+                                    estimate.push(Value::Float(v));
                                 }
                                 regime.push(Value::Int((i + 1) as i64));
-                                parameter.push(Value::Str("variance".into()));
-                                value.push(Value::Float(r.regime_variances[i]));
+                                term.push(Value::Str("variance".into()));
+                                estimate.push(Value::Float(r.regime_variances[i]));
                             }
-                            let n = value.len();
-                            map.insert("regime".into(), Value::List(Arc::new(regime)));
-                            map.insert("parameter".into(), Value::List(Arc::new(parameter)));
-                            map.insert("value".into(), Value::List(Arc::new(value)));
+                            let n = estimate.len();
                             let nan_col = vec![Value::Float(f64::NAN); n];
+                            map.insert("regime".into(), Value::List(Arc::new(regime)));
+                            map.insert("term".into(), Value::List(Arc::new(term)));
+                            map.insert("estimate".into(), Value::List(Arc::new(estimate)));
+                            map.insert("std_error".into(), Value::List(Arc::new(nan_col.clone())));
+                            map.insert("statistic".into(), Value::List(Arc::new(nan_col.clone())));
+                            map.insert("p_value".into(), Value::List(Arc::new(nan_col.clone())));
                             map.insert("conf_low".into(), Value::List(Arc::new(nan_col.clone())));
                             map.insert("conf_high".into(), Value::List(Arc::new(nan_col)));
                         }
                         #[cfg(feature = "greeners-timeseries")]
                         Value::MSARResult(r) => {
                             let mut regime = Vec::new();
-                            let mut parameter = Vec::new();
-                            let mut value = Vec::new();
+                            let mut term = Vec::new();
+                            let mut estimate = Vec::new();
                             for i in 0..r.k_regimes {
                                 regime.push(Value::Int((i + 1) as i64));
-                                parameter.push(Value::Str("intercept".into()));
-                                value.push(Value::Float(r.regime_means[i]));
+                                term.push(Value::Str("intercept".into()));
+                                estimate.push(Value::Float(r.regime_means[i]));
                                 for p in 0..r.ar_order {
                                     regime.push(Value::Int((i + 1) as i64));
-                                    parameter.push(Value::Str(format!("ar{}", p + 1)));
-                                    value.push(Value::Float(r.ar_params[[i, p]]));
+                                    term.push(Value::Str(format!("ar{}", p + 1)));
+                                    estimate.push(Value::Float(r.ar_params[[i, p]]));
                                 }
                                 regime.push(Value::Int((i + 1) as i64));
-                                parameter.push(Value::Str("sigma".into()));
-                                value.push(Value::Float(r.regime_sigmas[i]));
+                                term.push(Value::Str("sigma".into()));
+                                estimate.push(Value::Float(r.regime_sigmas[i]));
                             }
-                            let n = value.len();
-                            map.insert("regime".into(), Value::List(Arc::new(regime)));
-                            map.insert("parameter".into(), Value::List(Arc::new(parameter)));
-                            map.insert("value".into(), Value::List(Arc::new(value)));
+                            let n = estimate.len();
                             let nan_col = vec![Value::Float(f64::NAN); n];
+                            map.insert("regime".into(), Value::List(Arc::new(regime)));
+                            map.insert("term".into(), Value::List(Arc::new(term)));
+                            map.insert("estimate".into(), Value::List(Arc::new(estimate)));
+                            map.insert("std_error".into(), Value::List(Arc::new(nan_col.clone())));
+                            map.insert("statistic".into(), Value::List(Arc::new(nan_col.clone())));
+                            map.insert("p_value".into(), Value::List(Arc::new(nan_col.clone())));
                             map.insert("conf_low".into(), Value::List(Arc::new(nan_col.clone())));
                             map.insert("conf_high".into(), Value::List(Arc::new(nan_col)));
                         }
                         Value::PcaResult(m) => {
                             let r = &m.result;
-                            let mut var = Vec::new();
-                            let mut pc = Vec::new();
-                            let mut loading = Vec::new();
+                            let mut term = Vec::new();
+                            let mut component = Vec::new();
+                            let mut estimate = Vec::new();
                             let k = m.var_names.len();
                             let c = r.n_components;
                             for j in 0..c {
                                 for i in 0..k {
-                                    var.push(Value::Str(m.var_names[i].clone()));
-                                    pc.push(Value::Str(format!("PC{}", j + 1)));
-                                    loading.push(Value::Float(r.loadings[[i, j]]));
+                                    term.push(Value::Str(m.var_names[i].clone()));
+                                    component.push(Value::Str(format!("PC{}", j + 1)));
+                                    estimate.push(Value::Float(r.loadings[[i, j]]));
                                 }
                             }
-                            let n = loading.len();
-                            map.insert("variable".into(), Value::List(Arc::new(var)));
-                            map.insert("component".into(), Value::List(Arc::new(pc)));
-                            map.insert("loading".into(), Value::List(Arc::new(loading)));
+                            let n = estimate.len();
                             let nan_col = vec![Value::Float(f64::NAN); n];
+                            map.insert("term".into(), Value::List(Arc::new(term)));
+                            map.insert("component".into(), Value::List(Arc::new(component)));
+                            map.insert("estimate".into(), Value::List(Arc::new(estimate)));
+                            map.insert("std_error".into(), Value::List(Arc::new(nan_col.clone())));
+                            map.insert("statistic".into(), Value::List(Arc::new(nan_col.clone())));
+                            map.insert("p_value".into(), Value::List(Arc::new(nan_col.clone())));
                             map.insert("conf_low".into(), Value::List(Arc::new(nan_col.clone())));
                             map.insert("conf_high".into(), Value::List(Arc::new(nan_col)));
                         }
                         Value::FactorResult(m) => {
                             let r = &m.result;
-                            let mut var = Vec::new();
+                            let mut term = Vec::new();
                             let mut factor = Vec::new();
-                            let mut loading = Vec::new();
+                            let mut estimate = Vec::new();
                             let mut comm = Vec::new();
                             let mut uniq = Vec::new();
                             let k = m.var_names.len();
                             let f = r.n_factors;
                             for j in 0..f {
                                 for i in 0..k {
-                                    var.push(Value::Str(m.var_names[i].clone()));
+                                    term.push(Value::Str(m.var_names[i].clone()));
                                     factor.push(Value::Str(format!("F{}", j + 1)));
-                                    loading.push(Value::Float(r.loadings[[i, j]]));
+                                    estimate.push(Value::Float(r.loadings[[i, j]]));
                                     comm.push(Value::Float(r.communalities[i]));
                                     uniq.push(Value::Float(r.uniquenesses[i]));
                                 }
                             }
-                            let n = loading.len();
-                            map.insert("variable".into(), Value::List(Arc::new(var)));
-                            map.insert("factor".into(), Value::List(Arc::new(factor)));
-                            map.insert("loading".into(), Value::List(Arc::new(loading)));
-                            map.insert("communality".into(), Value::List(Arc::new(comm)));
-                            map.insert("uniqueness".into(), Value::List(Arc::new(uniq)));
+                            let n = estimate.len();
                             let nan_col = vec![Value::Float(f64::NAN); n];
+                            map.insert("term".into(), Value::List(Arc::new(term)));
+                            map.insert("factor".into(), Value::List(Arc::new(factor)));
+                            map.insert("estimate".into(), Value::List(Arc::new(estimate)));
+                            map.insert("std_error".into(), Value::List(Arc::new(nan_col.clone())));
+                            map.insert("statistic".into(), Value::List(Arc::new(nan_col.clone())));
+                            map.insert("p_value".into(), Value::List(Arc::new(nan_col.clone())));
                             map.insert("conf_low".into(), Value::List(Arc::new(nan_col.clone())));
                             map.insert("conf_high".into(), Value::List(Arc::new(nan_col)));
+                            map.insert("communality".into(), Value::List(Arc::new(comm)));
+                            map.insert("uniqueness".into(), Value::List(Arc::new(uniq)));
                         }
                         #[cfg(feature = "greeners-timeseries")]
                         Value::DFMResult(m) => {
                             let r = &m.result;
-                            let mut var = Vec::new();
+                            let mut term = Vec::new();
                             let mut factor = Vec::new();
-                            let mut loading = Vec::new();
+                            let mut estimate = Vec::new();
                             let k = m.var_names.len();
                             let f = r.n_factors;
                             for j in 0..f {
                                 for i in 0..k {
-                                    var.push(Value::Str(m.var_names[i].clone()));
+                                    term.push(Value::Str(m.var_names[i].clone()));
                                     factor.push(Value::Str(format!("F{}", j + 1)));
-                                    loading.push(Value::Float(r.factor_loadings[[i, j]]));
+                                    estimate.push(Value::Float(r.factor_loadings[[i, j]]));
                                 }
                             }
-                            let n = loading.len();
-                            map.insert("variable".into(), Value::List(Arc::new(var)));
-                            map.insert("factor".into(), Value::List(Arc::new(factor)));
-                            map.insert("loading".into(), Value::List(Arc::new(loading)));
+                            let n = estimate.len();
                             let nan_col = vec![Value::Float(f64::NAN); n];
+                            map.insert("term".into(), Value::List(Arc::new(term)));
+                            map.insert("factor".into(), Value::List(Arc::new(factor)));
+                            map.insert("estimate".into(), Value::List(Arc::new(estimate)));
+                            map.insert("std_error".into(), Value::List(Arc::new(nan_col.clone())));
+                            map.insert("statistic".into(), Value::List(Arc::new(nan_col.clone())));
+                            map.insert("p_value".into(), Value::List(Arc::new(nan_col.clone())));
                             map.insert("conf_low".into(), Value::List(Arc::new(nan_col.clone())));
                             map.insert("conf_high".into(), Value::List(Arc::new(nan_col)));
                         }
                         #[cfg(feature = "greeners-timeseries")]
                         Value::DecompResult(_) | Value::MstlResult(_) | Value::UCResult(_) => {
                             // No coefficient-like parameters; return empty tidy table
-                            map.insert("variable".into(), Value::List(Arc::new(Vec::new())));
-                            map.insert("coef".into(), Value::List(Arc::new(Vec::new())));
-                            map.insert("std_err".into(), Value::List(Arc::new(Vec::new())));
-                            map.insert("t".into(), Value::List(Arc::new(Vec::new())));
+                            map.insert("term".into(), Value::List(Arc::new(Vec::new())));
+                            map.insert("estimate".into(), Value::List(Arc::new(Vec::new())));
+                            map.insert("std_error".into(), Value::List(Arc::new(Vec::new())));
+                            map.insert("statistic".into(), Value::List(Arc::new(Vec::new())));
                             map.insert("p_value".into(), Value::List(Arc::new(Vec::new())));
                             map.insert("conf_low".into(), Value::List(Arc::new(Vec::new())));
                             map.insert("conf_high".into(), Value::List(Arc::new(Vec::new())));
@@ -1086,20 +1131,20 @@ impl Interpreter {
                         #[cfg(feature = "greeners-imputation")]
                         Value::MiceResult(_) => {
                             // No coefficient-like parameters; return empty tidy table
-                            map.insert("variable".into(), Value::List(Arc::new(Vec::new())));
-                            map.insert("coef".into(), Value::List(Arc::new(Vec::new())));
-                            map.insert("std_err".into(), Value::List(Arc::new(Vec::new())));
-                            map.insert("t".into(), Value::List(Arc::new(Vec::new())));
+                            map.insert("term".into(), Value::List(Arc::new(Vec::new())));
+                            map.insert("estimate".into(), Value::List(Arc::new(Vec::new())));
+                            map.insert("std_error".into(), Value::List(Arc::new(Vec::new())));
+                            map.insert("statistic".into(), Value::List(Arc::new(Vec::new())));
                             map.insert("p_value".into(), Value::List(Arc::new(Vec::new())));
                             map.insert("conf_low".into(), Value::List(Arc::new(Vec::new())));
                             map.insert("conf_high".into(), Value::List(Arc::new(Vec::new())));
                         }
                         Value::LowessResult(_) => {
                             // No coefficient-like parameters; return empty tidy table
-                            map.insert("variable".into(), Value::List(Arc::new(Vec::new())));
-                            map.insert("coef".into(), Value::List(Arc::new(Vec::new())));
-                            map.insert("std_err".into(), Value::List(Arc::new(Vec::new())));
-                            map.insert("t".into(), Value::List(Arc::new(Vec::new())));
+                            map.insert("term".into(), Value::List(Arc::new(Vec::new())));
+                            map.insert("estimate".into(), Value::List(Arc::new(Vec::new())));
+                            map.insert("std_error".into(), Value::List(Arc::new(Vec::new())));
+                            map.insert("statistic".into(), Value::List(Arc::new(Vec::new())));
                             map.insert("p_value".into(), Value::List(Arc::new(Vec::new())));
                             map.insert("conf_low".into(), Value::List(Arc::new(Vec::new())));
                             map.insert("conf_high".into(), Value::List(Arc::new(Vec::new())));

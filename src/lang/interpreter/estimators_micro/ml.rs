@@ -1198,7 +1198,7 @@ impl Interpreter {
         )
         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        Ok(Value::BartResult(Rc::new(result)))
+        Ok(Value::BartResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-ml")]
@@ -1220,7 +1220,7 @@ impl Interpreter {
         let result = greeners::gp::GaussianProcess::fit(&y_arr, &x_arr, Some(var_names))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        Ok(Value::GpResult(Rc::new(result)))
+        Ok(Value::GpResult(Arc::new(result)))
     }
 
     #[cfg(all(feature = "greeners-causal", feature = "greeners-ml"))]
@@ -1566,7 +1566,7 @@ impl Interpreter {
         let result = greeners::spectral::SpectralClustering::fit(&x_mat, k, sigma, None)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        Ok(Value::SpectralResult(Rc::new(result)))
+        Ok(Value::SpectralResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-ml")]
@@ -1608,7 +1608,7 @@ impl Interpreter {
         let result = greeners::isotonic::IsotonicRegression::fit(&x_arr, &y_arr, !decreasing, None)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        Ok(Value::IsotonicResult(Rc::new(result)))
+        Ok(Value::IsotonicResult(Arc::new(result)))
     }
 
     #[cfg(all(feature = "greeners-imputation", feature = "greeners-ml"))]
@@ -1787,7 +1787,7 @@ impl Interpreter {
         let result = greeners::kmeans::KMeans::fit(&x_mat, k, None, None)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        Ok(Value::KmeansResult(Rc::new(result)))
+        Ok(Value::KmeansResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-ml")]
@@ -1860,7 +1860,7 @@ impl Interpreter {
         let result = greeners::dbscan::DBSCAN::fit(&x_mat, eps, min_pts)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        Ok(Value::DbscanResult(Rc::new(result)))
+        Ok(Value::DbscanResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-ml")]
@@ -1934,7 +1934,7 @@ impl Interpreter {
         let result = greeners::gmm_clustering::GmmClustering::fit(&x_mat, k, max_iter, tol)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        Ok(Value::GmmClusteringResult(Rc::new(result)))
+        Ok(Value::GmmClusteringResult(Arc::new(result)))
     }
 
     #[cfg(all(feature = "greeners-ml", feature = "greeners-ols"))]
@@ -2214,7 +2214,7 @@ impl Interpreter {
             greeners::hierarchical::HierarchicalClustering::fit(&x_mat, linkage, cut_height)
                 .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        Ok(Value::HierarchicalResult(Rc::new(result)))
+        Ok(Value::HierarchicalResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-ml")]
@@ -2588,7 +2588,7 @@ impl Interpreter {
         let result = greeners::Lowess::fit(&y_vec, &x_vec, frac, it)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         println!("{result}");
-        Ok(Value::LowessResult(Rc::new(result)))
+        Ok(Value::LowessResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-ml")]
@@ -2647,7 +2647,7 @@ impl Interpreter {
         let result = greeners::KDEUnivariate::fit(&data, bw_opt, kernel)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        Ok(Value::KdeResult(Rc::new(result)))
+        Ok(Value::KdeResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-ml")]
@@ -2688,8 +2688,8 @@ impl Interpreter {
         }
         let result = greeners::PCA::fit(&data, n_components)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        Ok(Value::Model(Rc::new(PcaModel {
-            result: Rc::new(result),
+        Ok(Value::Model(Arc::new(PcaModel {
+            result: Arc::new(result),
             var_names,
         })))
     }
@@ -2744,8 +2744,8 @@ impl Interpreter {
         }
         let result = greeners::FactorAnalysis::fit(&data, n_factors, rotation)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        Ok(Value::Model(Rc::new(FactorModel {
-            result: Rc::new(result),
+        Ok(Value::Model(Arc::new(FactorModel {
+            result: Arc::new(result),
             var_names,
         })))
     }

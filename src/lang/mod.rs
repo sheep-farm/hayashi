@@ -1,6 +1,5 @@
-// `Value` uses `Arc` for DataFrame/List/Dict/Series/UserFn (to enable `parallel for`)
-// even though `Value` as a whole is not `Send+Sync` (model results use `Rc`).
-#![allow(clippy::arc_with_non_send_sync)]
+// `Value` uses `Arc` for shared data and model results to enable `parallel for`.
+// Its `Send + Sync` guarantees are checked structurally by the compiler.
 
 pub mod ast;
 pub mod commands;

@@ -11,7 +11,7 @@ use std::any::Any;
 /// Each adapter wraps a Greeners result and exposes the operations needed by
 /// the interpreter: display, summary, coefficient extraction, prediction,
 /// residual access, field lookup, and DAP/JSON serialization.
-pub trait Model: std::fmt::Display + Any {
+pub trait Model: std::fmt::Display + Any + Send + Sync {
     /// Estimator name shown to the user, e.g. "OlsResult".
     fn type_name(&self) -> &str;
 
@@ -24,8 +24,8 @@ pub trait Model: std::fmt::Display + Any {
     /// Canonical view used by `tidy()`, `glance()`, `esttab`, DAP, etc.
     fn to_model_view(&self) -> ModelView;
 
-    /// `tidy()` output: a Dict with columns `variable`, `coef`, `std_err`,
-    /// `t`, `p_value`, `conf_low`, `conf_high`.
+    /// `tidy()` output: a Dict with canonical columns `term`, `estimate`,
+    /// `std_error`, `statistic`, `p_value`, `conf_low`, `conf_high`.
     fn tidy(&self) -> Value {
         let mv = self.to_model_view();
         Value::Dict(std::sync::Arc::new(mv.to_tidy_map()))

@@ -95,11 +95,13 @@ Hayashi is a Rust interpreter split into two crates in this repo:
 - **Hayashi** (`hayashi-lang`): lexer, parser, interpreter, CLI,
   REPL, DAP server, I/O loaders, Jupyter kernel, documentation, examples,
   validation programme, benchmarks, and books.
-- **Greeners** (`greeners = "=2.0.0"` on crates.io): the published facade
-  aggregates the `greeners-*` sub-crates (`greeners-core`, `greeners-ols`,
-  etc.). Hayashi's own Cargo features still gate estimator dispatch modules
-  in `src/lang/interpreter`, but every sub-crate is now resolved through the
-  registry version pinned in `Cargo.lock`.
+- **Greeners** (`greeners = "=2.0.2-dev"`): the facade aggregates the
+  `greeners-*` sub-crates (`greeners-core`, `greeners-ols`, etc.). On `dev`,
+  a `[patch.crates-io]` override resolves `greeners` (with all sub-crates)
+  from the Greeners repository `dev` branch at the commit frozen in
+  `Cargo.lock`; stable releases consume the published crates.io facade at an
+  exact pin. Hayashi's own Cargo features gate estimator dispatch modules in
+  `src/lang/interpreter`.
 
 Public surface:
 - `src/lib.rs` exposes `Interpreter` and `run_source`. It also provides
@@ -134,8 +136,10 @@ Public surface:
   Shadowing is forbidden.
 - `src/lang/interpreter/value.rs` defines `Value` (primitives, `DataFrame`,
   `List`, `Dict`, `Series`, `UserFn`, 50+ model result variants, and a
-  generic `ModelResult`). `Rc`-backed model results are not `Send`;
-  `Value::is_send_safe()` and `SendValue` guard `parallel for`.
+  generic `ModelResult`). Shared values and model results use `Arc`, and
+  `Model` requires `Send + Sync`, making `Value` structurally thread-safe.
+  `Value::is_send_safe()` and `SendValue` preserve the **capture policy**;
+  `ParallelItem` accepts all **iterator items**, including shared models.
 - `src/lang/interpreter/eval_expr.rs` evaluates expressions, including
   f-strings, closures, `match`, if-expressions, pipes, ranges, and
   vectorised `eval_col_expr` / `eval_col_expr_typed` over DataFrames.
@@ -156,17 +160,20 @@ Public surface:
 
 ## 3. Greeners integration
 
-- `Cargo.toml` depends on the published facade,
-  `greeners = { version = "=2.0.0", default-features = false }`. The local
-  `crates/greeners` facade is no longer wired into the build and the
-  `greeners-*` features are empty lists that only gate Hayashi's own dispatch
-  modules — `default-features = false` merely drops the facade's `url` feature.
+- `Cargo.toml` pins `greeners = { version = "=2.0.2-dev", default-features = false }`
+  and, on `dev`, a `[patch.crates-io]` block resolves `greeners` and all
+  `greeners-*` sub-crates from the Greeners repository `dev` branch. The local
+  `crates/greeners` facade is no longer wired into the build;
+  `default-features = false` only drops the facade's `url` feature. The
+  `greeners-*` features are empty lists that gate Hayashi's own dispatch
+  modules. Stable release branches remove the patch and consume the published
+  crates.io facade at an exact pin.
 - The `=` pin plus a committed `Cargo.lock` and `--locked` in CI mean a Greeners
   fix (including one that changes numbers) can only reach Hayashi through a
-  deliberate commit: either `cargo update -p greeners-<crate> --precise <ver>`
-  for a sub-crate patch, or a facade bump in a dedicated PR that runs the full
-  validation matrix. Never depend on a Greeners pre-release (`-rc`) outside
-  `dev`.
+  deliberate commit: either `cargo update -p greeners` (moving the git `dev`
+  head forward) or a facade bump in a dedicated PR that runs the full
+  validation matrix. Pre-releases (`-rc`, `-dev`) are intentional on `dev`
+  only — stable releases never depend on them.
 - `src/lang/interpreter.rs` has `materialize_formula()` (lines ~1292–1441).
   It turns a Hayashi `Formula` into a Greeners `GFormula` by:
   1. Evaluating complex RHS terms (`log(K)`, `I(x^2)`) and inserting them
@@ -178,7 +185,7 @@ Public surface:
   extra metadata for post-estimation / DAP:
   `OlsModel`, `BinaryModel`, `SurModel`, `PcaModel`, `FactorModel`,
   `DFMModel`, `ThreeSLSModel`, `PenalizedModel`.
-- Most other estimators wrap `Rc<greeners::*Result>` directly.
+- Most other estimators wrap `Arc<greeners::*Result>` directly.
 - `src/lang/interpreter/dap/model_expansion/` converts model results into
   DAP / JSON trees (`coefficients` DataFrame, `fit` Dict, per-parameter
   Series).
@@ -191,8 +198,12 @@ Public surface:
   estimators.
 - `display_names` (for UI) and `variable_names` (for Greeners) are two
   parallel naming systems that can drift.
-- `Rc<GreenersResult>` model results are not `Send`, so they cannot be
-  captured by `parallel for`.
+- Dedicated model results remain excluded from **environment captures**
+  by policy, but may be passed as **iterator items**, including repeated
+  references and models nested in containers. `Arc` and `Model: Send + Sync`
+  make this safe without assuming unique ownership. The capture check also
+  traverses `Series.values` and every `ModelResult` value map (`fit`,
+  `extras`, `fields`). See `ParallelItem` in `value.rs` and `control.md`.
 
 ## 4. I/O and DataFrames
 
@@ -229,11 +240,12 @@ Public surface:
 ### 5.1 CI
 
 - `ci.yml`: validation metadata check, `cargo deny check advisories`,
-  `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test` on
-  Ubuntu/macOS/Windows. Greeners is consumed as the published `greeners`
-  facade crate from crates.io; versions are pinned in `Cargo.lock` and CI runs
-  with `--locked`, so a lockfile drift fails the build instead of being
-  silently resolved.
+  `cargo fmt --check`, `cargo clippy -- -D warnings`,
+  `scripts/check_readme_counts.sh` (README test/validation/example counts),
+  `cargo test` on Ubuntu/macOS/Windows. On `dev`, Greeners is resolved from the
+  git `dev` branch via `[patch.crates-io]` at the commit frozen in
+  `Cargo.lock`; CI runs with `--locked`, so any lockfile drift (including a
+  moved Greeners head) fails the build instead of being silently resolved.
 - `validation.yml`: full empirical validation on Ubuntu/macOS/Windows with
   R + Python.
 - `nightly.yml`: builds `dev` and publishes a `nightly` GitHub release.
@@ -242,10 +254,11 @@ Public surface:
 
 ## 6. Branches and releases
 
-- `dev`: active development. Current HEAD: `52bf02f` (Switch greeners
-  dependency to crates.io 2.0.0).
-- `master`: stable releases. Current HEAD: `36d04b4` (site rebuild for
-  0.2.9). Tags include `v0.2.0` through `v0.2.9` and `nightly`.
+- `dev`: active development. Tracks Greeners `dev` branch (pre-release
+  `2.0.2-dev`) via `[patch.crates-io]`.
+- `master`: stable releases. Consumes the published `greeners` facade from
+  crates.io at an exact pin (e.g. `=2.0.1` in 0.2.10-1). Tags include
+  `v0.2.0` through `v0.2.10-1` and `nightly`.
 - `gh-pages`: published site.
 - Open feature/fix branches:
   - `pr62` — validation comparison against every reference.
@@ -263,7 +276,7 @@ Workflow: PRs target `dev`; `master` is release-only.
 ## 7. Known fragile areas
 
 1. **Model wrapper inconsistency**: some estimators use dedicated
-   wrappers, others use `Rc<GreenersResult>` or `ModelResult`. Uniform
+   wrappers, others use `Arc<GreenersResult>` or `ModelResult`. Uniform
    access to residuals / predict requires knowing which variant is which.
 2. **DAP tests active**: all 5 DAP tests run and pass with
    `cargo test --test dap` (no `#[ignore]`).
@@ -278,15 +291,20 @@ Workflow: PRs target `dev`; `master` is release-only.
 
 ## 8. Design decisions, not fragilities
 
-- **Greeners dependency**: Hayashi consumes the published `greeners` facade
-  from crates.io with an exact pin (`=2.0.0`) and the versions frozen in
-  `Cargo.lock`. Greeners moves on its own release train; Hayashi follows it
-  only when someone bumps the pin.
-- **`parallel for` does not capture `Rc` model results**: this is
-  intentional. Each iteration is an independent, self-contained sandbox
-  whose state must die at the end of the block. Preventing `Rc`-backed
-  model results from crossing the thread boundary enforces that design
-  and avoids the classic shared-mutable-state pitfalls of parallelism.
+- **Greeners dependency**: on `dev`, Hayashi resolves `greeners` (pinned
+  `=2.0.2-dev`) from the Greeners `dev` branch through `[patch.crates-io]`;
+  stable releases consume the published crates.io facade at an exact pin.
+  Either way the resolution is frozen in `Cargo.lock` with `--locked` in CI:
+  Greeners moves on its own release train and Hayashi follows it only when
+  someone deliberately bumps the pin or the git head.
+- **`parallel for` and shared model results**: all `Value` variants use
+  owned data or `Arc`, and `Model` requires `Send + Sync`. `SendValue`,
+  `ParallelItem` and `ThreadResult` derive thread safety from their fields;
+  none uses `unsafe impl Send/Sync`. Model aliases may occur across items,
+  nested containers, returned results and the parent, so moving a wrapper
+  must never be treated as proof of exclusive ownership. Dedicated models
+  remain iterator-only by capture policy. Regression checks:
+  `cargo test --lib parallel_` and `cargo test --test smoke parallel_for_`.
 
 ## 9. Adding a new estimator
 

@@ -16,7 +16,7 @@ pub(in crate::lang::interpreter) fn nan_last_cmp(a: &f64, b: &f64) -> Ordering {
 
 /// Builds a rendered diagnostic value.
 pub(in crate::lang::interpreter) fn diag(rendered: String) -> Value {
-    Value::DiagResult(Rc::new(DiagResult {
+    Value::DiagResult(Arc::new(DiagResult {
         rendered,
         fields: HashMap::new(),
     }))
@@ -27,7 +27,7 @@ pub(in crate::lang::interpreter) fn diag_with(
     rendered: String,
     fields: HashMap<String, Value>,
 ) -> Value {
-    Value::DiagResult(Rc::new(DiagResult { rendered, fields }))
+    Value::DiagResult(Arc::new(DiagResult { rendered, fields }))
 }
 
 /// Converts `Value` to boolean permissively.

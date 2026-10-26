@@ -19,8 +19,8 @@ impl Interpreter {
         let result = Logit::from_formula(&g_formula, &df)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         let coef_names = coef_names_from_formula(&formula_ast, &df, x.ncols());
-        Ok(Value::Model(Rc::new(BinaryModel {
-            result: Rc::new(result),
+        Ok(Value::Model(Arc::new(BinaryModel {
+            result: Arc::new(result),
             y,
             x,
             kind: "logit".into(),
@@ -45,8 +45,8 @@ impl Interpreter {
         let result = Probit::from_formula(&g_formula, &df)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         let coef_names = coef_names_from_formula(&formula_ast, &df, x.ncols());
-        Ok(Value::Model(Rc::new(BinaryModel {
-            result: Rc::new(result),
+        Ok(Value::Model(Arc::new(BinaryModel {
+            result: Arc::new(result),
             y,
             x,
             kind: "probit".into(),
@@ -123,7 +123,7 @@ impl Interpreter {
         )
         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        Ok(Value::HeckmanResult(Rc::new(result)))
+        Ok(Value::HeckmanResult(Arc::new(result)))
     }
 
     #[cfg(all(feature = "greeners-glm", feature = "greeners-ols"))]
@@ -150,7 +150,7 @@ impl Interpreter {
         };
         let result = greeners::tobit::Tobit::fit(&y_vec, &x_mat, ll_limit, Some(var_names))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        Ok(Value::TobitResult(Rc::new(result)))
+        Ok(Value::TobitResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-glm")]
@@ -172,7 +172,7 @@ impl Interpreter {
         let cov = resolve_cov_full(opt_map, &df)?;
         let result = greeners::Poisson::fit_with_names(&y_vec, &x_mat, cov, Some(var_names))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        Ok(Value::PoissonResult(Rc::new(result)))
+        Ok(Value::PoissonResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-glm")]
@@ -194,7 +194,7 @@ impl Interpreter {
         let cov = resolve_cov_full(opt_map, &df)?;
         let result = greeners::NegBin::fit_with_names(&y_vec, &x_mat, cov, Some(var_names))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        Ok(Value::NegBinResult(Rc::new(result)))
+        Ok(Value::NegBinResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-glm")]
@@ -209,7 +209,7 @@ impl Interpreter {
         let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
         let result = greeners::OrderedLogit::from_formula(&g_formula, &df)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        Ok(Value::OrderedResult(Rc::new(result)))
+        Ok(Value::OrderedResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-glm")]
@@ -224,7 +224,7 @@ impl Interpreter {
         let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
         let result = greeners::OrderedProbit::from_formula(&g_formula, &df)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        Ok(Value::OrderedResult(Rc::new(result)))
+        Ok(Value::OrderedResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-glm")]
@@ -245,7 +245,7 @@ impl Interpreter {
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         let result = greeners::MNLogit::fit_with_names(&y_vec, &x_mat, Some(var_names))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        Ok(Value::MNLogitResult(Rc::new(result)))
+        Ok(Value::MNLogitResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-glm")]
@@ -332,7 +332,7 @@ impl Interpreter {
             Some(var_names),
         )
         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        Ok(Value::GeeResult(Rc::new(result)))
+        Ok(Value::GeeResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-glm")]
@@ -407,6 +407,6 @@ impl Interpreter {
             )
             .map_err(|e| HayashiError::Runtime(e.to_string()))?
         };
-        Ok(Value::ZeroInflatedResult(Rc::new(result)))
+        Ok(Value::ZeroInflatedResult(Arc::new(result)))
     }
 }

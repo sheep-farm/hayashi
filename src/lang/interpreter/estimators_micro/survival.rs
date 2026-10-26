@@ -44,7 +44,7 @@ impl Interpreter {
         let events: ndarray::Array1<u8> = events_f.iter().map(|&v| v as u8).collect();
         let result = greeners::KaplanMeier::fit(&times, &events)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        Ok(Value::KMResult(Rc::new(result)))
+        Ok(Value::KMResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-survival")]
@@ -104,6 +104,6 @@ impl Interpreter {
         }
         let result = greeners::CoxPH::fit_with_names(&times, &events, &x_mat, Some(rhs_vars))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        Ok(Value::CoxResult(Rc::new(result)))
+        Ok(Value::CoxResult(Arc::new(result)))
     }
 }

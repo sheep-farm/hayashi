@@ -52,7 +52,7 @@ impl Interpreter {
             .with_inference(200)
             .map_err(|e| self.rt_err(format!("VECM inference: {e}")))?;
 
-        Ok(Value::VecmResult(Rc::new(result)))
+        Ok(Value::VecmResult(Arc::new(result)))
     }
 
     /// `var(df, y1, y2, ..., lags=2)` — Vetor Auto-regressivo.
@@ -99,7 +99,7 @@ impl Interpreter {
         let result = greeners::VAR::fit(&data, lags, Some(var_names))
             .map_err(|e| self.rt_err(format!("VAR: {e}")))?;
 
-        Ok(Value::VarResult(Rc::new(result)))
+        Ok(Value::VarResult(Arc::new(result)))
     }
 
     /// `irf(model, steps=10)` — Impulse Response Function.
@@ -339,6 +339,6 @@ impl Interpreter {
             }
         };
 
-        Ok(Value::ArimaResult(Rc::new(result)))
+        Ok(Value::ArimaResult(Arc::new(result)))
     }
 }

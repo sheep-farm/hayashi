@@ -42,6 +42,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --check
       - run: cargo clippy --locked -- -D warnings
+      # README auto-counts (tests, validation matrix, examples) must match
+      # reality; the count is taken on ubuntu (as with the other jobs).
+      - run: scripts/check_readme_counts.sh
 
   test:
     strategy:

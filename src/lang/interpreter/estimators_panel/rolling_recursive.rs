@@ -43,7 +43,7 @@ impl Interpreter {
         let dates_ref = dates.as_deref();
         let result = greeners::RollingOLS::fit(&y_vec, &x_mat, window, dates_ref, Some(var_names))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        Ok(Value::RollingResult(Rc::new(result)))
+        Ok(Value::RollingResult(Arc::new(result)))
     }
 
     /// `recursive` / `recols` — recursive OLS (Kalman).
@@ -56,6 +56,6 @@ impl Interpreter {
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         let result = greeners::RecursiveLS::fit(&y_vec, &x_mat)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        Ok(Value::RecursiveLSResult(Rc::new(result)))
+        Ok(Value::RecursiveLSResult(Arc::new(result)))
     }
 }

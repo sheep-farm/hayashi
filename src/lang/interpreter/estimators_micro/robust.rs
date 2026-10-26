@@ -38,7 +38,7 @@ impl Interpreter {
         let cov = resolve_cov_full(opt_map, &df)?;
         let result = greeners::RLM::fit_with_names(&y_vec, &x_mat, &norm, cov, Some(var_names))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        Ok(Value::RlmResult(Rc::new(result)))
+        Ok(Value::RlmResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-glm")]
@@ -127,7 +127,7 @@ impl Interpreter {
             Some(var_names),
         )
         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        Ok(Value::GeeResult(Rc::new(result)))
+        Ok(Value::GeeResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-bayesian")]
@@ -206,7 +206,7 @@ impl Interpreter {
             Some(var_names),
         )
         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        Ok(Value::MixedResult(Rc::new(result)))
+        Ok(Value::MixedResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-ols")]
@@ -239,7 +239,7 @@ impl Interpreter {
         let result =
             greeners::GLSAR::fit_with_names(&y_vec, &x_mat, ar_order, max_iter, Some(var_names))
                 .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        Ok(Value::GlsarResult(Rc::new(result)))
+        Ok(Value::GlsarResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-glm")]
@@ -275,7 +275,7 @@ impl Interpreter {
         };
         let result = greeners::BetaModel::fit_with_names(&y_vec, &x_mat, &link, Some(var_names))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        Ok(Value::BetaResult(Rc::new(result)))
+        Ok(Value::BetaResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-glm")]
@@ -351,6 +351,6 @@ impl Interpreter {
             _ => greeners::GLM::fit_with_names(&y_vec, &x_mat, family, cov, Some(var_names))
                 .map_err(|e| HayashiError::Runtime(e.to_string()))?,
         };
-        Ok(Value::GlmResult(Rc::new(result)))
+        Ok(Value::GlmResult(Arc::new(result)))
     }
 }

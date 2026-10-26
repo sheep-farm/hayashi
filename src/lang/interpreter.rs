@@ -37,7 +37,6 @@ use serde_json::{json, Value as JsonValue};
 use statrs::distribution::{ContinuousCDF, Normal};
 use std::collections::{HashMap, HashSet};
 use std::io::{self, Write as _};
-use std::rc::Rc;
 use std::sync::Arc;
 
 #[derive(Clone, Copy)]
@@ -105,7 +104,7 @@ pub use models::DFMModel;
 pub use models::{OlsModel, PcaModel};
 #[cfg(feature = "greeners-ols")]
 pub use models::{PenalizedModel, SurModel, ThreeSLSModel};
-pub use value::{DiagResult, ErrorValue, SendValue, Series, UserFn, Value};
+pub use value::{DiagResult, ErrorValue, ParallelItem, SendValue, Series, UserFn, Value};
 
 fn t_critical_95(df: f64) -> f64 {
     t_quantile(0.975, df)

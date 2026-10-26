@@ -178,7 +178,7 @@ impl Interpreter {
             damped,
         )
         .map_err(|e| self.rt_err(format!("ets: {e}")))?;
-        Ok(Value::EtsResult(Rc::new(result)))
+        Ok(Value::EtsResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-panel")]
@@ -235,7 +235,7 @@ impl Interpreter {
         let q_arr = ndarray::Array1::from(q_col.to_vec());
         let result = greeners::PanelThreshold::fit(&y_vec, &x_mat, &q_arr, &entity_ids)
             .map_err(|e| self.rt_err(format!("pthresh: {e}")))?;
-        Ok(Value::ThresholdResult(Rc::new(result)))
+        Ok(Value::ThresholdResult(Arc::new(result)))
     }
 
     pub(super) fn cancorr(
@@ -1918,7 +1918,7 @@ impl Interpreter {
             println!("  {:<20} {:>12.6}", name, params[i]);
         }
         let std_errors = ndarray::Array1::<f64>::zeros(params.len());
-        Ok(Value::Model(Rc::new(PenalizedModel {
+        Ok(Value::Model(Arc::new(PenalizedModel {
             params,
             std_errors,
             variable_names: display_names,
@@ -2086,7 +2086,7 @@ impl Interpreter {
             println!("  {:<20} {:>12.6}", name, params[i]);
         }
         let std_errors = ndarray::Array1::<f64>::zeros(params.len());
-        Ok(Value::Model(Rc::new(PenalizedModel {
+        Ok(Value::Model(Arc::new(PenalizedModel {
             params,
             std_errors,
             variable_names: display_names,
@@ -2257,7 +2257,7 @@ impl Interpreter {
             println!("  {:<20} {:>12.6}", name, params[i]);
         }
         let std_errors = ndarray::Array1::<f64>::zeros(params.len());
-        Ok(Value::Model(Rc::new(PenalizedModel {
+        Ok(Value::Model(Arc::new(PenalizedModel {
             params,
             std_errors,
             variable_names: display_names,

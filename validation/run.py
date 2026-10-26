@@ -83,6 +83,7 @@ def parse_hayashi_csv_from_string(text: str) -> dict[str, dict[str, float]]:
     header_aliases = [
         ("Variable,Coef,Std_Err", "Variable", "Coef", "Std_Err"),
         ("variable,coef,std_err", "variable", "coef", "std_err"),
+        ("term,estimate,std_error", "term", "estimate", "std_error"),
     ]
     for header, var_col, coef_col, se_col in header_aliases:
         start = text.find(header)

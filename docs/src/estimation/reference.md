@@ -257,7 +257,7 @@ supported options of a specific estimator.
 
 | Command | Description |
 |---------|-------------|
-| `tidy(m)` | Tidy coefficient table (variable, coef, std_err, t/z, p_value, conf_low, conf_high) |
+| `tidy(m)` | Tidy coefficient table (term, estimate, std_error, statistic, p_value, conf_low, conf_high) |
 | `glance(m)` | Model fit statistics (r2, adj_r2, AIC, BIC, log_lik, n, sigma, etc.) |
 | `esttab(m1, m2, ...)` | Side-by-side estimation table |
 | `predict df var = m [, "kind"]` | Fitted values, residuals, probabilities |

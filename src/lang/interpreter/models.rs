@@ -5,14 +5,13 @@ use crate::lang::interpreter::value::{Series, Value};
 use greeners::{Column, DataFrame};
 use indexmap::IndexMap;
 use ndarray::{Array1, Array2};
-use std::rc::Rc;
 use std::sync::Arc;
 
 // ── Wrappers that preserve the X matrix for diagnostics and predict ─────────
 
 #[derive(Clone)]
 pub struct OlsModel {
-    pub result: Rc<greeners::OlsResult>,
+    pub result: Arc<greeners::OlsResult>,
     pub residuals: Array1<f64>,
     pub x: Array2<f64>,
 }
@@ -74,7 +73,7 @@ impl std::fmt::Display for PenalizedModel {
 #[derive(Clone)]
 #[cfg(feature = "greeners-glm")]
 pub struct BinaryModel {
-    pub result: Rc<greeners::discrete::BinaryModelResult>,
+    pub result: Arc<greeners::discrete::BinaryModelResult>,
     pub y: Array1<f64>,
     pub x: Array2<f64>,
     pub kind: String,            // "logit" | "probit"
@@ -93,7 +92,7 @@ impl std::fmt::Display for BinaryModel {
 #[derive(Clone)]
 #[cfg(feature = "greeners-ols")]
 pub struct SurModel {
-    pub result: Rc<greeners::sur::SurResult>,
+    pub result: Arc<greeners::sur::SurResult>,
     pub eq_var_names: Vec<Vec<String>>, // names per equation
 }
 
@@ -140,7 +139,7 @@ impl std::fmt::Display for SurModel {
 // ── PCA wrapper (adds variable names to PCAResult) ───────────────────────────
 #[derive(Clone)]
 pub struct PcaModel {
-    pub result: Rc<greeners::multivariate::PCAResult>,
+    pub result: Arc<greeners::multivariate::PCAResult>,
     pub var_names: Vec<String>,
 }
 
@@ -192,7 +191,7 @@ impl std::fmt::Display for PcaModel {
 // ── Factor Analysis wrapper ───────────────────────────────────────────────────
 #[derive(Clone)]
 pub struct FactorModel {
-    pub result: Rc<greeners::multivariate::FactorResult>,
+    pub result: Arc<greeners::multivariate::FactorResult>,
     pub var_names: Vec<String>,
 }
 
@@ -230,7 +229,7 @@ impl std::fmt::Display for FactorModel {
 #[derive(Clone)]
 #[cfg(feature = "greeners-timeseries")]
 pub struct DFMModel {
-    pub result: Rc<greeners::dynamic_factor::DynamicFactorResult>,
+    pub result: Arc<greeners::dynamic_factor::DynamicFactorResult>,
     #[allow(dead_code)]
     pub var_names: Vec<String>,
 }
@@ -246,7 +245,7 @@ impl std::fmt::Display for DFMModel {
 #[derive(Clone)]
 #[cfg(feature = "greeners-ols")]
 pub struct ThreeSLSModel {
-    pub result: Rc<greeners::three_sls::ThreeSLSResult>,
+    pub result: Arc<greeners::three_sls::ThreeSLSResult>,
     #[allow(dead_code)]
     pub eq_var_names: Vec<Vec<String>>,
 }

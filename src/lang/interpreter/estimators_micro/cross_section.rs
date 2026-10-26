@@ -55,8 +55,8 @@ impl Interpreter {
         let residuals = &y - &fitted;
         let x_used = result.x_clean.clone().unwrap_or(x);
 
-        Ok(Value::Model(Rc::new(OlsModel {
-            result: Rc::new(result),
+        Ok(Value::Model(Arc::new(OlsModel {
+            result: Arc::new(result),
             residuals,
             x: x_used,
         })))
@@ -109,7 +109,7 @@ impl Interpreter {
         let result = IV::from_formula(&g_endog, &g_instr, &df_endog, cov)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        Ok(Value::IvResult(Rc::new(result)))
+        Ok(Value::IvResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-ols")]
@@ -143,7 +143,7 @@ impl Interpreter {
         let result =
             greeners::QuantileReg::fit_with_names(&y_vec, &x_mat, tau, n_boot, Some(var_names))
                 .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        Ok(Value::QuantileResult(Rc::new(result)))
+        Ok(Value::QuantileResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-ols")]
@@ -177,8 +177,8 @@ impl Interpreter {
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         let fitted = x.dot(&result.params);
         let residuals = &y - &fitted;
-        Ok(Value::Model(Rc::new(OlsModel {
-            result: Rc::new(result),
+        Ok(Value::Model(Arc::new(OlsModel {
+            result: Arc::new(result),
             residuals,
             x,
         })))

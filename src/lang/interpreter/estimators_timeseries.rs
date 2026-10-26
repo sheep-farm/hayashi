@@ -165,7 +165,7 @@ impl Interpreter {
             _ => unreachable!(),
         };
 
-        Ok(Value::GarchResult(Rc::new(
+        Ok(Value::GarchResult(Arc::new(
             result.map_err(|e| self.rt_err(format!("{func}: {e}")))?,
         )))
     }
@@ -2369,7 +2369,7 @@ impl Interpreter {
         }
         let result =
             greeners::VARMA::fit(&data, p, q).map_err(|e| self.rt_err(format!("VARMA: {e}")))?;
-        Ok(Value::VarmaResult(Rc::new(result)))
+        Ok(Value::VarmaResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-timeseries")]
@@ -2417,7 +2417,7 @@ impl Interpreter {
         };
         let result = greeners::Decomposition::seasonal_decompose(&series, period, model_str)
             .map_err(|e| self.rt_err(format!("decompose: {e}")))?;
-        Ok(Value::DecompResult(Rc::new(result)))
+        Ok(Value::DecompResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-timeseries")]
@@ -2471,7 +2471,7 @@ impl Interpreter {
         };
         let result = greeners::Decomposition::stl(&series, period, sw, tw)
             .map_err(|e| self.rt_err(format!("stl: {e}")))?;
-        Ok(Value::DecompResult(Rc::new(result)))
+        Ok(Value::DecompResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-timeseries")]
@@ -2525,7 +2525,7 @@ impl Interpreter {
         };
         let result = greeners::mstl::MSTL::fit(&series, &periods)
             .map_err(|e| self.rt_err(format!("mstl: {e}")))?;
-        Ok(Value::MstlResult(Rc::new(result)))
+        Ok(Value::MstlResult(Arc::new(result)))
     }
 
     pub(super) fn proptest(
@@ -3025,7 +3025,7 @@ impl Interpreter {
         let result =
             greeners::unobserved_components::UnobservedComponents::fit(&y, level, seasonal)
                 .map_err(|e| self.rt_err(format!("ucm: {e}")))?;
-        Ok(Value::UCResult(Rc::new(result)))
+        Ok(Value::UCResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-glm")]
@@ -3062,7 +3062,7 @@ impl Interpreter {
             Some(linear_names),
         )
         .map_err(|e| self.rt_err(format!("gam: {e}")))?;
-        Ok(Value::GamResult(Rc::new(result)))
+        Ok(Value::GamResult(Arc::new(result)))
     }
 
     fn parse_gam_options(
@@ -3267,7 +3267,7 @@ impl Interpreter {
         let result = greeners::MICE::impute(&data, m, iter)
             .map_err(|e| self.rt_err(format!("mice: {e}")))?;
         println!("{result}");
-        Ok(Value::MiceResult(Rc::new(result)))
+        Ok(Value::MiceResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-timeseries")]
@@ -3314,7 +3314,7 @@ impl Interpreter {
         };
         let result = greeners::markov_autoreg::MarkovAutoregression::fit(&y, k, p)
             .map_err(|e| self.rt_err(format!("msauto: {e}")))?;
-        Ok(Value::MSARResult(Rc::new(result)))
+        Ok(Value::MSARResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-timeseries")]
@@ -3374,7 +3374,7 @@ impl Interpreter {
         };
         let result = greeners::SVAR::fit(&data, lags, identification)
             .map_err(|e| self.rt_err(format!("svar: {e}")))?;
-        Ok(Value::SVarResult(Rc::new(result)))
+        Ok(Value::SVarResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-timeseries")]
@@ -3602,8 +3602,8 @@ impl Interpreter {
         }
         let result = greeners::ThreeSLS::fit(&equations, &z_instr)
             .map_err(|e| self.rt_err(format!("threesl: {e}")))?;
-        Ok(Value::Model(Rc::new(ThreeSLSModel {
-            result: Rc::new(result),
+        Ok(Value::Model(Arc::new(ThreeSLSModel {
+            result: Arc::new(result),
             eq_var_names,
         })))
     }
@@ -3663,8 +3663,8 @@ impl Interpreter {
         }
         let result = greeners::dynamic_factor::DynamicFactor::fit(&data, k_factors, factor_order)
             .map_err(|e| self.rt_err(format!("dfm: {e}")))?;
-        Ok(Value::Model(Rc::new(DFMModel {
-            result: Rc::new(result),
+        Ok(Value::Model(Arc::new(DFMModel {
+            result: Arc::new(result),
             var_names,
         })))
     }

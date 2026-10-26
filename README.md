@@ -463,8 +463,8 @@ hay validate
 See `validation/README.md` for the full protocol and `validation/MATRIX.md` for
 the current status of every case.
 
-The matrix now covers **215 cases across 115 estimators**, with 199 passing
-against R and Python reference implementations.
+The matrix now covers **235 cases across 149 estimator families**, with 219
+passing against R and Python reference implementations.
 
 ## Graphs
 
@@ -728,10 +728,10 @@ Available plugins:
 
 ```bash
 cargo build --release      # optimized binary -> target/release/hay
-cargo test                 # 428 tests, <1s
+cargo test                 # 837 tests, <1s
 ```
 
-60 example scripts in `examples/`, all passing.
+63 example scripts in `examples/`, all passing.
 
 ## Error messages
 

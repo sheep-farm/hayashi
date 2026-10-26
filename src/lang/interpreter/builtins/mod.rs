@@ -496,6 +496,9 @@ mod type_conversions;
 
 impl Interpreter {
     /// Helper for `tidy`: build a tidy coefficient map from model result vectors.
+    ///
+    /// Canonical columns: `term`, `estimate`, `std_error`, `statistic`,
+    /// `p_value`, `conf_low`, `conf_high`.
     #[allow(clippy::too_many_arguments)]
     fn build_tidy_coef_map(
         &self,
@@ -508,21 +511,21 @@ impl Interpreter {
         conf_upper: &ndarray::Array1<f64>,
     ) -> std::collections::HashMap<String, Value> {
         let n = params.len();
-        let name_col: Vec<Value> = (0..n)
+        let term_col: Vec<Value> = (0..n)
             .map(|i| Value::Str(names.get(i).cloned().unwrap_or_else(|| format!("x{i}"))))
             .collect();
-        let coef_col: Vec<Value> = params.iter().map(|&v| Value::Float(v)).collect();
+        let estimate_col: Vec<Value> = params.iter().map(|&v| Value::Float(v)).collect();
         let se_col: Vec<Value> = std_errors.iter().map(|&v| Value::Float(v)).collect();
-        let t_col: Vec<Value> = t_values.iter().map(|&v| Value::Float(v)).collect();
+        let stat_col: Vec<Value> = t_values.iter().map(|&v| Value::Float(v)).collect();
         let p_col: Vec<Value> = p_values.iter().map(|&v| Value::Float(v)).collect();
         let cl_col: Vec<Value> = conf_lower.iter().map(|&v| Value::Float(v)).collect();
         let cu_col: Vec<Value> = conf_upper.iter().map(|&v| Value::Float(v)).collect();
 
         let mut map = std::collections::HashMap::new();
-        map.insert("variable".into(), Value::List(Arc::new(name_col)));
-        map.insert("coef".into(), Value::List(Arc::new(coef_col)));
-        map.insert("std_err".into(), Value::List(Arc::new(se_col)));
-        map.insert("t".into(), Value::List(Arc::new(t_col)));
+        map.insert("term".into(), Value::List(Arc::new(term_col)));
+        map.insert("estimate".into(), Value::List(Arc::new(estimate_col)));
+        map.insert("std_error".into(), Value::List(Arc::new(se_col)));
+        map.insert("statistic".into(), Value::List(Arc::new(stat_col)));
         map.insert("p_value".into(), Value::List(Arc::new(p_col)));
         map.insert("conf_low".into(), Value::List(Arc::new(cl_col)));
         map.insert("conf_high".into(), Value::List(Arc::new(cu_col)));
@@ -530,6 +533,9 @@ impl Interpreter {
     }
 
     /// Helper for `tidy`: build a tidy coefficient map without confidence intervals.
+    ///
+    /// Canonical columns: `term`, `estimate`, `std_error`, `statistic`,
+    /// `p_value`, `conf_low`, `conf_high` (NaN).
     fn build_tidy_simple(
         &self,
         names: Vec<String>,
@@ -539,20 +545,20 @@ impl Interpreter {
         p_values: &ndarray::Array1<f64>,
     ) -> std::collections::HashMap<String, Value> {
         let n = params.len();
-        let name_col: Vec<Value> = (0..n)
+        let term_col: Vec<Value> = (0..n)
             .map(|i| Value::Str(names.get(i).cloned().unwrap_or_else(|| format!("x{i}"))))
             .collect();
-        let coef_col: Vec<Value> = params.iter().map(|&v| Value::Float(v)).collect();
+        let estimate_col: Vec<Value> = params.iter().map(|&v| Value::Float(v)).collect();
         let se_col: Vec<Value> = std_errors.iter().map(|&v| Value::Float(v)).collect();
         let stat_col: Vec<Value> = stat_values.iter().map(|&v| Value::Float(v)).collect();
         let p_col: Vec<Value> = p_values.iter().map(|&v| Value::Float(v)).collect();
         let nan_col: Vec<Value> = vec![Value::Float(f64::NAN); n];
 
         let mut map = std::collections::HashMap::new();
-        map.insert("variable".into(), Value::List(Arc::new(name_col)));
-        map.insert("coef".into(), Value::List(Arc::new(coef_col)));
-        map.insert("std_err".into(), Value::List(Arc::new(se_col)));
-        map.insert("t".into(), Value::List(Arc::new(stat_col)));
+        map.insert("term".into(), Value::List(Arc::new(term_col)));
+        map.insert("estimate".into(), Value::List(Arc::new(estimate_col)));
+        map.insert("std_error".into(), Value::List(Arc::new(se_col)));
+        map.insert("statistic".into(), Value::List(Arc::new(stat_col)));
         map.insert("p_value".into(), Value::List(Arc::new(p_col)));
         map.insert("conf_low".into(), Value::List(Arc::new(nan_col.clone())));
         map.insert("conf_high".into(), Value::List(Arc::new(nan_col)));

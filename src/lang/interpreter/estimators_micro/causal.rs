@@ -82,7 +82,7 @@ impl Interpreter {
             Some((outcome_name, running_name)),
         )
         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        Ok(Value::RdResult(Rc::new(result)))
+        Ok(Value::RdResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-causal")]
@@ -175,7 +175,7 @@ impl Interpreter {
             Some((outcome_name, running_name, treatment_name)),
         )
         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        Ok(Value::RdResult(Rc::new(result)))
+        Ok(Value::RdResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-causal")]
@@ -281,7 +281,7 @@ impl Interpreter {
             Some((outcome_name, treatment_name, covariate_names)),
         )
         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        Ok(Value::PsmResult(Rc::new(result)))
+        Ok(Value::PsmResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-causal")]
@@ -375,7 +375,7 @@ impl Interpreter {
             cov_cols.as_deref(),
         )
         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        Ok(Value::SynthResult(Rc::new(result)))
+        Ok(Value::SynthResult(Arc::new(result)))
     }
 
     #[cfg(feature = "greeners-causal")]
@@ -417,7 +417,7 @@ impl Interpreter {
         let cov = resolve_cov_full(opt_map, &df)?;
         let result = greeners::DiffInDiff::fit(&y, &treated, &post, cov)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        Ok(Value::DidResult(Rc::new(result)))
+        Ok(Value::DidResult(Arc::new(result)))
     }
 
     #[cfg(all(feature = "greeners-causal", feature = "greeners-ols"))]

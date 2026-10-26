@@ -645,7 +645,7 @@ impl Interpreter {
                 let result = greeners::AutoReg::fit(&y, lags, None, &trend)
                     .map_err(|e| self.rt_err(format!("autoreg: {e}")))?;
 
-                Ok(Value::AutoRegResult(Rc::new(result)))
+                Ok(Value::AutoRegResult(Arc::new(result)))
             }
 
             // ── ardl ─────────────────────────────────────────────────────────
@@ -707,7 +707,7 @@ impl Interpreter {
                 let result = greeners::ARDL::fit(&y_arr, &x_no_const, y_lags, x_lags)
                     .map_err(|e| self.rt_err(format!("ardl: {e}")))?;
 
-                Ok(Value::ArdlResult(Rc::new(result)))
+                Ok(Value::ArdlResult(Arc::new(result)))
             }
 
             // ── kalman ───────────────────────────────────────────────────────
@@ -799,7 +799,7 @@ impl Interpreter {
                         // Local-level model: fit variances by MLE and return a result object.
                         let result = greeners::statespace::LocalLevel::fit(&y_vec)
                             .map_err(|e| self.rt_err(format!("kalman (ll): {e}")))?;
-                        return Ok(Some(Value::LocalLevelResult(Rc::new(result))));
+                        return Ok(Some(Value::LocalLevelResult(Arc::new(result))));
                     }
                     "llt" | "local_linear_trend" => {
                         // States: [level, slope]

@@ -92,7 +92,7 @@ let results = parallel for t in tickers, threads=4 {
 ### Isolation model
 
 Each thread gets its own interpreter with a **snapshot** of the outer
-environment (only send-safe values are captured). Auto-display is
+environment (subject to the capture policy below). Auto-display is
 suppressed inside threads — only explicit `print()` calls produce
 output. This has important consequences:
 
@@ -124,26 +124,41 @@ effects to propagate outward.
 | Type | Capturable? | Reason |
 |---|---|---|
 | `Int`, `Float`, `Str`, `Bool`, `Nil` | Yes | Primitive, copied by value |
-| `List`, `Dict` (of send-safe values) | Yes | `Arc`-backed, shared read-only |
-| `DataFrame`, `Series` | Yes | `Arc`-backed, operations are functional |
+| `List`, `Dict`, `Series` (of capturable values) | Yes | `Arc`-backed, checked recursively |
+| `DataFrame` | Yes | `Arc`-backed, operations are functional |
 | `UserFn` | Yes | `Arc`-backed |
-| Model results (`ols`, `iv`, `rolling`, ...) | **No** | Contain `Rc`, not `Send` |
+| Model results (`ols`, `iv`, `rolling`, ...) | No; iterator items only | Preserves the environment capture policy |
 
-Model results from the outer scope cannot be captured. Compute models
-**inside** the body instead:
+**Captured environment variables** (outer scope) are cloned into each worker
+subject to the capture policy above. Dedicated models, diagnostics and error
+values are not captured, even when nested in containers or generic model
+metadata. **Iterator items** and returned values have no such restriction.
+
+All shared values, including model results, use `Arc`, and model implementations
+must satisfy Rust's `Send + Sync` bounds. Safety is checked by the compiler,
+without unsafe thread-transfer wrappers. Repeated references to the same model
+in different items are safe, including references nested in lists or dicts.
+This also lets you chain two `parallel for` blocks: the first produces model
+results, and the second consumes them while the originals remain usable.
 
 ```
-// WRONG: m contains Rc, will be rejected
+// Capturing a model from the outer scope: excluded by capture policy
 let m = ols(y ~ x, df)
-parallel for i in 1..10 { predict(m, newdata) }
+parallel for i in 1..10 { predict(m, newdata) }   // m is not captured
 
-// CORRECT: compute inside the body
-parallel for i in 1..10 {
-    let sub = filter(df, group == i)
-    let m = ols(y ~ x, sub)
+// Iterating over model results: OK (shared allocations use Arc)
+let models = parallel for t in tickers {
+    let sub = filter(df, ticker == t)
+    ols(y ~ x, sub)
+}
+let summaries = parallel for m in models {
     tidy(m)
 }
 ```
+
+If you need to capture a model from the outer scope, extract the data you
+need (e.g. `tidy(m)`) into a capturable value first, or restructure so the
+model is an iterator item rather than a captured variable.
 
 ### Skipping iterations
 

@@ -69,25 +69,35 @@ fn parse_coefficient_rows(out: &str) -> Vec<(String, f64)> {
                 .collect()
         })
         .collect();
+    // Support both canonical tidy headers (term, estimate) and legacy
+    // model-rendered headers (variable, coef).
     let header_index = rows
         .iter()
         .position(|row| {
-            row.iter().any(|cell| cell == "variable") && row.iter().any(|cell| cell == "coef")
+            (row.iter().any(|cell| cell == "term") && row.iter().any(|cell| cell == "estimate"))
+                || (row.iter().any(|cell| cell == "variable")
+                    && row.iter().any(|cell| cell == "coef"))
         })
         .unwrap_or_else(|| panic!("missing coefficient table header:\n{out}"));
     let header = &rows[header_index];
-    let variable_index = header.iter().position(|cell| cell == "variable").unwrap();
-    let coefficient_index = header.iter().position(|cell| cell == "coef").unwrap();
+    let term_index = header
+        .iter()
+        .position(|cell| cell == "term" || cell == "variable")
+        .unwrap();
+    let estimate_index = header
+        .iter()
+        .position(|cell| cell == "estimate" || cell == "coef")
+        .unwrap();
     let header_len = header.len();
 
     rows.into_iter()
         .skip(header_index + 1)
         .filter(|row| row.len() == header_len)
         .map(|row| {
-            let coefficient = row[coefficient_index]
+            let coefficient = row[estimate_index]
                 .parse::<f64>()
                 .unwrap_or_else(|_| panic!("invalid coefficient row {row:?}:\n{out}"));
-            (row[variable_index].clone(), coefficient)
+            (row[term_index].clone(), coefficient)
         })
         .collect()
 }
@@ -1770,8 +1780,56 @@ let m = ols(Y ~ X, df)
 let t = tidy(m)
 print(t)
 "#,
-        "variable",
+        "term",
     );
+}
+
+#[test]
+fn tidy_canonical_columns_present() {
+    // Every tidy() output must have the canonical columns:
+    // term, estimate, std_error, statistic, p_value, conf_low, conf_high
+    assert_ok_contains(
+        "tidy_canonical",
+        r#"
+input df
+Y X
+10 2
+12 3
+8 1
+15 5
+11 2
+14 4
+end
+let m = ols(Y ~ X, df)
+let t = tidy(m)
+print(t)
+"#,
+        "estimate",
+    );
+    // Also verify statistic and std_error appear (not old t/std_err)
+    let (_, out) = run_inline(
+        r#"
+input df
+Y X
+10 2
+12 3
+8 1
+15 5
+11 2
+14 4
+end
+let m = ols(Y ~ X, df)
+let t = tidy(m)
+print(t)
+"#,
+    );
+    assert!(out.contains("term"), "missing 'term':\n{out}");
+    assert!(out.contains("estimate"), "missing 'estimate':\n{out}");
+    assert!(out.contains("std_error"), "missing 'std_error':\n{out}");
+    assert!(out.contains("statistic"), "missing 'statistic':\n{out}");
+    assert!(out.contains("p_value"), "missing 'p_value':\n{out}");
+    assert!(out.contains("conf_low"), "missing 'conf_low':\n{out}");
+    assert!(out.contains("conf_high"), "missing 'conf_high':\n{out}");
 }
 
 #[test]
@@ -9677,6 +9735,101 @@ display x[7]
 }
 
 #[test]
+fn parallel_for_repeated_model_items() {
+    assert_ok(
+        "parallel_repeated_models",
+        r#"
+quietly on
+input df
+y x
+10 2
+12 3
+8 1
+15 5
+11 2
+14 4
+9 1
+13 4
+end
+let model = ols(y ~ x, df)
+let expected = tidy(model)["estimate"]
+let models = [model, model, model, model, model, model, model, model]
+for workers in [2, 4] {
+    let returned = parallel for item in models, threads=workers {
+        for repetition in 0..32 {
+            let alias = item
+            let coefs = tidy(alias)["estimate"]
+            assert(abs(coefs[0] - expected[0]) < 1e-10)
+            assert(abs(coefs[1] - expected[1]) < 1e-10)
+        }
+        return item
+    }
+    assert(len(returned) == 8)
+    for returned_model in returned {
+        let coefs = tidy(returned_model)["estimate"]
+        assert(abs(coefs[0] - expected[0]) < 1e-10)
+        assert(abs(coefs[1] - expected[1]) < 1e-10)
+    }
+}
+let original = tidy(model)["estimate"]
+assert(abs(original[0] - expected[0]) < 1e-10)
+assert(abs(original[1] - expected[1]) < 1e-10)
+"#,
+    );
+}
+
+#[test]
+fn parallel_for_nested_shared_models_and_chained_results() {
+    assert_ok(
+        "parallel_nested_shared_models",
+        r#"
+quietly on
+input df
+y x
+10 2
+12 3
+8 1
+15 5
+11 2
+14 4
+9 1
+13 4
+end
+let linear = ols(y ~ x, df)
+let counts = poisson(y ~ x, df)
+let expected_linear = tidy(linear)["estimate"][0]
+let expected_counts = tidy(counts)["estimate"][0]
+let shared_models = [linear, counts]
+let shared = {"models": shared_models}
+let inputs = [shared, shared, shared, shared]
+let returned = parallel for item in inputs, threads=4 {
+    let local = item["models"]
+    let appended = push(local, local[0])
+    return local
+}
+assert(len(returned) == 4)
+assert(len(shared_models) == 2)
+assert(len(shared["models"]) == 2)
+let estimates = parallel for item in returned, threads=2 {
+    assert(len(item) == 3)
+    let first = tidy(item[0])["estimate"][0]
+    let second = tidy(item[1])["estimate"][0]
+    let third = tidy(item[2])["estimate"][0]
+    return [first, second, third]
+}
+assert(len(estimates) == 4)
+for row in estimates {
+    assert(abs(row[0] - expected_linear) < 1e-10)
+    assert(abs(row[1] - expected_counts) < 1e-10)
+    assert(abs(row[2] - expected_linear) < 1e-10)
+}
+assert(abs(tidy(linear)["estimate"][0] - expected_linear) < 1e-10)
+assert(abs(tidy(counts)["estimate"][0] - expected_counts) < 1e-10)
+"#,
+    );
+}
+
+#[test]
 fn parallel_for_expression_form() {
     // parallel for as expression: let r = parallel for ...
     assert_ok_contains(
@@ -9697,6 +9850,42 @@ display r[4]
 // ══════════════════════════════════════════════════════════════════════════════
 // MATCH — cases with types and expressions in arms
 // ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn parallel_for_chained_with_model() {
+    // Model results (Arc-backed) from one parallel for can be iterated
+    // as items in a second parallel for. Shared model allocations use
+    // atomic reference counts across both stages.
+    assert_ok_contains(
+        "parallel_chained_model",
+        r#"
+input df1
+y x
+1 1
+2 2
+3 3
+end
+input df2
+y x
+4 4
+5 5
+6 6
+end
+let dfs = [df1, df2]
+let models = parallel for d in dfs, threads=2 {
+    ols(y ~ x, d)
+}
+let summaries = parallel for m in models, threads=2 {
+    let t = tidy(m)
+    let coefs = t["estimate"]
+    return [len(coefs), coefs[0], coefs[1]]
+}
+display len(summaries)
+display summaries[0][0]
+"#,
+        "2",
+    );
+}
 
 #[test]
 fn match_int_values() {
@@ -14106,7 +14295,7 @@ end
 let m = var(df, y1, y2, lags=1)
 tidy(m)
 "#,
-        "variable",
+        "term",
     );
 }
 
@@ -14163,7 +14352,7 @@ end
 let m = autoreg(df, "y", lags=2)
 tidy(m)
 "#,
-        "variable",
+        "term",
     );
 }
 
@@ -14218,7 +14407,7 @@ end
 let m = glsar(y ~ x1, df, ar=1)
 tidy(m)
 "#,
-        "variable",
+        "term",
     );
 }
 

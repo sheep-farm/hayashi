@@ -5,15 +5,13 @@ use super::*;
 use std::sync::Arc;
 
 /// Wrapper for thread results in `parallel for` — values created inside a
-/// child thread are moved to the parent thread.  This is safe because:
-/// - Send-safe values (Arc, primitives) are genuinely Send.
-/// - Rc-backed values are created within the child thread, have refcount 1,
-///   and are moved (never cloned) to the parent.  No concurrent refcount
-///   access occurs.
+/// child thread are moved to the parent thread. This is checked because:
+/// - Value uses Arc for shared data and model results.
+/// - Model implementations must satisfy Send + Sync.
+/// - Nested values carry the same guarantees, including aliases retained
+///   by another worker or by the parent.
+// Send is inferred from the fields instead of asserted with unsafe.
 struct ThreadResult(std::result::Result<Value, HayashiError>);
-
-// SAFETY: see struct-level comment.
-unsafe impl Send for ThreadResult {}
 
 struct LoadOptions {
     sheet: Option<String>,
@@ -1668,7 +1666,7 @@ impl Interpreter {
         if let Some(err) = caught {
             self.env.push_scope();
             let catch_result = (|| -> Result<()> {
-                self.env.declare(error_var, Value::Error(Rc::new(err)))?;
+                self.env.declare(error_var, Value::Error(Arc::new(err)))?;
                 run_block(self, catch_body)
             })();
             self.env.pop_scope();
@@ -1964,16 +1962,26 @@ impl Interpreter {
             return Ok(Value::List(Arc::new(results)));
         }
 
-        // 4. Divide items into chunks (wrapped as SendValue for thread-safety).
+        // 4. Divide items into chunks.
+        //    Iterator items are wrapped in `ParallelItem` (not `SendValue`)
+        //    because they are not subject to the environment capture policy.
+        //    Arc-backed models remain safe even when items share allocations.
+        //    This allows the result of one `parallel for` to be fed into
+        //    another, e.g. estimating models in parallel and then
+        //    post-processing them in a second `parallel for`.
+        //
+        //    Items are MOVED (not cloned) into ParallelItem to avoid
+        //    incrementing Arc refcounts unnecessarily.
         let chunk_size = items.len().div_ceil(n_threads);
-        let chunks: Vec<Vec<SendValue>> = items
-            .chunks(chunk_size)
-            .map(|c| {
-                c.iter()
-                    .map(|v| SendValue::new(v.clone()).map_err(HayashiError::Runtime))
-                    .collect::<Result<Vec<_>>>()
-            })
-            .collect::<Result<Vec<_>>>()?;
+        let mut chunks: Vec<Vec<ParallelItem>> = Vec::with_capacity(n_threads);
+        {
+            let mut iter = items.into_iter();
+            for _ in 0..n_threads {
+                let chunk: Vec<ParallelItem> =
+                    iter.by_ref().take(chunk_size).map(ParallelItem).collect();
+                chunks.push(chunk);
+            }
+        }
 
         // 5. Shared stdout mutex for thread-safe printing.
         let stdout_lock = Arc::new(std::sync::Mutex::new(()));
@@ -2007,7 +2015,7 @@ impl Interpreter {
 
                     let mut results = Vec::with_capacity(chunk.len());
                     for (i, item) in chunk.into_iter().enumerate() {
-                        let item = item.0; // unwrap SendValue
+                        let item = item.0; // unwrap ParallelItem
                         interp.env.push_scope();
                         let _ = interp.env.set(&var, item);
                         if let Some(ref v2) = var2 {
@@ -2030,7 +2038,10 @@ impl Interpreter {
                 for tr in chunk_results {
                     match tr.0 {
                         Ok(v) => all.push(v),
-                        Err(_e) => all.push(Value::Nil),
+                        Err(e) => {
+                            eprintln!("parallel for: iteration error: {e}");
+                            all.push(Value::Nil);
+                        }
                     }
                 }
             }

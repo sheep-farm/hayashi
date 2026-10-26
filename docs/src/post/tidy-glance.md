@@ -13,17 +13,34 @@ let t = tidy(m)
 print(t)
 ```
 
-Returns a DataFrame with one row per coefficient:
+Returns a DataFrame with one row per coefficient. Column names follow
+the `broom` convention (canonical across all model types):
 
 | Column | Description |
 |---|---|
-| `variable` | Coefficient name |
-| `coef` | Point estimate |
-| `std_err` | Standard error |
-| `t` | t-statistic (or `z` for MLE models) |
+| `term` | Coefficient / parameter name |
+| `estimate` | Point estimate |
+| `std_error` | Standard error |
+| `statistic` | t-statistic (or z for MLE models) |
 | `p_value` | Two-sided p-value |
 | `conf_low` | Lower 95% confidence bound |
 | `conf_high` | Upper 95% confidence bound |
+
+Some model types add extra columns:
+
+| Model type | Extra columns |
+|---|---|
+| Rolling | `date`, `r_squared` |
+| SUR, 3SLS | `equation` |
+| MNLogit | `outcome` |
+| VAR, VECM | (term encodes equation and lag) |
+| SVar | `matrix`, `from`, `to` |
+| VARMA | `type`, `lag`, `from`, `to` |
+| Markov, MSAR | `regime` |
+| PCA | `component` |
+| Factor, DFM | `factor` |
+| KM (survival) | `time` (replaces `term`) |
+| PSM | `smd_before`, `smd_after` |
 
 ### Supported model types
 
@@ -122,7 +139,7 @@ print(g2)
 - Both `tidy` and `glance` return DataFrames, so they can be
   exported, filtered, or piped into any DataFrame operation.
 - For models without standard errors (e.g. RecursiveLS, Threshold),
-  `tidy` reports zeros for `std_err`, `t`, and `p_value`.
+  `tidy` reports NaN for `std_error`, `statistic`, and `p_value`.
 - `glance` keys are model-specific: only relevant statistics are
   reported for each model type. Use `names(glance(m))` to inspect
   available keys.
