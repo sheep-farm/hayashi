@@ -564,13 +564,13 @@ fn dist_update_help() {
 /// newer than the current one. Returns Ok(None) when already up to date.
 fn check_latest_release() -> Result<Option<String>, String> {
     let release_url = "https://api.github.com/repos/sheep-farm/hayashi/releases/latest";
-    let release_resp = ureq::get(release_url)
-        .set("User-Agent", "hay")
-        .set("Accept", "application/vnd.github.v3+json")
+    let mut release_resp = ureq::get(release_url)
+        .header("User-Agent", "hay")
+        .header("Accept", "application/vnd.github.v3+json")
         .call()
         .map_err(|e| format!("cannot fetch latest release: {e}"))?;
 
-    let release_body: String = release_resp.into_string().unwrap_or_default();
+    let release_body: String = packages::read_body_text(&mut release_resp).unwrap_or_default();
     let release: packages::GhRelease = serde_json::from_str(&release_body)
         .map_err(|e| format!("cannot parse release payload: {e}"))?;
 
@@ -594,13 +594,13 @@ fn dist_replace_from_release(
     };
     let (_, archive_cmd) = dist_asset_kind();
 
-    let release_resp = ureq::get(release_url)
-        .set("User-Agent", "hay")
-        .set("Accept", "application/vnd.github.v3+json")
+    let mut release_resp = ureq::get(release_url)
+        .header("User-Agent", "hay")
+        .header("Accept", "application/vnd.github.v3+json")
         .call()
         .map_err(|e| format!("cannot fetch {release_kind} release: {e}"))?;
 
-    let release_body: String = release_resp.into_string().unwrap_or_default();
+    let release_body: String = packages::read_body_text(&mut release_resp).unwrap_or_default();
     let release: packages::GhRelease = serde_json::from_str(&release_body)
         .map_err(|e| format!("cannot parse {release_kind} release payload: {e}"))?;
 
@@ -622,10 +622,14 @@ fn dist_replace_from_release(
 
     let archive_path = tmp_dir.join(asset_name);
     println!("hay dist-update: downloading {} ...", asset.name);
-    let resp = ureq::get(&asset.browser_download_url)
+    let mut resp = ureq::get(&asset.browser_download_url)
         .call()
         .map_err(|e| format!("download failed: {e}"))?;
-    let mut reader = resp.into_reader();
+    let mut reader = resp
+        .body_mut()
+        .with_config()
+        .limit(512 * 1024 * 1024)
+        .reader();
     let mut file =
         std::fs::File::create(&archive_path).map_err(|e| format!("download failed: {e}"))?;
     std::io::copy(&mut reader, &mut file).map_err(|e| format!("download failed: {e}"))?;

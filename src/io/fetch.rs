@@ -13,6 +13,46 @@ struct ValidatedDownloadUrl {
     socket_addrs: Vec<SocketAddr>,
 }
 
+/// Resolver that pins an already-validated `host:port` to the socket addresses
+/// checked against the SSRF rules.
+///
+/// Any other authority falls back to the default resolver, which still filters
+/// answers through [`resolve_safe_socket_addrs`].
+#[derive(Debug)]
+struct PinnedResolver {
+    resolver_key: String,
+    socket_addrs: Vec<SocketAddr>,
+}
+
+impl ureq::unversioned::resolver::Resolver for PinnedResolver {
+    fn resolve(
+        &self,
+        uri: &ureq::http::Uri,
+        config: &ureq::config::Config,
+        timeout: ureq::unversioned::transport::NextTimeout,
+    ) -> std::result::Result<ureq::unversioned::resolver::ResolvedSocketAddrs, ureq::Error> {
+        let pinned = match (uri.scheme(), uri.authority()) {
+            (Some(scheme), Some(authority)) => {
+                ureq::unversioned::resolver::DefaultResolver::host_and_port(scheme, authority)
+                    .is_some_and(|key| key == self.resolver_key)
+            }
+            _ => false,
+        };
+
+        if pinned {
+            let mut addrs = self.empty();
+            for addr in &self.socket_addrs {
+                // The validated answer set is small; entries beyond the
+                // resolver capacity are dropped rather than failing the request.
+                let _ = addrs.try_push(*addr);
+            }
+            return Ok(addrs);
+        }
+
+        ureq::unversioned::resolver::DefaultResolver::default().resolve(uri, config, timeout)
+    }
+}
+
 /// Downloads `url` to a temporary file and returns the path.
 /// The temporary file is kept alive while the `TempPath` exists.
 pub fn download_to_temp(url: &str) -> Result<tempfile::TempPath> {
@@ -34,34 +74,43 @@ fn download_validated_to_temp(
 
     let resolver_key = validated.resolver_key.clone();
     let socket_addrs = validated.socket_addrs.clone();
-    let agent = ureq::AgentBuilder::new()
-        .timeout(DOWNLOAD_TIMEOUT)
-        .redirects(0)
-        .resolver(move |addr: &str| {
-            if addr == resolver_key {
-                Ok(socket_addrs.clone())
-            } else {
-                resolve_safe_socket_addrs(addr)
-            }
-        })
+    let config = ureq::Agent::config_builder()
+        .timeout_global(Some(DOWNLOAD_TIMEOUT))
+        // Redirects are refused so the validated URL cannot be bounced to a
+        // different host; the 3xx response is inspected below.
+        .max_redirects(0)
+        .http_status_as_error(false)
         .build();
+    let agent = ureq::Agent::with_parts(
+        config,
+        ureq::unversioned::transport::DefaultConnector::default(),
+        PinnedResolver {
+            resolver_key,
+            socket_addrs,
+        },
+    );
 
-    let resp = agent
+    let mut resp = agent
         .get(validated.url.as_str())
         .call()
         .map_err(|e| HayashiError::Runtime(format!("HTTP error for '{url}': {e}")))?;
     let status = resp.status();
-    if !(200..=299).contains(&status) {
+    if !status.is_success() {
         return Err(HayashiError::Runtime(format!(
-            "HTTP error for '{url}': status {status} {}",
-            resp.status_text()
+            "HTTP error for '{url}': status {} {}",
+            status.as_u16(),
+            status.canonical_reason().unwrap_or("")
         )));
     }
 
-    if let Some(content_length) = resp.header("Content-Length") {
-        let content_length = content_length.parse::<u64>().map_err(|e| {
-            HayashiError::Runtime(format!("invalid Content-Length for '{url}': {e}"))
-        })?;
+    if let Some(content_length) = resp.headers().get("content-length") {
+        let content_length = content_length
+            .to_str()
+            .map_err(|e| HayashiError::Runtime(format!("invalid Content-Length for '{url}': {e}")))?
+            .parse::<u64>()
+            .map_err(|e| {
+                HayashiError::Runtime(format!("invalid Content-Length for '{url}': {e}"))
+            })?;
         if content_length > max_download_bytes {
             return Err(HayashiError::Runtime(format!(
                 "download too large for '{url}': {content_length} bytes exceeds {max_download_bytes} byte limit"
@@ -69,7 +118,9 @@ fn download_validated_to_temp(
         }
     }
 
-    let mut reader = resp.into_reader();
+    // The size cap is enforced by `copy_limited` so the error message stays
+    // stable; `Content-Length` was already rejected above.
+    let mut reader = resp.body_mut().as_reader();
     copy_limited(&mut reader, &mut tmp, max_download_bytes)
         .map_err(|e| HayashiError::Runtime(format!("download error: {e}")))?;
 

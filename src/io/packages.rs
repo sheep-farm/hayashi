@@ -9,6 +9,19 @@ use std::path::PathBuf;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// Upper bound for streamed binary downloads (native releases, plugin assets).
+const MAX_ASSET_BYTES: u64 = 512 * 1024 * 1024;
+
+/// Reads a response body as UTF-8 text.
+///
+/// ureq 3 dropped `Response::into_string()`; the body is now read through
+/// `body_mut()`, which keeps the response alive for header inspection.
+pub fn read_body_text(
+    resp: &mut ureq::http::Response<ureq::Body>,
+) -> std::result::Result<String, ureq::Error> {
+    resp.body_mut().read_to_string()
+}
+
 /// Returns the canonical package installation directory: `~/.hay/packages`.
 pub fn packages_dir() -> PathBuf {
     let home = std::env::var("HOME")
@@ -104,21 +117,21 @@ pub fn install(spec: &str, version: Option<&str>, force: bool) -> Result<()> {
     let api_url = format!("https://api.github.com/repos/{user}/{repo}/contents/");
     println!("Fetching {user}/{repo}...");
 
-    let resp = ureq::get(&api_url)
-        .set("User-Agent", "hay")
-        .set("Accept", "application/vnd.github.v3+json")
+    let mut resp = ureq::get(&api_url)
+        .header("User-Agent", "hay")
+        .header("Accept", "application/vnd.github.v3+json")
         .call()
         .map_err(|e| HayashiError::Runtime(format!("cannot reach GitHub API: {e}")))?;
 
-    let body: String = resp.into_string().unwrap_or_default();
+    let body: String = read_body_text(&mut resp).unwrap_or_default();
     let entries: Vec<GhEntry> = serde_json::from_str(&body)
         .map_err(|e| HayashiError::Runtime(format!("cannot parse GitHub response: {e}")))?;
 
     // Check plugin compatibility: look for hayashi.toml in repo root
     if let Some(toml_entry) = entries.iter().find(|e| e.name == "hayashi.toml") {
         if let Some(url) = &toml_entry.download_url {
-            if let Ok(resp) = ureq::get(url).set("User-Agent", "hay").call() {
-                let toml_body = resp.into_string().unwrap_or_default();
+            if let Ok(mut resp) = ureq::get(url).header("User-Agent", "hay").call() {
+                let toml_body = read_body_text(&mut resp).unwrap_or_default();
                 // Parse min_version = "x.y.z" (simple TOML, no crate needed)
                 if let Some(line) = toml_body
                     .lines()
@@ -184,9 +197,9 @@ pub fn install(spec: &str, version: Option<&str>, force: bool) -> Result<()> {
             None => format!("https://api.github.com/repos/{user}/{repo}/releases/latest"),
         };
 
-        let release_resp = ureq::get(&release_url)
-            .set("User-Agent", "hay")
-            .set("Accept", "application/vnd.github.v3+json")
+        let mut release_resp = ureq::get(&release_url)
+            .header("User-Agent", "hay")
+            .header("Accept", "application/vnd.github.v3+json")
             .call()
             .map_err(|e| {
                 if let Some(tag) = &version_tag {
@@ -198,7 +211,7 @@ pub fn install(spec: &str, version: Option<&str>, force: bool) -> Result<()> {
                 }
             })?;
 
-        let release_body: String = release_resp.into_string().unwrap_or_default();
+        let release_body: String = read_body_text(&mut release_resp).unwrap_or_default();
         let release: GhRelease = serde_json::from_str(&release_body)
             .map_err(|e| HayashiError::Runtime(format!("cannot parse release payload: {e}")))?;
 
@@ -220,8 +233,12 @@ pub fn install(spec: &str, version: Option<&str>, force: bool) -> Result<()> {
 
             print!("Downloading {} ... ", asset.name);
             match ureq::get(&asset.browser_download_url).call() {
-                Ok(resp) => {
-                    let mut reader = resp.into_reader();
+                Ok(mut resp) => {
+                    let mut reader = resp
+                        .body_mut()
+                        .with_config()
+                        .limit(MAX_ASSET_BYTES)
+                        .reader();
                     let mut out_file = std::fs::File::create(&dest_file).map_err(|e| {
                         HayashiError::Runtime(format!("cannot create {}: {e}", dest_file.display()))
                     })?;
@@ -267,8 +284,8 @@ pub fn install(spec: &str, version: Option<&str>, force: bool) -> Result<()> {
         let url = file.download_url.as_ref().unwrap();
         print!("  {} ... ", file.name);
         match ureq::get(url).call() {
-            Ok(resp) => {
-                let content = resp.into_string().unwrap_or_default();
+            Ok(mut resp) => {
+                let content = read_body_text(&mut resp).unwrap_or_default();
                 let path = dest.join(&file.name);
                 if std::fs::write(&path, &content).is_ok() {
                     println!("ok");
@@ -283,12 +300,12 @@ pub fn install(spec: &str, version: Option<&str>, force: bool) -> Result<()> {
 
     let commit_url = format!("https://api.github.com/repos/{user}/{repo}/commits");
     let mut version = "unknown".to_string();
-    if let Ok(c_resp) = ureq::get(&commit_url)
-        .set("User-Agent", "hay")
-        .set("Accept", "application/vnd.github.v3+json")
+    if let Ok(mut c_resp) = ureq::get(&commit_url)
+        .header("User-Agent", "hay")
+        .header("Accept", "application/vnd.github.v3+json")
         .call()
     {
-        if let Ok(c_body) = c_resp.into_string() {
+        if let Ok(c_body) = read_body_text(&mut c_resp) {
             if let Ok(commits) = serde_json::from_str::<Vec<GhCommitInfo>>(&c_body) {
                 if let Some(first) = commits.first() {
                     version = first.sha.clone();
@@ -574,15 +591,14 @@ pub fn check_integrity(meta: &PkgMetadata) -> Result<(String, bool)> {
             "https://api.github.com/repos/{}/{}/releases/latest",
             meta.user, meta.repo
         );
-        let resp = ureq::get(&release_url)
-            .set("User-Agent", "hay")
-            .set("Accept", "application/vnd.github.v3+json")
+        let mut resp = ureq::get(&release_url)
+            .header("User-Agent", "hay")
+            .header("Accept", "application/vnd.github.v3+json")
             .call()
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        let body: String = resp
-            .into_string()
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let body: String =
+            read_body_text(&mut resp).map_err(|e| HayashiError::Runtime(e.to_string()))?;
         let release: GhRelease =
             serde_json::from_str(&body).map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
@@ -593,15 +609,14 @@ pub fn check_integrity(meta: &PkgMetadata) -> Result<(String, bool)> {
             "https://api.github.com/repos/{}/{}/commits",
             meta.user, meta.repo
         );
-        let resp = ureq::get(&commit_url)
-            .set("User-Agent", "hay")
-            .set("Accept", "application/vnd.github.v3+json")
+        let mut resp = ureq::get(&commit_url)
+            .header("User-Agent", "hay")
+            .header("Accept", "application/vnd.github.v3+json")
             .call()
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        let body: String = resp
-            .into_string()
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let body: String =
+            read_body_text(&mut resp).map_err(|e| HayashiError::Runtime(e.to_string()))?;
         let commits: Vec<GhCommitInfo> =
             serde_json::from_str(&body).map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
