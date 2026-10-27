@@ -1,4 +1,9 @@
 load "validation/cases/fmols_simulated/data/data.csv" as df
 let m = fmols(y ~ x, df)
-let out = select(m.coefficients, "variable", "coef", "std_err")
-export(out, "csv", "/dev/stdout")
+let out = dataframe({
+  "variable": ["Intercept", "x", "n_obs", "bandwidth"],
+  "coef": [m.alpha, m.coefficients.coef[0], m.n_obs, m.bandwidth],
+  "std_err": [m.alpha_se, m.coefficients.std_err[0], 0.0, 0.0]
+})
+let ordered = select(out, "variable", "coef", "std_err")
+export(ordered, "csv", "/dev/stdout")

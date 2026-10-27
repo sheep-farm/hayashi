@@ -14,10 +14,24 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from fractions import Fraction
 from pathlib import Path, PureWindowsPath
 from typing import Any
 
 import yaml
+
+
+class ValidationLoader(yaml.SafeLoader):
+    """Recognise plain scientific numbers without coercing quoted strings."""
+
+
+# SafeLoader's YAML 1.1 resolver treats a bare 1e-6 as a string. Case files use
+# this numeric spelling, so resolve it at ingestion before strict comparison.
+ValidationLoader.add_implicit_resolver(
+    "tag:yaml.org,2002:float",
+    re.compile(r"^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)[eE][+-]?[0-9]+$"),
+    list("-+0123456789."),
+)
 
 VALIDATION_DIR = Path(__file__).resolve().parent
 ROOT_DIR = VALIDATION_DIR.parent
@@ -1065,12 +1079,13 @@ def parse_hayashi_sur(text: str) -> dict[str, dict[str, float]]:
     return result
 
 
-def approx_equal(a: float, b: float, tol: float) -> bool:
-    if math.isnan(a) and math.isnan(b):
-        return True
-    if math.isinf(a) and math.isinf(b) and (a > 0) == (b > 0):
-        return True
-    return abs(a - b) <= tol
+def approx_equal(a: int | float | str, b: int | float | str, tol: float) -> bool:
+    """Compare finite numbers without rounding integers or numerical strings."""
+    finite = all(isinstance(v, int) or math.isfinite(float(v)) for v in (a, b, tol))
+    return finite and tol >= 0 and abs(Fraction(a) - Fraction(b)) <= Fraction(tol)
+
+
+_MISSING = object()
 
 
 def _get_nested(data: Any, path: str) -> Any:
@@ -1081,24 +1096,36 @@ def _get_nested(data: Any, path: str) -> Any:
         if isinstance(current, dict) and part in current:
             current = current[part]
         else:
-            return None
+            return _MISSING
     return current
 
 
 def _compare_values(hay_val: Any, ref_val: Any, tol: float, path: str) -> list[str]:
     """Compare two JSON-like values and return failure messages."""
     failures: list[str] = []
+    if hay_val is _MISSING:
+        return [f"{path}: missing in Hayashi output"]
+    if hay_val is None or ref_val is None:
+        return [f"{path}: null is not numerical evidence"]
+    if isinstance(hay_val, bool) or isinstance(ref_val, bool):
+        return [f"{path}: boolean is not numerical evidence"]
     if isinstance(ref_val, dict):
+        if not ref_val:
+            return [f"{path}: empty reference mapping"]
+        if not isinstance(hay_val, dict):
+            return [f"{path}: expected a mapping in Hayashi output"]
         for key in ref_val:
             failures.extend(
                 _compare_values(
-                    hay_val.get(key) if isinstance(hay_val, dict) else None,
+                    hay_val.get(key, _MISSING),
                     ref_val[key],
                     tol,
                     f"{path}.{key}",
                 )
             )
     elif isinstance(ref_val, list):
+        if not ref_val:
+            return [f"{path}: empty reference list"]
         if not isinstance(hay_val, list) or len(hay_val) != len(ref_val):
             failures.append(f"{path}: length mismatch hayashi={hay_val} reference={ref_val}")
             return failures
@@ -1106,10 +1133,22 @@ def _compare_values(hay_val: Any, ref_val: Any, tol: float, path: str) -> list[s
             failures.extend(_compare_values(h, r, tol, f"{path}[{idx}]"))
     elif isinstance(ref_val, (int, float)):
         try:
-            if not approx_equal(float(hay_val), float(ref_val), tol):
+            if not approx_equal(hay_val, ref_val, tol):
                 failures.append(f"{path}: {hay_val} vs {ref_val} (tol={tol})")
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, OverflowError):
             failures.append(f"{path}: cannot compare {hay_val} with {ref_val}")
+    elif isinstance(ref_val, str):
+        try:
+            float(ref_val)
+        except ValueError:
+            if str(hay_val) != ref_val:
+                failures.append(f"{path}: {hay_val} != {ref_val}")
+        else:
+            try:
+                if not approx_equal(hay_val, ref_val, tol):
+                    failures.append(f"{path}: {hay_val} vs {ref_val} (tol={tol})")
+            except (ValueError, TypeError, OverflowError):
+                failures.append(f"{path}: cannot compare {hay_val} with {ref_val}")
     else:
         if str(hay_val) != str(ref_val):
             failures.append(f"{path}: {hay_val} != {ref_val}")
@@ -1121,16 +1160,31 @@ def compare_quantities(
     reference: dict[str, Any],
     tolerances: dict[str, float],
 ) -> tuple[str, list[str]]:
+    """Compare selected nonempty reference quantities; invalid evidence fails."""
     failures: list[str] = []
-    for quantity in tolerances:
+    if not isinstance(tolerances, dict) or not tolerances:
+        return "fail", ["comparison tolerances must be a nonempty mapping"]
+    for quantity, tol in tolerances.items():
+        if not isinstance(quantity, str) or not quantity:
+            failures.append("comparison quantity must be a nonempty string")
+            continue
+        try:
+            valid_tolerance = (
+                isinstance(tol, (int, float)) and not isinstance(tol, bool)
+                and math.isfinite(tol) and tol >= 0
+            )
+        except OverflowError:
+            valid_tolerance = False
+        if not valid_tolerance:
+            failures.append(f"{quantity}: tolerance must be numeric, finite and nonnegative")
+            continue
         ref_val = _get_nested(reference, quantity)
         hay_val = _get_nested(hayashi, quantity)
-        tol = float(tolerances[quantity])
 
-        if ref_val is None:
+        if ref_val is _MISSING:
             failures.append(f"{quantity}: missing in reference")
             continue
-        if hay_val is None:
+        if hay_val is _MISSING:
             failures.append(f"{quantity}: missing in Hayashi output")
             continue
 
@@ -1606,7 +1660,7 @@ def render_matrix_md(cases: list[dict[str, Any]]) -> str:
             "failed or are missing; exits non-zero unless `--allow-partial` is passed."
         ),
         "- `fail` — Hayashi differs from at least one reference beyond tolerances.",
-        "- `blocked` — no declared reference could run; the case cannot be judged.",
+        "- `blocked` — required execution or fitted inference is unavailable; the case cannot be judged.",
         (
             "- `not-supported` — the validation programme cannot currently test "
             "the stated estimator/workflow contract; this does not necessarily mean "
@@ -1813,7 +1867,7 @@ def load_cases() -> tuple[dict[str, Any], list[dict[str, Any]], set[str], set[st
         raise FileNotFoundError(f"{MATRIX_YML} not found")
 
     with open(MATRIX_YML, encoding="utf-8") as f:
-        matrix = yaml.safe_load(f) or {}
+        matrix = yaml.load(f, Loader=ValidationLoader) or {}
 
     registry = matrix.get("cases", [])
     registry_ids = {entry.get("id") for entry in registry if entry.get("id")}
@@ -1823,7 +1877,7 @@ def load_cases() -> tuple[dict[str, Any], list[dict[str, Any]], set[str], set[st
     for case_yml in sorted(VALIDATION_DIR.glob("cases/*/case.yml")):
         case_id = case_yml.parent.name
         with open(case_yml, encoding="utf-8") as f:
-            case = yaml.safe_load(f) or {}
+            case = yaml.load(f, Loader=ValidationLoader) or {}
         case["id"] = case_id
         case["_manifest_status"] = case.get("status", "not-started")
         discovered.append(case)

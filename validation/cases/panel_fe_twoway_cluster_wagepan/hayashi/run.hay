@@ -1,8 +1,39 @@
-// Panel FE validation target with two-way clustered standard errors.
-
+// Exact availability contract for the retained raw two-way covariance.
 load "validation/cases/panel_fe_twoway_cluster_wagepan/data/wagepan.csv" as df
-
 xtset(df, nr, year)
-let m = fe(lwage ~ union + married + d81 + d82 + d83 + d84 + d85 + d86 + d87, df, cluster=nr, cluster2=year)
 
-export(m, "txt", "/dev/stdout")
+// Loading, setup and ordinary FE are positive controls outside the catch.
+let control = fe(lwage ~ union + married + d81 + d82 + d83 + d84 + d85 + d86 + d87, df)
+let control_table = control.coefficients
+assert(control.fit.n_obs == nrow(df), "Plain FE sample changed")
+assert(control.fit.n_entities > 1, "Plain FE requires multiple entities")
+assert(len(control_table.variable) > 0, "Plain FE has no retained regressors")
+assert(nrow(df) > len(control_table.variable) + control.fit.n_entities - 1, "Plain FE has no residual degrees of freedom")
+assert(control.fit.sigma - control.fit.sigma == 0 && control.fit.sigma > 0, "Plain FE residual scale is invalid")
+for i in 0..len(control_table.variable) {
+    let value = control_table.coef[i]
+    assert(value - value == 0, "Plain FE coefficient is non-finite")
+    let uncertainty = control_table.std_err[i]
+    assert(uncertainty - uncertainty == 0 && uncertainty > 0, "Plain FE standard error is invalid")
+}
+
+let covariance_rejected = 0
+try {
+    let clustered = fe(lwage ~ union + married + d81 + d82 + d83 + d84 + d85 + d86 + d87, df, cluster=nr, cluster2=year)
+} catch error {
+    // Exact observed covariance guards only; rank, data and environment errors fail.
+    let known_covariance_error = error["kind"] == "runtime" && (
+        error["msg"] == "Invalid operation: Zero covariance variance has nonzero cross-covariance" ||
+        error["msg"] == "Invalid operation: Fitted covariance has negative variance" ||
+        error["msg"] == "Invalid operation: Fitted covariance is materially indefinite"
+    )
+    assert(known_covariance_error, "Unexpected clustered-fit error: " + error["msg"])
+    covariance_rejected = 1
+}
+// Unexpected successful inference is outside the catch and cannot become rejection.
+assert(covariance_rejected == 1, "Expected covariance rejection did not occur")
+let result = {
+    "availability": {"covariance_rejected": covariance_rejected},
+    "inference_available": covariance_rejected == 0
+}
+export(result, "json", "/dev/stdout")

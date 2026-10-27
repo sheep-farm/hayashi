@@ -23,6 +23,35 @@ Use `--experimental` to include cases whose `case.yml` is marked `experimental: 
 the reference scripts for each selected case, compares the declared quantities
 against tolerances, and updates `MATRIX.md`.
 
+Numerical agreement requires finite compared values and a nonempty tolerance
+mapping with finite, nonnegative numerical tolerances. Zero tolerance is valid.
+Missing values, nulls, booleans, empty reference containers and matching NaNs or
+infinities fail comparison. Every successfully executed reference must provide
+valid evidence for the selected quantities; another passing reference cannot
+hide invalid evidence. Integer and numerical-string comparisons preserve their
+represented precision. Unselected output fields remain outside the comparison.
+
+Plain scientific YAML scalars such as `1e-6` are read as numbers at case
+ingestion. Quoted numeric strings remain strings and cannot satisfy the strict
+numerical tolerance contract. This does not change declared tolerance values.
+
+The MODWT, random-forest, spatial-Durbin and synthetic-DiD cases compare only
+their declared finite point quantities. Their uncertainty placeholders are
+unselected, so a pass provides no uncertainty qualification. Both synthetic-DiD
+references are labelled `behavioural-proxy` because their pre-treatment weighting
+and post-treatment gap do not match the general estimator and inference contract.
+
+The two-way clustered wage-panel case has dimension `availability`: it checks
+that Hayashi rejects the fixed full-rank design's materially indefinite raw
+covariance, after an ordinary fixed-effects positive control succeeds. Its R/Python
+references retain named raw covariance entries and independently establish the
+rejection premise. Only the numeric `availability.covariance_rejected` indicator
+is compared, at exact tolerance zero. A pass means the expected rejection occurred;
+it does not qualify coefficient accuracy, standard errors or interval coverage.
+Unexpected inference, unrelated errors and admissible or non-finite reference
+covariance fail this contract. No variance clipping or blanket blocked-result
+allowance is used.
+
 For focused development or issue triage, run a single case without updating
 the generated matrix files:
 
@@ -82,7 +111,8 @@ Rscript -e 'd <- read.dcf("validation/DESCRIPTION"); pkgs <- trimws(strsplit(d[1
 Most cases provide both an R and a Python reference implementation. The
 validation runner runs every declared reference and compares Hayashi
 independently against every reference that runs successfully. A case is
-`blocked` when no declared reference runs. It is `partial` when at least one
+`blocked` when required execution or fitted inference is unavailable, including
+when no declared reference runs. It is `partial` when at least one
 reference runs but another declared reference fails or is missing; partial
 results exit non-zero unless `--allow-partial` is passed. `MATRIX.md` lists the
 declared references and recorded case status. When a runner result records

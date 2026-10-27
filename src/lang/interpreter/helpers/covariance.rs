@@ -40,17 +40,24 @@ pub(in crate::lang::interpreter) fn col_to_cluster_ids(
             })
             .collect())
     } else if let Ok(arr) = df.get(col) {
-        Ok(arr
-            .iter()
+        let mut floats: HashMap<u64, usize> = HashMap::new();
+        arr.iter()
             .map(|&v| {
-                let key = v as i64;
-                *map.entry(key).or_insert_with(|| {
+                if !v.is_finite() {
+                    return Err(HayashiError::Runtime(format!(
+                        "cluster column '{col}' contains a missing or non-finite label"
+                    )));
+                }
+                // Identity is exact, except both IEEE signed zeros are one label.
+                let bits = v.to_bits();
+                let key = if bits << 1 == 0 { 0 } else { bits };
+                Ok(*floats.entry(key).or_insert_with(|| {
                     let id = next;
                     next += 1;
                     id
-                })
+                }))
             })
-            .collect())
+            .collect()
     } else if let Ok(arr) = df.get_string(col) {
         let mut smap: HashMap<String, usize> = HashMap::new();
         Ok(arr

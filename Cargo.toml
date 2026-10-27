@@ -83,9 +83,9 @@ indexmap = { version = "2", features = ["serde"] }
 [features]
 default = ["plotters", "wasm", "native", "full"]
 
-# Greeners sub-crate toggles. `greeners = "=2.0.0"` is now the published facade
-# and always includes every sub-crate, so these features only gate Hayashi's
-# conditional compilation of estimator modules.
+# Greeners sub-crate toggles. The exact facade dependency uses the Git revision
+# declared below; these features gate Hayashi dispatch.
+# The facade includes every sub-crate; these flags control interpreter modules.
 experimental = ["greeners/experimental"]
 greeners-ols = []
 greeners-glm = []
@@ -135,5 +135,5 @@ panic = 'abort'
 strip = 'symbols'
 
 [patch.crates-io]
-greeners = { git = "https://github.com/sheep-farm/Greeners.git", branch = "dev" }
+greeners = { git = "https://github.com/shawcharles/Greeners.git", rev = "73412437389ec74dc5e51b1cb23c06af296575c4" }
 

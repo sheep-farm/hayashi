@@ -104,7 +104,7 @@ impl Interpreter {
         opt_map: &HashMap<String, Value>,
     ) -> Result<Value> {
         let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
-        let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+        let (df, g_formula, display_names) = self.prepare_formula(&formula_ast, &df)?;
         let (y_vec, x_mat) = df
             .to_design_matrix(&g_formula)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
@@ -122,7 +122,7 @@ impl Interpreter {
             _ => 2000,
         };
 
-        let var_names = g_formula.independents.clone();
+        let var_names = Self::expanded_formula_names(&df, &g_formula, &display_names)?;
         let model_type = if func == "bayes_sfa_cost" {
             "cost"
         } else {
@@ -147,31 +147,26 @@ impl Interpreter {
         }
         .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        let names: Vec<String> = std::iter::once("const".into())
-            .chain(
-                result
-                    .variable_names
-                    .as_deref()
-                    .unwrap_or(&[])
-                    .iter()
-                    .cloned(),
-            )
-            .collect();
+        let names = result.variable_names.clone().ok_or_else(|| {
+            HayashiError::Runtime("Bayesian SFA result has no coefficient names".into())
+        })?;
         let summary = format!(
             "BayesSFA({}), n={}, mean_eff={:.4}",
             result.model_type, result.n_obs, result.mean_efficiency
         );
+        // The backend retains posterior summaries, but no sign probabilities.
+        let coefficients = DataFrame::builder()
+            .add_string("variable", names)
+            .add_column("mean", result.beta.to_vec())
+            .add_column("sd", result.beta_sd.to_vec())
+            .add_column("ci_low", result.beta_ci_low.to_vec())
+            .add_column("ci_high", result.beta_ci_high.to_vec())
+            .build()
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         let fields = vec![
             (
                 "coefficients".into(),
-                model_expansion::posterior_coef_df(
-                    &names,
-                    &result.beta,
-                    &result.beta_sd,
-                    &result.beta_ci_low,
-                    &result.beta_ci_high,
-                    &result.beta, // no p_positive in BayesianSfaResult, reuse mean as placeholder
-                ),
+                Value::DataFrame(Arc::new(coefficients)),
             ),
             (
                 "fit".into(),
@@ -205,20 +200,21 @@ impl Interpreter {
         _opt_map: &HashMap<String, Value>,
     ) -> Result<Value> {
         let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
-        let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+        let (df, mut g_formula, display_names) = self.prepare_formula(&formula_ast, &df)?;
+
+        // BayesianLinear inserts its own intercept; give it predictors only.
+        g_formula.intercept = false;
 
         let (y_arr, x_arr) = df
             .to_design_matrix(&g_formula)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-        let var_names = g_formula.independents.clone();
+        let var_names = Self::expanded_formula_names(&df, &g_formula, &display_names)?;
 
         let result =
             greeners::bayesian_linear::BayesianLinear::fit(&y_arr, &x_arr, Some(var_names))
                 .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        let names: Vec<String> = std::iter::once("const".into())
-            .chain(result.variable_names.iter().cloned())
-            .collect();
+        let names = result.variable_names.clone();
         let ci_low = result.beta_ci.column(0).to_owned();
         let ci_high = result.beta_ci.column(1).to_owned();
         let summary = format!(

@@ -109,6 +109,7 @@ impl Interpreter {
                         }
                         #[cfg(feature = "greeners-ols")]
                         Value::IvResult(r) => {
+                            let r = &r.result;
                             map = self.build_tidy_simple(
                                 r.variable_names.clone().unwrap_or_default(),
                                 &r.params,
