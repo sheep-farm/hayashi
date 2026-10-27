@@ -89,7 +89,7 @@ jobs:
       - name: Install R dependencies
         shell: bash
         run: |
-          Rscript -e 'install.packages("https://cloud.r-project.org/src/contrib/renv_1.2.4.tar.gz", repos=NULL, type="source")'
+          Rscript -e 'install.packages("https://cran.r-project.org/src/contrib/Archive/renv/renv_1.2.4.tar.gz", repos=NULL, type="source")'
           validation_r_lib="$(Rscript -e 'cat(renv::paths$library(project="validation"))')"
           mkdir -p "$validation_r_lib"
           if [ "$RUNNER_OS" = "macOS" ]; then

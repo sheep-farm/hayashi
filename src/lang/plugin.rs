@@ -846,10 +846,12 @@ impl HayashiPlugin for RustNativePlugin {
             // 6. Free host-allocated FFI boxes after deserialization has reconstructed the data
             for &(arr_ptr, sch_ptr) in &temp_boxes {
                 let mut arr_box = Box::from_raw(arr_ptr as *mut FFI_ArrowArray);
-                arr_box.release = None;
+                // Clearing the callback keeps `Drop` from releasing guest-owned
+                // buffers; the host only owns the box itself.
+                arr_box.set_release(None);
                 drop(arr_box);
                 let mut sch_box = Box::from_raw(sch_ptr as *mut FFI_ArrowSchema);
-                sch_box.release = None;
+                sch_box.set_release(None);
                 drop(sch_box);
             }
 
@@ -865,10 +867,12 @@ impl HayashiPlugin for RustNativePlugin {
                         let arr = arr_ptr as *mut FFI_ArrowArray;
                         let sch = sch_ptr as *mut FFI_ArrowSchema;
                         if !arr.is_null() {
-                            (*arr).release = None;
+                            // The guest handed us a live array; the explicit
+                            // free hook below owns the release step.
+                            (*arr).set_release(None);
                         }
                         if !sch.is_null() {
-                            (*sch).release = None;
+                            (*sch).set_release(None);
                         }
                         free_arrow_func(arr, sch);
                     }

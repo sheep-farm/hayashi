@@ -11,6 +11,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
   and `cargo test` in CI, so a Greeners release (including a numerical fix) can
   only reach Hayashi through a deliberate bump instead of a lockfile resolution.
 
+### Security
+
+- Cleared the 2026 RustSec advisories that had turned the `advisories` job red:
+  `rustls` now resolves to 0.23.46, `rustls-webpki` to 0.103.16, `tokio` to
+  1.54.1 and `webpki-roots` to 1.0.11. Delivering the remaining fixes required
+  migrating `ureq` 2 → 3, `parquet`/`arrow` 59 → 60, `calamine` 0.35 → 0.37 and
+  `rust_xlsxwriter` 0.95 → 0.101, which brings `zip` 9.1.2, `zstd` 0.14.3 and
+  `quick-xml` 0.42. The ureq migration keeps the pinned-resolver guard that
+  stops a validated download URL from rebinding to a private address.
+
+### Fixed
+
+- The validation workflow installs `renv` from the CRAN archive instead of the
+  current release directory, so the pinned 1.2.4 tarball keeps resolving after
+  CRAN moved it to `Archive/renv/`.
+
 ## [0.2.10] — 2026-08-20
 
 ### Changed
