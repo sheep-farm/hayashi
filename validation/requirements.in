@@ -7,6 +7,7 @@
 # publish versioned wheels that can be hashed.
 
 econml>=0.17
+arch==8.0.0
 linearmodels>=7.0
 numpy>=1.26
 pandas>=2.0

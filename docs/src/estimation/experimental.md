@@ -56,7 +56,16 @@ Without `--experimental`, the runner skips cases whose `case.yml` has
 
 ## Status
 
-- `fmols` and `spatial_panel_sar` are validated (`pass`) but remain
-  experimental.
+- `fmols` compares coefficients and standard errors with native arch and
+  convention-adjusted cointReg in its fixed numerical case. Initial OLS uses
+  N rows; FMOLS uses N-1, the one-sided Phillips-Hansen correction and conditional
+  Bartlett long-run variance with asymptotic Normal inference. Rank or unresolved
+  precision failures return errors; R-squared retains initial all-N OLS meaning.
+  Cointegration and weak dependence are assumed, not tested. Numerical agreement
+  does not qualify nominal interval calibration: a prespecified endogenous AR
+  study found 90.0% and 91.8% coverage of nominal 95% slope intervals at N=300
+  and N=1,000. Both Monte Carlo intervals exclude 95%, so it remains experimental.
+- The `spatial_panel_sar` case remains `not-supported`; its required R reference
+  is unqualified.
 - The remaining experimental estimators are listed in the validation matrix as
   `not-supported` while their reference implementations are being assembled.

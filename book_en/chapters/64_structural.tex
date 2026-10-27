@@ -70,9 +70,18 @@ print(m_fapanel)
 
 \section{Fully Modified OLS}
 
-\texttt{fmols} estimates a cointegrating regression with non-parametric
-corrections for endogeneity and serial correlation in the long-run
-covariance.
+\texttt{fmols} estimates a cointegrating time-series regression with an
+intercept, assuming cointegration and weak dependence rather than testing them.
+Initial OLS uses all $N$ rows; FMOLS uses rows 2 to $N$, the one-sided
+Phillips--Hansen bias correction and conditional Bartlett long-run variance
+with asymptotic Normal inference. Rank or unresolved precision failures return
+errors; R-squared retains its initial all-$N$ OLS meaning.
+
+Numerical reference agreement does not establish nominal interval calibration.
+In a prespecified endogenous autoregressive diagnostic with 500 replications per
+design, nominal 95\% slope intervals covered 90.0\% at $N=300$ and 91.8\% at
+$N=1{,}000$. Both Monte Carlo intervals exclude 95\%, so FMOLS remains
+experimental and its finite-sample coverage is not qualified.
 
 \begin{lstlisting}[caption={FM-OLS}]
 let m_fm = fmols(y ~ x1 + x2, df)

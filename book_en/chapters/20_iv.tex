@@ -306,36 +306,40 @@ The function reports:
 
 \section{IV post-estimation tests}
 
-\subsection{Sargan / Hansen J --- overidentification}
+\subsection{Classical Sargan test --- overidentification}
 
-When there are more instruments than endogenous regressors
-(overidentification), test the exogeneity of the instruments:
+When the full instrument design has more independent columns than the
+structural design ($L > K$), the classical homoskedastic Sargan test evaluates
+the overidentifying restrictions:
 
 \begin{lstlisting}
-estat_overid(y ~ x1 + x_endog, ~ z1 + z2, df)
+estat_overid(y ~ x1 + x_endog, ~ x1 + z1 + z2, df)
 \end{lstlisting}
 
 $H_0$: instruments are exogenous (valid). The Sargan statistic is
 $n \cdot R^2$ from the regression of IV residuals on the instruments,
-distributed as $\chi^2(L - K)$, where $L$ is the number of instruments
-and $K$ the number of regressors. Rejecting $H_0$ suggests the
+distributed as $\chi^2(L - K)$, where $L$ and $K$ count independent columns
+of the full instrument and structural designs, including intercept and
+exogenous terms. Rejecting $H_0$ suggests the
 instruments may be invalid. Not applicable when the model is exactly
-identified ($L = K$).
+identified ($L = K$). This command does not report a heteroskedasticity-robust
+Hansen test. Non-rejection does not establish instrument validity.
 
 \subsection{Durbin-Wu-Hausman --- endogeneity}
 
-Tests whether the suspect variable is truly endogenous, comparing OLS
-and IV:
+Tests exogeneity of the suspect regressor through the classical augmented
+regression, conditional on valid identifying instruments:
 
 \begin{lstlisting}
-estat_endog(y ~ x1 + x_endog, ~ z1 + z2, df)
+estat_endog(y ~ x1 + x_endog, ~ x1 + z1 + z2, df)
 \end{lstlisting}
 
 $H_0$: regressors are exogenous (OLS is consistent). Uses the augmented
 regression approach: adds first-stage residuals to the structural
-equation and tests their significance via $F$. If $H_0$ is rejected, IV
-is needed; if not rejected, OLS is consistent and preferred (more
-efficient).
+equation and tests their significance via $F$. Rejection provides evidence
+against the exogeneity restriction under the test assumptions. Non-rejection
+does not establish OLS consistency or instrument validity; weak instruments
+and limited power can make the result inconclusive.
 
 \section{Fitted values}
 
