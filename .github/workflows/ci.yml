@@ -18,7 +18,9 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -r validation/requirements.txt
-      - run: python -m unittest validation/test_run.py validation/test_ab_reference.py
+      - run: >-
+          python -m unittest validation/test_run.py validation/test_ab_reference.py
+          validation/cases/fmols_simulated/test_case.py
       - run: python validation/run.py --check
 
   advisories:

@@ -1,9 +1,25 @@
 load "validation/cases/fmols_simulated/data/data.csv" as df
-let m = fmols(y ~ x, df)
+let iid = filter(df, fixture == "iid")
+let endogeneity = filter(df, fixture == "endogeneity")
+let serial = filter(df, fixture == "serial_correlation")
+let holdout = filter(df, fixture == "holdout")
+let m = fmols(y ~ x, iid)
+let e = fmols(y ~ x, endogeneity)
+let s = fmols(y ~ x, serial)
+let h = fmols(y ~ x, holdout)
 let out = dataframe({
-  "variable": ["Intercept", "x", "n_obs", "bandwidth"],
-  "coef": [m.alpha, m.coefficients.coef[0], m.n_obs, m.bandwidth],
-  "std_err": [m.alpha_se, m.coefficients.std_err[0], 0.0, 0.0]
+  "variable": ["Intercept", "x", "n_obs", "bandwidth",
+    "endogeneity_Intercept", "endogeneity_x", "endogeneity_n_obs", "endogeneity_bandwidth",
+    "serial_correlation_Intercept", "serial_correlation_x", "serial_correlation_n_obs", "serial_correlation_bandwidth",
+    "holdout_Intercept", "holdout_x", "holdout_n_obs", "holdout_bandwidth"],
+  "coef": [m.alpha, m.coefficients.coef[0], m.n_obs, m.bandwidth,
+    e.alpha, e.coefficients.coef[0], e.n_obs, e.bandwidth,
+    s.alpha, s.coefficients.coef[0], s.n_obs, s.bandwidth,
+    h.alpha, h.coefficients.coef[0], h.n_obs, h.bandwidth],
+  "std_err": [m.alpha_se, m.coefficients.std_err[0], 0.0, 0.0,
+    e.alpha_se, e.coefficients.std_err[0], 0.0, 0.0,
+    s.alpha_se, s.coefficients.std_err[0], 0.0, 0.0,
+    h.alpha_se, h.coefficients.std_err[0], 0.0, 0.0]
 })
 let ordered = select(out, "variable", "coef", "std_err")
 export(ordered, "csv", "/dev/stdout")

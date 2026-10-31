@@ -127,6 +127,9 @@ jobs:
       - name: Test panel inference availability guards
         run: python -m unittest validation/test_panel_availability.py -v
 
+      - name: Test FMOLS fixture and native reference guards
+        run: python -m unittest discover -s validation/cases/fmols_simulated -p test_case.py -v
+
       - name: Run validation programme
         shell: bash
         run: |
