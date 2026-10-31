@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Fixed
 
+- Extend the experimental FMOLS consumer reference case with fixed endogeneity,
+  serial-correlation and fresh-seed holdout fixtures. Compare coefficients and
+  standard errors independently against locked R and Python references at the
+  existing tolerances; preserve the estimator, engine pin and experimental status.
+  Reference agreement does not resolve the documented interval undercoverage.
+
 - Correct experimental FMOLS to use the N-1 regression sample, one-sided
   endogeneity bias correction and conditional long-run variance, with
   rank-checked solves and asymptotic Normal probabilities. The numerical
