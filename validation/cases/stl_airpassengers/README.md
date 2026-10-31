@@ -4,8 +4,9 @@
 The immutable Greeners fork pin reproduces this declared Python full-vector
 contract at unchanged tolerances. The repair is submitted in draft
 [Greeners #25](https://github.com/sheep-farm/Greeners/pull/25), with its complete
-third-party notice retained. Upstream contract acceptance and contribution-terms
-clarification remain open; this result does not resolve either decision.
+third-party notice retained. Greeners acceptance and contribution-terms
+clarification remain open; downstream numerical agreement does not resolve either
+decision.
 
 ## Data and reference contract
 
@@ -62,12 +63,15 @@ units. Hayashi reconstructs exactly. Reconstruction is an accounting check, not
 STL validation. Tests include offsetting trend/remainder perturbations which
 preserve reconstruction but fail the component comparison.
 
-Against the current immutable combined fork `e7f57bc8450bdd62c6c2105788b689b839158b6a`,
+Against the earlier immutable combined fork `e7f57bc8450bdd62c6c2105788b689b839158b6a`,
 all 578 quantities pass without changing data, settings or tolerances. Maximum
 absolute errors are approximately `7.91e-14` (trend), `4.92e-14` (seasonal) and
 `3.01e-14` (remainder); observed values match and reconstruction error is zero.
 This is agreement with the specified Python contract, not R equivalence or a
 whole-domain guarantee.
+The current fork `73412437389ec74dc5e51b1cb23c06af296575c4` retains exactly the
+same Greeners timeseries source and attribution; these numerical values describe
+the earlier replay, not a new run.
 
 ## Reproduce
 
@@ -118,8 +122,11 @@ jumps and iteration counts are held fixed. This is a controlled diagnostic,
 not a replacement R reference or proof of equivalence for other inputs. The
 installed R result still fails the robust gate. See the [R STL documentation](https://stat.ethz.ch/R-manual/R-devel/library/stats/html/stl.html).
 
-Every component gate passes for the provisional immutable fork. Maintain the
-draft/release boundary until maintainers settle the reference contract and the
-STL contribution-terms question. MSTL and robust R equivalence are outside this
-case; full-matrix and platform results are separate evidence. This fixed-case
-agreement alone must not close #160.
+With maintainer acceptance of this declared statsmodels contract and merge of
+[Hayashi #168](https://github.com/sheep-farm/hayashi/pull/168), #160 can close for
+the reported Hayashi mismatch. Supporting evidence includes the engine's
+smoothing and robustness controls as well as the full-vector AirPassengers
+comparison. Robust R equivalence and MSTL remain unqualified; full-matrix and
+platform results are separate evidence. Greeners #25 remains draft pending
+upstream acceptance and contribution-terms clarification, independently of
+Hayashi issue closure.
