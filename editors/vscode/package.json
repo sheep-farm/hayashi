@@ -4,7 +4,7 @@
   "description": "Language support, formatter, runner and debugger for Hayashi (.hay)",
   "version": "0.2.0",
   "publisher": "sheep-farm",
-  "license": "GPL-3.0-only",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/sheep-farm/hayashi"

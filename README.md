@@ -1,6 +1,6 @@
 # 林 Hayashi Language
 
-[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Docs: CC BY-SA 4.0](https://img.shields.io/badge/Docs-CC%20BY--SA%204.0-lightgrey.svg)](LICENSE-BOOKS.md)
 [![Rust](https://img.shields.io/badge/Rust-2021-orange.svg)](https://www.rust-lang.org)
 [![Version](https://img.shields.io/badge/version-0.2.11--dev-blue.svg)](Cargo.toml)
@@ -713,7 +713,7 @@ plugin_path("/shared/plugins", "/team/lib")
 
 Packages, imports, and auto-loaded plugins execute Hayashi/native code in your session. Install and import only code you trust; see the [Trust Model](docs/src/trust-model.md).
 
-Native plugins (`.so`/`.dll`/`.dylib` / `.wasm`) are fully supported, enabling third parties to ship optimized estimators, spatial packages, and data connectors via Hayashi's namespace system (using the `hayashi-plugin-sdk`). Closed-source proprietary plugins are legally permitted through Hayashi's GPL-3.0 Linking Exception.
+Native plugins (`.so`/`.dll`/`.dylib` / `.wasm`) are fully supported, enabling third parties to ship optimized estimators, spatial packages, and data connectors via Hayashi's namespace system (using the `hayashi-plugin-sdk`). The MIT license permits both open-source and proprietary integrations.
 
 Available plugins:
 
@@ -756,13 +756,11 @@ error: line 1: expected DataFrame, got Int
     │ ^^^^^^^^^^^^^
 ```
 
-## Author
+## Authors
 
-Flávio de Vasconcellos Corrêa — [@sheep-farm](https://github.com/sheep-farm) — flavio.vcorrea@ufpel.edu.br
+- Flávio de Vasconcellos Corrêa — [@sheep-farm](https://github.com/sheep-farm) — flavio.vcorrea@ufpel.edu.br
+- Charles Shaw
 
 ## License
 
-GPL-3.0 with **Plugin Exception** — see [LICENSE](LICENSE).
-
-This exception explicitly allows linking and loading proprietary/closed-source plugins developed using `hayashi-plugin-sdk` into Hayashi without triggering copyleft requirements.
-
+MIT — see [LICENSE](LICENSE).
