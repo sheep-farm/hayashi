@@ -16,10 +16,8 @@ references:
 comparison:
   quantities:
     - coefficients
-    - standard_errors
   tolerances:
     coefficients: 1e-12
-    standard_errors: 1.0
 
 output_format: csv
 
@@ -28,7 +26,7 @@ reference_scripts:
   R: cases/modwt_simulated/reference/run.R
   Python: cases/modwt_simulated/reference/run.py
 
-notes: Simulated series (trend + 16-period sine + noise). Greeners MODWT uses unnormalised Haar filters, equivalent to pywt.swt(..., norm=False). Wavelet energies are compared as coefficient-like quantities; standard errors are not meaningful.
+notes: Simulated series (trend + 16-period sine + noise). Greeners MODWT uses unnormalised Haar filters, equivalent to pywt.swt(..., norm=False). Only wavelet energy summaries are compared; standard errors are undefined and excluded from qualification.
 
 result:
   summary: "MODWT wavelet energies match pywt.swt with norm=False."

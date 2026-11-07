@@ -14,6 +14,144 @@ mod timeseries_models;
 /// margins, VECM/VAR/IRF/FEVD, ARIMA/SARIMA/AutoReg/ARDL/Kalman/forecast,
 /// lincom/nlcom. Extracted from `eval_call` (see src/lang/interpreter.rs).
 impl Interpreter {
+    /// Identifies explicit coefficient dependence in ordinary scalar expressions.
+    /// Complex expressions and calls that can capture state remain conservative.
+    fn nlcom_depends_on(expression: &Expr, name: &str) -> bool {
+        match expression {
+            Expr::Var(variable) => variable == name,
+            Expr::Int(_) | Expr::Float(_) | Expr::Bool(_) | Expr::Str(_) | Expr::Nil => false,
+            Expr::Neg(inner) | Expr::Not(inner) => Self::nlcom_depends_on(inner, name),
+            Expr::BinOp { lhs, rhs, .. } => {
+                Self::nlcom_depends_on(lhs, name) || Self::nlcom_depends_on(rhs, name)
+            }
+            // Use the interpreter's existing scalar-transform recognition,
+            // which precedes user-function lookup, rather than a new name list.
+            Expr::Call { func, args, opts }
+                if opts.is_empty()
+                    && ((args.len() == 1
+                        && greeners::transforms::Transforms::apply(&[1.0], func).is_ok())
+                        || (args.len() == 2
+                            && greeners::transforms::Transforms::apply2(&[1.0], &[1.0], func)
+                                .is_ok())) =>
+            {
+                args.iter()
+                    .any(|argument| Self::nlcom_depends_on(argument, name))
+                    || opts
+                        .iter()
+                        .any(|option| Self::nlcom_depends_on(&option.value, name))
+            }
+            Expr::If {
+                cond,
+                then_expr,
+                else_expr,
+            } => {
+                Self::nlcom_depends_on(cond, name)
+                    || Self::nlcom_depends_on(then_expr, name)
+                    || Self::nlcom_depends_on(else_expr, name)
+            }
+            _ => true,
+        }
+    }
+
+    /// Evaluates a finite scalar nonlinear contrast in the temporary coefficient scope.
+    fn nlcom_number(&mut self, expression: &Expr) -> Result<f64> {
+        let value = match self.eval_expr(expression)? {
+            Value::Float(value) => value,
+            Value::Int(value) => value as f64,
+            _ => {
+                return Err(HayashiError::Type(
+                    "nlcom: expression must evaluate to a number".into(),
+                ))
+            }
+        };
+        if value.is_finite() {
+            Ok(value)
+        } else {
+            Err(self.rt_err("nlcom: expression is outside its finite numerical domain"))
+        }
+    }
+
+    /// Differentiates in coefficient units, checking domain and step convergence.
+    fn nlcom_derivative(
+        &mut self,
+        expression: &Expr,
+        name: &str,
+        parameter: f64,
+        coordinate_se: f64,
+        centre: f64,
+    ) -> Result<f64> {
+        if !Self::nlcom_depends_on(expression, name) {
+            return Ok(0.0);
+        }
+        if !parameter.is_finite() || !coordinate_se.is_finite() || coordinate_se < 0.0 {
+            return Err(self.rt_err(format!("nlcom: invalid coefficient scale for '{name}'")));
+        }
+        let scale = parameter.abs().max(coordinate_se);
+        // A zero covariance coordinate contributes no delta-method variance.
+        if scale == 0.0 {
+            return Ok(0.0);
+        }
+        let mut step = f64::EPSILON.cbrt() * scale;
+        let mut previous_difference = None;
+        let mut previous_extrapolation: Option<f64> = None;
+        let mut previous_gap = None;
+        for _ in 0..20 {
+            let plus = parameter + step;
+            let minus = parameter - step;
+            if !plus.is_finite() || !minus.is_finite() || plus == parameter || minus == parameter {
+                break;
+            }
+            self.env.set(name, Value::Float(plus))?;
+            let plus_value = self.nlcom_number(expression);
+            self.env.set(name, Value::Float(minus))?;
+            let minus_value = self.nlcom_number(expression);
+            let (Ok(plus_value), Ok(minus_value)) = (plus_value, minus_value) else {
+                previous_difference = None;
+                previous_extrapolation = None;
+                previous_gap = None;
+                step *= 0.5;
+                continue;
+            };
+            if plus_value == centre && minus_value == centre {
+                return Err(self.rt_err(format!(
+                    "nlcom: derivative for '{name}' is unresolved at expression precision"
+                )));
+            }
+            let span = plus - minus;
+            let difference = (plus_value - minus_value) / span;
+            let gap = ((plus_value - centre) / (plus - parameter)
+                - (centre - minus_value) / (parameter - minus))
+                .abs();
+            // This budget measures subtraction roundoff in derivative units.
+            let roundoff =
+                8.0 * f64::EPSILON * (plus_value.abs() + minus_value.abs() + 2.0 * centre.abs())
+                    / span;
+            if !difference.is_finite() || !gap.is_finite() || !roundoff.is_finite() {
+                break;
+            }
+            if let Some(previous) = previous_difference {
+                let extrapolation: f64 = difference + (difference - previous) / 3.0;
+                if let Some(previous_extrapolation) = previous_extrapolation {
+                    let tolerance = f64::EPSILON.sqrt()
+                        * extrapolation.abs().max(previous_extrapolation.abs())
+                        + roundoff;
+                    let smooth = gap <= tolerance
+                        || previous_gap.is_some_and(|previous| gap <= 0.75 * previous + tolerance);
+                    if (extrapolation - previous_extrapolation).abs() <= tolerance && smooth {
+                        return Ok(extrapolation);
+                    }
+                }
+                previous_extrapolation = Some(extrapolation);
+            }
+            previous_difference = Some(difference);
+            previous_gap = Some(gap);
+            step *= 0.5;
+        }
+        Err(self.rt_err(format!(
+            "nlcom: derivative for '{name}' is unresolved in its domain or numerical precision"
+        )))
+    }
+
     pub(super) fn eval_call_post_estimation_ts(
         &mut self,
         func: &str,
@@ -1038,82 +1176,97 @@ impl Interpreter {
                 let k = params.len();
                 let expr = &args[1];
 
-                // save existing variables and bind coefficients
-                let mut saved: Vec<(String, Option<Value>)> = Vec::new();
-                for (i, name) in names.iter().enumerate() {
-                    saved.push((name.clone(), self.env.get(name).cloned()));
-                    self.env.set(name, Value::Float(params[i]))?;
+                if names.len() != k || ols.result.std_errors.len() != k {
+                    return Err(self.rt_err("nlcom: coefficient dimensions disagree"));
                 }
-
-                // avaliar g(β̂)
-                let g = match self.eval_expr(expr)? {
-                    Value::Float(f) => f,
-                    Value::Int(i) => i as f64,
-                    _ => {
-                        for (name, old) in &saved {
-                            match old {
-                                Some(v) => {
-                                    self.env.set(name, v.clone())?;
-                                }
-                                None => {
-                                    self.env.remove(name);
-                                }
-                            }
-                        }
-                        return Err(HayashiError::Type(
-                            "nlcom: expression must evaluate to a number".into(),
-                        ));
+                // A temporary scope shadows mutable caller bindings. Pop it
+                // before propagating any binding, expression or gradient error.
+                let scope_depth = self.env.scope_count();
+                let call_depth = self.call_stack.len();
+                self.env.push_scope();
+                let evaluation = (|| -> Result<(f64, Array1<f64>)> {
+                    for (name, &parameter) in names.iter().zip(params.iter()) {
+                        self.env.declare(name, Value::Float(parameter))?;
                     }
+                    let g = self.nlcom_number(expr)?;
+                    let mut gradient = Array1::<f64>::zeros(k);
+                    for (((name, &parameter), &coordinate_se), derivative) in names
+                        .iter()
+                        .zip(params.iter())
+                        .zip(ols.result.std_errors.iter())
+                        .zip(gradient.iter_mut())
+                    {
+                        *derivative =
+                            self.nlcom_derivative(expr, name, parameter, coordinate_se, g)?;
+                        self.env.set(name, Value::Float(parameter))?;
+                    }
+                    Ok((g, gradient))
+                })();
+                while self.env.scope_count() > scope_depth {
+                    self.env.pop_scope();
+                }
+                self.call_stack.truncate(call_depth);
+                let (g, gradient) = evaluation?;
+                let contrast = gradient.view().insert_axis(Axis(0)).to_owned();
+                let prediction = ols
+                    .result
+                    .get_prediction(&contrast, &ols.x, 0.05)
+                    .map_err(|e| self.rt_err(format!("nlcom: {e}")))?;
+                let se = prediction
+                    .se
+                    .first()
+                    .copied()
+                    .ok_or_else(|| self.rt_err("nlcom: invalid prediction dimensions"))?;
+                if !se.is_finite() || se < 0.0 {
+                    return Err(self.rt_err("nlcom: invalid propagated standard error"));
+                }
+                // Avoid the original engine's absolute SE cutoff and offset
+                // subtraction: the delta null is g(beta)=0, not gradient*beta=0.
+                let statistic = if se > 0.0 {
+                    g / se
+                } else if g == 0.0 {
+                    0.0
+                } else {
+                    g.signum() * f64::INFINITY
                 };
-
-                // numerical gradient (central differences)
-                let h = 1e-7;
-                let mut grad = ndarray::Array1::<f64>::zeros(k);
-                for j in 0..k {
-                    let orig = params[j];
-                    self.env.set(&names[j], Value::Float(orig + h))?;
-                    let g_plus = match self.eval_expr(expr)? {
-                        Value::Float(f) => f,
-                        Value::Int(i) => i as f64,
-                        _ => g,
-                    };
-                    self.env.set(&names[j], Value::Float(orig - h))?;
-                    let g_minus = match self.eval_expr(expr)? {
-                        Value::Float(f) => f,
-                        Value::Int(i) => i as f64,
-                        _ => g,
-                    };
-                    grad[j] = (g_plus - g_minus) / (2.0 * h);
-                    self.env.set(&names[j], Value::Float(orig))?;
+                let normal = matches!(ols.result.inference_type, greeners::InferenceType::Normal);
+                let df = ols.result.df_resid as f64;
+                let (critical, p) = if normal {
+                    let distribution =
+                        Normal::new(0.0, 1.0).map_err(|e| self.rt_err(format!("nlcom: {e}")))?;
+                    (
+                        distribution.inverse_cdf(0.975),
+                        2.0 * distribution.sf(statistic.abs()),
+                    )
+                } else {
+                    let distribution = statrs::distribution::StudentsT::new(0.0, 1.0, df)
+                        .map_err(|e| self.rt_err(format!("nlcom: {e}")))?;
+                    (
+                        distribution.inverse_cdf(0.975),
+                        2.0 * distribution.sf(statistic.abs()),
+                    )
+                };
+                let ci_lower = g - critical * se;
+                let ci_upper = g + critical * se;
+                if !ci_lower.is_finite()
+                    || !ci_upper.is_finite()
+                    || !p.is_finite()
+                    || !(0.0..=1.0).contains(&p)
+                {
+                    return Err(
+                        self.rt_err("nlcom: interval or probability exceeds numerical precision")
+                    );
                 }
-
-                // restore variables
-                for (name, old) in &saved {
-                    match old {
-                        Some(v) => {
-                            self.env.set(name, v.clone())?;
-                        }
-                        None => {
-                            self.env.remove(name);
-                        }
-                    }
-                }
-
-                // V = σ²(X'X)⁻¹
-                let xt_x = ols.x.t().dot(&ols.x);
-                let xt_x_inv = xt_x.inv().map_err(|e| self.rt_err(format!("nlcom: {e}")))?;
-                let sigma2 = ols.result.sigma * ols.result.sigma;
-                let vcov = &xt_x_inv * sigma2;
-
-                // SE = sqrt(g' V g)
-                let se = (grad.dot(&vcov.dot(&grad))).max(0.0).sqrt();
-                let t = if se > 1e-15 { g / se } else { f64::NAN };
-                let p = t_pvalue_two(t, ols.result.df_resid as f64);
+                let statistic_name = if normal { "z" } else { "t" };
 
                 println!("\n{:=^60}", " nlcom ");
                 println!("  g(β̂) = {g:.6}");
                 println!("  SE    = {se:.6}   (delta method)");
-                println!("  t     = {t:.4}   p = {p:.4}");
+                println!("  {statistic_name}     = {statistic:.4}   p = {p:.4}");
+                if !normal {
+                    println!("  df    = {df}");
+                }
+                println!("  95% CI: [{ci_lower:.6}, {ci_upper:.6}]");
                 let sig = if p < 0.01 {
                     "***"
                 } else if p < 0.05 {
@@ -1127,7 +1280,21 @@ impl Interpreter {
                     println!("  {sig}");
                 }
                 println!("{:=^60}\n", "");
-                Ok(Value::Float(g))
+                let mut fields = HashMap::new();
+                fields.insert("estimate".into(), Value::Float(g));
+                fields.insert("std_err".into(), Value::Float(se));
+                fields.insert(statistic_name.into(), Value::Float(statistic));
+                fields.insert("p_value".into(), Value::Float(p));
+                fields.insert("ci_lower".into(), Value::Float(ci_lower));
+                fields.insert("ci_upper".into(), Value::Float(ci_upper));
+                fields.insert(
+                    "reference_distribution".into(),
+                    Value::Str(if normal { "normal" } else { "student_t" }.into()),
+                );
+                if !normal {
+                    fields.insert("df".into(), Value::Float(df));
+                }
+                Ok(Value::Dict(Arc::new(fields)))
             }
 
             "lincom" => {
@@ -1198,18 +1365,28 @@ impl Interpreter {
                     )));
                 }
 
-                // estimativa pontual c'β
-                let estimate = c.dot(&ols.result.params);
-
-                // inference delegated to Greeners: t_test uses (X'X)⁻¹σ² internally
-                let (t, p) = ols
+                // A contrast is a one-row prediction of the conditional mean.
+                // Obtain its uncertainty directly, including when c'β is zero.
+                let contrast = c.view().insert_axis(Axis(0)).to_owned();
+                let prediction = ols
+                    .result
+                    .get_prediction(&contrast, &ols.x, 0.05)
+                    .map_err(|e| self.rt_err(format!("lincom: {e}")))?;
+                let (Some(&estimate), Some(&se), Some(&ci_lower), Some(&ci_upper)) = (
+                    prediction.mean.first(),
+                    prediction.se.first(),
+                    prediction.ci_lower.first(),
+                    prediction.ci_upper.first(),
+                ) else {
+                    return Err(self.rt_err("lincom: invalid prediction dimensions"));
+                };
+                let (statistic, p) = ols
                     .result
                     .t_test(&c, 0.0, &ols.x)
                     .map_err(|e| self.rt_err(format!("lincom: {e}")))?;
-
-                let se = if t.abs() > 1e-15 { estimate / t } else { 0.0 };
-                let df_t = ols.result.df_resid as f64;
-                let tc = t_critical_95(df_t);
+                let normal = matches!(ols.result.inference_type, greeners::InferenceType::Normal);
+                let statistic_name = if normal { "z" } else { "t" };
+                let df = ols.result.df_resid as f64;
 
                 // readable label for the combination
                 let display_name = |n: &str| {
@@ -1246,26 +1423,36 @@ impl Interpreter {
                 let sep = "─".repeat(64);
                 println!("\nlincom: {expr_label}");
                 println!("{sep}");
-                println!(
-                    "{:<12} {:>10} {:>10} {:>8} {:>10}",
-                    "Estimate", "Std.Err.", "t", "df", "p"
-                );
+                if normal {
+                    println!(
+                        "{:<12} {:>10} {:>10} {:>10}",
+                        "Estimate", "Std.Err.", statistic_name, "p"
+                    );
+                    println!("{sep}");
+                    println!("{estimate:<12.6} {se:>10.6} {statistic:>10.4} {p:>10.4}");
+                } else {
+                    println!(
+                        "{:<12} {:>10} {:>10} {:>8} {:>10}",
+                        "Estimate", "Std.Err.", statistic_name, "df", "p"
+                    );
+                    println!("{sep}");
+                    println!("{estimate:<12.6} {se:>10.6} {statistic:>10.4} {df:>8.1} {p:>10.4}");
+                }
                 println!("{sep}");
-                println!(
-                    "{:<12.6} {:>10.6} {:>10.4} {:>8.1} {:>10.4}",
-                    estimate, se, t, df_t, p
-                );
-                println!("{sep}");
-                let ci_lower = estimate - tc * se;
-                let ci_upper = estimate + tc * se;
                 println!("95% CI: [{:.6},  {:.6}]", ci_lower, ci_upper);
                 println!();
 
                 let mut map = HashMap::new();
                 map.insert("estimate".into(), Value::Float(estimate));
                 map.insert("std_err".into(), Value::Float(se));
-                map.insert("t".into(), Value::Float(t));
-                map.insert("df".into(), Value::Float(df_t));
+                map.insert(statistic_name.into(), Value::Float(statistic));
+                if !normal {
+                    map.insert("df".into(), Value::Float(df));
+                }
+                map.insert(
+                    "reference_distribution".into(),
+                    Value::Str(if normal { "normal" } else { "student_t" }.into()),
+                );
                 map.insert("p_value".into(), Value::Float(p));
                 map.insert("ci_lower".into(), Value::Float(ci_lower));
                 map.insert("ci_upper".into(), Value::Float(ci_upper));

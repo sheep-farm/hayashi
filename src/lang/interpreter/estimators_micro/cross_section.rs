@@ -5,6 +5,32 @@ use super::super::*;
 use crate::lang::dap::model_expansion;
 
 impl Interpreter {
+    /// Expands categorical names and restores display names for materialised terms.
+    pub(super) fn expanded_formula_names(
+        df: &DataFrame,
+        formula: &GFormula,
+        display_names: &[String],
+    ) -> Result<Vec<String>> {
+        let mut names = df
+            .formula_var_names(formula)
+            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        for name in &mut names {
+            for (column, display) in formula.independents.iter().zip(display_names) {
+                if name == column {
+                    *name = display.clone();
+                    break;
+                }
+                if column.starts_with("C(") {
+                    if let Some(suffix) = name.strip_prefix(&format!("{column}_")) {
+                        *name = format!("{display}_{suffix}");
+                        break;
+                    }
+                }
+            }
+        }
+        Ok(names)
+    }
+
     #[cfg(feature = "greeners-ols")]
     pub(super) fn ols(
         &mut self,
@@ -40,14 +66,12 @@ impl Interpreter {
             .to_design_matrix(&g_formula)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        // Usa fit_with_names para preservar nomes legíveis (e.g. "log(K):log(L)")
-        let var_names: Vec<String> = if g_formula.intercept {
-            std::iter::once("_cons".to_string())
-                .chain(display_names)
-                .collect()
-        } else {
-            display_names
-        };
+        let mut var_names = Self::expanded_formula_names(&df, &g_formula, &display_names)?;
+        if g_formula.intercept {
+            if let Some(intercept) = var_names.first_mut() {
+                *intercept = "_cons".into();
+            }
+        }
         let result = OLS::fit_with_names(&y, &x, cov, Some(var_names))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
@@ -67,49 +91,27 @@ impl Interpreter {
         &mut self,
         _func: &str,
         args: &[Expr],
-        _opts: &[Opt],
+        opts: &[Opt],
         opt_map: &HashMap<String, Value>,
     ) -> Result<Value> {
-        if args.len() < 3 {
-            return Err(HayashiError::Runtime(
-                "iv() requires (endog_formula, instrument_formula, dataframe)".into(),
-            ));
-        }
-        let endog_ast = self.resolve_formula_allow_no_intercept(&args[0])?;
-        let instr_ast = self.resolve_formula_allow_no_intercept(&args[1])?;
-        let df_name = match &args[2] {
-            Expr::Var(name) => name.clone(),
-            _ => {
-                return Err(HayashiError::Type(
-                    "third argument must be a DataFrame variable".into(),
-                ))
-            }
-        };
-        let df = match self.env.get(&df_name) {
-            Some(Value::DataFrame(df)) => df.clone(),
-            _ => return Err(self.rt_err(format!("'{df_name}' is not a DataFrame"))),
-        };
-        let (df_endog, g_endog, _) = self.prepare_formula_allow_no_intercept(&endog_ast, &df)?;
-        let cov = resolve_cov_full(opt_map, &df_endog)?;
+        let mut prepared = self.prepare_iv(args, opts)?;
+        let cov = resolve_cov_full(opt_map, &prepared.structural_frame)?;
+        let result = IV::fit_with_names(
+            &prepared.y,
+            &prepared.x,
+            &prepared.z,
+            cov,
+            // The backend owns its names; metadata retains the original order
+            // for validating omitted positions and rematerialised predictions.
+            Some(prepared.design.names.clone()),
+        )
+        .map_err(|e| HayashiError::Runtime(e.to_string()))?;
 
-        // Instrumento pode ter LHS vazio (~ z1 + z2)
-        let g_instr = if instr_ast.lhs.is_empty() {
-            let (df_instr, g_i, _) = self.prepare_formula_allow_no_intercept(&instr_ast, &df)?;
-            let _ = df_instr; // df aumentado não é necessário para instrumento
-            GFormula {
-                dependent: String::new(),
-                independents: g_i.independents,
-                intercept: g_i.intercept,
-            }
-        } else {
-            let (_, g_i, _) = self.prepare_formula_allow_no_intercept(&instr_ast, &df)?;
-            g_i
-        };
-
-        let result = IV::from_formula(&g_endog, &g_instr, &df_endog, cov)
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
-
-        Ok(Value::IvResult(Arc::new(result)))
+        prepared.design.retain_fitted_columns(&result)?;
+        Ok(Value::IvResult(Arc::new(super::super::models::IvModel {
+            result,
+            design: prepared.design,
+        })))
     }
 
     #[cfg(feature = "greeners-ols")]
@@ -155,7 +157,7 @@ impl Interpreter {
         opt_map: &HashMap<String, Value>,
     ) -> Result<Value> {
         let (formula_ast, df) = self.extract_binary_args_filtered(args, opts)?;
-        let (df, g_formula, _display) = self.prepare_formula(&formula_ast, &df)?;
+        let (df, g_formula, display_names) = self.prepare_formula(&formula_ast, &df)?;
         let w_name = match opt_map.get("weights") {
             Some(Value::Str(s)) => s.clone(),
             None => {
@@ -167,14 +169,27 @@ impl Interpreter {
         };
         let weights = get_col_f64(&df, &w_name)?;
         let cov = resolve_cov_full(opt_map, &df)?;
-        let var_names = df
-            .formula_var_names(&g_formula)
-            .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        let var_names = Self::expanded_formula_names(&df, &g_formula, &display_names)?;
         let (y, x) = df
             .to_design_matrix(&g_formula)
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
         let result = greeners::WLS::fit_with_names(&y, &x, &weights, cov, Some(var_names))
             .map_err(|e| HayashiError::Runtime(e.to_string()))?;
+        // Omitted positions refer to the original columns, so retain those
+        // columns directly without reusing the backend's weighted design.
+        let x = if !result.omitted_vars.is_empty() {
+            let retained: Vec<usize> = (0..x.ncols())
+                .filter(|index| {
+                    !result
+                        .omitted_vars
+                        .iter()
+                        .any(|(position, _)| position == index)
+                })
+                .collect();
+            x.select(Axis(1), &retained)
+        } else {
+            x
+        };
         let fitted = x.dot(&result.params);
         let residuals = &y - &fitted;
         Ok(Value::Model(Arc::new(OlsModel {
@@ -226,15 +241,28 @@ impl Interpreter {
                         format!("testparm: variable '{v}' not found in model")
                     ))
             }).collect::<Result<_>>()?;
-            let (f_stat, p_val) = m.result.f_test(&indices, &m.x)
+            let (f_stat, fitted_p_val) = m.result.f_test(&indices, &m.x)
                 .map_err(|e| HayashiError::Runtime(e.to_string()))?;
             let df1 = indices.len();
             let df2 = m.result.df_resid;
-            println!("\n{:=^62}", " testparm — Joint F Test ");
+            let normal = matches!(m.result.inference_type, greeners::InferenceType::Normal);
+            let (test_name, distribution, p_val) = if normal {
+                let reference = statrs::distribution::ChiSquared::new(df1 as f64)
+                    .map_err(|e| self.rt_err(format!("testparm: {e}")))?;
+                ("testparm - Scaled Wald Test", "chi2", reference.sf(f_stat * df1 as f64))
+            } else {
+                ("testparm - Joint F Test", "F", fitted_p_val)
+            };
+            println!("\n{:=^62}", format!(" {test_name} "));
             println!(" H0: {} = 0 (simultaneously)", tested.join(" = "));
             println!("{:-^62}", "");
-            println!(" F({df1}, {df2})  =  {f_stat:.4}");
-            println!(" Prob > F      =  {p_val:.4}");
+            if normal {
+                println!(" Scaled Wald Q/{df1} = {f_stat:.4}");
+                println!(" Reference: chi-square({df1}) at Q");
+            } else {
+                println!(" F({df1}, {df2})  =  {f_stat:.4}");
+            }
+            println!(" p-value       =  {p_val:.4}");
             let verdict = if p_val < 0.01 {
                 "rejects H0 at 1%"
             } else if p_val < 0.05 {
@@ -247,10 +275,13 @@ impl Interpreter {
             println!(" Result: {verdict}");
             println!("{:=^62}", "");
             let mut map = HashMap::new();
-            map.insert("test".into(), Value::Str("testparm — Joint F Test".into()));
+            map.insert("test".into(), Value::Str(test_name.into()));
+            map.insert("reference_distribution".into(), Value::Str(distribution.into()));
             map.insert("f_stat".into(), Value::Float(f_stat));
             map.insert("df1".into(), Value::Int(df1 as i64));
-            map.insert("df2".into(), Value::Int(df2 as i64));
+            if !normal {
+                map.insert("df2".into(), Value::Int(df2 as i64));
+            }
             map.insert("p_value".into(), Value::Float(p_val));
             map.insert("variables".into(), Value::List(Arc::new(
                 tested.into_iter().map(Value::Str).collect()

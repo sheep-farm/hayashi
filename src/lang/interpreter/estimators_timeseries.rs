@@ -1391,7 +1391,7 @@ impl Interpreter {
             #[cfg(feature = "greeners-timeseries")]
             Value::VecmResult(ref m) => self.diagnostics_vecm(m, &thick, &thin)?,
             #[cfg(feature = "greeners-ols")]
-            Value::IvResult(ref iv) => self.diagnostics_iv(iv, &thick, &thin)?,
+            Value::IvResult(ref iv) => self.diagnostics_iv(&iv.result, &thick, &thin)?,
             #[cfg(feature = "greeners-panel")]
             Value::PanelResult(ref fe) => self.diagnostics_panel(fe, &thick, &thin)?,
             #[cfg(feature = "greeners-panel")]

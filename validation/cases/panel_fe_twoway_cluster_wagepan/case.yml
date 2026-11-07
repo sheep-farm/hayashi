@@ -1,12 +1,12 @@
 id: panel_fe_twoway_cluster_wagepan
-title: Panel fixed-effects wage equation with two-way clustered SEs on Wooldridge wagepan
+title: Availability of raw two-way fixed-effects covariance inference on wagepan
 estimator_family: panel_fe
 status: pass
-dimension: numerical
+dimension: availability
 
 dataset:
   name: wooldridge::wagepan
-  source: R package wooldridge / Python wooldridge package
+  source: Shared wagepan CSV produced by data/gen.py; both R and Python references read the same CSV
   licence: public teaching dataset
 
 references:
@@ -15,22 +15,36 @@ references:
 
 comparison:
   quantities:
-    - coefficients
-    - standard_errors
+    - availability.covariance_rejected
   tolerances:
-    coefficients: 1e-4
-    standard_errors: 1e-4
+    availability.covariance_rejected: 0
 
-output_format: txt
+reference_evidence:
+  R:
+    availability.covariance_rejected:
+      class: exact
+      rationale: Exact numeric rejection indicator after finite full-rank controls and material raw d81/eigenvalue rejection checks; no estimator or uncertainty accuracy claim.
+  Python:
+    availability.covariance_rejected:
+      class: exact
+      rationale: Exact numeric rejection indicator after finite full-rank controls and material raw d81/eigenvalue rejection checks; no estimator or uncertainty accuracy claim.
+
+output_format: json
 
 hayashi_script: cases/panel_fe_twoway_cluster_wagepan/hayashi/run.hay
 reference_scripts:
   R: cases/panel_fe_twoway_cluster_wagepan/reference/run.R
   Python: cases/panel_fe_twoway_cluster_wagepan/reference/run.py
 
-notes: Panel fixed-effects wage equation with two-way (entity + time) clustered standard errors using explicit within-transformed CR1 reference implementations.
+notes: >-
+  Explicit availability contract for the retained raw materially indefinite covariance.
+  Ordinary FE must succeed outside the catch; only specific covariance rejection
+  can produce the exact numeric indicator 1. Both references assert finite raw
+  covariance with material negative d81 variance and eigenvalues. Unexpected
+  inference success or unrelated errors fail. No coefficient/SE qualification,
+  clipping, PSD projection or blanket allow-blocked policy is implied.
 
 result:
-  summary: ""
+  summary: Exact availability contract passes against R and Python; raw covariance inference remains unavailable.
   known_differences: []
   issues_opened: []

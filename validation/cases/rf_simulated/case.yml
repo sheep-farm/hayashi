@@ -16,10 +16,8 @@ references:
 comparison:
   quantities:
     - coefficients
-    - standard_errors
   tolerances:
     coefficients: 5e-3
-    standard_errors: 1.0
 
 output_format: csv
 
@@ -28,7 +26,7 @@ reference_scripts:
   R: cases/rf_simulated/reference/run.R
   Python: cases/rf_simulated/reference/run.py
 
-notes: Simulated data y = 3*x1 + N(0, 0.1). In-sample R² compared against scikit-learn. Standard errors are not defined for an out-of-bag R² summary.
+notes: Simulated data y = 3*x1 + N(0, 0.1). Only in-sample R² is compared against scikit-learn; uncertainty and the full forest fitting contract are outside this comparison.
 
 result:
   summary: "In-sample R² matches scikit-learn."

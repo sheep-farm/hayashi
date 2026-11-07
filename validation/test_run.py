@@ -278,6 +278,42 @@ class MetadataCheckTests(unittest.TestCase):
 
         self.assertEqual(findings, [])
 
+    def test_invalid_numerical_reference_fails_case_and_cli(self):
+        loaded = self.evidence_case()
+        original_case = loaded[1][0]
+        scenarios = [
+            ('{"coefficients": {}}', {"coefficients": 1e-6}),
+            ('{"coefficients": {"x": NaN}}', {"coefficients": 1e-6}),
+            ('{"coefficients": {"x": null}}', {"coefficients": 1e-6}),
+            ('{"coefficients": {"x": 1}}', {}),
+            ('{"coefficients": {"x": 1}}', {"coefficients": True}),
+            ('{"coefficients": {"x": 1}}', {"coefficients": "invalid"}),
+        ]
+        for invalid_stdout, tolerances in scenarios:
+            with self.subTest(reference=invalid_stdout, tolerances=tolerances):
+                case = deepcopy(original_case)
+                case["comparison"]["tolerances"] = tolerances
+
+                def fake_run_command(cmd, cwd=None, quiet=False):
+                    if cmd[0] == "Rscript":
+                        stdout = '{"coefficients": {"x": 1}}'
+                    elif cmd[0] == "python":
+                        stdout = invalid_stdout
+                    else:
+                        stdout = "Variable,Coef,Std_Err\nx,1.0,0.1\n"
+                    return subprocess.CompletedProcess(cmd, 0, stdout=stdout, stderr="")
+
+                with patch.object(self.module, "python_executable", return_value="python"), patch.object(
+                    self.module, "check_executable", return_value=True
+                ), patch.object(self.module, "run_command", side_effect=fake_run_command), patch.object(
+                    self.module, "log"
+                ):
+                    status, failures, _ = self.module.run_case(case, quiet=True)
+                    self.assertEqual(status, "fail")
+                    self.assertTrue(failures)
+                    with patch.object(self.module, "load_cases", return_value=(loaded[0], [case], loaded[2], loaded[3])):
+                        self.assertEqual(self.module.main(["--no-write", "--allow-partial", "--allow-blocked"]), 1)
+
     def test_metadata_check_rejects_not_started_case_with_pass_result(self):
         self.write_case(status="not-started")
         self.write_matrix([
@@ -603,6 +639,43 @@ class MainExitStatusTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 1)
         self.assertIn("ERROR: validation blocked (use --allow-blocked to tolerate)", messages)
+
+
+class ScientificYamlToleranceTests(unittest.TestCase):
+    def load_tolerance(self, token):
+        module = load_runner_module()
+        with tempfile.TemporaryDirectory() as temporary:
+            validation = Path(temporary)
+            case = validation / "cases" / "example"
+            case.mkdir(parents=True)
+            matrix = validation / "matrix.yml"
+            matrix.write_text("cases: []\n", encoding="utf-8")
+            (case / "case.yml").write_text(
+                f"id: example\ncomparison:\n  tolerances:\n    estimate: {token}\n",
+                encoding="utf-8",
+            )
+            with patch.object(module, "VALIDATION_DIR", validation), patch.object(module, "MATRIX_YML", matrix):
+                _, cases, _, _ = module.load_cases()
+            return module, cases[0]["comparison"]["tolerances"]["estimate"]
+
+    def test_plain_scientific_yaml_is_numeric_at_ingestion(self):
+        for token, expected in [("1e-6", 1e-6), ("1E6", 1e6), ("+1e+2", 100.), (".5e-2", .005)]:
+            with self.subTest(token=token):
+                module, tolerance = self.load_tolerance(token)
+                self.assertIsInstance(tolerance, float)
+                self.assertEqual(tolerance, expected)
+                status, failures = module.compare_quantities({"estimate": 1.0}, {"estimate": 1.0}, {"estimate": tolerance})
+                self.assertEqual((status, failures), ("pass", []))
+
+    def test_quoted_scientific_strings_remain_invalid_tolerances(self):
+        module, tolerance = self.load_tolerance('"1e-6"')
+        self.assertIsInstance(tolerance, str)
+        status, _ = module.compare_quantities({"estimate": 1.0}, {"estimate": 1.0}, {"estimate": tolerance})
+        self.assertEqual(status, "fail")
+
+    def test_loader_does_not_modify_pyyaml_safe_loader(self):
+        self.load_tolerance("1e-6")
+        self.assertIsInstance(yaml.safe_load("value: 1e-6")['value'], str)
 
 
 if __name__ == "__main__":

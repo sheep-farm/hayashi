@@ -1,5 +1,5 @@
 id: synthdid_simulated
-title: Synthetic Difference-in-Differences on simulated panel data
+title: Synthetic DiD point-estimate proxy on simulated panel data
 estimator_family: synthdid
 status: pass
 dimension: numerical
@@ -16,10 +16,18 @@ references:
 comparison:
   quantities:
     - coefficients
-    - standard_errors
   tolerances:
     coefficients: 5e-2
-    standard_errors: 1.0
+
+reference_evidence:
+  R:
+    coefficients:
+      class: behavioural-proxy
+      rationale: Related pre-treatment-weighted post-treatment gap; the general synthetic DiD estimator and inference contract are not matched.
+  Python:
+    coefficients:
+      class: behavioural-proxy
+      rationale: Related pre-treatment-weighted post-treatment gap; the general synthetic DiD estimator and inference contract are not matched.
 
 output_format: csv
 
@@ -28,10 +36,10 @@ reference_scripts:
   R: cases/synthdid_simulated/reference/run.R
   Python: cases/synthdid_simulated/reference/run.py
 
-notes: Simulated panel with 20 units, 10 periods, treatment begins at period 6 for unit 0 with ATT=2.0. Reference uses a simple synthetic-control-style pre-treatment weighting and computes the post-treatment mean gap. The ATT has no standard error.
+notes: Simulated panel with 20 units, 10 periods, treatment begins at period 6 for unit 0 with ATT=2.0. Only the point estimate is compared with a synthetic-control-style pre-treatment weighting reference. Uncertainty and general synthetic DiD validity are outside this proxy comparison.
 
 result:
-  summary: "Synthetic DiD ATT matches the simple synthetic-control reference."
+  summary: "The point estimate matches the simple synthetic-control-style reference; this proxy does not qualify synthetic DiD inference."
   known_differences:
     - The ATT is a scalar treatment-effect estimate; standard error is set to NaN.
   issues_opened: []

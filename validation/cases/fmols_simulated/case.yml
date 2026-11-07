@@ -1,7 +1,7 @@
 id: fmols_simulated
 title: FMOLS on cointegrated simulated data
 estimator_family: fmols
-status: not-supported
+status: pass
 dimension: numerical
 dataset:
   name: simulated
@@ -9,20 +9,238 @@ dataset:
   licence: n/a
 references:
 - R
+- Python
+reference_evidence:
+  R:
+    coefficients.Intercept:
+      class: convention-matched
+      rationale: Native cointReg intercept with Bartlett B+1; reconcile its N bias multiplier to n=N-1, retaining
+        the native estimate in diagnostics.
+    coefficients.x:
+      class: convention-matched
+      rationale: Native cointReg slope with Bartlett B+1; reconcile its N bias multiplier to n=N-1, retaining
+        the native estimate in diagnostics.
+    coefficients.n_obs:
+      class: exact
+      rationale: The declared fully modified regression sample contains the final N-1 rows, exactly 299.
+    coefficients.bandwidth:
+      class: convention-matched
+      rationale: Report the declared Bartlett lag count B=5; native cointReg bandwidth B+1 gives the same weights.
+    standard_errors.Intercept:
+      class: convention-matched
+      rationale: Native intercept SE from conditional long-run variance and the common FM sample; no variance
+        clipping.
+    standard_errors.x:
+      class: convention-matched
+      rationale: Native slope SE from conditional long-run variance and the common FM sample; no variance clipping.
+    coefficients.endogeneity_Intercept:
+      class: convention-matched
+      rationale: 'endogeneity fixture: Native cointReg intercept with Bartlett B+1; reconcile its N bias multiplier
+        to n=N-1, retaining the native estimate in diagnostics.'
+    coefficients.endogeneity_x:
+      class: convention-matched
+      rationale: 'endogeneity fixture: Native cointReg slope with Bartlett B+1; reconcile its N bias multiplier
+        to n=N-1, retaining the native estimate in diagnostics.'
+    coefficients.endogeneity_n_obs:
+      class: exact
+      rationale: 'endogeneity fixture: The declared fully modified regression sample contains the final N-1
+        rows, exactly 299.'
+    coefficients.endogeneity_bandwidth:
+      class: convention-matched
+      rationale: 'endogeneity fixture: Report the declared Bartlett lag count B=5; native cointReg bandwidth
+        B+1 gives the same weights.'
+    standard_errors.endogeneity_Intercept:
+      class: convention-matched
+      rationale: 'endogeneity fixture: Native intercept SE from conditional long-run variance and the common
+        FM sample; no variance clipping.'
+    standard_errors.endogeneity_x:
+      class: convention-matched
+      rationale: 'endogeneity fixture: Native slope SE from conditional long-run variance and the common FM
+        sample; no variance clipping.'
+    coefficients.serial_correlation_Intercept:
+      class: convention-matched
+      rationale: 'serial_correlation fixture: Native cointReg intercept with Bartlett B+1; reconcile its N
+        bias multiplier to n=N-1, retaining the native estimate in diagnostics.'
+    coefficients.serial_correlation_x:
+      class: convention-matched
+      rationale: 'serial_correlation fixture: Native cointReg slope with Bartlett B+1; reconcile its N bias
+        multiplier to n=N-1, retaining the native estimate in diagnostics.'
+    coefficients.serial_correlation_n_obs:
+      class: exact
+      rationale: 'serial_correlation fixture: The declared fully modified regression sample contains the final
+        N-1 rows, exactly 299.'
+    coefficients.serial_correlation_bandwidth:
+      class: convention-matched
+      rationale: 'serial_correlation fixture: Report the declared Bartlett lag count B=5; native cointReg bandwidth
+        B+1 gives the same weights.'
+    standard_errors.serial_correlation_Intercept:
+      class: convention-matched
+      rationale: 'serial_correlation fixture: Native intercept SE from conditional long-run variance and the
+        common FM sample; no variance clipping.'
+    standard_errors.serial_correlation_x:
+      class: convention-matched
+      rationale: 'serial_correlation fixture: Native slope SE from conditional long-run variance and the common
+        FM sample; no variance clipping.'
+    coefficients.holdout_Intercept:
+      class: convention-matched
+      rationale: 'holdout fixture: Native cointReg intercept with Bartlett B+1; reconcile its N bias multiplier
+        to n=N-1, retaining the native estimate in diagnostics.'
+    coefficients.holdout_x:
+      class: convention-matched
+      rationale: 'holdout fixture: Native cointReg slope with Bartlett B+1; reconcile its N bias multiplier
+        to n=N-1, retaining the native estimate in diagnostics.'
+    coefficients.holdout_n_obs:
+      class: exact
+      rationale: 'holdout fixture: The declared fully modified regression sample contains the final N-1 rows,
+        exactly 299.'
+    coefficients.holdout_bandwidth:
+      class: convention-matched
+      rationale: 'holdout fixture: Report the declared Bartlett lag count B=5; native cointReg bandwidth B+1
+        gives the same weights.'
+    standard_errors.holdout_Intercept:
+      class: convention-matched
+      rationale: 'holdout fixture: Native intercept SE from conditional long-run variance and the common FM
+        sample; no variance clipping.'
+    standard_errors.holdout_x:
+      class: convention-matched
+      rationale: 'holdout fixture: Native slope SE from conditional long-run variance and the common FM sample;
+        no variance clipping.'
+  Python:
+    coefficients.Intercept:
+      class: convention-matched
+      rationale: Native arch 8.0.0 intercept with explicit Bartlett bandwidth and n=N-1 bias multiplier.
+    coefficients.x:
+      class: convention-matched
+      rationale: Native arch 8.0.0 slope with explicit Bartlett bandwidth and n=N-1 bias multiplier.
+    coefficients.n_obs:
+      class: exact
+      rationale: The declared fully modified regression sample contains the final N-1 rows, exactly 299.
+    coefficients.bandwidth:
+      class: exact
+      rationale: Native arch uses the explicit Bartlett lag count B=5.
+    standard_errors.Intercept:
+      class: convention-matched
+      rationale: Native arch intercept SE uses conditional variance without HAC demeaning or df adjustment;
+        fixed-case numerical evidence only.
+    standard_errors.x:
+      class: convention-matched
+      rationale: Native arch slope SE uses conditional variance without HAC demeaning or df adjustment; fixed-case
+        numerical evidence only.
+    coefficients.endogeneity_Intercept:
+      class: convention-matched
+      rationale: 'endogeneity fixture: Native arch 8.0.0 intercept with explicit Bartlett bandwidth and n=N-1
+        bias multiplier.'
+    coefficients.endogeneity_x:
+      class: convention-matched
+      rationale: 'endogeneity fixture: Native arch 8.0.0 slope with explicit Bartlett bandwidth and n=N-1 bias
+        multiplier.'
+    coefficients.endogeneity_n_obs:
+      class: exact
+      rationale: 'endogeneity fixture: The declared fully modified regression sample contains the final N-1
+        rows, exactly 299.'
+    coefficients.endogeneity_bandwidth:
+      class: exact
+      rationale: 'endogeneity fixture: Native arch uses the explicit Bartlett lag count B=5.'
+    standard_errors.endogeneity_Intercept:
+      class: convention-matched
+      rationale: 'endogeneity fixture: Native arch intercept SE uses conditional variance without HAC demeaning
+        or df adjustment; fixed-case numerical evidence only.'
+    standard_errors.endogeneity_x:
+      class: convention-matched
+      rationale: 'endogeneity fixture: Native arch slope SE uses conditional variance without HAC demeaning
+        or df adjustment; fixed-case numerical evidence only.'
+    coefficients.serial_correlation_Intercept:
+      class: convention-matched
+      rationale: 'serial_correlation fixture: Native arch 8.0.0 intercept with explicit Bartlett bandwidth
+        and n=N-1 bias multiplier.'
+    coefficients.serial_correlation_x:
+      class: convention-matched
+      rationale: 'serial_correlation fixture: Native arch 8.0.0 slope with explicit Bartlett bandwidth and
+        n=N-1 bias multiplier.'
+    coefficients.serial_correlation_n_obs:
+      class: exact
+      rationale: 'serial_correlation fixture: The declared fully modified regression sample contains the final
+        N-1 rows, exactly 299.'
+    coefficients.serial_correlation_bandwidth:
+      class: exact
+      rationale: 'serial_correlation fixture: Native arch uses the explicit Bartlett lag count B=5.'
+    standard_errors.serial_correlation_Intercept:
+      class: convention-matched
+      rationale: 'serial_correlation fixture: Native arch intercept SE uses conditional variance without HAC
+        demeaning or df adjustment; fixed-case numerical evidence only.'
+    standard_errors.serial_correlation_x:
+      class: convention-matched
+      rationale: 'serial_correlation fixture: Native arch slope SE uses conditional variance without HAC demeaning
+        or df adjustment; fixed-case numerical evidence only.'
+    coefficients.holdout_Intercept:
+      class: convention-matched
+      rationale: 'holdout fixture: Native arch 8.0.0 intercept with explicit Bartlett bandwidth and n=N-1 bias
+        multiplier.'
+    coefficients.holdout_x:
+      class: convention-matched
+      rationale: 'holdout fixture: Native arch 8.0.0 slope with explicit Bartlett bandwidth and n=N-1 bias
+        multiplier.'
+    coefficients.holdout_n_obs:
+      class: exact
+      rationale: 'holdout fixture: The declared fully modified regression sample contains the final N-1 rows,
+        exactly 299.'
+    coefficients.holdout_bandwidth:
+      class: exact
+      rationale: 'holdout fixture: Native arch uses the explicit Bartlett lag count B=5.'
+    standard_errors.holdout_Intercept:
+      class: convention-matched
+      rationale: 'holdout fixture: Native arch intercept SE uses conditional variance without HAC demeaning
+        or df adjustment; fixed-case numerical evidence only.'
+    standard_errors.holdout_x:
+      class: convention-matched
+      rationale: 'holdout fixture: Native arch slope SE uses conditional variance without HAC demeaning or
+        df adjustment; fixed-case numerical evidence only.'
 comparison:
   quantities:
   - coefficients
   - standard_errors
   tolerances:
-    coefficients: 5e-2
-    standard_errors: 5e-1
+    coefficients.Intercept: 1.0e-10
+    coefficients.x: 1.0e-10
+    coefficients.n_obs: 0
+    coefficients.bandwidth: 0
+    standard_errors.Intercept: 1.0e-10
+    standard_errors.x: 1.0e-10
+    coefficients.endogeneity_Intercept: 1.0e-10
+    coefficients.endogeneity_x: 1.0e-10
+    coefficients.endogeneity_n_obs: 0
+    coefficients.endogeneity_bandwidth: 0
+    standard_errors.endogeneity_Intercept: 1.0e-10
+    standard_errors.endogeneity_x: 1.0e-10
+    coefficients.serial_correlation_Intercept: 1.0e-10
+    coefficients.serial_correlation_x: 1.0e-10
+    coefficients.serial_correlation_n_obs: 0
+    coefficients.serial_correlation_bandwidth: 0
+    standard_errors.serial_correlation_Intercept: 1.0e-10
+    standard_errors.serial_correlation_x: 1.0e-10
+    coefficients.holdout_Intercept: 1.0e-10
+    coefficients.holdout_x: 1.0e-10
+    coefficients.holdout_n_obs: 0
+    coefficients.holdout_bandwidth: 0
+    standard_errors.holdout_Intercept: 1.0e-10
+    standard_errors.holdout_x: 1.0e-10
 output_format: csv
 hayashi_script: cases/fmols_simulated/hayashi/run.hay
 reference_scripts:
   R: cases/fmols_simulated/reference/run.R
-notes: R cointReg reference fails in CI; no stable reference currently available.
+  Python: cases/fmols_simulated/reference/run.py
+notes: 'Four fixed FMOLS fixtures: IID, endogeneity, serial correlation and a fresh-seed combined holdout.
+  Each uses initial N=300, final n=299, Bartlett B=5, no HAC centring/df adjustment and n bias multiplier.
+  Native arch 8.0.0 and convention-adjusted cointReg 0.2.0 compare every fixture coefficient and SE at unchanged
+  absolute tolerance 1e-10, with exact counts/bands. Native R coefficients remain in diagnostics. This numerical
+  pass does not qualify nominal 95% interval calibration: endogenous AR coverage was 90.0%/91.8% at N=300/N=1,000.
+  Normal probabilities are checked by engine tests, not this case.'
 result:
-  summary: ''
-  known_differences: []
-  issues_opened: []
+  summary: All four declared FMOLS fixture calculations agree independently with R and Python.
+  known_differences:
+  - R uses original-N bias multiplier and Student-t probabilities; the declared coefficient adapter selects
+    n=N-1.
+  - Endogenous AR simulation intervals undercover nominal 95%; numerical pass is not coverage qualification.
+  issues_opened:
+  - 152
 experimental: true

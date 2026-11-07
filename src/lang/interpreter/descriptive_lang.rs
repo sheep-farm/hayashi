@@ -1927,6 +1927,7 @@ impl Interpreter {
                 }
                 #[cfg(feature = "greeners-ols")]
                 Value::IvResult(r) => {
+                    let r = &r.result;
                     models.push(esttab_extract_std(
                         "IV/2SLS",
                         &r.variable_names,

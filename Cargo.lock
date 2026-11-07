@@ -493,9 +493,9 @@ checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
 name = "calamine"
-version = "0.37.0"
+version = "0.38.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9ca341b94bc4b29e08970b1a03914fad2dfe177e2ecb67fcd6de9046004aafb"
+checksum = "f431b67cba6122a1f7d26b7adafc71bbdf07026095fe811f5efc025d8748e1d8"
 dependencies = [
  "atoi_simd",
  "byteorder",
@@ -1419,7 +1419,7 @@ dependencies = [
 [[package]]
 name = "greeners"
 version = "2.0.2-dev"
-source = "git+https://github.com/sheep-farm/Greeners.git?branch=dev#b7a34ec4d8f1fcf1bfb7e5dc9bd83b6ec2af438c"
+source = "git+https://github.com/shawcharles/Greeners.git?rev=73412437389ec74dc5e51b1cb23c06af296575c4#73412437389ec74dc5e51b1cb23c06af296575c4"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1454,7 +1454,7 @@ dependencies = [
 [[package]]
 name = "greeners-bayesian"
 version = "2.0.2-dev"
-source = "git+https://github.com/sheep-farm/Greeners.git?branch=dev#b7a34ec4d8f1fcf1bfb7e5dc9bd83b6ec2af438c"
+source = "git+https://github.com/shawcharles/Greeners.git?rev=73412437389ec74dc5e51b1cb23c06af296575c4#73412437389ec74dc5e51b1cb23c06af296575c4"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1478,7 +1478,7 @@ dependencies = [
 [[package]]
 name = "greeners-causal"
 version = "2.0.2-dev"
-source = "git+https://github.com/sheep-farm/Greeners.git?branch=dev#b7a34ec4d8f1fcf1bfb7e5dc9bd83b6ec2af438c"
+source = "git+https://github.com/shawcharles/Greeners.git?rev=73412437389ec74dc5e51b1cb23c06af296575c4#73412437389ec74dc5e51b1cb23c06af296575c4"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1503,7 +1503,7 @@ dependencies = [
 [[package]]
 name = "greeners-core"
 version = "2.0.2-dev"
-source = "git+https://github.com/sheep-farm/Greeners.git?branch=dev#b7a34ec4d8f1fcf1bfb7e5dc9bd83b6ec2af438c"
+source = "git+https://github.com/shawcharles/Greeners.git?rev=73412437389ec74dc5e51b1cb23c06af296575c4#73412437389ec74dc5e51b1cb23c06af296575c4"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1526,7 +1526,7 @@ dependencies = [
 [[package]]
 name = "greeners-diagnostics"
 version = "2.0.2-dev"
-source = "git+https://github.com/sheep-farm/Greeners.git?branch=dev#b7a34ec4d8f1fcf1bfb7e5dc9bd83b6ec2af438c"
+source = "git+https://github.com/shawcharles/Greeners.git?rev=73412437389ec74dc5e51b1cb23c06af296575c4#73412437389ec74dc5e51b1cb23c06af296575c4"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1552,7 +1552,7 @@ dependencies = [
 [[package]]
 name = "greeners-glm"
 version = "2.0.2-dev"
-source = "git+https://github.com/sheep-farm/Greeners.git?branch=dev#b7a34ec4d8f1fcf1bfb7e5dc9bd83b6ec2af438c"
+source = "git+https://github.com/shawcharles/Greeners.git?rev=73412437389ec74dc5e51b1cb23c06af296575c4#73412437389ec74dc5e51b1cb23c06af296575c4"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1577,7 +1577,7 @@ dependencies = [
 [[package]]
 name = "greeners-imputation"
 version = "2.0.2-dev"
-source = "git+https://github.com/sheep-farm/Greeners.git?branch=dev#b7a34ec4d8f1fcf1bfb7e5dc9bd83b6ec2af438c"
+source = "git+https://github.com/shawcharles/Greeners.git?rev=73412437389ec74dc5e51b1cb23c06af296575c4#73412437389ec74dc5e51b1cb23c06af296575c4"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1602,7 +1602,7 @@ dependencies = [
 [[package]]
 name = "greeners-ml"
 version = "2.0.2-dev"
-source = "git+https://github.com/sheep-farm/Greeners.git?branch=dev#b7a34ec4d8f1fcf1bfb7e5dc9bd83b6ec2af438c"
+source = "git+https://github.com/shawcharles/Greeners.git?rev=73412437389ec74dc5e51b1cb23c06af296575c4#73412437389ec74dc5e51b1cb23c06af296575c4"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1626,7 +1626,7 @@ dependencies = [
 [[package]]
 name = "greeners-ols"
 version = "2.0.2-dev"
-source = "git+https://github.com/sheep-farm/Greeners.git?branch=dev#b7a34ec4d8f1fcf1bfb7e5dc9bd83b6ec2af438c"
+source = "git+https://github.com/shawcharles/Greeners.git?rev=73412437389ec74dc5e51b1cb23c06af296575c4#73412437389ec74dc5e51b1cb23c06af296575c4"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1650,7 +1650,7 @@ dependencies = [
 [[package]]
 name = "greeners-panel"
 version = "2.0.2-dev"
-source = "git+https://github.com/sheep-farm/Greeners.git?branch=dev#b7a34ec4d8f1fcf1bfb7e5dc9bd83b6ec2af438c"
+source = "git+https://github.com/shawcharles/Greeners.git?rev=73412437389ec74dc5e51b1cb23c06af296575c4#73412437389ec74dc5e51b1cb23c06af296575c4"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1675,7 +1675,7 @@ dependencies = [
 [[package]]
 name = "greeners-spatial"
 version = "2.0.2-dev"
-source = "git+https://github.com/sheep-farm/Greeners.git?branch=dev#b7a34ec4d8f1fcf1bfb7e5dc9bd83b6ec2af438c"
+source = "git+https://github.com/shawcharles/Greeners.git?rev=73412437389ec74dc5e51b1cb23c06af296575c4#73412437389ec74dc5e51b1cb23c06af296575c4"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1699,7 +1699,7 @@ dependencies = [
 [[package]]
 name = "greeners-survival"
 version = "2.0.2-dev"
-source = "git+https://github.com/sheep-farm/Greeners.git?branch=dev#b7a34ec4d8f1fcf1bfb7e5dc9bd83b6ec2af438c"
+source = "git+https://github.com/shawcharles/Greeners.git?rev=73412437389ec74dc5e51b1cb23c06af296575c4#73412437389ec74dc5e51b1cb23c06af296575c4"
 dependencies = [
  "argmin",
  "argmin-math",
@@ -1723,7 +1723,7 @@ dependencies = [
 [[package]]
 name = "greeners-timeseries"
 version = "2.0.2-dev"
-source = "git+https://github.com/sheep-farm/Greeners.git?branch=dev#b7a34ec4d8f1fcf1bfb7e5dc9bd83b6ec2af438c"
+source = "git+https://github.com/shawcharles/Greeners.git?rev=73412437389ec74dc5e51b1cb23c06af296575c4#73412437389ec74dc5e51b1cb23c06af296575c4"
 dependencies = [
  "argmin",
  "argmin-math",

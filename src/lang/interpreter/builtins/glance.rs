@@ -62,6 +62,7 @@ impl Interpreter {
                         }
                         #[cfg(feature = "greeners-ols")]
                         Value::IvResult(r) => {
+                            let r = &r.result;
                             let scalar = |v: f64| self.gf(v);
                             map.insert("r2".into(), scalar(r.r_squared));
                             map.insert(
