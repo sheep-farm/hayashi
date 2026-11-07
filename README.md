@@ -783,7 +783,7 @@ Available plugins:
 
 ```bash
 cargo build --release      # optimized binary -> target/release/hay
-cargo test                 # 874 tests, <1s
+cargo test                 # 877 tests, <1s
 ```
 
 63 example scripts in `examples/`, all passing.

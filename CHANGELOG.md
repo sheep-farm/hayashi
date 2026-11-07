@@ -89,6 +89,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Security
 
+- Upgrade Calamine from 0.37 to 0.38 to address RUSTSEC-2026-0436. Malformed
+  compound Excel files now return loader errors instead of triggering the
+  directory-parser panic or unbounded DIFAT allocation. Add bounded subprocess
+  regressions using the upstream reproducer files and retained MIT attribution.
+
 - Cleared the 2026 RustSec advisories that had turned the `advisories` job red:
   `rustls` now resolves to 0.23.46, `rustls-webpki` to 0.103.16, `tokio` to
   1.54.1 and `webpki-roots` to 1.0.11. Delivering the remaining fixes required
