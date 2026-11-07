@@ -938,16 +938,15 @@ fn open_depth(s: &str) -> i32 {
 
 fn print_repl_banner() {
     println!("Hayashi version {VERSION}");
-    println!("Copyright (C) 2026 Flávio de Vasconcellos Corrêa");
+    println!("Copyright (c) 2025-2026 Flávio de Vasconcellos Corrêa");
+    println!("Copyright (c) 2026 Charles Shaw");
     println!();
-    println!("Hayashi is free software licensed under GPL-3.0-only.");
-    println!(
-        "You may redistribute it under the terms of the GNU General Public License version 3."
-    );
+    println!("Hayashi is free software licensed under the MIT License.");
+    println!("You may use, modify, and redistribute it under the MIT License.");
     println!("This program comes with ABSOLUTELY NO WARRANTY.");
     println!();
     println!("Source code:          <https://github.com/sheep-farm/hayashi>");
-    println!("License text:         <https://www.gnu.org/licenses/gpl-3.0.html>");
+    println!("License text:         <https://opensource.org/licenses/MIT>");
     println!("Project website:      <https://haylang.dev>");
     println!();
     println!("In honor of Fumio Hayashi. Type 'exit' or Ctrl-D to quit.");

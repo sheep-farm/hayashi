@@ -4,7 +4,7 @@
 
 | | Hayashi | Stata 18 |
 |---|---|---|
-| Price | Free (GPL-3.0) | US$ 595–2,985/year |
+| Price | Free (MIT) | US$ 595–2,985/year |
 | Binary | ~20 MB, zero system deps | ~500 MB + license |
 | Language | Rust | C/Java |
 | Interface | Terminal (REPL + script) + VS Code | GUI + terminal |
@@ -18,7 +18,7 @@
 | REPL | Tab completion, syntax highlighting, hints | Basic |
 | Namespaces | Module-based (import as/only) | — |
 | Date/time | date(), year(), month(), dow() | Built-in |
-| License | GPL-3.0 | Proprietary |
+| License | MIT | Proprietary |
 
 ## Syntax side by side
 
@@ -248,7 +248,7 @@ frlink 1:1 id, frame(clients)
 ## Where Hayashi wins
 
 **Cost and deployment:**
-- Free and open source (GPL-3.0) vs US$ 595+/year
+- Free and open source (MIT) vs US$ 595+/year
 - Single 20 MB binary, no system dependencies
 - `cargo install hay` — done
 
@@ -329,9 +329,9 @@ Hayashi is extensible at two levels:
 
 - **Script plugins (`.hay`)**: any `.hay` file in `~/.hay/packages/` can be loaded via `import`. Users can also `import("module")` from local paths, `$HAY_PATH`, or URLs. This provides the same community-driven ecosystem dynamic as R (CRAN) and Python (PyPI), with `hay install user/repo` for GitHub-based distribution.
 
-- **Native Rust & WASM plugins**: fully supported native plugins (`.so`/`.dll`/`.dylib` / `.wasm`) using the `hayashi-plugin-sdk`. They register new estimators, data sources, or transforms via Hayashi's namespace system. The package manager `hay install` automatically retrieves OS-compatible binary assets from GitHub Releases. Native plugins support transparent, high-performance **zero-copy memory sharing using the Apache Arrow FFI format**, allowing third parties to build data-intensive packages (like Spatial, SEM, and Survey estimators) without performance bottlenecks. Closed-source proprietary plugins are permitted through Hayashi's GPL-3.0 linking exception.
+- **Native Rust & WASM plugins**: fully supported native plugins (`.so`/`.dll`/`.dylib` / `.wasm`) using the `hayashi-plugin-sdk`. They register new estimators, data sources, or transforms via Hayashi's namespace system. The package manager `hay install` automatically retrieves OS-compatible binary assets from GitHub Releases. Native plugins support transparent, high-performance **zero-copy memory sharing using the Apache Arrow FFI format**, allowing third parties to build data-intensive packages (like Spatial, SEM, and Survey estimators) without performance bottlenecks. The MIT license permits proprietary as well as open-source integrations.
 
-The Greeners engine (MIT-licensed) can be used independently by Rust developers, while Hayashi (GPL-3.0) provides the user-facing language layer.
+Both the Greeners engine and Hayashi's user-facing language layer are MIT-licensed.
 
 ## Conclusion
 

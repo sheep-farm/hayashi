@@ -1,19 +1,18 @@
 pub fn help_license() -> String {
     format!(
         "Hayashi — {}\n\n\
-         Copyright (C) 2025-2026 {}\n\n\
-         This program is free software: you can redistribute it and/or modify\n\
-         it under the terms of the GNU General Public License as published by\n\
-         the Free Software Foundation, either version 3 of the License, or\n\
-         (at your option) any later version.\n\n\
-         This program is distributed in the hope that it will be useful,\n\
-         but WITHOUT ANY WARRANTY; without even the implied warranty of\n\
-         MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the\n\
-         GNU General Public License for more details.\n\n\
-         You should have received a copy of the GNU General Public License\n\
-         along with this program. If not, see <https://www.gnu.org/licenses/>.\n",
+         Authors: {}\n\n\
+         Permission is hereby granted, free of charge, to any person obtaining\n\
+         a copy of this software and associated documentation files (the\n\
+         \"Software\"), to deal in the Software without restriction, including\n\
+         without limitation the rights to use, copy, modify, merge, publish,\n\
+         distribute, sublicense, and/or sell copies of the Software.\n\n\
+         The above copyright notice and this permission notice shall be\n\
+         included in all copies or substantial portions of the Software.\n\n\
+         THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND,\n\
+         EXPRESS OR IMPLIED. See the LICENSE file for the full terms.\n",
         env!("CARGO_PKG_LICENSE"),
-        env!("CARGO_PKG_AUTHORS"),
+        env!("CARGO_PKG_AUTHORS").replace(':', ", "),
     )
 }
 
@@ -26,13 +25,13 @@ pub fn help_about() -> String {
          Named after Fumio Hayashi, author of \"Econometrics\" (Princeton, 2000).\n\n\
          Built in Rust on top of Greeners (econometrics engine).\n\
          100% Rust — no C, no Fortran, no system BLAS/LAPACK.\n\n\
-         Author: {}\n\
+         Authors: {}\n\
          Repository: {}\n\
          Website: https://haylang.dev\n\
          Crate: https://crates.io/crates/hayashi-lang\n",
         env!("CARGO_PKG_VERSION"),
         env!("CARGO_PKG_LICENSE"),
-        env!("CARGO_PKG_AUTHORS"),
+        env!("CARGO_PKG_AUTHORS").replace(':', ", "),
         env!("CARGO_PKG_REPOSITORY"),
     )
 }

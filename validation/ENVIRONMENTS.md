@@ -8,15 +8,17 @@ recorded in the validation artefact.
 
 This document covers the R/Python package environments. The numerical engine (Greeners) is resolved by the exact facade dependency and
 immutable Git patch in `Cargo.toml`/`Cargo.lock`. The current provisional fork
-revision is `e7f57bc8450bdd62c6c2105788b689b839158b6a`. It combines the
+revision is `73412437389ec74dc5e51b1cb23c06af296575c4`. It combines the
 statistical corrections submitted in [PR #26](https://github.com/sheep-farm/Greeners/pull/26)
-with the exact STL repair from draft [PR #25](https://github.com/sheep-farm/Greeners/pull/25),
-plus a test-only Gaussian inference fixture correction. Both engine contributions
-remain unmerged; PR #25 retains third-party attribution and awaits contribution-terms
-clarification in [issue #24](https://github.com/sheep-farm/Greeners/issues/24).
-This is a provisional fork pin, not upstream acceptance or a release. Cargo fetches
-that immutable source; the validation workflow does not maintain a separate mutable
-engine checkout.
+with the exact STL repair from draft [PR #25](https://github.com/sheep-farm/Greeners/pull/25)
+and the FMOLS correction from [PR #27](https://github.com/sheep-farm/Greeners/pull/27),
+plus a test-only Gaussian inference fixture correction. PR #27 merged on
+15 October 2026; PR #26 remains open and PR #25 remains draft. PR #25 retains
+third-party attribution and awaits contribution-terms clarification in
+[issue #24](https://github.com/sheep-farm/Greeners/issues/24).
+The combined fork remains provisional; it is not an upstream release or acceptance
+of the remaining contributions. Cargo fetches that immutable source; the validation
+workflow does not maintain a separate mutable engine checkout.
 
 ## Python
 

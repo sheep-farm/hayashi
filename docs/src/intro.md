@@ -16,7 +16,7 @@ esttab(m1, m2, m3)
 
 ## Why Hayashi?
 
-- **Free and open source** (GPL-3.0) — no license fees, no restrictions
+- **Free and open source** (MIT) — permissive terms, including commercial use
 - **Single binary** (~20 MB) — no installers, no dependencies for the default build
 - **Broad estimator coverage** — OLS, IV, panel models, Logit/Probit, ARIMA, GARCH, VAR, DID, and more
 - **Modern language** — closures, pipe (`|>`), namespaces (`mod::func()`), f-strings, t-strings, try/catch
@@ -50,4 +50,4 @@ esttab(models)
 
 - **Source**: [github.com/sheep-farm/hayashi](https://github.com/sheep-farm/hayashi)
 - **Crate**: [crates.io/crates/hayashi-lang](https://crates.io/crates/hayashi-lang)
-- **License**: GPL-3.0
+- **License**: MIT

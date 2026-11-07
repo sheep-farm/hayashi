@@ -22,6 +22,7 @@ https://creativecommons.org/licenses/by-sa/4.0/legalcode
 
 ---
 
-The Hayashi language implementation, the Greeners library, and all source code
-files remain licensed under the GNU General Public License v3.0 (GPL-3.0-only).
-See the `LICENSE` file for the full text.
+The Hayashi language implementation is licensed under the MIT License. The
+Greeners library is separately licensed under MIT. Third-party components retain
+their respective licenses; see their notices for details. See `LICENSE` for the
+full MIT License text covering Hayashi.
