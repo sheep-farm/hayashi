@@ -6,6 +6,7 @@ pub mod commands;
 pub mod dap;
 pub mod error;
 pub mod help;
+pub mod host_api;
 pub mod interpreter;
 pub mod lexer;
 pub mod parser;
