@@ -89,13 +89,37 @@ Model result (OLS and other estimators with a `ModelView`):
 Models are not reconstructed from JSON. Inside a session, pass them with
 `set_ref`; export them with `get` only for inspection.
 
+## One-shot execution
+
+`execute` binds inputs, runs `source`, and returns the requested outputs in a
+single round trip. Each input is either a serialized `value` or a `ref` to an
+existing session variable (required for models):
+
+```json
+{
+  "id": 5,
+  "cmd": "execute",
+  "session": "s1",
+  "source": "let m = ols(y ~ x, df)\n__n3_out_1 = m",
+  "inputs": {
+    "df": {"value": {"kind":"dataframe","n":3,"columns":[...]}}
+  },
+  "outputs": ["__n3_out_1"]
+}
+```
+
+The result carries `output`, `stderr`, `error` and `outputs` (a map from the
+requested name to its value envelope). Requested outputs are removed from the
+session before the run, so a script that no longer assigns a name cannot leak
+a previous value. A model input cannot be sent by `value`; use `ref`.
+
 ## Example
 
 ```
 {"id":1,"cmd":"create"}
 {"id":2,"cmd":"set","session":"s1","name":"df","value":{"kind":"dataframe","n":3,"columns":[{"name":"x","type":"float","values":[1,2,3]},{"name":"y","type":"float","values":[3,5,7]}]}}
-{"id":3,"cmd":"run","session":"s1","source":"let m = ols(y ~ x, df)"}
-{"id":4,"cmd":"get","session":"s1","name":"m"}
+{"id":3,"cmd":"execute","session":"s1","source":"let m = ols(y ~ x, df)\n__out = m","inputs":{"df":{"ref":"df"}},"outputs":["__out"]}
+{"id":4,"cmd":"get","session":"s1","name":"__out"}
 ```
 
 ## WebAssembly

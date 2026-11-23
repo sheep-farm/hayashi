@@ -148,6 +148,56 @@ fn main() {
                     .collect();
                 Ok(json!({"variables": variables}))
             }),
+            "execute" => {
+                let source = request
+                    .get("source")
+                    .and_then(Json::as_str)
+                    .ok_or_else(|| "source is required".to_string())?;
+                let inputs = request
+                    .get("inputs")
+                    .and_then(Json::as_object)
+                    .cloned()
+                    .unwrap_or_default();
+                let outputs: Vec<String> = request
+                    .get("outputs")
+                    .and_then(Json::as_array)
+                    .map(|items| {
+                        items
+                            .iter()
+                            .filter_map(Json::as_str)
+                            .map(str::to_string)
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                with_session(&mut sessions, session_id, |session| {
+                    for (name, spec) in &inputs {
+                        if let Some(reference) = spec.get("ref").and_then(Json::as_str) {
+                            session.set_ref(name, reference)?;
+                        } else if let Some(value) = spec.get("value") {
+                            session.set_value(name, host_api::value_from_json(value)?)?;
+                        } else {
+                            return Err(format!("input '{name}' needs 'value' or 'ref'"));
+                        }
+                    }
+                    // Missing outputs must not keep a value from a previous run.
+                    for name in &outputs {
+                        session.remove(name);
+                    }
+                    let result = session.run(source);
+                    let mut exported = serde_json::Map::new();
+                    for name in &outputs {
+                        if let Some(value) = session.get_value(name) {
+                            exported.insert(name.clone(), host_api::value_to_json(&value));
+                        }
+                    }
+                    Ok(json!({
+                        "output": result.output,
+                        "stderr": result.stderr,
+                        "error": result.error,
+                        "outputs": exported,
+                    }))
+                })
+            }
             "run" | "eval" => {
                 let source = request
                     .get("source")
