@@ -900,6 +900,25 @@ display mean(df, Y)
 }
 
 #[test]
+#[test]
+fn rename_and_dropna_command_forms() {
+    assert_ok_contains(
+        "rename command",
+        "input df x y\n1 2\n. 3\nend\nrename df x z\nprint(df)",
+        "z",
+    );
+    assert_ok_contains(
+        "dropna command",
+        "input df x y\n1 2\n. 3\n4 .\nend\ndropna df\nprint(nrow(df))",
+        "1",
+    );
+    assert_ok_contains(
+        "dropna command with columns",
+        "input df x y\n1 2\n. 3\n4 .\nend\ndropna df x\nprint(nrow(df))",
+        "2",
+    );
+}
+
 fn data_generate() {
     assert_ok_contains(
         "generate",

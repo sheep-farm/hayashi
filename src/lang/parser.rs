@@ -1525,6 +1525,20 @@ impl Parser {
             // ── scalar name = expr  (alias de let) ───────────────────────────
             Token::Ident(ref s) if s == "scalar" => self.parse_scalar_stmt(),
 
+            // rename df old new  (command form; also available as rename(df, old, new))
+            Token::Ident(ref s)
+                if s == "rename" && matches!(self.peek_raw_at(1), Some(Token::Ident(_))) =>
+            {
+                self.parse_rename_command()
+            }
+
+            // dropna df [cols...]  (command form; also available as dropna(df, ...))
+            Token::Ident(ref s)
+                if s == "dropna" && matches!(self.peek_raw_at(1), Some(Token::Ident(_))) =>
+            {
+                self.parse_dropna_command()
+            }
+
             // name = expr (assignment without let — modifies existing variable)
             Token::Ident(name)
                 if self
@@ -1599,6 +1613,39 @@ impl Parser {
                 msg: format!("unexpected token at statement level: {t:?}"),
             }),
         }
+    }
+
+    fn parse_rename_command(&mut self) -> Result<Option<Stmt>> {
+        self.advance(); // rename
+        let df = self.expect_ident()?;
+        let old = self.expect_ident()?;
+        let new = self.expect_ident()?;
+        Ok(Some(Stmt::Assign {
+            name: df.clone(),
+            value: Expr::Call {
+                func: "rename".into(),
+                args: vec![Expr::Var(df), Expr::Var(old), Expr::Var(new)],
+                opts: Vec::new(),
+            },
+        }))
+    }
+
+    fn parse_dropna_command(&mut self) -> Result<Option<Stmt>> {
+        self.advance(); // dropna
+        let df = self.expect_ident()?;
+        let mut args = vec![Expr::Var(df.clone())];
+        while let Token::Ident(col) = self.peek().clone() {
+            self.advance();
+            args.push(Expr::Var(col));
+        }
+        Ok(Some(Stmt::Assign {
+            name: df,
+            value: Expr::Call {
+                func: "dropna".into(),
+                args,
+                opts: Vec::new(),
+            },
+        }))
     }
 
     fn parse_input_stmt(&mut self, line: usize) -> Result<Option<Stmt>> {
