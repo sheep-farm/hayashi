@@ -156,6 +156,11 @@ mod wasm {
             }
         }
 
+        /// Remove a variable so a later run cannot read a stale output.
+        pub fn remove(&mut self, name: &str) {
+            self.inner.remove(name);
+        }
+
         pub fn get_summary_json(&self, name: &str) -> String {
             match self.inner.get_value(name) {
                 Some(value) => serde_json::json!({
